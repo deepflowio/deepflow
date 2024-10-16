@@ -54,7 +54,8 @@ const (
 	MESSAGE_TYPE_ALERT_EVENT
 	MESSAGE_TYPE_K8S_EVENT
 	MESSAGE_TYPE_APPLICATION_LOG
-	MESSAGE_TYPE_AGENT_LOG // 18
+	MESSAGE_TYPE_AGENT_LOG
+	MESSAGE_TYPE_SKYWALKING // 19
 	MESSAGE_TYPE_MAX
 )
 
@@ -80,6 +81,7 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	MESSAGE_TYPE_K8S_EVENT:                "k8s_event",
 	MESSAGE_TYPE_APPLICATION_LOG:          "application_log",
 	MESSAGE_TYPE_AGENT_LOG:                "agent_log",
+	MESSAGE_TYPE_SKYWALKING:               "skywalking",
 }
 
 func (m MessageType) String() string {
@@ -123,6 +125,7 @@ var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
 	MESSAGE_TYPE_K8S_EVENT:                HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_APPLICATION_LOG:          HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_AGENT_LOG:                HEADER_TYPE_LT_VTAP,
+	MESSAGE_TYPE_SKYWALKING:               HEADER_TYPE_LT_VTAP,
 }
 
 func (m MessageType) HeaderType() MessageHeaderType {

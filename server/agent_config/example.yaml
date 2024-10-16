@@ -323,7 +323,7 @@ l7_log_collect_nps_threshold: 10000
 ## NPB Configuration ##
 #######################
 # NPB Socket Type
-# Default: RAW_UDP. Options: UDP, RAW_UDP
+# Default: RAW_UDP. Options: UDP, RAW_UDP, TCP, ZMQ
 # Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
 #   performance, but there may be compatibility issues in some environments.
 npb_socket_type: RAW_UDP
@@ -1096,6 +1096,7 @@ static_config:
   #- Oracle
   - Redis
   #- MongoDB
+  #- Memcached
   - Kafka
   #- MQTT
   #- AMQP
@@ -1127,6 +1128,7 @@ static_config:
     "Oracle": "1521"
     "Redis": "1-65535"
     "MongoDB": "1-65535"
+    "Memcached": "11211"
     "Kafka": "1-65535"
     "MQTT": "1-65535"
     "AMQP": "1-65535"
@@ -1610,6 +1612,7 @@ static_config:
     #   - Oracle
     #   - Redis
     #   - MongoDB
+    #   - Memcached
     #   - Kafka
     #   - MQTT
     #   - AMQP
@@ -1639,6 +1642,7 @@ static_config:
     #   - Oracle
     #   - Redis
     #   - MongoDB
+    #   - Memcached
     #   - Kafka
     #   - MQTT
     #   - AMQP

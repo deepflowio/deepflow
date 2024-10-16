@@ -1765,7 +1765,7 @@ will be accepted (essentially will auto append `- match_regex: .*` at the end).
 Configuration Item:
 - match_regex: The regexp use for match the process, default value is `.*`
 - match_type: regexp match field, default value is `process_name`, options are
-  [process_name, cmdline, parent_process_name, tag]
+  [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
 - ignore: Whether to ignore when regex match, default value is `false`
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
@@ -1854,6 +1854,7 @@ inputs:
 | cmdline | |
 | parent_process_name | |
 | tag | |
+| cmdline_with_args | |
 
 **Schema**:
 | Key  | Value                        |
@@ -2327,7 +2328,7 @@ Calico:        cali.*
 Cilium         lxc.*
 Kube-OVN       [0-9a-f]+_h$
 ```
-When the `tap_interface_regex` is not configured, it indicates 
+When the `tap_interface_regex` is not configured, it indicates
 that network card traffic is not being collected
 
 #### Bond Interfaces {#inputs.cbpf.af_packet.bond_interfaces}
@@ -4485,7 +4486,7 @@ inputs:
 
 **Description**:
 
-When there are multiple deepflow-agents in the same K8s cluster, 
+When there are multiple deepflow-agents in the same K8s cluster,
 only one deepflow-agent will be enabled to collect K8s resources.
 
 #### K8s Namespace {#inputs.resources.kubernetes.kubernetes_namespace}
@@ -7651,6 +7652,8 @@ outputs:
 | ----- | ---------------------------- |
 | UDP | |
 | RAW_UDP | |
+| TCP | |
+| ZMQ | |
 
 **Schema**:
 | Key  | Value                        |

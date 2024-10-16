@@ -2056,6 +2056,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 
 	init_thread_ids();
 
+	if (!check_netns_enabled())
+		ebpf_warning("If the system has not enabled the 'CONFIG_NET_NS'"
+			     " option, the 'netns_id' for continuously profiling"
+			     " data will be 0.\n");
+
 	/*
 	 * Set up the lock now, so we can use it to make the first add
 	 * thread-safe for tracer alloc.
@@ -2131,6 +2136,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	}
 
 	return ETR_OK;
+}
+
+bool is_rt_kernel(void)
+{       
+	return (strstr(linux_release, ".rt") || strstr(linux_release, "-rt"));
 }
 
 void bpf_tracer_finish(void)

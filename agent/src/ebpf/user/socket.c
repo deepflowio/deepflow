@@ -45,6 +45,7 @@
 #include "socket_trace_bpf_5_2_plus.c"
 #include "socket_trace_bpf_kylin.c"
 #include "socket_trace_bpf_kfunc.c"
+#include "socket_trace_bpf_rt.c"
 
 static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
@@ -1232,7 +1233,6 @@ static int check_kern_adapt_and_state_update(void)
 			  "Set the status to TRACER_RUNNING\n", linux_release);
 		t->state = TRACER_RUNNING;
 		CLIB_MEMORY_BARRIER();
-		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
 		set_period_event_invalid("trigger_kern_adapt");
 		t->adapt_success = true;
@@ -2056,7 +2056,12 @@ static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	if (!skip_kfunc && fentry_can_attach(TEST_KFUNC_NAME)
+	if (is_rt_kernel()) {
+		g_k_type = K_TYPE_RT;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-rt");
+		bpf_bin_buffer = (void *)socket_trace_rt_ebpf_data;
+		buffer_sz = sizeof(socket_trace_rt_ebpf_data);
+	} else if (!skip_kfunc && fentry_can_attach(TEST_KFUNC_NAME)
 	    && get_kfunc_params_num(TEST_KFUNC_NAME) == TEST_KFUNC_PARAMS_NUM) {
 		g_k_type = K_TYPE_KFUNC;
 		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kfunc");

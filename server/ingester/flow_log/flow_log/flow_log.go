@@ -54,6 +54,7 @@ type FlowLog struct {
 	OtelLogger           *Logger
 	OtelCompressedLogger *Logger
 	L4PacketLogger       *Logger
+	SkyWalkingLogger     *Logger
 	Exporters            *exporters.Exporters
 	SpanWriter           *dbwriter.SpanWriter
 	TraceTreeWriter      *dbwriter.TraceTreeWriter
@@ -118,6 +119,10 @@ func NewFlowLog(config *config.Config, traceTreeQueue *queue.OverwriteQueue, rec
 	if err != nil {
 		return nil, err
 	}
+	skywalkingLogger, err := NewLogger(datatype.MESSAGE_TYPE_SKYWALKING, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, nil, spanWriter)
+	if err != nil {
+		return nil, err
+	}
 	return &FlowLog{
 		FlowLogConfig:        config,
 		L4FlowLogger:         l4FlowLogger,
@@ -125,6 +130,7 @@ func NewFlowLog(config *config.Config, traceTreeQueue *queue.OverwriteQueue, rec
 		OtelLogger:           otelLogger,
 		OtelCompressedLogger: otelCompressedLogger,
 		L4PacketLogger:       l4PacketLogger,
+		SkyWalkingLogger:     skywalkingLogger,
 		Exporters:            exporters,
 		SpanWriter:           spanWriter,
 		TraceTreeWriter:      traceTreeWriter,
@@ -356,6 +362,9 @@ func (s *FlowLog) Start() {
 	if s.OtelCompressedLogger != nil {
 		s.OtelCompressedLogger.Start()
 	}
+	if s.SkyWalkingLogger != nil {
+		s.SkyWalkingLogger.Start()
+	}
 	if s.SpanWriter != nil {
 		s.SpanWriter.Start()
 	}
@@ -379,6 +388,9 @@ func (s *FlowLog) Close() error {
 	}
 	if s.OtelCompressedLogger != nil {
 		s.OtelCompressedLogger.Close()
+	}
+	if s.SkyWalkingLogger != nil {
+		s.SkyWalkingLogger.Close()
 	}
 	if s.SpanWriter != nil {
 		s.SpanWriter.Close()

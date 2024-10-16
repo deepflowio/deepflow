@@ -69,6 +69,7 @@ use crate::ebpf;
 use crate::exception::ExceptionHandler;
 use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
+use crate::platform::ProcessData;
 use crate::policy::PolicyGetter;
 use crate::rpc::get_timestamp;
 use crate::utils::{process::ProcessListener, stats};
@@ -347,11 +348,12 @@ impl EbpfDispatcher {
     fn run(&self, counter: Arc<EbpfCounter>, exception_handler: ExceptionHandler) {
         let ebpf_config = self.config.load();
         let out_of_order_reassembly_bitmap = L7ProtocolBitmap::from(
-            &ebpf_config
+            ebpf_config
                 .ebpf
                 .socket
                 .preprocess
-                .out_of_order_reassembly_protocols,
+                .out_of_order_reassembly_protocols
+                .as_slice(),
         );
         let reorder_counter = Arc::new(ReorderCounter::default());
         self.stats_collector.register_countable(
@@ -643,7 +645,7 @@ impl EbpfCollector {
         ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
         if config.ebpf.socket.uprobe.golang.enabled {
             let feature = "ebpf.socket.uprobe.golang";
-            process_listener.register(feature, ebpf::set_feature_uprobe_golang);
+            process_listener.register(feature, set_feature_uprobe_golang);
 
             let uprobe_proc_regexp = config
                 .process_matcher
@@ -671,7 +673,7 @@ impl EbpfCollector {
         ebpf::set_uprobe_openssl_enabled(config.ebpf.socket.uprobe.tls.enabled);
         if config.ebpf.socket.uprobe.tls.enabled {
             let feature = "ebpf.socket.uprobe.tls";
-            process_listener.register(feature, ebpf::set_feature_uprobe_tls);
+            process_listener.register(feature, set_feature_uprobe_tls);
 
             let uprobe_proc_regexp = config
                 .process_matcher
@@ -701,7 +703,7 @@ impl EbpfCollector {
 
         if config.symbol_table.golang_specific.enabled {
             let feature = "proc.golang_symbol_table";
-            process_listener.register(feature, ebpf::set_feature_uprobe_golang_symbol);
+            process_listener.register(feature, set_feature_uprobe_golang_symbol);
 
             let uprobe_proc_regexp = config
                 .process_matcher
@@ -737,11 +739,12 @@ impl EbpfCollector {
         }
 
         let segmentation_reassembly_bitmap = L7ProtocolBitmap::from(
-            &config
+            config
                 .ebpf
                 .socket
                 .preprocess
-                .segmentation_reassembly_protocols,
+                .segmentation_reassembly_protocols
+                .as_slice(),
         );
         for i in get_all_protocol().into_iter() {
             if segmentation_reassembly_bitmap.is_enabled(i.protocol()) {
@@ -915,7 +918,7 @@ impl EbpfCollector {
 
             if !on_cpu.disabled {
                 let feature = "ebpf.profile.on_cpu";
-                process_listener.register(feature, ebpf::set_feature_on_cpu);
+                process_listener.register(feature, set_feature_on_cpu);
 
                 let on_cpu_regexp = config
                     .process_matcher
@@ -952,10 +955,10 @@ impl EbpfCollector {
                             .find(|f| f.eq_ignore_ascii_case(feature))
                             .is_some()
                     })
-                    .map(|p| p.match_regex.to_owned())
+                    .map(|p| p.match_regex.as_str())
                     .unwrap_or_default();
                 if !off_cpu.disabled {
-                    process_listener.register(feature, ebpf::set_feature_off_cpu);
+                    process_listener.register(feature, set_feature_off_cpu);
 
                     ebpf::set_feature_regex(
                         ebpf::FEATURE_PROFILE_ONCPU,
@@ -971,7 +974,7 @@ impl EbpfCollector {
 
                 if !memory.disabled {
                     let feature = "ebpf.profile.memory";
-                    process_listener.register(feature, ebpf::set_feature_memory);
+                    process_listener.register(feature, set_feature_memory);
 
                     let memory_cpu_regexp = config
                         .process_matcher
@@ -982,7 +985,7 @@ impl EbpfCollector {
                                 .find(|f| f.eq_ignore_ascii_case("ebpf.profile.memory"))
                                 .is_some()
                         })
-                        .map(|p| p.match_regex.to_owned())
+                        .map(|p| p.match_regex.as_str())
                         .unwrap_or_default();
                     ebpf::set_feature_regex(
                         ebpf::FEATURE_PROFILE_MEMORY,
@@ -1250,5 +1253,65 @@ impl EbpfCollector {
 impl Drop for EbpfCollector {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+pub fn set_feature_uprobe_golang(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_UPROBE_GOLANG,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
+    }
+}
+
+pub fn set_feature_uprobe_golang_symbol(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
+    }
+}
+
+pub fn set_feature_uprobe_tls(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_UPROBE_OPENSSL,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
+    }
+}
+
+pub fn set_feature_on_cpu(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_PROFILE_ONCPU,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
+    }
+}
+
+pub fn set_feature_off_cpu(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_PROFILE_OFFCPU,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
+    }
+}
+
+pub fn set_feature_memory(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+    unsafe {
+        ebpf::set_feature_pids(
+            ebpf::FEATURE_PROFILE_MEMORY,
+            pids.as_ptr() as *const i32,
+            pids.len() as i32,
+        );
     }
 }

@@ -558,11 +558,13 @@ static __inline enum message_type parse_http2_headers_frame(const char
 		if (static_table_idx >= 1 && static_table_idx <= 7) {
 			msg_type = MSG_REQUEST;
 			conn_info->role =
-			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+			    (conn_info->direction ==
+			     T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 
 		} else if (static_table_idx >= 8 && static_table_idx <= 14) {
 			conn_info->role =
-			    (conn_info->direction == T_EGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+			    (conn_info->direction ==
+			     T_EGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 			msg_type = MSG_RESPONSE;
 		}
 
@@ -661,8 +663,8 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		    conn_info->socket_info_ptr->direction) {
 			bpf_probe_read_kernel(conn_info->prev_buf,
 					      sizeof(conn_info->prev_buf),
-					      conn_info->
-					      socket_info_ptr->prev_data);
+					      conn_info->socket_info_ptr->
+					      prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -1023,6 +1025,82 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 	}
 }
 
+#define CSTR_LEN(s) (sizeof(s) / sizeof(char) - 1)
+#define CSTR_MASK(s) ((~0ull) >> (64 - CSTR_LEN(s) * 8))
+// convert const string with length <= 8 for matching
+#define CSTR_AS_U64(s) (*((uint64_t*)(s)) & CSTR_MASK(s))
+#define CSTR_EQ(key, s) (((key) & CSTR_MASK(s)) == CSTR_AS_U64(s))
+
+// ref:
+//  https://github.com/memcached/memcached/blob/master/doc/protocol.txt
+static __inline enum message_type infer_memcached_message(const char *buf,
+							  size_t count,
+							  struct conn_info_s
+							  *conn_info)
+{
+	// shortest being `END\r\n`
+	if (count < 5)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_MEMCACHED, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_MEMCACHED)
+			return MSG_UNKNOWN;
+	}
+
+	char key[16];
+	// __builtin_memcpy not supported
+	for (int i = 0; i < 16; i++) {
+		if (i < count) {
+			key[i] = buf[i];
+		} else {
+			key[i] = 0;
+		}
+	}
+
+	__u64 *ukey = (__u64 *) key;
+	bool is_request =
+	    CSTR_EQ(*ukey, "set ") ||
+	    CSTR_EQ(*ukey, "add ") ||
+	    CSTR_EQ(*ukey, "replace ") ||
+	    CSTR_EQ(*ukey, "append ") ||
+	    CSTR_EQ(*ukey, "prepend ") ||
+	    CSTR_EQ(*ukey, "cas ") ||
+	    CSTR_EQ(*ukey, "get ") ||
+	    CSTR_EQ(*ukey, "gets ") ||
+	    CSTR_EQ(*ukey, "gat ") ||
+	    CSTR_EQ(*ukey, "gats ") ||
+	    CSTR_EQ(*ukey, "delete ") ||
+	    CSTR_EQ(*ukey, "incr ") ||
+	    CSTR_EQ(*ukey, "decr ") ||
+	    CSTR_EQ(*ukey, "touch ");
+	if (is_request) {
+		return MSG_REQUEST;
+	}
+
+	__u64 *ukey2 = (__u64 *)(key + 8);
+	bool is_response =
+	    CSTR_EQ(*ukey, "ERROR\r\n") ||
+	    CSTR_EQ(*ukey, "STORED\r\n") ||
+	    (CSTR_EQ(*ukey, "NOT_STOR") && CSTR_EQ(*ukey2, "ED\r\n")) ||
+	    CSTR_EQ(*ukey, "EXISTS\r\n") ||
+	    (CSTR_EQ(*ukey, "NOT_FOUN") && CSTR_EQ(*ukey2, "D\r\n")) ||
+	    CSTR_EQ(*ukey, "END\r\n") ||
+	    (CSTR_EQ(*ukey, "DELETED\r") && CSTR_EQ(*ukey2, "\n")) ||
+	    (CSTR_EQ(*ukey, "TOUCHED\r") && CSTR_EQ(*ukey2, "\n")) ||
+	    CSTR_EQ(*ukey, "ERROR ") ||
+	    (CSTR_EQ(*ukey, "CLIENT_E") && CSTR_EQ(*ukey2, "RROR ")) ||
+	    (CSTR_EQ(*ukey, "SERVER_E") && CSTR_EQ(*ukey2, "RROR ")) ||
+	    CSTR_EQ(*ukey, "VALUE ");
+	if (is_response) {
+		return MSG_RESPONSE;
+	}
+
+	return MSG_UNKNOWN;
+}
+
 static __inline bool sofarpc_check_character(__u8 val)
 {
 	// 0 - 9, a - z, A - Z, '.' '_' '-' '*'
@@ -1085,8 +1163,8 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	const __u8 *infer_buf = (const __u8 *)buf;
-	__u8 proto = infer_buf[0]; // Under version V1, proto = 1; under version V2, proto = 2
-	__u8 type = infer_buf[1]; // 0 => RESPONSE，1 => REQUEST，2 => REQUEST_ONEWAY
+	__u8 proto = infer_buf[0];	// Under version V1, proto = 1; under version V2, proto = 2
+	__u8 type = infer_buf[1];	// 0 => RESPONSE，1 => REQUEST，2 => REQUEST_ONEWAY
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
@@ -2838,8 +2916,10 @@ static __inline enum message_type infer_kafka_message(const char *buf,
  * - Length Must be equal to payload length - 8
  *
  */
-static __inline enum message_type infer_some_ip_request(const char *buf, size_t count,
-						      struct conn_info_s *conn_info)
+static __inline enum message_type infer_some_ip_request(const char *buf,
+							size_t count,
+							struct conn_info_s
+							*conn_info)
 {
 #define MESSAGE_TYPE_REQUEST 0
 #define MESSAGE_TYPE_REQUEST_NO_RETURN 1
@@ -2850,14 +2930,17 @@ static __inline enum message_type infer_some_ip_request(const char *buf, size_t 
 	const __s32 message_type = buf[14];
 	const __s32 return_code = buf[15];
 
-	if (message_type != MESSAGE_TYPE_REQUEST && message_type != MESSAGE_TYPE_REQUEST &&
-		message_type != MESSAGE_TYPE_TP_REQUEST && message_type != MESSAGE_TYPE_TP_REQUEST_NO_RETURN) {
+	if (message_type != MESSAGE_TYPE_REQUEST
+	    && message_type != MESSAGE_TYPE_REQUEST
+	    && message_type != MESSAGE_TYPE_TP_REQUEST
+	    && message_type != MESSAGE_TYPE_TP_REQUEST_NO_RETURN) {
 		return MSG_UNKNOWN;
 	}
 
 	if (return_code == 0 && length == count - 8) {
 		conn_info->role =
-			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+		    (conn_info->direction ==
+		     T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 		return MSG_REQUEST;
 	}
 
@@ -2865,9 +2948,9 @@ static __inline enum message_type infer_some_ip_request(const char *buf, size_t 
 }
 
 static __inline enum message_type infer_some_ip_message(const char *buf,
-						      size_t count,
-						      struct conn_info_s
-						      *conn_info)
+							size_t count,
+							struct conn_info_s
+							*conn_info)
 {
 #define SOME_IP_HEADER_SIZE 16
 	if (!protocol_port_check_2(PROTO_SOME_IP, conn_info))
@@ -2883,8 +2966,8 @@ static __inline enum message_type infer_some_ip_message(const char *buf,
 		conn_info->role = conn_info->socket_info_ptr->role;
 
 		if ((conn_info->role == ROLE_CLIENT
-			&& conn_info->direction == T_EGRESS)
-			|| (conn_info->role == ROLE_SERVER
+		     && conn_info->direction == T_EGRESS)
+		    || (conn_info->role == ROLE_SERVER
 			&& conn_info->direction == T_INGRESS)) {
 			return MSG_REQUEST;
 		}
@@ -3474,7 +3557,7 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	} else if ((inferred_message.type =
 #endif
 		    infer_some_ip_message(infer_buf, count,
-				       conn_info)) != MSG_UNKNOWN) {
+					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_SOME_IP;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
@@ -3493,6 +3576,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_MEMCACHED && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_memcached_message(infer_buf,
+					    count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MEMCACHED;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_OPENWIRE && (inferred_message.type =
 #else
@@ -3771,7 +3862,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_SOME_IP:
 			if ((inferred_message.type =
 			     infer_some_ip_message(infer_buf, count,
-						 conn_info)) != MSG_UNKNOWN) {
+						   conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_SOME_IP;
 				return inferred_message;
 			}
@@ -3827,6 +3918,15 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ORACLE;
+				return inferred_message;
+			}
+			break;
+		case PROTO_MEMCACHED:
+			if ((inferred_message.type =
+			     infer_memcached_message(infer_buf, count,
+						     conn_info)) !=
+			    MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_MEMCACHED;
 				return inferred_message;
 			}
 			break;
@@ -3931,8 +4031,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 #else
 	if ((inferred_message.type =
 #endif
-		    infer_kafka_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
+	     infer_kafka_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
@@ -3949,7 +4048,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 #else
 	} else if ((inferred_message.type =
 #endif
-	     infer_mysql_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		    infer_mysql_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
@@ -3973,7 +4073,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 	}
-
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	if (inferred_message.protocol != MSG_UNKNOWN)
 		return inferred_message;

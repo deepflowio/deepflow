@@ -138,6 +138,7 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		orgID:                   args.OrgID,
 		slimit:                  args.Slimit,
 		blockTeamID:             args.BlockTeamID,
+		extraFilters:            args.ExtraFilters,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -201,6 +202,7 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		slimit:                  args.Slimit,
 		orgID:                   args.OrgID,
 		blockTeamID:             args.BlockTeamID,
+		extraFilters:            args.ExtraFilters,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -266,18 +268,20 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 		slimit:                  args.Slimit,
 		orgID:                   args.OrgID,
 		blockTeamID:             args.BlockTeamID,
+		extraFilters:            args.ExtraFilters,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
 	queryRequests := analyzer.parsePromQL(args.Promql, start, end, step)
 	promRequest := &model.DeepFlowPromRequest{
-		Slimit:      args.Slimit,
-		Start:       start.UnixMilli(),
-		End:         end.UnixMilli(),
-		Step:        step,
-		Query:       args.Promql,
-		OrgID:       args.OrgID,
-		BlockTeamID: args.BlockTeamID,
+		Slimit:       args.Slimit,
+		Start:        start.UnixMilli(),
+		End:          end.UnixMilli(),
+		Step:         step,
+		Query:        args.Promql,
+		OrgID:        args.OrgID,
+		BlockTeamID:  args.BlockTeamID,
+		ExtraFilters: args.ExtraFilters,
 	}
 
 	var cached promql.Result
@@ -398,6 +402,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 		slimit:                  args.Slimit,
 		orgID:                   args.OrgID,
 		blockTeamID:             args.BlockTeamID,
+		extraFilters:            args.ExtraFilters,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -415,13 +420,14 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	}
 
 	promRequest := &model.DeepFlowPromRequest{
-		Slimit:      args.Slimit,
-		Start:       minStart,
-		End:         maxEnd,
-		Step:        1 * time.Second,
-		Query:       args.Promql,
-		OrgID:       args.OrgID,
-		BlockTeamID: args.BlockTeamID,
+		Slimit:       args.Slimit,
+		Start:        minStart,
+		End:          maxEnd,
+		Step:         1 * time.Second,
+		Query:        args.Promql,
+		OrgID:        args.OrgID,
+		BlockTeamID:  args.BlockTeamID,
+		ExtraFilters: args.ExtraFilters,
 	}
 
 	var cached promql.Result
@@ -690,6 +696,7 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
 		orgID:                   args.OrgID,
 		blockTeamID:             args.BlockTeamID,
+		extraFilters:            args.ExtraFilters,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}

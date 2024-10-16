@@ -53,9 +53,10 @@ type CacheKeyGenerator struct {
 // generate key without query time (start/end) for cache query
 func (k *CacheKeyGenerator) GenerateCacheKey(req *model.DeepFlowPromRequest) string {
 	return fmt.Sprintf(
-		"df:%s:%s:%s:%d:%d:%d:%s",
+		"df:%s:%s:%s:%s:%d:%d:%d:%s",
 		req.OrgID,
 		strings.Join(req.BlockTeamID, "-"),
+		req.ExtraFilters,
 		req.Query,
 		req.Step,
 		req.Start%int64(req.Step.Seconds()), // real interval for data

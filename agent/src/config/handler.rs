@@ -574,11 +574,11 @@ impl From<(&UserConfig, &DynamicConfig)> for FlowConfig {
             packet_sequence_flag: conf.processors.packet.tcp_header.header_fields_flag, // Enterprise Edition Feature: packet-sequence
             packet_sequence_block_size: conf.processors.packet.tcp_header.block_size, // Enterprise Edition Feature: packet-sequence
             l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
-                &conf
-                    .processors
+                conf.processors
                     .request_log
                     .application_protocol_inference
-                    .enabled_protocols,
+                    .enabled_protocols
+                    .as_slice(),
             ),
             l7_protocol_parse_port_bitmap: Arc::new(conf.get_protocol_port_parse_bitmap()),
             plugins: PluginConfig {
@@ -639,11 +639,11 @@ impl From<(&UserConfig, &DynamicConfig)> for FlowConfig {
                 .oracle
                 .clone(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
-                &conf
-                    .processors
+                conf.processors
                     .request_log
                     .tag_extraction
-                    .obfuscate_protocols,
+                    .obfuscate_protocols
+                    .as_slice(),
             ),
             server_ports: conf
                 .processors
@@ -1919,11 +1919,11 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     &conf.processors.request_log.tag_extraction.http_endpoint,
                 ),
                 obfuscate_enabled_protocols: L7ProtocolBitmap::from(
-                    &conf
-                        .processors
+                    conf.processors
                         .request_log
                         .tag_extraction
-                        .obfuscate_protocols,
+                        .obfuscate_protocols
+                        .as_slice(),
                 ),
                 l7_log_blacklist: conf.processors.request_log.filters.tag_filters.clone(),
                 l7_log_blacklist_trie: {
@@ -2057,11 +2057,11 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     MacAddr::ZERO
                 },
                 l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
-                    &conf
-                        .processors
+                    conf.processors
                         .request_log
                         .application_protocol_inference
-                        .enabled_protocols,
+                        .enabled_protocols
+                        .as_slice(),
                 ),
                 l7_protocol_parse_port_bitmap: Arc::new(conf.get_protocol_port_parse_bitmap()),
                 l7_protocol_ports: conf.get_protocol_port(),

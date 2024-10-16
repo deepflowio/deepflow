@@ -38,9 +38,9 @@ use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
-    AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, NatsLog,
-    OpenWireLog, OracleLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog, SomeIpLog, TarsLog,
-    TlsLog, ZmtpLog,
+    AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MemcachedLog, MongoDBLog, MqttLog,
+    MysqlLog, NatsLog, OpenWireLog, OracleLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog,
+    SomeIpLog, TarsLog, TlsLog, ZmtpLog,
 };
 
 use crate::flow_generator::{LogMessageType, Result};
@@ -170,6 +170,7 @@ impl_protocol_parser! {
         Kafka(KafkaLog),
         Redis(RedisLog),
         MongoDB(MongoDBLog),
+        Memcached(MemcachedLog),
         PostgreSQL(PostgresqlLog),
         Dubbo(DubboLog),
         FastCGI(FastCGILog),
@@ -183,7 +184,7 @@ impl_protocol_parser! {
         ZMTP(ZmtpLog),
         OpenWire(OpenWireLog),
         TLS(TlsLog),
-        SomeIp(SomeIpLog)
+        SomeIp(SomeIpLog),
         // add protocol below
     }
 }
@@ -531,8 +532,8 @@ impl L7ProtocolChecker for L7ProtocolBitmap {
     }
 }
 
-impl From<&Vec<String>> for L7ProtocolBitmap {
-    fn from(vs: &Vec<String>) -> Self {
+impl From<&[String]> for L7ProtocolBitmap {
+    fn from(vs: &[String]) -> Self {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
             if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {

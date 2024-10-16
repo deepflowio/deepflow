@@ -11,6 +11,10 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: update mirror ci [#8300](https://github.com/deepflowio/deepflow/pull/8300) by [jiumos](https://github.com/jiumos)
+* fix: agent - eBPF Random time to process symbol table creation [#8281](https://github.com/deepflowio/deepflow/pull/8281) by [yinjiping](https://github.com/yinjiping)
+* fix: add export thread id [#8279](https://github.com/deepflowio/deepflow/pull/8279) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Handle the scenario where CONFIG_NET_NS is disabled [#8277](https://github.com/deepflowio/deepflow/pull/8277) by [yinjiping](https://github.com/yinjiping)
 * fix: topK multiple parameter query error [#8250](https://github.com/deepflowio/deepflow/pull/8250) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: querier TopK supporrt resource_id [#8234](https://github.com/deepflowio/deepflow/pull/8234) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8227](https://github.com/deepflowio/deepflow/pull/8227) by [yinjiping](https://github.com/yinjiping)
@@ -146,6 +150,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Support RT kernel [#8301](https://github.com/deepflowio/deepflow/pull/8301) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Adjust log output for get_process_starttime_and_comm [#8294](https://github.com/deepflowio/deepflow/pull/8294) by [yinjiping](https://github.com/yinjiping)
+* feat: exist function supports non-resource tags [#8256](https://github.com/deepflowio/deepflow/pull/8256) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8245](https://github.com/deepflowio/deepflow/pull/8245) by [yinjiping](https://github.com/yinjiping)
 * feat: querier uniq function supports multi params [#8229](https://github.com/deepflowio/deepflow/pull/8229) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: the application log table uses app_service as the primary key [#8221](https://github.com/deepflowio/deepflow/pull/8221) by [lzf575](https://github.com/lzf575)

@@ -1119,7 +1119,7 @@ inputs:
     #     Configuration Item:
     #     - match_regex: The regexp use for match the process, default value is `.*`
     #     - match_type: regexp match field, default value is `process_name`, options are
-    #       [process_name, cmdline, parent_process_name, tag]
+    #       [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
     #     - ignore: Whether to ignore when regex match, default value is `false`
     #     - rewrite_name: The name will replace the process name or cmd use regexp replace.
     #       Default value `""` means no replacement.
@@ -1176,7 +1176,7 @@ inputs:
     #   ch: 匹配类型
     # unit:
     # range: []
-    # enum_options: [process_name, cmdline, parent_process_name, tag]
+    # enum_options: [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
     # modification: agent_restart
     # ee_feature: false
     # description:
@@ -4058,6 +4058,7 @@ processors:
         Oracle: 1521
         Redis: 1-65535
         MongoDB: 1-65535
+        Memcached: 11211
         Kafka: 1-65535
         MQTT: 1-65535
         AMQP: 1-65535
@@ -4203,6 +4204,7 @@ processors:
         Oracle: []
         Redis: []
         MongoDB: []
+        Memcached: []
         Kafka: []
         MQTT: []
         AMQP: []
@@ -5051,7 +5053,7 @@ outputs:
     #   ch: NPB Socket 类型
     # unit:
     # range: []
-    # enum_options: [UDP, RAW_UDP]
+    # enum_options: [UDP, RAW_UDP, TCP, ZMQ]
     # modification: hot_update
     # ee_feature: true
     # description:

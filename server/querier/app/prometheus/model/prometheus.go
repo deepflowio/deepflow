@@ -24,17 +24,18 @@ import (
 )
 
 type PromQueryParams struct {
-	Debug       bool
-	Offloading  bool
-	Slimit      int
-	Promql      string
-	StartTime   string
-	EndTime     string
-	Step        string
-	OrgID       string
-	Matchers    []string
-	BlockTeamID []string
-	Context     context.Context
+	Debug        bool
+	Offloading   bool
+	Slimit       int
+	Promql       string
+	StartTime    string
+	EndTime      string
+	Step         string
+	OrgID        string
+	ExtraFilters string
+	Matchers     []string
+	BlockTeamID  []string
+	Context      context.Context
 }
 
 type PromQueryData struct {
@@ -81,12 +82,13 @@ type WrapHistorySeries struct {
 }
 
 type DeepFlowPromRequest struct {
-	Slimit      int
-	Start       int64
-	End         int64
-	Step        time.Duration
-	Query       string
-	OrgID       string
-	BlockTeamID []string
-	Matchers    []string
+	Slimit       int
+	Start        int64
+	End          int64
+	Step         time.Duration
+	Query        string
+	OrgID        string
+	ExtraFilters string
+	BlockTeamID  []string
+	Matchers     []string
 }

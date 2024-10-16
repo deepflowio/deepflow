@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix warning log in kube-rs crate by upgrading to 0.77 [#8305](https://github.com/deepflowio/deepflow/pull/8305) by [rvql](https://github.com/rvql)
+* fix: agent - eBPF Random time to process symbol table creation [#8283](https://github.com/deepflowio/deepflow/pull/8283) by [yinjiping](https://github.com/yinjiping)
+* fix: agent - eBPF Handle the scenario where CONFIG_NET_NS is disabled [#8282](https://github.com/deepflowio/deepflow/pull/8282) by [yinjiping](https://github.com/yinjiping)
+* fix: add export thread id [#8278](https://github.com/deepflowio/deepflow/pull/8278) by [lzf575](https://github.com/lzf575)
 * fix: topK multiple parameter query error [#8249](https://github.com/deepflowio/deepflow/pull/8249) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: add process_id in profile data query [#8238](https://github.com/deepflowio/deepflow/pull/8238) by [taloric](https://github.com/taloric)
 * fix: custom data source creation failed in enterprise ClickHouse [#8233](https://github.com/deepflowio/deepflow/pull/8233) by [lzf575](https://github.com/lzf575)
@@ -212,6 +216,14 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Support RT kernel (#8301) [#8304](https://github.com/deepflowio/deepflow/pull/8304) by [yinjiping](https://github.com/yinjiping)
+* feat: add zeromq to npb sender [#8297](https://github.com/deepflowio/deepflow/pull/8297) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: Memcached ebpf support [#8296](https://github.com/deepflowio/deepflow/pull/8296) by [rvql](https://github.com/rvql)
+* feat: agent - eBPF Adjust log output for get_process_starttime_and_comm [#8293](https://github.com/deepflowio/deepflow/pull/8293) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Keep the agent running after initialization [#8287](https://github.com/deepflowio/deepflow/pull/8287) by [yinjiping](https://github.com/yinjiping)
+* feat: support skywalking integration [#8286](https://github.com/deepflowio/deepflow/pull/8286) by [taloric](https://github.com/taloric)
+* feat: exist function supports non-resource tags [#8255](https://github.com/deepflowio/deepflow/pull/8255) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: add process listener [#8211](https://github.com/deepflowio/deepflow/pull/8211) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8246](https://github.com/deepflowio/deepflow/pull/8246) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - Add a configuration option to enable go/tls trace [#8244](https://github.com/deepflowio/deepflow/pull/8244) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Create maps based on functional configuration [#8243](https://github.com/deepflowio/deepflow/pull/8243) by [yinjiping](https://github.com/yinjiping)

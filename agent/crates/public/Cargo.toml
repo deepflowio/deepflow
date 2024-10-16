@@ -28,8 +28,8 @@ thiserror = "1.0"
 tonic = "0.8.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-k8s-openapi = { version = "^0.15", features = ["v1_19", "schemars"] }
-kube = { version = "0.74", default-features = false, features = ["client"] }
+k8s-openapi.workspace = true
+kube = { workspace = true, features = ["client"] }
 neli = "0.6.4"
 nix = "0.23"
 
