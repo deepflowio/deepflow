@@ -193,7 +193,10 @@ fn set_linkage() -> Result<()> {
             println!("cargo:rustc-link-lib=dylib=pthread");
             println!("cargo:rustc-link-lib=dylib=z");
             println!("cargo:rustc-link-lib=dylib=stdc++");
+            #[cfg(feature = "dylib_pcap")]
             println!("cargo:rustc-link-lib=dylib=pcap");
+            #[cfg(not(feature = "dylib_pcap"))]
+            println!("cargo:rustc-link-lib=static=pcap");
         }
         "musl" => {
             #[cfg(target_arch = "x86_64")]
