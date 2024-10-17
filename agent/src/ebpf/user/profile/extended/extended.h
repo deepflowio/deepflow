@@ -46,4 +46,10 @@ int extended_maps_set(struct bpf_tracer *tracer);
  */
 int extended_proc_event_handler(int pid, const char *name,
 				enum proc_act_type type);
+
+/**
+ * @brief **extended_print_cp_tracer_status()** Extended Profile runtime
+ *        status output.
+ */
+void extended_print_cp_tracer_status(void);
 #endif /* DF_PROFILE_EXT_H */

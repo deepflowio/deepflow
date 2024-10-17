@@ -35,6 +35,7 @@
 #include "elf.h"
 #include "load.h"
 #include "mem.h"
+#include "profile/perf_profiler.h"
 
 uint32_t k_version;
 // Linux kernel major version, minor version, revision version, and revision number.
@@ -1617,6 +1618,8 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 			rx_q->ring_capacity = t->queues[j].r->capacity;
 		}
 	}
+
+	print_cp_tracer_status();
 
 	return ETR_OK;
 }
