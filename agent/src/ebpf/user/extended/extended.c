@@ -58,3 +58,4 @@ bool __attribute__ ((weak)) extended_require_dwarf(int pid, const char *path)
 }
 
 void __attribute__ ((weak)) extended_map_preprocess(struct ebpf_map *map) {}
+void __attribute__ ((weak)) extended_print_cp_tracer_status(void) {}
