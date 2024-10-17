@@ -62,6 +62,33 @@ jobs:
           build-args: |
             GITHUB_REF_NAME=${{ github.ref_name }}
 
+      - name: Check dynamic dependencies
+        run: |
+          required_libs=()
+          in_arm_section=false
+          while IFS= read -r line; do
+              if [[ "$line" =~ ^\#\ X86\ Dynamic\ Libraries ]]; then
+                  in_arm_section=true
+                  continue
+              fi
+
+              if [[ "$line" =~ ^\#\  ]] && [[ "$in_arm_section" = true ]]; then
+                  break
+              fi
+
+              if [[ "$in_arm_section" = true ]] && [[ "$line" =~ \*\*([^\*]+)\*\* ]]; then
+                  required_libs+=("${BASH_REMATCH[1]}")
+              fi
+          done < agent/README.md
+          dynamic_libs=$(ldd agent/output/target/release/deepflow-agent | awk '{print $1}' | xargs -n1 basename)
+          echo "All dynamic dependency: ${dynamic_libs}"
+          for lib in $dynamic_libs; do
+              if [[ ! " ${required_libs[@]} " =~ " ${lib} " ]]; then
+                  echo "Warning: Do not introduce any additional dynamic library dependencies!: ${lib}"
+                  exit 1
+              fi
+          done
+
       - name: Package code build results
         run: |
           tar cvf agent-artifact-amd64.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
@@ -195,6 +222,33 @@ jobs:
           outputs: type=local,dest=./agent/output/
           build-args: |
             GITHUB_REF_NAME=${{ github.ref_name }}
+
+      - name: Check dynamic dependencies
+        run: |
+          required_libs=()
+          in_arm_section=false
+          while IFS= read -r line; do
+              if [[ "$line" =~ ^\#\ ARM\ Dynamic\ Libraries ]]; then
+                  in_arm_section=true
+                  continue
+              fi
+
+              if [[ "$line" =~ ^\#\  ]] && [[ "$in_arm_section" = true ]]; then
+                  break
+              fi
+
+              if [[ "$in_arm_section" = true ]] && [[ "$line" =~ \*\*([^\*]+)\*\* ]]; then
+                  required_libs+=("${BASH_REMATCH[1]}")
+              fi
+          done < agent/README.md
+          dynamic_libs=$(ldd agent/output/target/release/deepflow-agent | awk '{print $1}' | xargs -n1 basename)
+          echo "All dynamic dependency: ${dynamic_libs}"
+          for lib in $dynamic_libs; do
+              if [[ ! " ${required_libs[@]} " =~ " ${lib} " ]]; then
+                  echo "Warning: Do not introduce any additional dynamic library dependencies!: ${lib}"
+                  exit 1
+              fi
+          done
 
       - name: Package code build results
         run: |
