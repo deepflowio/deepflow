@@ -27,11 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gopkg.in/yaml.v2"
 	"gorm.io/gorm"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
+	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -71,6 +73,7 @@ type VTapInfo struct {
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupShortIDToLcuuid       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
+	agentGroupLcuuidToYamlConfig   map[string]*agent_config.AgentGroupConfigYaml
 	vtapGroupLcuuidToLocalConfig   map[string]string
 	vtapGroupLcuuidToEAHPEnabled   map[string]*int
 	noVTapTapPortsMac              mapset.Set
@@ -94,6 +97,9 @@ type VTapInfo struct {
 	// 保存remote segment 只有专属采集器有，并且所有专属采集器数据一样
 	remoteSegments []*trident.Segment
 
+	// 保存new remote segment 只有专属采集器有，并且所有专属采集器数据一样
+	agentRemoteSegments []*agent.Segment
+
 	// vtapregister
 	registerMU        sync.Mutex
 	register          map[string]*VTapRegister
@@ -110,8 +116,11 @@ type VTapInfo struct {
 
 	localClusterID *string
 
-	processInfo *ProcessInfo
-	dbVTapIDs   mapset.Set
+	processInfo      *ProcessInfo
+	agentProcessInfo *AgentProcessInfo
+	dbVTapIDs        mapset.Set
+
+	defaultUserConfig agent_config.UserConfig
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -136,6 +145,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupShortIDToLcuuid:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
+		agentGroupLcuuidToYamlConfig:   make(map[string]*agent_config.AgentGroupConfigYaml),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
 		noVTapTapPortsMac:              mapset.NewSet(),
@@ -162,6 +172,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 
 	vTapInfo.vTapPlatformData = newVTapPlatformData(orgID)
 	vTapInfo.processInfo = NewProcessInfo(db, cfg, orgID)
+	vTapInfo.agentProcessInfo = NewAgentProcessInfo(db, cfg, orgID)
 
 	return vTapInfo
 }
@@ -169,9 +180,13 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 func (v *VTapInfo) AddVTapCache(vtap *mysql_model.VTap) {
 	vTapCache := NewVTapCache(vtap, v)
 	vTapCache.init()
-	v.vTapPlatformData.setPlatformDataByVTap(v.metaData.GetPlatformDataOP(), vTapCache)
+	v.vTapPlatformData.setPlatformDataByVTap(v.metaData, vTapCache)
 	vTapCache.setVTapLocalSegments(v.GenerateVTapLocalSegments(vTapCache))
 	vTapCache.setVTapRemoteSegments(v.GetRemoteSegment(vTapCache))
+
+	vTapCache.setAgentLocalSegments(v.GenerateAgentLocalSegments(vTapCache))
+	vTapCache.setAgentRemoteSegments(v.GetAgentRemoteSegment(vTapCache))
+
 	v.vTapCaches.Add(vTapCache)
 	v.vtapIDCaches.Add(vTapCache)
 	if vTapCache.GetVTapType() == VTAP_TYPE_KVM {
@@ -394,21 +409,7 @@ func (v *VTapInfo) loadPlugins() {
 }
 
 func (v *VTapInfo) loadConfigData() {
-	deafaultConfiguration := &agent_config.AgentGroupConfigModel{}
-	b, err := json.Marshal(DefaultVTapGroupConfig)
-	if err == nil {
-		err = json.Unmarshal(b, deafaultConfiguration)
-		if err != nil {
-			log.Error(v.Logf("%s", err))
-		}
-	} else {
-		log.Error(v.Logf("%s", err))
-	}
-
-	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration)
-	dbDataCache := v.metaData.GetDBDataCache()
-	configs := dbDataCache.GetAgentGroupConfigsFromDB(v.db)
-	v.convertConfig(configs)
+	v.convertConfig()
 	v.loadPlugins()
 }
 
@@ -425,6 +426,25 @@ func (v *VTapInfo) loadVTaps() {
 		log.Error(v.Logf("%s", err))
 	}
 	v.vtaps = vtaps
+}
+
+func (v *VTapInfo) loadDefaultUserConfig() {
+	deafaultConfiguration := &agent_config.AgentGroupConfigModel{}
+	b, err := json.Marshal(DefaultVTapGroupConfig)
+	if err == nil {
+		err = json.Unmarshal(b, deafaultConfiguration)
+		if err != nil {
+			log.Error(v.Logf("%s", err))
+		}
+	} else {
+		log.Error(v.Logf("%s", err))
+	}
+
+	if err := yaml.Unmarshal(agent_config.YamlAgentGroupConfigTemplate, &v.defaultUserConfig); err != nil {
+		log.Error(err)
+	}
+
+	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration, v.defaultUserConfig)
 }
 
 func (v *VTapInfo) loadBaseData() {
@@ -486,7 +506,37 @@ func AllowEmptyField(filed string) bool {
 	return false
 }
 
-func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) {
+func (v *VTapInfo) convertUserConfig() {
+	yamlConfigs := v.metaData.GetDBDataCache().GetAgentGroupUserConfigsFromDB(v.db)
+	if yamlConfigs == nil {
+		log.Error(v.Log("no agent user configs data"))
+		return
+	}
+
+	agentGroupLcuuidToYamlConfig := make(map[string]*agent_config.AgentGroupConfigYaml)
+	for _, yamlConfig := range yamlConfigs {
+		agentGroupLcuuidToYamlConfig[yamlConfig.AgentGroupLcuuid] = yamlConfig
+	}
+	v.agentGroupLcuuidToYamlConfig = agentGroupLcuuidToYamlConfig
+}
+
+func (v *VTapInfo) checkUserConfigs(configs map[string]*VTapConfig) {
+	for lcuuid, yamlConfig := range v.agentGroupLcuuidToYamlConfig {
+		if _, ok := configs[lcuuid]; ok {
+			continue
+		}
+		userConfig := v.defaultUserConfig
+		if err := yaml.Unmarshal([]byte(yamlConfig.Yaml), &userConfig); err != nil {
+			log.Error(err)
+		}
+		vTapConfig := NewVTapConfig(DefaultVTapGroupConfig, userConfig)
+		configs[lcuuid] = vTapConfig
+	}
+}
+
+func (v *VTapInfo) convertConfig() {
+	v.convertUserConfig()
+	configs := v.metaData.GetDBDataCache().GetAgentGroupConfigsFromDB(v.db)
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
@@ -540,12 +590,20 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) 
 		} else {
 			log.Error(v.Logf("%s", err))
 		}
-
-		vTapConfig := NewVTapConfig(rtapConfiguration)
+		userConfig := v.defaultUserConfig
+		if yamlConfig, ok := v.agentGroupLcuuidToYamlConfig[*rtapConfiguration.VTapGroupLcuuid]; ok {
+			if len(yamlConfig.Yaml) > 0 {
+				if err := yaml.Unmarshal([]byte(yamlConfig.Yaml), &userConfig); err != nil {
+					log.Error(err)
+				}
+			}
+		}
+		vTapConfig := NewVTapConfig(rtapConfiguration, userConfig)
 		if config.VTapGroupLcuuid != nil {
 			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
 		}
 	}
+	v.checkUserConfigs(vtapGroupLcuuidToConfiguration)
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
 	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig
 	v.vtapGroupLcuuidToEAHPEnabled = vtapGroupLcuuidToEAHPEnabled
@@ -586,6 +644,10 @@ func (v *VTapInfo) GetDefaultMaxEscapeSeconds() int {
 	return DefaultMaxEscapeSeconds
 }
 
+func (v *VTapInfo) GetDefaultMaxEscapeSecondsStr() string {
+	return DefaultMaxEscapeSecondsStr
+}
+
 func (v *VTapInfo) GetDefaultMaxMemory() int {
 	return DefaultMaxMemory
 }
@@ -604,6 +666,13 @@ func (v *VTapInfo) GetTapTypes() []*trident.TapType {
 	return v.metaData.GetTapTypes()
 }
 
+func (v *VTapInfo) GetCaptureNetworkTypes() []*agent.CaptureNetworkType {
+	if v == nil {
+		return nil
+	}
+	return v.metaData.GetAgentMetaData().GetCaptureNetworkTypes()
+}
+
 func (v *VTapInfo) GetSkipInterface(c *VTapCache) []*trident.SkipInterface {
 	if v == nil {
 		return nil
@@ -619,11 +688,38 @@ func (v *VTapInfo) GetSkipInterface(c *VTapCache) []*trident.SkipInterface {
 	return nil
 }
 
+func (v *VTapInfo) GetAgentSkipInterface(c *VTapCache) []*agent.SkipInterface {
+	if v == nil {
+		return nil
+	}
+	if c.GetVTapType() == VTAP_TYPE_KVM {
+		launchServer := c.GetLaunchServer()
+		rawData := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetRawData()
+		if rawData != nil {
+			return rawData.GetSkipInterface(launchServer)
+		}
+	}
+
+	return nil
+}
+
 func (v *VTapInfo) GetContainers(vtapID int) []*trident.Container {
 	if v == nil {
 		return nil
 	}
 	rawData := v.metaData.GetPlatformDataOP().GetRawData()
+	if rawData != nil {
+		return rawData.GetContainers(vtapID)
+	}
+
+	return nil
+}
+
+func (v *VTapInfo) GetAgentContainers(vtapID int) []*agent.Container {
+	if v == nil {
+		return nil
+	}
+	rawData := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetRawData()
 	if rawData != nil {
 		return rawData.GetContainers(vtapID)
 	}
@@ -666,6 +762,20 @@ func (v *VTapInfo) GetGroupDataVersion() uint64 {
 	return v.groupData.getGroupDataVersion()
 }
 
+func (v *VTapInfo) GetAgentGroupData() []byte {
+	if v == nil {
+		return nil
+	}
+	return v.groupData.getAgentGroupData()
+}
+
+func (v *VTapInfo) GetAgentGroupDataVersion() uint64 {
+	if v == nil {
+		return 0
+	}
+	return v.groupData.getAgentGroupDataVersion()
+}
+
 func (v *VTapInfo) GetVTapPolicyData(vtapID int, functions mapset.Set) []byte {
 	if v == nil {
 		return nil
@@ -678,6 +788,20 @@ func (v *VTapInfo) GetVTapPolicyVersion(vtapID int, functions mapset.Set) uint64
 		return 0
 	}
 	return v.vTapPolicyData.getVTapPolicyVersion(vtapID, functions)
+}
+
+func (v *VTapInfo) GetAgentPolicyData(vtapID int, functions mapset.Set) []byte {
+	if v == nil {
+		return nil
+	}
+	return v.vTapPolicyData.getAgentPolicyData(vtapID, functions)
+}
+
+func (v *VTapInfo) GetAgentPolicyVersion(vtapID int, functions mapset.Set) uint64 {
+	if v == nil {
+		return 0
+	}
+	return v.vTapPolicyData.getAgentPolicyVersion(vtapID, functions)
 }
 
 func (v *VTapInfo) IsTheSameCluster(clusterID string) bool {
@@ -789,6 +913,13 @@ func (v *VTapInfo) GetProcessInfo() *ProcessInfo {
 	return v.processInfo
 }
 
+func (v *VTapInfo) GetAgentProcessInfo() *AgentProcessInfo {
+	if v == nil {
+		return nil
+	}
+	return v.agentProcessInfo
+}
+
 func (v *VTapInfo) GenerateVTapCache() {
 	v.loadBaseData()
 	v.updateVTapInfo()
@@ -831,14 +962,13 @@ func (v *VTapInfo) IsCtrlMacInTapPorts(ctrlIP string, ctrlMac string) bool {
 
 func (v *VTapInfo) generateAllVTapPlatformData() {
 	v.vTapPlatformData.clearPlatformDataTypeCache()
-	platformDataOP := v.metaData.GetPlatformDataOP()
 	cacheKeys := v.vTapCaches.List()
 	for _, cacheKey := range cacheKeys {
 		cacheVTap := v.GetVTapCache(cacheKey)
 		if cacheVTap == nil {
 			continue
 		}
-		v.vTapPlatformData.setPlatformDataByVTap(platformDataOP, cacheVTap)
+		v.vTapPlatformData.setPlatformDataByVTap(v.metaData, cacheVTap)
 	}
 	log.Debug(v.Logf("%s", v.vTapPlatformData))
 }
@@ -864,6 +994,7 @@ func (v *VTapInfo) generateLocalClusterID() {
 }
 
 func (v *VTapInfo) InitData() {
+	v.loadDefaultUserConfig()
 	v.loadBaseData()
 	if v.vtaps != nil {
 		for _, vtap := range v.vtaps {
@@ -1289,6 +1420,7 @@ func (v *VTapInfo) timedRefreshVTapCache() {
 			log.Info(v.Logf("start generate vtap cache data from timed"))
 			v.GenerateVTapCache()
 			v.processInfo.DeleteAgentExpiredData(v.dbVTapIDs)
+			v.agentProcessInfo.DeleteAgentExpiredData(v.dbVTapIDs)
 			log.Info(v.Logf("end generate vtap cache data from timed"))
 		case <-v.chVTapCacheRefresh:
 			log.Info(v.Logf("start generate vtap cache data from rpc"))
@@ -1310,7 +1442,12 @@ func (v *VTapInfo) TimedGenerateGPIDInfo() {
 		select {
 		case <-ticker:
 			log.Info(v.Log("start generate gpid data from timed"))
+			v.processInfo.getDBData()
 			v.processInfo.generateData()
+			v.agentProcessInfo.UpdateAgentIdAndPIDToGPID(v.processInfo.agentIdAndPIDToGPID)
+			v.agentProcessInfo.UpdateRVData(v.processInfo.rvData)
+			v.agentProcessInfo.UpdateGrpcConns(v.processInfo.grpcConns)
+			v.agentProcessInfo.generateData()
 			log.Info(v.Log("end generate gpid data from timed"))
 		case <-v.ctx.Done():
 			log.Info(v.Log("exit generate gpid data"))
