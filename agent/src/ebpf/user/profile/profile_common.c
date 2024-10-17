@@ -769,7 +769,7 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 		clib_mem_free(trace_str);
 		return;
 	}
-
+	memset(msg, 0, len);
 	set_stack_trace_msg(ctx, msg, v, false, 0, 0, process_name, NULL);
 	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
 	msg->data_len = strlen((char *)msg->data);
