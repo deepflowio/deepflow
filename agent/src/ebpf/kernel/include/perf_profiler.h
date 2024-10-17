@@ -38,6 +38,7 @@ typedef enum {
 	ENABLE_IDX,		/* Enable profiler sampling flag.
 				   0: disable sampling; 1: enable sampling. */
 	MINBLOCK_TIME_IDX,	/* The minimum blocking time, applied in the profiler extension.*/
+	RT_KERN,                /* Indicates whether it is a real-time kernel.*/
 	PROFILER_CNT
 } profiler_idx;
 
