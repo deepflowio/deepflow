@@ -33,11 +33,9 @@ use std::time::{Duration, SystemTime};
 #[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
 use log::{info, warn};
-use nom::AsBytes;
 use socket2::{Domain, SockAddr, Socket, Type};
 #[cfg(windows)]
 use windows::Win32::Networking::WinSock::socket;
-use zmq;
 
 use super::QUEUE_BATCH_SIZE;
 
@@ -57,6 +55,7 @@ use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::exception::ExceptionHandler;
 use crate::utils::stats;
 use npb_handler::{NpbHeader, NOT_SUPPORT};
+use npb_sender::ZmqSender;
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use public::proto::agent::{Exception, SocketType};
 use public::queue::Receiver;
@@ -448,140 +447,6 @@ impl TcpSender {
     fn close(&mut self) {}
 }
 
-struct ZmqSender {
-    socket: Option<zmq::Socket>,
-    underlay_is_ipv6: bool,
-
-    overlay_packet_offset: usize,
-
-    dst_ip: IpAddr,
-    dst_port: u16,
-
-    last_connect: u32, // time in second
-}
-
-impl Debug for ZmqSender {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "socket: {} underlay_is_ipv6: {} overlay_packet_offset: {} dst_ip: {} dst_port: {} last_connect: {}",
-            self.socket.is_some(), self.underlay_is_ipv6, self.overlay_packet_offset, self.dst_ip, self.dst_port, self.last_connect
-        )
-    }
-}
-
-impl ZmqSender {
-    const CONNECT_TIMEOUT: u64 = 100; // time in millis
-    const CONNECT_INTERVAL: u32 = 10; // time in second
-    const MAX_TRY_COUNT: usize = 3000;
-
-    fn new(dst_ip: &IpAddr, dst_port: u16) -> Self {
-        Self {
-            socket: None,
-            underlay_is_ipv6: dst_ip.is_ipv6(),
-            overlay_packet_offset: if dst_ip.is_ipv6() {
-                TCP6_PACKET_SIZE
-            } else {
-                TCP_PACKET_SIZE
-            },
-            dst_port,
-            dst_ip: dst_ip.clone(),
-            last_connect: 0,
-        }
-    }
-
-    fn connect(&mut self) -> IOResult<()> {
-        let ctx = zmq::Context::new();
-        let socket = ctx.socket(zmq::REQ).unwrap();
-        let remote = format!("tcp://{}:{}", self.dst_ip, self.dst_port);
-
-        socket.connect(&remote).map_err(|e| {
-            IOError::new(
-                ErrorKind::Other,
-                format!("ZeroMQ init with {} failed: {:?}", remote, e),
-            )
-        })?;
-
-        self.socket.replace(socket);
-        info!("Npb ZeroMQ init with {}.", remote);
-        Ok(())
-    }
-
-    fn connect_check(&mut self) -> IOResult<()> {
-        if self.socket.is_some() {
-            return Ok(());
-        }
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as u32;
-        // If the local timestamp adjustment requires recalculating the interval
-        if self.last_connect > now {
-            self.last_connect = now;
-        }
-        if self.last_connect + Self::CONNECT_INTERVAL > now {
-            return Err(IOError::new(
-                ErrorKind::Other,
-                "Waiting for reconnection time interval",
-            ));
-        }
-        self.last_connect = now;
-        self.connect()
-    }
-
-    fn send_timeout(socket: &zmq::Socket, packet: &[u8], timeout: usize) -> IOResult<usize> {
-        let mut error = String::new();
-        for _ in 0..timeout {
-            let Err(e) = socket.send(packet, 1) else {
-                return Ok(packet.len());
-            };
-            error = format!("ZeroMQ send failed: {:?}", e);
-            thread::sleep(Duration::from_micros(1));
-        }
-        Err(IOError::new(ErrorKind::Other, error))
-    }
-
-    fn recv_timeout(socket: &zmq::Socket, timeout: usize) -> IOResult<()> {
-        let mut error = String::new();
-        for _ in 0..timeout {
-            let Err(e) = socket.recv_bytes(1) else {
-                return Ok(());
-            };
-            error = format!("ZeroMQ recv failed: {:?}", e);
-            thread::sleep(Duration::from_micros(1));
-        }
-        Err(IOError::new(ErrorKind::Other, error))
-    }
-
-    fn send(
-        &mut self,
-        underlay_l2_opt_size: usize,
-        mut packet: Vec<u8>,
-        arp: &Arc<NpbArpTable>,
-    ) -> IOResult<usize> {
-        self.connect_check()?;
-        let _ = arp.lookup_counter(&self.dst_ip);
-
-        let overlay_packet_offset = self.overlay_packet_offset + underlay_l2_opt_size;
-        let packet = &mut packet.as_mut_slice()[overlay_packet_offset..];
-        let mut header = NpbHeader::default();
-        let _ = header.decode(packet);
-        header.total_length = packet.len() as u16;
-        let _ = header.encode(packet);
-
-        let socket = self.socket.take().unwrap();
-
-        let n = Self::send_timeout(&socket, packet.as_bytes(), Self::MAX_TRY_COUNT)?;
-        match Self::recv_timeout(&socket, Self::MAX_TRY_COUNT) {
-            Ok(()) => {
-                self.socket.replace(socket);
-                Ok(n)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn close(&mut self) {}
-}
-
 #[derive(Debug)]
 enum NpbSender {
     IpSender(IpSender),
@@ -605,7 +470,10 @@ impl NpbSender {
             #[cfg(unix)]
             Self::RawSender(s) => s.send(timestamp, underlay_l2_opt_size, packet, arp),
             Self::TcpSender(s) => s.send(underlay_l2_opt_size, packet, arp),
-            Self::ZmqSender(s) => s.send(underlay_l2_opt_size, packet, arp),
+            Self::ZmqSender(s) => {
+                let _ = arp.lookup_counter(&s.dst_ip);
+                s.send(underlay_l2_opt_size, packet)
+            }
         }
     }
 }

@@ -66,6 +66,7 @@ md-5 = "0.10.1"
 nom = "7.1.1"
 npb_handler = { path = "plugins/npb_handler" }
 npb_pcap_policy = { path = "plugins/npb_pcap_policy" }
+npb_sender = { path = "plugins/npb_sender" }
 num_enum = "0.5.7"
 packet_dedup = { path = "plugins/packet_dedup" }
 packet_segmentation_reassembly = { path = "plugins/packet_segmentation_reassembly" }
@@ -99,7 +100,6 @@ tokio = { version = "1.20.1", features = ["full"] }
 tonic = "0.8.1"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
-zmq = "0.10.0"
 zstd = "0.13.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
