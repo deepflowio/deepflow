@@ -211,3 +211,44 @@ pub mod opengauss {
         }
     }
 }
+
+pub mod tkex {
+    use super::*;
+
+    use k8s_openapi::{
+        api::core::v1::PodTemplateSpec, apimachinery::pkg::apis::meta::v1::LabelSelector,
+    };
+
+    #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    #[kube(
+        group = "platform.stke",
+        version = "v1alpha1",
+        kind = "StatefulSetPlus",
+        namespaced
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct StatefulSetPlusSpec {
+        pub replicas: Option<i32>,
+        pub selector: LabelSelector,
+        pub template: PodTemplateSpec,
+    }
+
+    impl Trimmable for StatefulSetPlus {
+        fn trim(mut self) -> Self {
+            let name = if let Some(name) = self.metadata.name.as_ref() {
+                name
+            } else {
+                ""
+            };
+            let mut ssp = Self::new(name, self.spec);
+            ssp.metadata = ObjectMeta {
+                uid: self.metadata.uid.take(),
+                name: self.metadata.name.take(),
+                namespace: self.metadata.namespace.take(),
+                labels: self.metadata.labels.take(),
+                ..Default::default()
+            };
+            ssp
+        }
+    }
+}
