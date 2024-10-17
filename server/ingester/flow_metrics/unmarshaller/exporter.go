@@ -19,6 +19,7 @@ package unmarshaller
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 	"unsafe"
@@ -252,11 +253,15 @@ func EncodeToPrometheus(e app.Document, utags *utag.UniversalTagsManager, cfg *c
 
 		ts := prompb.TimeSeries{}
 		ts.Labels = make([]prompb.Label, 0, len(labels)+1)
-		ts.Labels = append(ts.Labels, labels...)
 		ts.Labels = append(ts.Labels, prompb.Label{
 			Name:  "__name__",
 			Value: structTags.Name,
 		})
+		ts.Labels = append(ts.Labels, labels...)
+		sort.Slice(ts.Labels, func(i, j int) bool {
+			return ts.Labels[i].Name < ts.Labels[j].Name
+		})
+
 		ts.Samples = make([]prompb.Sample, 1)
 		ts.Samples[0].Value = valueFloat64
 		ts.Samples[0].Timestamp = int64(e.Time()) * 1000 // convert to  ms
