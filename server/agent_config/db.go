@@ -16,6 +16,21 @@
 
 package agent_config
 
+import "time"
+
+type AgentGroupConfigYaml struct {
+	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:not null" json:"LCUUID"`
+	AgentGroupLcuuid string    `gorm:"column:agent_group_lcuuid;type:char(64);default:not null" json:"AGENT_GROUP_LCUUID"`
+	Yaml             string    `gorm:"column:yaml;type:text;default:not null" json:"YAML"`
+	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+func (AgentGroupConfigYaml) TableName() string {
+	return "agent_group_configuration"
+}
+
 type AgentGroupConfigModel struct {
 	ID                                int      `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	MaxCollectPps                     *int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
