@@ -42,3 +42,7 @@ int __attribute__ ((weak)) extended_proc_event_handler(int pid,
 {
 	return 0;
 }
+
+void __attribute__ ((weak)) extended_print_cp_tracer_status(void)
+{
+}
