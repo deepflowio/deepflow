@@ -172,4 +172,6 @@ void cpdbg_process(stack_trace_msg_t * msg);
 int check_profiler_running_pid(int pid);
 int check_profiler_is_running(void);
 int write_profiler_running_pid(void);
+void print_cp_tracer_status(void);
+void output_profiler_status(struct bpf_tracer *t, void *context);
 #endif /* DF_USER_PERF_PROFILER_H */

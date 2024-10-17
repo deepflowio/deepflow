@@ -78,9 +78,6 @@ static FILE *folded_file;
 char *flame_graph_start_time;
 static char *flame_graph_end_time;
 
-static void print_cp_tracer_status(struct bpf_tracer *t,
-				   struct profiler_context *ctx);
-
 /* Continuous Profiler debug related settings. */
 static pthread_mutex_t cpdbg_mutex;
 static bool cpdbg_enable;
@@ -142,7 +139,7 @@ static int release_profiler(struct bpf_tracer *tracer)
 	/* free all readers */
 	free_all_readers(tracer);
 
-	print_cp_tracer_status(tracer, &oncpu_ctx);
+	print_cp_tracer_status();
 
 	/* release object */
 	release_object(tracer->obj);
@@ -257,7 +254,7 @@ static void oncpu_reader_work(void *arg)
 	}
 
 exit:
-	print_cp_tracer_status(t, &oncpu_ctx);
+	print_cp_tracer_status();
 
 	print_hash_stack_str(&oncpu_ctx.stack_str_hash);
 	/* free stack_str_hash */
@@ -463,9 +460,10 @@ int stop_continuous_profiler(void)
 	return (0);
 }
 
-static void print_cp_tracer_status(struct bpf_tracer *t,
-				   struct profiler_context *ctx)
+void output_profiler_status(struct bpf_tracer *t,
+		 	    void *context)
 {
+	struct profiler_context *ctx = context;
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
 
@@ -497,7 +495,23 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 			     ctx->state_map_name);
 	}
 
-	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
+	u64 is_rt_kern = 0;
+	if (!bpf_table_get_value(t, ctx->state_map_name, RT_KERN,
+				 (void *)&is_rt_kern)) {
+		ebpf_warning("Get map '%s' is_rt_kern failed.\n",
+			     ctx->state_map_name);
+	}
+
+	u64 is_enabled = 0;
+	if (!bpf_table_get_value(t, ctx->state_map_name, ENABLE_IDX,
+				 (void *)&is_enabled)) {
+		ebpf_warning("Get map '%s' is_enabled failed.\n",
+			     ctx->state_map_name);
+	}
+
+	ebpf_info("\n\n----------------------------\n"
+		  "Profiler Name: %s\nstate_map_name: %s\n"
+		  "enabled: %lu\nrecv envent:\t%lu\n"
 		  "process-cnt:\t%lu\nkern_lost:\t%lu perf_buf_lost_a:\t%lu, "
 		  "perf_buf_lost_b:\t%lu process_lost_count:\t%lu "
 		  "stack_table_data_miss:\t%lu\n"
@@ -510,10 +524,11 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 		  " - sample_drop_cnt:\t%lu\n"
 		  " - output_err_cnt:\t%lu\n"
 		  " - iter_max_cnt:\t%lu\n"
+		  " - is_rt_kern:\t%lu\n"
 		  "----------------------------\n\n",
+		  ctx->name, ctx->state_map_name, is_enabled,
 		  atomic64_read(&t->recv), ctx->process_count,
 		  atomic64_read(&t->lost), ctx->perf_buf_lost_a_count,
-		  ctx->perf_buf_lost_b_count, ctx->perf_buf_lost_a_count,
 		  ctx->perf_buf_lost_b_count, get_process_lost_count(ctx),
 		  get_stack_table_data_miss_count(),
 		  ctx->stackmap_clear_failed_count, ctx->stack_trace_err,
@@ -521,7 +536,15 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 		  ((double)atomic64_read(&t->recv) /
 		   (double)ctx->transfer_count), alloc_b, free_b,
 		  alloc_b - free_b, output_count, sample_drop_cnt,
-		  output_err_cnt, iter_max_cnt);
+		  output_err_cnt, iter_max_cnt, is_rt_kern);
+}
+
+void print_cp_tracer_status(void)
+{
+	if (profiler_tracer == NULL)
+		return;
+	output_profiler_status(profiler_tracer, (void *)&oncpu_ctx);
+	extended_print_cp_tracer_status();
 }
 
 static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
@@ -965,6 +988,10 @@ int enable_oncpu_profiler(void)
 int disable_oncpu_profiler(void)
 {
 	return 0;
+}
+
+void print_cp_tracer_status(void)
+{
 }
 
 #endif /* AARCH64_MUSL */

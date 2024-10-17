@@ -127,6 +127,24 @@ void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 		  enable_flag);
 }
 
+void set_bpf_rt_kern(struct bpf_tracer *t, struct profiler_context *ctx)
+{
+	if (ctx->profiler_stop == 1)
+		return;
+
+	u64 rt_flag = 1;
+	if (bpf_table_set_value(t, ctx->state_map_name,
+				RT_KERN, &rt_flag) == false) {
+		ebpf_warning("%sprofiler state map update error."
+			     "(%s rt_flag %lu) - %s\n",
+			     ctx->tag, ctx->state_map_name, rt_flag,
+			     strerror(errno));
+		return;
+	}
+
+	ebpf_info("%s%s() success, rt_flag:%d\n", ctx->tag, __func__, rt_flag);
+}
+
 int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx)
 {
 	if (*pattern == '\0') {
@@ -383,9 +401,12 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	}
 }
 
+/* *INDENT-OFF* */
 static void __attribute__ ((__unused__))
 print_profiler_status(struct profiler_context *ctx,
 		      struct bpf_tracer *t, u64 iter_count)
+/* *INDENT-ON* */
+
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
