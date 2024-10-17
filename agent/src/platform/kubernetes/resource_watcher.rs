@@ -59,6 +59,7 @@ use super::crd::{
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
     opengauss::OpenGaussCluster,
     pingan_cloud::ServiceRule,
+    tkex::StatefulSetPlus,
 };
 use crate::utils::stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable};
 
@@ -101,6 +102,7 @@ pub enum GenericResourceWatcher {
     KruiseStatefulSet(ResourceWatcher<KruiseStatefulSet>),
     IpPool(ResourceWatcher<IpPool>),
     OpenGaussCluster(ResourceWatcher<OpenGaussCluster>),
+    StatefulSetPlus(ResourceWatcher<StatefulSetPlus>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -343,6 +345,10 @@ pub fn supported_resources() -> Vec<Resource> {
                 GroupVersion {
                     group: "apps.kruise.io",
                     version: "v1beta1",
+                },
+                GroupVersion {
+                    group: "platform.stke",
+                    version: "v1alpha1",
                 },
             ],
             selected_gv: None,
@@ -1295,6 +1301,15 @@ impl ResourceWatcherFactory {
                     group: "apps.kruise.io",
                     version: "v1beta1",
                 } => GenericResourceWatcher::KruiseStatefulSet(self.new_watcher_inner(
+                    resource,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                GroupVersion {
+                    group: "platform.stke",
+                    version: "v1alpha1",
+                } => GenericResourceWatcher::StatefulSetPlus(self.new_watcher_inner(
                     resource,
                     stats_collector,
                     namespace,
