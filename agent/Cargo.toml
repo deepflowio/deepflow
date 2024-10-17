@@ -143,6 +143,7 @@ tonic-build = "0.8.0"
 [features]
 enterprise = ["off_cpu", "enterprise-utils"]
 off_cpu = []
+dylib_pcap = []
 
 [[bench]]
 name = "common"
