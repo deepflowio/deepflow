@@ -1,0 +1,13 @@
+[package]
+name = "npb_sender"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+nom = "7.1.1"
+npb_handler = { path = "../../plugins/npb_handler"}
+public = { path = "../../crates/public"}
+zmq = "0.10.0"
