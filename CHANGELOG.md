@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: remove dynamic libpcap [#8321](https://github.com/deepflowio/deepflow/pull/8321) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: when EPC is unknown, region should not be unknown [#8315](https://github.com/deepflowio/deepflow/pull/8315) by [lzf575](https://github.com/lzf575)
 * fix agent - eBPF Fix the parsing of the kernel version [#8311](https://github.com/deepflowio/deepflow/pull/8311) by [yinjiping](https://github.com/yinjiping)
 * fix: Fix warning log in kube-rs crate by upgrading to 0.77 [#8305](https://github.com/deepflowio/deepflow/pull/8305) by [rvql](https://github.com/rvql)
 * fix: agent - eBPF Random time to process symbol table creation [#8283](https://github.com/deepflowio/deepflow/pull/8283) by [yinjiping](https://github.com/yinjiping)
@@ -217,6 +219,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: sort prometheus export tags [#8328](https://github.com/deepflowio/deepflow/pull/8328) by [lzf575](https://github.com/lzf575)
 * feat: agent - eBPF Support RT kernel (#8301) [#8304](https://github.com/deepflowio/deepflow/pull/8304) by [yinjiping](https://github.com/yinjiping)
 * feat: add zeromq to npb sender [#8297](https://github.com/deepflowio/deepflow/pull/8297) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: Memcached ebpf support [#8296](https://github.com/deepflowio/deepflow/pull/8296) by [rvql](https://github.com/rvql)
