@@ -89,6 +89,7 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		debug := c.Request.FormValue("debug")
 		block_team_id := c.Request.FormValue("block-team-id")
 		offloading := c.Request.FormValue("operator-offloading")
+		args.ExtraFilters = c.Request.FormValue("extra-filters")
 		setRouterArgs(slimit, &args.Slimit, config.Cfg.Prometheus.SeriesLimit, strconv.Atoi)
 		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
 		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
