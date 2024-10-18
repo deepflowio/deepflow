@@ -32,6 +32,7 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/xwb1989/sqlparser"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -300,37 +301,11 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 	filters := make([]string, 0, len(q.Matchers)+1)
 	filters = append(filters, fmt.Sprintf("(time >= %d AND time <= %d)", startTime, endTime))
 	for _, matcher := range q.Matchers {
-		if matcher.Name == PROMETHEUS_METRICS_NAME {
+		tagName, tagAlias, isDeepFlowTag, newFilter := p.parseMatchers(matcher, prefixType, db)
+		if newFilter == "" {
 			continue
 		}
-		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
-		operation, value := getLabelMatcher(matcher.Type, matcher.Value, isDeepFlowTag)
-		if operation == "" {
-			return ctx, "", "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
-		}
-
-		// for normal query & DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
-		tagMatcher := tagName
-		if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
-			// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
-			tagMatcher = tagAlias
-		}
-
-		if len(value) > 1 {
-			tmpFilters := make([]string, 0, len(value))
-			for _, v := range value {
-				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(v)))
-			}
-			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
-		} else {
-			// () with only ONE condition in it will cause error
-			if value[0] == "" && isDeepFlowTag {
-				// only for DeepFlow Tag, when value is empty, use [not] exist(`tag`) for query
-				filters = append(filters, fmt.Sprintf("%s(%s)", operation, tagMatcher))
-			} else {
-				filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
-			}
-		}
+		filters = append(filters, newFilter)
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
 			if isDeepFlowTag && (len(q.Hints.Grouping) == 0 || tagAlias != "") {
@@ -341,6 +316,22 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 				// append in query for analysis (findout if tag is target_label)
 				expectedDeepFlowNativeTags[tagName] = tagAlias
 			}
+		}
+	}
+
+	if len(p.extraFilters) > 0 {
+		// to support same pron like promql filters, here we need to parse and extract `where` clause
+		// it can't be use in querier where directly
+		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
+		if err == nil {
+			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixType, db,
+				func(tagName, tagAlias string, isDeepFlowTag bool) {
+					if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
+						if isDeepFlowTag && (len(q.Hints.Grouping) == 0 || tagAlias != "") {
+							expectedDeepFlowNativeTags[tagName] = tagAlias
+						}
+					}
+				}))
 		}
 	}
 
@@ -362,12 +353,64 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 	if len(p.blockTeamID) > 0 {
 		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
 	}
-	if len(p.extraFilters) > 0 {
-		filters = append(filters, fmt.Sprintf("(%s)", p.extraFilters))
-	}
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy, orderBy)
 	return ctx, sql, db, dataPrecision, queryMetric, err
+}
+
+func (p *prometheusReader) parseMatchers(matcher *prompb.LabelMatcher, prefixType prefix, db string) (string, string, bool, string) {
+	if matcher.Name == labels.MetricName {
+		return "", "", false, ""
+	}
+	tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
+	operation, value := getLabelMatcher(matcher.Type, matcher.Value, isDeepFlowTag)
+	if operation == "" {
+		return "", "", false, ""
+	}
+
+	// for normal query & DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
+	tagMatcher := tagName
+	if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
+		// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
+		tagMatcher = tagAlias
+	}
+
+	if len(value) > 1 {
+		tmpFilters := make([]string, 0, len(value))
+		for _, v := range value {
+			tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(v)))
+		}
+		return tagName, tagAlias, isDeepFlowTag, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR "))
+	} else {
+		// () with only ONE condition in it will cause error
+		if value[0] == "" && isDeepFlowTag {
+			// only for DeepFlow Tag, when value is empty, use [not] exist(`tag`) for query
+			return tagName, tagAlias, isDeepFlowTag, fmt.Sprintf("%s(%s)", operation, tagMatcher)
+		} else {
+			return tagName, tagAlias, isDeepFlowTag, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0]))
+		}
+	}
+}
+
+// parse extra-filters to filters in `where` clause
+func (p *prometheusReader) parseExtraFiltersToWhereClause(extraLabelMatchers [][]*prompb.LabelMatcher, prefixType prefix, db string, handleTags func(string, string, bool)) string {
+	outerFilters := make([]string, 0, len(extraLabelMatchers))
+	for i := 0; i < len(extraLabelMatchers); i++ {
+		innerFilters := make([]string, 0, len(extraLabelMatchers[i]))
+		for j := 0; j < len(extraLabelMatchers[i]); j++ {
+			matcher := extraLabelMatchers[i][j]
+			tagName, tagAlias, isDeepFlowTag, newFilter := p.parseMatchers(matcher, prefixType, db)
+			if newFilter == "" {
+				continue
+			}
+			innerFilters = append(innerFilters, newFilter)
+			handleTags(tagName, tagAlias, isDeepFlowTag)
+		}
+		// inside matchers use 'AND' for connected
+		outerFilters = append(outerFilters, fmt.Sprintf("(%s)", strings.Join(innerFilters, " AND ")))
+	}
+	// outside matchers use 'OR' for connected
+	return fmt.Sprintf("(%s)", strings.Join(outerFilters, " OR "))
 }
 
 // return: prefixType, metricName, db, table, dataPrecision, metricAlias
@@ -1017,6 +1060,17 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 			expectedQueryTags[tagName] = tagAlias
 		}
 	}
+	if len(p.extraFilters) > 0 {
+		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
+		if err == nil {
+			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixDeepFlow, chCommon.DB_NAME_PROMETHEUS,
+				func(tagName, tagAlias string, isDeepFlowTag bool) {
+					if isDeepFlowTag && cap(groupBy) == 0 {
+						expectedQueryTags[tagName] = tagAlias
+					}
+				}))
+		}
+	}
 
 	// order
 	orderBy := []string{fmt.Sprintf("%s desc", PROMETHEUS_TIME_COLUMNS)}
@@ -1100,9 +1154,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 	if len(p.blockTeamID) > 0 {
 		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
 	}
-	if len(p.extraFilters) > 0 {
-		filters = append(filters, fmt.Sprintf("(%s)", p.extraFilters))
-	}
+
 	sql := parseToQuerierSQL(ctx, chCommon.DB_NAME_PROMETHEUS, queryReq.GetMetric(), selection, filters, groupBy, orderBy)
 	return sql
 }
@@ -1394,4 +1446,110 @@ func removeTagPrefix(tag string) string {
 
 func escapeSingleQuote(v string) string {
 	return strings.Replace(v, "'", "''", -1)
+}
+
+func removeEscapeQuote(v string, r string) string {
+	return strings.TrimPrefix(strings.TrimSuffix(v, r), r)
+}
+
+func parseOperator(op string) prompb.LabelMatcher_Type {
+	switch op {
+	case "=":
+		return prompb.LabelMatcher_EQ
+	case "!=":
+		return prompb.LabelMatcher_NEQ
+	default:
+		return prompb.LabelMatcher_EQ
+	}
+}
+
+func parseExtraFiltersToMatchers(filters string) ([][]*prompb.LabelMatcher, error) {
+	fakeSQL := fmt.Sprintf("select 1 from t where %s", filters)
+	stmt, err := sqlparser.Parse(fakeSQL)
+	if err != nil {
+		return nil, err
+	}
+	selectStmt := stmt.(*sqlparser.Select)
+	labelMatchers := make([][]*prompb.LabelMatcher, 0)
+	_, err = iterateExprs(selectStmt.Where.Expr, &labelMatchers)
+	if err != nil {
+		return nil, err
+	}
+	return labelMatchers, nil
+}
+
+func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*prompb.LabelMatcher) (sqlparser.Expr, error) {
+	switch node := node.(type) {
+	case *sqlparser.AndExpr:
+		left, err := iterateExprs(node.Left, labelMatchers)
+		if err != nil {
+			return left, err
+		}
+		right, err := iterateExprs(node.Right, labelMatchers)
+		if err != nil {
+			return right, err
+		}
+		if left == nil {
+			return right, nil
+		} else if right == nil {
+			return left, nil
+		}
+		return node, nil
+	case *sqlparser.OrExpr:
+		left, err := iterateExprs(node.Left, labelMatchers)
+		if err != nil {
+			return left, err
+		}
+		right, err := iterateExprs(node.Right, labelMatchers)
+		if err != nil {
+			return right, err
+		}
+		if left == nil {
+			return right, nil
+		} else if right == nil {
+			return left, nil
+		}
+		return node, nil
+	case *sqlparser.ParenExpr:
+		(*labelMatchers) = append((*labelMatchers), []*prompb.LabelMatcher{})
+		expr, err := iterateExprs(node.Expr, labelMatchers)
+		if err != nil {
+			return expr, err
+		}
+		return expr, nil
+	case *sqlparser.ComparisonExpr:
+		var comparExpr sqlparser.Expr
+		if parenExpr, ok := node.Left.(*sqlparser.ParenExpr); ok {
+			comparExpr = parenExpr.Expr
+		} else {
+			comparExpr = node.Left
+		}
+		var colName, colValue, op string
+		switch comparExpr.(type) {
+		case *sqlparser.SQLVal:
+			colValue = sqlparser.String(comparExpr)
+			colName = sqlparser.String(node.Right)
+			op = node.Operator
+		case *sqlparser.ColName:
+			colName = sqlparser.String(comparExpr)
+			colValue = sqlparser.String(node.Right)
+			op = node.Operator
+		}
+		lastIndex := len(*labelMatchers) - 1
+		if lastIndex < 0 {
+			(*labelMatchers) = append((*labelMatchers), []*prompb.LabelMatcher{})
+			lastIndex = len(*labelMatchers) - 1
+		}
+
+		(*labelMatchers)[lastIndex] = append((*labelMatchers)[lastIndex], &prompb.LabelMatcher{
+			Type: parseOperator(op),
+			// some tag will escape by sqlparser
+			// https://github.com/xwb1989/sqlparser/blob/master/token.go#L85
+			Name:  removeEscapeQuote(colName, "`"),
+			Value: removeEscapeQuote(colValue, "'"),
+		})
+		return node, nil
+	default:
+		return node, nil
+	}
 }
