@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Total process message initialization [#8331](https://github.com/deepflowio/deepflow/pull/8331) by [yinjiping](https://github.com/yinjiping)
 * fix: remove dynamic libpcap [#8320](https://github.com/deepflowio/deepflow/pull/8320) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: when EPC is unknown, region should not be unknown [#8316](https://github.com/deepflowio/deepflow/pull/8316) by [lzf575](https://github.com/lzf575)
 * fix agent - eBPF Fix the parsing of the kernel version (#8311) [#8312](https://github.com/deepflowio/deepflow/pull/8312) by [yinjiping](https://github.com/yinjiping)
@@ -153,6 +154,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: modify the epc of multicast address [#8337](https://github.com/deepflowio/deepflow/pull/8337) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: sort prometheus export tags [#8329](https://github.com/deepflowio/deepflow/pull/8329) by [lzf575](https://github.com/lzf575)
 * feat: add ci to check dynamic libs [#8325](https://github.com/deepflowio/deepflow/pull/8325) by [jiumos](https://github.com/jiumos)
 * feat: agent - eBPF Profile support RT kernel [#8323](https://github.com/deepflowio/deepflow/pull/8323) by [yinjiping](https://github.com/yinjiping)
