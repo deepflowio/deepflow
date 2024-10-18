@@ -37,6 +37,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		"InPlaceSet":            false,
 		"ReplicaSet":            false,
 		"StatefulSet":           false,
+		"StatefulSetPlus":       false,
 		"OpenGaussCluster":      false,
 		"ReplicationController": false,
 	}
