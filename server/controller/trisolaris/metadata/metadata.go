@@ -26,6 +26,8 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata/agentmetadata"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -48,13 +50,14 @@ type MetaData struct {
 	db             *gorm.DB
 	ctx            context.Context
 	cancel         context.CancelFunc
+	agentMetaData  *agentmetadata.MetaData
 	ORGID
 }
 
 func NewMetaData(db *gorm.DB, cfg *config.Config, orgID int, pctx context.Context) *MetaData {
 	ctx, cancel := context.WithCancel(pctx)
 	dbDataCache := &atomic.Value{}
-	dbDataCache.Store(newDBDataCache(ORGID(orgID), cfg))
+	dbDataCache.Store(NewDBDataCache(ORGID(orgID), cfg))
 	metaData := &MetaData{
 		dbDataCache:    dbDataCache,
 		tapType:        newTapType(db),
@@ -71,13 +74,20 @@ func NewMetaData(db *gorm.DB, cfg *config.Config, orgID int, pctx context.Contex
 	metaData.platformDataOP = newPlatformDataOP(db, metaData)
 	metaData.groupDataOP = newGroupDataOP(metaData)
 	metaData.policyDataOP = newPolicyDaTaOP(metaData, cfg.BillingMethod)
+	metaData.agentMetaData = agentmetadata.NewMetaData(db, cfg, orgID)
+	metaData.agentMetaData.UpdateDBDataCache(metaData.GetDBDataCache())
 	return metaData
 }
 
+func (m *MetaData) GetAgentMetaData() *agentmetadata.MetaData {
+	return m.agentMetaData
+}
+
 func (m *MetaData) generateDbDataCache() {
-	dbDataCache := newDBDataCache(m.ORGID, m.config)
+	dbDataCache := NewDBDataCache(m.ORGID, m.config)
 	dbDataCache.GetDataCacheFromDB(m.db)
 	m.updateDBDataCache(dbDataCache)
+	m.agentMetaData.UpdateDBDataCache(dbDataCache)
 }
 
 func (m *MetaData) GetDBDataCache() *DBDataCache {
@@ -180,6 +190,7 @@ func (m *MetaData) InitData(startTime int64) {
 	m.groupDataOP.generateGroupData()
 	m.tapType.generateTapTypes()
 	m.policyDataOP.generatePolicyData()
+	m.agentMetaData.InitData(startTime)
 }
 
 func (m *MetaData) timedRefreshMetaData() {
@@ -190,6 +201,7 @@ func (m *MetaData) timedRefreshMetaData() {
 		case <-ticker:
 			log.Info(m.Log("start generate metaData from timed"))
 			m.generateDbDataCache()
+			m.agentMetaData.TickerTrigger()
 			m.platformDataOP.GeneratePlatformData()
 			m.groupDataOP.generateGroupData()
 			m.policyDataOP.generatePolicyData()
@@ -200,11 +212,13 @@ func (m *MetaData) timedRefreshMetaData() {
 			time.Sleep(time.Duration(m.config.PlatformDataRefreshDelayTime) * time.Second)
 			log.Info("processing generate platform data from rpc")
 			m.generateDbDataCache()
+			m.agentMetaData.ChPlatformDataTrigger()
 			m.platformDataOP.GeneratePlatformData()
 			log.Info(m.Log("end generate platform data from rpc"))
 		case <-m.chPolicy:
 			log.Info(m.Log("start generate policy from rpc"))
 			m.generateDbDataCache()
+			m.agentMetaData.ChPolicyTrigger()
 			m.groupDataOP.generateGroupData()
 			m.policyDataOP.generatePolicyData()
 			log.Info(m.Log("end generate policy from rpc"))
@@ -212,11 +226,13 @@ func (m *MetaData) timedRefreshMetaData() {
 		case <-m.chGroup:
 			log.Info(m.Log("start generate group from rpc"))
 			m.generateDbDataCache()
+			m.agentMetaData.ChGroupTrigger()
 			m.groupDataOP.generateGroupData()
 			log.Info(m.Log("end generate group from rpc"))
 			pushmanager.Broadcast(m.GetORGID())
 		case <-m.chTapType:
 			log.Info(m.Log("start generate tap type from rpc"))
+			m.agentMetaData.ChCaptureNetworkTypeTrigger()
 			m.tapType.generateTapTypes()
 			log.Info(m.Log("end generate tap type from rpc"))
 		case <-m.ctx.Done():

@@ -38,3 +38,11 @@ func (v *VTapPolicyData) getVTapPolicyVersion(vtapID int, functions mapset.Set) 
 func (v *VTapPolicyData) getVTapPolicyData(vtapID int, functions mapset.Set) []byte {
 	return v.metaData.GetVTapPolicyString(vtapID, functions)
 }
+
+func (v *VTapPolicyData) getAgentPolicyVersion(vtapID int, functions mapset.Set) uint64 {
+	return v.metaData.GetAgentMetaData().GetAgentPolicyVersion(vtapID, functions)
+}
+
+func (v *VTapPolicyData) getAgentPolicyData(vtapID int, functions mapset.Set) []byte {
+	return v.metaData.GetAgentMetaData().GetAgentPolicyString(vtapID, functions)
+}

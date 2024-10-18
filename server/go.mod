@@ -13,6 +13,10 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache => ./controller/trisolaris/dbcache
+	github.com/deepflowio/deepflow/server/controller/trisolaris/metadata/agentmetadata => ./controller/trisolaris/metadata/agentmetadata
+	github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/agentdebug => ./controller/trisolaris/services/grpc/agentdebug
+	github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/agentsynchronize => ./controller/trisolaris/services/grpc/agentsynchronize
 	github.com/deepflowio/deepflow/server/ingester/config/configdefaults => ./ingester/config/configdefaults
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import => ./ingester/flow_log/log_data/sw_import
 	github.com/deepflowio/deepflow/server/libs/logger/blocker => ./libs/logger/blocker
@@ -106,6 +110,10 @@ require (
 	github.com/bytedance/sonic v1.11.8
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/trisolaris/metadata/agentmetadata v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/agentdebug v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/agentsynchronize v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-20240822020041-cdaf0f82ce6f
 	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap v0.0.0-00010101000000-000000000000

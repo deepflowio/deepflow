@@ -2298,7 +2298,7 @@ inputs:
           #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
-          port: ""
+          ports: ""
       # type: section
       # name:
       #   en: Tunning
@@ -3917,7 +3917,7 @@ processors:
       #     新周期。
       # upgrade_from: static_config.l7-protocol-inference-ttl
       # TODO: 增加了最小、最大值
-      inference_result_ttl: 60
+      inference_result_ttl: 60s
       # type: string
       # name:
       #   en: Enabled Protocols
