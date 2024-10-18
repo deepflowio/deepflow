@@ -655,16 +655,30 @@ impl Labeler {
         }
     }
 
-    fn is_intranet_address(ip: &IpAddr) -> bool {
+    fn is_multicast(ip: &IpAddr) -> bool {
         match ip {
-            IpAddr::V4(a) => a.is_link_local() || a.is_private(),
-            IpAddr::V6(a) => is_unicast_link_local(a),
+            IpAddr::V4(a) => a.is_broadcast() || a.is_multicast(),
+            IpAddr::V6(a) => a.is_multicast(),
+        }
+    }
+
+    fn is_intranet_address(ip: &IpAddr) -> bool {
+        let is_multicast = Self::is_multicast(ip);
+        match ip {
+            IpAddr::V4(a) => a.is_link_local() || a.is_private() || is_multicast,
+            IpAddr::V6(a) => is_unicast_link_local(a) || is_multicast,
         }
     }
 
     fn modify_internet_epc(&self, ip_src: &IpAddr, ip_dst: &IpAddr, endpoint: &mut EndpointData) {
         let src_data = &mut endpoint.src_info;
         let dst_data = &mut endpoint.dst_info;
+
+        if src_data.l3_epc_id == 0 && dst_data.l3_epc_id > 0 && Self::is_multicast(ip_src) {
+            src_data.l3_epc_id = dst_data.l3_epc_id;
+        } else if src_data.l3_epc_id > 0 && dst_data.l3_epc_id == 0 && Self::is_multicast(ip_dst) {
+            dst_data.l3_epc_id = src_data.l3_epc_id;
+        }
 
         if src_data.l3_epc_id == 0 && !Self::is_intranet_address(ip_src) {
             src_data.l3_epc_id = EPC_INTERNET;
@@ -1227,6 +1241,24 @@ mod tests {
         let mut endpoints: EndpointData = Default::default();
         labeler.modify_internet_epc(&ip, &ip, &mut endpoints);
         assert_eq!(endpoints.dst_info.l3_epc_id, 0);
+        assert_eq!(endpoints.src_info.l3_epc_id, 0);
+
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l3_epc_id = 0;
+        let multicast_ip = IpAddr::V4(Ipv4Addr::new(224, 0, 0, 10));
+        labeler.modify_internet_epc(&ip, &multicast_ip, &mut endpoints);
+        assert_eq!(endpoints.dst_info.l3_epc_id, 10);
+
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l3_epc_id = 0;
+        let multicast_ip = IpAddr::V4(Ipv4Addr::new(123, 0, 0, 10));
+        labeler.modify_internet_epc(&ip, &multicast_ip, &mut endpoints);
+        assert_eq!(endpoints.dst_info.l3_epc_id, -2);
+
+        endpoints.src_info.l3_epc_id = 0;
+        endpoints.dst_info.l3_epc_id = 0;
+        let multicast_ip = IpAddr::V6(Ipv6Addr::new(0xff00, 0, 0, 0, 0, 0, 0, 1));
+        labeler.modify_internet_epc(&multicast_ip, &ip, &mut endpoints);
         assert_eq!(endpoints.src_info.l3_epc_id, 0);
     }
 
