@@ -110,7 +110,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 	sqlstr, callbacks, query_uuid, columnSchemaMap, simpleSql := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap, params.SimpleSql
 	queryCacheStr := ""
 	if params.UseQueryCache {
-		queryCacheStr = " SETTINGS use_query_cache = true, query_cache_store_results_of_queries_with_nondeterministic_functions = 1"
+		queryCacheStr = " SETTINGS use_query_cache = true, query_cache_nondeterministic_function_handling = 'save'"
 		if params.QueryCacheTTL != "" {
 			queryCacheStr += fmt.Sprintf(", query_cache_ttl = %s", params.QueryCacheTTL)
 		}

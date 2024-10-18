@@ -1186,9 +1186,9 @@ func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string,
 					return filter, nil
 				}
 				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) GLOBAL IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", appLabel.AppLabelColumnIndex, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) GLOBAL IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE label_name_id=%d and %s(label_value,%s))", appLabel.AppLabelColumnIndex, labelNameID, op, value)
 				} else {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) GLOBAL IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s)", appLabel.AppLabelColumnIndex, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) GLOBAL IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE label_name_id=%d and label_value %s %s)", appLabel.AppLabelColumnIndex, labelNameID, op, value)
 				}
 				break
 			}
@@ -1196,9 +1196,9 @@ func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string,
 	}
 	if !isAppLabel {
 		if strings.Contains(op, "match") {
-			filter = fmt.Sprintf("toUInt64(target_id) GLOBAL IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) GLOBAL IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
 		} else {
-			filter = fmt.Sprintf("toUInt64(target_id) GLOBAL IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) GLOBAL IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
 		}
 	}
 	return filter, nil
@@ -1250,9 +1250,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 
 				// lru timeout
 				if strings.Contains(op, "match") {
-					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", labelNameID, op, value)
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_map WHERE label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", labelNameID, op, value)
 				} else {
-					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s GROUP BY label_value_id", labelNameID, op, value)
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_map WHERE label_name_id=%d and label_value %s %s GROUP BY label_value_id", labelNameID, op, value)
 				}
 				chClient := client.Client{
 					Host:     config.Cfg.Clickhouse.Host,
@@ -1287,9 +1287,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	if !isAppLabel {
 		transFilter := ""
 		if strings.Contains(op, "match") {
-			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY target_id", metricID, labelNameID, op, value)
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY target_id", metricID, labelNameID, op, value)
 		} else {
-			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY target_id", metricID, labelNameID, op, value)
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY target_id", metricID, labelNameID, op, value)
 		}
 		targetLabelFilter := TargetLabelFilter{OriginFilter: originFilter, TransFilter: transFilter}
 		e.TargetLabelFilters = append(e.TargetLabelFilters, targetLabelFilter)
