@@ -907,3 +907,35 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 	}
 
 }
+
+func TestParseExFilters(t *testing.T) {
+	var testCases = []struct {
+		input  string
+		output [][]*prompb.LabelMatcher
+	}{{
+		input: "(pod=1 and pod_ns=2) or (pod=1 and pod_ns=3) or (pod=5 and pod_ns=3)",
+		output: [][]*prompb.LabelMatcher{
+			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "1"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "2"}},
+			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "1"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "3"}},
+			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "5"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "3"}},
+		},
+	}}
+	t.Run("ParseExFilters", func(t *testing.T) {
+		for i := 0; i < len(testCases); i++ {
+			output, err := parseExtraFiltersToMatchers(testCases[i].input)
+			if err != nil {
+				t.Errorf("Expected output: %v, got: %v", testCases[i].output, err)
+			} else {
+				outerIndex := len(testCases[i].output)
+				for j := 0; j < outerIndex; j++ {
+					innerIndex := len(testCases[i].output[j])
+					for k := 0; k < innerIndex; k++ {
+						assert.Equal(t, testCases[i].output[j][k].Name, output[j][k].Name)
+						assert.Equal(t, testCases[i].output[j][k].Value, output[j][k].Value)
+						assert.Equal(t, testCases[i].output[j][k].Type, output[j][k].Type)
+					}
+				}
+			}
+		}
+	})
+}
