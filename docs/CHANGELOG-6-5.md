@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: fix bug in some vtap exception translation [#8347](https://github.com/deepflowio/deepflow/pull/8347) by [SongZhen0704](https://github.com/SongZhen0704)
+* fix: fix bug in vtap exception translation [#8345](https://github.com/deepflowio/deepflow/pull/8345) by [SongZhen0704](https://github.com/SongZhen0704)
 * fix: agent - eBPF Total process message initialization [#8331](https://github.com/deepflowio/deepflow/pull/8331) by [yinjiping](https://github.com/yinjiping)
 * fix: remove dynamic libpcap [#8320](https://github.com/deepflowio/deepflow/pull/8320) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: when EPC is unknown, region should not be unknown [#8316](https://github.com/deepflowio/deepflow/pull/8316) by [lzf575](https://github.com/lzf575)
