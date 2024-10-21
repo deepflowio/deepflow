@@ -61,7 +61,9 @@ use crate::{
     policy::PolicyGetter,
 };
 
-use integration_skywalking::{handle_skywalking_request, SkyWalkingExtra};
+use integration_skywalking::{
+    handle_skywalking_request, handle_skywalking_streaming_request, SkyWalkingExtra,
+};
 use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     enums::{CaptureNetworkType, EthernetType, L4Protocol},
@@ -829,9 +831,7 @@ async fn handler(
         }
         (
             &Method::POST,
-            "/v3/segments"
-            | "/skywalking.v3.TraceSegmentReportService/collect"
-            | "/skywalking.v3.TraceSegmentReportService/collectInSync",
+            "/v3/segments" | "/skywalking.v3.TraceSegmentReportService/collectInSync",
         ) => {
             if external_trace_integration_disabled {
                 return Ok(Response::builder().body(Body::empty()).unwrap());
@@ -848,6 +848,19 @@ async fn handler(
                 handle_skywalking_request(peer_addr, data, part.uri.path(), skywalking_sender)
                     .await,
             )
+        }
+        (&Method::POST, "/skywalking.v3.TraceSegmentReportService/collect") => {
+            if external_trace_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
+            let (part, body) = req.into_parts();
+            Ok(handle_skywalking_streaming_request(
+                peer_addr,
+                body,
+                part.uri.path(),
+                skywalking_sender,
+            )
+            .await)
         }
         // Return the 404 Not Found for other routes.
         _ => Ok(Response::builder()

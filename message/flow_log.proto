@@ -299,4 +299,5 @@ message MqttTopic {
 message SkyWalkingExtra {
     bytes data = 1;
     bytes peer_ip = 2;
+    string uri = 3;
 }

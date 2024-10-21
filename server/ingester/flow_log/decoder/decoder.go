@@ -304,15 +304,16 @@ func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbSkyWalkingDat
 			d.counter.ErrorCount++
 			continue
 		}
-		d.sendSkyWalking(pbSkyWalkingData.Data, pbSkyWalkingData.PeerIp)
+		d.sendSkyWalking(pbSkyWalkingData.Data, pbSkyWalkingData.PeerIp, pbSkyWalkingData.Uri)
 	}
 }
-func (d *Decoder) sendSkyWalking(segmentData, peerIP []byte) {
+
+func (d *Decoder) sendSkyWalking(segmentData, peerIP []byte, uri string) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv skywalking data length: %d", d.index, d.agentId, len(segmentData))
 	}
 	d.counter.Count++
-	ls := sw_import.SkyWalkingDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, segmentData, peerIP, d.platformData, d.cfg)
+	ls := sw_import.SkyWalkingDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, segmentData, peerIP, uri, d.platformData, d.cfg)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {

@@ -47,3 +47,15 @@ pub async fn handle_skywalking_request(
         .body(Body::empty())
         .unwrap()
 }
+
+pub async fn handle_skywalking_streaming_request(
+    _: SocketAddr,
+    _: Body,
+    _: &str,
+    _: DebugSender<SkyWalkingExtra>,
+) -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .unwrap()
+}
