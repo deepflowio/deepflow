@@ -1,0 +1,28 @@
+global_comment:
+  type: section
+global:
+  limits_comment:
+    type: section
+  limits:
+    max_millicpus_comment:
+      type: int
+      upgrade_from: max_millicpus
+    max_millicpus: 1000
+  alerts_comment:
+    type: section
+  alerts:
+    thread_threshold_comment:
+      type: int
+      upgrade_from: thread_threshold
+    thread_threshold: 500
+
+inputs_comment:
+  type: section
+inputs:
+  proc_comment:
+    type: section
+  proc:
+    enabled_comment:
+      type: bool
+      upgrade_from: static_config.os-proc-sync-enabled
+    enabled: false

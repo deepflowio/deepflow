@@ -28,44 +28,41 @@ import (
 
 type DynamicOptions map[string]*yaml.Node
 
-var FieldCommentSuffix = "_comment"
+const keyCommentSuffix = "_comment"
 
 func ParseYAMLToJson(yamlData []byte, d DynamicOptions) ([]byte, error) { // TODO refactor d
 	formatedTemplate, err := formatTemplateYAML(yamlData)
+	// lineParser := NewLineParser(yamlData)
+	// formatedTemplate, err := lineParser.StripLines()
 	if err != nil {
-		log.Infof("weiqiang formatTemplateYAML error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("format template yaml error: %v", err)
 	}
 
 	var node yaml.Node
 	err = yaml.Unmarshal(formatedTemplate, &node)
 	if err != nil {
-		log.Infof("weiqiang yaml.Unmarshal error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("unmarshal data to yaml node error: %v", err)
 	}
 
 	formattedNode, err := convTypeDictValToString(&node)
 	if err != nil {
-		log.Infof("weiqiang convTypeDictValToString error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("convert type dict value to string error: %v", err)
 	}
 
 	formattedNode, err = fillingEnumOptions("", formattedNode, d)
 	if err != nil {
-		log.Infof("weiqiang fillingEnumOptions error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("filling enum options error: %v", err)
 	}
 
 	jsonData, err := fillingOrder(formattedNode)
+	// jsonData, err := fillingOrder(&node)
 	if err != nil {
-		log.Infof("weiqiang yamlNodeToMapWithOrder error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("yaml node to map with order error: %v", err)
 	}
 
 	jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
 	if err != nil {
-		log.Infof("weiqiang json.MarshalIndent error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("marshal data to json error: %v", err)
 	}
 	jsonStr := string(jsonBytes)
 	jsonStr = strings.ReplaceAll(jsonStr, ": null", ": []") // TODO 为什么要替换 null 为 []？
@@ -88,7 +85,7 @@ func IndentTemplate(yamlData []byte) ([]string, error) {
 	var indentedLines []string
 	var tempLines []string
 	for i := 0; i < len(lines); i++ {
-		// 以 --- 开头结尾的注释，是升级前的注释及配置，需要忽略
+		// 以 --- 开头结尾的注释，需要忽略
 		if strings.Contains(lines[i], "---") {
 			j := i + 1
 			for ; j < len(lines); j++ {
@@ -206,10 +203,10 @@ func convTypeDictValToString(node *yaml.Node) (*yaml.Node, error) {
 		for i := 0; i < len(node.Content); i += 2 {
 			key := node.Content[i].Value
 			valueNode := node.Content[i+1]
-			if strings.HasSuffix(key, FieldCommentSuffix) {
+			if strings.HasSuffix(key, keyCommentSuffix) {
 				for j := 0; j < len(valueNode.Content); j += 2 {
 					if valueNode.Content[j].Value == "type" && valueNode.Content[j+1].Value == "dict" {
-						dictKey = strings.TrimSuffix(key, FieldCommentSuffix)
+						dictKey = strings.TrimSuffix(key, keyCommentSuffix)
 						break
 					}
 				}
@@ -229,7 +226,6 @@ func convTypeDictValToString(node *yaml.Node) (*yaml.Node, error) {
 					Value: string(bytes),
 				}
 				node.Content[i+1] = strValNode
-				// fmt.Printf("keyNode: %#v, valueNode: %#v\n", node.Content[i], node.Content[i+1])
 				dictKey = ""
 			} else {
 				value, err := convTypeDictValToString(valueNode)
@@ -258,29 +254,12 @@ func convTypeDictValToString(node *yaml.Node) (*yaml.Node, error) {
 	}
 }
 
-type OrderedMap struct {
-	keys   []string
-	values map[string]interface{}
-}
-
-func (om *OrderedMap) MarshalJSON() ([]byte, error) {
-	var pairs []string
-	for _, key := range om.keys {
-		value, _ := json.Marshal(om.values[key])
-		pairs = append(pairs, fmt.Sprintf("%q:%s", key, string(value)))
-	}
-	return []byte("{" + strings.Join(pairs, ",") + "}"), nil
-}
-
 func fillingOrder(node *yaml.Node) (interface{}, error) {
 	switch node.Kind {
 	case yaml.DocumentNode:
 		return fillingOrder(node.Content[0])
 	case yaml.MappingNode:
-		om := &OrderedMap{
-			keys:   make([]string, 0, len(node.Content)/2),
-			values: make(map[string]interface{}),
-		}
+		values := make(map[string]interface{})
 		for i := 0; i < len(node.Content); i += 2 {
 			keyNode := node.Content[i]
 			valueNode := node.Content[i+1]
@@ -291,17 +270,16 @@ func fillingOrder(node *yaml.Node) (interface{}, error) {
 				return nil, err
 			}
 
-			if strings.HasSuffix(key, FieldCommentSuffix) {
+			if strings.HasSuffix(key, keyCommentSuffix) {
 				if valueMap, ok := value.(map[string]interface{}); ok {
 					valueMap["order"] = i/2 + 1
 					value = valueMap
 				}
 			}
 
-			om.keys = append(om.keys, key)
-			om.values[key] = value
+			values[key] = value
 		}
-		return om.values, nil
+		return values, nil
 	case yaml.SequenceNode:
 		var seq []interface{}
 		for i, contentNode := range node.Content {
@@ -389,8 +367,6 @@ func ParseJsonToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error)
 }
 
 func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
-	fmt.Printf("----\nnode: %#v\n", node)
-	fmt.Printf("nodeTemplate: %#v\n", nodeTemplate)
 	if node.Kind != nodeTemplate.Kind {
 		return fmt.Errorf("node kind mismatch: expected %v, got %v", nodeTemplate.Kind, node.Kind)
 	}

@@ -1065,27 +1065,27 @@ inputs:
     #     inputs:
     #       proc:
     #         process_matcher:
-    #         - match_regex: python3 (.*)\.py
-    #           match_type: cmdline
-    #           match_languages: []
-    #           match_usernames: []
-    #           only_in_container: true
-    #           only_with_tag: false
-    #           ignore: false
-    #           rewrite_name: $1-py-script
-    #           enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
-    #         - match_regex: (?P<PROC_NAME>nginx)
-    #           match_type: process_name
-    #           rewrite_name: ${PROC_NAME}-%HOSTNAME%
-    #         - match_regex: "nginx"
-    #           match_type: parent_process_name
-    #           ignore: true
-    #         - match_regex: .*sleep.*
-    #           match_type: process_name
-    #           ignore: true
-    #         - match_regex: .+ # match after concatenating a tag key and value pair using colon,
+    #           - match_regex: python3 (.*)\.py
+    #             match_type: cmdline
+    #             match_languages: []
+    #             match_usernames: []
+    #             only_in_container: true
+    #             only_with_tag: false
+    #             ignore: false
+    #             rewrite_name: $1-py-script
+    #             enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
+    #           - match_regex: (?P<PROC_NAME>nginx)
+    #             match_type: process_name
+    #             rewrite_name: ${PROC_NAME}-%HOSTNAME%
+    #           - match_regex: "nginx"
+    #             match_type: parent_process_name
+    #             ignore: true
+    #           - match_regex: .*sleep.*
+    #             match_type: process_name
+    #             ignore: true
+    #           - match_regex: .+ # match after concatenating a tag key and value pair using colon,
     #                           # i.e., an regex `app:.+` can match all processes has a `app` tag
-    #           match_type: tag
+    #             match_type: tag
     #     ```
     # upgrade_from: static_config.os-proc-regex
     # TODO: 注意 dict 的升级
@@ -1118,7 +1118,7 @@ inputs:
     # description:
     #   en: |-
     #     The type of matcher.
-    # upgrade_from: static_config.os-proc-regex.match-regex
+    # upgrade_from: static_config.os-proc-regex.match-type
     # ---
     # match_type: ""
     # ---
