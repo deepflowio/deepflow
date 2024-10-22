@@ -5707,23 +5707,6 @@ outputs:
 #   ch: 插件
 # description:
 plugins:
-  # type: duration
-  # name:
-  #   en: Plugins Update Time
-  #   ch: 插件更新时间
-  # unit:
-  # range: []
-  # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
-  # modification: hot_update
-  # ee_feature: false
-  # description:
-  #   en: |-
-  #     Plugins Update Time.
-  #   ch: |-
-  #     插件更新时间。
-  # upgrade_from: update_time
-  # TODO: 候选项需要特殊处理
-  update_time:
   # type: string
   # name:
   #   en: Wasm Plugins
