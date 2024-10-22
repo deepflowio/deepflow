@@ -26,10 +26,12 @@ import (
 	"gorm.io/gorm"
 
 	agentconf "github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 var (
@@ -260,6 +262,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data map[s
 	if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
 		return nil, err
 	}
+	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
 }
 
@@ -292,6 +295,7 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data map[s
 	if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
 		return nil, err
 	}
+	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
 }
 
@@ -301,10 +305,9 @@ func (a *AgentGroupConfig) DeleteAgentGroupConfig(groupLcuuid string) error {
 		return err
 	}
 
-	var agentGroup model.VTapGroup
-	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
+	if err := dbInfo.Where("agent_group_lcuuid = ?", groupLcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error; err != nil {
 		return err
 	}
-
-	return dbInfo.Where("agent_group_lcuuid = ?", groupLcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error
+	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
+	return nil
 }
