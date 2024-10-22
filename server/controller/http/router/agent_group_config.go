@@ -47,6 +47,7 @@ func (cgc *AgentGroupConfig) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/agent-group-configuration/:group-lcuuid/json", postJsonAgentGroupConfig(cgc.cfg))
 	e.PUT("/v1/agent-group-configuration/:group-lcuuid/json", putJsonAgentGroupConfig(cgc.cfg))
 
+	e.GET("/v1/agent-group-configuration/yaml", getYAMLAgentGroupConfigs(cgc.cfg))
 	e.GET("/v1/agent-group-configuration/:group-lcuuid/yaml", getYAMLAgentGroupConfig(cgc.cfg))
 	e.POST("/v1/agent-group-configuration/:group-lcuuid/yaml", postYAMLAgentGroupConfig(cgc.cfg))
 	e.PUT("/v1/agent-group-configuration/:group-lcuuid/yaml", putYAMLAgentGroupConfig(cgc.cfg))
@@ -76,8 +77,8 @@ func getJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 func getJsonAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs()
-		routercommon.JsonResponse(c, data, err)
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(service.DataTypeJSON)
+		routercommon.JsonResponse(c, data.([]byte), err)
 	}
 }
 
@@ -103,6 +104,13 @@ func putJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 		groupLcuuid := c.Param("group-lcuuid")
 		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, postData, service.DataTypeJSON)
+		routercommon.JsonResponse(c, data, err)
+	}
+}
+
+func getYAMLAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(service.DataTypeYAML)
 		routercommon.JsonResponse(c, data, err)
 	}
 }
