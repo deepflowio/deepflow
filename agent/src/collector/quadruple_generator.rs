@@ -986,6 +986,19 @@ impl QuadrupleGenerator {
                     | CloseType::TcpFin
                     | CloseType::Unknown
                     | CloseType::TcpFinClientRst
+                    | CloseType::IcmpOtherTimeout
+                    | CloseType::IcmpAddressMaskTimeout
+                    | CloseType::IcmpDestinationUnreachable
+                    | CloseType::IcmpEchoTimeout
+                    | CloseType::IcmpInformationTimeout
+                    | CloseType::IcmpNeighborTimeout
+                    | CloseType::IcmpNormal
+                    | CloseType::IcmpPacketTooBig
+                    | CloseType::IcmpParameterProblem
+                    | CloseType::IcmpRouterTimeout
+                    | CloseType::IcmpSourceQuench
+                    | CloseType::IcmpTimeExceeded
+                    | CloseType::IcmpTimestampTimeout
                     | CloseType::Max => (),
                 }
             }
