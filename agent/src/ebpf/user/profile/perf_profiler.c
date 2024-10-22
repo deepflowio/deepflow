@@ -651,10 +651,10 @@ int check_profiler_running_pid(int pid)
 	}
 	// Compare the recorded and actual start times
 	if (recorded_start_time == actual_start_time) {
-		ebpf_warning("The deepflow-agent with process ID %d is already "
-			     "running. You can disable the continuous profiling "
-			     "feature of the deepflow-agent to skip this check.\n",
-			     recorded_pid);
+		ebpf_error("The deepflow-agent with process ID %d is already "
+			   "running. You can disable the continuous profiling "
+			   "feature of the deepflow-agent to skip this check.\n",
+			   recorded_pid);
 		return ETR_EXIST;
 	} else {
 		ebpf_info("Recorded PID(%d) and its startup time(%lu) do not"
