@@ -193,7 +193,7 @@ func (a *AgentGroupConfig) strToBytes(data string, returnType int) ([]byte, erro
 	}
 }
 
-func (a *AgentGroupConfig) GetAgentGroupConfigs() ([]byte, error) {
+func (a *AgentGroupConfig) GetAgentGroupConfigs(dataType int) (interface{}, error) {
 	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
@@ -202,21 +202,25 @@ func (a *AgentGroupConfig) GetAgentGroupConfigs() ([]byte, error) {
 	if err := dbInfo.Find(&data).Error; err != nil {
 		return nil, err
 	}
-	var jsonArray bytes.Buffer
-	jsonArray.WriteByte('{')
-	for i, d := range data {
-		if i > 0 {
-			jsonArray.WriteByte(',')
+	if dataType == DataTypeJSON {
+		var jsonArray bytes.Buffer
+		jsonArray.WriteByte('{')
+		for i, d := range data {
+			if i > 0 {
+				jsonArray.WriteByte(',')
+			}
+			bs, err := a.strToBytes(d.Yaml, dataType)
+			if err != nil {
+				return nil, err
+			}
+			jsonArray.WriteString(`"` + d.AgentGroupLcuuid + `":`)
+			jsonArray.Write(bs)
 		}
-		bs, err := a.strToBytes(d.Yaml, DataTypeJSON)
-		if err != nil {
-			return nil, err
-		}
-		jsonArray.WriteString(`"` + d.AgentGroupLcuuid + `":`)
-		jsonArray.Write(bs)
+		jsonArray.WriteByte('}')
+		return jsonArray.Bytes(), nil
+	} else {
+		return data, nil
 	}
-	jsonArray.WriteByte('}')
-	return jsonArray.Bytes(), nil
 }
 
 func (a *AgentGroupConfig) getStringYaml(data interface{}, dataType int) (string, error) {
@@ -270,8 +274,9 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 		return nil, err
 	}
 
-	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
+
+	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
 }
 
@@ -337,8 +342,9 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 		return nil, err
 	}
 
-	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
+
+	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
 }
 
@@ -348,7 +354,17 @@ func (a *AgentGroupConfig) DeleteAgentGroupConfig(groupLcuuid string) error {
 		return err
 	}
 
-	if err := dbInfo.Where("agent_group_lcuuid = ?", groupLcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error; err != nil {
+	db := dbInfo.GetGORMDB()
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("agent_group_lcuuid = ?", groupLcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
+		}
+		if err := tx.Where("vtap_group_lcuuid = ?", groupLcuuid).Delete(&agentconf.AgentGroupConfigModel{}).Error; err != nil {
+			return fmt.Errorf("failed to delete vtap_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
