@@ -220,6 +220,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feature: calls trisolaris refresh after updating agent group config [#8356](https://github.com/deepflowio/deepflow/pull/8356) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feature: removes unused configuration [#8355](https://github.com/deepflowio/deepflow/pull/8355) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: agent - eBPF Choose to exit when an error occurs [#8352](https://github.com/deepflowio/deepflow/pull/8352) by [yinjiping](https://github.com/yinjiping)
+* feat: genesis support agent func [#8288](https://github.com/deepflowio/deepflow/pull/8288) by [askyrie](https://github.com/askyrie)
+* feature: adds agent group config api [#8065](https://github.com/deepflowio/deepflow/pull/8065) by [roryye](https://github.com/roryye)
 * feat: modify the epc of multicast address [#8336](https://github.com/deepflowio/deepflow/pull/8336) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: move zmq to plugins [#8327](https://github.com/deepflowio/deepflow/pull/8327) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: add ci to check dynamic libs [#8326](https://github.com/deepflowio/deepflow/pull/8326) by [jiumos](https://github.com/jiumos)
@@ -502,6 +507,7 @@
 * chore: update cli dependencies [#7249](https://github.com/deepflowio/deepflow/pull/7249) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* Support for one custom workload StatefulSetPlus [#8348](https://github.com/deepflowio/deepflow/pull/8348) by [Hyzhou](https://github.com/Hyzhou)
 * add ci to clear stale branch [#8149](https://github.com/deepflowio/deepflow/pull/8149) by [jiumos](https://github.com/jiumos)
 * failed to create tables in ByConity database under non-default organization [#8148](https://github.com/deepflowio/deepflow/pull/8148) by [lzf575](https://github.com/lzf575)
 * Update typo in comments [#8127](https://github.com/deepflowio/deepflow/pull/8127) by [Hyzhou](https://github.com/Hyzhou)
