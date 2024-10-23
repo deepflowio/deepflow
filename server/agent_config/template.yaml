@@ -254,7 +254,7 @@ global:
     #     Calculation Method: `(free_memory / total_memory) * 100%`
     #   ch: |-
     #     计算公式：`(free_memory / total_memory) * 100%`
-    sys_free_memory_percentage:
+    sys_memory_percentage:
       # type: int
       # name:
       #   en: Trigger Threshold
@@ -266,17 +266,33 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
-      #     1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
+      #     Setting sys_memory_limit to 0 indicates that the system free/available memory ratio is not checked.
+      #     1. When the current system free/available memory ratio is below sys_memory_limit * 70%,
       #        the agent will automatically restart.
-      #     2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
+      #     2. When the current system free/available memory ratio is below sys_memory_limit but above 70%,
       #        the agent enters the disabled state.
-      #     3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+      #     3. When the current system free/available memory ratio remains above sys_memory_limit * 110%,
       #        the agent recovers from the disabled state.
       #   ch: |-
       #     当系统空闲内存低于此阈值的 90% 时，deepflow-agent 将自动重启。
       # upgrade_from: sys_free_memory_limit
       trigger_threshold: 0
+      # type: string
+      # name:
+      #   en: Metric
+      #   ch: 观测指标
+      # unit:
+      # range: []
+      # enum_options: [free, available]
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     deepflow-agent observes the percentage of this memory metric
+      #   ch: |-
+      #     deepflow-agent 观测该内存指标的百分比
+      # upgrade_from: sys_free_memory_metric
+      metric: free
     # type: section
     # name:
     #   en: Relative System Load
@@ -347,7 +363,7 @@ global:
       #   ch: |-
       #     deepflow-agent 默认每 10 秒监控一次所设定的系统负载指标项。
       # upgrade_from: system_load_circuit_breaker_metric
-      system_load_circuit_breaker_metric: load15
+      metric: load15
     # type: section
     # name:
     #   en: Tx Throughput

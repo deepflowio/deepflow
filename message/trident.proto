@@ -203,6 +203,11 @@ enum SystemLoadMetric {
     Load15 = 2;
 }
 
+enum SysMemoryMetric {
+    Free = 0;
+    Available = 1;
+}
+
 message Config {
     optional bool enabled = 1 [default = true];
     optional uint32 max_cpus = 2 [default = 1];
@@ -311,6 +316,7 @@ message Config {
     optional SystemLoadMetric system_load_circuit_breaker_metric = 505 [default = Load15];
     optional float system_load_circuit_breaker_recover = 506 [default = 0.9];
     optional string secret_key = 507; // secret key for dataplane
+    optional SysMemoryMetric sys_free_memory_metric = 508 [default = Free];
 
     optional string local_config = 510;  // 全量的配置文件内容
 }

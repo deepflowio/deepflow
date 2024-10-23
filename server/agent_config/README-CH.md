@@ -303,11 +303,11 @@ check provides a switch to prevent the process hang. Additional links:
 
 控制 deepflow-agent 在一定的环境条件下停止运行或停止部分功能。
 
-### 系统空闲内存百分比 {#global.circuit_breakers.sys_free_memory_percentage}
+### 系统空闲内存百分比 {#global.circuit_breakers.sys_memory_percentage}
 
 计算公式：`(free_memory / total_memory) * 100%`
 
-#### 触发阈值 {#global.circuit_breakers.sys_free_memory_percentage.trigger_threshold}
+#### 触发阈值 {#global.circuit_breakers.sys_memory_percentage.trigger_threshold}
 
 **标签**:
 
@@ -315,7 +315,7 @@ check provides a switch to prevent the process hang. Additional links:
 
 **FQCN**:
 
-`global.circuit_breakers.sys_free_memory_percentage.trigger_threshold`
+`global.circuit_breakers.sys_memory_percentage.trigger_threshold`
 
 Upgrade from old version: `sys_free_memory_limit`
 
@@ -323,7 +323,7 @@ Upgrade from old version: `sys_free_memory_limit`
 ```yaml
 global:
   circuit_breakers:
-    sys_free_memory_percentage:
+    sys_memory_percentage:
       trigger_threshold: 0
 ```
 
@@ -337,6 +337,35 @@ global:
 **详细描述**:
 
 当系统空闲内存低于此阈值的 90% 时，deepflow-agent 将自动重启。
+
+#### 观测指标 {#global.circuit_breakers.sys_memory_percentage.metric}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.sys_memory_percentage.metric`
+
+Upgrade from old version: `sys_free_memory_metric`
+
+**默认值**:
+```yaml
+global:
+  circuit_breakers:
+    sys_memory_percentage:
+      metric: free
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+deepflow-agent 观测该内存指标的百分比
 
 ### 相对系统负载 {#global.circuit_breakers.relative_sys_load}
 
