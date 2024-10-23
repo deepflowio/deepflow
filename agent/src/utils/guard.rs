@@ -33,7 +33,7 @@ use log::{debug, error, info, warn};
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 use super::process::{
-    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss, get_thread_num,
+    get_current_sys_memory_percentage, get_file_and_size_sum, get_memory_rss, get_thread_num,
     FileAndSizeSum,
 };
 use crate::common::{
@@ -45,7 +45,7 @@ use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
-use public::proto::agent::{Exception, PacketCaptureType, SystemLoadMetric};
+use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
 
 struct SystemLoadGuard {
     system: Arc<Mutex<System>>,
@@ -267,43 +267,51 @@ impl Guard {
         (cpu_limit / 10) as f32 > cpu_usage // The cpu_usage is in percentage, and the unit of cpu_limit is milli-cores. Divide cpu_limit by 10 to align the units
     }
 
-    fn check_sys_free_memory(
-        sys_free_memory_limit: f64,
-        under_sys_free_memory_limit: &mut bool,
+    fn check_sys_memory(
+        sys_memory_limit: f64,
+        sys_memory_metric: SysMemoryMetric,
+        under_sys_memory_limit: &mut bool,
         last_exceeded: &mut Duration,
         exception_handler: &ExceptionHandler,
     ) {
-        let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage() as f64;
+        let (current_sys_free_memory_percentage, current_sys_available_memory_percentage) =
+            get_current_sys_memory_percentage();
         debug!(
-            "current_sys_free_memory_percentage: {}, sys_free_memory_limit: {}",
-            current_sys_free_memory_percentage, sys_free_memory_limit
+            "current_sys_memory_percentage: [ free: {}, available: {} ], sys_memory_metric: {:?} sys_memory_limit: {}",
+            current_sys_free_memory_percentage, current_sys_available_memory_percentage, sys_memory_metric, sys_memory_limit
         );
-        if sys_free_memory_limit != 0.0 {
-            if current_sys_free_memory_percentage < sys_free_memory_limit * 0.7 {
+        let current_memory_percentage = if sys_memory_metric == SysMemoryMetric::Free {
+            current_sys_free_memory_percentage as f64
+        } else {
+            current_sys_available_memory_percentage as f64
+        };
+
+        if sys_memory_limit != 0.0 {
+            if current_memory_percentage < sys_memory_limit * 0.7 {
                 *last_exceeded = get_timestamp(0);
                 exception_handler.set(Exception::FreeMemExceeded);
-                *under_sys_free_memory_limit = true;
+                *under_sys_memory_limit = true;
                 error!(
-                    "current system free memory percentage is less than the 70% of sys_free_memory_limit, current system free memory percentage={}%, sys_free_memory_limit={}%, deepflow-agent restart...",
-                    current_sys_free_memory_percentage, sys_free_memory_limit
+                    "current system {:?} memory percentage is less than the 70% of sys_memory_limit, current system memory percentage={}%, sys_memory_limit={}%, deepflow-agent restart...",
+                    sys_memory_metric, current_memory_percentage, sys_memory_limit
                 );
                 crate::utils::notify_exit(-1);
-            } else if current_sys_free_memory_percentage < sys_free_memory_limit {
+            } else if current_memory_percentage < sys_memory_limit {
                 *last_exceeded = get_timestamp(0);
                 exception_handler.set(Exception::FreeMemExceeded);
-                *under_sys_free_memory_limit = true;
+                *under_sys_memory_limit = true;
                 error!(
-                    "current system free memory percentage is less than sys_free_memory_limit, current system free memory percentage={}%, sys_free_memory_limit={}%, set the agent to disabled",
-                    current_sys_free_memory_percentage, sys_free_memory_limit
+                    "current system {:?} memory percentage is less than sys_memory_limit, current system memory percentage={}%, sys_memory_limit={}%, set the agent to disabled",
+                    sys_memory_metric, current_memory_percentage, sys_memory_limit
                 );
-            } else if current_sys_free_memory_percentage >= sys_free_memory_limit * 1.1 {
+            } else if current_memory_percentage >= sys_memory_limit * 1.1 {
                 let now = get_timestamp(0);
-                if *under_sys_free_memory_limit && now > *last_exceeded + CONTINUOUS_SAFETY_TIME {
+                if *under_sys_memory_limit && now > *last_exceeded + CONTINUOUS_SAFETY_TIME {
                     exception_handler.clear(Exception::FreeMemExceeded);
-                    *under_sys_free_memory_limit = false;
+                    *under_sys_memory_limit = false;
                     info!(
-                        "current system free memory percentage: {}% remains above sys_free_memory_limit: {} * 110%, set the agent to enabled.",
-                        current_sys_free_memory_percentage, sys_free_memory_limit
+                        "current system {:?} memory percentage: {}% remains above sys_memory_limit: {} * 110%, set the agent to enabled.",
+                        sys_memory_metric, current_memory_percentage, sys_memory_limit
                     );
                 }
             }
@@ -453,7 +461,7 @@ impl Guard {
                     }
                 }
 
-                Self::check_sys_free_memory(config.sys_free_memory_limit as f64, &mut under_sys_free_memory_limit, &mut last_exceeded, &exception_handler);
+                Self::check_sys_memory(config.sys_memory_limit as f64, config.sys_memory_metric, &mut under_sys_free_memory_limit, &mut last_exceeded, &exception_handler);
 
                 match get_thread_num() {
                     Ok(thread_num) => {

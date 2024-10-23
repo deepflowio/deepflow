@@ -33,7 +33,7 @@ use crate::config::handler::EnvironmentAccess;
 use crate::{
     error::{Error, Result},
     utils::{
-        process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
+        process::{get_current_sys_memory_percentage, get_file_and_size_sum},
         stats::{
             self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
             StatsOption,
@@ -211,23 +211,39 @@ impl RefCountable for SysStatusBroker {
         }
 
         let mut metrics = vec![];
-        let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
+        let (current_sys_free_memory_percentage, current_sys_available_memory_percentage) =
+            get_current_sys_memory_percentage();
         metrics.push((
             "sys_free_memory",
             CounterType::Gauged,
             CounterValue::Unsigned(current_sys_free_memory_percentage as u64),
         ));
+        metrics.push((
+            "sys_available_memory",
+            CounterType::Gauged,
+            CounterValue::Unsigned(current_sys_available_memory_percentage as u64),
+        ));
 
-        let sys_free_memory_limit = self.config.load().sys_free_memory_limit as f64;
-        let sys_free_memory_limit_ratio = if sys_free_memory_limit > 0.0 {
-            current_sys_free_memory_percentage as f64 / sys_free_memory_limit
-        } else {
-            0.0 // If sys_free_memory_limit is set to 0, it means that there is no need to check if the system's free memory is too low. In this case, 0.0 will be directly returned, indicating that there will be no low system free memory alert.
-        };
+        let sys_memory_limit = self.config.load().sys_memory_limit as f64;
+
+        let (sys_free_memory_limit_ratio, sys_available_memory_limit_ratio) =
+            if sys_memory_limit > 0.0 {
+                (
+                    current_sys_free_memory_percentage as f64 / sys_memory_limit,
+                    current_sys_available_memory_percentage as f64 / sys_memory_limit,
+                )
+            } else {
+                (0.0, 0.0) // If sys_memory_limit is set to 0, it means that there is no need to check if the system's free/available memory is too low. In this case, 0.0 will be directly returned, indicating that there will be no low system free/available memory alert.
+            };
         metrics.push((
             "sys_free_memory_limit_ratio",
             CounterType::Gauged,
             CounterValue::Float(sys_free_memory_limit_ratio),
+        ));
+        metrics.push((
+            "sys_available_memory_limit_ratio",
+            CounterType::Gauged,
+            CounterValue::Float(sys_available_memory_limit_ratio),
         ));
 
         match get_file_and_size_sum(&self.log_dir) {
