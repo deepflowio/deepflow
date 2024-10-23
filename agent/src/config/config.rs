@@ -1385,12 +1385,40 @@ impl Default for Policy {
     }
 }
 
+fn parse_maybe_binary_u8<'de, D>(deserializer: D) -> Result<u8, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+
+    if let Ok(n) = s.parse::<u8>() {
+        return Ok(n);
+    }
+
+    if s.starts_with("0b") {
+        let mut n = 0;
+        for c in s[2..].chars() {
+            if matches!(c, '0' | '1') {
+                n <<= 1;
+                n += if c == '1' { 1 } else { 0 };
+            }
+        }
+        return Ok(n);
+    }
+
+    return Err(de::Error::invalid_value(
+        Unexpected::Str(&s),
+        &"0b[0-1]{8}|[0-9]+",
+    ));
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TcpHeader {
     pub block_size: usize,
     pub sender_queue_size: usize,
     pub sender_queue_count: usize,
+    #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub header_fields_flag: u8,
 }
 
@@ -1825,13 +1853,13 @@ fn to_system_load_metric<'de, D>(deserializer: D) -> Result<agent::SystemLoadMet
 where
     D: Deserializer<'de>,
 {
-    match u8::deserialize(deserializer)? {
-        0 => Ok(agent::SystemLoadMetric::Load1),
-        1 => Ok(agent::SystemLoadMetric::Load5),
-        2 => Ok(agent::SystemLoadMetric::Load15),
+    match String::deserialize(deserializer)?.as_str() {
+        "load1" => Ok(agent::SystemLoadMetric::Load1),
+        "load5" => Ok(agent::SystemLoadMetric::Load5),
+        "load15" => Ok(agent::SystemLoadMetric::Load15),
         other => Err(de::Error::invalid_value(
-            Unexpected::Unsigned(other as u64),
-            &"[0-2]",
+            Unexpected::Str(other),
+            &"[load1|load5|load15]",
         )),
     }
 }
@@ -2268,6 +2296,7 @@ pub struct Npb {
     pub extra_vlan_header: agent::VlanMode,
     pub traffic_global_dedup: bool,
     pub target_port: u16,
+    #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub custom_vxlan_flags: u8,
     pub overlay_vlan_header_trimming: bool,
     pub max_tx_throughput: u64,
@@ -5043,6 +5072,8 @@ fn resolve_domain(addr: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    use std::fs;
+
     #[test]
     fn read_yaml_file() {
         // TODO: improve test cases
@@ -5073,5 +5104,51 @@ log_backhaul_enabled: false
         assert_eq!(log.log_level, log::Level::Warn);
         assert_eq!(log.log_file, "/tmp/agent.log");
         assert!(!log.log_backhaul_enabled);
+    }
+
+    #[test]
+    fn parse_user_config() {
+        let template_path = "../server/agent_config/template.yaml";
+        let yaml_content = fs::read_to_string(template_path).expect("Failed to read template.yaml");
+
+        let _: UserConfig = serde_yaml::from_str(&yaml_content)
+            .expect("Failed to parse template.yaml to UserConfig");
+    }
+
+    #[test]
+    fn parse_tcp_header() {
+        let yaml = r#"
+block_size: 512
+sender_queue_size: 131072
+sender_queue_count: 2
+header_fields_flag: "0b1010_1010"
+"#;
+        let tcp_header: TcpHeader = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(tcp_header.block_size, 512);
+        assert_eq!(tcp_header.sender_queue_size, 131072);
+        assert_eq!(tcp_header.sender_queue_count, 2);
+        assert_eq!(tcp_header.header_fields_flag, 0b1010_1010);
+
+        // Test with decimal input for header_fields_flag
+        let yaml = r#"
+block_size: 256
+sender_queue_size: 65536
+sender_queue_count: 1
+header_fields_flag: "170"
+"#;
+        let tcp_header: TcpHeader = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(tcp_header.header_fields_flag, 170); // 170 decimal == 0b1010_1010
+
+        // Test with invalid input
+        let yaml_invalid = r#"
+block_size: 256
+sender_queue_size: 65536
+sender_queue_count: 1
+header_fields_flag: "invalid"
+"#;
+        let result: Result<TcpHeader, _> = serde_yaml::from_str(yaml_invalid);
+        assert!(result.is_err());
     }
 }

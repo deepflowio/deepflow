@@ -3917,7 +3917,7 @@ processors:
       #     新周期。
       # upgrade_from: static_config.l7-protocol-inference-ttl
       # TODO: 增加了最小、最大值
-      inference_result_ttl: 60
+      inference_result_ttl: 60s
       # type: string
       # name:
       #   en: Enabled Protocols
