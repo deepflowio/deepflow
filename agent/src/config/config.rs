@@ -1781,6 +1781,7 @@ pub struct Limits {
     pub max_memory: u64,
     pub max_log_backhaul_rate: u32,
     pub max_local_log_file_size: u32,
+    #[serde(with = "humantime_serde")]
     pub local_log_retention: Duration,
 }
 
@@ -1867,6 +1868,7 @@ impl Default for RelativeSysLoad {
 #[serde(default)]
 pub struct TxThroughput {
     pub trigger_threshold: u64,
+    #[serde(with = "humantime_serde")]
     pub throughput_monitoring_interval: Duration,
 }
 
@@ -1893,6 +1895,7 @@ pub struct Tunning {
     pub cpu_affinity: Vec<usize>,
     pub process_scheduling_priority: usize,
     pub idle_memory_trimming: bool,
+    #[serde(with = "humantime_serde")]
     pub resource_monitoring_interval: Duration,
 }
 
@@ -1911,7 +1914,9 @@ impl Default for Tunning {
 #[serde(default)]
 pub struct Ntp {
     pub enabled: bool,
+    #[serde(with = "humantime_serde")]
     pub max_drift: Duration,
+    #[serde(with = "humantime_serde")]
     pub min_drift: Duration,
 }
 
@@ -1928,7 +1933,9 @@ impl Default for Ntp {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Communication {
+    #[serde(with = "humantime_serde")]
     pub proactive_request_interval: Duration,
+    #[serde(with = "humantime_serde")]
     pub max_escape_duration: Duration,
     pub ingester_ip: String,
     pub ingester_port: u16,
@@ -2013,6 +2020,7 @@ pub struct SelfMonitoring {
     pub profile: Profile,
     pub debug: Debug,
     pub hostname: String,
+    #[serde(with = "humantime_serde")]
     pub interval: Duration,
 }
 
@@ -2302,6 +2310,7 @@ pub struct Outputs {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Plugins {
+    #[serde(with = "humantime_serde")]
     pub update_time: Duration,
     pub wasm_plugins: Vec<String>,
     pub so_plugins: Vec<String>,
