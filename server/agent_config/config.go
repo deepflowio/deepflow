@@ -85,8 +85,9 @@ type AgentGroupConfig struct {
 	Domains                           []string      `json:"DOMAINS" yaml:"domains,omitempty"`                                 // domains info, separate by ","
 	DecapType                         []int         `json:"DECAP_TYPE" yaml:"decap_type,omitempty"`                           // separate by ","
 	HTTPLogSpanID                     *string       `json:"HTTP_LOG_SPAN_ID" yaml:"http_log_span_id,omitempty"`
-	SysFreeMemoryLimit                *int          `json:"SYS_FREE_MEMORY_LIMIT" yaml:"sys_free_memory_limit,omitempty"` // unit: %
-	LogFileSize                       *int          `json:"LOG_FILE_SIZE" yaml:"log_file_size,omitempty"`                 // unit: MB
+	SysFreeMemoryLimit                *int          `json:"SYS_FREE_MEMORY_LIMIT" yaml:"sys_free_memory_limit,omitempty"`   // unit: %
+	SysFreeMemoryMetric               *string       `json:"SYS_FREE_MEMORY_METRIC" yaml:"sys_free_memory_metric,omitempty"` // unit: %
+	LogFileSize                       *int          `json:"LOG_FILE_SIZE" yaml:"log_file_size,omitempty"`                   // unit: MB
 	HTTPLogXRequestID                 *string       `json:"HTTP_LOG_X_REQUEST_ID" yaml:"http_log_x_request_id,omitempty"`
 	ExternalAgentHTTPProxyEnabled     *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED" yaml:"external_agent_http_proxy_enabled,omitempty"`
 	ExternalAgentHTTPProxyPort        *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`

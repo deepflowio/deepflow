@@ -28,14 +28,19 @@ max_memory: 768
 # System Free Memory Limit
 # Unit: %. Default: 0. Range: [0, 100]
 # Note: The limit of the percentage of system free memory.
-#   Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
-#   1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
+#   Setting sys_memory_limit to 0 indicates that the system free/available memory ratio is not checked.
+#   1. When the current system free/available memory ratio is below sys_memory_limit * 70%,
 #      the agent will automatically restart.
-#   2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
+#   2. When the current system free/available memory ratio is below sys_memory_limit but above 70%,
 #      the agent enters the disabled state.
-#   3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+#   3. When the current system free/available memory ratio remains above sys_memory_limit * 110%,
 #      the agent recovers from the disabled state.
 sys_free_memory_limit: 0
+
+# System Free Memory Metric
+# Default: free
+# Supported values: free, available
+sys_free_memory_metric: free
 
 # Packet Capture Rate Limit
 # Unit: Kpps. Default: 200. Range: [1, 1000000]

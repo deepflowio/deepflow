@@ -57,7 +57,7 @@ use public::{
     bitmap::Bitmap,
     consts::NPB_DEFAULT_PORT,
     proto::{
-        agent::{self, SocketType, SystemLoadMetric},
+        agent::{self, SocketType, SysMemoryMetric, SystemLoadMetric},
         common,
         trident::{self, KubernetesClusterIdRequest, TapMode},
     },
@@ -1843,10 +1843,26 @@ impl Default for Alerts {
     }
 }
 
+fn to_sys_memory_metric<'de, D>(deserializer: D) -> Result<agent::SysMemoryMetric, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "free" => Ok(agent::SysMemoryMetric::Free),
+        "available" => Ok(agent::SysMemoryMetric::Available),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"[free|available]",
+        )),
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct SysFreeMemoryPercentage {
+pub struct SysMemoryPercentage {
     pub trigger_threshold: u32,
+    #[serde(deserialize_with = "to_sys_memory_metric")]
+    pub metric: agent::SysMemoryMetric,
 }
 
 fn to_system_load_metric<'de, D>(deserializer: D) -> Result<agent::SystemLoadMetric, D::Error>
@@ -1870,14 +1886,14 @@ pub struct RelativeSysLoad {
     pub trigger_threshold: f32,
     pub recovery_threshold: f32,
     #[serde(deserialize_with = "to_system_load_metric")]
-    pub system_load_circuit_breaker_metric: agent::SystemLoadMetric,
+    pub metric: agent::SystemLoadMetric,
 }
 
 impl PartialEq for RelativeSysLoad {
     fn eq(&self, other: &Self) -> bool {
         self.trigger_threshold == other.trigger_threshold
             || self.recovery_threshold == other.recovery_threshold
-            || self.system_load_circuit_breaker_metric == other.system_load_circuit_breaker_metric
+            || self.metric == other.metric
     }
 }
 impl Eq for RelativeSysLoad {}
@@ -1887,7 +1903,7 @@ impl Default for RelativeSysLoad {
         RelativeSysLoad {
             trigger_threshold: 1.0,
             recovery_threshold: 0.9,
-            system_load_circuit_breaker_metric: agent::SystemLoadMetric::Load15,
+            metric: agent::SystemLoadMetric::Load15,
         }
     }
 }
@@ -1912,7 +1928,7 @@ impl Default for TxThroughput {
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CircuitBreakers {
-    pub sys_free_memory_percentage: SysFreeMemoryPercentage,
+    pub sys_memory_percentage: SysMemoryPercentage,
     pub relative_sys_load: RelativeSysLoad,
     pub tx_throughput: TxThroughput,
 }
@@ -2369,13 +2385,15 @@ impl From<&RuntimeConfig> for UserConfig {
                     check_core_file_disabled: rc.yaml_config.check_core_file_disabled,
                 },
                 circuit_breakers: CircuitBreakers {
-                    sys_free_memory_percentage: SysFreeMemoryPercentage {
-                        trigger_threshold: rc.sys_free_memory_limit,
+                    sys_memory_percentage: SysMemoryPercentage {
+                        trigger_threshold: rc.sys_memory_limit,
+                        metric: SysMemoryMetric::from_str_name(rc.sys_memory_metric.as_str_name())
+                            .unwrap_or(SysMemoryMetric::Free),
                     },
                     relative_sys_load: RelativeSysLoad {
                         trigger_threshold: rc.system_load_circuit_breaker_threshold,
                         recovery_threshold: rc.system_load_circuit_breaker_recover,
-                        system_load_circuit_breaker_metric: SystemLoadMetric::from_str_name(
+                        metric: SystemLoadMetric::from_str_name(
                             rc.system_load_circuit_breaker_metric.as_str_name(),
                         )
                         .unwrap_or(SystemLoadMetric::Load15),
@@ -4538,7 +4556,9 @@ pub struct RuntimeConfig {
     pub kubernetes_api_enabled: bool,
     #[serde(deserialize_with = "bool_from_int")]
     pub ntp_enabled: bool,
-    pub sys_free_memory_limit: u32,
+    pub sys_memory_limit: u32,
+    #[serde(skip)]
+    pub sys_memory_metric: trident::SysMemoryMetric,
     pub log_file_size: u32,
     #[serde(deserialize_with = "bool_from_int")]
     pub external_agent_http_proxy_enabled: bool,
@@ -4644,7 +4664,8 @@ impl RuntimeConfig {
             l4_performance_enabled: true,
             kubernetes_api_enabled: false,
             ntp_enabled: false,
-            sys_free_memory_limit: 0,
+            sys_memory_limit: 0,
+            sys_memory_metric: trident::SysMemoryMetric::Free,
             log_file_size: 1000,
             external_agent_http_proxy_enabled: false,
             external_agent_http_proxy_port: 38086,
@@ -4902,7 +4923,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             l4_performance_enabled: conf.l4_performance_enabled(),
             kubernetes_api_enabled: conf.kubernetes_api_enabled(),
             ntp_enabled: conf.ntp_enabled(),
-            sys_free_memory_limit: conf.sys_free_memory_limit(),
+            sys_memory_limit: conf.sys_free_memory_limit(),
+            sys_memory_metric: conf.sys_free_memory_metric(),
             log_file_size: conf.log_file_size(),
             external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
             external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,

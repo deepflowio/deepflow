@@ -301,11 +301,11 @@ check provides a switch to prevent the process hang. Additional links:
 
 ## Circuit Breakers {#global.circuit_breakers}
 
-### System Free Memory Percentage {#global.circuit_breakers.sys_free_memory_percentage}
+### System Free Memory Percentage {#global.circuit_breakers.sys_memory_percentage}
 
 Calculation Method: `(free_memory / total_memory) * 100%`
 
-#### Trigger Threshold {#global.circuit_breakers.sys_free_memory_percentage.trigger_threshold}
+#### Trigger Threshold {#global.circuit_breakers.sys_memory_percentage.trigger_threshold}
 
 **Tags**:
 
@@ -313,7 +313,7 @@ Calculation Method: `(free_memory / total_memory) * 100%`
 
 **FQCN**:
 
-`global.circuit_breakers.sys_free_memory_percentage.trigger_threshold`
+`global.circuit_breakers.sys_memory_percentage.trigger_threshold`
 
 Upgrade from old version: `sys_free_memory_limit`
 
@@ -321,7 +321,7 @@ Upgrade from old version: `sys_free_memory_limit`
 ```yaml
 global:
   circuit_breakers:
-    sys_free_memory_percentage:
+    sys_memory_percentage:
       trigger_threshold: 0
 ```
 
@@ -341,6 +341,35 @@ Setting sys_free_memory_limit to 0 indicates that the system free memory ratio i
    the agent enters the disabled state.
 3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
    the agent recovers from the disabled state.
+
+#### Metric {#global.circuit_breakers.sys_memory_percentage.metric}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.sys_memory_percentage.metric`
+
+Upgrade from old version: `sys_free_memory_metric`
+
+**Default value**:
+```yaml
+global:
+  circuit_breakers:
+    sys_memory_percentage:
+      metric: free
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+deepflow-agent observes the percentage of this memory metric.
 
 ### Relative System Load {#global.circuit_breakers.relative_sys_load}
 
@@ -414,7 +443,7 @@ minutes, the agent can recover from the circuit breaker
 disabled state, and setting it to 0 means turning off the
 circuit breaker feature.
 
-#### Metric {#global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric}
+#### Metric {#global.circuit_breakers.relative_sys_load.metric}
 
 **Tags**:
 
@@ -431,7 +460,7 @@ Upgrade from old version: `system_load_circuit_breaker_metric`
 global:
   circuit_breakers:
     relative_sys_load:
-      system_load_circuit_breaker_metric: load15
+      metric: load15
 ```
 
 **Enum options**:

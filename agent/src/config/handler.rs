@@ -197,7 +197,8 @@ pub struct EnvironmentConfig {
     pub max_millicpus: u32,
     pub process_threshold: u32,
     pub thread_threshold: u32,
-    pub sys_free_memory_limit: u32,
+    pub sys_memory_limit: u32,
+    pub sys_memory_metric: agent::SysMemoryMetric,
     pub log_file_size: u32,
     pub capture_mode: PacketCaptureType,
     pub guard_interval: Duration,
@@ -1567,11 +1568,12 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 max_millicpus: conf.global.limits.max_millicpus,
                 process_threshold: conf.global.alerts.process_threshold,
                 thread_threshold: conf.global.alerts.thread_threshold,
-                sys_free_memory_limit: conf
+                sys_memory_limit: conf
                     .global
                     .circuit_breakers
-                    .sys_free_memory_percentage
+                    .sys_memory_percentage
                     .trigger_threshold,
+                sys_memory_metric: conf.global.circuit_breakers.sys_memory_percentage.metric,
                 log_file_size: conf.global.limits.max_local_log_file_size,
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
                 guard_interval: conf.global.tunning.resource_monitoring_interval,
@@ -1589,7 +1591,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     .global
                     .circuit_breakers
                     .relative_sys_load
-                    .system_load_circuit_breaker_metric,
+                    .metric,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: conf.global.communication.proactive_request_interval,
@@ -3499,28 +3501,31 @@ impl ConfigHandler {
                 relative_sys_load.recovery_threshold, new_relative_sys_load.recovery_threshold);
             relative_sys_load.recovery_threshold = new_relative_sys_load.recovery_threshold;
         }
-        if relative_sys_load.system_load_circuit_breaker_metric
-            != new_relative_sys_load.system_load_circuit_breaker_metric
-        {
-            info!("Update global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric from {:?} to {:?}.", 
-                relative_sys_load.system_load_circuit_breaker_metric, new_relative_sys_load.system_load_circuit_breaker_metric);
-            relative_sys_load.system_load_circuit_breaker_metric =
-                new_relative_sys_load.system_load_circuit_breaker_metric;
+        if relative_sys_load.metric != new_relative_sys_load.metric {
+            info!(
+                "Update global.circuit_breakers.relative_sys_load.metric from {:?} to {:?}.",
+                relative_sys_load.metric, new_relative_sys_load.metric
+            );
+            relative_sys_load.metric = new_relative_sys_load.metric;
         }
         if relative_sys_load.trigger_threshold != new_relative_sys_load.trigger_threshold {
             info!("Update global.circuit_breakers.relative_sys_load.trigger_threshold from {:?} to {:?}.", 
                 relative_sys_load.trigger_threshold, new_relative_sys_load.trigger_threshold);
             relative_sys_load.trigger_threshold = new_relative_sys_load.trigger_threshold;
         }
-        let sys_free_memory_percentage = &mut circuit_breakers.sys_free_memory_percentage;
-        let new_sys_free_memory_percentage = &mut new_circuit_breakers.sys_free_memory_percentage;
-        if sys_free_memory_percentage.trigger_threshold
-            != new_sys_free_memory_percentage.trigger_threshold
-        {
-            info!("Update global.circuit_breakers.sys_free_memory_percentage.trigger_threshold from {:?} to {:?}.", 
-                sys_free_memory_percentage.trigger_threshold, new_sys_free_memory_percentage.trigger_threshold);
-            sys_free_memory_percentage.trigger_threshold =
-                new_sys_free_memory_percentage.trigger_threshold;
+        let sys_memory_percentage = &mut circuit_breakers.sys_memory_percentage;
+        let new_sys_memory_percentage = &mut new_circuit_breakers.sys_memory_percentage;
+        if sys_memory_percentage.trigger_threshold != new_sys_memory_percentage.trigger_threshold {
+            info!("Update global.circuit_breakers.sys_memory_percentage.trigger_threshold from {:?} to {:?}.", 
+                sys_memory_percentage.trigger_threshold, new_sys_memory_percentage.trigger_threshold);
+            sys_memory_percentage.trigger_threshold = new_sys_memory_percentage.trigger_threshold;
+        }
+        if sys_memory_percentage.metric != new_sys_memory_percentage.metric {
+            info!(
+                "Update global.circuit_breakers.sys_memory_percentage.metric from {:?} to {:?}.",
+                sys_memory_percentage.metric, new_sys_memory_percentage.metric
+            );
+            sys_memory_percentage.metric = new_sys_memory_percentage.metric;
         }
         let tx_throughput = &mut circuit_breakers.tx_throughput;
         let new_tx_throughput = &mut new_circuit_breakers.tx_throughput;
@@ -4812,6 +4817,11 @@ impl ConfigHandler {
             crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
             return vec![];
         }
+
+        candidate_config.environment = new_config.environment;
+        candidate_config.log = new_config.log;
+        candidate_config.port_config = new_config.port_config;
+        candidate_config.pcap = new_config.pcap;
 
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
