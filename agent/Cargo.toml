@@ -89,7 +89,7 @@ ring = "0.16.20"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.72"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 signal-hook = "0.3"
 socket2 = "0.4.4"
 special_recv_engine = { path = "plugins/special_recv_engine" }
