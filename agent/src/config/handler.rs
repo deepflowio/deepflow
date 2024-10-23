@@ -197,7 +197,8 @@ pub struct EnvironmentConfig {
     pub max_millicpus: u32,
     pub process_threshold: u32,
     pub thread_threshold: u32,
-    pub sys_free_memory_limit: u32,
+    pub sys_memory_limit: u32,
+    pub sys_memory_metric: agent::SysMemoryMetric,
     pub log_file_size: u32,
     pub capture_mode: PacketCaptureType,
     pub guard_interval: Duration,
@@ -1567,11 +1568,12 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 max_millicpus: conf.global.limits.max_millicpus,
                 process_threshold: conf.global.alerts.process_threshold,
                 thread_threshold: conf.global.alerts.thread_threshold,
-                sys_free_memory_limit: conf
+                sys_memory_limit: conf
                     .global
                     .circuit_breakers
-                    .sys_free_memory_percentage
+                    .sys_memory_percentage
                     .trigger_threshold,
+                sys_memory_metric: conf.global.circuit_breakers.sys_memory_percentage.metric,
                 log_file_size: conf.global.limits.max_local_log_file_size,
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
                 guard_interval: conf.global.tunning.resource_monitoring_interval,
@@ -1589,7 +1591,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     .global
                     .circuit_breakers
                     .relative_sys_load
-                    .system_load_circuit_breaker_metric,
+                    .metric,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: conf.global.communication.proactive_request_interval,
@@ -3002,15 +3004,26 @@ impl ConfigHandler {
             }
         }
 
-        if candidate_config.environment.sys_free_memory_limit
-            != new_config.environment.sys_free_memory_limit
+        if candidate_config.environment.sys_memory_limit
+            != new_config.environment.sys_memory_limit
         {
             info!(
-                "sys_free_memory_limit set to {}",
-                new_config.environment.sys_free_memory_limit
+                "sys_memory_limit set to {}",
+                new_config.environment.sys_memory_limit
             );
-            candidate_config.environment.sys_free_memory_limit =
-                new_config.environment.sys_free_memory_limit;
+            candidate_config.environment.sys_memory_limit =
+                new_config.environment.sys_memory_limit;
+        }
+
+        if candidate_config.environment.sys_memory_metric
+            != new_config.environment.sys_memory_metric
+        {
+            info!(
+                "sys_memory_metric set to {:?}",
+                new_config.environment.sys_memory_metric
+            );
+            candidate_config.environment.sys_memory_metric =
+                new_config.environment.sys_memory_metric;
         }
 
         if candidate_config.environment.process_threshold

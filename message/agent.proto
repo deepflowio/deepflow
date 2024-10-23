@@ -197,6 +197,11 @@ enum SystemLoadMetric {
     Load15 = 2;
 }
 
+enum SysMemoryMetric {
+    Free = 0;
+    Available = 1;
+}
+
 message Segment {  // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
