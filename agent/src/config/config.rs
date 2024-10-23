@@ -1961,19 +1961,9 @@ impl Default for Communication {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(remote = "log::Level")]
-enum LevelDef {
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Log {
-    #[serde(with = "LevelDef")]
+    #[serde(deserialize_with = "to_log_level")]
     pub log_level: log::Level,
     pub log_file: String,
     pub log_backhaul_enabled: bool,
@@ -3719,7 +3709,7 @@ pub struct BondGroup {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
-    #[serde(with = "LevelDef")]
+    #[serde(deserialize_with = "to_log_level")]
     pub log_level: log::Level,
     pub profiler: bool,
     #[serde(alias = "afpacket-blocks-enabled")]
@@ -5060,5 +5050,28 @@ mod tests {
             .expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");
+    }
+
+    #[test]
+    fn parse_log_level() {
+        let yaml = r#"
+log_level: Info
+log_file: "/var/log/deepflow_agent/test.log"
+log_backhaul_enabled: true
+"#;
+        let log: Log = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(log.log_level, log::Level::Info);
+        assert_eq!(log.log_file, "/var/log/deepflow_agent/test.log");
+        assert!(log.log_backhaul_enabled);
+
+        let yaml_with_warn = r#"
+log_level: WARN
+log_file: "/tmp/agent.log"
+log_backhaul_enabled: false
+"#;
+        let log: Log = serde_yaml::from_str(yaml_with_warn).unwrap();
+        assert_eq!(log.log_level, log::Level::Warn);
+        assert_eq!(log.log_file, "/tmp/agent.log");
+        assert!(!log.log_backhaul_enabled);
     }
 }
