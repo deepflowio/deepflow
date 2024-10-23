@@ -2069,6 +2069,7 @@ where
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct GlobalCommon {
     pub enabled: bool,
     #[serde(deserialize_with = "to_agent_type")]
@@ -2076,6 +2077,7 @@ pub struct GlobalCommon {
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Global {
     pub limits: Limits,
     pub alerts: Alerts,
@@ -4273,6 +4275,7 @@ impl Default for YamlConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct PortConfig {
     pub analyzer_port: u16,
     pub proxy_controller_port: u16,
