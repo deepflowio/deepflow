@@ -74,6 +74,7 @@ var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
 	Domains:                       &DefaultDomains,
 	DecapType:                     &DefaultDecapType,
 	HTTPLogSpanID:                 &DefaultHTTPLogSpanID,
+	SysFreeMemoryMetric:           &DefaultSysFreeMemoryMetric,
 	SysFreeMemoryLimit:            &DefaultSysFreeMemoryLimit,
 	LogFileSize:                   &DefaultLogFileSize,
 	HTTPLogXRequestID:             &DefaultHTTPLogXRequestID,
@@ -146,6 +147,7 @@ var (
 	DefaultDomains                       = "0"
 	DefaultDecapType                     = "1,2"
 	DefaultHTTPLogSpanID                 = "traceparent, sw8"
+	DefaultSysFreeMemoryMetric           = "free"
 	DefaultSysFreeMemoryLimit            = 0
 	DefaultLogFileSize                   = 1000
 	DefaultHTTPLogXRequestID             = "X-Request-ID"

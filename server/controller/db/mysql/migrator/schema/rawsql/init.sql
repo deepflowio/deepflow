@@ -1480,6 +1480,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     domains                                 TEXT           COMMENT 'domains info, separate by ","',
     http_log_span_id                        TEXT           DEFAULT NULL,
     http_log_x_request_id                   CHAR(64),
+    sys_free_memory_metric                  CHAR(64),
     sys_free_memory_limit                   INTEGER        DEFAULT NULL     COMMENT 'unit: %',
     log_file_size                           INTEGER        DEFAULT NULL     COMMENT 'unit: MB',
     external_agent_http_proxy_enabled       TINYINT(1)     COMMENT '0: disabled 1: enabled',

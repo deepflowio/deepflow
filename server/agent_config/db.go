@@ -92,6 +92,7 @@ type AgentGroupConfigModel struct {
 	Domains                           *string  `gorm:"column:domains;type:text;default:null" json:"DOMAINS"`                                       // domains info, separate by ","
 	DecapType                         *string  `gorm:"column:decap_type;type:text;default:null" json:"DECAP_TYPE"`                                 // separate by ","
 	HTTPLogSpanID                     *string  `gorm:"column:http_log_span_id;type:text;default:null" json:"HTTP_LOG_SPAN_ID"`
+	SysFreeMemoryMetric               *string  `gorm:"column:sys_free_memory_metric;type:char(64);default:null" json:"SYS_FREE_MEMORY_METRIC"`
 	SysFreeMemoryLimit                *int     `gorm:"column:sys_free_memory_limit;type:int;default:null" json:"SYS_FREE_MEMORY_LIMIT"` // unit: %
 	LogFileSize                       *int     `gorm:"column:log_file_size;type:int;default:null" json:"LOG_FILE_SIZE"`                 // unit: MB
 	HTTPLogXRequestID                 *string  `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
