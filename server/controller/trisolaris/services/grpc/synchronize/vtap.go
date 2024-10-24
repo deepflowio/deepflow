@@ -48,6 +48,16 @@ var SOCKET_TYPE_TO_MESSAGE = map[string]api.SocketType{
 	"FILE":    FILE_SOCKET,
 }
 
+var (
+	FREE_SYS_MEMORY_METRIC      = api.SysMemoryMetric_Free
+	AVAILABLE_SYS_MEMORY_METRIC = api.SysMemoryMetric_Available
+)
+
+var SYS_MEMORY_METRIC_TO_MESSAGE = map[string]api.SysMemoryMetric{
+	"free":      FREE_SYS_MEMORY_METRIC,
+	"available": AVAILABLE_SYS_MEMORY_METRIC,
+}
+
 type VTapEvent struct{}
 
 func NewVTapEvent() *VTapEvent {
@@ -87,6 +97,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[*vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
+	}
+	sysFreeMemoryMetric, ok := SYS_MEMORY_METRIC_TO_MESSAGE[*vtapConfig.SysFreeMemoryMetric]
+	if ok == false {
+		sysFreeMemoryMetric = FREE_SYS_MEMORY_METRIC
 	}
 	decapTypes := make([]api.DecapType, 0, len(vtapConfig.ConvertedDecapType))
 	for _, decap := range vtapConfig.ConvertedDecapType {
@@ -155,6 +169,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		NtpEnabled:                    proto.Bool(Int2Bool(*vtapConfig.NtpEnabled)),
 		L4PerformanceEnabled:          proto.Bool(Int2Bool(*vtapConfig.L4PerformanceEnabled)),
 		KubernetesApiEnabled:          proto.Bool(false),
+		SysFreeMemoryMetric:           &sysFreeMemoryMetric,
 		SysFreeMemoryLimit:            proto.Uint32(uint32(*vtapConfig.SysFreeMemoryLimit)),
 		LogFileSize:                   proto.Uint32(uint32(*vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig())),
@@ -503,6 +518,10 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
 	}
+	sysFreeMemoryMetric, ok := SYS_MEMORY_METRIC_TO_MESSAGE[*vtapConfig.SysFreeMemoryMetric]
+	if ok == false {
+		sysFreeMemoryMetric = FREE_SYS_MEMORY_METRIC
+	}
 	decapTypes := make([]api.DecapType, 0, len(vtapConfig.ConvertedDecapType))
 	for _, decap := range vtapConfig.ConvertedDecapType {
 		decapTypes = append(decapTypes, api.DecapType(decap))
@@ -513,6 +532,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 	tapMode := api.TapMode(*vtapConfig.TapMode)
 	breakerMetricStr := convertBreakerMetric(*vtapConfig.SystemLoadCircuitBreakerMetric)
 	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
+
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(*vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -560,6 +580,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 		NtpEnabled:                    proto.Bool(Int2Bool(*vtapConfig.NtpEnabled)),
 		L4PerformanceEnabled:          proto.Bool(Int2Bool(*vtapConfig.L4PerformanceEnabled)),
 		KubernetesApiEnabled:          proto.Bool(false),
+		SysFreeMemoryMetric:           &sysFreeMemoryMetric,
 		SysFreeMemoryLimit:            proto.Uint32(uint32(*vtapConfig.SysFreeMemoryLimit)),
 		LogFileSize:                   proto.Uint32(uint32(*vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(*vtapConfig.ExternalAgentHTTPProxyEnabled)),

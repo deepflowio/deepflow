@@ -94,6 +94,7 @@ type AgentGroupConfigResponse struct {
 	Domains                           []*DomainInfo  `json:"DOMAINS"`                 // domains info, separate by ","
 	DecapType                         []*TypeInfo    `json:"DECAP_TYPE"`              // separate by ","
 	HTTPLogSpanID                     *string        `json:"HTTP_LOG_SPAN_ID"`
+	SysFreeMemoryMetric               *string        `json:"SYS_FREE_MEMORY_METRIC"`
 	SysFreeMemoryLimit                *int           `json:"SYS_FREE_MEMORY_LIMIT"` // unit: %
 	LogFileSize                       *int           `json:"LOG_FILE_SIZE"`         // unit: MB
 	HTTPLogXRequestID                 *string        `json:"HTTP_LOG_X_REQUEST_ID"`
