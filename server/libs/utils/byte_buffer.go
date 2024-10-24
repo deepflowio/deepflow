@@ -53,12 +53,12 @@ func (b *ByteBuffer) SetQuota(n int) {
 	b.quota = n
 }
 
-var byteBufferPool = pool.NewLockFreePool(func() interface{} {
+var byteBufferPool = pool.NewLockFreePool(func() *ByteBuffer {
 	return &ByteBuffer{quota: 1 << 16}
 })
 
 func AcquireByteBuffer() *ByteBuffer {
-	b := byteBufferPool.Get().(*ByteBuffer)
+	b := byteBufferPool.Get()
 	b.ReferenceCount.Reset()
 	return b
 }

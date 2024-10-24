@@ -112,12 +112,12 @@ func (d *DocumentFlow) String() string {
 		d.Timestamp, d.Flags, d.Tag, d.FlowMeter)
 }
 
-var poolDocumentFlow = pool.NewLockFreePool(func() interface{} {
+var poolDocumentFlow = pool.NewLockFreePool(func() *DocumentFlow {
 	return &DocumentFlow{}
 })
 
 func AcquireDocumentFlow() *DocumentFlow {
-	d := poolDocumentFlow.Get().(*DocumentFlow)
+	d := poolDocumentFlow.Get()
 	d.ReferenceCount.Reset()
 	return d
 }
@@ -157,12 +157,12 @@ func (d *DocumentApp) String() string {
 		d.Timestamp, d.Flags, d.Tag, d.AppMeter)
 }
 
-var poolDocumentApp = pool.NewLockFreePool(func() interface{} {
+var poolDocumentApp = pool.NewLockFreePool(func() *DocumentApp {
 	return &DocumentApp{}
 })
 
 func AcquireDocumentApp() *DocumentApp {
-	d := poolDocumentApp.Get().(*DocumentApp)
+	d := poolDocumentApp.Get()
 	d.ReferenceCount.Reset()
 	return d
 }
@@ -198,12 +198,12 @@ func (d *DocumentUsage) String() string {
 		d.Timestamp, d.Flags, d.Tag, d.UsageMeter)
 }
 
-var poolDocumentUsage = pool.NewLockFreePool(func() interface{} {
+var poolDocumentUsage = pool.NewLockFreePool(func() *DocumentUsage {
 	return &DocumentUsage{}
 })
 
 func AcquireDocumentUsage() *DocumentUsage {
-	d := poolDocumentUsage.Get().(*DocumentUsage)
+	d := poolDocumentUsage.Get()
 	d.ReferenceCount.Reset()
 	return d
 }

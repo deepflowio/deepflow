@@ -177,12 +177,12 @@ func (b *MetaPacketBlock) String() string {
 	return result
 }
 
-var metaPacketBlockPool = pool.NewLockFreePool(func() interface{} {
+var metaPacketBlockPool = pool.NewLockFreePool(func() *MetaPacketBlock {
 	return new(MetaPacketBlock)
 }, pool.OptionPoolSizePerCPU(16), pool.OptionInitFullPoolSize(16))
 
 func AcquireMetaPacketBlock() *MetaPacketBlock {
-	b := metaPacketBlockPool.Get().(*MetaPacketBlock)
+	b := metaPacketBlockPool.Get()
 	b.ReferenceCount.Reset()
 	return b
 }

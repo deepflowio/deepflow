@@ -264,12 +264,12 @@ func (t *MiniTag) GetTAPType() uint8 {
 	return uint8(t.TAPType)
 }
 
-var miniFieldPool = pool.NewLockFreePool(func() interface{} {
+var miniFieldPool = pool.NewLockFreePool(func() *MiniField {
 	return &MiniField{}
 })
 
 func AcquireMiniField() *MiniField {
-	return miniFieldPool.Get().(*MiniField)
+	return miniFieldPool.Get()
 }
 
 func ReleaseMiniField(miniField *MiniField) {
@@ -286,12 +286,12 @@ func CloneMiniField(miniField *MiniField) *MiniField {
 	return newMiniField
 }
 
-var miniTagPool = pool.NewLockFreePool(func() interface{} {
+var miniTagPool = pool.NewLockFreePool(func() *MiniTag {
 	return &MiniTag{}
 })
 
 func AcquireMiniTag() *MiniTag {
-	return miniTagPool.Get().(*MiniTag)
+	return miniTagPool.Get()
 }
 
 // ReleaseMiniTag 需要释放Tag拥有的Field

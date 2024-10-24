@@ -199,12 +199,12 @@ func (t *FlowTag) Release() {
 	ReleaseFlowTag(t)
 }
 
-var flowTagPool = pool.NewLockFreePool(func() interface{} {
+var flowTagPool = pool.NewLockFreePool(func() *FlowTag {
 	return &FlowTag{}
 })
 
 func AcquireFlowTag(tagType TagType) *FlowTag {
-	f := flowTagPool.Get().(*FlowTag)
+	f := flowTagPool.Get()
 	f.ReferenceCount.Reset()
 	f.TagType = tagType
 	return f
