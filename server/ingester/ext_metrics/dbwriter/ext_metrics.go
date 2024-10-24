@@ -243,12 +243,12 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	}
 }
 
-var extMetricsPool = pool.NewLockFreePool(func() interface{} {
+var extMetricsPool = pool.NewLockFreePool(func() *ExtMetrics {
 	return &ExtMetrics{}
 })
 
 func AcquireExtMetrics() *ExtMetrics {
-	return extMetricsPool.Get().(*ExtMetrics)
+	return extMetricsPool.Get()
 }
 
 var emptyUniversalTag = flow_metrics.UniversalTag{}

@@ -163,7 +163,7 @@ func (s *DFStats) GenCKTable(ttl int) *ckdb.Table {
 	}
 }
 
-var poolDFStats = pool.NewLockFreePool(func() interface{} {
+var poolDFStats = pool.NewLockFreePool(func() *DFStats {
 	return &DFStats{
 		Tags:   make([]Tag, 0, 4),
 		Fields: make([]Field, 0, 4),
@@ -171,7 +171,7 @@ var poolDFStats = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireDFStats() *DFStats {
-	return poolDFStats.Get().(*DFStats)
+	return poolDFStats.Get()
 }
 
 func ReleaseDFStats(s *DFStats) {

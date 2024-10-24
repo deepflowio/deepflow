@@ -84,9 +84,9 @@ func (r *RecvBuffer) String() string {
 	return fmt.Sprintf("IP:%s %s\n", r.IP, string(r.Buffer))
 }
 
-func newBufferPool(bufferSize, poolSizePerCPU int) *pool.LockFreePool {
-	return pool.NewLockFreePool(
-		func() interface{} {
+func newBufferPool(bufferSize, poolSizePerCPU int) *pool.LockFreePool[*RecvBuffer] {
+	return pool.NewLockFreePool[*RecvBuffer](
+		func() *RecvBuffer {
 			return &RecvBuffer{
 				Buffer: make([]byte, bufferSize),
 			}
@@ -97,7 +97,7 @@ func newBufferPool(bufferSize, poolSizePerCPU int) *pool.LockFreePool {
 	)
 }
 
-var recvBufferPools = []*pool.LockFreePool{
+var recvBufferPools = []*pool.LockFreePool[*RecvBuffer]{
 	newBufferPool(RECV_BUFSIZE_2K, 16),
 	newBufferPool(RECV_BUFSIZE_8K, 32),
 	newBufferPool(RECV_BUFSIZE_64K, 8),
@@ -128,7 +128,7 @@ func minPowerOfTwo(v int) int {
 func AcquireRecvBuffer(length int, socketType ServerType) (*RecvBuffer, bool) {
 	isNew := false
 	index := getBufferPoolIndex(length)
-	buf := recvBufferPools[index].Get().(*RecvBuffer)
+	buf := recvBufferPools[index].Get()
 	buf.SocketType = socketType
 	if len(buf.Buffer) < length {
 		length = minPowerOfTwo(length)

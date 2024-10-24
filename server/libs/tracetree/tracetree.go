@@ -114,12 +114,12 @@ func TraceTreeColumns() []*ckdb.Column {
 	}
 }
 
-var poolTraceTree = pool.NewLockFreePool(func() interface{} {
+var poolTraceTree = pool.NewLockFreePool(func() *TraceTree {
 	return new(TraceTree)
 })
 
 func AcquireTraceTree() *TraceTree {
-	return poolTraceTree.Get().(*TraceTree)
+	return poolTraceTree.Get()
 }
 
 func ReleaseTraceTree(t *TraceTree) {

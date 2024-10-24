@@ -1469,12 +1469,12 @@ func (t *Tag) DatabaseSuffix() string {
 	return DatabaseSuffix[t.DatabaseSuffixID()]
 }
 
-var fieldPool = pool.NewLockFreePool(func() interface{} {
+var fieldPool = pool.NewLockFreePool(func() *Field {
 	return &Field{}
 })
 
 func AcquireField() *Field {
-	return fieldPool.Get().(*Field)
+	return fieldPool.Get()
 }
 
 func ReleaseField(field *Field) {
@@ -1499,12 +1499,12 @@ func CloneField(field *Field) *Field {
 	return newField
 }
 
-var tagPool = pool.NewLockFreePool(func() interface{} {
+var tagPool = pool.NewLockFreePool(func() *Tag {
 	return &Tag{}
 })
 
 func AcquireTag() *Tag {
-	return tagPool.Get().(*Tag)
+	return tagPool.Get()
 }
 
 // ReleaseTag 需要释放Tag拥有的Field

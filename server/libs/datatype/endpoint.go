@@ -224,12 +224,12 @@ func FormatGroupId(id uint32) uint32 {
 	}
 }
 
-var endpointInfoPool = pool.NewLockFreePool(func() interface{} {
+var endpointInfoPool = pool.NewLockFreePool(func() *EndpointInfo {
 	return new(EndpointInfo)
 })
 
 func AcquireEndpointInfo() *EndpointInfo {
-	return endpointInfoPool.Get().(*EndpointInfo)
+	return endpointInfoPool.Get()
 }
 
 func ReleaseEndpointInfo(i *EndpointInfo) {
@@ -243,12 +243,12 @@ func CloneEndpointInfo(i *EndpointInfo) *EndpointInfo {
 	return dup
 }
 
-var endpointDataPool = pool.NewLockFreePool(func() interface{} {
+var endpointDataPool = pool.NewLockFreePool(func() *EndpointData {
 	return new(EndpointData)
 })
 
 func AcquireEndpointData(infos ...*EndpointInfo) *EndpointData {
-	d := endpointDataPool.Get().(*EndpointData)
+	d := endpointDataPool.Get()
 	len := len(infos)
 	if len == 0 {
 		d.SrcInfo = AcquireEndpointInfo()

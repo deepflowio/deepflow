@@ -25,12 +25,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var mysqlInfoPool = pool.NewLockFreePool(func() interface{} {
+var mysqlInfoPool = pool.NewLockFreePool(func() *MysqlInfo {
 	return new(MysqlInfo)
 })
 
 func AcquireMYSQLInfo() *MysqlInfo {
-	return mysqlInfoPool.Get().(*MysqlInfo)
+	return mysqlInfoPool.Get()
 }
 
 func ReleaseMYSQLInfo(d *MysqlInfo) {
@@ -138,12 +138,12 @@ func (i *MysqlInfo) Merge(r interface{}) {
 	}
 }
 
-var redisInfoPool = pool.NewLockFreePool(func() interface{} {
+var redisInfoPool = pool.NewLockFreePool(func() *RedisInfo {
 	return new(RedisInfo)
 })
 
 func AcquireREDISInfo() *RedisInfo {
-	return redisInfoPool.Get().(*RedisInfo)
+	return redisInfoPool.Get()
 }
 
 func ReleaseREDISInfo(d *RedisInfo) {
