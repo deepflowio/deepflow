@@ -108,12 +108,12 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 
 }
 
-var poolSpanTrace = pool.NewLockFreePool(func() interface{} {
+var poolSpanTrace = pool.NewLockFreePool(func() *SpanTrace {
 	return new(SpanTrace)
 })
 
 func AcquireSpanTrace() *SpanTrace {
-	return poolSpanTrace.Get().(*SpanTrace)
+	return poolSpanTrace.Get()
 }
 
 func ReleaseSpanTrace(t *SpanTrace) {

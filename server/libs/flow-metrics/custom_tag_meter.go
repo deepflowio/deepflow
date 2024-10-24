@@ -134,12 +134,12 @@ type CustomTag struct {
 	pool.ReferenceCount
 }
 
-var customTagPool = pool.NewLockFreePool(func() interface{} {
+var customTagPool = pool.NewLockFreePool(func() *CustomTag {
 	return &CustomTag{}
 })
 
 func AcquireCustomTag() *CustomTag {
-	t := customTagPool.Get().(*CustomTag)
+	t := customTagPool.Get()
 	t.Reset()
 	return t
 }

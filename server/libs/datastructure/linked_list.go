@@ -21,7 +21,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var elementPool = pool.NewLockFreePool(func() interface{} {
+var elementPool = pool.NewLockFreePool(func() *Element {
 	return new(Element)
 })
 
@@ -37,7 +37,7 @@ type LinkedList struct {
 }
 
 func element(v interface{}) *Element {
-	e := elementPool.Get().(*Element)
+	e := elementPool.Get()
 	e.value = v
 	return e
 }
