@@ -8,12 +8,12 @@ import (
 
 	{{ $pool_name := print "pool" . }}
 
-	var {{$pool_name}} = pool.NewLockFreePool(func() interface{} {
+	var {{$pool_name}} = pool.NewLockFreePool(func() *{{.}} {
 		return new({{.}})
 	})
 
 	func Acquire{{.}}() *{{.}} {
-		return {{$pool_name}}.Get().(*{{.}})
+		return {{$pool_name}}.Get()
 	}
 
 	func Release{{.}}(meter *{{.}}) {

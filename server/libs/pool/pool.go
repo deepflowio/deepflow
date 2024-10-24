@@ -78,18 +78,18 @@ func SetCounterRegisterCallback(callback CounterRegisterCallback) {
 // 我们需要利用好这一个元素的位置，所以在这个元素上放置slice指针
 // 作为实际的pool使用，每次Get/Put时，先拿到slice，弹出/推入元素后再
 // 将slice放回，以尽可能无锁分配释放资源
-type LockFreePool struct {
+type LockFreePool[T any] struct {
 	emptyPool *sync.Pool
 	fullPool  *sync.Pool
 
 	counter *Counter
 }
 
-func (p *LockFreePool) Get() interface{} {
+func (p *LockFreePool[T]) Get() T {
 	atomic.AddUint64(&p.counter.InUseObjects, 1)
 	atomic.AddUint64(&p.counter.InUseBytes, p.counter.ObjectSize)
 
-	elemPool := p.fullPool.Get().(*[]interface{}) // avoid convT2Eslice
+	elemPool := p.fullPool.Get().(*[]T) // avoid convT2Eslice
 	pool := *elemPool
 	e := pool[len(pool)-1]
 	*elemPool = pool[:len(pool)-1]
@@ -101,11 +101,11 @@ func (p *LockFreePool) Get() interface{} {
 	return e
 }
 
-func (p *LockFreePool) Put(x interface{}) {
+func (p *LockFreePool[T]) Put(x T) {
 	atomic.AddUint64(&p.counter.InUseObjects, math.MaxUint64)
 	atomic.AddUint64(&p.counter.InUseBytes, math.MaxUint64-p.counter.ObjectSize+1)
 
-	pool := p.emptyPool.Get().(*[]interface{}) // avoid convT2Eslice
+	pool := p.emptyPool.Get().(*[]T) // avoid convT2Eslice
 	*pool = append(*pool, x)
 	if len(*pool) < cap(*pool) {
 		p.emptyPool.Put(pool)
@@ -115,7 +115,7 @@ func (p *LockFreePool) Put(x interface{}) {
 }
 
 // 注意OptionInitFullPoolSize不能大于OptionPoolSizePerCPU，且不能小于等于0
-func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool {
+func NewLockFreePool[T any](alloc func() T, options ...Option) *LockFreePool[T] {
 	// options
 	poolSizePerCPU := POOL_SIZE_PER_CPU
 	initFullPoolSize := INIT_FULL_POOL_SIZE
@@ -144,12 +144,12 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool 
 	}
 
 	// functions
-	newEmptySlice := func() interface{} {
-		p := make([]interface{}, 0, poolSizePerCPU)
+	newEmptySlice := func() any {
+		p := make([]T, 0, poolSizePerCPU)
 		return &p
 	}
-	newFullSlice := func() interface{} {
-		p := make([]interface{}, initFullPoolSize, poolSizePerCPU)
+	newFullSlice := func() any {
+		p := make([]T, initFullPoolSize, poolSizePerCPU)
 		for i := OptionInitFullPoolSize(0); i < initFullPoolSize; i++ {
 			p[i] = alloc()
 		}
@@ -175,7 +175,7 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool 
 	allCounters = append(allCounters, counter)
 	counterListLock.Unlock()
 
-	return &LockFreePool{
+	return &LockFreePool[T]{
 		emptyPool: &sync.Pool{
 			New: newEmptySlice,
 		},

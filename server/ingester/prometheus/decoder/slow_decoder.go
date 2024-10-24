@@ -56,12 +56,12 @@ type SlowItem struct {
 	ts           prompb.TimeSeries
 }
 
-var slowItemPool = pool.NewLockFreePool(func() interface{} {
+var slowItemPool = pool.NewLockFreePool(func() *SlowItem {
 	return &SlowItem{}
 })
 
 func AcquireSlowItem(vtapId, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
-	s := slowItemPool.Get().(*SlowItem)
+	s := slowItemPool.Get()
 	s.vtapId = vtapId
 	s.epcId = epcId
 	s.podClusterId = podClusterId
