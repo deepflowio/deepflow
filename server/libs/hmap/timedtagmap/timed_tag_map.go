@@ -33,12 +33,12 @@ const (
 	MAX_TTL            = 32 // 需要用32bit表示是否invalid
 )
 
-var tagIDSlicePool = pool.NewLockFreePool(func() interface{} {
+var tagIDSlicePool = pool.NewLockFreePool(func() []TagID {
 	return make([]TagID, MAX_TTL+1)
 })
 
 func AcquireTagIDSlice(ttl int) []TagID {
-	ti := tagIDSlicePool.Get().([]TagID)
+	ti := tagIDSlicePool.Get()
 	for i := 0; i < ttl; i++ {
 		ti[i] = INVALID_TAG_ID
 	}

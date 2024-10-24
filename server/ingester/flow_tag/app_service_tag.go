@@ -84,12 +84,12 @@ func (t *AppServiceTag) Release() {
 	ReleaseAppServiceTag(t)
 }
 
-var appServiceTagPool = pool.NewLockFreePool(func() interface{} {
+var appServiceTagPool = pool.NewLockFreePool(func() *AppServiceTag {
 	return &AppServiceTag{}
 })
 
 func AcquireAppServiceTag() *AppServiceTag {
-	f := appServiceTagPool.Get().(*AppServiceTag)
+	f := appServiceTagPool.Get()
 	return f
 }
 

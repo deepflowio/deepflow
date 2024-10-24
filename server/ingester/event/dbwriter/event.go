@@ -353,7 +353,7 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	}
 }
 
-var eventPool = pool.NewLockFreePool(func() interface{} {
+var eventPool = pool.NewLockFreePool(func() *EventStore {
 	return &EventStore{
 		AttributeNames:  []string{},
 		AttributeValues: []string{},
@@ -361,7 +361,7 @@ var eventPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireEventStore() *EventStore {
-	e := eventPool.Get().(*EventStore)
+	e := eventPool.Get()
 	e.Reset()
 	return e
 }
