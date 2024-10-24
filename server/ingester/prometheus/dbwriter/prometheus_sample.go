@@ -283,12 +283,12 @@ func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, met
 	m.PrometheusSampleMini.GenerateNewFlowTags(cache, metricName, timeSeries, extraLabels, tsLabelNameIDs, tsLabelValueIDs)
 }
 
-var prometheusSampleMiniPool = pool.NewLockFreePool(func() interface{} {
+var prometheusSampleMiniPool = pool.NewLockFreePool(func() *PrometheusSampleMini {
 	return &PrometheusSampleMini{}
 })
 
 func AcquirePrometheusSampleMini() *PrometheusSampleMini {
-	return prometheusSampleMiniPool.Get().(*PrometheusSampleMini)
+	return prometheusSampleMiniPool.Get()
 }
 
 func ReleasePrometheusSampleMini(p *PrometheusSampleMini) {
@@ -296,12 +296,12 @@ func ReleasePrometheusSampleMini(p *PrometheusSampleMini) {
 	prometheusSampleMiniPool.Put(p)
 }
 
-var prometheusSamplePool = pool.NewLockFreePool(func() interface{} {
+var prometheusSamplePool = pool.NewLockFreePool(func() *PrometheusSample {
 	return &PrometheusSample{}
 })
 
 func AcquirePrometheusSample() *PrometheusSample {
-	return prometheusSamplePool.Get().(*PrometheusSample)
+	return prometheusSamplePool.Get()
 }
 
 var emptyUniversalTag = flow_metrics.UniversalTag{}

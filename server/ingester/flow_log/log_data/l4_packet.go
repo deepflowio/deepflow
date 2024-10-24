@@ -77,12 +77,12 @@ func (p *L4Packet) String() string {
 	return fmt.Sprintf("L4Packet: %+v\n", *p)
 }
 
-var poolL4Packet = pool.NewLockFreePool(func() interface{} {
+var poolL4Packet = pool.NewLockFreePool(func() *L4Packet {
 	return new(L4Packet)
 })
 
 func AcquireL4Packet() *L4Packet {
-	l := poolL4Packet.Get().(*L4Packet)
+	l := poolL4Packet.Get()
 	return l
 }
 

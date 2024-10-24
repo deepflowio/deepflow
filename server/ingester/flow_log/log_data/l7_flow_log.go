@@ -634,12 +634,12 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 	)
 }
 
-var poolL7FlowLog = pool.NewLockFreePool(func() interface{} {
+var poolL7FlowLog = pool.NewLockFreePool(func() *L7FlowLog {
 	return new(L7FlowLog)
 })
 
 func AcquireL7FlowLog() *L7FlowLog {
-	l := poolL7FlowLog.Get().(*L7FlowLog)
+	l := poolL7FlowLog.Get()
 	l.ReferenceCount.Reset()
 	return l
 }

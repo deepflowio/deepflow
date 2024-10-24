@@ -1065,13 +1065,13 @@ func (f *L4FlowLog) HitPcapPolicy() bool {
 	return len(f.AclGids) > 0
 }
 
-var poolL4FlowLog = pool.NewLockFreePool(func() interface{} {
+var poolL4FlowLog = pool.NewLockFreePool(func() *L4FlowLog {
 	l := new(L4FlowLog)
 	return l
 })
 
 func AcquireL4FlowLog() *L4FlowLog {
-	l := poolL4FlowLog.Get().(*L4FlowLog)
+	l := poolL4FlowLog.Get()
 	l.ReferenceCount.Reset()
 	return l
 }

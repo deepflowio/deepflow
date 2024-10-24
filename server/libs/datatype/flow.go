@@ -898,12 +898,12 @@ func (f *Flow) String() string {
 }
 
 var ZeroFlowPerfStats FlowPerfStats = FlowPerfStats{}
-var flowPerfStatsPool = pool.NewLockFreePool(func() interface{} {
+var flowPerfStatsPool = pool.NewLockFreePool(func() *FlowPerfStats {
 	return new(FlowPerfStats)
 })
 
 func AcquireFlowPerfStats() *FlowPerfStats {
-	return flowPerfStatsPool.Get().(*FlowPerfStats)
+	return flowPerfStatsPool.Get()
 }
 
 func ReleaseFlowPerfStats(s *FlowPerfStats) {

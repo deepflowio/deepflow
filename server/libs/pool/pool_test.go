@@ -84,9 +84,9 @@ func BenchmarkNativePoolOverPut(b *testing.B) {
 }
 
 func BenchmarkLockFreePoolGetPut1Thread(b *testing.B) {
-	pools := make([]*LockFreePool, b.N/1024)
+	pools := make([]*LockFreePool[int], b.N/1024)
 	for p, _ := range pools {
-		pool := NewLockFreePool(func() interface{} { return 0 })
+		pool := NewLockFreePool(func() int { return 0 })
 		for i := 0; i < 1024; i++ {
 			pool.Put(0)
 		}
@@ -103,13 +103,13 @@ func BenchmarkLockFreePoolGetPut1Thread(b *testing.B) {
 }
 
 func BenchmarkLockFreePoolGetPut2Thread(b *testing.B) {
-	pools := make([]*LockFreePool, 16)
+	pools := make([]*LockFreePool[int], 16)
 	for i := range pools {
-		pool := NewLockFreePool(func() interface{} { return 0 })
+		pool := NewLockFreePool(func() int { return 0 })
 		pools[i] = pool
 	}
 
-	put := func(pool []*LockFreePool) {
+	put := func(pool []*LockFreePool[int]) {
 		for i := 0; i < b.N; i++ {
 			for _, p := range pools {
 				p.Put(0)
@@ -127,14 +127,14 @@ func BenchmarkLockFreePoolGetPut2Thread(b *testing.B) {
 }
 
 func BenchmarkLockFreePoolHungryGet(b *testing.B) {
-	pool := NewLockFreePool(func() interface{} { return 0 })
+	pool := NewLockFreePool[int](func() int { return 0 })
 	for i := 0; i < b.N; i++ {
 		pool.Get()
 	}
 }
 
 func BenchmarkLockFreePoolOverPut(b *testing.B) {
-	pool := NewLockFreePool(func() interface{} { return 0 })
+	pool := NewLockFreePool[int](func() int { return 0 })
 	for i := 0; i < 1024; i++ {
 		pool.Put(0)
 	}

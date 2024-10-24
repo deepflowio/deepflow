@@ -326,7 +326,7 @@ func (l *ApplicationLogStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) 
 	}
 }
 
-var logPool = pool.NewLockFreePool(func() interface{} {
+var logPool = pool.NewLockFreePool(func() *ApplicationLogStore {
 	return &ApplicationLogStore{
 		IsIPv4:          true,
 		AttributeNames:  []string{},
@@ -337,7 +337,7 @@ var logPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireApplicationLogStore() *ApplicationLogStore {
-	e := logPool.Get().(*ApplicationLogStore)
+	e := logPool.Get()
 	e.Reset()
 	return e
 }

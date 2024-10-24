@@ -77,12 +77,12 @@ func (f *TaggedFlow) Reverse() {
 	f.Tag.Reverse()
 }
 
-var taggedFlowPool = pool.NewLockFreePool(func() interface{} {
+var taggedFlowPool = pool.NewLockFreePool(func() *TaggedFlow {
 	return new(TaggedFlow)
 })
 
 func AcquireTaggedFlow() *TaggedFlow {
-	f := taggedFlowPool.Get().(*TaggedFlow)
+	f := taggedFlowPool.Get()
 	f.ReferenceCount.Reset()
 	return f
 }
