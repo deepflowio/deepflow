@@ -23,12 +23,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var dubboInfoPool = pool.NewLockFreePool(func() interface{} {
+var dubboInfoPool = pool.NewLockFreePool(func() *DubboInfo {
 	return new(DubboInfo)
 })
 
 func AcquireDubboInfo() *DubboInfo {
-	return dubboInfoPool.Get().(*DubboInfo)
+	return dubboInfoPool.Get()
 }
 
 func ReleaseDubboInfo(d *DubboInfo) {

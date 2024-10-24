@@ -20,7 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
+var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() *AppProtoLogsData {
 	return &AppProtoLogsData{
 		Base: &AppProtoLogsBaseInfo{
 			Head: &AppProtoHead{},
@@ -29,7 +29,7 @@ var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquirePbAppProtoLogsData() *AppProtoLogsData {
-	d := pbAppProtoLogsDataPool.Get().(*AppProtoLogsData)
+	d := pbAppProtoLogsDataPool.Get()
 	return d
 }
 

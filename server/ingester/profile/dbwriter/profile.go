@@ -260,7 +260,7 @@ func (p *InProcessProfile) OrgID() uint16 {
 	return p.OrgId
 }
 
-var poolInProcess = pool.NewLockFreePool(func() interface{} {
+var poolInProcess = pool.NewLockFreePool(func() *InProcessProfile {
 	return new(InProcessProfile)
 })
 
@@ -273,7 +273,7 @@ func (p *InProcessProfile) String() string {
 }
 
 func AcquireInProcess() *InProcessProfile {
-	l := poolInProcess.Get().(*InProcessProfile)
+	l := poolInProcess.Get()
 	return l
 }
 
