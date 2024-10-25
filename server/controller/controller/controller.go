@@ -34,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/grpc"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/agent"
 	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
 	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	"github.com/deepflowio/deepflow/server/controller/http"
