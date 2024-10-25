@@ -17,6 +17,7 @@
 package vtap
 
 import (
+	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/trident"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
@@ -103,6 +104,58 @@ func (v *VTapInfo) GenerateRemoteSegments() []*trident.Segment {
 	return segment.GetNotVtapUsedSegments()
 }
 
+func (v *VTapInfo) GenerateAgentLocalSegments(c *VTapCache) []*agent.Segment {
+	var localSegments []*agent.Segment
+	vtapType := c.GetVTapType()
+	launchServer := c.GetLaunchServer()
+	launchServerID := c.GetLaunchServerID()
+	rawData := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetRawData()
+	segment := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetSegment()
+	podNodeIDToVmID := rawData.GetPodNodeIDToVmID()
+
+	if vtapType == VTAP_TYPE_ESXI {
+		localSegments = segment.GetTypeVMSegments(launchServer, launchServerID)
+	} else if Find[int](serverVTap, vtapType) {
+		launchServerSegments := segment.GetLaunchServerSegments(launchServer)
+		hostIDSegments := segment.GetHostIDSegments(launchServerID)
+		localSegments = make([]*agent.Segment, 0, len(launchServerSegments)+len(hostIDSegments))
+		localSegments = append(localSegments, launchServerSegments...)
+		localSegments = append(localSegments, hostIDSegments...)
+	} else if Find[int](workloadVTap, vtapType) {
+		if launchServerID != 0 {
+			localSegments = segment.GetVMIDSegments(launchServerID)
+		}
+	} else if Find[int](podVTap, vtapType) {
+		if vmID, ok := podNodeIDToVmID[launchServerID]; ok {
+			// pod_node和vm有关联，获取vm上所有segments包括(vm, pod_node, pod)
+			localSegments = segment.GetVMIDSegments(vmID)
+		} else {
+			// 无关联获取pod_node所有segments包括(pod_node, pod)
+			localSegments = segment.GetPodNodeSegments(launchServerID)
+		}
+	} else if vtapType == VTAP_TYPE_K8S_SIDECAR {
+		localSegments = segment.GetPodIDSegments(launchServerID)
+	} else if Find[int](noLocalSegments, vtapType) {
+		// 专属采集器，隧道解封装采集器没有local segments
+		return localSegments
+	} else {
+		log.Errorf(v.Logf("vtap type(%d) not found", vtapType))
+	}
+
+	return localSegments
+}
+
+func (v *VTapInfo) GenerateAgentRemoteSegments() []*agent.Segment {
+	rawData := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetRawData()
+	segment := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetSegment()
+	allGatewayHostSegments := segment.GetAllGatewayHostSegments()
+	if len(allGatewayHostSegments) > 0 {
+		return allGatewayHostSegments
+	}
+	segment.GenerateNoVTapUsedSegments(rawData)
+	return segment.GetNotAgentUsedSegments()
+}
+
 func (v *VTapInfo) GetRemoteSegment(c *VTapCache) []*trident.Segment {
 	if c.GetVTapType() != VTAP_TYPE_DEDICATED {
 		return nil
@@ -111,10 +164,22 @@ func (v *VTapInfo) GetRemoteSegment(c *VTapCache) []*trident.Segment {
 	return v.remoteSegments
 }
 
+func (v *VTapInfo) GetAgentRemoteSegment(c *VTapCache) []*agent.Segment {
+	if c.GetVTapType() != VTAP_TYPE_DEDICATED {
+		return nil
+	}
+
+	return v.agentRemoteSegments
+}
+
 func (v *VTapInfo) generateAllVTapSegements() {
 	bmDedicatedVTaps := []*VTapCache{}
 	segment := v.metaData.GetPlatformDataOP().GetSegment()
 	segment.ClearVTapUsedVInterfaceIDs()
+
+	agentSegment := v.metaData.GetAgentMetaData().GetPlatformDataOP().GetSegment()
+	agentSegment.ClearAgentUsedVInterfaceIDs()
+
 	cacheKeys := v.vTapCaches.List()
 	for _, cacheKey := range cacheKeys {
 		cacheVTap := v.GetVTapCache(cacheKey)
@@ -126,14 +191,19 @@ func (v *VTapInfo) generateAllVTapSegements() {
 		}
 		localSegments := v.GenerateVTapLocalSegments(cacheVTap)
 		cacheVTap.setVTapLocalSegments(localSegments)
+
+		cacheVTap.setAgentLocalSegments(v.GenerateAgentLocalSegments(cacheVTap))
 	}
 
 	remoteSegments := v.GenerateRemoteSegments()
+	agentRemoteSegments := v.GenerateAgentRemoteSegments()
 	// 专属采集器下发本区域所有采集器(除专属采集器)下发的local_segment，作为专属采集器的remote_segment
 	for _, bmVTap := range bmDedicatedVTaps {
 		bmVTap.setVTapRemoteSegments(remoteSegments)
+		bmVTap.setAgentRemoteSegments(agentRemoteSegments)
 	}
 	v.remoteSegments = remoteSegments
+	v.agentRemoteSegments = agentRemoteSegments
 }
 
 func (v *VTapInfo) generateAllVTapRemoteSegements() {
@@ -149,11 +219,14 @@ func (v *VTapInfo) generateAllVTapRemoteSegements() {
 		}
 	}
 	remoteSegments := v.GenerateRemoteSegments()
+	agentRemoteSegments := v.GenerateAgentRemoteSegments()
 	// 专属采集器下发本区域所有采集器(除专属采集器)下发的local_segment，作为专属采集器的remote_segment
 	for _, bmVTap := range dedicatedVTaps {
 		bmVTap.setVTapRemoteSegments(remoteSegments)
+		bmVTap.setAgentRemoteSegments(agentRemoteSegments)
 	}
 	v.remoteSegments = remoteSegments
+	v.agentRemoteSegments = agentRemoteSegments
 }
 
 func (v *VTapInfo) setVTapChangedForSegment() {
