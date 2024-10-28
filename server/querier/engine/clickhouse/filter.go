@@ -256,7 +256,7 @@ func TransAlertEventNoSuffixFilter(translator, regexpTranslator, op, value strin
 	return
 }
 
-// pod_ingress, pod_service,
+// pod_ingress, pod_service, ip
 // x_request_id, syscall_thread, syscall_coroutine, syscall_cap_seq, syscall_trace_id, tcp_seq
 func TransIngressFilter(translator, regexpTranslator, op, value string) (filter string) {
 	switch strings.ToLower(op) {
@@ -1141,8 +1141,10 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			case "pod_ingress", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
 				whereFilter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
-				if strings.Contains(op, "match") {
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value)
+				if strings.Contains(noSuffixTag, "_id") {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+				} else if strings.Contains(op, "match") {
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
 				} else {
 					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value)
 				}
