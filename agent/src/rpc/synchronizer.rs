@@ -19,7 +19,7 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::net::IpAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::{
@@ -31,9 +31,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
-#[cfg(any(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use k8s_openapi::api::apps::v1::DaemonSet;
-#[cfg(any(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use kube::{
     api::{Api, Patch, PatchParams},
     Client, Config,
@@ -2728,6 +2728,13 @@ pub struct RuntimeEnvironment {
     pub kernel_version: String,
 }
 
+#[cfg(target_os = "linux")]
+#[derive(PartialEq, Eq)]
+enum InfoType {
+    Name,
+    OsVersion,
+}
+
 impl RuntimeEnvironment {
     fn new() -> RuntimeEnvironment {
         let mut sys = System::new();
@@ -2736,6 +2743,25 @@ impl RuntimeEnvironment {
             cpu_num: sys.cpus().len() as u32,
             memory_size: sys.total_memory(),
             arch: std::env::consts::ARCH.into(),
+            #[cfg(target_os = "linux")]
+            os: {
+                let os_name = Self::get_system_info_linux(
+                    InfoType::Name,
+                    Path::new("/proc/1/root/etc/os-release"),
+                    Path::new("/proc/1/root/etc/lsb-release"),
+                );
+                let os_version = Self::get_system_info_linux(
+                    InfoType::OsVersion,
+                    Path::new("/proc/1/root/etc/os-release"),
+                    Path::new("/proc/1/root/etc/lsb-release"),
+                );
+                format!(
+                    "{} {}",
+                    os_name.unwrap_or_else(|| sys.name().unwrap_or_default()),
+                    os_version.unwrap_or_else(|| sys.os_version().unwrap_or_default())
+                )
+            },
+            #[cfg(not(target_os = "linux"))]
             os: format!(
                 "{} {}",
                 sys.name().unwrap_or_default(),
@@ -2743,6 +2769,43 @@ impl RuntimeEnvironment {
             ),
             kernel_version: sys.kernel_version().unwrap_or_default(),
         }
+    }
+
+    // Code is from https://github.com/GuillaumeGomez/sysinfo/blob/51b249e6e7e6e5ad0eb3f83a64f8a6505195e200/src/unix/linux/system.rs#L611
+    // Agent in container does not have access to system files, neither can it set mount namespace
+    // An alternative approach is to use `/proc/1/root/etc/os-release` and `/proc/1/root/etc/lsb-release`
+    // files to get system info
+    #[cfg(target_os = "linux")]
+    fn get_system_info_linux(info: InfoType, path: &Path, fallback_path: &Path) -> Option<String> {
+        if let Ok(buf) = fs::read_to_string(path) {
+            let info_str = match info {
+                InfoType::Name => "NAME=",
+                InfoType::OsVersion => "VERSION_ID=",
+            };
+
+            for line in buf.lines() {
+                if let Some(stripped) = line.strip_prefix(info_str) {
+                    return Some(stripped.replace('"', ""));
+                }
+            }
+        }
+
+        // Fallback to `/etc/lsb-release` file for systems where VERSION_ID is not included.
+        // VERSION_ID is not required in the `/etc/os-release` file
+        // per https://www.linux.org/docs/man5/os-release.html
+        // If this fails for some reason, fallback to None
+        let buf = fs::read_to_string(fallback_path).ok()?;
+
+        let info_str = match info {
+            InfoType::OsVersion => "DISTRIB_RELEASE=",
+            InfoType::Name => "DISTRIB_ID=",
+        };
+        for line in buf.lines() {
+            if let Some(stripped) = line.strip_prefix(info_str) {
+                return Some(stripped.replace('"', ""));
+            }
+        }
+        None
     }
 }
 
