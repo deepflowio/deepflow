@@ -184,12 +184,22 @@ pub fn get_hostname() -> Result<String> {
             .into_string()
             .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
     }
+
+    let origin_path = Path::new(ORIGIN_UTS_PATH);
+    let root_path = Path::new(ROOT_UTS_PATH);
+    match (fs::read_link(origin_path), fs::read_link(root_path)) {
+        (Ok(origin_link), Ok(root_link)) if origin_link == root_link => {
+            return hostname();
+        }
+        _ => (),
+    }
+
     // If the ORIGIN_UTS_PATH or ROOT_UTS_PATH does not exist, it may be due to a kernel version that is too low
     // to support UTS namespaces, therefore, do not switch UTS namespaces and directly return the hostname.
-    let Ok(origin_fp) = File::open(Path::new(ORIGIN_UTS_PATH)) else {
+    let Ok(origin_fp) = File::open(origin_path) else {
         return hostname();
     };
-    let Ok(root_fp) = File::open(Path::new(ROOT_UTS_PATH)) else {
+    let Ok(root_fp) = File::open(root_path) else {
         return hostname();
     };
     if let Err(e) = set_utsns(&root_fp) {
