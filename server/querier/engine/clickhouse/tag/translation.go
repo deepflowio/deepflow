@@ -382,10 +382,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),dictGet('flow_tag.device_map', 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+"))))",
 					"",
-					fmt.Sprintf("if(%s in (0,255),if(is_ipv4=1, %s %%s toIPv4(%%s), %s %%s toIPv6(%%s)),(toUInt64(%s),toUInt64(%s)) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %%s %%s AND %s))",
+					fmt.Sprintf("if(%s in (0,255),if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)) %%s %%s,(toUInt64(%s),toUInt64(%s)) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %%s %%s AND %s))",
 						autoTypeSuffix, ip4Suffix, ip6Suffix, autoIDSuffix, autoTypeSuffix, deviceTypeFilter),
-					fmt.Sprintf("if(%s in (0,255),1!=1,(toUInt64(%s),toUInt64(%s)) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %%s(name,%%s) AND %s))",
-						autoTypeSuffix, autoIDSuffix, autoTypeSuffix, deviceTypeFilter),
+					fmt.Sprintf("if(%s in (0,255),%%s(if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)),%%s),(toUInt64(%s),toUInt64(%s)) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %%s(name,%%s) AND %s))",
+						autoTypeSuffix, ip4Suffix, ip6Suffix, autoIDSuffix, autoTypeSuffix, deviceTypeFilter),
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
