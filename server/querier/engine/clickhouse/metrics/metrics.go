@@ -270,7 +270,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			}
 		}
 		// Dynamic tag metrics
-		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
+		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, context.Background(), nil)
 		if err != nil {
 			log.Error("Failed to get tag type dynamic metrics")
 			return nil, false

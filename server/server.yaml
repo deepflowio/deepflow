@@ -357,6 +357,9 @@ querier:
     timeout: 60
     max-connection: 20
     # user-password:
+    use-query-cache: true
+    # unit: s
+    query-cache-ttl: 600
 
   # profile相关配置
   profile:
