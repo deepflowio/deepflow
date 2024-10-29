@@ -47,9 +47,9 @@ type QuerierConfig struct {
 	LogFile                         string                        `default:"/var/log/querier.log" yaml:"log-file"`
 	LogLevel                        string                        `default:"info" yaml:"log-level"`
 	ListenPort                      int                           `default:"20416" yaml:"listen-port"`
-	Clickhouse                      Clickhouse                    `yaml:clickhouse`
-	Profile                         profile.ProfileConfig         `yaml:profile`
-	Tracemap                        tracemap.TraceMapConfig       `yaml:trace-map`
+	Clickhouse                      Clickhouse                    `yaml:"clickhouse"`
+	Profile                         profile.ProfileConfig         `yaml:"profile"`
+	Tracemap                        tracemap.TraceMapConfig       `yaml:"trace-map"`
 	DeepflowApp                     DeepflowApp                   `yaml:"deepflow-app"`
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`
@@ -89,7 +89,10 @@ type Clickhouse struct {
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
 	MaxConnection  int    `default:"20" yaml:"max-connection"`
+	UseQueryCache  bool   `default:"true" yaml:"use-query-cache"`
+	QueryCacheTTL  string `default:"600" yaml:"query-cache-ttl"`
 }
+
 type AutoCustomTags struct {
 	TagName     string   `default:"" yaml:"tag-name"`
 	TagFields   []string `yaml:"tag-fields" binding:"omitempty,dive"`
