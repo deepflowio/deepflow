@@ -43,6 +43,10 @@ func NewBlock(batch driver.Batch) *Block {
 	}
 }
 
+func (b *Block) SetBatch(batch driver.Batch) {
+	b.batch = batch
+}
+
 func (b *Block) WriteAll() error {
 	err := b.batch.Append(b.items...)
 	b.items = b.items[:0]
