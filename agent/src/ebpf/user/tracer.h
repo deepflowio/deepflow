@@ -88,7 +88,7 @@
 #define PERF_READER_NUM_MAX	16
 
 #define DEBUG_BUFF_SIZE 4096
-typedef void (*debug_callback_t)(char *data, int len);
+typedef void (*debug_callback_t) (char *data, int len);
 
 enum perf_event_state {
 	PERF_EV_INIT,
@@ -122,8 +122,8 @@ struct thread_index_entry {
 };
 
 struct thread_index_array {
-    struct thread_index_entry *entries;
-    pthread_mutex_t lock;
+	struct thread_index_entry *entries;
+	pthread_mutex_t lock;
 };
 
 // PID management for feature-matching processes
@@ -275,10 +275,10 @@ enum {
 struct mem_block_head {
 	uint8_t is_last;
 	void *free_ptr;
-	void (*fn)(void *);
-} __attribute__((packed));
+	void (*fn) (void *);
+} __attribute__ ((packed));
 
-typedef void (*tracer_callback_t)(void *ctx, void *cp_data);
+typedef void (*tracer_callback_t) (void *ctx, void *cp_data);
 
 struct tracer_probes_conf {
 	char *bin_file;		// only use uprobe;
@@ -354,7 +354,7 @@ struct map_config {
 struct ebpf_object;
 struct perf_reader;
 struct bpf_tracer;
-typedef int (*tracer_op_fun_t)(struct bpf_tracer *);
+typedef int (*tracer_op_fun_t) (struct bpf_tracer *);
 
 /*
  * This is used to read data from the perf buffer, and each MAP
@@ -362,16 +362,16 @@ typedef int (*tracer_op_fun_t)(struct bpf_tracer *);
  * may contain multiple readers.
  */
 struct bpf_perf_reader {
-	char name[NAME_LEN];			// perf ring-buffer map
-	bool is_use;				// false : free, ture : used
-	struct ebpf_map *map;			// ebpf_map address
-	struct perf_reader *readers[MAX_CPU_NR];// percpu readers (read from percpu ring-buffer map)
-	int reader_fds[MAX_CPU_NR];		// percpu reader fds
-	int readers_count;			// readers count
-	unsigned int perf_pages_cnt;		// ring-buffer set memory size (memory pages count)
-	perf_reader_raw_cb raw_cb;		// Used for perf ring-buffer receive callback.
-	perf_reader_lost_cb lost_cb;		// Callback for perf ring-buffer data loss.
-	int epoll_timeout;			// perf poll timeout (ms)
+	char name[NAME_LEN];	// perf ring-buffer map
+	bool is_use;		// false : free, ture : used
+	struct ebpf_map *map;	// ebpf_map address
+	struct perf_reader *readers[MAX_CPU_NR];	// percpu readers (read from percpu ring-buffer map)
+	int reader_fds[MAX_CPU_NR];	// percpu reader fds
+	int readers_count;	// readers count
+	unsigned int perf_pages_cnt;	// ring-buffer set memory size (memory pages count)
+	perf_reader_raw_cb raw_cb;	// Used for perf ring-buffer receive callback.
+	perf_reader_lost_cb lost_cb;	// Callback for perf ring-buffer data loss.
+	int epoll_timeout;	// perf poll timeout (ms)
 	int epoll_fds[MAX_CPU_NR];
 	int epoll_fds_count;
 	struct bpf_tracer *tracer;
@@ -381,13 +381,13 @@ struct bpf_tracer {
 	/*
 	 * tracer info
 	 */
-	char name[NAME_LEN];		// tracer name
+	char name[NAME_LEN];	// tracer name
 	char bpf_load_name[NAME_LEN];	// Tracer bpf load buffer name.
 	// Used to identify which eBPF buffer is loaded by the kernel
-	void *buffer_ptr;		// eBPF bytecodes buffer pointer
-	int buffer_sz;			// eBPF buffer size
+	void *buffer_ptr;	// eBPF bytecodes buffer pointer
+	int buffer_sz;		// eBPF buffer size
 	struct ebpf_object *obj;	// eBPF object
-	bool is_use;			// Whether it is being used.
+	bool is_use;		// Whether it is being used.
 	volatile uint32_t *lock;	// tracer lock
 
 	/*
@@ -395,18 +395,18 @@ struct bpf_tracer {
 	 */
 	struct tracer_probes_conf *tps;	// probe, tracepoint, uprobes config
 	struct list_head probes_head;
-	int probes_count;		// probe count.
+	int probes_count;	// probe count.
 	struct tracepoint tracepoints[PROBES_NUM_MAX];
 	int tracepoints_count;
 	struct kfunc kfuncs[PROBES_NUM_MAX];
 	int kfuncs_count;
-	pthread_mutex_t mutex_probes_lock; // Protect the probes operation in multiple threads
+	pthread_mutex_t mutex_probes_lock;	// Protect the probes operation in multiple threads
 
 	/*
 	 * perf event(type is TRACER_TYPE_PERF_EVENT) for attach fds.
 	 */
 	int per_cpu_fds[MAX_CPU_NR];
-	int sample_freq; // sample frequency, Hertz.
+	int sample_freq;	// sample frequency, Hertz.
 	/*
 	 * Enable CPU sampling?
 	 * For the following scenario:
@@ -421,12 +421,12 @@ struct bpf_tracer {
 	/*
 	 * Data distribution processing worker, queues
 	 */
-	pthread_t perf_workers[MAX_CPU_NR];      // Main thread for user-space receiving perf-buffer data
-	pthread_t dispatch_workers[MAX_CPU_NR]; // Dispatch threads
-	int dispatch_workers_nr;                // Number of dispatch threads
-	struct queue queues[MAX_CPU_NR];        // Dispatch queues, each dispatch thread has its corresponding queue.
-	void *process_fn;                       // Callback interface passed from the application for data processing
-	void (*datadump) (void *data, int64_t boot_time); // eBPF data dump handle
+	pthread_t perf_workers[MAX_CPU_NR];	// Main thread for user-space receiving perf-buffer data
+	pthread_t dispatch_workers[MAX_CPU_NR];	// Dispatch threads
+	int dispatch_workers_nr;	// Number of dispatch threads
+	struct queue queues[MAX_CPU_NR];	// Dispatch queues, each dispatch thread has its corresponding queue.
+	void *process_fn;	// Callback interface passed from the application for data processing
+	void (*datadump) (void *data, int64_t boot_time);	// eBPF data dump handle
 
 	/*
 	 * perf ring-buffer from kernel to user.
@@ -440,8 +440,8 @@ struct bpf_tracer {
 	/*
 	 * statistics
 	 */
-	atomic64_t recv;			// User-level program event reception statistics. 
-	atomic64_t lost;			// User-level programs not receiving data in time can cause data loss in the kernel.
+	atomic64_t recv;	// User-level program event reception statistics. 
+	atomic64_t lost;	// User-level programs not receiving data in time can cause data loss in the kernel.
 	atomic64_t proto_status[PROTO_NUM];	// Statistical analysis based on different l7 protocols.
 
 	/*
@@ -459,13 +459,13 @@ struct bpf_tracer {
 	/*
 	 * tracer 控制接口和运行状态
 	 */
-	volatile enum tracer_state state;// 追踪器状态（Tracker status）
-	bool adapt_success;		 // 是否成功适配内核, true 成功适配，false 适配失败
-	uint32_t data_limit_max;	 // The maximum amount of data returned to the user-reader
+	volatile enum tracer_state state;	// 追踪器状态（Tracker status）
+	bool adapt_success;	// 是否成功适配内核, true 成功适配，false 适配失败
+	uint32_t data_limit_max;	// The maximum amount of data returned to the user-reader
 
 	/*
-	* Callback function contexts for continuous profiler
-	* Should only be used to create profiler context
+	 * Callback function contexts for continuous profiler
+	 * Should only be used to create profiler context
 	 */
 	void *profiler_callback_ctx[PROFILER_CTX_NUM];
 };
@@ -473,7 +473,7 @@ struct bpf_tracer {
 #define EXTRA_TYPE_SERVER 0
 #define EXTRA_TYPE_CLIENT 1
 
-typedef int (*extra_waiting_fun_t)();
+typedef int (*extra_waiting_fun_t) ();
 
 struct extra_waiting_op {
 	struct list_head list;
@@ -482,14 +482,14 @@ struct extra_waiting_op {
 	int type;
 };
 
-typedef int (*period_event_fun_t)();
+typedef int (*period_event_fun_t) ();
 
 struct period_event_op {
 	struct list_head list;
 	char name[NAME_LEN];
 	bool is_valid;
 	/* The cycle time of event triggering (unit is microseconds) */
-	uint32_t times; 
+	uint32_t times;
 	period_event_fun_t f;
 };
 
@@ -505,7 +505,7 @@ struct rx_queue_info {
 	uint64_t heap_get_failed;
 	int queue_size;
 	int ring_capacity;
-} __attribute__((aligned(8)));
+} __attribute__ ((aligned(8)));
 
 struct bpf_tracer_param {
 	char name[NAME_LEN];
@@ -513,14 +513,14 @@ struct bpf_tracer_param {
 	int dispatch_workers_nr;
 	unsigned int perf_pg_cnt;
 	/* rx_queues start address 8-byte alignment */
-	struct rx_queue_info rx_queues[MAX_CPU_NR] __attribute__((aligned(8)));
+	struct rx_queue_info rx_queues[MAX_CPU_NR] __attribute__ ((aligned(8)));
 	uint64_t lost;
 	int probes_count;
 	int state;
 	bool adapt_success;
 	uint32_t data_limit_max;
 	uint64_t proto_status[PROTO_NUM];
-} __attribute__((__packed__));
+} __attribute__ ((__packed__));
 
 struct bpf_tracer_param_array {
 	int count;
@@ -620,13 +620,13 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    tracer_op_fun_t free_cb,
 				    tracer_op_fun_t create_cb,
 				    void *handle,
-				    void *profiler_callback_ctx[PROFILER_CTX_NUM],
+				    void
+				    *profiler_callback_ctx[PROFILER_CTX_NUM],
 				    int freq);
 int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries);
 struct bpf_tracer *find_bpf_tracer(const char *name);
 int register_period_event_op(const char *name,
-			     period_event_fun_t f,
-			     uint32_t period_time);
+			     period_event_fun_t f, uint32_t period_time);
 int set_period_event_invalid(const char *name);
 
 /**
@@ -649,6 +649,7 @@ void free_probe_from_tracer(struct probe *pb);
 int tracer_hooks_process(struct bpf_tracer *tracer,
 			 enum tracer_hook_type type, int *probes_count);
 int tracer_uprobes_update(struct bpf_tracer *tracer);
+int probe_attach(struct probe *p);
 
 /**
  * @brief Create a perf buffer reader.
@@ -663,20 +664,18 @@ int tracer_uprobes_update(struct bpf_tracer *tracer);
  * @param epoll_timeout perf epoll timeout
  * @return perf_reader address on success, NULL on error
  */
-struct bpf_perf_reader*
-create_perf_buffer_reader(struct bpf_tracer *t,
-			  const char *map_name,
-			  perf_reader_raw_cb raw_cb,
-			  perf_reader_lost_cb lost_cb,
-			  unsigned int pages_cnt,
-			  int thread_nr,
-			  int epoll_timeout);
+struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
+						  const char *map_name,
+						  perf_reader_raw_cb raw_cb,
+						  perf_reader_lost_cb lost_cb,
+						  unsigned int pages_cnt,
+						  int thread_nr,
+						  int epoll_timeout);
 void free_perf_buffer_reader(struct bpf_perf_reader *reader);
 int release_bpf_tracer(const char *name);
 void free_all_readers(struct bpf_tracer *t);
 int enable_tracer_reader_work(const char *name, int idx,
-			      struct bpf_tracer *tracer,
-			      void *fn);
+			      struct bpf_tracer *tracer, void *fn);
 bool is_rt_kernel(void);
 /**
  * @brief Enable eBPF segmentation reassembly for the specified protocol.
@@ -693,8 +692,13 @@ int exec_set_feature_pids(int feature, const int *pids, int num);
  * @param pids Address of the process list
  * @param num Number of elements in the process list
  * @return 0 on success, non-zero on error
- */ 
+ */
 int set_feature_pids(int feature, const int *pids, int num);
 int init_match_pids_hash(void);
 bool is_pid_match(int feature, int pid);
+struct probe *create_probe(struct bpf_tracer *tracer,
+			   const char *func_name, bool isret,
+			   enum probe_type type, void *private,
+			   bool add_tracer);
+void free_probe_from_conf(struct probe *pb, struct tracer_probes_conf *conf);
 #endif /* DF_USER_TRACER_H */

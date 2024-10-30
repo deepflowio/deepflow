@@ -333,8 +333,7 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    int workers_nr,
 				    tracer_op_fun_t free_cb,
 				    tracer_op_fun_t create_cb,
-				    void *handle,
-				    void
+				    void *handle, void
 				    *profiler_callback_ctx[PROFILER_CTX_NUM],
 				    int sample_freq)
 {
@@ -695,9 +694,20 @@ void free_probe_from_tracer(struct probe *pb)
 	free(pb);
 }
 
-static struct probe *create_probe(struct bpf_tracer *tracer,
-				  const char *func_name, bool isret,
-				  enum probe_type type, void *private)
+void free_probe_from_conf(struct probe *pb, struct tracer_probes_conf *conf)
+{
+	if (pb->type == UPROBE && pb->private_data != NULL) {
+		struct symbol_uprobe *sym_u = pb->private_data;
+		free_uprobe_symbol(sym_u, conf);
+	}
+
+	list_head_del(&pb->list);
+	free(pb);
+}
+
+struct probe *create_probe(struct bpf_tracer *tracer,
+			   const char *func_name, bool isret,
+			   enum probe_type type, void *private, bool add_tracer)
 {
 	struct probe *pb;
 	struct ebpf_prog *prog;
@@ -735,7 +745,13 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 	pb->private_data = private;
 	pb->tracer = tracer;
 
-	add_probe_to_tracer(pb);
+	/*
+	 * Some features' eBPF tracing interfaces require independent management
+	 * and do not need to be included in the unified management of the tracer.
+	 */
+	if (add_tracer)
+		add_probe_to_tracer(pb);
+
 	return pb;
 }
 
@@ -830,7 +846,7 @@ static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
 	return link;
 }
 
-static int probe_attach(struct probe *p)
+int probe_attach(struct probe *p)
 {
 	if (p->link || p->installed) {
 		return ETR_EXIST;
@@ -1138,21 +1154,18 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->progs[i].
-							       prog_fd,
+				    program__attach_perf_event(obj->
+							       progs[i].prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->
-							       sample_freq,
+							       tracer->sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->
-							       per_cpu_fds,
+							       tracer->per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->
-								per_cpu_fds));
+							       (tracer->per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1224,14 +1237,14 @@ int tracer_probes_init(struct bpf_tracer *tracer)
 
 	for (i = 0; i < tps->kprobes_nr; ++i) {
 		p = create_probe(tracer, tps->ksymbols[i].func,
-				 tps->ksymbols[i].isret, KPROBE, NULL);
+				 tps->ksymbols[i].isret, KPROBE, NULL, true);
 		if (!p)
 			return ETR_INVAL;
 	}
 
 	list_for_each_entry(usym, &tps->uprobe_syms_head, list) {
 		p = create_probe(tracer, usym->probe_func, usym->isret, UPROBE,
-				 usym);
+				 usym, true);
 		if (!p)
 			return ETR_INVAL;
 	}
@@ -1260,7 +1273,7 @@ int tracer_uprobes_update(struct bpf_tracer *tracer)
 		if (usym->in_probe)
 			continue;
 		p = create_probe(tracer, usym->probe_func, usym->isret, UPROBE,
-				 usym);
+				 usym, true);
 		if (!p)
 			return ETR_INVAL;
 	}
@@ -1959,7 +1972,7 @@ int set_feature_pids(int feature, const int *match_pids, int num)
 				     match_pids[i]);
 		} else {
 			pids[j++] = match_pids[i];
-		}	
+		}
 	}
 
 	num = j;
@@ -2144,7 +2157,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 }
 
 bool is_rt_kernel(void)
-{       
+{
 	return (strstr(linux_release, ".rt") || strstr(linux_release, "-rt"));
 }
 
