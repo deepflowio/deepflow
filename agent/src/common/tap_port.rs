@@ -56,9 +56,15 @@ impl TapPort {
     const RESERVED_OFFSET: u8 = 40;
     const RESERVED_MASK: u32 = 0xfffff;
     const DATA_SOURCE_OFFSET: u8 = 24;
+    // In analyzer mode, it is necessary to use 'mac' + 'from' to distinguish different flows
+    const TAP_MAC_MASK: u64 = 0xf0000000ffffffff;
 
     pub fn is_from(&self, w: u8) -> bool {
         (self.0 >> Self::FROM_OFFSET) as u8 == w
+    }
+
+    pub fn get_tap_mac(&self) -> u64 {
+        self.0 & Self::TAP_MAC_MASK
     }
 
     pub fn ignore_nat_source(&self) -> u64 {
