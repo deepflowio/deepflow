@@ -281,7 +281,7 @@ pub struct SK_BPF_DATA {
     pub syscall_trace_id_call: u64,
 
     /* data info */
-    pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为微妙）
+    pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为纳秒）
     pub direction: u8,  // 数据的收发方向，值是 SOCK_DIR_SND/SOCK_DIR_RCV
 
     /*

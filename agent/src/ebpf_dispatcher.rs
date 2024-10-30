@@ -490,6 +490,10 @@ impl EbpfCollector {
                 return;
             }
 
+            // The timestamp provided by eBPF is in nanoseconds, and here it is
+            // converted to microseconds.
+            (*sd).timestamp = (*sd).timestamp / 1000;
+
             let container_id =
                 CStr::from_ptr(ptr::addr_of!((*sd).container_id) as *const libc::c_char)
                     .to_string_lossy();
