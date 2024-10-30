@@ -843,6 +843,9 @@ mod tests {
                 team_id: None,
                 organize_id: None,
                 secret_key: None,
+                enabled: None,
+                agent_type: None,
+                hostname: None,
             },
         )
             .into();
@@ -926,6 +929,9 @@ mod tests {
                 team_id: None,
                 organize_id: None,
                 secret_key: None,
+                enabled: None,
+                agent_type: None,
+                hostname: None,
             },
         )
             .into();

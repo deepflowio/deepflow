@@ -57,7 +57,7 @@ use public::{
     bitmap::Bitmap,
     consts::NPB_DEFAULT_PORT,
     proto::{
-        agent::{self, SocketType, SysMemoryMetric, SystemLoadMetric},
+        agent::{self, DynamicConfig, SocketType, SysMemoryMetric, SystemLoadMetric},
         common,
         trident::{self, KubernetesClusterIdRequest, TapMode},
     },
@@ -2053,6 +2053,7 @@ pub struct SelfMonitoring {
     pub log: Log,
     pub profile: Profile,
     pub debug: Debug,
+    #[serde(skip)]
     pub hostname: String,
     #[serde(with = "humantime_serde")]
     pub interval: Duration,
@@ -2129,6 +2130,7 @@ pub struct Global {
     pub communication: Communication,
     pub self_monitoring: SelfMonitoring,
     pub standalone_mode: StandaloneMode,
+    #[serde(skip)]
     pub common: GlobalCommon,
 }
 
@@ -3402,6 +3404,12 @@ impl UserConfig {
         config.set_standalone();
 
         config
+    }
+
+    pub fn set_dynamic_config(&mut self, dynamic_config: &DynamicConfig) {
+        self.global.common.agent_type = dynamic_config.agent_type();
+        self.global.common.enabled = dynamic_config.enabled();
+        self.global.self_monitoring.hostname = dynamic_config.hostname().to_string();
     }
 }
 
