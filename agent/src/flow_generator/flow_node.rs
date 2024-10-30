@@ -215,7 +215,10 @@ impl FlowNode {
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;
-        if flow_key.tap_port.ignore_nat_source() != meta_packet.tap_port.ignore_nat_source()
+        // TapPort comparison ignored tunnel_type and nat_source:
+        //   tunnel_type: support aggregation of packets with and without tunnels(eg: weave cni)
+        //   nat_source: possible extraction from TCP options address, can be ignored
+        if flow_key.tap_port.get_tap_mac() != meta_packet.tap_port.get_tap_mac()
             || flow_key.tap_type != meta_lookup_key.tap_type
         {
             return false;
@@ -408,8 +411,10 @@ impl FlowNode {
 
 #[cfg(test)]
 mod tests {
-    use super::PacketSegmentationReassembly;
-    use crate::common::MetaPacket;
+    use public::proto::agent::AgentType;
+
+    use super::{FlowNode, PacketSegmentationReassembly};
+    use crate::common::{decapsulate::TunnelType, MetaPacket, TapPort};
     use crate::utils::test::Capture;
 
     #[test]
@@ -439,5 +444,27 @@ mod tests {
         assert_eq!(outputs[0].get_l4_payload().as_ref().unwrap()[1448], 0x2c);
         assert_eq!(outputs[1].payload_len, 2896);
         assert_eq!(outputs[1].packet_len, 2962);
+    }
+
+    #[test]
+    fn match_vxlan_and_none() {
+        let mut node = FlowNode::default();
+        let mut meta_packet = MetaPacket::default();
+
+        node.tagged_flow.flow.flow_key.tap_port =
+            TapPort::from_local_mac(0, TunnelType::Vxlan, 0x11223344);
+        meta_packet.tap_port = TapPort::from_local_mac(0, TunnelType::None, 0x11223344);
+        assert_eq!(
+            node.match_node(&mut meta_packet, true, true, true, AgentType::TtProcess),
+            true
+        );
+
+        node.tagged_flow.flow.flow_key.tap_port =
+            TapPort::from_local_mac(0, TunnelType::None, 0x11223344);
+        meta_packet.tap_port = TapPort::from_local_mac(0, TunnelType::Vxlan, 0x11223344);
+        assert_eq!(
+            node.match_node(&mut meta_packet, true, true, true, AgentType::TtProcess),
+            true
+        );
     }
 }
