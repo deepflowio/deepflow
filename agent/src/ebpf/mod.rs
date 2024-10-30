@@ -148,6 +148,16 @@ pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "extended_observability")] {
+        #[allow(dead_code)]
+        pub const DATA_SOURCE_DPDK: u8 = 7;
+        #[allow(dead_code)]
+        pub const DPDK_HOOK_TYPE_RECV: u8 = 0;
+        #[allow(dead_code)]
+        pub const DPDK_HOOK_TYPE_XMIT: u8 = 1;
+    }
+}
 
 // Message types
 // Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE,
@@ -185,7 +195,7 @@ pub const PROFILER_TYPE_UNKNOWN: u8 = 0;
 #[allow(dead_code)]
 pub const PROFILER_TYPE_ONCPU: u8 = 1;
 cfg_if::cfg_if! {
-    if #[cfg(feature = "extended_profile")] {
+    if #[cfg(feature = "extended_observability")] {
         #[allow(dead_code)]
         pub const PROFILER_TYPE_OFFCPU: u8 = 2;
         #[allow(dead_code)]
@@ -193,7 +203,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(feature = "extended_profile")]
+#[cfg(feature = "extended_observability")]
 pub const PROFILER_CTX_MEMORY_IDX: usize = 2;
 pub const PROFILER_CTX_NUM: usize = 3;
 
@@ -705,7 +715,7 @@ extern "C" {
     pub fn set_dwarf_shard_map_size(size: c_int) -> c_void;
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "extended_profile")] {
+        if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;
 
             pub fn disable_offcpu_profiler() -> c_int;
@@ -719,6 +729,51 @@ extern "C" {
             pub fn enable_memory_profiler() -> c_int;
 
             pub fn disable_memory_profiler() -> c_int;
+
+            /**
+             * @brief **set_dpdk_trace_enabled()** DPDK tracing feature enable switch.
+             *
+             * @param enabled Used to control whether to enable this feature.
+             *   'true': enbaled; 'false': disabled
+             * @return 0 on success, non-zero on error
+             */
+            pub fn set_dpdk_trace_enabled(enabled: bool) -> c_int;
+
+            /**
+             * @brief **set_dpdk_cmd_name()** Set the command line name of the DPDK application.
+             *
+             * @param name Command name. For example, in the command line '/usr/bin/mydpdk',
+             *   the name selected is the part after the last '/', i.e., 'mydpdk'.
+             *
+             * @return 0 on success, non-zero on error
+             */
+             pub fn set_dpdk_cmd_name(name: *const c_char) -> c_int;
+
+             /**
+              * @brief **set_dpdk_hooks()** Set all DPDK hook points tracked by eBPF.
+              *
+              * @param fucs The list of tracked interfaces,
+              *   for example: i40e_recv_pkts,i40e_xmit_pkts,ixgbe_recv_pkts,ixgbe_xmit_pkts
+              * @param type Is DPDK_HOOK_TYPE_RECV or DPDK_HOOK_TYPE_XMIT, Indicates whether
+              *   it is receiving or transmitting packets.
+              *
+              * @return 0 on success, non-zero on error
+              */
+             pub fn set_dpdk_hooks(func_type: c_int, funcs: *const c_char) -> c_int;
+
+             /**
+              * @brief **dpdk_trace_start()** Start the DPDK tracing module.
+              *
+              * @return 0 on success, non-zero on error
+              */
+             pub fn dpdk_trace_start() -> c_int;
+
+             /**
+              * @brief **dpdk_trace_stop()** Stop the DPDK tracing module.
+              *
+              * @return 0 on success, non-zero on error
+              */
+              pub fn dpdk_trace_stop() -> c_int;
         }
     }
 }

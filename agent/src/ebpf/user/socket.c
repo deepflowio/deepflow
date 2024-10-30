@@ -746,11 +746,13 @@ static void process_event(struct process_event_t *e)
 			return;
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		unwind_process_exec(e->pid);
+		extended_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
 		unwind_process_exit(e->pid);
+		extended_process_exit(e->pid);
 	}
 }
 
@@ -905,7 +907,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		return;
 	}
 
-	if (buf->events_num <= 0 || buf->events_num > MAX_PKT_BURST) {
+	if (buf->events_num <= 0 || buf->events_num > MAX_EVENTS_BURST) {
 		ebpf_warning("buf->events_num %u, invalid\n", buf->events_num);
 		return;
 	}
@@ -934,14 +936,14 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	q_idx = fwd_info->queue_id;
 	q = &tracer->queues[q_idx];
 
-	if (buf->events_num > MAX_PKT_BURST) {
+	if (buf->events_num > MAX_EVENTS_BURST) {
 		ebpf_info
-		    ("buf->events_num > MAX_PKT_BURST(16) error. events_num:%d\n",
+		    ("buf->events_num > MAX_EVENTS_BURST(32) error. events_num:%d\n",
 		     buf->events_num);
 		return;
 	}
 
-	struct socket_bpf_data *burst_data[MAX_PKT_BURST];
+	struct socket_bpf_data *burst_data[MAX_EVENTS_BURST];
 
 	/*
 	 * ----------- -> memory block ptr (free_ptr)
@@ -991,46 +993,51 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 		data_buf_ptr = block_head + 1;
 		submit_data = data_buf_ptr;
+		memset(submit_data, 0, sizeof(*submit_data));
 
-		submit_data->socket_id = sd->socket_id;
 		submit_data->timestamp = sd->timestamp;
-		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
-		submit_data->l7_protocal_hint = sd->data_type;
-		submit_data->need_reconfirm =
-		    need_proto_reconfirm(sd->data_type);
-		submit_data->process_id = sd->tgid;
-		submit_data->thread_id = sd->pid;
-		submit_data->coroutine_id = sd->coroutine_id;
 		submit_data->source = sd->source;
-		submit_data->is_tls = sd->is_tls;
-		if (sd->source == DATA_SOURCE_GO_TLS_UPROBE ||
-		    sd->source == DATA_SOURCE_OPENSSL_UPROBE)
-			submit_data->is_tls = true;
-
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
-		submit_data->tcp_seq = sd->tcp_seq;
-		submit_data->cap_seq = sd->data_seq;
-		submit_data->syscall_trace_id_call = sd->thread_trace_id;
 		safe_buf_copy(submit_data->process_kname,
 			      sizeof(submit_data->process_kname), sd->comm,
 			      sizeof(sd->comm));
 		submit_data->process_kname[sizeof(submit_data->process_kname) -
 					   1] = '\0';
-		get_container_id_from_procs_cache(sd->tgid,
-						  submit_data->container_id,
-						  sizeof
-						  (submit_data->container_id));
-		submit_data->msg_type = sd->msg_type;
-		submit_data->socket_role = sd->socket_role;
+		submit_data->l7_protocal_hint = sd->data_type;
+		if (sd->source != DATA_SOURCE_DPDK) {
+			submit_data->socket_id = sd->socket_id;
+			submit_data->tuple = sd->tuple;
+			submit_data->need_reconfirm =
+			    need_proto_reconfirm(sd->data_type);
+			submit_data->process_id = sd->tgid;
+			submit_data->thread_id = sd->pid;
+			submit_data->coroutine_id = sd->coroutine_id;
+			submit_data->is_tls = sd->is_tls;
+			if (sd->source == DATA_SOURCE_GO_TLS_UPROBE ||
+			    sd->source == DATA_SOURCE_OPENSSL_UPROBE)
+				submit_data->is_tls = true;
 
-		// 各种协议的统计
-		if (sd->data_type >= PROTO_NUM)
-			sd->data_type = PROTO_UNKNOWN;
+			submit_data->tcp_seq = sd->tcp_seq;
+			submit_data->cap_seq = sd->data_seq;
+			submit_data->syscall_trace_id_call =
+			    sd->thread_trace_id;
+			get_container_id_from_procs_cache(sd->tgid,
+							  submit_data->
+							  container_id,
+							  sizeof(submit_data->
+								 container_id));
+			submit_data->msg_type = sd->msg_type;
+			submit_data->socket_role = sd->socket_role;
+		}
+		// Statistics of Various Protocols
+		if (submit_data->l7_protocal_hint >= PROTO_NUM)
+			submit_data->l7_protocal_hint = PROTO_UNKNOWN;
 
-		atomic64_inc(&tracer->proto_status[sd->data_type]);
+		atomic64_inc(&tracer->
+			     proto_status[submit_data->l7_protocal_hint]);
 		int offset = 0;
 		if (len > 0) {
 			if (sd->extra_data_count > 0) {
@@ -1849,9 +1856,9 @@ static void process_data(void *queue)
 	volatile int nr;
 	struct queue *q = (struct queue *)queue;
 	struct ring *r = q->r;
-	void *rx_burst[MAX_PKT_BURST];
+	void *rx_burst[MAX_EVENTS_BURST];
 	for (;;) {
-		nr = ring_sc_dequeue_burst(r, rx_burst, MAX_PKT_BURST, NULL);
+		nr = ring_sc_dequeue_burst(r, rx_burst, MAX_EVENTS_BURST, NULL);
 		if (nr == 0) {
 			/*
 			 * 等着生产者唤醒
@@ -1862,7 +1869,7 @@ static void process_data(void *queue)
 		} else {
 			atomic64_add(&q->dequeue_nr, nr);
 			prefetch_and_process_data(q->t, nr, rx_burst);
-			if (nr == MAX_PKT_BURST)
+			if (nr == MAX_EVENTS_BURST)
 				atomic64_inc(&q->burst_count);
 		}
 	}
@@ -2062,7 +2069,8 @@ static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 		bpf_bin_buffer = (void *)socket_trace_rt_ebpf_data;
 		buffer_sz = sizeof(socket_trace_rt_ebpf_data);
 	} else if (!skip_kfunc && fentry_can_attach(TEST_KFUNC_NAME)
-	    && get_kfunc_params_num(TEST_KFUNC_NAME) == TEST_KFUNC_PARAMS_NUM) {
+		   && get_kfunc_params_num(TEST_KFUNC_NAME) ==
+		   TEST_KFUNC_PARAMS_NUM) {
 		g_k_type = K_TYPE_KFUNC;
 		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kfunc");
 		bpf_bin_buffer = (void *)socket_trace_kfunc_ebpf_data;
@@ -2988,7 +2996,8 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 	int len = 0;
 	len +=
 	    snprintf(buff, sizeof(buff), DATADUMP_FORMAT, timestamp,
-		     datadump_seq++, proto_tag,
+		     datadump_seq++,
+		     sd->source == DATA_SOURCE_DPDK ? "Pkt" : proto_tag,
 		     sd->direction == T_EGRESS ? "out" : "in", type,
 		     sd->msg_type, sd->process_id, sd->thread_id,
 		     sd->coroutine_id, role_str,
@@ -3012,6 +3021,11 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 		len +=
 		    print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len,
 						buff + len, sizeof(buff) - len);
+	} else if (sd->source == DATA_SOURCE_DPDK) {
+		len +=
+		    print_extra_pkt_info(datadump_enable, sd->cap_data,
+					 sd->cap_len, buff + len,
+					 sizeof(buff) - len, sd->direction);
 	} else {
 		int i;
 		uint8_t v;

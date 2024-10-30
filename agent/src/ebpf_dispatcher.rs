@@ -37,7 +37,7 @@ fn main() {
 
  */
 
-#[cfg(feature = "extended_profile")]
+#[cfg(feature = "extended_observability")]
 pub mod memory_profile;
 
 use std::ffi::{CStr, CString};
@@ -452,7 +452,7 @@ impl FlowAclListener for SyncEbpfDispatcher {
 
 #[derive(Default)]
 struct ConfigHandle {
-    #[cfg(feature = "extended_profile")]
+    #[cfg(feature = "extended_observability")]
     memory_profile_settings: Option<memory_profile::MemoryContextSettings>,
 }
 
@@ -535,7 +535,7 @@ impl EbpfCollector {
             }
             let data = &mut *data;
 
-            #[cfg(feature = "extended_profile")]
+            #[cfg(feature = "extended_observability")]
             if data.profiler_type == ebpf::PROFILER_TYPE_MEMORY {
                 let mut ts_nanos = data.timestamp;
                 if let Some(time_diff) = TIME_DIFF.as_ref() {
@@ -569,7 +569,7 @@ impl EbpfCollector {
                 }
             }
             profile.event_type = match data.profiler_type {
-                #[cfg(feature = "extended_profile")]
+                #[cfg(feature = "extended_observability")]
                 ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
                 _ => metric::ProfileEventType::EbpfOnCpu.into(),
             };
@@ -856,7 +856,8 @@ impl EbpfCollector {
         let memory = &ebpf_conf.profile.memory;
 
         let profiler_enabled = !on_cpu.disabled
-            || (cfg!(feature = "extended_profile") && (!off_cpu.disabled || !memory.disabled));
+            || (cfg!(feature = "extended_observability")
+                && (!off_cpu.disabled || !memory.disabled));
         if profiler_enabled {
             if !on_cpu.disabled {
                 ebpf::enable_oncpu_profiler();
@@ -877,7 +878,7 @@ impl EbpfCollector {
                 config.ebpf.profile.unwinding.dwarf_shard_map_size as i32,
             );
 
-            #[cfg(feature = "extended_profile")]
+            #[cfg(feature = "extended_observability")]
             {
                 if !off_cpu.disabled {
                     ebpf::enable_offcpu_profiler();
@@ -894,7 +895,7 @@ impl EbpfCollector {
 
             #[allow(unused_mut)]
             let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
-            #[cfg(feature = "extended_profile")]
+            #[cfg(feature = "extended_observability")]
             {
                 let mp_ctx = memory_profile::MemoryContext::new(
                     memory.report_interval,
@@ -943,7 +944,7 @@ impl EbpfCollector {
                 ebpf::set_profiler_cpu_aggregation(on_cpu.aggregate_by_cpu as i32);
             }
 
-            #[cfg(feature = "extended_profile")]
+            #[cfg(feature = "extended_observability")]
             {
                 let feature = "ebpf.profile.off_cpu";
                 let off_cpu_regexp = config
@@ -1166,7 +1167,7 @@ impl EbpfCollector {
                 ebpf::stop_continuous_profiler(
                     &mut contexts as *mut [*mut c_void; ebpf::PROFILER_CTX_NUM],
                 );
-                #[cfg(feature = "extended_profile")]
+                #[cfg(feature = "extended_observability")]
                 {
                     std::mem::drop(Box::from_raw(
                         contexts[ebpf::PROFILER_CTX_MEMORY_IDX]
@@ -1181,7 +1182,7 @@ impl EbpfCollector {
                     return;
                 }
             }
-            #[cfg(feature = "extended_profile")]
+            #[cfg(feature = "extended_observability")]
             if let Some(s) = self.config_handle.memory_profile_settings.as_ref() {
                 s.set_report_interval(ecfg.memory.report_interval);
             }

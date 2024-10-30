@@ -17,9 +17,9 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
-use std::env;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
+use std::env;
 use std::ffi::CString;
 use std::fmt::Write;
 use std::net::IpAddr;
@@ -616,6 +616,23 @@ fn main() {
         let num: c_int = pids.len() as c_int;
         let result = set_feature_pids(feature, pids.as_ptr(), num);
         println!("Result {}", result);
+
+        // Test for dpdk
+        //set_dpdk_trace_enabled(true);
+        //set_dpdk_cmd_name(
+        //    CString::new("l2fwd".as_bytes()).unwrap().as_c_str().as_ptr
+        //);
+        //// i40e_recv_pkts, virtio_recv_pkts
+        //// i40e_xmit_pkts, virtio_xmit_pkts, virtio_recv_mergeable_pkts
+        //set_dpdk_hooks(
+        //    DPDK_HOOK_TYPE_RECV as c_int,
+        //    CString::new("rte_eth_rx_burst,virtio_recv_mergeable_pkts".
+        //);
+        //set_dpdk_hooks(
+        //    DPDK_HOOK_TYPE_XMIT as c_int,
+        //    CString::new("virtio_xmit_pkts".as_bytes()).unwrap().as_c_s
+        //);
+        //dpdk_trace_start();
 
         // test data limit max
         set_data_limit_max(10000);

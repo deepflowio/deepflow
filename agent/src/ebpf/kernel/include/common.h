@@ -89,7 +89,8 @@ enum traffic_protocol {
 	PROTO_DNS = 120,
 	PROTO_TLS = 121,
 	PROTO_CUSTOM = 127,
-	PROTO_NUM = 130
+	PROTO_DPDK_PKT = 199,
+	PROTO_NUM = 200
 };
 
 enum process_data_extra_source {
@@ -100,6 +101,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_IO_EVENT,
 	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
 	DATA_SOURCE_CLOSE,
+	DATA_SOURCE_DPDK,
 };
 
 struct protocol_message_t {

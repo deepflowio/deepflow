@@ -58,7 +58,6 @@
 
 #define RING_SIZE 16384
 #define MAX_BULK 32
-#define MAX_PKT_BURST 16
 #define SOCKET_ID_ANY -1
 
 #define NANOSEC_PER_SEC 1000000000ULL	/* 10^9 */
@@ -324,7 +323,7 @@ struct queue {
 	struct bpf_tracer *t;
 	struct ring *r;
 	unsigned int ring_size;	// 队列配置大小，值为2的次幂
-	void *datas_burst[MAX_PKT_BURST];	// burst的方式获取数据
+	void *datas_burst[MAX_EVENTS_BURST];	// burst的方式获取数据
 	int nr;			// datas_burst中data数量
 
 	/*
