@@ -1053,6 +1053,9 @@ impl Synchronizer {
             team_id: Some(runtime_config.team_id),
             organize_id: Some(runtime_config.organize_id),
             secret_key: Some(runtime_config.secret_key.clone()),
+            enabled: Some(runtime_config.enabled),
+            agent_type: Some(runtime_config.trident_type.into()),
+            hostname: Some(runtime_config.host.clone()),
         };
         if !runtime_config.enabled
             || exception_handler.has(Exception::SystemLoadCircuitBreaker)
@@ -2207,7 +2210,10 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let user_config: UserConfig = user_config.unwrap();
+        let mut user_config: UserConfig = user_config.unwrap();
+        if let Some(dynamic_config) = resp.dynamic_config.as_ref() {
+            user_config.set_dynamic_config(dynamic_config);
+        }
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
@@ -2258,6 +2264,9 @@ impl Synchronizer {
                 team_id: None,
                 organize_id: None,
                 secret_key: None,
+                enabled: None,
+                hostname: None,
+                agent_type: None,
             },
         )) || updated;
         let wait_ntp = status_guard.ntp_enabled && status_guard.first;
@@ -2678,6 +2687,9 @@ impl Synchronizer {
                             team_id: None,
                             organize_id: None,
                             secret_key: None,
+                            enabled: None,
+                            agent_type: None,
+                            hostname: None,
                         },
                     )));
                 } else {

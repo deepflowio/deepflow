@@ -5,74 +5,6 @@
 # description:
 global:
   # type: section
-  # name: Common
-  # description:
-  #   en: Common configuration of deepflow-agent.
-  #   ch: deepflow-agent 通用配置。
-  common:
-    # type: bool
-    # name: Enabled
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Disabled / Enabled the deepflow-agent.
-    #   ch: 禁用 / 启用 deepflow-agent。
-    # upgrade_from: enabled
-    enabled: true
-    # type: int
-    # name:
-    #   en: Agent Type
-    #   ch: 采集器类型
-    # unit:
-    # range: [0, 12]
-    # enum_options:
-    #   - 0:
-    #       en: TT_UNKNOWN
-    #       ch: TT_UNKNOWN
-    #   - 1:
-    #       en: TT_PROCESS, Agent in KVM
-    #       ch: TT_PROCESS, Agent in KVM
-    #   - 2:
-    #       en: TT_VM, Agent in a dedicated VM on ESXi
-    #       ch: TT_VM, Agent in a dedicated VM on ESXi
-    #   - 3:
-    #       en: TT_PUBLIC_CLOUD, Agent in Cloud host (VM)
-    #       ch: TT_PUBLIC_CLOUD, Agent in Cloud host (VM)
-    #   - 5:
-    #       en: TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host
-    #       ch: TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host
-    #   - 6:
-    #       en: TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic
-    #       ch: TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic
-    #   - 7:
-    #       en: TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host)
-    #       ch: TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host)
-    #   - 8:
-    #       en: TT_VM_POD, Agent in K8s Node (Cloud VM)
-    #       ch: TT_VM_POD, Agent in K8s Node (Cloud VM)
-    #   - 9:
-    #       en: TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic
-    #       ch: TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic
-    #   - 10:
-    #       en: TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node
-    #       ch: TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node
-    #   - 11:
-    #       en: TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node
-    #       ch: TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node
-    #   - 12:
-    #       en: TT_K8S_SIDECAR, Agent in K8s POD
-    #       ch: TT_K8S_SIDECAR, Agent in K8s POD
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Agent Type.
-    #   ch: 采集器类型。
-    # upgrade_from: trident_type
-    agent_type: 0
-  # type: section
   # name:
   #   en: Limits
   #   ch: 资源限制
@@ -883,18 +815,6 @@ global:
       # upgrade_from: static_config.enable-debug-stats
       # deprecated: true
       debug_metrics_enabled: false
-    # type: string
-    # name: Hostname
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Override statsd host tag.
-    #   ch: 覆盖 statsd 主机标签。
-    # upgrade_from: host
-    hostname: ""
     # type: duration
     # name: Interval
     # unit:
