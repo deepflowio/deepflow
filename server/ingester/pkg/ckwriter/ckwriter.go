@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	server_common "github.com/deepflowio/deepflow/server/common"
@@ -91,7 +90,6 @@ type CKWriter struct {
 	name         string // 数据库名-表名 用作 queue名字和counter名字
 	prepare      string // 写入数据时，先执行prepare
 	conns        []clickhouse.Conn
-	batchs       []driver.Batch
 	connCount    uint64
 	dataQueues   queue.FixedMultiQueue
 	counters     []Counter
@@ -234,7 +232,6 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 
 	addrCount := len(addrs)
 	conns := make([]clickhouse.Conn, addrCount)
-	batchs := make([]driver.Batch, queueCount*addrCount)
 	for i := 0; i < addrCount; i++ {
 		if conns[i], err = clickhouse.Open(&clickhouse.Options{
 			Addr: []string{addrs[i]},
@@ -261,9 +258,10 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
 		for i := range orgCaches {
 			orgCaches[i] = new(Cache)
-			orgCaches[i].items = make([]CKItem, 0)
 			orgCaches[i].orgID = uint16(i)
 			orgCaches[i].prepare = table.MakeOrgPrepareTableInsertSQL(uint16(i))
+			orgCaches[i].conns = conns
+			orgCaches[i].connCount = len(conns)
 		}
 		orgQueueCaches[i] = orgCaches
 	}
@@ -284,7 +282,6 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		name:        name,
 		prepare:     table.MakePrepareTableInsertSQL(),
 		conns:       conns,
-		batchs:      batchs,
 		connCount:   uint64(len(conns)),
 		dataQueues:  dataQueues,
 		counters:    make([]Counter, queueCount),
@@ -340,17 +337,73 @@ func (w *CKWriter) Put(items ...interface{}) {
 type Cache struct {
 	orgID         uint16
 	prepare       string
-	items         []CKItem
 	lastWriteTime time.Time
 	tableCreated  bool
 	dropTime      uint32
+
+	conns        []clickhouse.Conn
+	connCount    int
+	block        *ckdb.Block
+	batch        driver.Batch
+	batchSize    int
+	writeCounter int
+}
+
+func (c *Cache) resetBatch() error {
+	var err error
+	conn := c.conns[c.writeCounter%c.connCount]
+	if IsNil(c.batch) {
+		c.batch, err = conn.PrepareBatch(context.Background(), c.prepare)
+		if err != nil {
+			return fmt.Errorf("prepare batch item write block failed: %s", err)
+		}
+	} else {
+		c.batch, err = conn.PrepareReuseBatch(context.Background(), c.prepare, c.batch)
+		if err != nil {
+			return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
+		}
+	}
+	return nil
+}
+
+func (c *Cache) Add(item CKItem) error {
+	if IsNil(c.batch) {
+		if err := c.resetBatch(); err != nil {
+			return err
+		}
+	}
+	if c.block == nil {
+		c.block = ckdb.NewBlock(c.batch)
+	} else {
+		c.block.SetBatch(c.batch)
+	}
+	item.WriteBlock(c.block)
+	if err := c.block.WriteAll(); err != nil {
+		item.Release()
+		return fmt.Errorf("item write block failed: %s", err)
+	}
+	item.Release()
+	c.batchSize++
+	return nil
+}
+
+func (c *Cache) Write() error {
+	if c.batchSize == 0 {
+		return nil
+	}
+	if err := c.block.Send(); err != nil {
+		return fmt.Errorf("cache send write block failed: %s", err)
+	}
+	c.writeCounter++
+	c.lastWriteTime = time.Now()
+	c.resetBatch()
+	c.batchSize = 0
+	return nil
 }
 
 func (c *Cache) Release() {
-	for _, item := range c.items {
-		item.Release()
-	}
-	c.items = c.items[:0]
+	c.block = nil
+	c.batch = nil
 }
 
 func (c *Cache) OrgIdExists() bool {
@@ -389,17 +442,15 @@ func (w *CKWriter) queueProcess(queueID int) {
 					continue
 				}
 				cache = orgCaches[orgID]
-				cache.items = append(cache.items, ck)
-				if len(cache.items) >= w.batchSize {
+				cache.Add(ck)
+				if cache.batchSize >= w.batchSize {
 					w.Write(queueID, cache)
-					cache.lastWriteTime = time.Now()
 				}
 			} else if IsNil(item) { // flush ticker
 				now := time.Now()
 				for _, cache := range orgCaches {
-					if len(cache.items) > 0 && now.Sub(cache.lastWriteTime) > w.flushDuration {
+					if cache.batchSize > 0 && now.Sub(cache.lastWriteTime) > w.flushDuration {
 						w.Write(queueID, cache)
-						cache.lastWriteTime = now
 					}
 				}
 			} else {
@@ -428,8 +479,7 @@ func (w *CKWriter) ResetConnection(connID int) error {
 }
 
 func (w *CKWriter) Write(queueID int, cache *Cache) {
-	connID := int(atomic.AddUint64(&w.writeCounter, 1) % w.connCount)
-	itemsLen := len(cache.items)
+	itemsLen := cache.batchSize
 	// Prevent frequent log writing
 	logEnabled := w.counters[queueID].WriteFailedCount == 0
 	if !cache.OrgIdExists() {
@@ -452,11 +502,11 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 		}
 		cache.tableCreated = true
 	}
-	if err := w.writeItems(queueID, connID, cache); err != nil {
+	if err := cache.Write(); err != nil {
 		if logEnabled {
 			log.Warningf("write table (%s.%s) failed, will retry write (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 		}
-		if err := w.ResetConnection(connID); err != nil {
+		if err := w.ResetConnection(cache.writeCounter % int(w.connCount)); err != nil {
 			log.Warningf("reconnect clickhouse failed: %s", err)
 			time.Sleep(time.Second * 10)
 		} else {
@@ -467,7 +517,7 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 
 		w.counters[queueID].RetryCount++
 		// 写失败重连后重试一次, 规避偶尔写失败问题
-		err = w.writeItems(queueID, connID, cache)
+		err = cache.Write()
 		if logEnabled {
 			if err != nil {
 				w.counters[queueID].RetryFailedCount++
@@ -484,8 +534,6 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 	} else {
 		w.counters[queueID].WriteSuccessCount += int64(itemsLen)
 	}
-
-	cache.Release()
 }
 
 func IsNil(i interface{}) bool {
@@ -497,50 +545,6 @@ func IsNil(i interface{}) bool {
 		return vi.IsNil()
 	}
 	return false
-}
-
-func (w *CKWriter) writeItems(queueID, connID int, cache *Cache) error {
-	if len(cache.items) == 0 {
-		return nil
-	}
-	ck := w.conns[connID]
-	if IsNil(ck) {
-		if err := w.ResetConnection(connID); err != nil {
-			time.Sleep(time.Second * 10)
-			return fmt.Errorf("write block failed, can not connect to clickhouse: %s", err)
-		}
-		ck = w.conns[connID]
-	}
-	var err error
-	batchID := queueID*int(w.connCount) + connID
-	batch := w.batchs[batchID]
-	if IsNil(batch) {
-		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), cache.prepare)
-		if err != nil {
-			return fmt.Errorf("prepare batch item write block failed: %s", err)
-		}
-		batch = w.batchs[batchID]
-	} else {
-		batch, err = ck.PrepareReuseBatch(context.Background(), cache.prepare, batch)
-		if err != nil {
-			return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
-		}
-		w.batchs[batchID] = batch
-	}
-
-	ckdbBlock := ckdb.NewBlock(batch)
-	for _, item := range cache.items {
-		item.WriteBlock(ckdbBlock)
-		if err := ckdbBlock.WriteAll(); err != nil {
-			return fmt.Errorf("item write block failed: %s", err)
-		}
-	}
-	if err = ckdbBlock.Send(); err != nil {
-		return fmt.Errorf("send write block failed: %s", err)
-	} else {
-		log.Debugf("batch write success, table (%s.%s) commit %d items", w.table.Database, w.table.LocalName, len(cache.items))
-	}
-	return nil
 }
 
 func (w *CKWriter) Close() {
