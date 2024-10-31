@@ -66,12 +66,12 @@
  * cache b for writing data and vice versa.
  */
 
-MAP_PERF_EVENT(profiler_output_a, int, __u32, MAX_CPU, FEATURE_PROFILE_ONCPU)
-MAP_PERF_EVENT(profiler_output_b, int, __u32, MAX_CPU, FEATURE_PROFILE_ONCPU)
-MAP_PROG_ARRAY(cp_progs_jmp_pe_map, __u32, __u32, CP_PROG_PE_NUM, FEATURE_PROFILE_ONCPU)
+MAP_PERF_EVENT(profiler_output_a, int, __u32, MAX_CPU, FEATURE_FLAG_PROFILE_ONCPU)
+MAP_PERF_EVENT(profiler_output_b, int, __u32, MAX_CPU, FEATURE_FLAG_PROFILE_ONCPU)
+MAP_PROG_ARRAY(cp_progs_jmp_pe_map, __u32, __u32, CP_PROG_PE_NUM, FEATURE_FLAG_PROFILE_ONCPU)
 
-MAP_STACK_TRACE(stack_map_a, STACK_MAP_ENTRIES, FEATURE_PROFILE_ONCPU)
-MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES, FEATURE_PROFILE_ONCPU)
+MAP_STACK_TRACE(stack_map_a, STACK_MAP_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
+MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
 typedef struct {
     struct bpf_map_def *state;
@@ -93,8 +93,8 @@ typedef __u64 __raw_stack[PERF_MAX_STACK_DEPTH];
  *
  * Map sizes are configured in user space program
  */
-MAP_HASH(custom_stack_map_a, __u32, __raw_stack, 1, FEATURE_DWARF_UNWINDING)
-MAP_HASH(custom_stack_map_b, __u32, __raw_stack, 1, FEATURE_DWARF_UNWINDING)
+MAP_HASH(custom_stack_map_a, __u32, __raw_stack, 1, FEATURE_FLAG_DWARF_UNWINDING)
+MAP_HASH(custom_stack_map_b, __u32, __raw_stack, 1, FEATURE_FLAG_DWARF_UNWINDING)
 
 /*
  * The following maps are used for DWARF based unwinding
@@ -106,13 +106,13 @@ MAP_HASH(custom_stack_map_b, __u32, __raw_stack, 1, FEATURE_DWARF_UNWINDING)
  *
  * Map sizes are configured in user space program
  */
-MAP_HASH(process_shard_list_table, __u32, process_shard_list_t, 1, FEATURE_DWARF_UNWINDING)
-MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 1, FEATURE_DWARF_UNWINDING)
+MAP_HASH(process_shard_list_table, __u32, process_shard_list_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
+MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
 
 /*
  * For sysinfo gathered from BTF
  */
-MAP_ARRAY(unwind_sysinfo, __u32, unwind_sysinfo_t, 1, FEATURE_DWARF_UNWINDING)
+MAP_ARRAY(unwind_sysinfo, __u32, unwind_sysinfo_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
 
 typedef struct {
     __u64 ip;
@@ -148,7 +148,7 @@ static inline __attribute__((always_inline)) void reset_unwind_state(unwind_stat
     __builtin_memset(&state->stack, 0, sizeof(stack_t));
 }
 
-MAP_PERARRAY(heap, __u32, unwind_state_t, 1, FEATURE_DWARF_UNWINDING)
+MAP_PERARRAY(heap, __u32, unwind_state_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
 #else
 
 typedef void stack_t; // placeholder
@@ -159,7 +159,7 @@ typedef void stack_t; // placeholder
  * Used for communication between user space and BPF to control the
  * switching between buffer a and buffer b.
  */
-MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT, FEATURE_PROFILE_ONCPU)
+MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT, FEATURE_FLAG_PROFILE_ONCPU)
 #ifdef LINUX_VER_5_2_PLUS
 static inline __attribute__((always_inline)) void add_frame(stack_t *stack, __u64 frame) {
     __u8 len = stack->len;

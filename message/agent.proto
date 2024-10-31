@@ -356,6 +356,7 @@ message SkipInterface {
 
 message DynamicConfig {
     optional bool kubernetes_api_enabled = 1;
+    optional bool enabled = 2;
 
     optional uint32 region_id = 10;       // Region ID of the deepflow-agent or Region ID of the data node
     optional uint32 pod_cluster_id = 11;  // Cluster ID of the container where the deepflow-agent is located
@@ -363,8 +364,10 @@ message DynamicConfig {
     optional uint32 agent_id = 13;  // range: [0, 64000]
     optional uint32 team_id = 14;
     optional uint32 organize_id = 15;
+    optional AgentType agent_type = 16;
 
     optional string secret_key = 20; // secret key for dataplane
+    optional string hostname = 21;
 }
 
 message SyncResponse {

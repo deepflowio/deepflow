@@ -46,7 +46,7 @@
 /*
  * 向用户态传递数据的专用map
  */
-MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU, FEATURE_SOCKET_TRACER)
+MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * Why use two Tail Calls jmp tables ?
@@ -66,23 +66,23 @@ MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU, FEATURE_SOCKET_TRACER)
  * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
  *
  */
-MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM, FEATURE_SOCKET_TRACER)
-MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM, FEATURE_SOCKET_TRACER)
+MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM, FEATURE_FLAG_SOCKET_TRACER)
+MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * 因为ebpf栈只有512字节无法存放http数据，这里使用map做为buffer。
  */
-MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1, FEATURE_SOCKET_TRACER)
+MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * For protocol infer buffer
  */
-MAP_PERARRAY(ctx_info, __u32, struct ctx_info_s, 1, FEATURE_SOCKET_TRACER)
+MAP_PERARRAY(ctx_info, __u32, struct ctx_info_s, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * 结构体成员偏移
  */
-MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1, FEATURE_SOCKET_TRACER)
+MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * 记录追踪各种ID值(确保唯一性, per CPU 没有使用锁）
@@ -96,15 +96,15 @@ MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1, FEATURE_SOCK
  * 可以存储176年(如果从2022年开始)的数据而UID不会出现重复。
  * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years
  */
-MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1, FEATURE_SOCKET_TRACER)
+MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * 对各类map进行统计
  */
-MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
-MAP_ARRAY(protocol_filter, int, int, PROTO_NUM, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(protocol_filter, int, int, PROTO_NUM, FEATURE_FLAG_SOCKET_TRACER)
 
 /**
  * @brief Record which protocols allow data segmentation
@@ -112,10 +112,10 @@ MAP_ARRAY(protocol_filter, int, int, PROTO_NUM, FEATURE_SOCKET_TRACER)
  *
  * key: protocol id, value: is protocol allowed?, size: PROTO_NUM
  */
-MAP_ARRAY(allow_reasm_protos_map, int, bool, PROTO_NUM, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(allow_reasm_protos_map, int, bool, PROTO_NUM, FEATURE_FLAG_SOCKET_TRACER)
 
 // 0: allow bitmap; 1: bypass bitmap
-MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2, FEATURE_FLAG_SOCKET_TRACER)
 
 /*
  * l7-protocol-ports
@@ -123,31 +123,31 @@ MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2, FEATURE_SOCKE
  * inference, inference is only targeted at specified ports of Layer 7
  * protocols.
  */
-MAP_ARRAY(proto_ports_bitmap, __u32, ports_bitmap_t, PROTO_NUM, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(proto_ports_bitmap, __u32, ports_bitmap_t, PROTO_NUM, FEATURE_FLAG_SOCKET_TRACER)
 
 // write() syscall's input argument.
 // Key is {tgid, pid}.
-BPF_HASH(active_write_args_map, __u64, struct data_args_t, MAP_MAX_ENTRIES_DEF, FEATURE_SOCKET_TRACER)
+BPF_HASH(active_write_args_map, __u64, struct data_args_t, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER)
 
 // read() syscall's input argument.
 // Key is {tgid, pid}.
-BPF_HASH(active_read_args_map, __u64, struct data_args_t, MAP_MAX_ENTRIES_DEF, FEATURE_SOCKET_TRACER)
+BPF_HASH(active_read_args_map, __u64, struct data_args_t, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER)
 
 // socket_info_map, 这是个hash表，用于记录socket信息，
 // Key is {pid + fd}. value is struct socket_info_s
-BPF_HASH(socket_info_map, __u64, struct socket_info_s, MAP_MAX_ENTRIES_DEF, FEATURE_SOCKET_TRACER)
+BPF_HASH(socket_info_map, __u64, struct socket_info_s, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER)
 
 // socket_info lifecycle is inconsistent with socket. If the role information
 // is saved to the socket_info_map, it will affect the generation of syscall
 // trace id. Create an independent map to save role information
 // Key is {pid + fd}. value is role type
-BPF_HASH(socket_role_map, __u64, __u32, MAP_MAX_ENTRIES_DEF, FEATURE_SOCKET_TRACER);
+BPF_HASH(socket_role_map, __u64, __u32, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER);
 
 // Key is struct trace_key_t. value is trace_info_t
-BPF_HASH(trace_map, struct trace_key_t, struct trace_info_t, MAP_MAX_ENTRIES_DEF, FEATURE_SOCKET_TRACER)
+BPF_HASH(trace_map, struct trace_key_t, struct trace_info_t, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER)
 
 // Stores the identity used to fit the kernel, key: 0, vlaue:{tgid, pid}
-MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 /*
@@ -159,7 +159,7 @@ MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1, FEATURE_SOCKET_TRACER)
  * The process-ID/thread-ID range [0, 5242880], if the process value exceeds the
  * maximum value range, fast cache matching becomes invalid.
  */
-MAP_ARRAY(proto_infer_cache_map, __u32, struct proto_infer_cache_t, PROTO_INFER_CACHE_SIZE, FEATURE_SOCKET_TRACER)
+MAP_ARRAY(proto_infer_cache_map, __u32, struct proto_infer_cache_t, PROTO_INFER_CACHE_SIZE, FEATURE_FLAG_SOCKET_TRACER)
 #endif
 /* *INDENT-ON* */
 
@@ -2701,7 +2701,7 @@ KFUNC_PROG(__sys_connect, int fd, struct sockaddr __user * uservaddr,
 }
 
 // Store IO event information
-MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1, FEATURE_SOCKET_TRACER)
+MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 static __inline int finalize_data_output(void *ctx,
 					 struct tracer_ctx_s *tracer_ctx,

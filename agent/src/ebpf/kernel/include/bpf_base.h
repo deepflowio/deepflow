@@ -376,14 +376,14 @@ struct bpf_map_def {
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
-	unsigned int feat;
+	__u32 feat_flags;
 };
 
 #define __BPF_MAP_DEF(_kt, _vt, _ents, _f) \
 	.key_size = sizeof(_kt),       \
 	.value_size = sizeof(_vt),     \
 	.max_entries = (_ents),	\
-	.feat = (_f)
+	.feat_flags = (_f)
 
 #define MAP_ARRAY(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __##name = \
@@ -444,7 +444,7 @@ struct bpf_map_def SEC("maps") __ ## name = { \
   .key_size = sizeof(__u32), \
   .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
   .max_entries = (max), \
-  .feat = (f), \
+  .feat_flags = (f), \
 };
 
 #define MAP_HASH(name, key_type, value_type, max_entries, feat) \

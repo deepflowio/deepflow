@@ -1519,6 +1519,9 @@ impl Default for ModuleConfig {
                 team_id: None,
                 organize_id: None,
                 secret_key: None,
+                agent_type: None,
+                enabled: None,
+                hostname: None,
             },
         ))
         .unwrap()
@@ -2115,6 +2118,9 @@ impl ConfigHandler {
                 team_id: None,
                 organize_id: None,
                 secret_key: None,
+                enabled: None,
+                hostname: None,
+                agent_type: None,
             },
         ))
         .unwrap();
