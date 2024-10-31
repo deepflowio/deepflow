@@ -731,15 +731,6 @@ extern "C" {
             pub fn disable_memory_profiler() -> c_int;
 
             /**
-             * @brief **set_dpdk_trace_enabled()** DPDK tracing feature enable switch.
-             *
-             * @param enabled Used to control whether to enable this feature.
-             *   'true': enbaled; 'false': disabled
-             * @return 0 on success, non-zero on error
-             */
-            pub fn set_dpdk_trace_enabled(enabled: bool) -> c_int;
-
-            /**
              * @brief **set_dpdk_cmd_name()** Set the command line name of the DPDK application.
              *
              * @param name Command name. For example, in the command line '/usr/bin/mydpdk',
