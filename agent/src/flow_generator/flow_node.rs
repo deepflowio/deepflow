@@ -29,6 +29,7 @@ use crate::common::{
     tagged_flow::TaggedFlow,
     TapPort, Timestamp,
 };
+use crate::utils::environment::{is_tt_hyper_v, is_tt_pod};
 use public::{proto::common::TridentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
@@ -211,7 +212,10 @@ impl FlowNode {
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;
-        if flow_key.tap_port.ignore_nat_source() != meta_packet.tap_port.ignore_nat_source()
+        // TapPort comparison ignored tunnel_type and nat_source:
+        //   tunnel_type: support aggregation of packets with and without tunnels(eg: weave cni)
+        //   nat_source: possible extraction from TCP options address, can be ignored
+        if flow_key.tap_port.get_tap_mac() != meta_packet.tap_port.get_tap_mac()
             || flow_key.tap_type != meta_lookup_key.tap_type
         {
             return false;
@@ -261,7 +265,7 @@ impl FlowNode {
             || (meta_packet.tunnel.is_none() && flow.tunnel.tunnel_type != TunnelType::None)
         {
             // 微软ACS存在非对称隧道流量，需要排除
-            if !Self::is_hyper_v(trident_type) {
+            if !is_tt_hyper_v(trident_type) && !is_tt_pod(trident_type) {
                 return false;
             }
         }
@@ -298,10 +302,6 @@ impl FlowNode {
             )
     }
 
-    fn is_hyper_v(trident_type: TridentType) -> bool {
-        trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
-    }
-
     // Microsoft ACS：
     //   HyperVNetwork网关宿主机和HyperVCompute网关流量模型中，MAC地址不对称
     //   在部分微软ACS环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
@@ -318,7 +318,7 @@ impl FlowNode {
         trident_type: TridentType,
     ) -> MatchMac {
         let ignore_mac = meta_packet.tunnel.is_some()
-            && ((Self::is_hyper_v(trident_type) && meta_packet.tunnel.unwrap().tier < 2)
+            && ((is_tt_hyper_v(trident_type) && meta_packet.tunnel.unwrap().tier < 2)
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::TencentGre
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::Ipip);
 
@@ -387,5 +387,36 @@ impl FlowNode {
                     && lookup_key.l2_end_1 == peers[0].is_l2_end
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use public::proto::common::TridentType;
+
+    use crate::common::{decapsulate::TunnelType, MetaPacket, TapPort};
+
+    use super::FlowNode;
+
+    #[test]
+    fn match_vxlan_and_none() {
+        let mut node = FlowNode::default();
+        let mut meta_packet = MetaPacket::default();
+
+        node.tagged_flow.flow.flow_key.tap_port =
+            TapPort::from_local_mac(0, TunnelType::Vxlan, 0x11223344);
+        meta_packet.tap_port = TapPort::from_local_mac(0, TunnelType::None, 0x11223344);
+        assert_eq!(
+            node.match_node(&mut meta_packet, true, true, true, TridentType::TtProcess),
+            true
+        );
+
+        node.tagged_flow.flow.flow_key.tap_port =
+            TapPort::from_local_mac(0, TunnelType::None, 0x11223344);
+        meta_packet.tap_port = TapPort::from_local_mac(0, TunnelType::Vxlan, 0x11223344);
+        assert_eq!(
+            node.match_node(&mut meta_packet, true, true, true, TridentType::TtProcess),
+            true
+        );
     }
 }
