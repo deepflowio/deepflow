@@ -935,15 +935,12 @@ int ebpf_obj_load(struct ebpf_object *obj)
 			map_flags = BPF_F_NO_PREALLOC;
 		}
 
-		if (map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
-		    ((map->def.feat == FEATURE_UPROBE_GOLANG
-		     && !is_golang_trace_enabled())
-		    || (map->def.feat == FEATURE_UPROBE_OPENSSL
-			&& !is_openssl_trace_enabled())
-		    || (map->def.feat == FEATURE_PROFILE_ONCPU
-			&& !oncpu_profiler_enabled())
-		    || (map->def.feat == FEATURE_DWARF_UNWINDING
-			&& !get_dwarf_enabled()))) {
+		bool map_enabled = map->def.type == BPF_MAP_TYPE_PROG_ARRAY;
+		map_enabled |= ((map->def.feat_flags & FEATURE_FLAG_UPROBE_GOLANG) != 0 && is_golang_trace_enabled());
+		map_enabled |= ((map->def.feat_flags & FEATURE_FLAG_UPROBE_OPENSSL) != 0 && is_openssl_trace_enabled());
+		map_enabled |= ((map->def.feat_flags & FEATURE_FLAG_PROFILE_ONCPU) != 0 && oncpu_profiler_enabled());
+		map_enabled |= ((map->def.feat_flags & FEATURE_FLAG_DWARF_UNWINDING) != 0 && get_dwarf_enabled());
+		if (!map_enabled) {
 			map->def.max_entries = 1;
 		}
 
