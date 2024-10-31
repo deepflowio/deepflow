@@ -1787,13 +1787,13 @@ static int print_match_pids_kvp_cb(pids_match_hash_kv * kv, void *arg)
 {
 	ebpf_info("  PID %lu flags 0x%lx (%s %s %s %s %s %s %s)\n",
 		  kv->key, kv->value,
-		  (kv->value & (1 << FEATURE_UPROBE_GOLANG_SYMBOL)) ? "GOSYMBOL"
+		  (kv->value & FEATURE_FLAG_UPROBE_GOLANG_SYMBOL) ? "GOSYMBOL"
 		  : "",
-		  (kv->value & (1 << FEATURE_UPROBE_GOLANG)) ? "GOLANG" : "",
-		  (kv->value & (1 << FEATURE_UPROBE_OPENSSL)) ? "OPENSSL" : "",
-		  (kv->value & (1 << FEATURE_PROFILE_ONCPU)) ? "ONCPU" : "",
-		  (kv->value & (1 << FEATURE_PROFILE_OFFCPU)) ? "OFFCPU" : "",
-		  (kv->value & (1 << FEATURE_PROFILE_MEMORY)) ? "OFFCPU" : "");
+		  (kv->value & FEATURE_FLAG_UPROBE_GOLANG) ? "GOLANG" : "",
+		  (kv->value & FEATURE_FLAG_UPROBE_OPENSSL) ? "OPENSSL" : "",
+		  (kv->value & FEATURE_FLAG_PROFILE_ONCPU) ? "ONCPU" : "",
+		  (kv->value & FEATURE_FLAG_PROFILE_OFFCPU) ? "OFFCPU" : "",
+		  (kv->value & FEATURE_FLAG_PROFILE_MEMORY) ? "OFFCPU" : "");
 	return BIHASH_WALK_CONTINUE;
 }
 

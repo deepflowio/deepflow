@@ -31,10 +31,10 @@ struct http2_tcp_seq_key {
 /*
  * In uprobe go_tls_read_exit()
  * Save the TCP sequence number before the syscall(read())
- * 
+ *
  * In uprobe http2 read() (after syscall read()), lookup TCP sequence number recorded previously on the map.
- * e.g.: In go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
- * 
+ * e.g.: In go_http2serverConn_processHeaders(), get TCP sequence before syscall read().
+ *
  * Note:  Use for after uprobe read() only.
  */
 struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
@@ -42,7 +42,7 @@ struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
 	.key_size = sizeof(struct http2_tcp_seq_key),
 	.value_size = sizeof(__u32),
 	.max_entries = HASH_ENTRIES_MAX,
-	.feat = FEATURE_UPROBE_GOLANG, 
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 
 /*
@@ -55,7 +55,7 @@ struct bpf_map_def SEC("maps") proc_info_map = {
 	.key_size = sizeof(int),
 	.value_size = sizeof(struct ebpf_proc_info),
 	.max_entries = HASH_ENTRIES_MAX,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 
 // Process ID and coroutine ID, marking the coroutine in the system
@@ -73,7 +73,7 @@ struct bpf_map_def SEC("maps") go_ancerstor_map = {
 	.key_size = sizeof(struct go_key),
 	.value_size = sizeof(__u64),
 	.max_entries = HASH_ENTRIES_MAX,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 
 // Used to determine the timeout, as a termination condition for finding
@@ -85,7 +85,7 @@ struct bpf_map_def SEC("maps") go_rw_ts_map = {
 	.key_size = sizeof(struct go_key),
 	.value_size = sizeof(__u64),
 	.max_entries = HASH_ENTRIES_MAX,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 
 // Pass data between coroutine entry and exit functions
@@ -99,7 +99,7 @@ struct bpf_map_def SEC("maps") pid_tgid_callerid_map = {
 	.key_size = sizeof(__u64),
 	.value_size = sizeof(struct go_newproc_caller),
 	.max_entries = HASH_ENTRIES_MAX,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 
 /*
@@ -112,7 +112,7 @@ struct bpf_map_def SEC("maps") goroutines_map = {
 	.key_size = sizeof(__u64),
 	.value_size = sizeof(__u64),
 	.max_entries = MAX_SYSTEM_THREADS,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 /* *INDENT-ON* */
 
@@ -166,7 +166,7 @@ struct __http2_stack {
 	bool tls;
 } __attribute__ ((packed));
 
-MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1, FEATURE_UPROBE_GOLANG)
+MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1, FEATURE_FLAG_UPROBE_GOLANG)
 
 static __inline struct __http2_stack *get_http2_stack()
 {
@@ -339,14 +339,14 @@ static __inline int get_fd_from_tls_conn_struct(void *conn,
 static __inline int
 get_fd_from_go_proxyproto_interface(void *conn, struct ebpf_proc_info *info)
 {
-	/* conn = {tab = 0x770a10 
+	/* conn = {tab = 0x770a10
 	 * <go:itab.*github.com/armon/go-proxyproto.Conn,net.Conn>, data = 0xc0001963c0}
 	 * (gdb) x/16xg 0xc0001963c0
 	 * 0xc0001963c0:   0x000000c0001947e0      0x0000000000770ac0
 	 * 0xc0001963d0:   0x000000c0001bc090      0x0000000000000000
 	 *
 	 * struct github.com/armon/go-proxyproto.Conn {
-	 *       bufio.Reader *             bufReader; (0x000000c0001947e0)         
+	 *       bufio.Reader *             bufReader; (0x000000c0001947e0)
 	 *       net.Conn                   conn; (tab net.TCPConn,net.Conn,
 	 *                                         data 0x000000c0001bc090)
 	 */
@@ -390,9 +390,9 @@ static __inline int get_fd_from_h2c_rwConn_interface(void *conn, struct ebpf_pro
 	/*
 	 * The process of inferring the file descriptor (0x0000000000000004)
 	 * through the 'conn':
-	 * +(gdb) p conn          
+	 * +(gdb) p conn
 	 * +$3 = {tab = 0x70e270 <rwConn,net.Conn>, data = 0xc0000abe90}
-	 * +(gdb) x/16xg 0xc0000abe90 
+	 * +(gdb) x/16xg 0xc0000abe90
 	 * +0xc0000abe90:   0x000000000070e320      0x000000c000110020
 	 * +(gdb) x/16xg 0x000000c000110020
 	 * +0xc000110020:   0x000000c000128280      0x0000000000000000
@@ -437,7 +437,7 @@ get_fd_from_tcp_or_tls_conn_interface(void *conn, struct ebpf_proc_info *info)
 	return -1;
 }
 
-// Go implements a new way of passing function arguments and results using 
+// Go implements a new way of passing function arguments and results using
 // registers instead of the stack. We need the go version and the computer
 // architecture to determine the parameter locations
 static __inline bool is_register_based_call(struct ebpf_proc_info *info)
@@ -488,7 +488,7 @@ UPROG(runtime_execute) (struct pt_regs *ctx)
 	return 0;
 }
 
-// This function creates a new go coroutine, and the parent and child 
+// This function creates a new go coroutine, and the parent and child
 // coroutine numbers are in the parameters and return values respectively.
 // Pass the function parameters through pid_tgid_callerid_map
 //
