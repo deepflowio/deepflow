@@ -29,6 +29,7 @@ use crate::common::{
     tagged_flow::TaggedFlow,
     TapPort, Timestamp,
 };
+use crate::utils::environment::{is_tt_hyper_v, is_tt_pod};
 use public::{proto::agent::AgentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
@@ -268,7 +269,7 @@ impl FlowNode {
             || (meta_packet.tunnel.is_none() && flow.tunnel.tunnel_type != TunnelType::None)
         {
             // 微软ACS存在非对称隧道流量，需要排除
-            if !Self::is_hyper_v(agent_type) {
+            if !is_tt_hyper_v(agent_type) && !is_tt_pod(agent_type) {
                 return false;
             }
         }
@@ -305,10 +306,6 @@ impl FlowNode {
             )
     }
 
-    fn is_hyper_v(agent_type: AgentType) -> bool {
-        agent_type == AgentType::TtHyperVCompute || agent_type == AgentType::TtHyperVNetwork
-    }
-
     // Microsoft ACS：
     //   HyperVNetwork网关宿主机和HyperVCompute网关流量模型中，MAC地址不对称
     //   在部分微软ACS环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
@@ -325,7 +322,7 @@ impl FlowNode {
         agent_type: AgentType,
     ) -> MatchMac {
         let ignore_mac = meta_packet.tunnel.is_some()
-            && ((Self::is_hyper_v(agent_type) && meta_packet.tunnel.unwrap().tier < 2)
+            && ((is_tt_hyper_v(agent_type) && meta_packet.tunnel.unwrap().tier < 2)
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::TencentGre
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::Ipip);
 
