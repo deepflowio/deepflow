@@ -2177,8 +2177,8 @@ impl Default for Socket {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct FlowLogFilters {
-    pub l4_capture_network_types: Vec<u16>,
-    pub l7_capture_network_types: Vec<u16>,
+    pub l4_capture_network_types: Vec<i16>,
+    pub l7_capture_network_types: Vec<i16>,
     pub l4_ignored_observation_points: Vec<u16>,
     pub l7_ignored_observation_points: Vec<u16>,
 }
@@ -2886,12 +2886,12 @@ impl From<&RuntimeConfig> for UserConfig {
                         l4_capture_network_types: rc
                             .l4_log_store_tap_types
                             .iter()
-                            .map(|t| *t as u16)
+                            .map(|t| *t as i16)
                             .collect(),
                         l7_capture_network_types: rc
                             .l7_log_store_tap_types
                             .iter()
-                            .map(|t| *t as u16)
+                            .map(|t| *t as i16)
                             .collect(),
                         l4_ignored_observation_points: rc
                             .l4_log_ignore_tap_sides
