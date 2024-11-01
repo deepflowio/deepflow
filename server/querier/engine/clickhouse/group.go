@@ -300,6 +300,10 @@ func (g *GroupTag) Format(m *view.Model) {
 	}
 	preAsTag, preAsOK := g.AsTagMap[g.Value]
 	for _, suffix := range []string{"", "_0", "_1"} {
+		table := m.From.ToString()
+		if table == "event.`alert_event`" {
+			break
+		}
 		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
 			resourceTypeSuffix := "auto_service_type" + suffix
 			oldResourceTypeSuffix := resourceName + "_type" + suffix
