@@ -1509,7 +1509,14 @@ static __inline bool mqtt_decoding_length(const __u8 * buffer, int *length,
 	buffer += 1;
 	*length = 0;
 	*lensize = 0;
-	do {
+
+	/*
+	 * Limit the number of loop iterations, ensuring the byte usage remains
+	 * within 32 bytes. This also resolves the issue of loading eBPF bytecode
+	 * on the 4.19.90-25.24.v2101.ky10.aarch64 kernel.
+	 */
+	static const int loop_count = 32;
+	for (int i = 0; i < loop_count; i++) {
 		digit = buffer[(*lensize)++];
 		*length += (digit & 127) * multiplier;
 		multiplier *= 128;
@@ -1517,8 +1524,11 @@ static __inline bool mqtt_decoding_length(const __u8 * buffer, int *length,
 		// mqtt 最多用4个字节表示长度
 		if ((*lensize) > 4)
 			return false;
-	} while ((digit & 128) != 0);
-	return true;
+		if((digit & 128) == 0)
+			return true;
+	}
+
+	return false;
 }
 
 static __inline bool mqtt_decoding_message_type(const __u8 * buffer,
