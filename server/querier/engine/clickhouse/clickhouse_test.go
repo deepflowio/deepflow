@@ -588,6 +588,11 @@ var (
 		db:     "_prometheus",
 		input:  "SHOW tag-values",
 		output: []string{"SELECT field_name AS `label_name`, field_value AS `label_value` FROM flow_tag.`prometheus_custom_field_value` GROUP BY `label_name`, `label_value` ORDER BY `label_name` asc LIMIT 10000"},
+	}, {
+		name:   "test_alert",
+		db:     "event",
+		input:  "SELECT Count(row), alert_policy, alert_policy_id, event_level, auto_service_0, auto_service_type_0, auto_service_type, auto_service FROM alert_event where auto_service='abc' AND auto_service_type_1=1 GROUP BY alert_policy, alert_policy_id, event_level, auto_service_0, auto_service_type_0, auto_service_type, auto_service LIMIT 1",
+		output: []string{"SELECT dictGet('flow_tag.alarm_policy_map', 'name', (toUInt64(policy_id))) AS `alert_policy`, policy_id AS `alert_policy_id`, event_level, tag_string_values[indexOf(tag_string_names,'auto_service_0')] AS `auto_service_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type_0')] AS `auto_service_type_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type')] AS `auto_service_type`, tag_string_values[indexOf(tag_string_names,'auto_service')] AS `auto_service`, COUNT(1) AS `Count(row)` FROM event.`alert_event` PREWHERE if(indexOf(tag_string_names,'auto_service')=0 AND indexOf(tag_string_names,'auto_service_0')=0 AND indexOf(tag_string_names,'auto_service_1')=0,1!=1,(tag_string_values[indexOf(tag_string_names,'auto_service')] = 'abc' OR tag_string_values[indexOf(tag_string_names,'auto_service_0')] = 'abc' OR tag_string_values[indexOf(tag_string_names,'auto_service_1')] = 'abc')) AND if(indexOf(tag_int_names,'auto_service_type_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'auto_service_type_1')]) = 1 AND (policy_id!=0) GROUP BY dictGet('flow_tag.alarm_policy_map', 'name', (toUInt64(policy_id))) AS `alert_policy`, policy_id AS `alert_policy_id`, `event_level`, tag_string_values[indexOf(tag_string_names,'auto_service_0')] AS `auto_service_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type_0')] AS `auto_service_type_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type')] AS `auto_service_type`, tag_string_values[indexOf(tag_string_names,'auto_service')] AS `auto_service` LIMIT 1"},
 	}}
 )
 

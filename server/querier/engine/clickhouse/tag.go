@@ -42,9 +42,20 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 		selectTag = alias
 	}
 	labelType := ""
-	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	nameNoBackQuote := strings.Trim(name, "`")
+	tagItem, ok := tag.GetTag(nameNoBackQuote, db, table, "default")
 	if table == "alert_event" {
-		if ok {
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, nameNoBackQuote) {
+			autoTagMap := tagItem.TagTranslatorMap
+			autoTagSlice := []string{}
+			for autoTagKey, _ := range autoTagMap {
+				autoTagSlice = append(autoTagSlice, autoTagKey)
+			}
+			sort.Strings(autoTagSlice)
+			for _, autoTagKey := range autoTagSlice {
+				stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})
+			}
+		} else if ok {
 			tagTranslator := tagItem.TagTranslator
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else {
