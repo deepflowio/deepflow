@@ -558,6 +558,7 @@ impl Default for GolangSpecific {
 pub struct Java {
     #[serde(with = "humantime_serde")]
     pub refresh_defer_duration: Duration,
+    #[serde(deserialize_with = "deser_usize_with_mega_unit")]
     pub max_symbol_file_size: usize,
 }
 
@@ -565,7 +566,7 @@ impl Default for Java {
     fn default() -> Self {
         Self {
             refresh_defer_duration: Duration::from_secs(60),
-            max_symbol_file_size: 10,
+            max_symbol_file_size: 10 << 20,
         }
     }
 }
@@ -1806,8 +1807,10 @@ pub struct Processors {
 #[serde(default)]
 pub struct Limits {
     pub max_millicpus: u32,
+    #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub max_memory: u64,
     pub max_log_backhaul_rate: u32,
+    #[serde(deserialize_with = "deser_u32_with_mega_unit")]
     pub max_local_log_file_size: u32,
     #[serde(with = "humantime_serde")]
     pub local_log_retention: Duration,
@@ -1817,9 +1820,9 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             max_millicpus: 1000,
-            max_memory: 768,
+            max_memory: 768 << 20,
             max_log_backhaul_rate: 300,
-            max_local_log_file_size: 1000,
+            max_local_log_file_size: 1000 << 20,
             local_log_retention: Duration::from_secs(300 * 24 * 3600),
         }
     }
@@ -1911,6 +1914,7 @@ impl Default for RelativeSysLoad {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TxThroughput {
+    #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub trigger_threshold: u64,
     #[serde(with = "humantime_serde")]
     pub throughput_monitoring_interval: Duration,
@@ -1983,6 +1987,7 @@ pub struct Communication {
     pub max_escape_duration: Duration,
     pub ingester_ip: String,
     pub ingester_port: u16,
+    #[serde(deserialize_with = "deser_usize_with_mega_unit")]
     pub grpc_buffer_size: usize,
     pub request_via_nat_ip: bool,
     pub proxy_controller_ip: String,
@@ -1998,7 +2003,7 @@ impl Default for Communication {
             proxy_controller_port: 30035,
             ingester_ip: "".to_string(),
             ingester_port: 30033,
-            grpc_buffer_size: 5,
+            grpc_buffer_size: 5 << 20,
             request_via_nat_ip: false,
         }
     }
@@ -2074,6 +2079,7 @@ impl Default for SelfMonitoring {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct StandaloneMode {
+    #[serde(deserialize_with = "deser_u32_with_mega_unit")]
     pub max_data_file_size: u32,
     pub data_file_dir: String,
 }
@@ -2081,7 +2087,7 @@ pub struct StandaloneMode {
 impl Default for StandaloneMode {
     fn default() -> Self {
         Self {
-            max_data_file_size: 200,
+            max_data_file_size: 200 << 20,
             data_file_dir: "/var/log/deepflow_agent/".to_string(),
         }
     }
@@ -2317,6 +2323,7 @@ pub struct Npb {
     #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub custom_vxlan_flags: u8,
     pub overlay_vlan_header_trimming: bool,
+    #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub max_tx_throughput: u64,
 }
 
@@ -2330,7 +2337,7 @@ impl Default for Npb {
             target_port: 4789,
             custom_vxlan_flags: 0b1111_1111,
             overlay_vlan_header_trimming: false,
-            max_tx_throughput: 1000,
+            max_tx_throughput: 1000 << 20,
         }
     }
 }
@@ -2376,9 +2383,9 @@ impl From<&RuntimeConfig> for UserConfig {
             global: Global {
                 limits: Limits {
                     max_millicpus: rc.max_millicpus,
-                    max_memory: rc.max_memory,
+                    max_memory: rc.max_memory << 20,
                     max_log_backhaul_rate: rc.log_threshold,
-                    max_local_log_file_size: rc.log_file_size,
+                    max_local_log_file_size: rc.log_file_size << 20,
                     local_log_retention: Duration::from_secs(rc.log_retention as u64),
                 },
                 alerts: Alerts {
@@ -2401,7 +2408,7 @@ impl From<&RuntimeConfig> for UserConfig {
                         .unwrap_or(SystemLoadMetric::Load15),
                     },
                     tx_throughput: TxThroughput {
-                        trigger_threshold: rc.server_tx_bandwidth_threshold,
+                        trigger_threshold: rc.server_tx_bandwidth_threshold << 20,
                         throughput_monitoring_interval: rc.bandwidth_probe_interval,
                     },
                 },
@@ -2432,7 +2439,7 @@ impl From<&RuntimeConfig> for UserConfig {
                     proxy_controller_port: rc.proxy_controller_port,
                     ingester_ip: rc.analyzer_ip.clone(),
                     ingester_port: rc.analyzer_port,
-                    grpc_buffer_size: rc.yaml_config.grpc_buffer_size,
+                    grpc_buffer_size: rc.yaml_config.grpc_buffer_size << 20,
                     request_via_nat_ip: false, // TODO: This configuration is not used
                 },
                 self_monitoring: SelfMonitoring {
@@ -2453,7 +2460,7 @@ impl From<&RuntimeConfig> for UserConfig {
                     interval: Duration::from_secs(rc.stats_interval),
                 },
                 standalone_mode: StandaloneMode {
-                    max_data_file_size: rc.yaml_config.standalone_data_file_size,
+                    max_data_file_size: rc.yaml_config.standalone_data_file_size << 20,
                     data_file_dir: rc.yaml_config.standalone_data_file_dir.clone(),
                 },
                 common: GlobalCommon {
@@ -2628,7 +2635,7 @@ impl From<&RuntimeConfig> for UserConfig {
                                 .yaml_config
                                 .ebpf
                                 .java_symbol_file_refresh_defer_interval,
-                            max_symbol_file_size: 10, // TODO: No corresponding configuration is found
+                            ..Default::default()
                         },
                     },
                 },
@@ -2653,7 +2660,6 @@ impl From<&RuntimeConfig> for UserConfig {
                         extra_netns_regex: rc.extra_netns_regex.clone(),
                         extra_bpf_filter: rc.capture_bpf.clone(),
                         vlan_pcp_in_physical_mirror_traffic: rc.yaml_config.mirror_traffic_pcp,
-                        bpf_filter_disabled: false, // TODO: No corresponding configuration is found
                         tunning: AfPacketTunning {
                             socket_version: agent::CaptureSocketType::from_str_name(
                                 rc.capture_socket_type.as_str_name(),
@@ -2838,10 +2844,7 @@ impl From<&RuntimeConfig> for UserConfig {
                         ingress_flavour: "kubernetes".to_string(), // deprecated
                         pod_mac_collection_method: rc.yaml_config.kubernetes_poller_type,
                     },
-                    pull_resource_from_controller: PullResourceFromController {
-                        domain_filter: vec![], // TODO: No corresponding configuration is found
-                        only_kubernetes_pod_ip_in_local_cluster: false, // TODO: No corresponding configuration is found
-                    },
+                    ..Default::default()
                 },
                 integration: Integration {
                     enabled: rc.external_agent_http_proxy_enabled,
@@ -2938,7 +2941,7 @@ impl From<&RuntimeConfig> for UserConfig {
                     target_port: rc.yaml_config.npb_port,
                     custom_vxlan_flags: rc.yaml_config.vxlan_flags,
                     overlay_vlan_header_trimming: rc.yaml_config.ignore_overlay_vlan,
-                    max_tx_throughput: rc.npb_bps_threshold,
+                    max_tx_throughput: rc.npb_bps_threshold << 20,
                 },
             },
             processors: Processors {
@@ -3371,18 +3374,7 @@ impl UserConfig {
         }
     }
 
-    fn modify_unit(&mut self) {
-        self.global.circuit_breakers.tx_throughput.trigger_threshold <<= 20;
-        self.global.communication.grpc_buffer_size <<= 20;
-        self.global.limits.max_memory <<= 20;
-        self.global.limits.max_local_log_file_size <<= 20;
-        self.global.standalone_mode.max_data_file_size <<= 20;
-        self.inputs.proc.symbol_table.java.max_symbol_file_size <<= 20;
-        self.outputs.npb.max_tx_throughput <<= 20;
-    }
-
     fn modify(&mut self) {
-        self.modify_unit();
         self.modify_decap_types();
     }
 
@@ -5096,6 +5088,27 @@ fn resolve_domain(addr: &str) -> Option<String> {
             None
         }
     }
+}
+
+fn deser_u32_with_mega_unit<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(u32::deserialize(deserializer)? << 20)
+}
+
+fn deser_u64_with_mega_unit<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(u64::deserialize(deserializer)? << 20)
+}
+
+fn deser_usize_with_mega_unit<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(usize::deserialize(deserializer)? << 20)
 }
 
 #[cfg(test)]
