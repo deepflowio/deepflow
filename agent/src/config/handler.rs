@@ -2007,7 +2007,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                         .l7_capture_network_types
                         .iter()
                     {
-                        if t >= u16::from(CaptureNetworkType::Max) {
+                        if t >= u16::from(CaptureNetworkType::Max) as i16 {
                             warn!("invalid tap type: {}", t);
                         } else {
                             tap_types[t as usize] = true;
