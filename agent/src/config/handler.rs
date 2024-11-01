@@ -498,7 +498,9 @@ impl From<(&UserConfig, &DynamicConfig)> for FlowConfig {
                 .physical_mirror
                 .private_cloud_gateway_traffic,
             collector_enabled: conf.outputs.flow_metrics.enabled,
-            l7_log_tap_types: generate_tap_types_array(&conf.outputs.flow_log.filters.l7_capture_network_types),
+            l7_log_tap_types: generate_tap_types_array(
+                &conf.outputs.flow_log.filters.l7_capture_network_types,
+            ),
             capacity: conf.processors.flow_log.tunning.concurrent_flow_limit,
             hash_slots: conf.processors.flow_log.tunning.flow_map_hash_slots,
             packet_delay: conf
@@ -1713,7 +1715,9 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_type: conf.global.common.agent_type,
                 agent_id: dynamic_config.agent_id() as u16,
-                l4_log_store_tap_types: generate_tap_types_array(&conf.outputs.flow_log.filters.l4_capture_network_types),
+                l4_log_store_tap_types: generate_tap_types_array(
+                    &conf.outputs.flow_log.filters.l4_capture_network_types,
+                ),
                 l4_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
                     for t in conf
@@ -1980,7 +1984,9 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     .session_aggregate_window_duration,
                 l7_log_packet_size: CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
-                l7_log_tap_types: generate_tap_types_array(&conf.outputs.flow_log.filters.l7_capture_network_types),
+                l7_log_tap_types: generate_tap_types_array(
+                    &conf.outputs.flow_log.filters.l7_capture_network_types,
+                ),
                 l7_protocol_inference_max_fail_count: conf
                     .processors
                     .request_log
