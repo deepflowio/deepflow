@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Mega units in configuration [#8435](https://github.com/deepflowio/deepflow/pull/8435) by [rvql](https://github.com/rvql)
+* fix: L4/L7 log store tap types configuration [#8434](https://github.com/deepflowio/deepflow/pull/8434) by [rvql](https://github.com/rvql)
+* fix: Invalid type in config cause parse failure [#8433](https://github.com/deepflowio/deepflow/pull/8433) by [rvql](https://github.com/rvql)
 * fix: container env supports aggr packets with and without tunnels [#8427](https://github.com/deepflowio/deepflow/pull/8427) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: modify the matching logic of flow_node [#8420](https://github.com/deepflowio/deepflow/pull/8420) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Compatible with older configurations [#8377](https://github.com/deepflowio/deepflow/pull/8377) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
