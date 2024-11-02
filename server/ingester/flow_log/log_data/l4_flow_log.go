@@ -41,6 +41,7 @@ const (
 )
 
 type L4FlowLog struct {
+	BelongingBlock []L4FlowLog
 	pool.ReferenceCount
 	_id uint64 `json:"_id" category:"$tag" sub:"flow_info"` // 用来标记全局(多节点)唯一的记录
 
@@ -1065,15 +1066,31 @@ func (f *L4FlowLog) HitPcapPolicy() bool {
 	return len(f.AclGids) > 0
 }
 
-var poolL4FlowLog = pool.NewLockFreePool(func() *L4FlowLog {
-	l := new(L4FlowLog)
-	return l
-})
+var poolL4FlowLogBatch = pool.NewLockFreePool(func() []L4FlowLog {
+	ls := make([]L4FlowLog, 8)
+	for i := range ls {
+		ls[i].BelongingBlock = ls
+	}
+	return ls
+},
+	pool.OptionPoolSizePerCPU(32),
+	pool.OptionInitFullPoolSize(32))
 
-func AcquireL4FlowLog() *L4FlowLog {
-	l := poolL4FlowLog.Get()
-	l.ReferenceCount.Reset()
-	return l
+func AcquireL4FlowLogBatch(size int) []L4FlowLog {
+	ls := poolL4FlowLogBatch.Get()
+	if cap(ls) >= size {
+		ls = ls[:size]
+	} else {
+		poolL4FlowLogBatch.Put(ls)
+		s := make([]L4FlowLog, size)
+		ls = s
+	}
+	for i := range ls {
+		l := ls[i]
+		l.BelongingBlock = ls
+		l.ReferenceCount.Reset()
+	}
+	return ls
 }
 
 func ReleaseL4FlowLog(l *L4FlowLog) {
@@ -1084,7 +1101,12 @@ func ReleaseL4FlowLog(l *L4FlowLog) {
 		return
 	}
 	*l = L4FlowLog{}
-	poolL4FlowLog.Put(l)
+	for i := range l.BelongingBlock {
+		if (l.BelongingBlock)[i].GetReferenceCount() > 0 {
+			return
+		}
+	}
+	poolL4FlowLogBatch.Put(l.BelongingBlock)
 }
 
 var L4FlowCounter uint32
@@ -1095,20 +1117,23 @@ func genID(time uint32, counter *uint32, analyzerID uint32) uint64 {
 	return uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
-func TaggedFlowToL4FlowLog(orgId, teamId uint16, f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
-	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
+func TaggedFlowsToL4FlowLogs(orgId, teamId uint16, fs []pb.TaggedFlow, platformData *grpc.PlatformInfoTable) []L4FlowLog {
+	ls := AcquireL4FlowLogBatch(len(fs))
+	for i := range fs {
+		f := &fs[i]
+		s := &ls[i]
+		isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
+		s.OrgId, s.TeamID = orgId, teamId
+		s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, platformData.QueryAnalyzerID())
+		s.DataLinkLayer.Fill(f.Flow)
+		s.NetworkLayer.Fill(f.Flow, isIPV6)
+		s.TransportLayer.Fill(f.Flow)
+		s.ApplicationLayer.Fill(f.Flow)
+		s.Internet.Fill(f.Flow)
+		s.KnowledgeGraph.FillL4(f.Flow, isIPV6, platformData)
+		s.FlowInfo.Fill(f.Flow)
+		s.Metrics.Fill(f.Flow)
+	}
 
-	s := AcquireL4FlowLog()
-	s.OrgId, s.TeamID = orgId, teamId
-	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, platformData.QueryAnalyzerID())
-	s.DataLinkLayer.Fill(f.Flow)
-	s.NetworkLayer.Fill(f.Flow, isIPV6)
-	s.TransportLayer.Fill(f.Flow)
-	s.ApplicationLayer.Fill(f.Flow)
-	s.Internet.Fill(f.Flow)
-	s.KnowledgeGraph.FillL4(f.Flow, isIPV6, platformData)
-	s.FlowInfo.Fill(f.Flow)
-	s.Metrics.Fill(f.Flow)
-
-	return s
+	return ls
 }
