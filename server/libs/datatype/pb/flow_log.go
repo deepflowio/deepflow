@@ -93,8 +93,7 @@ func (t *TaggedFlow) IsValid() bool {
 		t.Flow == nil ||
 		t.Flow.FlowKey == nil ||
 		t.Flow.MetricsPeerSrc == nil ||
-		t.Flow.MetricsPeerDst == nil ||
-		t.Flow.Tunnel == nil {
+		t.Flow.MetricsPeerDst == nil {
 		return false
 	}
 	return true
