@@ -76,21 +76,24 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index         int
-	msgType       datatype.MessageType
-	dataSourceID  uint32
-	platformData  *grpc.PlatformInfoTable
-	inQueue       queue.QueueReader
-	throttler     *throttler.ThrottlingQueue
-	flowTagWriter *flow_tag.FlowTagWriter
-	spanWriter    *dbwriter.SpanWriter
-	spanBuf       []interface{}
-	exporters     *exporters.Exporters
-	cfg           *config.Config
-	debugEnabled  bool
+	index                  int
+	msgType                datatype.MessageType
+	dataSourceID           uint32
+	platformData           *grpc.PlatformInfoTable
+	inQueue                queue.QueueReader
+	throttler              *throttler.ThrottlingQueue
+	flowTagWriter          *flow_tag.FlowTagWriter
+	spanWriter             *dbwriter.SpanWriter
+	spanBuf                []interface{}
+	exporters              *exporters.Exporters
+	cfg                    *config.Config
+	debugEnabled           bool
+	maxL4Count, maxL7Count int
 
 	agentId, orgId, teamId uint16
 
+	protoLogBuf    []pb.AppProtoLogsData
+	taggedFlowBuf  []pb.TaggedFlow
 	fieldsBuf      []interface{}
 	fieldValuesBuf []interface{}
 	counter        *Counter
@@ -124,6 +127,8 @@ func NewDecoder(
 		fieldsBuf:      make([]interface{}, 0, 64),
 		fieldValuesBuf: make([]interface{}, 0, 64),
 		counter:        &Counter{},
+		protoLogBuf:    make([]pb.AppProtoLogsData, 0, 16),
+		taggedFlowBuf:  make([]pb.TaggedFlow, 0, 16),
 	}
 }
 
@@ -147,7 +152,6 @@ func (d *Decoder) Run() {
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
-	pbTaggedFlow := pb.NewTaggedFlow()
 	pbTracesData := &v1.TracesData{}
 	for {
 		n := d.inQueue.Gets(buffer)
@@ -170,7 +174,7 @@ func (d *Decoder) Run() {
 			case datatype.MESSAGE_TYPE_PROTOCOLLOG:
 				d.handleProtoLog(decoder)
 			case datatype.MESSAGE_TYPE_TAGGEDFLOW:
-				d.handleTaggedFlow(decoder, pbTaggedFlow)
+				d.handleTaggedFlow(decoder)
 			case datatype.MESSAGE_TYPE_OPENTELEMETRY:
 				d.handleOpenTelemetry(decoder, pbTracesData, false)
 			case datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED:
@@ -187,10 +191,11 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder, pbTaggedFlow *pb.TaggedFlow) {
+func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder) {
+	d.taggedFlowBuf = d.taggedFlowBuf[:0]
 	for !decoder.IsEnd() {
-		pbTaggedFlow.ResetAll()
-		decoder.ReadPB(pbTaggedFlow)
+		pbTaggedFlow := pb.TaggedFlow{}
+		decoder.ReadPB(&pbTaggedFlow)
 		if decoder.Failed() {
 			d.counter.ErrorCount++
 			log.Errorf("flow decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
@@ -201,23 +206,39 @@ func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder, pbTaggedFlow *p
 			log.Warningf("invalid flow %s", pbTaggedFlow.Flow)
 			continue
 		}
-		d.sendFlow(pbTaggedFlow)
+
+		d.taggedFlowBuf = append(d.taggedFlowBuf, pbTaggedFlow)
 	}
+	if d.maxL4Count < len(d.taggedFlowBuf) {
+		d.maxL4Count = len(d.taggedFlowBuf)
+	}
+	if d.counter.RawCount == 1 && time.Now().Unix()%60 <= 10 {
+		log.Infof("max flow log l4 count=%d", d.maxL4Count)
+		d.maxL4Count = 0
+	}
+	d.sendFlow()
 }
 
 func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
+	d.protoLogBuf = d.protoLogBuf[:0]
 	for !decoder.IsEnd() {
-		protoLog := pb.AcquirePbAppProtoLogsData()
-
-		decoder.ReadPB(protoLog)
+		protoLog := pb.AppProtoLogsData{}
+		decoder.ReadPB(&protoLog)
 		if decoder.Failed() || !protoLog.IsValid() {
 			d.counter.ErrorCount++
-			pb.ReleasePbAppProtoLogsData(protoLog)
 			log.Errorf("proto log decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
-		d.sendProto(protoLog)
+		d.protoLogBuf = append(d.protoLogBuf, protoLog)
 	}
+	if d.maxL7Count < len(d.protoLogBuf) {
+		d.maxL7Count = len(d.protoLogBuf)
+	}
+	if d.counter.RawCount == 1 && time.Now().Unix()%60 <= 10 {
+		log.Infof("max flow log l7 count=%d", d.maxL7Count)
+		d.maxL7Count = 0
+	}
+	d.sendProto()
 }
 
 func decompressOpenTelemetry(compressed []byte) ([]byte, error) {
@@ -294,24 +315,27 @@ func (d *Decoder) handleL4Packet(decoder *codec.SimpleDecoder) {
 	}
 }
 
-func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
+func (d *Decoder) sendFlow() {
 	if d.debugEnabled {
-		log.Debugf("decoder %d recv flow: %s", d.index, flow)
+		log.Debugf("decoder %d recv flow: %s", d.index, d.taggedFlowBuf[0])
 	}
 	d.counter.Count++
-	l := log_data.TaggedFlowToL4FlowLog(d.orgId, d.teamId, flow, d.platformData)
+	ls := log_data.TaggedFlowsToL4FlowLogs(d.orgId, d.teamId, d.taggedFlowBuf, d.platformData)
 
-	if l.HitPcapPolicy() {
-		d.export(l)
-		d.throttler.SendWithoutThrottling(l)
-	} else {
-		l.AddReferenceCount()
-		if !d.throttler.SendWithThrottling(l) {
-			d.counter.DropCount++
-		} else {
+	for i := range ls {
+		l := &ls[i]
+		if l.HitPcapPolicy() {
 			d.export(l)
+			d.throttler.SendWithoutThrottling(l)
+		} else {
+			l.AddReferenceCount()
+			if !d.throttler.SendWithThrottling(l) {
+				d.counter.DropCount++
+			} else {
+				d.export(l)
+			}
+			l.Release()
 		}
-		l.Release()
 	}
 }
 
@@ -346,26 +370,29 @@ func (d *Decoder) spanWrite(l *log_data.L7FlowLog) {
 	}
 }
 
-func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
+func (d *Decoder) sendProto() {
 	if d.debugEnabled {
-		log.Debugf("decoder %d recv proto: %s", d.index, proto)
+		log.Debugf("decoder %d recv proto: %s", d.index, d.protoLogBuf[0])
 	}
 
-	l := log_data.ProtoLogToL7FlowLog(d.orgId, d.teamId, proto, d.platformData, d.cfg)
-	l.AddReferenceCount()
-	sent := d.throttler.SendWithThrottling(l)
-	if sent {
-		if d.flowTagWriter != nil {
-			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
-			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
-			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+	ls := log_data.ProtoLogsToL7FlowLogs(d.orgId, d.teamId, d.protoLogBuf, d.platformData, d.cfg)
+	for i := range ls {
+		l := &ls[i]
+		l.AddReferenceCount()
+		sent := d.throttler.SendWithThrottling(l)
+		if sent {
+			if d.flowTagWriter != nil {
+				d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+				l.GenerateNewFlowTags(d.flowTagWriter.Cache)
+				d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+			}
+			d.export(l)
+			d.spanWrite(l)
 		}
-		d.export(l)
-		d.spanWrite(l)
+		d.updateCounter(datatype.L7Protocol(l.L7Protocol), !sent)
+		l.Release()
 	}
-	d.updateCounter(datatype.L7Protocol(proto.Base.Head.Proto), !sent)
-	l.Release()
-	proto.Release()
+	d.protoLogBuf = d.protoLogBuf[:0]
 
 }
 

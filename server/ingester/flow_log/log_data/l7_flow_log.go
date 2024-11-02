@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
@@ -192,6 +193,9 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 }
 
 type L7FlowLog struct {
+	BelongingBlock []L7FlowLog
+	BlockReleased  int32
+
 	pool.ReferenceCount
 	_id uint64 `json:"_id" category:"$tag" sub:"flow_info"`
 
@@ -634,14 +638,35 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 	)
 }
 
-var poolL7FlowLog = pool.NewLockFreePool(func() *L7FlowLog {
-	return new(L7FlowLog)
-})
+var poolL7FlowLogBatch = pool.NewLockFreePool(func() []L7FlowLog {
+	ls := make([]L7FlowLog, 8)
+	for i := range ls {
+		ls[i].BelongingBlock = ls
+	}
+	return ls
+},
+	pool.OptionPoolSizePerCPU(16),
+	pool.OptionInitFullPoolSize(16))
 
-func AcquireL7FlowLog() *L7FlowLog {
-	l := poolL7FlowLog.Get()
-	l.ReferenceCount.Reset()
-	return l
+func AcquireL7FlowLogBatch(size int) []L7FlowLog {
+	if size == 0 {
+		return []L7FlowLog{}
+	}
+	ls := poolL7FlowLogBatch.Get()
+	if cap(ls) >= size {
+		ls = ls[:size]
+	} else {
+		s := make([]L7FlowLog, size)
+		ls = s
+	}
+	for i := range ls {
+		l := &ls[i]
+		l.BelongingBlock = ls
+		l.ReferenceCount.Reset()
+	}
+	ls[0].BlockReleased = 0
+
+	return ls
 }
 
 func ReleaseL7FlowLog(l *L7FlowLog) {
@@ -651,18 +676,33 @@ func ReleaseL7FlowLog(l *L7FlowLog) {
 	if l.SubReferenceCount() {
 		return
 	}
+	belongingBlock := l.BelongingBlock
+	if belongingBlock == nil {
+		return
+	}
 	*l = L7FlowLog{}
-	poolL7FlowLog.Put(l)
+
+	for i := len(belongingBlock) - 1; i >= 0; i-- {
+		if belongingBlock[i].GetReferenceCount() > 0 {
+			return
+		}
+	}
+	if atomic.CompareAndSwapInt32(&belongingBlock[0].BlockReleased, 0, 1) {
+		poolL7FlowLogBatch.Put(belongingBlock)
+	}
 }
 
 var L7FlowLogCounter uint32
 
-func ProtoLogToL7FlowLog(orgId, teamId uint16, l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
-	h := AcquireL7FlowLog()
-	h.OrgId, h.TeamID = orgId, teamId
-	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
-	h.Fill(l, platformData, cfg)
-	return h
+func ProtoLogsToL7FlowLogs(orgId, teamId uint16, ls []pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []L7FlowLog {
+	hs := AcquireL7FlowLogBatch(len(ls))
+	for i := range ls {
+		h := &hs[i]
+		h.OrgId, h.TeamID = orgId, teamId
+		h._id = genID(uint32(ls[i].Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
+		h.Fill(&ls[i], platformData, cfg)
+	}
+	return hs
 }
 
 var extraFieldNamesNeedWriteFlowTag = [3]string{"app_service", "endpoint", "app_instance"}

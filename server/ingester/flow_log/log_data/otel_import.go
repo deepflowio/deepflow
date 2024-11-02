@@ -45,20 +45,24 @@ func OTelTracesDataToL7FlowLogs(vtapID, orgId, teamId uint16, l *v1.TracesData, 
 			resAttributes = resource.Attributes
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
-			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7FlowLog(vtapID, orgId, teamId, span, resAttributes, platformData, cfg))
+			logs := spansToL7FlowLog(vtapID, orgId, teamId, scopeSpan.GetSpans(), resAttributes, platformData, cfg)
+			for i := range logs {
+				ret = append(ret, &logs[i])
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7FlowLog(vtapID, orgId, teamId uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
-	h := AcquireL7FlowLog()
-	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
-	h.VtapID, h.OrgId, h.TeamID = vtapID, orgId, teamId
-	h.FillOTel(span, resAttributes, platformData, cfg)
-	return h
+func spansToL7FlowLog(vtapID, orgId, teamId uint16, spans []*v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []L7FlowLog {
+	hs := AcquireL7FlowLogBatch(len(spans))
+	for i := range hs {
+		h := &hs[i]
+		h._id = genID(uint32(spans[i].EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
+		h.VtapID, h.OrgId, h.TeamID = vtapID, orgId, teamId
+		h.FillOTel(spans[i], resAttributes, platformData, cfg)
+	}
+	return hs
 }
 
 func spanKindToTapSide(spanKind v1.Span_SpanKind) flow_metrics.TAPSideEnum {
