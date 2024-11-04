@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent stuck when ntp is turned on [#8443](https://github.com/deepflowio/deepflow/pull/8443) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: container env supports aggr packets with and without tunnels [#8425](https://github.com/deepflowio/deepflow/pull/8425) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: modify the matching logic of flow_node [#8419](https://github.com/deepflowio/deepflow/pull/8419) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF Total process message initialization [#8331](https://github.com/deepflowio/deepflow/pull/8331) by [yinjiping](https://github.com/yinjiping)
