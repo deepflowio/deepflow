@@ -171,7 +171,7 @@ void ssl_process_exec(int pid)
 		return;
 	}
 
-	add_event_to_proc_list(&proc_events, tracer, pid);
+	add_event_to_proc_list(&proc_events, tracer, pid, NULL);
 }
 
 void ssl_process_exit(int pid)
@@ -220,7 +220,7 @@ void ssl_events_handle(void)
 
 	next:
 		remove_event(&proc_events, event);
-		free(event);
+		process_event_free(event);
 
 	} while (true);
 }

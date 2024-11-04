@@ -1027,8 +1027,21 @@ bool process_probing_check(int pid)
 	return true;
 }
 
+void process_event_free(struct process_create_event *event)
+{
+	if (event == NULL) {
+		ebpf_warning("The event is empty.\n");
+		return;
+	}
+
+	if (event->path)
+		free(event->path);
+
+	free(event);
+}
+
 void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
-			    int pid)
+			    int pid, char *path)
 {
 	static const uint32_t PROC_EVENT_HANDLE_DELAY = 120;
 	struct process_create_event *event = NULL;
@@ -1042,6 +1055,7 @@ void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
 	event->tracer = tracer;
 	event->pid = pid;
 	event->stime = get_process_starttime(pid);
+	event->path = path;
 	event->expire_time = get_sys_uptime() + PROC_EVENT_HANDLE_DELAY;
 
 	pthread_mutex_lock(&list->m);
