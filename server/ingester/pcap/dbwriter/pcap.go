@@ -85,12 +85,12 @@ func (p *PcapStore) String() string {
 	return fmt.Sprintf("PcapStore: %+v\n", *p)
 }
 
-var poolPcapStore = pool.NewLockFreePool(func() interface{} {
+var poolPcapStore = pool.NewLockFreePool(func() *PcapStore {
 	return new(PcapStore)
 })
 
 func AcquirePcapStore() *PcapStore {
-	l := poolPcapStore.Get().(*PcapStore)
+	l := poolPcapStore.Get()
 	return l
 }
 

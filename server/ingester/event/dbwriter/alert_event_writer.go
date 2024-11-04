@@ -29,12 +29,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var alertEventPool = pool.NewLockFreePool(func() interface{} {
+var alertEventPool = pool.NewLockFreePool(func() *AlertEventStore {
 	return &AlertEventStore{}
 })
 
 func AcquireAlertEventStore() *AlertEventStore {
-	return alertEventPool.Get().(*AlertEventStore)
+	return alertEventPool.Get()
 }
 
 func ReleaseAlertEventStore(e *AlertEventStore) {
