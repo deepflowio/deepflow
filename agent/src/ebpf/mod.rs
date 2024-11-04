@@ -731,7 +731,23 @@ extern "C" {
             pub fn disable_memory_profiler() -> c_int;
 
             /**
+             * @brief **set_dpdk_trace_enabled()** DPDK tracing feature enable switch.
+             *
+             * Note: The call must be executed before `running_socket_tracer()` because
+             * `set_dpdk_trace_enabled()` may need to adjust the eBPF maps before loading
+             * the eBPF program. The eBPF program loading process is implemented within
+             * `running_socket_tracer()`.
+             *
+             * @param enabled Used to control whether to enable this feature.
+             *   'true': enbaled; 'false': disabled
+             * @return 0 on success, non-zero on error
+             */
+            pub fn set_dpdk_trace_enabled(enabled: bool) -> c_int;
+
+            /**
              * @brief **set_dpdk_cmd_name()** Set the command line name of the DPDK application.
+             *
+             * Note: The call must be executed before `dpdk_trace_start()`
              *
              * @param name Command name. For example, in the command line '/usr/bin/mydpdk',
              *   the name selected is the part after the last '/', i.e., 'mydpdk'.
@@ -742,6 +758,8 @@ extern "C" {
 
              /**
               * @brief **set_dpdk_hooks()** Set all DPDK hook points tracked by eBPF.
+              *
+              * Note: The call must be executed before `dpdk_trace_start()`
               *
               * @param fucs The list of tracked interfaces,
               *   for example: i40e_recv_pkts,i40e_xmit_pkts,ixgbe_recv_pkts,ixgbe_xmit_pkts

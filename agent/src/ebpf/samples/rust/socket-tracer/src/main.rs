@@ -597,6 +597,9 @@ fn main() {
             CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
+	// dpdk enable
+	// set_dpdk_trace_enabled(true);
+
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
@@ -618,7 +621,6 @@ fn main() {
         println!("Result {}", result);
 
         // Test for dpdk
-        //set_dpdk_trace_enabled(true);
         //set_dpdk_cmd_name(
         //    CString::new("l2fwd".as_bytes()).unwrap().as_c_str().as_ptr
         //);

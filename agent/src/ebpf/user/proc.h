@@ -205,6 +205,7 @@ struct process_create_event {
 	int pid;
 	uint64_t stime; // Process start time
 	uint32_t expire_time;
+	char *path;
 	struct bpf_tracer *tracer;
 };
 
