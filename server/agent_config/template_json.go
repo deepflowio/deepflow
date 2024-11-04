@@ -332,6 +332,12 @@ func fillingOrder(node *yaml.Node) (interface{}, error) {
 				return nil, err
 			}
 			return boolValue, nil
+		} else if node.Tag == "!!float" {
+			floatValue, err := strconv.ParseFloat(node.Value, 64)
+			if err != nil {
+				return nil, err
+			}
+			return floatValue, nil
 		}
 		return node.Value, nil
 	default:
@@ -429,6 +435,9 @@ func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
 		}
 		// TODO validate sequence content by comment
 	case yaml.ScalarNode:
+		if nodeTemplate.Tag == "!!float" && node.Tag == "!!int" {
+			return nil
+		}
 		if node.Tag != nodeTemplate.Tag {
 			return fmt.Errorf("scalar type mismatch: expected %s, got %s", nodeTemplate.Tag, node.Tag)
 		}
