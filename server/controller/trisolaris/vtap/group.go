@@ -37,3 +37,11 @@ func (g *GroupData) getGroupData() []byte {
 func (g *GroupData) getGroupDataVersion() uint64 {
 	return g.metaData.GetTridentGroupsVersion()
 }
+
+func (g *GroupData) getAgentGroupData() []byte {
+	return g.metaData.GetAgentMetaData().GetAgentGroups()
+}
+
+func (g *GroupData) getAgentGroupDataVersion() uint64 {
+	return g.metaData.GetAgentMetaData().GetAgentGroupsVersion()
+}

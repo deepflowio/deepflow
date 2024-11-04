@@ -156,6 +156,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Support Kylin OS v10 SP2 [#8431](https://github.com/deepflowio/deepflow/pull/8431) by [yinjiping](https://github.com/yinjiping)
 * feat: querier add query cache config [#8405](https://github.com/deepflowio/deepflow/pull/8405) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: modify the epc of multicast address [#8337](https://github.com/deepflowio/deepflow/pull/8337) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: sort prometheus export tags [#8329](https://github.com/deepflowio/deepflow/pull/8329) by [lzf575](https://github.com/lzf575)

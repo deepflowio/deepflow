@@ -23,67 +23,62 @@ import (
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
+	metadata "github.com/deepflowio/deepflow/server/controller/trisolaris/metadata/agentmetadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var ALL_DOMAIMS = []string{"0"}
-
-type VTapPlatformData struct {
+type AgentPlatformData struct {
 
 	// 下的云平台列表=xxx，容器集群内部IP下发=所有集群
 	// key为vtap_group_lcuuid
-	platformDataType1 *PlatformDataType
+	platformDataType1 *AgentPlatformDataType
 
 	// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
 	// key为vtap_group_lcuuid+采集器所在容器集群LCUUID
-	platformDataType2 *PlatformDataType
+	platformDataType2 *AgentPlatformDataType
 
 	// 下发的云平台列表=xxx，容器集群内部IP下发=采集器所在集群
 	// key为vtap_group_lcuuid+集器所在容器集群LCUUID
-	platformDataType3 *PlatformDataType
+	platformDataType3 *AgentPlatformDataType
 
 	// 专属采集器
-	platformDataBMDedicated *PlatformDataType
-
-	agentPlatformData *AgentPlatformData
+	platformDataBMDedicated *AgentPlatformDataType
 
 	ORGID
 }
 
-func newVTapPlatformData(orgID int) *VTapPlatformData {
-	return &VTapPlatformData{
-		platformDataType1:       newPlatformDataType("platformDataType1"),
-		platformDataType2:       newPlatformDataType("platformDataType2"),
-		platformDataType3:       newPlatformDataType("platformDataType3"),
-		platformDataBMDedicated: newPlatformDataType("platformDataBMDedicated"),
-		agentPlatformData:       newAgentPlatformData(orgID),
+func newAgentPlatformData(orgID int) *AgentPlatformData {
+	return &AgentPlatformData{
+		platformDataType1:       newAgentPlatformDataType("platformDataType1"),
+		platformDataType2:       newAgentPlatformDataType("platformDataType2"),
+		platformDataType3:       newAgentPlatformDataType("platformDataType3"),
+		platformDataBMDedicated: newAgentPlatformDataType("platformDataBMDedicated"),
 		ORGID:                   ORGID(orgID),
 	}
 }
 
-func (v *VTapPlatformData) String() string {
+func (v *AgentPlatformData) String() string {
 	log.Debug(v.Logf("%s", v.platformDataType1))
 	log.Debug(v.Logf("%s", v.platformDataType2))
 	log.Debug(v.Logf("%s", v.platformDataType3))
 	log.Debug(v.Logf("%s", v.platformDataBMDedicated))
-	return "vtap Platform data"
+	return "agent platform data"
 }
 
-type PlatformDataType struct {
+type AgentPlatformDataType struct {
 	sync.RWMutex
 	platformDataMap map[string]*metadata.PlatformData
 	name            string
 }
 
-func newPlatformDataType(name string) *PlatformDataType {
-	return &PlatformDataType{
+func newAgentPlatformDataType(name string) *AgentPlatformDataType {
+	return &AgentPlatformDataType{
 		platformDataMap: make(map[string]*metadata.PlatformData),
 		name:            name,
 	}
 }
 
-func (t *PlatformDataType) String() string {
+func (t *AgentPlatformDataType) String() string {
 	t.RLock()
 	defer t.RUnlock()
 	for k, v := range t.platformDataMap {
@@ -92,38 +87,33 @@ func (t *PlatformDataType) String() string {
 	return t.name
 }
 
-func (t *PlatformDataType) setPlatformDataCache(key string, data *metadata.PlatformData) {
+func (t *AgentPlatformDataType) setPlatformDataCache(key string, data *metadata.PlatformData) {
 	t.Lock()
 	defer t.Unlock()
 	t.platformDataMap[key] = data
 }
 
-func (t *PlatformDataType) getPlatformDataCache(key string) *metadata.PlatformData {
+func (t *AgentPlatformDataType) getPlatformDataCache(key string) *metadata.PlatformData {
 	t.RLock()
 	defer t.RUnlock()
 	return t.platformDataMap[key]
 }
 
-func (t *PlatformDataType) clearCache() {
+func (t *AgentPlatformDataType) clearCache() {
 	t.Lock()
 	defer t.Unlock()
 	t.platformDataMap = make(map[string]*metadata.PlatformData)
 }
 
-func (v *VTapPlatformData) clearPlatformDataTypeCache() {
+func (v *AgentPlatformData) clearAgentPlatformDataTypeCache() {
 	v.platformDataType1.clearCache()
 	v.platformDataType2.clearCache()
 	v.platformDataType3.clearCache()
 	v.platformDataBMDedicated.clearCache()
-
-	v.agentPlatformData.clearAgentPlatformDataTypeCache()
 }
 
-func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapCache) {
-
-	v.agentPlatformData.setPlatformDataByAgent(md.GetAgentMetaData().GetPlatformDataOP(), c)
-
-	p := md.GetPlatformDataOP()
+// TODO: add userConfig
+func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c *VTapCache) {
 	vTapType := c.GetVTapType()
 	// 隧道解封装采集器没有平台数据
 	if vTapType == VTAP_TYPE_TUNNEL_DECAPSULATION {
@@ -143,7 +133,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		// 所有云平台所有数据
 
 		log.Debug(v.Logf("all: %s", p.GetAllSimplePlatformData()))
-		c.setVTapPlatformData(p.GetAllSimplePlatformData())
+		c.setAgentPlatformData(p.GetAllSimplePlatformData())
 	} else if *vtapConfig.PodClusterInternalIP == ALL_CLUSTERS {
 		// 下发的云平台列表=xxx，容器集群内部IP下发=所有集群
 		// 云平台列表=xxx的所有数据
@@ -151,7 +141,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		// 获取缓存数据
 		data := v.platformDataType1.getPlatformDataCache(vTapGroupLcuuid)
 		if data != nil {
-			c.setVTapPlatformData(data)
+			c.setAgentPlatformData(data)
 			return
 		}
 		domainToAllPlatformData := p.GetDomainToAllPlatformData()
@@ -167,7 +157,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 		domainAllData.GeneratePlatformDataResult()
 		v.platformDataType1.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
-		c.setVTapPlatformData(domainAllData)
+		c.setAgentPlatformData(domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
 	} else if *vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
 		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
@@ -177,7 +167,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		// 专属服务器类型：所有集群
 		if vTapType == VTAP_TYPE_DEDICATED {
 			data := p.GetAllSimplePlatformData()
-			c.setVTapPlatformData(data)
+			c.setAgentPlatformData(data)
 			log.Debug(v.Logf("vtap_type_dedicated: %s", data))
 			return
 		}
@@ -186,7 +176,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		key := fmt.Sprintf("%s+%s", vTapGroupLcuuid, strings.Join(podDomains, "+"))
 		data := v.platformDataType2.getPlatformDataCache(key)
 		if data != nil {
-			c.setVTapPlatformData(data)
+			c.setAgentPlatformData(data)
 			return
 		}
 		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
@@ -201,7 +191,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 			domainAllData.MergeInterfaces(vTapDomainData)
 		}
 		domainAllData.GeneratePlatformDataResult()
-		c.setVTapPlatformData(domainAllData)
+		c.setAgentPlatformData(domainAllData)
 		v.platformDataType2.setPlatformDataCache(key, domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
 	} else if *vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP {
@@ -213,7 +203,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 			// 获取缓存数据
 			data := v.platformDataBMDedicated.getPlatformDataCache(vTapGroupLcuuid)
 			if data != nil {
-				c.setVTapPlatformData(data)
+				c.setAgentPlatformData(data)
 				return
 			}
 			domainToAllPlatformData := p.GetDomainToAllPlatformData()
@@ -228,7 +218,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 			}
 			domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 			domainAllData.GeneratePlatformDataResult()
-			c.setVTapPlatformData(domainAllData)
+			c.setAgentPlatformData(domainAllData)
 			v.platformDataBMDedicated.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
 			log.Debug(v.Logf("%s", domainAllData))
 			return
@@ -239,7 +229,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		key := fmt.Sprintf("%s+%s", vTapGroupLcuuid, strings.Join(podDomains, "+"))
 		data := v.platformDataType3.getPlatformDataCache(key)
 		if data != nil {
-			c.setVTapPlatformData(data)
+			c.setAgentPlatformData(data)
 			return
 		}
 
@@ -270,7 +260,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 
 		domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 		domainAllData.GeneratePlatformDataResult()
-		c.setVTapPlatformData(domainAllData)
+		c.setAgentPlatformData(domainAllData)
 		v.platformDataType3.setPlatformDataCache(key, domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
 	}
