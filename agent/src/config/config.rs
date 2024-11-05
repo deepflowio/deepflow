@@ -294,7 +294,7 @@ impl Default for Config {
             pid_file: Default::default(),
             team_id: "".into(),
             cgroups_disabled: false,
-            new_rpc: false,
+            new_rpc: true,
         }
     }
 }

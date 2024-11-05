@@ -51,4 +51,4 @@ controller-ips:
 #cgroups-disabled: false
 
 ## If it is true, it means that the communication with the server uses the new RPC interface
-#new_rpc: false
+#new-rpc: true
