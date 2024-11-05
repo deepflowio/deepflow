@@ -717,7 +717,7 @@ global:
       #   ch: |-
       #     deepflow-agent 运行日志的写入位置。
       # upgrade_from: static_config.log-file
-      log_file: /var/log/deepflow_agent/deepflow_agent.log
+      log_file: /var/log/deepflow-agent/deepflow-agent.log
       # type: bool
       # name:
       #   en: Log Backhaul Enabled
@@ -876,7 +876,7 @@ global:
     #   ch: |-
     #     数据文件的写入位置。
     # upgrade_from: static_config.standalone-data-file-dir
-    data_file_dir: /var/log/deepflow_agent/
+    data_file_dir: /var/log/deepflow-agent/
 
 # type: section
 # name:
