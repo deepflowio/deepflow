@@ -232,6 +232,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Enable agent new rpc by default [#8449](https://github.com/deepflowio/deepflow/pull/8449) by [rvql](https://github.com/rvql)
+* feat: agent - eBPF Add DPDK packet capture [#8415](https://github.com/deepflowio/deepflow/pull/8415) by [yinjiping](https://github.com/yinjiping)
 * feat: add new agent.proto func [#8112](https://github.com/deepflowio/deepflow/pull/8112) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * feat: agent - eBPF Support for the ARM version of Kylin v10 SP2 [#8439](https://github.com/deepflowio/deepflow/pull/8439) by [yinjiping](https://github.com/yinjiping)
 * feat: Change bpf map feat to feat_flags to support multi-function [#8424](https://github.com/deepflowio/deepflow/pull/8424) by [rvql](https://github.com/rvql)
