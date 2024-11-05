@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/vishvananda/netlink"
@@ -189,4 +190,9 @@ func Int2Bool(i int) bool {
 	}
 
 	return true
+}
+
+func Int2AgentTypePtr[T int | uint16](i T) *agent.AgentType {
+	value := agent.AgentType(int32(i))
+	return &value
 }

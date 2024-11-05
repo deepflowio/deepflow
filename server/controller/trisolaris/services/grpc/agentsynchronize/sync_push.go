@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -58,15 +59,12 @@ func NewAgentEvent() *AgentEvent {
 	return &AgentEvent{}
 }
 
-func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) string {
+func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) *viper.Viper {
 	userConfig := c.GetUserConfig()
 	viperConfig := viper.New()
 	viperConfig.SetConfigType("yaml")
 	if err := viperConfig.ReadConfig(bytes.NewBufferString(userConfig)); err != nil {
 		log.Errorf("viper read agent(%d) config yaml error: %v", c.GetVTapID(), err)
-	}
-	if clusterID != "" { // if agent report cluster_id, force set tridentType = VTAP_TYPE_POD_VM
-		viperConfig.Set(CONFIG_KEY_AGENT_TYPE, VTAP_TYPE_POD_VM)
 	}
 
 	configTSDBIP := gAgentInfo.GetConfigTSDBIP()
@@ -91,24 +89,24 @@ func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAg
 		log.Errorf("agent(%s) has no proxy_controller_ip, "+
 			"Please check whether the agent allocs controller IP or If nat-ip is enabled, whether the controller is configured with nat-ip", c.GetCtrlIP())
 	}
-	if viperConfig.GetString(CONFIG_KEY_INGESTER_IP) == "" {
-		viperConfig.Set(CONFIG_KEY_ENABLED, false)
-		log.Errorf("agent(%s) has no tsdb_ip, "+
-			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", c.GetCtrlIP())
-	}
 
 	if c.GetVTapEnabled() == 0 {
 		viperConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, false)
-		viperConfig.Set(CONFIG_KEY_ENABLED, false)
 	}
 
-	return e.formateViperConfigToString(viperConfig)
+	return viperConfig
 }
 
-func (e *AgentEvent) generateDynamicConfig(c *vtap.VTapCache) *api.DynamicConfig {
-
+func (e *AgentEvent) generateDynamicConfig(clusterID string, c *vtap.VTapCache) *api.DynamicConfig {
+	agentType := c.GetVTapType()
+	if clusterID != "" { // if agent report cluster_id, force set tridentType = VTAP_TYPE_POD_VM
+		agentType = VTAP_TYPE_POD_VM
+	}
 	return &api.DynamicConfig{
+		AgentType:            utils.Int2AgentTypePtr(agentType),
+		Enabled:              proto.Bool(c.GetVTapEnabled() != 0),
 		KubernetesApiEnabled: proto.Bool(false),
+		Hostname:             proto.String(c.GetVTapHost()),
 		RegionId:             proto.Uint32(uint32(c.GetRegionID())),
 		PodClusterId:         proto.Uint32(uint32(c.GetPodClusterID())),
 		VpcId:                proto.Uint32(uint32(c.GetVPCID())),
@@ -180,6 +178,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	teamIDStr := in.GetTeamId()
+	clusterID := in.GetKubernetesClusterId()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	gAgentInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gAgentInfo == nil {
@@ -200,7 +199,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		}
 		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), clusterID, in.GetKubernetesForceWatch(),
 			in.GetAgentGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime(), logger.NewORGPrefix(orgID))
 		// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
 		// resulting in unsuccessful registration and a large number of error logs.
@@ -303,19 +302,24 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		tapTypes = gAgentInfo.GetCaptureNetworkTypes()
 	}
 
-	dynamicConfig := e.generateDynamicConfig(vtapCache)
+	dynamicConfig := e.generateDynamicConfig(clusterID, vtapCache)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
-	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
-		value := gAgentInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
+	if clusterID != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
+		value := gAgentInfo.GetKubernetesClusterID(clusterID, vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
 		if value == vtapCacheKey {
 			log.Infof(
 				"open cluster(%s) kubernetes_api_enabled Agent(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac,
+				clusterID, ctrlIP, ctrlMac,
 				teamIDStr, teamIDInt, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 			dynamicConfig.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
-	userConfig := e.generateUserConfig(vtapCache, in.GetKubernetesClusterId(), gAgentInfo, orgID)
+	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	if userConfig.GetString(CONFIG_KEY_INGESTER_IP) == "" {
+		dynamicConfig.Enabled = proto.Bool(false)
+		log.Errorf("agent(%s) has no ingester_ip, "+
+			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
+	}
 	localSegments := vtapCache.GetAgentLocalSegments()
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	upgradeRevision := vtapCache.GetExpectedRevision()
@@ -325,7 +329,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
-		UserConfig:          proto.String(userConfig),
+		UserConfig:          proto.String(e.formateViperConfigToString(userConfig)),
 		DynamicConfig:       dynamicConfig,
 		PlatformData:        platformData,
 		Groups:              groups,
@@ -343,6 +347,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 
 func (e *AgentEvent) generateNoAgentCacheDynamicConfig() *api.DynamicConfig {
 	return &api.DynamicConfig{
+		Enabled:              proto.Bool(false),
 		KubernetesApiEnabled: proto.Bool(false),
 	}
 }
@@ -374,22 +379,21 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 
+	clusterID := in.GetKubernetesClusterId()
 	dynamicConfigInfo := e.generateNoAgentCacheDynamicConfig()
 	viperConfig := e.generateNoAgentCacheUserViperConfig(in.GetAgentGroupIdRequest(), orgID)
 	gAgentInfo := trisolaris.GetORGVTapInfo(orgID)
-	if in.GetKubernetesClusterId() != "" {
-		value := gAgentInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
+	if clusterID != "" {
+		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(VTAP_TYPE_POD_VM)
+		value := gAgentInfo.GetKubernetesClusterID(clusterID, vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
 		if value == vtapCacheKey {
 			dynamicConfigInfo.KubernetesApiEnabled = proto.Bool(true)
 			log.Infof(
 				"open cluster(%s) kubernetes_api_enabled Agent(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
+				clusterID, ctrlIP, ctrlMac, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 		}
-
 		viperConfig.Set(CONFIG_KEY_MAX_ESCAPE_DURATION, gAgentInfo.GetDefaultMaxEscapeSecondsStr())
 		viperConfig.Set(CONFIG_KEY_MAX_MEMORY, gAgentInfo.GetDefaultMaxMemory())
-		viperConfig.Set(CONFIG_KEY_AGENT_TYPE, VTAP_TYPE_POD_VM)
-		viperConfig.Set(CONFIG_KEY_ENABLED, false)
 
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
@@ -400,10 +404,9 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 
 	agentTypeForUnknowAgent := gAgentInfo.GetTridentTypeForUnknowVTap()
 	if agentTypeForUnknowAgent != 0 {
+		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(agentTypeForUnknowAgent)
 		viperConfig.Set(CONFIG_KEY_MAX_ESCAPE_DURATION, gAgentInfo.GetDefaultMaxEscapeSecondsStr())
 		viperConfig.Set(CONFIG_KEY_MAX_MEMORY, gAgentInfo.GetDefaultMaxMemory())
-		viperConfig.Set(CONFIG_KEY_AGENT_TYPE, int(agentTypeForUnknowAgent))
-		viperConfig.Set(CONFIG_KEY_ENABLED, false)
 		viperConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, true)
 
 		return &api.SyncResponse{
@@ -412,8 +415,6 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 			UserConfig:    proto.String(e.formateViperConfigToString(viperConfig)),
 		}
 	}
-	// if vtap not exist & not k8s/agent sync, set vtap disable
-	viperConfig.Set(CONFIG_KEY_ENABLED, false)
 
 	return &api.SyncResponse{
 		Status:        &STATUS_SUCCESS,
@@ -448,6 +449,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	teamIDStr := in.GetTeamId()
+	clusterID := in.GetKubernetesClusterId()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	gAgentInfo := trisolaris.GetORGVTapInfo(orgID)
@@ -525,19 +527,24 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		tapTypes = gAgentInfo.GetCaptureNetworkTypes()
 	}
 
-	dynamicConfig := e.generateDynamicConfig(vtapCache)
+	dynamicConfig := e.generateDynamicConfig(clusterID, vtapCache)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
-	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
-		value := gAgentInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
+	if clusterID != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
+		value := gAgentInfo.GetKubernetesClusterID(clusterID, vtapCacheKey, in.GetKubernetesForceWatch(), int(in.GetKubernetesWatchPolicy()))
 		if value == vtapCacheKey {
 			log.Infof(
 				"open cluster(%s) kubernetes_api_enabled Agent(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
+				clusterID, ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 			dynamicConfig.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
 
-	userConfig := e.generateUserConfig(vtapCache, in.GetKubernetesClusterId(), gAgentInfo, orgID)
+	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	if userConfig.GetString(CONFIG_KEY_INGESTER_IP) == "" {
+		dynamicConfig.Enabled = proto.Bool(false)
+		log.Errorf("agent(%s) has no ingester_ip, "+
+			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
+	}
 	localSegments := vtapCache.GetAgentLocalSegments()
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	skipInterface := gAgentInfo.GetAgentSkipInterface(vtapCache)
@@ -547,7 +554,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
 		DynamicConfig:       dynamicConfig,
-		UserConfig:          proto.String(userConfig),
+		UserConfig:          proto.String(e.formateViperConfigToString(userConfig)),
 		PlatformData:        platformData,
 		SkipInterface:       skipInterface,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
