@@ -2272,13 +2272,13 @@ inputs:
           #   en: |-
           #     The toggle for enabling DPDK packet capture feature.
           #   ch: |-
-          #     DPDK数据包采集特性的开启开关
+          #     DPDK 数据包采集特性的开启开关
           # upgrade_from:
           enabled: false
           # type: string
           # name:
           #   en: DPDK Application Command Name
-          #   ch: DPDK应用命令名称
+          #   ch: DPDK 应用命令名称
           # unit:
           # range: []
           # enum_options: []
@@ -2291,15 +2291,15 @@ inputs:
           #
           #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk` 
           #   ch: |-
-          #     设置DPDK应用的命令名称, eBPF会自动寻找并进行追踪采集数据包
+          #     设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
           #
-          #     配置样例: 如果命令行是`/usr/bin/mydpdk`, 可以配置成 `command: mydpdk` 
+          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk` 
           # upgrade_from:
           command: ""
           # type: string
           # name:
           #   en: DPDK Application RX Hooks Configuration
-          #   ch: DPDK应用数据包接收hook点设置
+          #   ch: DPDK 应用数据包接收 hook 点设置
           # unit:
           # range: []
           # enum_options: []
@@ -2358,10 +2358,10 @@ inputs:
           #              - rx: vmxnet3_recv_pkts
           #              - tx: vmxnet3_xmit_pkts
           #
-          #     Example: `rx_hooks: ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts`
+          #     Example: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
           #
           #   ch: |-
-          #     根据实际的网卡驱动填写合适的数据包接收hook点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
+          #     根据实际的网卡驱动填写合适的数据包接收 hook 点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
           #     ```
           #     Slot:   04:00.0
           #     Class:  Ethernet controller
@@ -2373,8 +2373,8 @@ inputs:
           #     Driver: igb_uio
           #     Module: i40e
           #     ```
-          #     上面的 "Driver: igb_uio" 说明是DPDP纳管的设备 (除此之外还有"vfio-pci", "uio_pci_generic"
-          #     也被DPDK纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
+          #     上面的 "Driver: igb_uio" 说明是 DPDP 纳管的设备 (除此之外还有 "vfio-pci", "uio_pci_generic"
+          #     也被 DPDK 纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
           #     下面列出了不同驱动对应的接口名称，仅供参考:
           #      1. Physical NIC Drivers:
           #          - Intel Drivers:
@@ -2409,13 +2409,13 @@ inputs:
           #              - rx: vmxnet3_recv_pkts
           #              - tx: vmxnet3_xmit_pkts
           #
-          #     配置样例: `rx_hooks: ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts`
+          #     配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
           # upgrade_from:
-          rx_hooks: ""
+          rx_hooks: []
           # type: string
           # name:
           #   en: DPDK Application TX Hooks Configuration
-          #   ch: DPDK应用数据包发送hook点设置
+          #   ch: DPDK 应用数据包发送 hook 点设置
           # unit:
           # range: []
           # enum_options: []
@@ -2426,13 +2426,13 @@ inputs:
           #     Specify the appropriate packet transmission hook point according to the actual network card driver.
           #     To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
           #
-          #     Example: `tx_hooks: i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts`
+          #     Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
           #   ch: |-
-          #     根据实际的网卡驱动填写合适的数据包发送hook点, 获取驱动方法和发送hook点设置参考'rx_hooks'的说明.
+          #     根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置参考 'rx_hooks' 的说明.
           #
-          #     配置样例: `tx_hooks: i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts`
+          #     配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
           # upgrade_from:
-          tx_hooks: ""
+          tx_hooks: []
       # type: section
       # name: Kprobe
       # description:

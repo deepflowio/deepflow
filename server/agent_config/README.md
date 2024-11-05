@@ -3520,7 +3520,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          rx_hooks: ""
+          rx_hooks: []
 ```
 
 **Schema**:
@@ -3580,7 +3580,7 @@ In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other o
             - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
               - rx: vmxnet3_recv_pkts
               - tx: vmxnet3_xmit_pkts
-Example: "rx_hooks: ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts"
+Example: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
 
 ###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
@@ -3600,7 +3600,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          tx_hooks: ""
+          tx_hooks: []
 ```
 
 **Schema**:
@@ -3613,7 +3613,7 @@ inputs:
 Specify the appropriate packet transmission hook point according to the actual network card driver.
 To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
 
-Example: "tx_hooks: i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts"
+Example: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 

@@ -3430,7 +3430,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          rx_hooks: ""
+          rx_hooks: []
 ```
 
 **模式**:
@@ -3488,7 +3488,7 @@ inputs:
             - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
               - rx: vmxnet3_recv_pkts
               - tx: vmxnet3_xmit_pkts
-配置样例: "rx_hooks: ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts"
+配置样例: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
 
 ###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
@@ -3508,7 +3508,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          tx_hooks: ""
+          tx_hooks: []
 ```
 
 **模式**:
@@ -3520,7 +3520,7 @@ inputs:
 
 根据实际的网卡驱动填写合适的数据包发送hook点, 获取驱动方法和发送hook点设置参考'rx_hooks'的说明.
 
-配置样例: "tx_hooks: i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts"
+配置样例: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
