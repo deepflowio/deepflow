@@ -140,6 +140,8 @@ static void datadump_help(void)
 	fprintf(stderr, "    106: PROTO_ZMTP\n");
 	fprintf(stderr, "    120: PROTO_DNS\n");
 	fprintf(stderr, "    121: PROTO_TLS\n");
+	fprintf(stderr, "    127: PROTO_CUSTOM\n");
+	fprintf(stderr, "    199: PROTO_DPDK_PKT\n");
 	fprintf(stderr, "PID:\n");
 	fprintf(stderr, "    0:   all process/thread\n");
 	fprintf(stderr, "COMM:\n");

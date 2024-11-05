@@ -18,7 +18,7 @@
 #define DF_EBPF_CONFIG_H
 
 #define EV_NAME_SIZE			1024
-
+#define MAX_EVENTS_BURST           	32 // The number of events in batch processing
 #define BOOT_TIME_UPDATE_PERIOD		60	// 系统启动时间更新周期, 单位：秒
 
 // eBPF Map Name

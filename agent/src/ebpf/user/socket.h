@@ -279,6 +279,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "MongoDB";
 	case PROTO_TLS:
 		return "TLS";
+	case PROTO_DPDK_PKT:
+		return "Pkt";
 	case PROTO_CUSTOM:
 		return "Custom";
 	default:
@@ -363,9 +365,9 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 				t->datadump((void *)sd, boot_time);
 			/*
 			 * Modify socket data time to real time, 
-			 * time precision is in microseconds.
+			 * time precision is in nanosecond.
 			 */
-			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
+			sd->timestamp = sd->timestamp + boot_time;
 			callback(NULL, sd);
 		}
 

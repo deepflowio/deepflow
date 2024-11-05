@@ -25,6 +25,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
+#include "../proc.h"
 
 int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
 {
@@ -36,26 +37,51 @@ int __attribute__ ((weak)) extended_maps_set(struct bpf_tracer *tracer)
 	return 0;
 }
 
-void __attribute__ ((weak)) extended_prog_jump_tables(struct bpf_tracer *tracer) {
+void __attribute__ ((weak)) extended_prog_jump_tables(struct bpf_tracer *tracer)
+{
 }
 
-int __attribute__ ((weak)) collect_extended_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
+int __attribute__ ((weak)) collect_extended_uprobe_syms_from_procfs(struct
+								    tracer_probes_conf
+								    *conf)
 {
 	return 0;
 }
 
-void __attribute__ ((weak)) extended_process_exec(int pid) {}
+void __attribute__ ((weak)) extended_process_exec(int pid)
+{
+}
 
-void __attribute__ ((weak)) extended_events_handle(void) {}
+void __attribute__ ((weak)) extended_events_handle(void)
+{
+}
 
-void __attribute__ ((weak)) extended_process_exit(int pid) {}
+void __attribute__ ((weak)) extended_process_exit(int pid)
+{
+}
 
-void __attribute__ ((weak)) extended_match_pid_handle(int feat, int pid, enum match_pids_act act) {}
+void __attribute__ ((weak)) extended_match_pid_handle(int feat, int pid,
+						      enum match_pids_act act)
+{
+}
 
 bool __attribute__ ((weak)) extended_require_dwarf(int pid, const char *path)
 {
 	return false;
 }
 
-void __attribute__ ((weak)) extended_map_preprocess(struct ebpf_map *map) {}
-void __attribute__ ((weak)) extended_print_cp_tracer_status(void) {}
+void __attribute__ ((weak)) extended_map_preprocess(struct ebpf_map *map)
+{
+}
+
+void __attribute__ ((weak)) extended_print_cp_tracer_status(void)
+{
+}
+
+int __attribute__ ((weak)) print_extra_pkt_info(bool datadump_enable,
+						const char *pkt_data, int len,
+						char *buf, int buf_len,
+						u8 direction)
+{
+	return 0;
+}

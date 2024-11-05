@@ -83,4 +83,18 @@ void extended_map_preprocess(struct ebpf_map *map);
  *        status output.
  */
 void extended_print_cp_tracer_status(void);
+
+/**
+ * @brief **print_extra_pkt_info()** Outputs detailed information of a packet
+ *
+ * @param datadump_enable Enables datadump; when enabled, information will be
+ * @param pkt_data Packet data.
+ * @param len Length of the packet.
+ * @param buf Buffer for outputting packet debug information.
+ * @param buf_len Length of the buffer for outputting packet debug informatio
+ * @param direction Data direction.
+ * @return Length of the output information.
+ */
+int print_extra_pkt_info(bool datadump_enable, const char *pkt_data, int len,
+			 char *buf, int buf_len, u8 direction);
 #endif /* DF_EXTENDED_H */

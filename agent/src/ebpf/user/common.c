@@ -1202,7 +1202,7 @@ int exec_command(const char *cmd, const char *args,
 		/* Read and print the output */
 		char buffer[1024];
 		int write_bytes =
-		    snprintf(ret_buf, ret_buf_size, "\n%s\n", cmd_buf);
+		    snprintf(ret_buf, ret_buf_size, "[ %s ]", cmd_buf);
 		while (fgets(buffer, sizeof(buffer), fp) != NULL) {
 			write_bytes +=
 			    snprintf(ret_buf + write_bytes,

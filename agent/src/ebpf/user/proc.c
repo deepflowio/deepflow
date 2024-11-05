@@ -218,8 +218,8 @@ static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exit_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->
-			    v.proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->v.
+			    proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
@@ -249,8 +249,8 @@ static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exec_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->
-			    v.proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->v.
+			    proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			if (curr_p != 0 && list_p != 0) {
@@ -444,10 +444,10 @@ void exec_proc_info_cache_update(void)
 	if (proc_event_ring == NULL)
 		goto vector_handle;
 	int nr;
-	void *rx_burst[MAX_PKT_BURST];
+	void *rx_burst[MAX_EVENTS_BURST];
 	do {
 		nr = ring_sc_dequeue_burst(proc_event_ring, rx_burst,
-					   MAX_PKT_BURST, NULL);
+					   MAX_EVENTS_BURST, NULL);
 		int i;
 		struct proc_event_info *ev_info;
 		for (i = 0; i < nr; i++) {
@@ -1012,7 +1012,7 @@ extern uint32_t k_version;
 bool kernel_version_check(void)
 {
 	return ((k_version == KERNEL_VERSION(3, 10, 0))
-	    || (k_version >= KERNEL_VERSION(4, 17, 0)));
+		|| (k_version >= KERNEL_VERSION(4, 17, 0)));
 }
 
 bool process_probing_check(int pid)
@@ -1027,7 +1027,21 @@ bool process_probing_check(int pid)
 	return true;
 }
 
-void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, int pid)
+void process_event_free(struct process_create_event *event)
+{
+	if (event == NULL) {
+		ebpf_warning("The event is empty.\n");
+		return;
+	}
+
+	if (event->path)
+		free(event->path);
+
+	free(event);
+}
+
+void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
+			    int pid, char *path)
 {
 	static const uint32_t PROC_EVENT_HANDLE_DELAY = 120;
 	struct process_create_event *event = NULL;
@@ -1041,6 +1055,7 @@ void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, 
 	event->tracer = tracer;
 	event->pid = pid;
 	event->stime = get_process_starttime(pid);
+	event->path = path;
 	event->expire_time = get_sys_uptime() + PROC_EVENT_HANDLE_DELAY;
 
 	pthread_mutex_lock(&list->m);
@@ -1048,7 +1063,7 @@ void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, 
 	pthread_mutex_unlock(&list->m);
 }
 
-struct process_create_event *get_first_event(proc_event_list_t *list)
+struct process_create_event *get_first_event(proc_event_list_t * list)
 {
 	struct process_create_event *event = NULL;
 	pthread_mutex_lock(&list->m);
@@ -1060,7 +1075,7 @@ struct process_create_event *get_first_event(proc_event_list_t *list)
 	return event;
 }
 
-void remove_event(proc_event_list_t *list, struct process_create_event *event)
+void remove_event(proc_event_list_t * list, struct process_create_event *event)
 {
 	pthread_mutex_lock(&list->m);
 	list_head_del(&event->list);
@@ -1182,11 +1197,11 @@ static int bcc_elf_foreach_sym_callback(const char *name, uint64_t addr,
 }
 
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
-					  struct tracer_probes_conf *conf,
-					  struct symbol symbols[], size_t n_symbols)
+				   struct tracer_probes_conf *conf,
+				   struct symbol symbols[], size_t n_symbols)
 {
-	int ret = 0;
-	int idx = 0;
+	int ret, idx, count;
+	ret = idx = count = 0;
 	struct symbol_uprobe *probe_sym = NULL;
 	struct symbol *cur = NULL;
 	struct bcc_elf_foreach_sym_payload payload;
@@ -1228,14 +1243,44 @@ int add_probe_sym_to_tracer_probes(int pid, const char *path,
 		probe_sym->binary_path = strdup(path);
 		probe_sym->pid = pid;
 
+		/*
+		 * For executable binary files (ET_EXEC), convert the virtual
+		 * address to a physical address.
+		 * For shared library binary files (ET_DYN), no conversion is needed.
+		 * ref: https://refspecs.linuxbase.org/elf/gabi4+/ch5.pheader.html
+		 */
+		if (bcc_elf_get_type(probe_sym->binary_path) == ET_EXEC) {
+			struct load_addr_t addr = {
+				.target_addr = probe_sym->entry,
+				.binary_addr = 0x0,
+			};
+
+			if (bcc_elf_foreach_load_section
+			    (probe_sym->binary_path, &find_load, &addr) < 0) {
+				goto invalid;
+			}
+			if (!addr.binary_addr) {
+				goto invalid;
+			}
+			probe_sym->entry = addr.binary_addr;
+		}
+
 		if (probe_sym->probe_func && probe_sym->name &&
 		    probe_sym->binary_path) {
 			add_uprobe_symbol(pid, probe_sym, conf);
 		} else {
-			free((void *)probe_sym->probe_func);
-			free((void *)probe_sym->name);
-			free((void *)probe_sym->binary_path);
+			goto invalid;
 		}
+
+		count++;
+		continue;
+
+	      invalid:
+		free((void *)probe_sym->probe_func);
+		free((void *)probe_sym->name);
+		free((void *)probe_sym->binary_path);
+		free(probe_sym);
 	}
-	return 0;
+
+	return count;
 }

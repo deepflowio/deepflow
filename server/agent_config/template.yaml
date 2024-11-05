@@ -2177,6 +2177,182 @@ inputs:
           # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
           # TODO: 进程匹配要统一修改
           enabled: false
+        # type: section
+        # name: DPDK
+        # description:
+        dpdk:
+          # type: bool
+          # name: Enabled
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     The toggle for enabling DPDK packet capture feature.
+          #   ch: |-
+          #     DPDK 数据包采集特性的开启开关
+          # upgrade_from:
+          enabled: false
+          # type: string
+          # name:
+          #   en: DPDK Application Command Name
+          #   ch: DPDK 应用命令名称
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Set the command name of the DPDK application, eBPF will automatically
+          #     locate and trace packets for data collection.
+          #
+          #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk` 
+          #   ch: |-
+          #     设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
+          #
+          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk` 
+          # upgrade_from:
+          command: ""
+          # type: string
+          # name:
+          #   en: DPDK Application RX Hooks Configuration
+          #   ch: DPDK 应用数据包接收 hook 点设置
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Fill in the appropriate packet reception hook point according to the actual network card driver. 
+          #     You can use the command 'lspci -vmmk' to find the network card driver type. For example:
+          #     ```
+          #     Slot:   04:00.0
+          #     Class:  Ethernet controller
+          #     Vendor: Intel Corporation
+          #     Device: Ethernet Controller XL710 for 40GbE QSFP+
+          #     SVendor:        Unknown vendor 1e18
+          #     SDevice:        Device 4712
+          #     Rev:    02
+          #     Driver: igb_uio
+          #     Module: i40e
+          #     ```
+          #     In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other options include 
+          #     "vfio-pci" and "uio_pci_generic", which are also managed by DPDK). The actual driver is 'i40e' 
+          #     (derived from 'Module: i40e').
+          #
+          #     Below are some common interface names for different drivers, for reference only:
+          #      1. Physical NIC Drivers:
+          #          - Intel Drivers:
+          #            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+          #              - rx: ixgbe_recv_pkts
+          #              - tx: ixgbe_xmit_pkts
+          #            - i40e:    Supports Intel X710, XL710 series NICs.
+          #              - rx: i40e_recv_pkts
+          #              - tx: i40e_xmit_pkts
+          #            - ice:     Supports Intel E810 series NICs.
+          #              - rx: ice_recv_pkts
+          #              - tx: ice_xmit_pkts 
+          #          - Mellanox Drivers:
+          #            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+          #              - rx: mlx4_rx_burst
+          #              - tx: mlx4_tx_burst
+          #            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+          #              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+          #              - tx: Pending confirmation
+          #          - Broadcom Drivers:
+          #            - bnxt:    Supports Broadcom NetXtreme series NICs.
+          #              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+          #              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+          #       2. Virtual NIC Drivers:
+          #          - Virtio Driver:
+          #            - virtio:  Supports Virtio-based virtual network interfaces.
+          #              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+          #                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+          #              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
+          #          - VMXNET3 Driver:
+          #            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+          #              - rx: vmxnet3_recv_pkts
+          #              - tx: vmxnet3_xmit_pkts
+          #
+          #     Example: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
+          #
+          #   ch: |-
+          #     根据实际的网卡驱动填写合适的数据包接收 hook 点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
+          #     ```
+          #     Slot:   04:00.0
+          #     Class:  Ethernet controller
+          #     Vendor: Intel Corporation
+          #     Device: Ethernet Controller XL710 for 40GbE QSFP+
+          #     SVendor:        Unknown vendor 1e18
+          #     SDevice:        Device 4712
+          #     Rev:    02
+          #     Driver: igb_uio
+          #     Module: i40e
+          #     ```
+          #     上面的 "Driver: igb_uio" 说明是 DPDP 纳管的设备 (除此之外还有 "vfio-pci", "uio_pci_generic"
+          #     也被 DPDK 纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
+          #     下面列出了不同驱动对应的接口名称，仅供参考:
+          #      1. Physical NIC Drivers:
+          #          - Intel Drivers:
+          #            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+          #              - rx: ixgbe_recv_pkts
+          #              - tx: ixgbe_xmit_pkts
+          #            - i40e:    Supports Intel X710, XL710 series NICs.
+          #              - rx: i40e_recv_pkts
+          #              - tx: i40e_xmit_pkts
+          #            - ice:     Supports Intel E810 series NICs.
+          #              - rx: ice_recv_pkts
+          #              - tx: ice_xmit_pkts 
+          #          - Mellanox Drivers:
+          #            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+          #              - rx: mlx4_rx_burst
+          #              - tx: mlx4_tx_burst
+          #            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+          #              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+          #              - tx: Pending confirmation
+          #          - Broadcom Drivers:
+          #            - bnxt:    Supports Broadcom NetXtreme series NICs.
+          #              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+          #              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+          #       2. Virtual NIC Drivers:
+          #          - Virtio Driver:
+          #            - virtio:  Supports Virtio-based virtual network interfaces.
+          #              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+          #                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+          #              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts, 
+          #          - VMXNET3 Driver:
+          #            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+          #              - rx: vmxnet3_recv_pkts
+          #              - tx: vmxnet3_xmit_pkts
+          #
+          #     配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
+          # upgrade_from:
+          rx_hooks: []
+          # type: string
+          # name:
+          #   en: DPDK Application TX Hooks Configuration
+          #   ch: DPDK 应用数据包发送 hook 点设置
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Specify the appropriate packet transmission hook point according to the actual network card driver.
+          #     To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
+          #
+          #     Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
+          #   ch: |-
+          #     根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置参考 'rx_hooks' 的说明.
+          #
+          #     配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
+          # upgrade_from:
+          tx_hooks: []
       # type: section
       # name: Kprobe
       # description:

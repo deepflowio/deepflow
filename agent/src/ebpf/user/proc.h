@@ -205,6 +205,7 @@ struct process_create_event {
 	int pid;
 	uint64_t stime; // Process start time
 	uint32_t expire_time;
+	char *path;
 	struct bpf_tracer *tracer;
 };
 
@@ -214,7 +215,8 @@ typedef struct {
 } proc_event_list_t;
 
 void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
-			    int pid);
+			    int pid, char *path);
+void process_event_free(struct process_create_event *event);
 void remove_event(proc_event_list_t * list, struct process_create_event *event);
 struct process_create_event *get_first_event(proc_event_list_t * list);
 
