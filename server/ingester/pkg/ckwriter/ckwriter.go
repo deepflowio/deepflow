@@ -391,13 +391,14 @@ func (c *Cache) Write() error {
 	if c.batchSize == 0 {
 		return nil
 	}
-	if err := c.block.Send(); err != nil {
-		return fmt.Errorf("cache send write block failed: %s", err)
-	}
+	err := c.block.Send()
 	c.writeCounter++
 	c.lastWriteTime = time.Now()
 	c.resetBatch()
 	c.batchSize = 0
+	if err != nil {
+		return fmt.Errorf("cache send write block failed: %s", err)
+	}
 	return nil
 }
 
@@ -504,33 +505,9 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 	}
 	if err := cache.Write(); err != nil {
 		if logEnabled {
-			log.Warningf("write table (%s.%s) failed, will retry write (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
+			log.Warningf("write table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 		}
-		if err := w.ResetConnection(cache.writeCounter % int(w.connCount)); err != nil {
-			log.Warningf("reconnect clickhouse failed: %s", err)
-			time.Sleep(time.Second * 10)
-		} else {
-			if logEnabled {
-				log.Infof("reconnect clickhouse success: %s %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName)
-			}
-		}
-
-		w.counters[queueID].RetryCount++
-		// 写失败重连后重试一次, 规避偶尔写失败问题
-		err = cache.Write()
-		if logEnabled {
-			if err != nil {
-				w.counters[queueID].RetryFailedCount++
-				log.Warningf("retry write table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
-			} else {
-				log.Infof("retry write table (%s.%s) success, write (%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
-			}
-		}
-		if err != nil {
-			w.counters[queueID].WriteFailedCount += int64(itemsLen)
-		} else {
-			w.counters[queueID].WriteSuccessCount += int64(itemsLen)
-		}
+		w.counters[queueID].WriteFailedCount += int64(itemsLen)
 	} else {
 		w.counters[queueID].WriteSuccessCount += int64(itemsLen)
 	}
