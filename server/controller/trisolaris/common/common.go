@@ -117,9 +117,6 @@ const (
 )
 
 const (
-	CONFIG_KEY_ENABLED                     = "global.common.enabled"
-	CONFIG_KEY_HOSTNAME                    = "global.self_monitoring.hostname"
-	CONFIG_KEY_AGENT_TYPE                  = "global.common.agent_type"
 	CONFIG_KEY_MAX_MEMORY                  = "global.limits.max_memory"
 	CONFIG_KEY_MAX_ESCAPE_DURATION         = "global.communication.max_escape_duration"
 	CONFIG_KEY_INGESTER_IP                 = "global.communication.ingester_ip"
