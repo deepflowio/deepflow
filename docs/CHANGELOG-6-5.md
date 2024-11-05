@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent stuck when ntp is turned on [#8443](https://github.com/deepflowio/deepflow/pull/8443) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: container env supports aggr packets with and without tunnels [#8425](https://github.com/deepflowio/deepflow/pull/8425) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: modify the matching logic of flow_node [#8419](https://github.com/deepflowio/deepflow/pull/8419) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF Total process message initialization [#8331](https://github.com/deepflowio/deepflow/pull/8331) by [yinjiping](https://github.com/yinjiping)
 * fix: remove dynamic libpcap [#8320](https://github.com/deepflowio/deepflow/pull/8320) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: when EPC is unknown, region should not be unknown [#8316](https://github.com/deepflowio/deepflow/pull/8316) by [lzf575](https://github.com/lzf575)
@@ -154,6 +157,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Support Kylin OS v10 SP2 [#8431](https://github.com/deepflowio/deepflow/pull/8431) by [yinjiping](https://github.com/yinjiping)
+* feat: querier add query cache config [#8405](https://github.com/deepflowio/deepflow/pull/8405) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: modify the epc of multicast address [#8337](https://github.com/deepflowio/deepflow/pull/8337) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: sort prometheus export tags [#8329](https://github.com/deepflowio/deepflow/pull/8329) by [lzf575](https://github.com/lzf575)
 * feat: add ci to check dynamic libs [#8325](https://github.com/deepflowio/deepflow/pull/8325) by [jiumos](https://github.com/jiumos)
@@ -262,8 +267,8 @@
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
 
 #### Performance
+* perf: reduce ckwriter memory [#8423](https://github.com/deepflowio/deepflow/pull/8423) by [lzf575](https://github.com/lzf575)
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7266](https://github.com/deepflowio/deepflow/pull/7266) by [lzf575](https://github.com/lzf575)
-
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)

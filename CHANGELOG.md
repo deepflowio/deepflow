@@ -8,6 +8,14 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent stuck when ntp is turned on [#8445](https://github.com/deepflowio/deepflow/pull/8445) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent config api panic when requests float type value [#8442](https://github.com/deepflowio/deepflow/pull/8442) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Mega units in configuration [#8435](https://github.com/deepflowio/deepflow/pull/8435) by [rvql](https://github.com/rvql)
+* fix: L4/L7 log store tap types configuration [#8434](https://github.com/deepflowio/deepflow/pull/8434) by [rvql](https://github.com/rvql)
+* fix: Invalid type in config cause parse failure [#8433](https://github.com/deepflowio/deepflow/pull/8433) by [rvql](https://github.com/rvql)
+* fix: container env supports aggr packets with and without tunnels [#8427](https://github.com/deepflowio/deepflow/pull/8427) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: modify the matching logic of flow_node [#8420](https://github.com/deepflowio/deepflow/pull/8420) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Compatible with older configurations [#8377](https://github.com/deepflowio/deepflow/pull/8377) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: More configuration parse bugs [#8364](https://github.com/deepflowio/deepflow/pull/8364) by [rvql](https://github.com/rvql)
 * fix: LogLevel deserialize [#8363](https://github.com/deepflowio/deepflow/pull/8363) by [rvql](https://github.com/rvql)
 * fix: Duration deserialize in config [#8361](https://github.com/deepflowio/deepflow/pull/8361) by [rvql](https://github.com/rvql)
@@ -224,6 +232,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add new agent.proto func [#8112](https://github.com/deepflowio/deepflow/pull/8112) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: agent - eBPF Support for the ARM version of Kylin v10 SP2 [#8439](https://github.com/deepflowio/deepflow/pull/8439) by [yinjiping](https://github.com/yinjiping)
+* feat: Change bpf map feat to feat_flags to support multi-function [#8424](https://github.com/deepflowio/deepflow/pull/8424) by [rvql](https://github.com/rvql)
+* feat: modify agent.proto [#8416](https://github.com/deepflowio/deepflow/pull/8416) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: querier add query cache config [#8404](https://github.com/deepflowio/deepflow/pull/8404) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: querier optimize ip filter [#8343](https://github.com/deepflowio/deepflow/pull/8343) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: modify the epc of multicast address [#8336](https://github.com/deepflowio/deepflow/pull/8336) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: move zmq to plugins [#8327](https://github.com/deepflowio/deepflow/pull/8327) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -488,6 +501,8 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: use template instead of Interface{} in LockFreePool [#8372](https://github.com/deepflowio/deepflow/pull/8372) by [lzf575](https://github.com/lzf575)
+* perf: reduce ckwriter memory [#8417](https://github.com/deepflowio/deepflow/pull/8417) by [lzf575](https://github.com/lzf575)
 * perf: remove the '-l' compilation parameter to allow inline [#7935](https://github.com/deepflowio/deepflow/pull/7935) by [lzf575](https://github.com/lzf575)
 * perf: improve the performance of ClickHouse table changes under multiple organizations [#7788](https://github.com/deepflowio/deepflow/pull/7788) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7748](https://github.com/deepflowio/deepflow/pull/7748) by [lzf575](https://github.com/lzf575)

@@ -245,14 +245,14 @@ func (e *PrometheusExporter) sendRequest(queueID int, batchs []prompb.TimeSeries
 	return nil
 }
 
-var prompbTimeSeriesPool = pool.NewLockFreePool(func() interface{} {
+var prompbTimeSeriesPool = pool.NewLockFreePool(func() *prompb.TimeSeries {
 	return &prompb.TimeSeries{
 		Samples: make([]prompb.Sample, 1),
 	}
 })
 
 func AcquirePrompbTimeSeries() *prompb.TimeSeries {
-	return prompbTimeSeriesPool.Get().(*prompb.TimeSeries)
+	return prompbTimeSeriesPool.Get()
 }
 
 func ReleasePrompbTimeSeries(t *prompb.TimeSeries) {

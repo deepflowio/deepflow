@@ -5,74 +5,6 @@
 # description:
 global:
   # type: section
-  # name: Common
-  # description:
-  #   en: Common configuration of deepflow-agent.
-  #   ch: deepflow-agent 通用配置。
-  common:
-    # type: bool
-    # name: Enabled
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Disabled / Enabled the deepflow-agent.
-    #   ch: 禁用 / 启用 deepflow-agent。
-    # upgrade_from: enabled
-    enabled: true
-    # type: int
-    # name:
-    #   en: Agent Type
-    #   ch: 采集器类型
-    # unit:
-    # range: [0, 12]
-    # enum_options:
-    #   - 0:
-    #       en: TT_UNKNOWN
-    #       ch: TT_UNKNOWN
-    #   - 1:
-    #       en: TT_PROCESS, Agent in KVM
-    #       ch: TT_PROCESS, Agent in KVM
-    #   - 2:
-    #       en: TT_VM, Agent in a dedicated VM on ESXi
-    #       ch: TT_VM, Agent in a dedicated VM on ESXi
-    #   - 3:
-    #       en: TT_PUBLIC_CLOUD, Agent in Cloud host (VM)
-    #       ch: TT_PUBLIC_CLOUD, Agent in Cloud host (VM)
-    #   - 5:
-    #       en: TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host
-    #       ch: TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host
-    #   - 6:
-    #       en: TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic
-    #       ch: TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic
-    #   - 7:
-    #       en: TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host)
-    #       ch: TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host)
-    #   - 8:
-    #       en: TT_VM_POD, Agent in K8s Node (Cloud VM)
-    #       ch: TT_VM_POD, Agent in K8s Node (Cloud VM)
-    #   - 9:
-    #       en: TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic
-    #       ch: TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic
-    #   - 10:
-    #       en: TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node
-    #       ch: TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node
-    #   - 11:
-    #       en: TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node
-    #       ch: TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node
-    #   - 12:
-    #       en: TT_K8S_SIDECAR, Agent in K8s POD
-    #       ch: TT_K8S_SIDECAR, Agent in K8s POD
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Agent Type.
-    #   ch: 采集器类型。
-    # upgrade_from: trident_type
-    agent_type: 0
-  # type: section
   # name:
   #   en: Limits
   #   ch: 资源限制
@@ -785,7 +717,7 @@ global:
       #   ch: |-
       #     deepflow-agent 运行日志的写入位置。
       # upgrade_from: static_config.log-file
-      log_file: /var/log/deepflow_agent/deepflow_agent.log
+      log_file: /var/log/deepflow-agent/deepflow-agent.log
       # type: bool
       # name:
       #   en: Log Backhaul Enabled
@@ -883,18 +815,6 @@ global:
       # upgrade_from: static_config.enable-debug-stats
       # deprecated: true
       debug_metrics_enabled: false
-    # type: string
-    # name: Hostname
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: Override statsd host tag.
-    #   ch: 覆盖 statsd 主机标签。
-    # upgrade_from: host
-    hostname: ""
     # type: duration
     # name: Interval
     # unit:
@@ -956,7 +876,7 @@ global:
     #   ch: |-
     #     数据文件的写入位置。
     # upgrade_from: static_config.standalone-data-file-dir
-    data_file_dir: /var/log/deepflow_agent/
+    data_file_dir: /var/log/deepflow-agent/
 
 # type: section
 # name:
@@ -2490,7 +2410,7 @@ inputs:
           #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
-          port: ""
+          ports: ""
       # type: section
       # name:
       #   en: Tunning
@@ -4881,7 +4801,7 @@ processors:
       #   en: Extra Tolerable Flow Delay
       #   ch: 额外可容忍的 Flow 延迟
       # unit:
-      # range: [1s, 10s]
+      # range: [0s, 10s]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false

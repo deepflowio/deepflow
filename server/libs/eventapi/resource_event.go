@@ -176,12 +176,12 @@ func (r *ResourceEvent) Release() {
 	ReleaseResourceEvent(r)
 }
 
-var poolResourceEvent = pool.NewLockFreePool(func() interface{} {
+var poolResourceEvent = pool.NewLockFreePool(func() *ResourceEvent {
 	return new(ResourceEvent)
 })
 
 func AcquireResourceEvent() *ResourceEvent {
-	return poolResourceEvent.Get().(*ResourceEvent)
+	return poolResourceEvent.Get()
 }
 
 func ReleaseResourceEvent(event *ResourceEvent) {

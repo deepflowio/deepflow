@@ -2575,6 +2575,9 @@ pub fn _new_flow_map_and_receiver(
                     team_id: None,
                     organize_id: None,
                     secret_key: None,
+                    enabled: None,
+                    hostname: None,
+                    agent_type: None,
                 },
             ))
                 .into()

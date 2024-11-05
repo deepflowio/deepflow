@@ -36,7 +36,7 @@ const (
 	RIGHT_CLOSED                     // ... endpoint] (...
 )
 
-var subTreePool = pool.NewLockFreePool(func() interface{} {
+var subTreePool = pool.NewLockFreePool(func() *SubTree {
 	return new(SubTree)
 })
 
@@ -50,7 +50,7 @@ type SortableEndpoints struct {
 }
 
 func subTree(tree SubTree) *SubTree {
-	t := subTreePool.Get().(*SubTree)
+	t := subTreePool.Get()
 	*t = tree
 	return t
 }

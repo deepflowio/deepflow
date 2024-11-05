@@ -30,7 +30,7 @@ struct bpf_map_def SEC("maps") tls_conn_map = {
 	.key_size = sizeof(struct tls_conn_key),
 	.value_size = sizeof(struct tls_conn),
 	.max_entries = MAX_SYSTEM_THREADS,
-	.feat = FEATURE_UPROBE_GOLANG,
+	.feat_flags = FEATURE_FLAG_UPROBE_GOLANG,
 };
 /* *INDENT-ON* */
 

@@ -24,12 +24,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-var kafkaInfoPool = pool.NewLockFreePool(func() interface{} {
+var kafkaInfoPool = pool.NewLockFreePool(func() *KafkaInfo {
 	return new(KafkaInfo)
 })
 
 func AcquireKafkaInfo() *KafkaInfo {
-	return kafkaInfoPool.Get().(*KafkaInfo)
+	return kafkaInfoPool.Get()
 }
 
 func ReleaseKafkaInfo(d *KafkaInfo) {
@@ -80,12 +80,12 @@ func (i *KafkaInfo) Merge(r interface{}) {
 	}
 }
 
-var mqttInfoPool = pool.NewLockFreePool(func() interface{} {
+var mqttInfoPool = pool.NewLockFreePool(func() *MqttInfo {
 	return new(MqttInfo)
 })
 
 func AcquireMqttInfo() *MqttInfo {
-	return mqttInfoPool.Get().(*MqttInfo)
+	return mqttInfoPool.Get()
 }
 
 func ReleaseMqttInfo(d *MqttInfo) {

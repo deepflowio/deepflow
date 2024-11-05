@@ -56,12 +56,12 @@ type PidPair struct {
 	pid1     uint32
 }
 
-var pidPairPool = pool.NewLockFreePool(func() interface{} {
+var pidPairPool = pool.NewLockFreePool(func() *PidPair {
 	return &PidPair{}
 })
 
 func newPidPair() *PidPair {
-	return pidPairPool.Get().(*PidPair)
+	return pidPairPool.Get()
 }
 
 func releasePidPair(pidPair *PidPair) {
@@ -1056,6 +1056,5 @@ func (p *ProcessInfo) getDBData() {
 
 func (p *ProcessInfo) generateData() {
 	p.sendLocalShareEntryData()
-	p.getDBData()
 	p.generateGlobalLocalEntries()
 }

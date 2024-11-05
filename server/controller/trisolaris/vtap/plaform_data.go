@@ -46,6 +46,8 @@ type VTapPlatformData struct {
 	// 专属采集器
 	platformDataBMDedicated *PlatformDataType
 
+	agentPlatformData *AgentPlatformData
+
 	ORGID
 }
 
@@ -55,6 +57,7 @@ func newVTapPlatformData(orgID int) *VTapPlatformData {
 		platformDataType2:       newPlatformDataType("platformDataType2"),
 		platformDataType3:       newPlatformDataType("platformDataType3"),
 		platformDataBMDedicated: newPlatformDataType("platformDataBMDedicated"),
+		agentPlatformData:       newAgentPlatformData(orgID),
 		ORGID:                   ORGID(orgID),
 	}
 }
@@ -112,9 +115,15 @@ func (v *VTapPlatformData) clearPlatformDataTypeCache() {
 	v.platformDataType2.clearCache()
 	v.platformDataType3.clearCache()
 	v.platformDataBMDedicated.clearCache()
+
+	v.agentPlatformData.clearAgentPlatformDataTypeCache()
 }
 
-func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *VTapCache) {
+func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapCache) {
+
+	v.agentPlatformData.setPlatformDataByAgent(md.GetAgentMetaData().GetPlatformDataOP(), c)
+
+	p := md.GetPlatformDataOP()
 	vTapType := c.GetVTapType()
 	// 隧道解封装采集器没有平台数据
 	if vTapType == VTAP_TYPE_TUNNEL_DECAPSULATION {

@@ -14,6 +14,7 @@ service Synchronizer {
     rpc KubernetesAPISync(KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID(KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync(GPIDSyncRequest) returns (GPIDSyncResponse) {}
+    rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
     rpc Plugin(PluginRequest) returns (stream PluginResponse) {}
     // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
     rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
@@ -25,7 +26,6 @@ service Debug {
     rpc DebugGPIDAgentData(GPIDSyncRequest) returns (GPIDAgentData) {}
     rpc DebugRealGlobalData(GPIDSyncRequest) returns (RealGlobalData) {}
     rpc DebugRIPToVIP(GPIDSyncRequest) returns (RVData) {}
-    rpc DebugAgentCache(AgentCacheRequest) returns (AgentCacheResponse) {}
 }
 
 enum AgentType {
@@ -356,6 +356,7 @@ message SkipInterface {
 
 message DynamicConfig {
     optional bool kubernetes_api_enabled = 1;
+    optional bool enabled = 2;
 
     optional uint32 region_id = 10;       // Region ID of the deepflow-agent or Region ID of the data node
     optional uint32 pod_cluster_id = 11;  // Cluster ID of the container where the deepflow-agent is located
@@ -363,8 +364,10 @@ message DynamicConfig {
     optional uint32 agent_id = 13;  // range: [0, 64000]
     optional uint32 team_id = 14;
     optional uint32 organize_id = 15;
+    optional AgentType agent_type = 16;
 
     optional string secret_key = 20; // secret key for dataplane
+    optional string hostname = 21;
 }
 
 message SyncResponse {
@@ -627,6 +630,12 @@ enum GPIDSyncCompressAlgorithm {
     COMPRESS_ALGO_IGNORE_IF_EQUAL_TO_PREVIOUS = 1;
 }
 
+message ShareGPIDSyncRequests {
+    optional string server_ip = 1;
+    repeated GPIDSyncRequest sync_requests = 2;
+    optional uint32 org_id = 3;
+}
+
 message GPIDSyncRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 2;
@@ -701,16 +710,6 @@ message RVData {
 message GPIDAgentData {
     optional uint32 update_time = 1 [default = 0];
     optional GPIDSyncRequest sync_request = 2;
-}
-
-message AgentCacheRequest {
-    optional string ctrl_ip = 1;
-    optional string ctrl_mac = 2;
-    optional string team_id = 3; // agent team identity
-}
-
-message AgentCacheResponse {
-    optional bytes content = 1;  // json数据
 }
 
 message AgentId {
