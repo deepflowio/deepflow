@@ -1146,6 +1146,8 @@ impl Flow {
             self.tap_side = self.directions[0].into();
         } else if self.directions[0] == Direction::None && self.directions[1] != Direction::None {
             self.tap_side = self.directions[1].into();
+        } else {
+            self.tap_side = TapSide::Rest;
         }
     }
 
@@ -1218,7 +1220,7 @@ impl From<Flow> for flow_log::Flow {
     }
 }
 
-pub fn get_direction(
+fn get_direction(
     flow: &Flow,
     trident_type: TridentType,
     cloud_gateway_traffic: bool, // 从static config 获取
@@ -1569,10 +1571,9 @@ pub fn get_direction(
     if src_direct != Direction::None && dst_direct != Direction::None {
         if let TapType::Idc(_) = flow_key.tap_type {
             // When the IDC traffic collected by the dedicated deepflow-agent cannot distinguish between Directions,
-            // the Direction is set to None and Doc data to count a Rest record.
+            // L4FlowLog and Doc data to count a Rest record.
             // ======================================================================================================
-            // 当专属采集器采集的 IDC 流量无法区分 Direction 时，Direction设置为None Doc数据中统计一份 Rest 记录。
-            return [Direction::None, Direction::None];
+            // 当专属采集器采集的 IDC 流量无法区分 Direction 时，L4FlowLog 和 Doc数据中统计一份 Rest 记录。
         } else if (src_direct == Direction::ClientToServer || src_ep.is_l2_end)
             && dst_direct != Direction::ServerToClient
         {
