@@ -949,7 +949,9 @@ int ebpf_obj_load(struct ebpf_object *obj)
 			enabled_feats &= ~FEATURE_FLAG_DWARF_UNWINDING;
 		}
 		enabled_feats &= ~extended_feature_flags(map);
-		if (enabled_feats == 0) {
+		if (enabled_feats == 0 &&
+		    map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
+		    map->def.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY) {
 			map->def.max_entries = 1;
 		}
 
