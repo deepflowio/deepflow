@@ -1389,6 +1389,10 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	if (strstr(linux_release, "tlinux3"))
 		offset.struct_files_private_data_offset = 0xc0;
 
+	// For 4.19.90-2211.5.0.0178.22.uel20.x86_64
+	if (strstr(linux_release, "uel20"))
+		offset.struct_files_private_data_offset = 0xc0;
+
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
