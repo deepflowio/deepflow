@@ -79,6 +79,12 @@ bool extended_require_dwarf(int pid, const char *path);
 void extended_map_preprocess(struct ebpf_map *map);
 
 /**
+ * @brief **extended_feature_flags()** Get enabled features in extened profile
+ * @param map The pointer to the map to be created
+ */
+uint32_t extended_feature_flags(struct ebpf_map *map);
+
+/**
  * @brief **extended_print_cp_tracer_status()** Extended Profile runtime
  *        status output.
  */
