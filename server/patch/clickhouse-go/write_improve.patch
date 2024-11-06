@@ -22,10 +22,10 @@ index 351cc6c..aca1ad0 100644
  	conn, err := ch.acquire(ctx)
  	if err != nil {
 diff --git a/conn_batch.go b/conn_batch.go
-index c2af620..549ad92 100644
+index c2af620..1ecbec1 100644
 --- a/conn_batch.go
 +++ b/conn_batch.go
-@@ -65,6 +65,43 @@ func (c *connect) prepareBatch(ctx context.Context, query string, release func(*
+@@ -65,6 +65,42 @@ func (c *connect) prepareBatch(ctx context.Context, query string, release func(*
  	}, nil
  }
  
@@ -53,8 +53,6 @@ index c2af620..549ad92 100644
 +		return nil, err
 +	}
 +
-+	// Reset the input 'batch b' so that the memory can be reused and return it
-+	b.block.Reset()
 +	b.sent = false
 +	b.ctx = ctx
 +	b.conn = c
@@ -63,13 +61,14 @@ index c2af620..549ad92 100644
 +		release(c, err)
 +	}
 +	b.onProcess = onProcess
++	b.err = nil
 +	return b, nil
 +}
 +
  type batch struct {
  	err       error
  	ctx       context.Context
-@@ -75,6 +112,11 @@ type batch struct {
+@@ -75,6 +111,11 @@ type batch struct {
  	onProcess *onProcess
  }
  
@@ -123,7 +122,7 @@ index 5358d96..f4a0892 100644
  	switch v := v.(type) {
  	case reflect.Value:
 diff --git a/lib/column/column.go b/lib/column/column.go
-index 6994106..5951410 100644
+index 6994106..d2bf3d8 100644
 --- a/lib/column/column.go
 +++ b/lib/column/column.go
 @@ -75,12 +75,257 @@ type Interface interface {
