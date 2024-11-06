@@ -74,6 +74,11 @@ void __attribute__ ((weak)) extended_map_preprocess(struct ebpf_map *map)
 {
 }
 
+uint32_t __attribute__ ((weak)) extended_feature_flags(struct ebpf_map *map)
+{
+	return 0;
+}
+
 void __attribute__ ((weak)) extended_print_cp_tracer_status(void)
 {
 }
