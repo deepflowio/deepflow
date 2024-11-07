@@ -336,6 +336,14 @@ impl From<&str> for ProcessMatchType {
     }
 }
 
+fn to_process_match_type<'de, D>(deserializer: D) -> Result<ProcessMatchType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(s.as_str().into())
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum ProcessMatchAction {
     Accept,
@@ -356,6 +364,7 @@ impl From<&str> for ProcessMatchAction {
 pub struct ProcessMatcher {
     #[serde(deserialize_with = "to_match_regex")]
     pub match_regex: Regex,
+    #[serde(deserialize_with = "to_process_match_type")]
     pub match_type: ProcessMatchType,
     pub match_languages: Vec<String>,
     pub match_usernames: Vec<String>,
@@ -402,7 +411,7 @@ where
 impl Default for ProcessMatcher {
     fn default() -> Self {
         Self {
-            match_regex: Regex::new("deepflow-*").unwrap(),
+            match_regex: Regex::new("deepflow-.*").unwrap(),
             match_type: ProcessMatchType::Cmd,
             match_languages: vec![],
             match_usernames: vec![],
@@ -413,6 +422,7 @@ impl Default for ProcessMatcher {
             enabled_features: vec![
                 "ebpf.profile.on_cpu".to_string(),
                 "ebpf.profile.off_cpu".to_string(),
+                "proc.gprocess_info".to_string(),
             ],
             action: ProcessMatchAction::Accept,
         }
@@ -600,7 +610,7 @@ impl Default for Proc {
             sync_interval: Duration::from_secs(10),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
-            process_matcher: vec![],
+            process_matcher: vec![ProcessMatcher::default()],
             symbol_table: SymbolTable::default(),
         }
     }
@@ -5193,5 +5203,22 @@ header_fields_flag: "invalid"
 "#;
         let result: Result<TcpHeader, _> = serde_yaml::from_str(yaml_invalid);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_process_matcher() {
+        let yaml = r#"
+process_matcher:
+- match_regex: python[2|3].* (.*)\.py
+  match_type: cmdline
+  match_languages: []
+  match_usernames: []
+  only_in_container: true
+  only_with_tag: false
+  ignore: false
+  enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
+"#;
+
+        let _proc: Proc = serde_yaml::from_str(yaml).unwrap();
     }
 }
