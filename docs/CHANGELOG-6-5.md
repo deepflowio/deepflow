@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: ckwriter writing failure caused by not writing data for a long time [#8469](https://github.com/deepflowio/deepflow/pull/8469) by [lzf575](https://github.com/lzf575)
 * fix: no need to retry after writing failure [#8452](https://github.com/deepflowio/deepflow/pull/8452) by [lzf575](https://github.com/lzf575)
 * fix: agent stuck when ntp is turned on [#8443](https://github.com/deepflowio/deepflow/pull/8443) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: container env supports aggr packets with and without tunnels [#8425](https://github.com/deepflowio/deepflow/pull/8425) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -158,6 +159,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: the role field adds the values local and rest [#8465](https://github.com/deepflowio/deepflow/pull/8465) by [lzf575](https://github.com/lzf575)
+* feat: single-endpoints db support storing packet where the tap_side i… [#8463](https://github.com/deepflowio/deepflow/pull/8463) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Adapt to 4.19.90-2211.5.0.0178.22.uel20.x86_64 [#8460](https://github.com/deepflowio/deepflow/pull/8460) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Support Kylin OS v10 SP2 [#8431](https://github.com/deepflowio/deepflow/pull/8431) by [yinjiping](https://github.com/yinjiping)
 * feat: querier add query cache config [#8405](https://github.com/deepflowio/deepflow/pull/8405) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: modify the epc of multicast address [#8337](https://github.com/deepflowio/deepflow/pull/8337) by [yuanchaoa](https://github.com/yuanchaoa)
