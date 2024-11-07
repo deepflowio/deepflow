@@ -1266,7 +1266,7 @@ inputs:
       #   ch: Golang 特有
       # description:
       golang_specific:
-        # type: string
+        # type: bool
         # name:
         #   en: Enabled
         #   ch: Enabled
