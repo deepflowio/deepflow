@@ -464,7 +464,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 	}
 }
 
-func (c *Cache) resetBatch() error {
+func (c *Cache) initBatch() error {
 	var err error
 	conn := c.queueContext.conns[c.writeCounter%c.queueContext.connCount]
 	if IsNil(c.batch) {
@@ -472,26 +472,18 @@ func (c *Cache) resetBatch() error {
 		if err != nil {
 			return fmt.Errorf("prepare batch item write block failed: %s", err)
 		}
-	} else {
-		c.batch, err = conn.PrepareReuseBatch(context.Background(), c.prepare, c.batch)
-		if err != nil {
-			return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
-		}
+	}
+	if c.block == nil {
+		c.block = ckdb.NewBlock(c.batch)
 	}
 	return nil
 }
 
 func (c *Cache) Add(item CKItem) error {
-	if IsNil(c.batch) {
-		if err := c.resetBatch(); err != nil {
-			return err
-		}
+	if err := c.initBatch(); err != nil {
+		return err
 	}
-	if c.block == nil {
-		c.block = ckdb.NewBlock(c.batch)
-	} else {
-		c.block.SetBatch(c.batch)
-	}
+
 	item.WriteBlock(c.block)
 	if err := c.block.WriteAll(); err != nil {
 		item.Release()
@@ -506,10 +498,17 @@ func (c *Cache) Write() error {
 	if c.batchSize == 0 {
 		return nil
 	}
-	err := c.block.Send()
+	var err error
+	conn := c.queueContext.conns[c.writeCounter%c.queueContext.connCount]
+	c.batch, err = conn.PrepareReuseBatch(context.Background(), c.prepare, c.batch)
+	if err != nil {
+		return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
+	}
+
+	err = c.batch.Send()
+	c.batch.Reset()
 	c.writeCounter++
 	c.lastWriteTime = time.Now()
-	c.resetBatch()
 	c.batchSize = 0
 	if err != nil {
 		return fmt.Errorf("cache send write block failed: %s", err)

@@ -38,7 +38,7 @@ use super::{
 use crate::{
     common::{
         endpoint::EPC_INTERNET,
-        enums::{EthernetType, IpProtocol},
+        enums::{CaptureNetworkType, EthernetType, IpProtocol},
         flow::{CloseType, L7Protocol, SignalSource},
     },
     config::handler::{CollectorAccess, CollectorConfig},
@@ -53,6 +53,7 @@ use crate::{
     },
 };
 use public::{
+    proto::agent::AgentType,
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
 };
@@ -500,10 +501,17 @@ impl Stash {
         config: &CollectorConfig,
     ) {
         for ep in 0..2 {
-            // Do not count the data of None direction
-            if directions[ep] == Direction::None {
-                continue;
-            }
+            let direction = match config.agent_type {
+                AgentType::TtDedicatedPhysicalMachine
+                    if acc_flow.flow.flow_key.tap_type != CaptureNetworkType::Cloud
+                        && directions[0] != Direction::None
+                        && directions[1] != Direction::None =>
+                {
+                    Direction::None
+                }
+                _ if directions[ep] == Direction::None => continue,
+                _ => directions[ep],
+            };
             let is_active_host = if ep == 0 {
                 acc_flow.is_active_host0
             } else {
@@ -520,7 +528,7 @@ impl Stash {
                     self.global_thread_id,
                     &acc_flow.flow,
                     ep,
-                    directions[ep],
+                    direction,
                     is_active_host,
                     config,
                     None,
@@ -534,7 +542,7 @@ impl Stash {
             let tagger = get_edge_tagger(
                 self.global_thread_id,
                 &acc_flow.flow,
-                directions[ep],
+                direction,
                 acc_flow.is_active_host0,
                 acc_flow.is_active_host1,
                 config,
@@ -582,10 +590,11 @@ impl Stash {
     ) {
         // We collect the single-ended metrics data from Packet, XFlow, EBPF, Otel to the table (vtap_app_port).
         // In the case of signal_source grouping, the single_stats data is not duplicate.
-        // Only data whose direction is c|s|local has flow_meter.
+        // Only data whose direction is c|s|local|None has flow_meter.
         if tagger.direction == Direction::ServerToClient
             || tagger.direction == Direction::ClientToServer
             || tagger.direction == Direction::LocalToLocal
+            || tagger.direction == Direction::None
         {
             let key = StashKey::new(&tagger, tagger.ip, None, 0);
             self.add(key, tagger, Meter::Flow(flow_meter), close_type);
