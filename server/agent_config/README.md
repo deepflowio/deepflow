@@ -3438,6 +3438,183 @@ In the logs, you will encounter a message similar to the following:
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
 ```
 
+##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
+
+###### Enabled {#inputs.ebpf.socket.uprobe.dpdk.enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.enabled`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+The toggle for enabling DPDK packet capture feature.
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.command}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.command`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          command: ""
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Set the command name of the DPDK application, eBPF will automatically
+locate and trace packets for data collection.
+Example: In the command line '/usr/bin/mydpdk', it can be set as "command: mydpdk" 
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.rx_hooks`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          rx_hooks: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Fill in the appropriate packet reception hook point according to the actual network card driver. 
+You can use the command 'lspci -vmmk' to find the network card driver type. For example:
+     
+     Slot:   04:00.0
+     Class:  Ethernet controller
+     Vendor: Intel Corporation
+     Device: Ethernet Controller XL710 for 40GbE QSFP+
+     SVendor:        Unknown vendor 1e18
+     SDevice:        Device 4712
+     Rev:    02
+     Driver: igb_uio
+     Module: i40e
+     
+In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other options include 
+"vfio-pci" and "uio_pci_generic", which are also managed by DPDK). The actual driver is 'i40e' 
+(derived from 'Module: i40e').
+
+     Below are some common interface names for different drivers, for reference only:
+      1. Physical NIC Drivers:
+          - Intel Drivers:
+            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+              - rx: ixgbe_recv_pkts
+              - tx: ixgbe_xmit_pkts
+            - i40e:    Supports Intel X710, XL710 series NICs.
+              - rx: i40e_recv_pkts
+              - tx: i40e_xmit_pkts
+            - ice:     Supports Intel E810 series NICs.
+              - rx: ice_recv_pkts
+              - tx: ice_xmit_pkts 
+          - Mellanox Drivers:
+            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+              - rx: mlx4_rx_burst
+              - tx: mlx4_tx_burst
+            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+              - tx: Pending confirmation
+          - Broadcom Drivers:
+            - bnxt:    Supports Broadcom NetXtreme series NICs.
+              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+       2. Virtual NIC Drivers:
+          - Virtio Driver:
+            - virtio:  Supports Virtio-based virtual network interfaces.
+              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
+          - VMXNET3 Driver:
+            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+              - rx: vmxnet3_recv_pkts
+              - tx: vmxnet3_xmit_pkts
+Example: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.tx_hooks`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          tx_hooks: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Specify the appropriate packet transmission hook point according to the actual network card driver.
+To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
+
+Example: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
+
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
 ##### Blacklist {#inputs.ebpf.socket.kprobe.blacklist}

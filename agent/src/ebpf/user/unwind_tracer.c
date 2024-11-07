@@ -299,7 +299,7 @@ void unwind_process_exec(int pid) {
         return;
     }
 
-    add_event_to_proc_list(&proc_events, tracer, pid);
+    add_event_to_proc_list(&proc_events, tracer, pid, NULL);
 }
 
 // Process events in the queue
@@ -324,7 +324,7 @@ void unwind_events_handle(void) {
         }
 
         remove_event(&proc_events, event);
-        free(event);
+        process_event_free(event);
 
     } while (true);
     pthread_mutex_unlock(&g_unwind_table_lock);

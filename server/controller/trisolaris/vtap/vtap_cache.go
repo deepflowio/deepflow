@@ -137,9 +137,6 @@ func (f *VTapConfig) modifyUserConfig(c *VTapCache) {
 		log.Error("vtap configure is nil")
 		return
 	}
-	f.UserConfig.Set(CONFIG_KEY_AGENT_TYPE, c.GetVTapType())
-	f.UserConfig.Set(CONFIG_KEY_ENABLED, Int2Bool(c.GetVTapEnabled()))
-	f.UserConfig.Set(CONFIG_KEY_HOSTNAME, c.GetVTapHost())
 	if !f.UserConfig.IsSet(CONFIG_KEY_PROXY_CONTROLLER_IP) {
 		f.UserConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, c.GetControllerIP())
 	}

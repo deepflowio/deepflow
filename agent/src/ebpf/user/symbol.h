@@ -100,4 +100,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid);
 uint64_t get_symbol_addr_from_binary(int pid, const char *bin, const char *symname);
+int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
+	      void *payload);
 #endif /* _USER_SYMBOL_H_ */

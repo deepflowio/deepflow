@@ -440,7 +440,6 @@ static __inline struct member_fields_offset *retrieve_ready_kern_offset(void)
 
 #include "uprobe_base.bpf.c"
 #include "include/protocol_inference.h"
-#define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
 static __inline struct trace_key_t get_trace_key(__u64 timeout,
@@ -2873,7 +2872,7 @@ skip_copy:
 	__u64 curr_time = bpf_ktime_get_ns();
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
-	    v_buff->events_num >= EVENT_BURST_NUM ||
+	    v_buff->events_num >= MAX_EVENTS_BURST ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
@@ -2972,7 +2971,7 @@ skip_copy:
 	__u64 curr_time = bpf_ktime_get_ns();
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
-	    v_buff->events_num >= EVENT_BURST_NUM ||
+	    v_buff->events_num >= MAX_EVENTS_BURST ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}

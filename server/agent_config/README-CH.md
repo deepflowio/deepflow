@@ -3348,6 +3348,180 @@ inputs:
 `cat /proc/<PID>/maps | grep "libssl.so"`
 ```
 
+##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
+
+###### Enabled {#inputs.ebpf.socket.uprobe.dpdk.enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.enabled`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+DPDK数据包采集特性的开启开关
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.command}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.command`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          command: ""
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+设置DPDK应用的命令名称, eBPF会自动寻找并进行追踪采集数据包
+
+配置样例: 如果命令行是'/usr/bin/mydpdk', 可以配置成 "command: mydpdk" 
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.rx_hooks`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          rx_hooks: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+根据实际的网卡驱动填写合适的数据包接收hook点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
+     
+     Slot:   04:00.0
+     Class:  Ethernet controller
+     Vendor: Intel Corporation
+     Device: Ethernet Controller XL710 for 40GbE QSFP+
+     SVendor:        Unknown vendor 1e18
+     SDevice:        Device 4712
+     Rev:    02
+     Driver: igb_uio
+     Module: i40e
+     
+上面的 "Driver: igb_uio" 说明是DPDP纳管的设备 (除此之外还有"vfio-pci", "uio_pci_generic"
+也被DPDK纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
+
+     下面列出了不同驱动对应的接口名称，仅供参考:
+      1. Physical NIC Drivers:
+          - Intel Drivers:
+            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+              - rx: ixgbe_recv_pkts
+              - tx: ixgbe_xmit_pkts
+            - i40e:    Supports Intel X710, XL710 series NICs.
+              - rx: i40e_recv_pkts
+              - tx: i40e_xmit_pkts
+            - ice:     Supports Intel E810 series NICs.
+              - rx: ice_recv_pkts
+              - tx: ice_xmit_pkts 
+          - Mellanox Drivers:
+            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+              - rx: mlx4_rx_burst
+              - tx: mlx4_tx_burst
+            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+              - tx: Pending confirmation
+          - Broadcom Drivers:
+            - bnxt:    Supports Broadcom NetXtreme series NICs.
+              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+       2. Virtual NIC Drivers:
+          - Virtio Driver:
+            - virtio:  Supports Virtio-based virtual network interfaces.
+              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
+          - VMXNET3 Driver:
+            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+              - rx: vmxnet3_recv_pkts
+              - tx: vmxnet3_xmit_pkts
+配置样例: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
+
+###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.uprobe.dpdk.tx_hooks`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      uprobe:
+        dpdk:
+          tx_hooks: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+根据实际的网卡驱动填写合适的数据包发送hook点, 获取驱动方法和发送hook点设置参考'rx_hooks'的说明.
+
+配置样例: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
+
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
 ##### 黑名单 {#inputs.ebpf.socket.kprobe.blacklist}

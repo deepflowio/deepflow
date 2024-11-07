@@ -154,8 +154,8 @@ tonic-build = "0.8.0"
 walkdir = "2"
 
 [features]
-enterprise = ["extended_profile", "enterprise-utils"]
-extended_profile = []
+enterprise = ["extended_observability", "enterprise-utils"]
+extended_observability = []
 dylib_pcap = []
 
 [[bench]]
