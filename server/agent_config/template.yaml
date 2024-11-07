@@ -1251,7 +1251,7 @@ inputs:
     # ---
     # enabled_features: []
     process_matcher:
-      - match_regex: deepflow-*
+      - match_regex: deepflow-.*
         only_in_container: false
         enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu, proc.gprocess_info]
     # type: section
