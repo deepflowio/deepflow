@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: ckwriter writing failure caused by not writing data for a long time [#8469](https://github.com/deepflowio/deepflow/pull/8469) by [lzf575](https://github.com/lzf575)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +58,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: the role field adds the values local and rest [#8465](https://github.com/deepflowio/deepflow/pull/8465) by [lzf575](https://github.com/lzf575)
+* feat: single-endpoints db support storing packet where the tap_side i… [#8463](https://github.com/deepflowio/deepflow/pull/8463) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Adapt to 4.19.90-2211.5.0.0178.22.uel20.x86_64 [#8460](https://github.com/deepflowio/deepflow/pull/8460) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
