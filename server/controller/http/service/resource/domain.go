@@ -516,17 +516,6 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 		}
 		configStr, _ := json.Marshal(configUpdate)
 		dbUpdateMap["config"] = string(configStr)
-
-		// set vtap
-		var vTapValue string
-		v, ok := configUpdate["vtap_id"]
-		if ok && v != nil {
-			vTapValue = v.(string)
-		}
-		err := KubernetesSetVtap(lcuuid, vTapValue, false, db)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	log.Infof("update domain (%s) config (%v)", domain.Name, domainUpdate, db.LogPrefixORGID)
@@ -684,90 +673,6 @@ func deleteDomain(domain *mysqlmodel.Domain, db *mysql.DB, userInfo *httpcommon.
 
 	log.Infof("delete domain (%s) resources completed", domain.Name, db.LogPrefixORGID)
 	return map[string]string{"LCUUID": lcuuid}, nil
-}
-
-func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) error {
-	if value == "" {
-		return nil
-	}
-
-	var err error
-	var clusterID, domainLcuuid, subDomainLcuuid string
-	if isSubDomain {
-		var subDomain mysqlmodel.SubDomain
-		err = db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
-		if err != nil {
-			return err
-		}
-		clusterID = subDomain.ClusterID
-		domainLcuuid = subDomain.Domain
-		subDomainLcuuid = lcuuid
-	} else {
-		var domain mysqlmodel.Domain
-		err = db.Where("lcuuid = ?", lcuuid).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		clusterID = domain.ClusterID
-		domainLcuuid = lcuuid
-	}
-	if clusterID == "" {
-		return errors.New("domain or subdomain lcuuid not found cluster id")
-	}
-
-	vTapInfo := strings.Split(value, "-")
-	if len(vTapInfo) != 2 {
-		return errors.New(fmt.Sprintf("invalid kubernetes cluster value: (%s)", value))
-	}
-	var vTap mysqlmodel.VTap
-	err = db.Where("ctrl_ip = ? and ctrl_mac = ?", vTapInfo[0], vTapInfo[1]).First(&vTap).Error
-	if err != nil {
-		return errors.New(fmt.Sprintf("query vtap (%s) failed: (%s)", value, err.Error()))
-	}
-	var kubernetesClusters []mysqlmodel.KubernetesCluster
-	err = db.Where("cluster_id = ? and value = ?", clusterID, value).Find(&kubernetesClusters).Error
-	if err != nil {
-		return err
-	}
-	if len(kubernetesClusters) > 0 {
-		return nil
-	}
-
-	var podNodes []mysqlmodel.PodNode
-	err = db.Where("domain = ? and sub_domain = ?", domainLcuuid, subDomainLcuuid).Find(&podNodes).Error
-	if err != nil {
-		return err
-	}
-	if len(podNodes) == 0 {
-		return errors.New(fmt.Sprintf("the cluster (%s) not found pod node", clusterID))
-	}
-	nodeIPs := []string{}
-	for _, node := range podNodes {
-		nodeIPs = append(nodeIPs, node.IP)
-	}
-	var vTaps []mysqlmodel.VTap
-	err = db.Where("launch_server in ?", nodeIPs).Find(&vTaps).Error
-	if err != nil {
-		return err
-	}
-	if len(vTaps) == 0 {
-		return errors.New(fmt.Sprintf("not found vtap in launch server (%s)", nodeIPs))
-	}
-	vTapInfos := map[string]bool{}
-	for _, v := range vTaps {
-		vTapInfos[v.CtrlIP+"-"+v.CtrlMac] = false
-	}
-	if _, ok := vTapInfos[value]; !ok {
-		return errors.New(fmt.Sprintf("vtap (%s) not belong to the current domain", value))
-	}
-
-	var kubernetesCluster mysqlmodel.KubernetesCluster
-	err = db.Model(&kubernetesCluster).Where("cluster_id = ?", clusterID).Updates(mysqlmodel.KubernetesCluster{Value: value, UpdatedTime: time.Now()}).Error
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interface{}) ([]*model.SubDomain, error) {
@@ -964,17 +869,6 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	if ok {
 		configStr, _ := json.Marshal(fConfig)
 		dbUpdateMap["config"] = string(configStr)
-	}
-
-	var vTapValue string
-	v, ok := fConfig.(map[string]interface{})["vtap_id"]
-	if ok && v != nil {
-		vTapValue = v.(string)
-	}
-
-	err = KubernetesSetVtap(lcuuid, vTapValue, true, db)
-	if err != nil {
-		return nil, err
 	}
 
 	// pub to tagrecorder

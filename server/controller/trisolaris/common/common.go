@@ -17,6 +17,7 @@
 package common
 
 import (
+	"github.com/deepflowio/deepflow/message/agent"
 	api "github.com/deepflowio/deepflow/message/trident"
 )
 
@@ -131,4 +132,10 @@ var (
 	KWP_NORMAL         = api.KubernetesWatchPolicy_KWP_NORMAL
 	KWP_WATCH_ONLY     = api.KubernetesWatchPolicy_KWP_WATCH_ONLY
 	KWP_WATCH_DISABLED = api.KubernetesWatchPolicy_KWP_WATCH_DISABLED
+)
+
+var (
+	AGENT_KWP_NORMAL         = agent.KubernetesWatchPolicy_KWP_NORMAL
+	AGENT_KWP_WATCH_ONLY     = agent.KubernetesWatchPolicy_KWP_WATCH_ONLY
+	AGENT_KWP_WATCH_DISABLED = agent.KubernetesWatchPolicy_KWP_WATCH_DISABLED
 )
