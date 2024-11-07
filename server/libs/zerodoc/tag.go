@@ -166,6 +166,19 @@ func (d DirectionEnum) IsGateway() bool {
 	return SideType(d&_SIDE_TYPE_MASK)&(GatewaySide|GatewayHypervisorSide) != 0
 }
 
+func (d DirectionEnum) ToRole() uint8 {
+	switch d & _CLIENT_SERVER_MASK {
+	case ClientToServer:
+		return ROLE_CLIENT
+	case ServerToClient:
+		return ROLE_SERVER
+	case LocalToLocal:
+		return ROLE_LOCAL
+	default:
+		return ROLE_REST
+	}
+}
+
 type TAPSideEnum uint8
 
 const (
@@ -186,6 +199,13 @@ const (
 	ServerApp               = Server | TAPSideEnum(AppSide)
 	App                     = TAPSideEnum(AppSide)
 	Rest                    = 0
+)
+
+const (
+	ROLE_CLIENT = 0
+	ROLE_SERVER = 1
+	ROLE_LOCAL  = 2
+	ROLE_REST   = 3
 )
 
 var TAPSideEnumsString = []string{
@@ -577,10 +597,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&Direction != 0 {
-		if t.Direction.IsClientToServer() {
-			offset += copy(b[offset:], ",direction=c2s")
-		} else if t.Direction.IsServerToClient() {
-			offset += copy(b[offset:], ",direction=s2c")
+		role := t.Direction.ToRole()
+		if role == ROLE_CLIENT {
+			offset += copy(b[offset:], ",role=c2s")
+		} else if role == ROLE_SERVER {
+			offset += copy(b[offset:], ",role=s2c")
+		} else if role == ROLE_LOCAL {
+			offset += copy(b[offset:], ",role=local")
+		} else {
+			offset += copy(b[offset:], ",role=rest")
 		}
 	}
 	if t.Code&GPID != 0 {
@@ -910,7 +935,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端, 2: ip为本地，3: 其他"))
 	}
 
 	if code&GPID != 0 {
@@ -1121,12 +1146,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	}
 
 	if code&Direction != 0 {
-		if t.Direction.IsClientToServer() {
-			// 0: client, 1: server
-			block.Write(uint8(0))
-		} else {
-			block.Write(uint8(1))
-		}
+		block.Write(uint8(t.Direction.ToRole()))
 	}
 
 	if code&GPID != 0 {
