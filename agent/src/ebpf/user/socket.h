@@ -180,33 +180,9 @@ struct socket_trace_stats {
 	uint64_t proc_exit_event_count;
 };
 
-struct bpf_offset_param {
-	uint8_t ready;
-	uint32_t task__files_offset;
-	uint32_t sock__flags_offset;
-	uint32_t tcp_sock__copied_seq_offset;
-	uint32_t tcp_sock__write_seq_offset;
-
-	uint32_t struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
-	uint32_t struct_files_private_data_offset;	// offsetof(struct file, private_data)
-	uint32_t struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
-	uint32_t struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
-	uint32_t struct_file_dentry_offset;	// offsetof(struct file, f_path) + offsetof(struct path, dentry)
-	uint32_t struct_dentry_name_offset;	// offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
-	uint32_t struct_sock_family_offset;	// offsetof(struct sock_common, skc_family)
-	uint32_t struct_sock_saddr_offset;	// offsetof(struct sock_common, skc_rcv_saddr)
-	uint32_t struct_sock_daddr_offset;	// offsetof(struct sock_common, skc_daddr)
-	uint32_t struct_sock_ip6saddr_offset;	// offsetof(struct sock_common, skc_v6_rcv_saddr)
-	uint32_t struct_sock_ip6daddr_offset;	// offsetof(struct sock_common, skc_v6_daddr)
-	uint32_t struct_sock_dport_offset;	// offsetof(struct sock_common, skc_dport)
-	uint32_t struct_sock_sport_offset;	// offsetof(struct sock_common, skc_num)
-	uint32_t struct_sock_skc_state_offset;	// offsetof(struct sock_common, skc_state)
-	uint32_t struct_sock_common_ipv6only_offset;	// offsetof(struct sock_common, skc_flags)
-};
-
 struct bpf_offset_param_array {
 	int count;
-	struct bpf_offset_param offsets[0];
+	bpf_offset_param_t offsets[0];
 };
 
 struct bpf_socktrace_params {
