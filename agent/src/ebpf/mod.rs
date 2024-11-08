@@ -110,6 +110,10 @@ pub const FEATURE_PROFILE_ONCPU: c_int = 4;
 pub const FEATURE_PROFILE_OFFCPU: c_int = 5;
 #[allow(dead_code)]
 pub const FEATURE_PROFILE_MEMORY: c_int = 6;
+#[allow(dead_code)]
+pub const FEATURE_SOCKET_TRACER: c_int = 7;
+#[allow(dead_code)]
+pub const FEATURE_DWARF_UNWINDING: c_int = 8;
 
 //L7层协议是否需要重新核实
 #[allow(dead_code)]

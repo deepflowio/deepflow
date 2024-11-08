@@ -50,8 +50,8 @@ sort_by = "Name"
 usize_is_size_t = true
 
 [export]
-include = ["ProcessShardList", "UnwindEntryShard"]
-exclude = ["bpf_update_elem", "bpf_delete_elem"]
+include = ["ProcessShardList", "UnwindEntryShard", "PythonUnwindInfo", "PythonOffsets"]
+exclude = ["bpf_update_elem", "bpf_delete_elem", "BPF_ANY"]
 item_types = []
 renaming_overrides_prefixing = false
 
@@ -61,6 +61,20 @@ ProcessShardList = "process_shard_list_t"
 UnwindEntry = "unwind_entry_t"
 UnwindEntryShard = "unwind_entry_shard_t"
 UnwindTable = "unwind_table_t"
+PyCframe = "py_cframe_t"
+PyCodeObject = "py_code_object_t"
+PyFrameObject = "py_frame_object_t"
+PyInterpreterFrame = "py_interpreter_frame_t"
+PyInterpreterState = "py_interpreter_state_t"
+PyObject = "py_object_t"
+PyRuntimeState = "py_runtime_state_t"
+PyString = "py_string_t"
+PyThreadState = "py_thread_state_t"
+PyTupleObject = "py_tuple_object_t"
+PyTypeObject = "py_type_object_t"
+PythonOffsets = "python_offsets_t"
+PythonUnwindInfo = "python_unwind_info_t"
+PythonUnwindTable = "python_unwind_table_t"
 
 [struct]
 rename_fields = "SnakeCase"

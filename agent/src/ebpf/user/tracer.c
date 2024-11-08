@@ -1847,6 +1847,7 @@ static int add_pid_to_match_hash(int feature, int pid)
 	}
 
 	uprobe_match_pid_handle(feature, pid, MATCH_PID_ADD);
+	profiler_match_pid_handle(feature, pid, MATCH_PID_ADD);
 	extended_match_pid_handle(feature, pid, MATCH_PID_ADD);
 	return ret;
 }
@@ -1882,6 +1883,7 @@ static int clear_pid_from_match_hash(int feature, int pid)
 	}
 
 	uprobe_match_pid_handle(feature, pid, MATCH_PID_DEL);
+	profiler_match_pid_handle(feature, pid, MATCH_PID_DEL);
 	extended_match_pid_handle(feature, pid, MATCH_PID_DEL);
 	return ret;
 }

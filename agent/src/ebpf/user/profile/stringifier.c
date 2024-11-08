@@ -62,8 +62,9 @@
 #include "../proc.h"
 #include "trace_utils.h"
 
-static const char *k_err_tag = "[kernel stack trace error]";
-static const char *u_err_tag = "[user stack trace error]";
+// static const char *k_err_tag = "[kernel stack trace error]";
+// static const char *u_err_tag = "[user stack trace error]";
+static const char *i_err_tag = "[interpreter stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
@@ -420,6 +421,43 @@ finish:
 	return ptr;
 }
 
+static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int n_symbols, bool is_start_idx, u64 address)
+{
+	int len = 0;
+	char *ptr = NULL;
+	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 3];
+	memset(format_str, 0, sizeof(format_str));
+
+	u32 symbol_id = address & 0xFFFFFFFF;
+	for (int i = 0; i < n_symbols; i++) {
+		if (symbol_ids[i] == symbol_id) {
+			if (strlen(symbols[i].class_name) > 0) {
+				snprintf(format_str, sizeof(format_str), "%s::%s", symbols[i].class_name, symbols[i].method_name);
+			} else {
+				snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
+			}
+			goto finish;
+		}
+	}
+
+	/*
+	 * Maybe expelled from LRU
+	 */
+	if (is_start_idx) {
+		snprintf(format_str, sizeof(format_str),
+			 "[unknown start_thread?]");
+	} else {
+		snprintf(format_str, sizeof(format_str), "[unknown] 0x%08x",
+			 symbol_id);
+	}
+
+finish:
+	len = strlen(format_str);
+	ptr = create_symbol_str(len, format_str, "");
+
+	return ptr;
+}
+
 static int get_stack_ips(struct bpf_tracer *t,
 			 const char *stack_map_name, int stack_id, u64 * ips,
 			 u64 ts)
@@ -440,7 +478,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      stack_str_hash_t * h,
 				      bool new_cache,
 				      int *ret_val, void *info_p, u64 ts,
-				      bool ignore_libs)
+				      bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -455,6 +493,28 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
+
+	symbol_t symbols[MAX_SYMBOL_NUM];
+	memset(symbols, 0, sizeof(symbols));
+	u32 symbol_ids[MAX_SYMBOL_NUM];
+	memset(symbol_ids, 0, sizeof(symbol_ids));
+	int n_symbols = 0;
+
+	if (use_symbol_table) {
+		struct ebpf_map *map = ebpf_obj__get_map_by_name(t->obj, MAP_SYMBOL_TABLE_NAME);
+		if (map == NULL) {
+			ebpf_warning("bpf table %s not found", MAP_SYMBOL_TABLE_NAME);
+			return NULL;
+		}
+		symbol_t key = {};
+		while (bpf_get_next_key(map->fd, &key, &symbols[n_symbols]) == 0) {
+			int ret = bpf_lookup_elem(map->fd, &key, &symbol_ids[n_symbols]);
+			key = symbols[n_symbols];
+			if (ret == 0) {
+				n_symbols++;
+			}
+		}
+	}
 
 	int ret;
 	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
@@ -478,9 +538,11 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (start_idx == -1)
 			start_idx = i;
 
-		str =
-		    resolve_addr(t, pid, (i == start_idx), ips[i], new_cache,
-				 info_p);
+		if (use_symbol_table) {
+			str = resolve_custom_symbol_addr(symbols, symbol_ids, n_symbols, (i == start_idx), ips[i]);
+		} else {
+			str = resolve_addr(t, pid, (i == start_idx), ips[i], new_cache, info_p);
+		}
 		if (str) {
 			// ignore frames in library for memory profiling
 			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
@@ -536,7 +598,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
 				       bool new_cache, void *info_p, u64 ts,
-				       bool ignore_libs)
+				       bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -556,7 +618,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
 				       h, new_cache, &ret_val, info_p, ts,
-				       ignore_libs);
+				       ignore_libs, use_symbol_table);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -626,8 +688,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 
 	/* add separator and '\0' */
 	int len = 2;
-	char *k_trace_str, *u_trace_str, *trace_str, *uprobe_str;
-	k_trace_str = u_trace_str = trace_str = uprobe_str = NULL;
+	char *k_trace_str, *u_trace_str, *trace_str, *uprobe_str, *i_trace_str;
+	k_trace_str = u_trace_str = trace_str = uprobe_str = i_trace_str = NULL;
 
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
@@ -664,9 +726,10 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							0, stack_map_name,
 							h, new_cache, info_p,
 							v->timestamp,
-							ignore_libs);
+							ignore_libs, false);
 		if (k_trace_str == NULL)
 			return NULL;
+		len += strlen(k_trace_str);
 	}
 
 	if (v->userstack >= 0) {
@@ -678,9 +741,10 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							: stack_map_name, h,
 							new_cache, info_p,
 							v->timestamp,
-							ignore_libs);
+							ignore_libs, false);
 		if (u_trace_str == NULL)
 			return NULL;
+		len += strlen(u_trace_str);
 	}
 
 	if (v->flags & STACK_TRACE_FLAGS_URETPROBE && v->uprobe_addr != 0) {
@@ -690,70 +754,45 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		if (uprobe_str == NULL) {
 			return NULL;
 		}
+		len += strlen(uprobe_str) + 1;
 	}
 
-	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
-	if (v->kernstack >= 0 && v->userstack >= 0) {
-		if (k_trace_str) {
-			len += strlen(k_trace_str);
+	if (v->intpstack >= 0) {
+		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid, custom_stack_map_name, h, new_cache, info_p, v->timestamp, ignore_libs, true);
+		if (i_trace_str != NULL) {
+			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
 		} else {
-			len += strlen(k_err_tag);
+			len += strlen(i_err_tag);
 		}
+	}
 
-		if (u_trace_str) {
-			len += strlen(u_trace_str);
+	trace_str = alloc_stack_trace_str(len);
+	if (trace_str == NULL) {
+		ebpf_warning("No available memory space.\n");
+		goto error;
+	}
+
+	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
+	int offset = 0;
+	if (i_trace_str && u_trace_str) {
+		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+	} else if (i_trace_str) {
+		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
+	} else if (u_trace_str) {
+		if (v->intpstack >= 0) {
+			offset += snprintf(trace_str + offset, len - offset, "%s;%s", i_err_tag, u_trace_str);
 		} else {
-			len += strlen(u_err_tag);
+			offset += snprintf(trace_str + offset, len - offset, "%s", u_trace_str);
 		}
+	}
+	if (u_trace_str && uprobe_str) {
+		offset += snprintf(trace_str + offset, len - offset, ";%s", uprobe_str);
+	}
+	if (k_trace_str) {
+		offset += snprintf(trace_str + offset, len - offset, "%s%s", offset > 0 ? ";" : "", k_trace_str);
+	}
 
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			goto error;
-		}
-		snprintf(trace_str, len, "%s;%s",
-			 u_trace_str ? u_trace_str : u_err_tag,
-			 k_trace_str ? k_trace_str : k_err_tag);
-
-	} else if (v->kernstack >= 0) {
-		if (k_trace_str) {
-			len += strlen(k_trace_str);
-		} else {
-			len += strlen(k_err_tag);
-		}
-
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			goto error;
-		}
-
-		snprintf(trace_str, len, "%s",
-			 k_trace_str ? k_trace_str : k_err_tag);
-	} else if (v->userstack >= 0) {
-		if (u_trace_str) {
-			len += strlen(u_trace_str);
-			if (uprobe_str) {
-				len += strlen(uprobe_str) + 1;
-			}
-		} else {
-			len += strlen(u_err_tag);
-		}
-
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			goto error;
-		}
-
-		if (u_trace_str && uprobe_str) {
-			snprintf(trace_str, len, "%s;%s", u_trace_str,
-				 uprobe_str);
-		} else {
-			snprintf(trace_str, len, "%s",
-				 u_trace_str ? u_trace_str : u_err_tag);
-		}
-	} else {
+	if (offset == 0) {
 		/* 
 		 * The kernel can indicate the invalidity of a stack ID in two
 		 * different ways:
