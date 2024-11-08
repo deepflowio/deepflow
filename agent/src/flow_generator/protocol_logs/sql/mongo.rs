@@ -460,7 +460,7 @@ impl MongoOpMsg {
         let section_len = bytes::read_u32_le(
             &payload[Self::_DOC_LENGTH_OFFSET..Self::_DOC_LENGTH_OFFSET + Self::_DOC_LENGTH_LEN],
         );
-        if payload.len() < Self::_DOC_LENGTH_LEN + section_len as usize {
+        if payload.len() < Self::_KIND_LEN + section_len as usize {
             return Ok(false);
         }
         let _ = sections.decode(&payload);
@@ -676,7 +676,10 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("mongo.pcap", "mongo.result")];
+        let files = vec![
+            ("mongo.pcap", "mongo.result"),
+            ("mongo-msg.pcap", "mongo-msg.result"),
+        ];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
