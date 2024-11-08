@@ -166,6 +166,19 @@ func (d DirectionEnum) IsGateway() bool {
 	return SideType(d&_SIDE_TYPE_MASK)&(GatewaySide|GatewayHypervisorSide) != 0
 }
 
+func (d DirectionEnum) ToRole() uint8 {
+	switch d & _CLIENT_SERVER_MASK {
+	case ClientToServer:
+		return ROLE_CLIENT
+	case ServerToClient:
+		return ROLE_SERVER
+	case LocalToLocal:
+		return ROLE_LOCAL
+	default:
+		return ROLE_REST
+	}
+}
+
 type TAPSideEnum uint8
 
 const (
@@ -191,6 +204,8 @@ const (
 const (
 	ROLE_CLIENT = 0
 	ROLE_SERVER = 1
+	ROLE_LOCAL  = 2
+	ROLE_REST   = 3
 )
 
 var TAPSideEnumsString = []string{
@@ -602,6 +617,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",role=c2s")
 		} else if t.Role == ROLE_SERVER {
 			offset += copy(b[offset:], ",role=s2c")
+		} else if t.Role == ROLE_LOCAL {
+			offset += copy(b[offset:], ",role=local")
+		} else {
+			offset += copy(b[offset:], ",role=rest")
 		}
 	}
 	if t.Code&GPID != 0 {
@@ -923,7 +942,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端, 2: ip为本地，3: 其他"))
 	}
 
 	if code&GPID != 0 {
@@ -1368,11 +1387,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.L3EpcID = MarshalInt32WithSpecialID(p.Field.L3EpcId)
 	t.L3EpcID1 = MarshalInt32WithSpecialID(p.Field.L3EpcId1)
 	direction := DirectionEnum(p.Field.Direction)
-	if direction.IsClientToServer() {
-		t.Role = ROLE_CLIENT
-	} else {
-		t.Role = ROLE_SERVER
-	}
+	t.Role = direction.ToRole()
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
 	t.TAPSideStr = TAPSideEnum(p.Field.TapSide).String()
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)
