@@ -22,334 +22,56 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/baidubce/bce-sdk-go/util/log"
 	"gopkg.in/yaml.v3"
 )
 
-type DynamicOptions map[string]*yaml.Node
+const (
+	keyCommentSuffix = "_comment"
 
-var FieldCommentSuffix = "_comment"
+	commentFlag           = "#"
+	subelementCommentFlag = "# ---"
+	todoFlag              = "TODO"
 
-func ParseYAMLToJson(yamlData []byte, d DynamicOptions) ([]byte, error) { // TODO refactor d
-	formatedTemplate, err := formatTemplateYAML(yamlData)
+	templateIndent = "  "
+)
+
+func ConvertYAMLToJSON(yamlData []byte) ([]byte, error) {
+	keyToComment, err := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 	if err != nil {
-		log.Infof("weiqiang formatTemplateYAML error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("generate key to comment error: %v", err)
 	}
-
-	var node yaml.Node
-	err = yaml.Unmarshal(formatedTemplate, &node)
+	dataFmt := NewDataFommatter()
+	err = dataFmt.Init(yamlData)
 	if err != nil {
-		log.Infof("weiqiang yaml.Unmarshal error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("new data formatter error: %v", err)
 	}
+	return dataFmt.ConvertToJSON(keyToComment)
+}
 
-	formattedNode, err := convTypeDictValToString(&node)
+func ValidateYAML(yamlData []byte) error {
+	tmplFmt := NewTemplateFormatter(YamlAgentGroupConfigTemplate)
+	KeyToComment, err := tmplFmt.GenerateKeyToComment()
 	if err != nil {
-		log.Infof("weiqiang convTypeDictValToString error: %v", err)
-		return nil, err
+		return fmt.Errorf("generate key to comment error: %v", err)
 	}
+	tmplFmt.DataFomatter.fmtValAndRefresh(KeyToComment, true)
 
-	formattedNode, err = fillingEnumOptions("", formattedNode, d)
+	dataFmt := NewDataFommatter()
+	err = dataFmt.Init(yamlData)
 	if err != nil {
-		log.Infof("weiqiang fillingEnumOptions error: %v", err)
-		return nil, err
+		return fmt.Errorf("new data formatter error: %v", err)
 	}
-
-	jsonData, err := fillingOrder(formattedNode)
+	err = dataFmt.fmtValAndRefresh(KeyToComment, true)
 	if err != nil {
-		log.Infof("weiqiang yamlNodeToMapWithOrder error: %v", err)
-		return nil, err
+		return fmt.Errorf("convert value and refresh error: %v", err)
 	}
 
-	jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
-	if err != nil {
-		log.Infof("weiqiang json.MarshalIndent error: %v", err)
-		return nil, err
-	}
-	jsonStr := string(jsonBytes)
-	jsonStr = strings.ReplaceAll(jsonStr, ": null", ": []") // TODO 为什么要替换 null 为 []？
-
-	return []byte(jsonStr), nil
+	return validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFomatter.yamlNode)
 }
 
-func formatTemplateYAML(yamlData []byte) ([]byte, error) {
-	indentedLines, err := IndentTemplate(yamlData)
-	if err != nil {
-		return nil, err
-	}
-	return UncommentTemplate(indentedLines)
-}
-
-func IndentTemplate(yamlData []byte) ([]string, error) {
-	yamlStr := string(yamlData)
-	lines := strings.Split(yamlStr, "\n")
-
-	var indentedLines []string
-	var tempLines []string
-	for i := 0; i < len(lines); i++ {
-		// 以 --- 开头结尾的注释，是升级前的注释及配置，需要忽略
-		if strings.Contains(lines[i], "---") {
-			j := i + 1
-			for ; j < len(lines); j++ {
-				if strings.Contains(lines[j], "---") {
-					break
-				}
-			}
-			i = j + 1
-			continue
-		}
-
-		//  --- 包含以外的注释，需要提取出来，作为配置的注解
-		if strings.Contains(lines[i], "#") {
-			if !strings.HasPrefix(strings.TrimSpace(lines[i]), "#") {
-				tempLines = append(tempLines, lines[i])
-			} else {
-				// add indent to config
-				tempLines = append(tempLines, "  "+lines[i])
-			}
-			continue
-		}
-
-		configNames := strings.Split(lines[i], ":")
-		if len(configNames) == 0 {
-			return nil, fmt.Errorf("line(index: %d, value: %s) split by \":\" failed", i, lines[i])
-		}
-		if len(tempLines) > 0 {
-			indentedLines = append(indentedLines, configNames[0]+"_comment:")
-			indentedLines = append(indentedLines, tempLines...)
-		}
-		indentedLines = append(indentedLines, lines[i])
-		tempLines = []string{}
-	}
-
-	return indentedLines, nil
-}
-
-// UncommentTemplate removes all lines containing "TODO" and uncomments all lines
-// by removing the "#" prefix. It is used to convert the agent configuration
-// template file to json format.
-func UncommentTemplate(indentedLines []string) ([]byte, error) {
-	var uncommentedLines []string
-	for i := 0; i < len(indentedLines); i++ {
-		line := indentedLines[i]
-		if strings.Contains(line, "TODO") {
-			continue
-		}
-		if !strings.HasPrefix(strings.TrimSpace(line), "#") && strings.Contains(line, "#") {
-			uncommentedLines = append(uncommentedLines, line)
-			continue
-		}
-
-		line = strings.ReplaceAll(line, "# ", "")
-		line = strings.ReplaceAll(line, "#", "")
-		uncommentedLines = append(uncommentedLines, line)
-	}
-	return []byte(strings.Join(uncommentedLines, "\n")), nil
-}
-
-func fillingEnumOptions(ancetors string, node *yaml.Node, d DynamicOptions) (*yaml.Node, error) {
-	switch node.Kind {
-	case yaml.DocumentNode:
-		return fillingEnumOptions(ancetors, node.Content[0], d)
-	case yaml.MappingNode:
-		for i := 0; i < len(node.Content); i += 2 {
-			newAncetors := node.Content[i].Value
-			if ancetors != "" {
-				newAncetors = ancetors + "." + newAncetors
-			}
-			value, err := fillingEnumOptions(newAncetors, node.Content[i+1], d)
-			if err != nil {
-				return nil, err
-			}
-			node.Content[i+1] = value
-		}
-		return node, nil
-	case yaml.SequenceNode:
-		value := make([]*yaml.Node, 0)
-		if dynamicValue, ok := d[ancetors]; ok {
-			for _, contentNode := range node.Content {
-				if contentNode.Kind == yaml.MappingNode {
-					for i := 0; i < len(contentNode.Content); i += 2 {
-						key := contentNode.Content[i].Value
-						if key != "_DYNAMIC_OPTIONS_" {
-							value = append(value, contentNode)
-						}
-					}
-				}
-			}
-			value = append(value, dynamicValue.Content...)
-		} else {
-			for _, contentNode := range node.Content {
-				valueNode, err := fillingEnumOptions(ancetors, contentNode, d)
-				if err != nil {
-					return nil, err
-				}
-				value = append(value, valueNode)
-			}
-		}
-		node.Content = value
-		return node, nil
-	case yaml.ScalarNode:
-		return node, nil
-	default:
-		return nil, fmt.Errorf("unsupported YAML node kind: %v", node.Kind)
-	}
-}
-
-func convTypeDictValToString(node *yaml.Node) (*yaml.Node, error) {
-	switch node.Kind {
-	case yaml.DocumentNode:
-		return convTypeDictValToString(node.Content[0])
-	case yaml.MappingNode:
-		var dictKey string
-		for i := 0; i < len(node.Content); i += 2 {
-			key := node.Content[i].Value
-			valueNode := node.Content[i+1]
-			if strings.HasSuffix(key, FieldCommentSuffix) {
-				for j := 0; j < len(valueNode.Content); j += 2 {
-					if valueNode.Content[j].Value == "type" && valueNode.Content[j+1].Value == "dict" {
-						dictKey = strings.TrimSuffix(key, FieldCommentSuffix)
-						break
-					}
-				}
-				value, err := convTypeDictValToString(valueNode)
-				if err != nil {
-					return nil, err
-				}
-				node.Content[i+1] = value
-			} else if key == dictKey {
-				bytes, err := yaml.Marshal(valueNode)
-				if err != nil {
-					return nil, err
-				}
-				strValNode := &yaml.Node{
-					Kind:  yaml.ScalarNode,
-					Tag:   "!!str",
-					Value: string(bytes),
-				}
-				node.Content[i+1] = strValNode
-				// fmt.Printf("keyNode: %#v, valueNode: %#v\n", node.Content[i], node.Content[i+1])
-				dictKey = ""
-			} else {
-				value, err := convTypeDictValToString(valueNode)
-				if err != nil {
-					return nil, err
-				}
-				node.Content[i+1] = value
-			}
-		}
-		return node, nil
-	case yaml.SequenceNode:
-		value := make([]*yaml.Node, 0)
-		for i := 0; i < len(node.Content); i++ {
-			valueNode, err := convTypeDictValToString(node.Content[i])
-			if err != nil {
-				return nil, err
-			}
-			value = append(value, valueNode)
-		}
-		node.Content = value
-		return node, nil
-	case yaml.ScalarNode:
-		return node, nil
-	default:
-		return nil, fmt.Errorf("unsupported YAML node kind: %v", node.Kind)
-	}
-}
-
-type OrderedMap struct {
-	keys   []string
-	values map[string]interface{}
-}
-
-func (om *OrderedMap) MarshalJSON() ([]byte, error) {
-	var pairs []string
-	for _, key := range om.keys {
-		value, _ := json.Marshal(om.values[key])
-		pairs = append(pairs, fmt.Sprintf("%q:%s", key, string(value)))
-	}
-	return []byte("{" + strings.Join(pairs, ",") + "}"), nil
-}
-
-func fillingOrder(node *yaml.Node) (interface{}, error) {
-	switch node.Kind {
-	case yaml.DocumentNode:
-		return fillingOrder(node.Content[0])
-	case yaml.MappingNode:
-		om := &OrderedMap{
-			keys:   make([]string, 0, len(node.Content)/2),
-			values: make(map[string]interface{}),
-		}
-		for i := 0; i < len(node.Content); i += 2 {
-			keyNode := node.Content[i]
-			valueNode := node.Content[i+1]
-
-			key := keyNode.Value
-			value, err := fillingOrder(valueNode)
-			if err != nil {
-				return nil, err
-			}
-
-			if strings.HasSuffix(key, FieldCommentSuffix) {
-				if valueMap, ok := value.(map[string]interface{}); ok {
-					valueMap["order"] = i/2 + 1
-					value = valueMap
-				}
-			}
-
-			om.keys = append(om.keys, key)
-			om.values[key] = value
-		}
-		return om.values, nil
-	case yaml.SequenceNode:
-		var seq []interface{}
-		for i, contentNode := range node.Content {
-			value, err := fillingOrder(contentNode)
-			if err != nil {
-				return nil, err
-			}
-			if valueMap, ok := value.(map[string]interface{}); ok {
-				valueMap["order"] = i + 1
-				value = valueMap
-			}
-			seq = append(seq, value)
-		}
-		return seq, nil
-	case yaml.ScalarNode:
-		if node.Tag == "!!int" {
-			var err error
-			if intValue, err := strconv.Atoi(node.Value); err == nil {
-				return intValue, nil
-			}
-			if intValue, err := strconv.ParseInt(node.Value, 0, 64); err == nil {
-				return intValue, nil
-			}
-			return nil, err
-		} else if node.Tag == "!!bool" {
-			boolValue, err := strconv.ParseBool(node.Value)
-			if err != nil {
-				return nil, err
-			}
-			return boolValue, nil
-		} else if node.Tag == "!!float" {
-			floatValue, err := strconv.ParseFloat(node.Value, 64)
-			if err != nil {
-				return nil, err
-			}
-			return floatValue, nil
-		}
-		return node.Value, nil
-	default:
-		return nil, fmt.Errorf("unsupported YAML node kind: %v", node.Kind)
-	}
-}
-
-func ParseJsonToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error) {
-	// FIXME
+func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error) {
 	var buf strings.Builder
 	enc := yaml.NewEncoder(&buf)
-	var node yaml.Node
 	enc.SetIndent(2)
 	err := enc.Encode(jsonData)
 	if err != nil {
@@ -357,40 +79,43 @@ func ParseJsonToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error)
 	}
 	yamlData := []byte(buf.String())
 
-	err = yaml.Unmarshal(yamlData, &node)
+	tmplFmt := NewTemplateFormatter(YamlAgentGroupConfigTemplate)
+	KeyToComment, err := tmplFmt.GenerateKeyToComment()
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal data to yaml node error: %v", err)
+		return nil, fmt.Errorf("generate key to comment error: %v", err)
+	}
+	tmplFmt.DataFomatter.fmtValAndRefresh(KeyToComment, true)
+
+	dataFmt := NewDataFommatter()
+	err = dataFmt.Init(yamlData)
+	if err != nil {
+		return nil, fmt.Errorf("new data formatter error: %v", err)
+	}
+	err = dataFmt.fmtValAndRefresh(KeyToComment, true)
+	if err != nil {
+		return nil, fmt.Errorf("convert value and refresh error: %v", err)
 	}
 
-	formatedTemplate, err := formatTemplateYAML(YamlAgentGroupConfigTemplate)
-	if err != nil {
+	if err := validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFomatter.yamlNode); err != nil {
 		return nil, err
 	}
 
-	var nodeTemplate yaml.Node
-	err = yaml.Unmarshal(formatedTemplate, &nodeTemplate)
+	err = dataFmt.fmtValAndRefresh(KeyToComment, false)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal template data to yaml node error: %v", err)
+		return nil, fmt.Errorf("convert value and refresh error: %v", err)
 	}
 
-	nodeTemplate.Content[0], err = convTypeDictValToString(nodeTemplate.Content[0])
+	buf.Reset()
+	err = enc.Encode(dataFmt.mapData)
 	if err != nil {
-		log.Infof("weiqiang convTypeDictValToString error: %v", err)
 		return nil, err
 	}
-
-	// Check if each item in node is included in nodeTemplate
-	if err = validateNodeAgainstTemplate(&node, &nodeTemplate); err != nil {
-		// if err = validateNodeAgainstTemplate(&node, &nodeTemplate); err != nil {
-		return nil, fmt.Errorf("validate config error: %v", err)
-	}
+	yamlData = []byte(buf.String())
 
 	return yamlData, nil
 }
 
 func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
-	fmt.Printf("----\nnode: %#v\n", node)
-	fmt.Printf("nodeTemplate: %#v\n", nodeTemplate)
 	if node.Kind != nodeTemplate.Kind {
 		return fmt.Errorf("node kind mismatch: expected %v, got %v", nodeTemplate.Kind, node.Kind)
 	}
@@ -454,4 +179,468 @@ func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
 	}
 
 	return nil
+}
+
+func ConvertTemplateYAMLToJSON(d DynamicOptions) ([]byte, error) {
+	return NewTemplateFormatter(YamlAgentGroupConfigTemplate).ConvertToJSON(d)
+}
+
+type KeyToComment map[string]map[string]interface{}
+
+type TemplateFormatter struct {
+	lineFmt *LineFomatter
+	DataFomatter
+}
+
+func NewTemplateFormatter(data []byte) *TemplateFormatter {
+	return &TemplateFormatter{
+		lineFmt: NewLineFommatter(data),
+	}
+}
+
+func (f *TemplateFormatter) ConvertToJSON(d DynamicOptions) ([]byte, error) {
+	formattedLines, err := f.lineFmt.Format()
+	if err != nil {
+		return nil, fmt.Errorf("format template yaml lines error: %v", err)
+	}
+
+	err = f.DataFomatter.Init(formattedLines)
+	if err != nil {
+		return nil, fmt.Errorf("init data formatter error: %v", err)
+	}
+	keyToComment := make(KeyToComment)
+	f.generateKeyComment(f.mapData, "", keyToComment)
+	err = f.DataFomatter.fmtValAndRefresh(keyToComment, true)
+	if err != nil {
+		return nil, fmt.Errorf("convert dict value to string error: %v", err)
+	}
+
+	formattedNode, err := f.fillingEnumOptions(f.DataFomatter.yamlNode, "", d)
+	if err != nil {
+		return nil, fmt.Errorf("filling enum options error: %v", err)
+	}
+	formattedMap, err := f.fillingOrder(formattedNode)
+	if err != nil {
+		return nil, fmt.Errorf("filling order error: %v", err)
+	}
+	return f.formatJson(formattedMap)
+}
+
+func (f *TemplateFormatter) fillingEnumOptions(node *yaml.Node, ancetors string, d DynamicOptions) (*yaml.Node, error) {
+	switch node.Kind {
+	case yaml.DocumentNode:
+		return f.fillingEnumOptions(node.Content[0], ancetors, d)
+	case yaml.MappingNode:
+		for i := 0; i < len(node.Content); i += 2 {
+			newAncetors := node.Content[i].Value
+			if ancetors != "" {
+				newAncetors = ancetors + "." + newAncetors
+			}
+			value, err := f.fillingEnumOptions(node.Content[i+1], newAncetors, d)
+			if err != nil {
+				return nil, err
+			}
+			node.Content[i+1] = value
+		}
+		return node, nil
+	case yaml.SequenceNode:
+		value := make([]*yaml.Node, 0)
+		if dynamicValue, ok := d[ancetors]; ok {
+			for _, contentNode := range node.Content {
+				if contentNode.Kind == yaml.MappingNode {
+					for i := 0; i < len(contentNode.Content); i += 2 {
+						key := contentNode.Content[i].Value
+						if key != "_DYNAMIC_OPTIONS_" {
+							value = append(value, contentNode)
+						}
+					}
+				}
+			}
+			value = append(value, dynamicValue.Content...)
+		} else {
+			for _, contentNode := range node.Content {
+				valueNode, err := f.fillingEnumOptions(contentNode, ancetors, d)
+				if err != nil {
+					return nil, err
+				}
+				value = append(value, valueNode)
+			}
+		}
+		node.Content = value
+		return node, nil
+	case yaml.ScalarNode:
+		return node, nil
+	default:
+		return nil, fmt.Errorf("unsupported YAML node kind: %v", node.Kind)
+	}
+}
+
+func (f *TemplateFormatter) fillingOrder(node *yaml.Node) (interface{}, error) {
+	switch node.Kind {
+	case yaml.DocumentNode:
+		return f.fillingOrder(node.Content[0])
+	case yaml.MappingNode:
+		values := make(map[string]interface{})
+		for i := 0; i < len(node.Content); i += 2 {
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+
+			key := keyNode.Value
+			value, err := f.fillingOrder(valueNode)
+			if err != nil {
+				return nil, err
+			}
+
+			if strings.HasSuffix(key, keyCommentSuffix) {
+				if valueMap, ok := value.(map[string]interface{}); ok {
+					valueMap["order"] = i/2 + 1
+					value = valueMap
+				}
+			}
+			values[key] = value
+		}
+		return values, nil
+	case yaml.SequenceNode:
+		var seq []interface{}
+		for i, contentNode := range node.Content {
+			value, err := f.fillingOrder(contentNode)
+			if err != nil {
+				return nil, err
+			}
+			if valueMap, ok := value.(map[string]interface{}); ok {
+				valueMap["order"] = i + 1
+				value = valueMap
+			}
+			seq = append(seq, value)
+		}
+		return seq, nil
+	case yaml.ScalarNode:
+		if node.Tag == "!!int" {
+			var err error
+			if intValue, err := strconv.Atoi(node.Value); err == nil {
+				return intValue, nil
+			}
+			if intValue, err := strconv.ParseInt(node.Value, 0, 64); err == nil {
+				return intValue, nil
+			}
+			return nil, err
+		} else if node.Tag == "!!bool" {
+			boolValue, err := strconv.ParseBool(node.Value)
+			if err != nil {
+				return nil, err
+			}
+			return boolValue, nil
+		} else if node.Tag == "!!float" {
+			floatValue, err := strconv.ParseFloat(node.Value, 64)
+			if err != nil {
+				return nil, err
+			}
+			return floatValue, nil
+		}
+		return node.Value, nil
+	default:
+		return nil, fmt.Errorf("unsupported YAML node kind: %v", node.Kind)
+	}
+}
+
+func (f *TemplateFormatter) GenerateKeyToComment() (KeyToComment, error) {
+	formattedLines, err := f.lineFmt.Format()
+	if err != nil {
+		return nil, fmt.Errorf("format template yaml lines error: %v", err)
+	}
+	err = f.DataFomatter.Init(formattedLines)
+	if err != nil {
+		return nil, fmt.Errorf("init data formatter error: %v", err)
+	}
+
+	keyToComment := make(KeyToComment)
+	f.generateKeyComment(f.mapData, "", keyToComment)
+	return keyToComment, nil
+}
+
+func (f *TemplateFormatter) generateKeyComment(data interface{}, ancestors string, result KeyToComment) {
+	switch data := data.(type) {
+	case map[string]interface{}:
+		for key, value := range data {
+			newAncestors := f.appendAncestor(ancestors, key)
+			if f.isKeyComment(key) {
+				result[newAncestors] = value.(map[string]interface{})
+			} else {
+				f.generateKeyComment(value, newAncestors, result)
+			}
+		}
+	default:
+		return
+	}
+}
+
+// LineFomatter 将 template.yaml 文件中的注释转换为 yaml section。
+// 文件中的多行注释每一行以 # 开头，是多行注释结束后数据字段 key 的说明：
+// 1. 添加与数据字段 key 同缩进的说明字段 key_comment。
+// 2. 将说明反注释后增加缩进，作为说明字段的值。
+//
+// 例如：
+//
+//	# type: section
+//	# name:
+//	#   en: Global
+//	#   ch: 全局配置
+//	# description:
+//	global:
+//
+// 其中，# type: section 及至 # description: 行是 section 的说明，global 是 section 的 key，转换后的 yaml 为：
+//
+//	global_comment:
+//	  type: section
+//	  name:
+//	    en: Global
+//	    ch: 全局配置
+//	  description:
+//	global:
+type LineFomatter struct {
+	lines []string
+}
+
+func NewLineFommatter(bytes []byte) *LineFomatter {
+	return &LineFomatter{
+		lines: strings.Split(string(bytes), "\n"),
+	}
+}
+
+func (f *LineFomatter) Format() ([]byte, error) {
+	strippedLines := make([]string, 0)
+	for i := 0; i < len(f.lines); i++ {
+		if f.isCommentLine(f.lines[i]) {
+			end, lines, err := f.convCommentToSection(i)
+			if err != nil {
+				return []byte{}, err
+			}
+			strippedLines = append(strippedLines, lines...)
+			i = end
+			continue
+		}
+		strippedLines = append(strippedLines, f.lines[i])
+	}
+	return []byte(strings.Join(strippedLines, "\n")), nil
+}
+
+func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []string, err error) {
+	i := start
+	for ; i < len(f.lines); i++ {
+		if !f.isCommentLine(f.lines[i]) {
+			break
+		}
+		if f.isSubelementCommentLine(f.lines[i]) {
+			i = f.ignoreSubelementComments(i)
+			continue
+		}
+		if f.isTodoCommentLine(f.lines[i]) {
+			i = f.ignoreTodoComments(i)
+			continue
+		}
+		commentlines = append(commentlines, f.indentLine(f.uncommentLine(f.lines[i])))
+	}
+
+	keyCommentLine, err := f.keyLineToKeyCommentLine(f.lines[i])
+	if err != nil {
+		return 0, nil, fmt.Errorf(err.Error()+" at line: %d", i)
+	}
+	return i - 1, append([]string{keyCommentLine}, commentlines...), nil
+}
+
+func (f *LineFomatter) indentLine(line string) string {
+	return templateIndent + line
+}
+
+func (f *LineFomatter) uncommentLine(line string) string {
+	line = strings.Replace(line, commentFlag+" ", "", 1)
+	if f.isCommentLine(line) {
+		line = strings.Replace(line, commentFlag, "", 1)
+	}
+	return line
+}
+
+func (f *LineFomatter) isCommentLine(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), commentFlag)
+}
+
+func (f *LineFomatter) isSubelementCommentLine(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), subelementCommentFlag)
+}
+
+func (f *LineFomatter) isTodoCommentLine(line string) bool {
+	return (f.isCommentLine(line) && strings.Contains(line, todoFlag))
+}
+
+func (f *LineFomatter) keyLineToKeyCommentLine(line string) (string, error) {
+	parts := strings.SplitN(line, ":", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("failed to split key line: %s by \":\"", line)
+	}
+	key := parts[0]
+	keyCommentLine := key + keyCommentSuffix + ":"
+	return keyCommentLine, nil
+}
+
+func (f *LineFomatter) ignoreSubelementComments(start int) (end int) {
+	j := start + 1
+	for ; j < len(f.lines); j++ {
+		if !f.isCommentLine(f.lines[j]) {
+			break
+		}
+	}
+	return j - 1
+}
+
+func (f *LineFomatter) ignoreTodoComments(start int) (end int) {
+	j := start + 1
+	for ; j < len(f.lines); j++ {
+		if !f.isTodoCommentLine(f.lines[j]) {
+			break
+		}
+	}
+	return j - 1
+}
+
+type DynamicOptions map[string]*yaml.Node
+
+type DataFomatter struct {
+	mapData  map[string]interface{}
+	yamlNode *yaml.Node
+}
+
+func NewDataFommatter() *DataFomatter {
+	return &DataFomatter{}
+}
+
+func (f *DataFomatter) Init(yamlData []byte) error {
+	var mapData map[string]interface{}
+	err := yaml.Unmarshal(yamlData, &mapData)
+	if err != nil {
+		return fmt.Errorf("unmarshal data to map error: %v", err)
+	}
+	var yamlNode yaml.Node
+	err = yaml.Unmarshal(yamlData, &yamlNode)
+	if err != nil {
+		return fmt.Errorf("unmarshal data to yaml node error: %v", err)
+	}
+	f.mapData = mapData
+	f.yamlNode = &yamlNode
+	return nil
+}
+
+func (f *DataFomatter) ConvertToJSON(keyToComment KeyToComment) ([]byte, error) {
+	err := f.fmtValAndRefresh(keyToComment, true)
+	if err != nil {
+		return nil, fmt.Errorf("convert value and refresh error: %v", err)
+	}
+	bytes, err := f.formatJson(f.mapData)
+	if err != nil {
+		return nil, fmt.Errorf("format json error: %v", err)
+	}
+	return bytes, nil
+}
+
+func (f *DataFomatter) fmtValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
+	var err error
+	if dictValToStr {
+		err = f.dictValueToString(f.mapData, "", keyToComment)
+	} else {
+		err = f.stringToDictValue(f.mapData, "", keyToComment)
+	}
+	if err != nil {
+		return fmt.Errorf("convert dict value to string error: %v", err)
+	}
+	// refresh yamlNode if changes dict value
+	if _, ok := keyToComment["changesDictValue"]; ok {
+		yamlBytes, err := yaml.Marshal(f.mapData)
+		if err != nil {
+			return fmt.Errorf("marshal map to yaml error: %v", err)
+		}
+		err = yaml.Unmarshal(yamlBytes, f.yamlNode)
+		if err != nil {
+			return fmt.Errorf("unmarshal yaml to node error: %v", err)
+		}
+	}
+	return nil
+}
+
+func (f *DataFomatter) dictValueToString(data interface{}, ancestors string, keyToComment KeyToComment) error {
+	switch data := data.(type) {
+	case map[string]interface{}:
+		for key, value := range data {
+			newAncestors := f.appendAncestor(ancestors, key)
+			if !f.isKeyComment(key) {
+				if f.isDictValue(keyToComment[newAncestors]) {
+					valueStr, err := f.dictToString(value)
+					if err != nil {
+						return fmt.Errorf("convert dict value to string error: %v, key: %s", err, newAncestors)
+					}
+					data[key] = valueStr
+					keyToComment["changesDictValue"] = make(map[string]interface{})
+				}
+				f.dictValueToString(value, newAncestors, keyToComment)
+			}
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (f *DataFomatter) stringToDictValue(data interface{}, ancestors string, keyToComment KeyToComment) error {
+	switch data := data.(type) {
+	case map[string]interface{}:
+		for key, value := range data {
+			newAncestors := f.appendAncestor(ancestors, key)
+			if !f.isKeyComment(key) {
+				if f.isDictValue(keyToComment[newAncestors]) {
+					fmt.Printf("string to dict value: %#v\n", value)
+					var valueMap map[string]interface{}
+					err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
+					if err != nil {
+						return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+					}
+					data[key] = valueMap[key]
+				}
+				f.stringToDictValue(value, newAncestors, keyToComment)
+			}
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (f *DataFomatter) formatJson(data interface{}) ([]byte, error) {
+	indenttedJson, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshal json error: %v", err)
+	}
+	jsonStr := strings.ReplaceAll(string(indenttedJson), ": null", ": []")
+	return []byte(jsonStr), nil
+}
+
+func (f *DataFomatter) dictToString(data interface{}) (string, error) {
+	bytes, err := yaml.Marshal(data)
+	return string(bytes), err
+}
+
+func (f *DataFomatter) isKeyComment(key string) bool {
+	return strings.HasSuffix(key, keyCommentSuffix)
+}
+
+func (f *DataFomatter) appendAncestor(ancestor, key string) string {
+	key = strings.TrimSuffix(key, keyCommentSuffix)
+	if ancestor == "" {
+		return key
+	}
+	return ancestor + "." + key
+}
+
+func (f *DataFomatter) isDictValue(comment map[string]interface{}) bool {
+	if _, ok := comment["type"]; ok {
+		return comment["type"] == "dict"
+	}
+	return false
 }

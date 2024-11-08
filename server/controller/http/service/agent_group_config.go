@@ -19,6 +19,7 @@ package service
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -165,7 +166,7 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 		"processors.request_log.filters.port_number_prefilters_comment.enum_options":                   l7ProtocolsNode.Content[0],
 		"processors.request_log.filters.tag_filters_comment.enum_options":                              l7ProtocolsNode.Content[0],
 	}
-	return agentconf.ParseYAMLToJson(agentconf.YamlAgentGroupConfigTemplate, dynamicOptions)
+	return agentconf.ConvertTemplateYAMLToJSON(dynamicOptions)
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfig(groupLcuuid string, dataType int) ([]byte, error) {
@@ -178,13 +179,17 @@ func (a *AgentGroupConfig) GetAgentGroupConfig(groupLcuuid string, dataType int)
 		return nil, err
 	}
 
-	if dataType == DataTypeJSON {
-		if data.Yaml == "" {
+	return a.strToBytes(data.Yaml, dataType)
+}
+
+func (a *AgentGroupConfig) strToBytes(data string, returnType int) ([]byte, error) {
+	if returnType == DataTypeJSON {
+		if data == "" {
 			return []byte("{}"), nil
 		}
-		return agentconf.ParseYAMLToJson([]byte(data.Yaml), nil)
+		return agentconf.ConvertYAMLToJSON([]byte(data))
 	} else {
-		return []byte(data.Yaml), nil
+		return []byte(data), nil
 	}
 }
 
@@ -203,14 +208,9 @@ func (a *AgentGroupConfig) GetAgentGroupConfigs() ([]byte, error) {
 		if i > 0 {
 			jsonArray.WriteByte(',')
 		}
-		var bs []byte
-		if d.Yaml == "" {
-			bs = []byte("{}")
-		} else {
-			bs, err = agentconf.ParseYAMLToJson([]byte(d.Yaml), nil)
-			if err != nil {
-				return nil, err
-			}
+		bs, err := a.strToBytes(d.Yaml, DataTypeJSON)
+		if err != nil {
+			return nil, err
 		}
 		jsonArray.WriteString(`"` + d.AgentGroupLcuuid + `":`)
 		jsonArray.Write(bs)
@@ -219,7 +219,20 @@ func (a *AgentGroupConfig) GetAgentGroupConfigs() ([]byte, error) {
 	return jsonArray.Bytes(), nil
 }
 
-func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data map[string]interface{}, dataType int) ([]byte, error) {
+func (a *AgentGroupConfig) getStringYaml(data interface{}, dataType int) (string, error) {
+	if dataType == DataTypeJSON {
+		bytes, err := agentconf.ConvertJSONToYAMLAndValidate(data.(map[string]interface{}))
+		return string(bytes), err
+	} else {
+		err := agentconf.ValidateYAML(data.([]byte))
+		if err != nil {
+			return "", fmt.Errorf("yaml validate failed: %v, please check the yaml format", err)
+		}
+		return string(data.([]byte)), nil
+	}
+}
+
+func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data interface{}, dataType int) ([]byte, error) {
 	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
@@ -229,15 +242,9 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data map[s
 		return nil, err
 	}
 
-	var strYaml string
-	if dataType == DataTypeJSON {
-		yamlData, err := agentconf.ParseJsonToYAMLAndValidate(data)
-		if err != nil {
-			return nil, err
-		}
-		strYaml = string(yamlData)
-	} else {
-		strYaml = data["data"].(string)
+	strYaml, err := a.getStringYaml(data, dataType)
+	if err != nil {
+		return nil, err
 	}
 
 	var agentGroupConfig agentconf.MySQLAgentGroupConfiguration
@@ -266,7 +273,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data map[s
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
 }
 
-func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data map[string]interface{}, dataType int) ([]byte, error) {
+func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data interface{}, dataType int) ([]byte, error) {
 	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
@@ -276,15 +283,9 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data map[s
 		return nil, err
 	}
 
-	var strYaml string
-	if dataType == DataTypeJSON {
-		yamlData, err := agentconf.ParseJsonToYAMLAndValidate(data)
-		if err != nil {
-			return nil, err
-		}
-		strYaml = string(yamlData)
-	} else {
-		strYaml = data["data"].(string)
+	strYaml, err := a.getStringYaml(data, dataType)
+	if err != nil {
+		return nil, err
 	}
 
 	var agentGroupConfig agentconf.MySQLAgentGroupConfiguration
