@@ -20,6 +20,8 @@
 #define EV_NAME_SIZE			1024
 
 #define BOOT_TIME_UPDATE_PERIOD		60	// 系统启动时间更新周期, 单位：秒
+#define IO_FILEPATH_BUFF_SIZE		1024 // Default value for file path length
+#define DENTRY_NAME_SIZE		256  // Maximum length of a directory entry name
 
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME         "__members_offset"

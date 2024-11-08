@@ -129,7 +129,7 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
 static int update_offsets_table(struct bpf_tracer *t,
-				struct bpf_offset_param *offset);
+				bpf_offset_param_t *offset);
 static void datadump_process(void *data, int64_t boot_time);
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int socket_num, int trace_num,
@@ -499,12 +499,12 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 				   struct bpf_offset_param_array *array)
 {
 	int nr_cpus = get_num_possible_cpus();
-	struct bpf_offset_param values[nr_cpus];
+	bpf_offset_param_t values[nr_cpus];
 	if (!bpf_table_get_value(tracer, MAP_MEMBERS_OFFSET_NAME, 0, values))
 		return false;
 
-	struct bpf_offset_param *out_val =
-	    (struct bpf_offset_param *)(array + 1);
+	bpf_offset_param_t *out_val =
+	    (bpf_offset_param_t *)(array + 1);
 
 	int i;
 	for (i = 0; i < array->count; i++)
@@ -521,7 +521,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		return -1;
 
 	*outsize = sizeof(struct bpf_socktrace_params) +
-	    sizeof(struct bpf_offset_param) * sys_cpus_count;
+	    sizeof(bpf_offset_param_t) * sys_cpus_count;
 
 	*out = calloc(1, *outsize);
 	if (*out == NULL) {
@@ -1342,7 +1342,7 @@ static void process_events_handle_main(__unused void *arg)
 static int update_offset_map_default(struct bpf_tracer *t,
 				     enum linux_kernel_type kern_type)
 {
-	struct bpf_offset_param offset;
+	bpf_offset_param_t offset;
 	memset(&offset, 0, sizeof(offset));
 
 	switch (kern_type) {
@@ -1375,6 +1375,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
+	offset.struct_dentry_d_parent_offset = 0x18;
 	offset.struct_dentry_name_offset = 0x28;
 	offset.struct_sock_family_offset = 0x10;
 	offset.struct_sock_saddr_offset = 0x4;
@@ -1390,6 +1391,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		ebpf_error("update_offset_map_default failed.\n");
 		return ETR_UPDATE_MAP_FAILD;
 	}
+
 	return ETR_OK;
 }
 
@@ -1458,6 +1460,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	}
 	int struct_dentry_name_offset =
 	    struct_dentry_name_offset_1 + struct_dentry_name_offset_2;
+	int struct_dentry_d_parent_offset =
+	    kernel_struct_field_offset(obj, "dentry", "d_parent");
 	int struct_sock_family_offset =
 	    kernel_struct_field_offset(obj, "sock_common", "skc_family");
 	int struct_sock_saddr_offset =
@@ -1487,7 +1491,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    struct_sock_ip6saddr_offset < 0 ||
 	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
 	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
-	    struct_sock_common_ipv6only_offset < 0) {
+	    struct_sock_common_ipv6only_offset < 0 ||
+	    struct_dentry_d_parent_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -1508,6 +1513,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_file_dentry_offset);
 	ebpf_info("    struct_dentry_name_offset: 0x%x\n",
 		  struct_dentry_name_offset);
+	ebpf_info("    struct_dentry_d_parent_offset: 0x%x\n",
+		  struct_dentry_d_parent_offset);
 	ebpf_info("    struct_sock_family_offset: 0x%x\n",
 		  struct_sock_family_offset);
 	ebpf_info("    struct_sock_saddr_offset: 0x%x\n",
@@ -1527,7 +1534,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	ebpf_info("    struct_sock_common_ipv6only_offset: 0x%x\n",
 		  struct_sock_common_ipv6only_offset);
 
-	struct bpf_offset_param offset;
+	bpf_offset_param_t offset;
 	offset.ready = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
@@ -1540,6 +1547,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
 	offset.struct_dentry_name_offset = struct_dentry_name_offset;
+	offset.struct_dentry_d_parent_offset = struct_dentry_d_parent_offset;
 	offset.struct_sock_family_offset = struct_sock_family_offset;
 	offset.struct_sock_saddr_offset = struct_sock_saddr_offset;
 	offset.struct_sock_daddr_offset = struct_sock_daddr_offset;
@@ -2512,10 +2520,10 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 
 // Update offsets tables for all cpus
 static int update_offsets_table(struct bpf_tracer *t,
-				struct bpf_offset_param *offset)
+				bpf_offset_param_t *offset)
 {
 	int nr_cpus = get_num_possible_cpus();
-	struct bpf_offset_param offs[nr_cpus];
+	bpf_offset_param_t offs[nr_cpus];
 	int i;
 	memset(&offs, 0, sizeof(offs));
 	for (i = 0; i < nr_cpus; i++) {
@@ -2534,7 +2542,7 @@ static bool is_adapt_success(struct bpf_tracer *t)
 	int i;
 
 	if (sys_cpus_count > 0) {
-		struct bpf_offset_param *offset;
+		bpf_offset_param_t *offset;
 		struct bpf_offset_param_array *array =
 		    malloc(sizeof(*array) + sizeof(*offset) * sys_cpus_count);
 		if (array == NULL) {
@@ -2549,7 +2557,7 @@ static bool is_adapt_success(struct bpf_tracer *t)
 			return false;
 		}
 
-		offset = (struct bpf_offset_param *)(array + 1);
+		offset = (bpf_offset_param_t *)(array + 1);
 		for (i = 0; i < sys_cpus_count; i++) {
 			if (!cpu_online[i])
 				continue;

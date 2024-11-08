@@ -273,7 +273,7 @@ static bool __inline check_socket_valid(struct socket_info_s *socket_info_ptr, i
 	if (is_socket_info_valid(socket_info_ptr)) {
 		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
 		void *check_socket;
-                bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
+    bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
 				      socket_info_ptr->sk + sk_off);
 		if (unlikely(check_socket != socket_info_ptr->socket)) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
@@ -1474,8 +1474,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->
-							      peer_fd);
+							      socket_info_ptr->peer_fd);
 			/*
 			 * Query the socket information of the NGINX frontend and modify the
 			 * traceID of the data returned by the frontend.
@@ -1700,8 +1699,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			    conn_info->socket_info_ptr->port;
 			args->port = conn_info->tuple.dport;
 			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->
-					      socket_info_ptr->ipaddr);
+					      conn_info->socket_info_ptr->
+					      ipaddr);
 		}
 	}
 
@@ -3147,15 +3146,53 @@ static __inline bool is_regular_file(int fd,
 	return S_ISREG(i_mode);
 }
 
-static __inline char *fd_to_name(int fd, struct member_fields_offset *off_ptr)
+static __inline void *get_dentry_parent(void *curr,
+					struct member_fields_offset *offset)
 {
+	void *dentry = NULL;
+	bpf_probe_read_kernel(&dentry, sizeof(dentry),
+			      curr + offset->struct_dentry_d_parent_offset);
+	return dentry;
+}
+
+static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
+					   int fd,
+					   struct member_fields_offset *off_ptr)
+{
+#define MAX_DIRECTORY_DEPTH 20
+
 	struct member_fields_offset *offset = off_ptr;
 	if (offset == NULL) {
 		__u32 k0 = 0;
 		offset = members_offset__lookup(&k0);
 	}
+
 	void *file = fd_to_file(fd, offset);
-	return file_to_name(file, offset);
+	if (file == NULL)
+		return;
+
+	void *dentry = NULL, *parent;
+	bpf_probe_read_kernel(&dentry, sizeof(dentry),
+			      file + offset->struct_file_dentry_offset);
+	buffer->len = 0;
+#pragma unroll
+	for (int i = 0; i < MAX_DIRECTORY_DEPTH; i++) {
+		char *name = NULL;
+		bpf_probe_read_kernel(&name, sizeof(name),
+				      dentry +
+				      offset->struct_dentry_name_offset);
+		//struct __dentry_name *d_n =
+		//    (struct __dentry_name *)(buffer->filename + buffer->len);
+		//if (buffer->len + sizeof(d_n->name) > sizeof(buffer->filename))
+		//	break;
+		//buffer->len +=
+		//    (bpf_probe_read_kernel_str(d_n, sizeof(d_n->name), name) -
+		//     1);
+		//parent = get_dentry_parent(dentry, off_ptr);
+		//if (parent == dentry)
+		//	break;
+		//dentry = parent;
+	}
 }
 
 static __inline int trace_io_event_common(void *ctx,
@@ -3204,8 +3241,6 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
-	char *name = fd_to_name(data_args->fd, offset);
-
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
 	if (!buffer) {
 		return -1;
@@ -3214,9 +3249,7 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-	bpf_probe_read_kernel_str(buffer->filename, sizeof(buffer->filename),
-				  name);
-	buffer->filename[sizeof(buffer->filename) - 1] = '\0';
+	set_file_path_from_fd(buffer, data_args->fd, offset);
 
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
