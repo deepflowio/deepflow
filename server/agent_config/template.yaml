@@ -2651,7 +2651,7 @@ inputs:
         #     默认设置为“false”，将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
         #     设置为“true”将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
         # upgrade_from: static_config.ebpf.dwarf-disabled
-        dwarf_disabled: false
+        dwarf_disabled: true
         # type: string
         # name:
         #   en: DWARF unwinding process matching regular expression

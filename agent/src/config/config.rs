@@ -1032,13 +1032,24 @@ impl Default for EbpfProfilePreprocess {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Unwinding {
     pub dwarf_disabled: bool,
     pub dwarf_regex: String,
     pub dwarf_process_map_size: u32,
     pub dwarf_shard_map_size: u32,
+}
+
+impl Default for Unwinding {
+    fn default() -> Self {
+        Self {
+            dwarf_disabled: true,
+            dwarf_regex: Default::default(),
+            dwarf_process_map_size: 1024,
+            dwarf_shard_map_size: 128,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -1244,7 +1255,7 @@ impl Default for Kubernetes {
                 },
             ],
             api_list_page_size: 1000,
-            api_list_max_interval: Duration::from_millis(10),
+            api_list_max_interval: Duration::from_secs(600),
             ingress_flavour: "kubernetes".to_string(),
             pod_mac_collection_method: KubernetesPollerType::Adaptive,
         }
@@ -1388,7 +1399,7 @@ pub struct Policy {
 impl Default for Policy {
     fn default() -> Self {
         Self {
-            fast_path_map_size: 16384,
+            fast_path_map_size: 0,
             fast_path_disabled: false,
             forward_table_capacity: 16384,
             max_first_path_level: 8,
@@ -1532,26 +1543,11 @@ impl Default for ApplicationProtocolInference {
             enabled_protocols: vec![
                 "HTTP".to_string(),
                 "HTTP2".to_string(),
-                "Dubbo".to_string(),
-                "SofaRPC".to_string(),
-                "FastCGI".to_string(),
-                "bRPC".to_string(),
                 "MySQL".to_string(),
-                "PostgreSQL".to_string(),
-                "Oracle".to_string(),
                 "Redis".to_string(),
-                "MongoDB".to_string(),
-                "Memcached".to_string(),
                 "Kafka".to_string(),
-                "MQTT".to_string(),
-                "AMQP".to_string(),
-                "OpenWire".to_string(),
-                "NATS".to_string(),
-                "Pulsar".to_string(),
-                "ZMTP".to_string(),
                 "DNS".to_string(),
                 "TLS".to_string(),
-                "Custom".to_string(),
             ],
             protocol_special_config: ProtocolSpecialConfig::default(),
         }
@@ -1566,12 +1562,72 @@ pub struct TagFilterOperator {
     pub value: String,
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Filters {
     pub port_number_prefilters: HashMap<String, String>,
     pub tag_filters: HashMap<String, Vec<TagFilterOperator>>,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            port_number_prefilters: HashMap::from([
+                ("HTTP".to_string(), "1-65535".to_string()),
+                ("HTTP2".to_string(), "1-65535".to_string()),
+                ("Dubbo".to_string(), "1-65535".to_string()),
+                ("SofaRPC".to_string(), "1-65535".to_string()),
+                ("FastCGI".to_string(), "1-65535".to_string()),
+                ("bRPC".to_string(), "1-65535".to_string()),
+                ("Tars".to_string(), "1-65535".to_string()),
+                ("SomeIP".to_string(), "1-65535".to_string()),
+                ("MySQL".to_string(), "1-65535".to_string()),
+                ("PostgreSQL".to_string(), "1-65535".to_string()),
+                ("Oracle".to_string(), "1521".to_string()),
+                ("Redis".to_string(), "1-65535".to_string()),
+                ("MongoDB".to_string(), "1-65535".to_string()),
+                ("Memcached".to_string(), "11211".to_string()),
+                ("Kafka".to_string(), "1-65535".to_string()),
+                ("MQTT".to_string(), "1-65535".to_string()),
+                ("AMQP".to_string(), "1-65535".to_string()),
+                ("OpenWire".to_string(), "1-65535".to_string()),
+                ("NATS".to_string(), "1-65535".to_string()),
+                ("Pulsar".to_string(), "1-65535".to_string()),
+                ("ZMTP".to_string(), "1-65535".to_string()),
+                ("DNS".to_string(), "53,5353".to_string()),
+                ("TLS".to_string(), "443,6443".to_string()),
+                ("Custom".to_string(), "1-65535".to_string()),
+            ]),
+            tag_filters: HashMap::from([
+                ("HTTP".to_string(), vec![]),
+                ("HTTP2".to_string(), vec![]),
+                ("Dubbo".to_string(), vec![]),
+                ("gRPC".to_string(), vec![]),
+                ("SOFARPC".to_string(), vec![]),
+                ("FastCGI".to_string(), vec![]),
+                ("bRPC".to_string(), vec![]),
+                ("Tars".to_string(), vec![]),
+                ("SomeIP".to_string(), vec![]),
+                ("MySQL".to_string(), vec![]),
+                ("PostgreSQL".to_string(), vec![]),
+                ("Oracle".to_string(), vec![]),
+                ("Redis".to_string(), vec![]),
+                ("MongoDB".to_string(), vec![]),
+                ("Memcached".to_string(), vec![]),
+                ("Kafka".to_string(), vec![]),
+                ("MQTT".to_string(), vec![]),
+                ("AMQP".to_string(), vec![]),
+                ("OpenWire".to_string(), vec![]),
+                ("NATS".to_string(), vec![]),
+                ("Pulsar".to_string(), vec![]),
+                ("ZMTP".to_string(), vec![]),
+                ("DNS".to_string(), vec![]),
+                ("TLS".to_string(), vec![]),
+            ]),
+            unconcerned_dns_nxdomain_response_suffixes: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -1667,7 +1723,10 @@ impl Default for RequestLogTagExtraction {
         Self {
             tracing_tag: TracingTag::default(),
             http_endpoint: HttpEndpoint::default(),
-            custom_fields: HashMap::new(),
+            custom_fields: HashMap::from([
+                ("HTTP".to_string(), vec![]),
+                ("HTTP2".to_string(), vec![]),
+            ]),
             obfuscate_protocols: vec!["Redis".to_string()],
         }
     }
@@ -2009,7 +2068,7 @@ impl Default for Communication {
         Self {
             proactive_request_interval: Duration::from_secs(60),
             max_escape_duration: Duration::from_secs(3600),
-            proxy_controller_ip: "".to_string(),
+            proxy_controller_ip: "127.0.0.1".to_string(),
             proxy_controller_port: 30035,
             ingester_ip: "".to_string(),
             ingester_port: 30033,
@@ -2032,7 +2091,7 @@ impl Default for Log {
     fn default() -> Self {
         Self {
             log_level: log::Level::Info,
-            log_file: "/var/log/deepflow_agent/deepflow_agent.log".to_string(),
+            log_file: "/var/log/deepflow-agent/deepflow-agent.log".to_string(),
             log_backhaul_enabled: true,
         }
     }
@@ -2098,7 +2157,7 @@ impl Default for StandaloneMode {
     fn default() -> Self {
         Self {
             max_data_file_size: 200 << 20,
-            data_file_dir: "/var/log/deepflow_agent/".to_string(),
+            data_file_dir: "/var/log/deepflow-agent/".to_string(),
         }
     }
 }
@@ -2377,7 +2436,7 @@ pub struct Dev {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default = "UserConfig::standalone_default")]
+#[serde(default)]
 pub struct UserConfig {
     pub global: Global,
     pub inputs: Inputs,
@@ -5140,12 +5199,12 @@ mod tests {
     fn parse_log_level() {
         let yaml = r#"
 log_level: Info
-log_file: "/var/log/deepflow_agent/test.log"
+log_file: "/var/log/deepflow-agent/test.log"
 log_backhaul_enabled: true
 "#;
         let log: Log = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(log.log_level, log::Level::Info);
-        assert_eq!(log.log_file, "/var/log/deepflow_agent/test.log");
+        assert_eq!(log.log_file, "/var/log/deepflow-agent/test.log");
         assert!(log.log_backhaul_enabled);
 
         let yaml_with_warn = r#"
@@ -5166,6 +5225,17 @@ log_backhaul_enabled: false
 
         let _: UserConfig = serde_yaml::from_str(&yaml_content)
             .expect("Failed to parse template.yaml to UserConfig");
+    }
+
+    #[test]
+    fn check_defaults() {
+        let template_path = "../server/agent_config/template.yaml";
+        let yaml_content = fs::read_to_string(template_path).expect("Failed to read template.yaml");
+
+        let parsed_config: UserConfig = serde_yaml::from_str(&yaml_content)
+            .expect("Failed to parse template.yaml to UserConfig");
+
+        assert_eq!(parsed_config, UserConfig::default());
     }
 
     #[test]
