@@ -42,11 +42,11 @@ func ExecuteIssues(dc *DBConfig, curVersion string, schemaDir string) error {
 	nextVersions := getAscSortedNextVersions(issus, curVersion)
 	log.Info(LogDBName(dc.Config.Database, "%s issues to be executed: %v", schemaDir, nextVersions))
 	for _, nv := range nextVersions {
-		err = executeIssue(dc, nv, schemaDir)
+		err = executeScript(dc, nv)
 		if err != nil {
 			return err
 		}
-		err = executeScript(dc, nv)
+		err = executeIssue(dc, nv, schemaDir)
 		if err != nil {
 			return err
 		}
@@ -82,6 +82,8 @@ func executeScript(dc *DBConfig, nextVersion string) error { // TODO ce
 		err = script.ScriptUpdateCloudTags(dc.DB)
 	case script.SCRIPT_UPDATE_VM_PODNS_TAG:
 		err = script.ScriptUpdateVMPodNSTags(dc.DB)
+	case script.SCRIPT_UPGRADE_VTAP_GROUP_CONFIG:
+		err = script.UpgradeVTapAgentConfig(dc.DB)
 	}
 	return err
 }

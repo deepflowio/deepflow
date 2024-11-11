@@ -358,20 +358,20 @@ func (f *TemplateFormatter) GenerateKeyToComment() (KeyToComment, error) {
 	return keyToComment, nil
 }
 
-func (f *TemplateFormatter) generateKeyComment(data interface{}, ancestors string, result KeyToComment) {
+func (f *TemplateFormatter) generateKeyComment(data interface{}, ancestors string, result KeyToComment) interface{} {
 	switch data := data.(type) {
 	case map[string]interface{}:
 		for key, value := range data {
 			newAncestors := f.appendAncestor(ancestors, key)
 			if f.isKeyComment(key) {
-				result[newAncestors] = value.(map[string]interface{})
-			} else {
-				f.generateKeyComment(value, newAncestors, result)
+				result[newAncestors] = f.generateKeyComment(value, newAncestors, result).(map[string]interface{})
 			}
+			f.generateKeyComment(value, newAncestors, result)
 		}
 	default:
-		return
+		return data
 	}
+	return data
 }
 
 // LineFomatter 将 template.yaml 文件中的注释转换为 yaml section。
@@ -430,15 +430,15 @@ func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []
 		if !f.isCommentLine(f.lines[i]) {
 			break
 		}
-		if f.isSubelementCommentLine(f.lines[i]) {
-			i = f.ignoreSubelementComments(i)
-			continue
-		}
 		if f.isTodoCommentLine(f.lines[i]) {
 			i = f.ignoreTodoComments(i)
 			continue
 		}
-		commentlines = append(commentlines, f.indentLine(f.uncommentLine(f.lines[i])))
+		if f.isSubelementCommentLine(f.lines[i]) {
+			i = f.ignoreSubelementComments(i)
+			continue
+		}
+		commentlines = append(commentlines, f.indentLine(f.uncommentLine(f.lines[i]), 1))
 	}
 
 	keyCommentLine, err := f.keyLineToKeyCommentLine(f.lines[i])
@@ -448,8 +448,11 @@ func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []
 	return i - 1, append([]string{keyCommentLine}, commentlines...), nil
 }
 
-func (f *LineFomatter) indentLine(line string) string {
-	return templateIndent + line
+func (f *LineFomatter) indentLine(line string, indentCount int) string {
+	for i := 0; i < indentCount; i++ {
+		line = templateIndent + line
+	}
+	return line
 }
 
 func (f *LineFomatter) uncommentLine(line string) string {
@@ -482,6 +485,7 @@ func (f *LineFomatter) keyLineToKeyCommentLine(line string) (string, error) {
 	return keyCommentLine, nil
 }
 
+// TODO remove
 func (f *LineFomatter) ignoreSubelementComments(start int) (end int) {
 	j := start + 1
 	for ; j < len(f.lines); j++ {
@@ -490,6 +494,40 @@ func (f *LineFomatter) ignoreSubelementComments(start int) (end int) {
 		}
 	}
 	return j - 1
+}
+
+func (f *LineFomatter) convSubelementCommentToSection(start int, result []string) (end int, lines []string, err error) {
+	i := start
+	subeleCommentFlagLineNum := i
+	subeleCommentLines := make([]string, 0)
+	var subeleLineNum int
+	for ; i < len(f.lines); i++ {
+		if !f.isCommentLine(f.lines[i]) {
+			return i - 1, result, nil
+		}
+		if f.isSubelementCommentLine(f.lines[i]) {
+			if i == subeleCommentFlagLineNum {
+				continue
+			} else {
+				subeleLineNum = i + 1
+				break
+			}
+		}
+		if f.isTodoCommentLine(f.lines[i]) {
+			i = f.ignoreTodoComments(i)
+			continue
+		}
+		subeleCommentLines = append(subeleCommentLines, f.indentLine(f.uncommentLine(f.lines[i]), 2))
+	}
+
+	subeleKeyCommentLine, err := f.keyLineToKeyCommentLine(f.indentLine(f.uncommentLine(f.lines[subeleLineNum]), 1))
+	if err != nil {
+		return 0, nil, fmt.Errorf(err.Error()+" at line: %d", i)
+	}
+	subeleCommentSection := append([]string{subeleKeyCommentLine}, subeleCommentLines...)
+
+	result = append(result, subeleCommentSection...)
+	return f.convSubelementCommentToSection(subeleLineNum+1, result)
 }
 
 func (f *LineFomatter) ignoreTodoComments(start int) (end int) {
