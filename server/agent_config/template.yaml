@@ -1118,7 +1118,7 @@ inputs:
     # description:
     #   en: |-
     #     The type of matcher.
-    # upgrade_from: static_config.os-proc-regex.match-regex
+    # upgrade_from: static_config.os-proc-regex.match-type
     # ---
     # match_type: ""
     # ---
@@ -2006,6 +2006,7 @@ inputs:
       #     TODO
       #   ch: |-
       #     开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
+      # upgrade_from: static_config.packet-segmentation-reassembly
       packet_segmentation_reassembly: []
 
     # type: section

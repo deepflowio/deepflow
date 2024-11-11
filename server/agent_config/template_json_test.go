@@ -63,6 +63,86 @@ global:
 	}
 }
 
+func TestConvSubelementCommentToSection(t *testing.T) {
+	type args struct {
+		yamlData []byte
+		start    int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 4,
+			},
+			want: []string{
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+			},
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 4,
+			},
+			want: []string{
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+				"        rewrite_name_comment:",
+				"          type: string",
+				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter(tt.args.yamlData)
+			got := make([]string, 0)
+			_, got, err := parser.convSubelementCommentToSection(tt.args.start, got)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convSubelementCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := 0; i < len(got); i++ {
+				if got[i] != tt.want[i] {
+					t.Errorf("line %d convSubelementCommentToSection() = \"%v\", want \"%v\"", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestIgnoreTodoComments(t *testing.T) {
 	type args struct {
 		yamlData []byte
@@ -149,6 +229,37 @@ global:
 			want: []string{
 				"  limits_comment:",
 				"    type: section",
+			},
+			wantErr: false,
+		},
+		{
+			name: "case03",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 3,
+			},
+			want: []string{
+				"      process_matcher_comment:",
+				"        type: dict",
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+				"        rewrite_name_comment:",
+				"          type: string",
+				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
 			},
 			wantErr: false,
 		},
@@ -452,6 +563,45 @@ inputs:
 				},
 				"inputs.proc.proc_dir_path": map[string]interface{}{
 					"type": "string",
+				},
+			},
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+			},
+			want: map[string]interface{}{
+				"inputs.proc.tag_extraction.process_matcher": map[string]interface{}{
+					"type": "dict",
+					"match_regex_comment": map[string]interface{}{
+						"upgrade_from": "static_config.os-proc-regex.match-regex",
+					},
+					"rewrite_name_comment": map[string]interface{}{
+						"type":         "string",
+						"upgrade_from": "static_config.os-proc-regex.rewrite-name",
+					},
+				},
+				"inputs.proc.tag_extraction.process_matcher.match_regex": map[string]interface{}{
+					"upgrade_from": "static_config.os-proc-regex.match-regex",
+				},
+				"inputs.proc.tag_extraction.process_matcher.rewrite_name": map[string]interface{}{
+					"type":         "string",
+					"upgrade_from": "static_config.os-proc-regex.rewrite-name",
 				},
 			},
 		},
