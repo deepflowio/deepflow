@@ -129,6 +129,8 @@ var unsummableMaxFieldsMap = map[string]struct{}{
 	"art_max":        {},
 	"rrt_max":        {},
 	"cit_max":        {},
+
+	"direction_score": {},
 }
 
 // 对于unsumable的sum列使用max,min聚合时, count列取相应的max,min列的值
@@ -405,13 +407,11 @@ func MakeMVTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsumma
 	return fmt.Sprintf(`CREATE MATERIALIZED VIEW IF NOT EXISTS %s TO %s
 			AS SELECT %s
 	                FROM %s
-			GROUP BY %s
-			ORDER BY (%s)`,
+			GROUP BY %s`,
 		tableMv, tableAgg,
 		strings.Join(columns, ",\n"),
 		tableBase,
-		strings.Join(groupKeys, ","),
-		strings.Join(t.OrderKeys, ","))
+		strings.Join(groupKeys, ","))
 }
 
 func MakeCreateTableLocal(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsummable string) string {

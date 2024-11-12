@@ -56,6 +56,32 @@ func (a AggregationInterval) String() string {
 	}
 }
 
+func (a AggregationInterval) BaseTable() string {
+	switch a {
+	case AggregationMinute:
+		return "1s_local"
+	case AggregationHour:
+		return "1m_local"
+	case AggregationDay:
+		return "1h_agg"
+	default:
+		return "unkunown aggregation base table"
+	}
+}
+
+func (a AggregationInterval) ByconityBaseTable() string {
+	switch a {
+	case AggregationMinute:
+		return "1s"
+	case AggregationHour:
+		return "1m"
+	case AggregationDay:
+		return "1h_agg"
+	default:
+		return "unkunown aggregation byconity base table"
+	}
+}
+
 func (a AggregationInterval) PartitionBy() TimeFuncType {
 	switch a {
 	case AggregationMinute:
@@ -80,10 +106,6 @@ func (a AggregationInterval) Aggregation() TimeFuncType {
 	default:
 		return TimeFuncHour
 	}
-}
-
-func (a AggregationInterval) AggregationPrevious() AggregationInterval {
-	return a - 1
 }
 
 func IsDefaultOrgID(orgID uint16) bool {
@@ -416,10 +438,10 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
 	tableMv := fmt.Sprintf("%s.`%s.%s_mv`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
 	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
-	tableBase := fmt.Sprintf("%s.`%s.1m_local`", t.OrgDatabase(orgID), t.tablePrefix())
+	tableBase := fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.BaseTable())
 
 	if t.DBType == CKDBTypeByconity {
-		tableBase = fmt.Sprintf("%s.`%s.1m`", t.OrgDatabase(orgID), t.tablePrefix())
+		tableBase = fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.ByconityBaseTable())
 	}
 
 	groupKeys := t.OrderKeys
@@ -438,20 +460,22 @@ func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationI
 				groupKeys = append(groupKeys, c.Name)
 			}
 		} else {
-			columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", getAggr(c), c.Name, c.Name))
+			if strings.Contains(tableBase, "_agg") {
+				columns = append(columns, fmt.Sprintf("%sMergeState(%s__agg) AS %s__agg", getAggr(c), c.Name, c.Name))
+			} else {
+				columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", getAggr(c), c.Name, c.Name))
+			}
 		}
 	}
 
 	return fmt.Sprintf(`CREATE MATERIALIZED VIEW IF NOT EXISTS %s TO %s
 			AS SELECT %s
 	                FROM %s
-			GROUP BY (%s)
-			ORDER BY (%s)`,
+			GROUP BY %s`,
 		tableMv, tableAgg,
 		strings.Join(columns, ",\n"),
 		tableBase,
-		strings.Join(groupKeys, ","),
-		strings.Join(t.OrderKeys, ","))
+		strings.Join(groupKeys, ","))
 }
 
 func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
