@@ -33,6 +33,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/xwb1989/sqlparser"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -667,6 +668,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		return nil, fmt.Errorf("metricsIndex(%d), timeIndex(%d) get failed", columnIndexes[METRICS_INDEX], columnIndexes[TIME_INDEX])
 	}
 	metricsType := result.Schemas[columnIndexes[METRICS_INDEX]].ValueType
+	allowParseType := []string{"Int", "Float64", "UInt64"}
 
 	// append other deepflow native tag into results
 	allDeepFlowNativeTags := make([]int, 0, otherTagCount)
@@ -885,7 +887,8 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			continue
 		}
 
-		if metricsType != "Int" && metricsType != "Float64" && metricsType != "UInt64" {
+		nestedType := findNestedType(metricsType)
+		if !slices.Contains(allowParseType, nestedType) {
 			return nil, fmt.Errorf("unknown metrics type %s, value = %v ", metricsType, values[columnIndexes[METRICS_INDEX]])
 		}
 
@@ -963,18 +966,43 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	return resp, nil
 }
 
-func convertTo[T int | float64 | uint64](val interface{}) (v T, b bool) {
-	v, b = val.(T)
+// NOTE: metrics only support int/float64/uint64 datatype
+func convertTo[T int | float64 | uint64](val interface{}) (r T, b bool) {
+	// database type maybe nullable, should get nested value
+	switch v := val.(type) {
+	case *int:
+		if v == nil {
+			return
+		}
+		val = *v
+	case *float64:
+		if v == nil {
+			return
+		}
+		val = *v
+	case *uint64:
+		if v == nil {
+			return
+		}
+		val = *v
+	}
+	r, b = val.(T)
 	return
 }
 
 func parseValue(valueType string, val interface{}) (v float64, b bool) {
-	switch valueType {
+	// in v6.6, directly use db type instead of parsed type
+	// so val maybe nil in some cases
+	if val == nil {
+		return 0, true
+	}
+	// NOTE: don't use reflect/type assert here for performance issue
+	nestedType := findNestedType(valueType)
+	switch nestedType {
 	case "Int":
 		metricsValueInt, ok := convertTo[int](val)
 		return float64(metricsValueInt), ok
 	case "Float64":
-		// metricsType == "Float64" but typeof(values[metricsIndex]) is `int` ?? for robustness add type assert
 		metricsValueFloat, ok := convertTo[float64](val)
 		if !ok {
 			metricsValueInt, ok := convertTo[int](val)
@@ -1461,6 +1489,16 @@ func parseOperator(op string) prompb.LabelMatcher_Type {
 	default:
 		return prompb.LabelMatcher_EQ
 	}
+}
+
+// extrace inner nested type from Nullable(*)
+func findNestedType(dbType string) string {
+	if dbType == "" || !strings.Contains(dbType, "(") {
+		return dbType
+	}
+	leftParen := strings.Index(dbType, "(")
+	rightParen := strings.Index(dbType, ")")
+	return dbType[leftParen+1 : rightParen]
 }
 
 func parseExtraFiltersToMatchers(filters string) ([][]*prompb.LabelMatcher, error) {
