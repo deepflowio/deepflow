@@ -202,8 +202,8 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
     }
 
-    int process_map_fd = bpf_table_fd(tracer, MAP_PROCESS_SHARD_LIST_NAME);
-    int shard_map_fd = bpf_table_fd(tracer, MAP_UNWIND_ENTRY_SHARD_NAME);
+    int process_map_fd = bpf_table_get_fd(tracer, MAP_PROCESS_SHARD_LIST_NAME);
+    int shard_map_fd = bpf_table_get_fd(tracer, MAP_UNWIND_ENTRY_SHARD_NAME);
     if (process_map_fd < 0) {
         ebpf_warning("create unwind table failed: map %s not found", MAP_PROCESS_SHARD_LIST_NAME);
         return -1;
@@ -218,8 +218,8 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_unwind_table = table;
     pthread_mutex_unlock(&g_unwind_table_lock);
 
-    int unwind_info_map_fd = bpf_table_fd(tracer, MAP_PYTHON_UNWIND_INFO_NAME);
-    int offsets_map_fd = bpf_table_fd(tracer, MAP_PYTHON_OFFSETS_NAME);
+    int unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_UNWIND_INFO_NAME);
+    int offsets_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_OFFSETS_NAME);
     if (unwind_info_map_fd < 0 || offsets_map_fd < 0) {
         ebpf_warning("Failed to get unwind info map fd or offsets map fd\n");
         return -1;

@@ -143,7 +143,7 @@ void insert_prog_to_map(struct bpf_tracer *tracer, const char *map_name,
 		  map_name, key, prog_name);
 }
 
-int bpf_table_fd(struct bpf_tracer *tracer, const char *tb_name)
+int bpf_table_get_fd(struct bpf_tracer *tracer, const char *tb_name)
 {
 	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
 	if (map == NULL) {

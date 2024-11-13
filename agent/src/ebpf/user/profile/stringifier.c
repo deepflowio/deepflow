@@ -757,7 +757,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		len += strlen(uprobe_str) + 1;
 	}
 
-	if (v->intpstack >= 0) {
+	if (v->intpstack != 0) {
 		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid, custom_stack_map_name, h, new_cache, info_p, v->timestamp, ignore_libs, true);
 		if (i_trace_str != NULL) {
 			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
