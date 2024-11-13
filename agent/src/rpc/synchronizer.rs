@@ -19,7 +19,9 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::net::IpAddr;
-use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::{

@@ -735,16 +735,34 @@ impl Default for AfPacket {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Dpdk {
-    pub enabled: bool,
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+pub enum DpdkSource {
+    #[default]
+    None,
+    Ebpf,
+    PDump,
 }
 
-impl Default for Dpdk {
-    fn default() -> Self {
-        Self { enabled: false }
+fn to_dpdk_source<'de, D>(deserializer: D) -> Result<DpdkSource, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.to_uppercase().as_str() {
+        "NONE" => Ok(DpdkSource::None),
+        "EBPF" => Ok(DpdkSource::Ebpf),
+        "PDUMP" => Ok(DpdkSource::PDump),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"None|eBPF|pDump",
+        )),
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Dpdk {
+    #[serde(deserialize_with = "to_dpdk_source")]
+    pub source: DpdkSource,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -896,11 +914,19 @@ impl Default for EbpfSocketUprobeGolang {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+pub struct EbpfSocketUprobeDpdk {
+    pub command: String,
+    pub rx_hooks: String,
+    pub tx_hooks: String,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketUprobe {
     pub golang: EbpfSocketUprobeGolang,
     pub tls: EbpfSocketUprobeTls,
+    pub dpdk: EbpfSocketUprobeDpdk,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -2744,7 +2770,11 @@ impl From<&RuntimeConfig> for UserConfig {
                     },
                     special_network: SpecialNetwork {
                         dpdk: Dpdk {
-                            enabled: rc.yaml_config.dpdk_enabled,
+                            source: if rc.yaml_config.dpdk_enabled {
+                                DpdkSource::PDump
+                            } else {
+                                DpdkSource::None
+                            },
                         },
                         libpcap: Libpcap {
                             enabled: rc.yaml_config.libpcap_enabled,
@@ -2800,6 +2830,7 @@ impl From<&RuntimeConfig> for UserConfig {
                             tls: EbpfSocketUprobeTls {
                                 enabled: rc.yaml_config.ebpf.uprobe_openssl_trace_enabled,
                             },
+                            dpdk: EbpfSocketUprobeDpdk::default(),
                         },
                         kprobe: EbpfSocketKprobe {
                             blacklist: EbpfSocketKprobePorts {
