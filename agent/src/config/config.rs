@@ -5276,7 +5276,7 @@ header_fields_flag: "invalid"
     }
 
     #[test]
-    fn parse_process_matcher() {
+    fn parse_proc_config() {
         let yaml = r#"
 process_matcher:
 - match_regex: python[2|3].* (.*)\.py
@@ -5288,7 +5288,15 @@ process_matcher:
   ignore: false
   enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
 "#;
-
         let _proc: Proc = serde_yaml::from_str(yaml).unwrap();
+
+        let default_matcher_yaml = r#"
+enabled: true
+"#;
+        let proc: Proc = serde_yaml::from_str(default_matcher_yaml).unwrap();
+        assert_eq!(
+            proc.process_matcher.get(0),
+            Some(&ProcessMatcher::default())
+        );
     }
 }
