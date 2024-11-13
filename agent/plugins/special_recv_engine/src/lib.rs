@@ -17,11 +17,13 @@
 //! Enterprise Edition Feature: windows-dispatcher
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use public::counter;
 use public::debug::QueueDebugger;
 use public::error::Result;
 use public::packet;
+use public::queue::Receiver;
 
 #[derive(Default)]
 pub struct LibpcapCounter;
@@ -76,6 +78,22 @@ impl VhostUser {
     }
 
     pub unsafe fn read(&mut self) -> Result<packet::Packet> {
+        unimplemented!();
+    }
+
+    pub fn get_counter_handle(&self) -> Arc<dyn counter::RefCountable> {
+        unimplemented!();
+    }
+}
+
+pub struct DpdkFromEbpf;
+
+impl DpdkFromEbpf {
+    pub fn new(_: Receiver<Box<packet::Packet<'static>>>, _: Duration) -> Self {
+        unimplemented!();
+    }
+
+    pub unsafe fn read(&mut self) -> Result<Box<packet::Packet>> {
         unimplemented!();
     }
 

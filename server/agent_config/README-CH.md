@@ -2712,7 +2712,7 @@ inputs:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### Enabled {#inputs.cbpf.special_network.dpdk.enabled}
+##### Source {#inputs.cbpf.special_network.dpdk.source}
 
 **标签**:
 
@@ -2721,9 +2721,7 @@ inputs:
 
 **FQCN**:
 
-`inputs.cbpf.special_network.dpdk.enabled`
-
-Upgrade from old version: `static_config.dpdk-enabled`
+`inputs.cbpf.special_network.dpdk.source`
 
 **默认值**:
 ```yaml
@@ -2731,17 +2729,26 @@ inputs:
   cbpf:
     special_network:
       dpdk:
-        enabled: false
+        source: None
 ```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| None | |
+| eBPF | |
+| pDump | |
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | string |
 
 **详细描述**:
 
-TODO
+目前支持两种采集 DPDK 流量的方式，包括：
+- pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+- eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
 
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
@@ -3350,7 +3357,7 @@ inputs:
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
-###### Enabled {#inputs.ebpf.socket.uprobe.dpdk.enabled}
+###### Source {#inputs.ebpf.socket.uprobe.dpdk.source}
 
 **标签**:
 
@@ -3358,7 +3365,7 @@ inputs:
 
 **FQCN**:
 
-`inputs.ebpf.socket.uprobe.dpdk.enabled`
+`inputs.ebpf.socket.uprobe.dpdk.source`
 
 
 **默认值**:
@@ -3368,13 +3375,20 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          enabled: false
+          source: None
 ```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| None | |
+| eBPF | |
+| pDump | |
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | string |
 
 **详细描述**:
 
@@ -3410,7 +3424,7 @@ inputs:
 
 设置DPDK应用的命令名称, eBPF会自动寻找并进行追踪采集数据包
 
-配置样例: 如果命令行是'/usr/bin/mydpdk', 可以配置成 "command: mydpdk" 
+配置样例: 如果命令行是'/usr/bin/mydpdk', 可以配置成 "command: mydpdk"
 
 ###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
@@ -3441,7 +3455,7 @@ inputs:
 **详细描述**:
 
 根据实际的网卡驱动填写合适的数据包接收hook点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
-     
+
      Slot:   04:00.0
      Class:  Ethernet controller
      Vendor: Intel Corporation
@@ -3451,7 +3465,7 @@ inputs:
      Rev:    02
      Driver: igb_uio
      Module: i40e
-     
+
 上面的 "Driver: igb_uio" 说明是DPDP纳管的设备 (除此之外还有"vfio-pci", "uio_pci_generic"
 也被DPDK纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
 
@@ -3468,7 +3482,7 @@ inputs:
               - tx: i40e_xmit_pkts
             - ice:     Supports Intel E810 series NICs.
               - rx: ice_recv_pkts
-              - tx: ice_xmit_pkts 
+              - tx: ice_xmit_pkts
           - Mellanox Drivers:
             - mlx4:    Supports Mellanox ConnectX-3 series NICs.
               - rx: mlx4_rx_burst

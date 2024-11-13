@@ -48,7 +48,7 @@ use super::config::ProcessorsFlowLogTunning;
 use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
-        ApiResources, Config, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
+        ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, TagFilterOperator, UserConfig,
         YamlConfig,
     },
@@ -338,7 +338,7 @@ pub struct DispatcherConfig {
     pub pod_cluster_id: u32,
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
-    pub dpdk_enabled: bool,
+    pub dpdk_source: DpdkSource,
     pub dispatcher_queue: bool,
     pub bond_group: Vec<String>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1105,6 +1105,7 @@ pub struct EbpfConfig {
     pub symbol_table: SymbolTable,
     pub process_matcher: Vec<ProcessMatcher>,
     pub io_event: EbpfFileIoEvent,
+    pub dpdk_enabled: bool,
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1139,6 +1140,7 @@ impl fmt::Debug for EbpfConfig {
             .field("queue_size", &self.queue_size)
             .field("l7_protocol_ports", &self.l7_protocol_ports)
             .field("ebpf", &self.ebpf)
+            .field("dpdk_enabled", &self.dpdk_enabled)
             .finish()
     }
 }
@@ -1623,7 +1625,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
             dispatcher: DispatcherConfig {
                 global_pps_threshold: conf.inputs.cbpf.tunning.max_capture_pps,
                 capture_packet_size: conf.inputs.cbpf.tunning.max_capture_packet_size,
-                dpdk_enabled: conf.inputs.cbpf.special_network.dpdk.enabled,
+                dpdk_source: conf.inputs.cbpf.special_network.dpdk.source,
                 dispatcher_queue: conf.inputs.cbpf.tunning.dispatcher_queue_enabled,
                 l7_log_packet_size: conf.processors.request_log.tunning.payload_truncation,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(
@@ -2059,6 +2061,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 symbol_table: conf.inputs.proc.symbol_table,
                 process_matcher: conf.inputs.proc.process_matcher.clone(),
                 io_event: conf.inputs.ebpf.file.io_event,
+                dpdk_enabled: conf.inputs.cbpf.special_network.dpdk.source == DpdkSource::Ebpf,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.inputs.integration.enabled,
@@ -2794,12 +2797,12 @@ impl ConfigHandler {
 
         let special_network = &mut config.inputs.cbpf.special_network;
         let new_special_network = &mut new_config.user_config.inputs.cbpf.special_network;
-        if special_network.dpdk.enabled != new_special_network.dpdk.enabled {
+        if special_network.dpdk.source != new_special_network.dpdk.source {
             info!(
-                "Update inputs.cbpf.special_network.dpdk.enabled from {:?} to {:?}.",
-                special_network.dpdk.enabled, new_special_network.dpdk.enabled
+                "Update inputs.cbpf.special_network.dpdk.source from {:?} to {:?}.",
+                special_network.dpdk.source, new_special_network.dpdk.source
             );
-            special_network.dpdk.enabled = new_special_network.dpdk.enabled;
+            special_network.dpdk.source = new_special_network.dpdk.source;
             restart_agent = !first_run;
         }
         if special_network.libpcap.enabled != new_special_network.libpcap.enabled {
@@ -3085,6 +3088,33 @@ impl ConfigHandler {
                 golang_uprobe.tracing_timeout, new_golang_uprobe.tracing_timeout
             );
             golang_uprobe.tracing_timeout = new_golang_uprobe.tracing_timeout;
+            restart_agent = !first_run;
+        }
+
+        let dpdk_uprobe = &mut uprobe.dpdk;
+        let new_dpdk_uprobe = &mut new_uprobe.dpdk;
+        if dpdk_uprobe.command != new_dpdk_uprobe.command {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.dpdk.command from {:?} to {:?}.",
+                dpdk_uprobe.command, new_dpdk_uprobe.command
+            );
+            dpdk_uprobe.command = new_dpdk_uprobe.command.clone();
+            restart_agent = !first_run;
+        }
+        if dpdk_uprobe.rx_hooks != new_dpdk_uprobe.rx_hooks {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.dpdk.rx_hooks from {:?} to {:?}.",
+                dpdk_uprobe.rx_hooks, new_dpdk_uprobe.rx_hooks
+            );
+            dpdk_uprobe.rx_hooks = new_dpdk_uprobe.rx_hooks.clone();
+            restart_agent = !first_run;
+        }
+        if dpdk_uprobe.tx_hooks != new_dpdk_uprobe.tx_hooks {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.dpdk.tx_hooks from {:?} to {:?}.",
+                dpdk_uprobe.tx_hooks, new_dpdk_uprobe.tx_hooks
+            );
+            dpdk_uprobe.tx_hooks = new_dpdk_uprobe.tx_hooks.clone();
             restart_agent = !first_run;
         }
 
@@ -4802,6 +4832,21 @@ impl ConfigHandler {
                 callbacks.push(Self::set_npb);
             }
         }
+        // avoid first config changed to restart dispatcher
+        let restart_dispatcher =
+            components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled;
+        if restart_dispatcher
+            && new_config
+                .user_config
+                .inputs
+                .cbpf
+                .special_network
+                .dpdk
+                .source
+                == DpdkSource::Ebpf
+        {
+            restart_agent = !first_run;
+        }
 
         if restart_agent {
             warn!("Change configuration and restart agent...");
@@ -4814,8 +4859,7 @@ impl ConfigHandler {
         candidate_config.port_config = new_config.port_config;
         candidate_config.pcap = new_config.pcap;
 
-        // avoid first config changed to restart dispatcher
-        if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
+        if restart_dispatcher {
             callbacks.push(Self::set_restart_dispatcher);
         }
 

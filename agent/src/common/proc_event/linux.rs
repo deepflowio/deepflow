@@ -148,10 +148,9 @@ pub struct ProcEvent {
 
 impl ProcEvent {
     pub unsafe fn from_ebpf(
-        data: *mut SK_BPF_DATA,
+        data: &mut SK_BPF_DATA,
         event_type: EventType,
     ) -> Result<BoxedProcEvents, Error> {
-        let data = &mut data.read_unaligned();
         let raw_data = slice::from_raw_parts(data.cap_data as *const u8, data.cap_len as usize);
 
         let mut event_data: EventData = EventData::OtherEvent;

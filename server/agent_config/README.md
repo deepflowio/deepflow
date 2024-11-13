@@ -2777,7 +2777,7 @@ kernel to specify the desired packet distribution algorithm. Refer to:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### Enabled {#inputs.cbpf.special_network.dpdk.enabled}
+##### Source {#inputs.cbpf.special_network.dpdk.source}
 
 **Tags**:
 
@@ -2786,9 +2786,7 @@ kernel to specify the desired packet distribution algorithm. Refer to:
 
 **FQCN**:
 
-`inputs.cbpf.special_network.dpdk.enabled`
-
-Upgrade from old version: `static_config.dpdk-enabled`
+`inputs.cbpf.special_network.dpdk.source`
 
 **Default value**:
 ```yaml
@@ -2796,19 +2794,26 @@ inputs:
   cbpf:
     special_network:
       dpdk:
-        enabled: false
+        source: None
 ```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| None | |
+| eBPF | |
+| pDump | |
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | string |
 
 **Description**:
 
-The DPDK RecvEngine is only started when this configuration item is turned on.
-Note that you also need to set capture_mode to 1. Please refer to
-https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+Currently, there are two ways to collect DPDK traffic, including:
+- pdump: See details https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+- eBPF: Use eBPF Uprobe to obtain DPDK traffic
 
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
@@ -3440,7 +3445,7 @@ In the logs, you will encounter a message similar to the following:
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
-###### Enabled {#inputs.ebpf.socket.uprobe.dpdk.enabled}
+###### Source {#inputs.ebpf.socket.uprobe.dpdk.source}
 
 **Tags**:
 
@@ -3448,7 +3453,7 @@ In the logs, you will encounter a message similar to the following:
 
 **FQCN**:
 
-`inputs.ebpf.socket.uprobe.dpdk.enabled`
+`inputs.ebpf.socket.uprobe.dpdk.source`
 
 
 **Default value**:
@@ -3458,13 +3463,20 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          enabled: false
+          source: None
 ```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| None | |
+| eBPF | |
+| pDump | |
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | string |
 
 **Description**:
 
@@ -3500,7 +3512,7 @@ inputs:
 
 Set the command name of the DPDK application, eBPF will automatically
 locate and trace packets for data collection.
-Example: In the command line '/usr/bin/mydpdk', it can be set as "command: mydpdk" 
+Example: In the command line '/usr/bin/mydpdk', it can be set as "command: mydpdk"
 
 ###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
@@ -3530,9 +3542,9 @@ inputs:
 
 **Description**:
 
-Fill in the appropriate packet reception hook point according to the actual network card driver. 
+Fill in the appropriate packet reception hook point according to the actual network card driver.
 You can use the command 'lspci -vmmk' to find the network card driver type. For example:
-     
+
      Slot:   04:00.0
      Class:  Ethernet controller
      Vendor: Intel Corporation
@@ -3564,7 +3576,7 @@ to confirm the driver interfaces.
               - tx: i40e_xmit_pkts
             - ice:     Supports Intel E810 series NICs.
               - rx: ice_recv_pkts
-              - tx: ice_xmit_pkts 
+              - tx: ice_xmit_pkts
           - Mellanox Drivers:
             - mlx4:    Supports Mellanox ConnectX-3 series NICs.
               - rx: mlx4_rx_burst

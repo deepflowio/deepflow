@@ -20,7 +20,7 @@ pub mod handler;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use config::ApiResources;
 pub use config::{
-    AgentIdType, Config, ConfigError, KubernetesPollerType, OracleConfig, PcapStream,
+    AgentIdType, Config, ConfigError, DpdkSource, KubernetesPollerType, OracleConfig, PcapStream,
     ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, UserConfig, K8S_CA_CRT_PATH,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
