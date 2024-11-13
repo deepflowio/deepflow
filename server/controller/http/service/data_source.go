@@ -84,9 +84,9 @@ func (d *DataSource) generateIPToController() error {
 }
 
 var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
-	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.network*
-	"网络-流日志",                  // flow_log.l4_flow_log
-	"应用-指标（秒级）", "应用-指标（分钟级）", // flow_metrics.application*
+	"网络-指标（秒级）", "网络-指标（分钟级）", "网络-指标（小时级）", "网络-指标（天级）", // flow_metrics.network*
+	"网络-流日志",                                             // flow_log.l4_flow_log
+	"应用-指标（秒级）", "应用-指标（分钟级）", "应用-指标（小时级）", "应用-指标（天级）", // flow_metrics.application*
 	"应用-调用日志",       // flow_log.l7_flow_log
 	"网络-TCP 时序数据",   // flow_log.l4_packet
 	"网络-PCAP 数据",    // flow_log.l7_packet
