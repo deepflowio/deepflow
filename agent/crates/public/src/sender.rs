@@ -56,6 +56,7 @@ pub enum SendMessageType {
     ApplicationLog = 17,
     SyslogDetail = 18,
     SkyWalking = 19,
+    Datadog = 20,
 }
 
 impl fmt::Display for SendMessageType {
@@ -80,6 +81,7 @@ impl fmt::Display for SendMessageType {
             Self::ApplicationLog => write!(f, "application_log"),
             Self::SyslogDetail => write!(f, "syslog_detail"),
             Self::SkyWalking => write!(f, "skywalking"),
+            Self::Datadog => write!(f, "datadog"),
         }
     }
 }

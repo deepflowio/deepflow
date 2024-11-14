@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/dd_import"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -154,7 +155,7 @@ func (d *Decoder) Run() {
 	decoder := &codec.SimpleDecoder{}
 	pbTaggedFlow := pb.NewTaggedFlow()
 	pbTracesData := &v1.TracesData{}
-	pbSkywalkingData := &pb.SkyWalkingExtra{}
+	pbThirdPartyTrace := &pb.ThirdPartyTrace{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		start := time.Now()
@@ -184,7 +185,9 @@ func (d *Decoder) Run() {
 			case datatype.MESSAGE_TYPE_PACKETSEQUENCE:
 				d.handleL4Packet(decoder)
 			case datatype.MESSAGE_TYPE_SKYWALKING:
-				d.handleSkyWalking(decoder, pbSkywalkingData, false)
+				d.handleSkyWalking(decoder, pbThirdPartyTrace, false)
+			case datatype.MESSAGE_TYPE_DATADOG:
+				d.handleDatadog(decoder, pbThirdPartyTrace, false)
 			default:
 				log.Warningf("unknown msg type: %d", d.msgType)
 
@@ -283,10 +286,12 @@ func (d *Decoder) sendOpenMetetry(tracesData *v1.TracesData) {
 	}
 }
 
-func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbSkyWalkingData *pb.SkyWalkingExtra, compressed bool) {
+func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbThirdPartyTrace *pb.ThirdPartyTrace, compressed bool) {
 	var err error
+	buffer := log_data.GetBuffer()
 	for !decoder.IsEnd() {
-		pbSkyWalkingData.Reset()
+		pbThirdPartyTrace.Reset()
+		pbThirdPartyTrace.Data = buffer.Bytes()
 		bytes := decoder.ReadBytes()
 		if len(bytes) > 0 {
 			// universal compression
@@ -294,7 +299,7 @@ func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbSkyWalkingDat
 				bytes, err = decompressOpenTelemetry(bytes)
 			}
 			if err == nil {
-				err = proto.Unmarshal(bytes, pbSkyWalkingData)
+				err = proto.Unmarshal(bytes, pbThirdPartyTrace)
 			}
 		}
 		if decoder.Failed() || err != nil {
@@ -304,7 +309,8 @@ func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbSkyWalkingDat
 			d.counter.ErrorCount++
 			continue
 		}
-		d.sendSkyWalking(pbSkyWalkingData.Data, pbSkyWalkingData.PeerIp, pbSkyWalkingData.Uri)
+		d.sendSkyWalking(pbThirdPartyTrace.Data, pbThirdPartyTrace.PeerIp, pbThirdPartyTrace.Uri)
+		log_data.PutBuffer(buffer)
 	}
 }
 
@@ -314,6 +320,55 @@ func (d *Decoder) sendSkyWalking(segmentData, peerIP []byte, uri string) {
 	}
 	d.counter.Count++
 	ls := sw_import.SkyWalkingDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, segmentData, peerIP, uri, d.platformData, d.cfg)
+	for _, l := range ls {
+		l.AddReferenceCount()
+		if !d.throttler.SendWithThrottling(l) {
+			d.counter.DropCount++
+		} else {
+			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
+			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+			d.appServiceTagWrite(l)
+			d.spanWrite(l)
+		}
+		l.Release()
+	}
+}
+
+func (d *Decoder) handleDatadog(decoder *codec.SimpleDecoder, pbThirdPartyTrace *pb.ThirdPartyTrace, compressed bool) {
+	var err error
+	buffer := log_data.GetBuffer()
+	for !decoder.IsEnd() {
+		pbThirdPartyTrace.Reset()
+		pbThirdPartyTrace.Data = buffer.Bytes()
+		bytes := decoder.ReadBytes()
+		if len(bytes) > 0 {
+			// universal compression
+			if compressed {
+				bytes, err = decompressOpenTelemetry(bytes)
+			}
+			if err == nil {
+				err = proto.Unmarshal(bytes, pbThirdPartyTrace)
+			}
+		}
+		if decoder.Failed() || err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("datadog data decode failed, offset=%d len=%d err: %s", decoder.Offset(), len(decoder.Bytes()), err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		d.sendDatadog(pbThirdPartyTrace)
+		log_data.PutBuffer(buffer)
+	}
+}
+
+func (d *Decoder) sendDatadog(ddogData *pb.ThirdPartyTrace) {
+	if d.debugEnabled {
+		log.Debugf("decoder %d vtap %d recv datadog data length: %d", d.index, d.agentId, len(ddogData.Data))
+	}
+	d.counter.Count++
+	ls := dd_import.DDogDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, ddogData, d.platformData, d.cfg)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {
