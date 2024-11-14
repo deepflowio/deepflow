@@ -3152,6 +3152,9 @@ static __inline bool is_regular_file(int fd,
 static __inline void *get_dentry_parent(void *curr,
 					struct member_fields_offset *offset)
 {
+	if (curr == NULL)
+		return NULL;
+
 	void *dentry = NULL;
 	bpf_probe_read_kernel(&dentry, sizeof(dentry),
 			      curr + offset->struct_dentry_d_parent_offset);
@@ -3184,17 +3187,20 @@ static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
 		bpf_probe_read_kernel(&name, sizeof(name),
 				      dentry +
 				      offset->struct_dentry_name_offset);
-		//struct __dentry_name *d_n =
-		//    (struct __dentry_name *)(buffer->filename + buffer->len);
-		//if (buffer->len + sizeof(d_n->name) > sizeof(buffer->filename))
-		//	break;
-		//buffer->len +=
-		//    (bpf_probe_read_kernel_str(d_n, sizeof(d_n->name), name) -
-		//     1);
-		//parent = get_dentry_parent(dentry, off_ptr);
-		//if (parent == dentry)
-		//	break;
-		//dentry = parent;
+		struct __dentry_name *d_n =
+		    (struct __dentry_name *)(buffer->filename + buffer->len);
+		if (buffer->len + sizeof(d_n->name) > sizeof(buffer->filename))
+			break;
+		buffer->len +=
+		    (bpf_probe_read_kernel_str(d_n->name, sizeof(d_n->name), name) -
+		     1);
+
+		bpf_probe_read_kernel(&parent, sizeof(parent),
+                              dentry + offset->struct_dentry_d_parent_offset);
+
+		if (parent == dentry || parent == NULL)
+			break;
+		dentry = parent;
 	}
 }
 
@@ -3253,7 +3259,6 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->latency = latency;
 	buffer->operation = direction;
 	set_file_path_from_fd(buffer, data_args->fd, offset);
-
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
@@ -3281,7 +3286,6 @@ static __inline int trace_io_event_common(void *ctx,
 	v->thread_trace_id = trace_id;
 	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
-
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;

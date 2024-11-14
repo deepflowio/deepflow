@@ -266,7 +266,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("\n");
 }
 
-static void offset_dump(int cpu, struct bpf_offset_param *param)
+static void offset_dump(int cpu, bpf_offset_param_t *param)
 {
 	printf("----------------------------------\n");
 	printf("cpu: \t%d\n", cpu);
@@ -532,7 +532,7 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 
 		if (size < sizeof(*sk_trace_params)
 		    || size != sizeof(*sk_trace_params) +
-		    array->count * sizeof(struct bpf_offset_param)) {
+		    array->count * sizeof(bpf_offset_param_t)) {
 			fprintf(stderr, "corrupted response.\n");
 			df_bpf_sockopt_msg_free(sk_trace_params);
 			return ETR_INVAL;

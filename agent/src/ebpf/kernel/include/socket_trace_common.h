@@ -311,6 +311,7 @@ struct debug_data {
 
 struct member_fields_offset {
 	__u8 ready;
+	__u16 struct_dentry_d_parent_offset;    // offsetof(struct dentry, d_parent)
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;
 	__u32 tcp_sock__copied_seq_offset;
@@ -322,7 +323,6 @@ struct member_fields_offset {
 	__u32 struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
 	__u32 struct_file_dentry_offset;	// offsetof(struct file, f_path) + offsetof(struct path, dentry)
 	__u32 struct_dentry_name_offset;	// offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
-	__u32 struct_dentry_d_parent_offset;	// offsetof(struct dentry, d_parent)
 	__u32 struct_sock_family_offset;	// offsetof(struct sock_common, skc_family)
 	__u32 struct_sock_saddr_offset;	// offsetof(struct sock_common, skc_rcv_saddr)
 	__u32 struct_sock_daddr_offset;	// offsetof(struct sock_common, skc_daddr)
