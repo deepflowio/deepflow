@@ -305,27 +305,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		}
 	}
 
-	if len(h.L7ProtocolStr) > 0 {
-		l7ProtocolStrLower := strings.ToLower(h.L7ProtocolStr)
-		if strings.Contains(l7ProtocolStrLower, "https") {
-			h.IsTLS = 1
-		}
-		for l7ProtocolStr, l7Protocol := range datatype.L7ProtocolStringMap {
-			if strings.Contains(l7ProtocolStr, l7ProtocolStrLower) {
-				h.L7Protocol = uint8(l7Protocol)
-				break
-			}
-		}
-		// If the protocol name is 'http', it may be randomly matched to 'http1' or 'http2' and needs to be corrected.
-		if h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_1) || h.L7Protocol == uint8(datatype.L7_PROTOCOL_HTTP_2) {
-			if strings.HasPrefix(h.Version, "2") {
-				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_2)
-			} else {
-				h.L7Protocol = uint8(datatype.L7_PROTOCOL_HTTP_1)
-			}
-		}
-	}
-
+	h.L7Protocol, h.IsTLS = ParseL7Protocol(h.L7ProtocolStr, h.Version)
 	h.AttributeNames = attributeNames
 	h.AttributeValues = attributeValues
 	h.MetricsNames = metricsNames

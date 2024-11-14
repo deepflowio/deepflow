@@ -24,7 +24,7 @@ use public::{
 use std::net::SocketAddr;
 
 #[derive(Debug, PartialEq)]
-pub struct SkyWalkingExtra(pub flow_log::SkyWalkingExtra);
+pub struct SkyWalkingExtra(pub flow_log::ThirdPartyTrace);
 
 impl Sendable for SkyWalkingExtra {
     fn encode(self, _: &mut Vec<u8>) -> Result<usize, EncodeError> {
