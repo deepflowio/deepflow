@@ -225,10 +225,11 @@ struct __io_event_buffer {
 	// nanosecond
 	__u64 latency;
 
-	// strings terminated with \0
-	char filename[IO_FILEPATH_BUFF_SIZE];
 	// filename length
 	__u32 len;
+
+	// strings terminated with \0
+	char filename[IO_FILEPATH_BUFF_SIZE];
 } __attribute__ ((packed));
 
 // struct ebpf_proc_info -> offsets[]  arrays index.
