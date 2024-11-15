@@ -259,8 +259,10 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 		clientName := tagSlice[1].(string)
 		serverName := tagSlice[2].(string)
 		displayName := tagSlice[3].(string)
-		tagType := tagSlice[4].(string)
-		permissions := tagSlice[7].([]bool)
+		displayNameZH := tagSlice[4].(string)
+		displayNameEN := tagSlice[5].(string)
+		tagType := tagSlice[6].(string)
+		permissions := tagSlice[9].([]bool)
 		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 			continue
 		}
@@ -270,8 +272,8 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 		if name == "lb_listener" || name == "pod_ingress" {
 			continue
 		}
-		if len(tagSlice) >= 12 {
-			notSupportedOperators := tagSlice[11].([]string)
+		if len(tagSlice) >= 16 {
+			notSupportedOperators := tagSlice[15].([]string)
 			// not support select
 			if slices.Contains(notSupportedOperators, "select") {
 				continue
@@ -280,14 +282,18 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
 			if serverName == clientName {
 				clientNameMetric := []interface{}{
-					clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+					clientName, true, displayName, displayNameZH, displayNameEN, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "", "", "",
 				}
 				result.Values = append(result.Values, clientNameMetric)
 			} else {
 				var (
-					serverDisplayName = displayName
-					clientDisplayName = displayName
+					serverDisplayName   = displayName
+					clientDisplayName   = displayName
+					serverDisplayNameZH = chCommon.TagServerChPrefix + " " + displayName
+					serverDisplayNameEN = chCommon.TagServerEnPrefix + " " + displayName
+					clientDisplayNameZH = chCommon.TagClientChPrefix + " " + displayName
+					clientDisplayNameEN = chCommon.TagClientEnPrefix + " " + displayName
 				)
 				if config.Cfg.Language == "en" {
 					serverDisplayName = chCommon.TagServerEnPrefix + " " + displayName
@@ -302,19 +308,19 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 					}
 				}
 				serverNameMetric := []interface{}{
-					serverName, true, serverDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+					serverName, true, serverDisplayName, serverDisplayNameZH, serverDisplayNameEN, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "", "", "",
 				}
 				clientNameMetric := []interface{}{
-					clientName, true, clientDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+					clientName, true, clientDisplayName, clientDisplayNameZH, clientDisplayNameEN, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "", "", "",
 				}
 				result.Values = append(result.Values, serverNameMetric, clientNameMetric)
 			}
 		} else {
 			nameMetric := []interface{}{
-				name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-				"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+				name, true, displayName, displayName, displayName, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", metrics.METRICS_OPERATORS, permissions, table, "", "", "",
 			}
 			result.Values = append(result.Values, nameMetric)
 		}
@@ -358,6 +364,42 @@ func dataVisibilityfiltering(visibilityFilterRegexp *regexp.Regexp, values []int
 		}
 	}
 	return visibilityFilterValues
+}
+
+func formatTagByLanguage(language string, values []interface{}) {
+	for _, value := range values {
+		displaynameZH := value.([]interface{})[4].(string)
+		displaynameEN := value.([]interface{})[5].(string)
+		descriptionZH := value.([]interface{})[11].(string)
+		descriptionEN := value.([]interface{})[12].(string)
+		if language == chCommon.LanguageEN {
+			value.([]interface{})[3] = displaynameEN
+			value.([]interface{})[10] = descriptionEN
+		} else {
+			value.([]interface{})[3] = displaynameZH
+			value.([]interface{})[10] = descriptionZH
+		}
+	}
+}
+
+func formatMetricByLanguage(language string, values []interface{}) {
+	for _, value := range values {
+		displaynameZH := value.([]interface{})[3].(string)
+		displaynameEN := value.([]interface{})[4].(string)
+		unitZH := value.([]interface{})[6].(string)
+		unitEN := value.([]interface{})[7].(string)
+		descriptionZH := value.([]interface{})[14].(string)
+		descriptionEN := value.([]interface{})[15].(string)
+		if language == chCommon.LanguageEN {
+			value.([]interface{})[2] = displaynameEN
+			value.([]interface{})[5] = unitEN
+			value.([]interface{})[13] = descriptionEN
+		} else {
+			value.([]interface{})[2] = displaynameZH
+			value.([]interface{})[5] = unitZH
+			value.([]interface{})[13] = descriptionZH
+		}
+	}
 }
 
 func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInfo *client.DebugInfo) (*common.Result, []string, bool, error) {
@@ -428,6 +470,9 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
 			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
 		}
+		if args.Language != "" {
+			formatMetricByLanguage(args.Language, result.Values)
+		}
 		return result, []string{}, true, err
 	case 4: // show tag X values from Y  X, Y not nil
 		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
@@ -440,6 +485,9 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo)
 		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
 			data.Values = dataVisibilityfiltering(visibilityFilterRegexp, data.Values)
+		}
+		if args.Language != "" {
+			formatTagByLanguage(args.Language, data.Values)
 		}
 		return data, []string{}, true, err
 	case 6: // show  tables...

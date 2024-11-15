@@ -34,6 +34,7 @@ type QuerierParams struct {
 	NoPreWhere    bool
 	ORGID         string
 	SimpleSql     bool
+	Language      string
 }
 
 type TempoParams struct {

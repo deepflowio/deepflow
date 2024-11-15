@@ -37,6 +37,7 @@ const TagServerChPrefix = "服务端"
 const TagClientChPrefix = "客户端"
 const TagServerEnPrefix = "Server"
 const TagClientEnPrefix = "Client"
+const LanguageEN = "en"
 
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
