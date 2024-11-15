@@ -5271,7 +5271,7 @@ outputs:
       #     TODO
       # upgrade_from: l7_log_store_tap_types
       # TODO: 候选项需要特殊处理
-      l7_capture_network_types: []
+      l7_capture_network_types: [0]
       # type: int
       # name:
       #   en: Ignored Observation Points for L4
