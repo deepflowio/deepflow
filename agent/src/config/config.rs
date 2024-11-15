@@ -2262,7 +2262,7 @@ impl Default for FlowLogFilters {
     fn default() -> Self {
         Self {
             l4_capture_network_types: vec![0],
-            l7_capture_network_types: vec![],
+            l7_capture_network_types: vec![0],
             l4_ignored_observation_points: vec![],
             l7_ignored_observation_points: vec![],
         }
