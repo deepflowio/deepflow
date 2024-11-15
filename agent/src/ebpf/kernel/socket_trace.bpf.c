@@ -1686,6 +1686,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	       != SOCK_CHECK_TYPE_ERROR))) {
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 		return trace_io_event_common(ctx, offset, args, direction, id);
+#else
+		return -1;
 #endif
 	}
 
@@ -3149,18 +3151,6 @@ static __inline bool is_regular_file(int fd,
 	return S_ISREG(i_mode);
 }
 
-static __inline void *get_dentry_parent(void *curr,
-					struct member_fields_offset *offset)
-{
-	if (curr == NULL)
-		return NULL;
-
-	void *dentry = NULL;
-	bpf_probe_read_kernel(&dentry, sizeof(dentry),
-			      curr + offset->struct_dentry_d_parent_offset);
-	return dentry;
-}
-
 static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
 					   int fd,
 					   struct member_fields_offset *off_ptr)
@@ -3192,8 +3182,7 @@ static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
 		if (buffer->len + sizeof(d_n->name) > sizeof(buffer->filename))
 			break;
 		buffer->len +=
-		    (bpf_probe_read_kernel_str(d_n->name, sizeof(d_n->name), name) -
-		     1);
+		    bpf_probe_read_kernel_str(d_n->name, sizeof(d_n->name), name);
 
 		bpf_probe_read_kernel(&parent, sizeof(parent),
                               dentry + offset->struct_dentry_d_parent_offset);
