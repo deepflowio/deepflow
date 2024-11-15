@@ -72,8 +72,8 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0, null, %s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
 			metricName := fmt.Sprintf("metrics.%s", externalTag)
 			lm := NewMetrics(
-				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
-				"metrics", []bool{true, true, true}, "", tableName, "", "",
+				i, dbField, metricName, metricName, metricName, "", "", "", METRICS_TYPE_COUNTER,
+				"metrics", []bool{true, true, true}, "", tableName, "", "", "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}

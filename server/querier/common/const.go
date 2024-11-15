@@ -46,6 +46,7 @@ const (
 )
 
 const (
+	HEADER_KEY_LANGUAGE = "X-Language"
 	HEADER_KEY_X_ORG_ID = "X-Org-Id"
 	DEFAULT_ORG_ID      = "1"
 )

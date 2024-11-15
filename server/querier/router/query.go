@@ -48,6 +48,7 @@ func executeQuery() gin.HandlerFunc {
 		args.QueryUUID = c.Query("query_uuid")
 		args.NoPreWhere, _ = strconv.ParseBool(c.DefaultQuery("no_prewhere", "false"))
 		args.ORGID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		args.Language = c.Request.Header.Get(common.HEADER_KEY_LANGUAGE)
 		// if no org_id in header, set default org id
 		if args.ORGID == "" {
 			args.ORGID = common.DEFAULT_ORG_ID

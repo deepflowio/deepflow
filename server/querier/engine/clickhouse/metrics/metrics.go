@@ -44,18 +44,24 @@ var DB_DESCRIPTIONS map[string]interface{}
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 
 type Metrics struct {
-	Index       int    // 索引
-	DBField     string // 数据库字段
-	DisplayName string // 描述
-	Unit        string // 单位
-	Type        int    // 指标量类型
-	Category    string // 类别
-	Condition   string // 聚合过滤
-	IsAgg       bool   // 是否为聚合指标量
-	Permissions []bool // 指标量的权限控制
-	Table       string // 所属表
-	Description string // 描述
-	TagType     string // Tag type of metric's tag type
+	Index         int    // 索引
+	DBField       string // 数据库字段
+	DisplayName   string // 描述
+	DisplayNameZH string // 描述
+	DisplayNameEN string // 描述
+	Unit          string // 单位
+	UnitZH        string // 单位
+	UnitEN        string // 单位
+	Type          int    // 指标量类型
+	Category      string // 类别
+	Condition     string // 聚合过滤
+	IsAgg         bool   // 是否为聚合指标量
+	Permissions   []bool // 指标量的权限控制
+	Table         string // 所属表
+	Description   string // 描述
+	DescriptionZH string // 描述
+	DescriptionEN string // 描述
+	TagType       string // Tag type of metric's tag type
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -74,21 +80,27 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 }
 
 func NewMetrics(
-	index int, dbField string, displayname string, unit string, metricType int, category string,
-	permissions []bool, condition string, table string, description string, tagType string,
+	index int, dbField string, displayname string, displaynameZH string, displaynameEN string, unit string, unitZH string, unitEN string, metricType int, category string,
+	permissions []bool, condition string, table string, description string, descriptionZH string, descriptionEN string, tagType string,
 ) *Metrics {
 	return &Metrics{
-		Index:       index,
-		DBField:     dbField,
-		DisplayName: displayname,
-		Unit:        unit,
-		Type:        metricType,
-		Category:    category,
-		Permissions: permissions,
-		Condition:   condition,
-		Table:       table,
-		Description: description,
-		TagType:     tagType,
+		Index:         index,
+		DBField:       dbField,
+		DisplayName:   displayname,
+		DisplayNameZH: displaynameZH,
+		DisplayNameEN: displaynameEN,
+		Unit:          unit,
+		UnitZH:        unitZH,
+		UnitEN:        unitEN,
+		Type:          metricType,
+		Category:      category,
+		Permissions:   permissions,
+		Condition:     condition,
+		Table:         table,
+		Description:   description,
+		DescriptionZH: descriptionZH,
+		DescriptionEN: descriptionEN,
+		TagType:       tagType,
 	}
 }
 
@@ -123,8 +135,10 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 		clientName := tagSlice[1].(string)
 		serverName := tagSlice[2].(string)
 		displayName := tagSlice[3].(string)
-		tagType := tagSlice[4].(string)
-		permissions := tagSlice[7].([]bool)
+		displayNameZH := tagSlice[4].(string)
+		displayNameEN := tagSlice[5].(string)
+		tagType := tagSlice[6].(string)
+		permissions := tagSlice[9].([]bool)
 
 		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
 			continue
@@ -135,8 +149,8 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 		if name == "lb_listener" || name == "pod_ingress" {
 			continue
 		}
-		if len(tagSlice) >= 12 {
-			notSupportedOperators := tagSlice[11].([]string)
+		if len(tagSlice) >= 16 {
+			notSupportedOperators := tagSlice[15].([]string)
 			// not support select
 			if slices.Contains(notSupportedOperators, "select") {
 				continue
@@ -158,42 +172,48 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
 			if serverName == clientName {
 				clientNameMetric := NewMetrics(
-					0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", tagType,
+					0, clientNameDBField, displayName, displayNameZH, displayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", "", "", tagType,
 				)
 				newAllMetrics[clientName] = clientNameMetric
 			} else {
 				var (
-					serverDisplayName = displayName
-					clientDisplayName = displayName
+					serverDisplayName   = displayName
+					clientDisplayName   = displayName
+					serverDisplayNameZH = displayName
+					clientDisplayNameZH = displayName
+					serverDisplayNameEN = ckcommon.TagServerEnPrefix + " " + displayName
+					clientDisplayNameEN = ckcommon.TagClientEnPrefix + " " + displayName
 				)
+				if letterRegexp.MatchString(serverName) {
+					serverDisplayNameZH = ckcommon.TagServerChPrefix + " " + displayName
+					clientDisplayNameZH = ckcommon.TagClientChPrefix + " " + displayName
+				} else {
+					serverDisplayNameZH = ckcommon.TagServerChPrefix + displayName
+					clientDisplayNameZH = ckcommon.TagClientChPrefix + displayName
+				}
 				if config.Cfg.Language == "en" {
-					serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
-					clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
+					serverDisplayName = serverDisplayNameEN
+					clientDisplayName = clientDisplayNameEN
 				} else if config.Cfg.Language == "ch" {
-					if letterRegexp.MatchString(serverName) {
-						serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
-						clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
-					} else {
-						serverDisplayName = ckcommon.TagServerChPrefix + displayName
-						clientDisplayName = ckcommon.TagClientChPrefix + displayName
-					}
+					serverDisplayName = serverDisplayNameZH
+					clientDisplayName = clientDisplayNameZH
 				}
 				serverNameMetric := NewMetrics(
-					0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", tagType,
+					0, serverNameDBField, serverDisplayName, serverDisplayNameZH, serverDisplayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", "", "", tagType,
 				)
 				clientNameMetric := NewMetrics(
-					0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", tagType,
+					0, clientNameDBField, clientDisplayName, clientDisplayNameZH, clientDisplayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", "", "", tagType,
 				)
 				newAllMetrics[serverName] = serverNameMetric
 				newAllMetrics[clientName] = clientNameMetric
 			}
 		} else {
 			nameMetric := NewMetrics(
-				0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-				"Tag", permissions, "", table, "", tagType,
+				0, nameDBField, displayName, displayName, displayName, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", permissions, "", table, "", "", "", tagType,
 			)
 			newAllMetrics[name] = nameMetric
 		}
@@ -219,16 +239,16 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
-					field, "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table, "", "",
+					field, field, field, "", "", "", METRICS_TYPE_COUNTER,
+					"metrics", []bool{true, true, true}, "", table, "", "", "", "",
 				)
 				newAllMetrics[field] = metric
 			} else if fieldSplit[0] == "tag" {
 				fieldName := strings.Replace(field, "tag.", "", 1)
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(tag_names, '%s')=0,null,tag_values[indexOf(tag_names, '%s')])", fieldName, fieldName),
-					field, "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", []bool{true, true, true}, "", table, "", "",
+					field, field, field, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", []bool{true, true, true}, "", table, "", "", "", "",
 				)
 				newAllMetrics[field] = metric
 			}
@@ -347,8 +367,8 @@ func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, u
 			}
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
-				"metrics", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "",
+				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
+				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
 			)
 			return metrics, err
 		}
@@ -364,8 +384,8 @@ func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, u
 			}
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
-				"metrics", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "",
+				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
+				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
 			)
 			return metrics, err
 		}
@@ -377,7 +397,7 @@ func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, u
 
 func GetMetricsDescriptionsByDBTable(db, table string, allMetrics map[string]*Metrics) []interface{} {
 	/* columns := []interface{}{
-		 "name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
+		 "name", "is_agg", "display_name", "display_name_zh", "display_name_en", "unit", "unit_zh", "unit_en", "type", "category", "operators", "permissions", "table", "description", "description_zh", "description_en"
 	 } */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
@@ -390,9 +410,9 @@ func GetMetricsDescriptionsByDBTable(db, table string, allMetrics map[string]*Me
 			}
 		}
 		values[metrics.Index] = []interface{}{
-			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
+			field, metrics.IsAgg, metrics.DisplayName, metrics.DisplayNameZH, metrics.DisplayNameEN, metrics.Unit, metrics.UnitZH, metrics.UnitEN, metrics.Type,
 			metrics.Category, METRICS_OPERATORS, metrics.Permissions, metrics.Table,
-			metrics.Description,
+			metrics.Description, metrics.DescriptionZH, metrics.DescriptionEN,
 		}
 	}
 	return values
@@ -455,7 +475,7 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 		values = append(values, metricValues...)
 	}
 	columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table", "description",
+		"name", "is_agg", "display_name", "display_name_zh", "display_name_en", "unit", "unit_zh", "unit_en", "type", "category", "operators", "permissions", "table", "description", "description_zh", "description_en",
 	}
 	return &common.Result{
 		Columns: columns,
@@ -582,6 +602,8 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
 		metricsDataLanguage, _ := tableDate.(map[string]interface{})[table+"."+config.Cfg.Language]
+		metricsDataLanguageZH, _ := tableDate.(map[string]interface{})[table+".ch"]
+		metricsDataLanguageEN, _ := tableDate.(map[string]interface{})[table+".en"]
 		if ok {
 			loadMetrics = make(map[string]*Metrics)
 			for i, metrics := range metricsData.([][]interface{}) {
@@ -597,12 +619,20 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 					return nil, errors.New(fmt.Sprintf("parse metrics permission failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
 				metricsLanguage := metricsDataLanguage.([][]interface{})[i]
+				metricsLanguageZH := metricsDataLanguageZH.([][]interface{})[i]
+				metricsLanguageEN := metricsDataLanguageEN.([][]interface{})[i]
 				displayName := metricsLanguage[1].(string)
+				displayNameZH := metricsLanguageZH[1].(string)
+				displayNameEN := metricsLanguageEN[1].(string)
 				unit := metricsLanguage[2].(string)
+				unitZH := metricsLanguageZH[2].(string)
+				unitEN := metricsLanguageEN[2].(string)
 				description := metricsLanguage[3].(string)
+				descriptionZH := metricsLanguageZH[3].(string)
+				descriptionEN := metricsLanguageEN[3].(string)
 				lm := NewMetrics(
-					i, metrics[1].(string), displayName, unit, metricType,
-					metrics[3].(string), permissions, "", table, description, "",
+					i, metrics[1].(string), displayName, displayNameZH, displayNameEN, unit, unitZH, unitEN, metricType,
+					metrics[3].(string), permissions, "", table, description, descriptionZH, descriptionEN, "",
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}

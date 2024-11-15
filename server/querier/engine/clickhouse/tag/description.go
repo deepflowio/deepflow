@@ -90,10 +90,16 @@ type TagDescription struct {
 	ClientName            string
 	ServerName            string
 	DisplayName           string
+	DisplayNameZH         string
+	DisplayNameEN         string
 	Type                  string
 	EnumFile              string
+	EnumFileZH            string
+	EnumFileEN            string
 	Category              string
 	Description           string
+	DescriptionZH         string
+	DescriptionEN         string
 	Operators             []string
 	Permissions           []bool
 	RelatedTag            string
@@ -103,8 +109,8 @@ type TagDescription struct {
 }
 
 func NewTagDescription(
-	name, clientName, serverName, displayName, tagType, enumFile, category string,
-	permissions []bool, description, relatedTag string, deprecated bool, notSupportedOperators []string, table string,
+	name, clientName, serverName, displayName, displayNameZH, displayNameEN, tagType, enumFile, enumFileZH, enumFileEN, category string,
+	permissions []bool, description, descriptionZH, descriptionEN, relatedTag string, deprecated bool, notSupportedOperators []string, table string,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -115,12 +121,18 @@ func NewTagDescription(
 		ClientName:            clientName,
 		ServerName:            serverName,
 		DisplayName:           displayName,
+		DisplayNameZH:         displayNameZH,
+		DisplayNameEN:         displayNameEN,
 		Type:                  tagType,
 		EnumFile:              enumFile,
+		EnumFileZH:            enumFileZH,
+		EnumFileEN:            enumFileEN,
 		Category:              category,
 		Operators:             operators,
 		Permissions:           permissions,
 		Description:           description,
+		DescriptionZH:         descriptionZH,
+		DescriptionEN:         descriptionEN,
 		RelatedTag:            relatedTag,
 		Deprecated:            deprecated,
 		NotSupportedOperators: notSupportedOperators,
@@ -202,15 +214,23 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				}
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
+				tagLanguageZH := dbTagData.(map[string]interface{})[table+".ch"].([][]interface{})[i]
+				tagLanguageEN := dbTagData.(map[string]interface{})[table+".en"].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
 
 				enumFile := tag[4].(string)
 				enumFile = tag[4].(string) + "." + config.Cfg.Language
+				enumFileZH := tag[4].(string) + ".ch"
+				enumFileEN := tag[4].(string) + ".en"
 				displayName := tagLanguage[1].(string)
+				displayNameZH := tagLanguageZH[1].(string)
+				displayNameEN := tagLanguageEN[1].(string)
 				des := tagLanguage[2].(string)
+				desZH := tagLanguageZH[2].(string)
+				desEN := tagLanguageEN[2].(string)
 				description := NewTagDescription(
-					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, tag[5].(string), permissions, des, "", deprecated, notSupportedOperators, table,
+					tag[0].(string), tag[1].(string), tag[2].(string), displayName, displayNameZH, displayNameEN,
+					tag[3].(string), enumFile, enumFileZH, enumFileEN, tag[5].(string), permissions, des, desZH, desEN, "", deprecated, notSupportedOperators, table,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -662,8 +682,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 func GetStaticTagDescriptions(db, table string) (response *common.Result, err error) {
 	response = &common.Result{
 		Columns: []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
+			"operators", "permissions", "description", "description_zh", "description_en", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -675,8 +695,8 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 		response.Values = append(
 			response.Values,
 			[]interface{}{
-				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag, tag.Deprecated, tag.NotSupportedOperators, "",
+				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.DisplayNameZH, tag.DisplayNameEN, tag.Type,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.DescriptionZH, tag.DescriptionEN, tag.RelatedTag, tag.Deprecated, tag.NotSupportedOperators, "",
 			},
 		)
 	}
@@ -691,18 +711,18 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 			}
 			if slices.Contains(common.PEER_TABLES, table) {
 				response.Values = append(response.Values, []interface{}{
-					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
+					tagName, tagName + "_0", tagName + "_1", tagDisplayName, tagDisplayName, tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
 				})
 			} else if table == "alert_event" {
 				response.Values = append(response.Values, []interface{}{
-					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{"select", "group"}, "",
+					tagName, tagName + "_0", tagName + "_1", tagDisplayName, tagDisplayName, tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{"select", "group"}, "",
 				})
 			} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 				response.Values = append(response.Values, []interface{}{
-					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
+					tagName, tagName, tagName, tagDisplayName, tagDisplayName, tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
 				})
 			}
 		}
@@ -710,8 +730,8 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 
 	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 		response.Values = append(response.Values, []interface{}{
-			"tag", "tag", "tag", "tag", "map",
-			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{}, "",
+			"tag", "tag", "tag", "tag", "tag", "tag", "map",
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "tag", "tag", "", false, []string{}, "",
 		})
 	}
 	return
@@ -721,8 +741,8 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
 	response = &common.Result{
 		Columns: []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
+			"operators", "permissions", "description", "description_zh", "description_en", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -755,13 +775,13 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		labelKey := "k8s.label." + key.(string)
 		if slices.Contains(common.PEER_TABLES, table) {
 			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				labelKey, labelKey + "_0", labelKey + "_1", labelKey, labelKey, labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey, labelKey, labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				labelKey, labelKey, labelKey, labelKey, labelKey, labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		}
 	}
@@ -785,13 +805,13 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		annotationKey := "k8s.annotation." + key.(string)
 		if slices.Contains(common.PEER_TABLES, table) {
 			response.Values = append(response.Values, []interface{}{
-				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 			response.Values = append(response.Values, []interface{}{
-				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				annotationKey, annotationKey, annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		}
 	}
@@ -812,13 +832,13 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		envKey := "k8s.env." + key.(string)
 		if slices.Contains(common.PEER_TABLES, table) {
 			response.Values = append(response.Values, []interface{}{
-				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				envKey, envKey + "_0", envKey + "_1", envKey, envKey, envKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 			response.Values = append(response.Values, []interface{}{
-				envKey, envKey, envKey, envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				envKey, envKey, envKey, envKey, envKey, envKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		}
 	}
@@ -838,13 +858,13 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		chostCloudTagKey := "cloud.tag." + key.(string)
 		if slices.Contains(common.PEER_TABLES, table) {
 			response.Values = append(response.Values, []interface{}{
-				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 			response.Values = append(response.Values, []interface{}{
-				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		}
 	}
@@ -864,13 +884,13 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		osAPPTagKey := "os.app." + key.(string)
 		if slices.Contains(common.PEER_TABLES, table) {
 			response.Values = append(response.Values, []interface{}{
-				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		} else if !slices.Contains(noCustomTagDB, db) && !slices.Contains(noCustomTagTable, table) {
 			response.Values = append(response.Values, []interface{}{
-				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, notSupportOperator, "",
+				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, "",
 			})
 		}
 	}
@@ -942,8 +962,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		if db == "_prometheus" {
 			externalTag := tagName.(string)
 			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 			})
 		} else if table == "alert_event" {
 			externalTag := tagName.(string)
@@ -952,34 +972,34 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") {
 				categoryValue = "Custom Tag"
 				response.Values = append(response.Values, []interface{}{
-					externalTag, externalTag, externalTag, externalTag, "map_item",
-					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
+					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 				})
 			} else if strings.HasPrefix(externalTag, "tag.") || strings.HasPrefix(externalTag, "attribute.") {
 				categoryValue = "Native Tag"
 				response.Values = append(response.Values, []interface{}{
-					externalTag, externalTag, externalTag, externalTag, "map_item",
-					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
+					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 				})
 			} else {
 				categoryValue = _tagName.([]interface{})[2].(string)
 				response.Values = append(response.Values, []interface{}{
-					externalTag, externalTag, externalTag, externalTag, categoryValue,
-					categoryValue, tagTypeToOperators[categoryValue], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, categoryValue,
+					categoryValue, tagTypeToOperators[categoryValue], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 				})
 			}
 
 		} else if slices.Contains(tagNativeTagDB, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 			})
 		}
 	}
@@ -989,8 +1009,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 func GetAlertEventTagDescriptions(staticTag, dynamicTag *common.Result) (response *common.Result, err error) {
 	response = &common.Result{
 		Columns: []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
+			"operators", "permissions", "description", "description_zh", "description_en", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -1023,8 +1043,8 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	table = strings.Trim(table, "`")
 	response = &common.Result{
 		Columns: []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
+			"operators", "permissions", "description", "description_zh", "description_en", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -1108,7 +1128,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 func GetEnumTags(db, table, sql string) (*common.Result, error) {
 	response := &common.Result{
 		Columns: []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category",
+			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
 			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
@@ -1121,7 +1141,7 @@ func GetEnumTags(db, table, sql string) (*common.Result, error) {
 				enumTagSlice = append(enumTagSlice, tagDescription.Name)
 				response.Values = append(response.Values,
 					[]interface{}{
-						tagDescription.Name, tagDescription.ClientName, tagDescription.ServerName, tagDescription.DisplayName, tagDescription.Type,
+						tagDescription.Name, tagDescription.ClientName, tagDescription.ServerName, tagDescription.DisplayName, tagDescription.DisplayNameZH, tagDescription.DisplayNameEN, tagDescription.Type,
 						tagDescription.Category, tagDescription.Operators, tagDescription.Permissions, tagDescription.Description, tagDescription.RelatedTag, tagDescription.Deprecated, tagDescription.NotSupportedOperators, "",
 					})
 			}
