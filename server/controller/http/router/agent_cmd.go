@@ -26,7 +26,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+
+	grpcapi "github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -35,8 +38,6 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
 const (
@@ -208,7 +209,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 
 		userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
 		if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
-			var cmds []*trident.RemoteCommand
+			var cmds []*grpcapi.RemoteCommand
 			for _, item := range data.RemoteCommand {
 				_, ok1 := profileCommandMap[*item.Cmd]
 				_, ok2 := probeCommandMap[*item.Cmd]
@@ -220,7 +221,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 		}
 
 		if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
-			var cmds []*trident.RemoteCommand
+			var cmds []*grpcapi.RemoteCommand
 			for _, item := range data.RemoteCommand {
 				if item.Cmd == nil {
 					continue
@@ -271,8 +272,8 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			}
 		}
 
-		agentReq := trident.RemoteExecRequest{
-			ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
+		agentReq := grpcapi.RemoteExecRequest{
+			ExecType: grpcapi.ExecutionType_RUN_COMMAND.Enum(),
 			// CommandId:    req.CommandId, // deprecated
 			CommandIdent: req.CommandIdent,
 			LinuxNsPid:   req.LinuxNsPid,
@@ -296,7 +297,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			return
 		}
 
-		if req.OutputFormat.String() == trident.OutputFormat_TEXT.String() {
+		if req.OutputFormat.String() == grpcapi.OutputFormat_TEXT.String() {
 			JsonResponse(c, content, nil)
 			return
 		}

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/message/trident"
+	grpcapi "github.com/deepflowio/deepflow/message/agent"
 	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -71,7 +71,7 @@ func AddToCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 	log.Infof("add agent(key:%s) to cmd manager", key)
 	agentCMDManager[key] = &CMDManager{
 		requestID: requestID,
-		ExecCH:    make(chan *trident.RemoteExecRequest, 1),
+		ExecCH:    make(chan *grpcapi.RemoteExecRequest, 1),
 
 		requestIDToResp: make(map[uint64]*CMDResp),
 	}
@@ -112,7 +112,7 @@ func RemoveAllFromCMDManager(key string) {
 
 type CMDManager struct {
 	requestID       uint64
-	ExecCH          chan *trident.RemoteExecRequest
+	ExecCH          chan *grpcapi.RemoteExecRequest
 	requestIDToResp map[uint64]*CMDResp
 }
 
@@ -174,7 +174,7 @@ func GetRequestID(key string) uint64 {
 	return 0
 }
 
-func AppendCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
+func AppendCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = append(resp.data.RemoteCommand, data...)
@@ -182,7 +182,7 @@ func AppendCommands(key string, requestID uint64, data []*trident.RemoteCommand)
 	}
 }
 
-func InitCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
+func InitCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = data
@@ -190,7 +190,7 @@ func InitCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
 	}
 }
 
-func AppendNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
+func AppendNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = append(resp.data.LinuxNamespace, data...)
@@ -198,7 +198,7 @@ func AppendNamespaces(key string, requestID uint64, data []*trident.LinuxNamespa
 	}
 }
 
-func InitNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
+func InitNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = data
@@ -244,7 +244,7 @@ func GetContent(key string, requestID uint64) string {
 	return ""
 }
 
-func GetCommands(key string, requestID uint64) []*trident.RemoteCommand {
+func GetCommands(key string, requestID uint64) []*grpcapi.RemoteCommand {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
@@ -255,7 +255,7 @@ func GetCommands(key string, requestID uint64) []*trident.RemoteCommand {
 	return nil
 }
 
-func GetCommandsWithoutLock(key string, requestID uint64) []*trident.RemoteCommand {
+func GetCommandsWithoutLock(key string, requestID uint64) []*grpcapi.RemoteCommand {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			return resp.data.RemoteCommand
@@ -264,7 +264,7 @@ func GetCommandsWithoutLock(key string, requestID uint64) []*trident.RemoteComma
 	return nil
 }
 
-func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
+func GetNamespaces(key string, requestID uint64) []*grpcapi.LinuxNamespace {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
@@ -275,7 +275,7 @@ func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
 	return nil
 }
 
-func GetNamespacesWithoutLock(key string, requestID uint64) []*trident.LinuxNamespace {
+func GetNamespacesWithoutLock(key string, requestID uint64) []*grpcapi.LinuxNamespace {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			return resp.data.LinuxNamespace
@@ -305,9 +305,9 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 	}
 	defer RemoveAgentCMDResp(key, requestID)
 
-	cmdReq := &trident.RemoteExecRequest{
+	cmdReq := &grpcapi.RemoteExecRequest{
 		RequestId: &requestID,
-		ExecType:  trident.ExecutionType_LIST_COMMAND.Enum(),
+		ExecType:  grpcapi.ExecutionType_LIST_COMMAND.Enum(),
 	}
 	manager.ExecCH <- cmdReq
 
@@ -323,7 +323,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
 			resp.RemoteCommand = GetCommands(key, requestID)
-			namespaceReq := &trident.RemoteExecRequest{RequestId: &requestID, ExecType: trident.ExecutionType_LIST_NAMESPACE.Enum()}
+			namespaceReq := &grpcapi.RemoteExecRequest{RequestId: &requestID, ExecType: grpcapi.ExecutionType_LIST_NAMESPACE.Enum()}
 			manager.ExecCH <- namespaceReq
 		case _, ok := <-cmdResp.LinuxNamespaceDoneCH:
 			if !ok {
@@ -352,7 +352,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 	}
 }
 
-func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
+func RunAgentCMD(timeout, orgID, agentID int, req *grpcapi.RemoteExecRequest, CMD string) (string, error) {
 	serverLog := fmt.Sprintf("The deepflow-server is unable to execute the `%s` command."+
 		" Detailed error information is as follows:\n\n", CMD)
 	dbInfo, err := mysql.GetDB(orgID)
