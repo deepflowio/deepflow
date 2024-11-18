@@ -329,19 +329,23 @@ type ChPodServiceK8sLabels struct {
 }
 
 type ChStringEnum struct {
-	TagName     string    `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
-	Value       string    `gorm:"primaryKey;column:value;type:varchar(256);default:null" json:"VALUE"`
-	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	Description string    `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	TagName       string    `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
+	Value         string    `gorm:"primaryKey;column:value;type:varchar(256);default:null" json:"VALUE"`
+	NameZH        string    `gorm:"column:name_zh;type:varchar(256);default:null" json:"NAME_ZH"`
+	NameEN        string    `gorm:"column:name_en;type:varchar(256);default:null" json:"NAME_EN"`
+	DescriptionZH string    `gorm:"column:description_zh;type:varchar(256);default:null" json:"DESCRIPTION_ZH"`
+	DescriptionEN string    `gorm:"column:description_en;type:varchar(256);default:null" json:"DESCRIPTION_EN"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChIntEnum struct {
-	TagName     string    `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
-	Value       int       `gorm:"primaryKey;column:value;type:int;default:0" json:"VALUE"`
-	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	Description string    `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	TagName       string    `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
+	Value         int       `gorm:"primaryKey;column:value;type:int;default:0" json:"VALUE"`
+	NameZH        string    `gorm:"column:name_zh;type:varchar(256);default:null" json:"NAME_ZH"`
+	NameEN        string    `gorm:"column:name_en;type:varchar(256);default:null" json:"NAME_EN"`
+	DescriptionZH string    `gorm:"column:description_zh;type:varchar(256);default:null" json:"DESCRIPTION_ZH"`
+	DescriptionEN string    `gorm:"column:description_en;type:varchar(256);default:null" json:"DESCRIPTION_EN"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChNodeType struct {

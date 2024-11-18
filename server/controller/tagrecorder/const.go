@@ -549,8 +549,10 @@ const (
 		"(\n" +
 		"    `tag_name` String,\n" +
 		"    `value` String,\n" +
-		"    `name` String,\n" +
-		"    `description` String\n" +
+		"    `name_zh` String,\n" +
+		"    `name_en` String,\n" +
+		"    `description_zh` String,\n" +
+		"    `description_en` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
 		SQL_SOURCE_MYSQL +
@@ -560,8 +562,10 @@ const (
 		"(\n" +
 		"    `tag_name` String,\n" +
 		"    `value` UInt64,\n" +
-		"    `name` String,\n" +
-		"    `description` String\n" +
+		"    `name_zh` String,\n" +
+		"    `name_en` String,\n" +
+		"    `description_zh` String,\n" +
+		"    `description_en` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
 		SQL_SOURCE_MYSQL +
