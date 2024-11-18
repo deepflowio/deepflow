@@ -477,14 +477,48 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-// EscapeJSONString is used to escape special characters in JSON strings
-func EscapeJSONString(value string) string {
-	replacer := strings.NewReplacer(
-		`\`, `\\`,
-		`"`, `\"`,
-		"\n", `\n`,
-	)
-	return replacer.Replace(value)
+func EscapeJsonStringToStringBuilder(sb *strings.Builder, str string) {
+	for i := 0; i < len(str); i++ {
+		c := str[i]
+		if c == 0x08 {
+			sb.WriteString("\\b")
+		} else if c == 0x09 {
+			sb.WriteString("\\t")
+		} else if c == 0x0A {
+			sb.WriteString("\\n")
+		} else if c == 0x0C {
+			sb.WriteString("\\f")
+		} else if c == 0x0D {
+			sb.WriteString("\\r")
+		} else if c == 0x22 {
+			sb.WriteString("\\\"")
+		} else if c == 0x5C {
+			sb.WriteString("\\\\")
+		} else if c >= 0x00 && c <= 0x1F {
+			sb.WriteString(fmt.Sprintf("\\u%04x", int(c)))
+		} else {
+			sb.WriteByte(c)
+		}
+	}
+}
+
+func IsEscapeJsonNeeded(str string) bool {
+	for i := 0; i < len(str); i++ {
+		c := str[i]
+		if (c >= 0x00 && c <= 0x1F) || c == 0x22 || c == 0x5C {
+			return true
+		}
+	}
+	return false
+}
+
+func EscapeJsonString(str string) string {
+	if !IsEscapeJsonNeeded(str) {
+		return str
+	}
+	var result strings.Builder
+	EscapeJsonStringToStringBuilder(&result, str)
+	return result.String()
 }
 
 func CloneStringSlice(strs []string) []string {
