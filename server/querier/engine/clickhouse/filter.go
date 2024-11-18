@@ -276,7 +276,7 @@ func TransIngressFilter(translator, regexpTranslator, op, value string) (filter 
 	return
 }
 
-// The tag is not in the tagResourceMap
+// The tag is not in the tagResourceMap default
 func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter string, isRemoteRead bool, e *CHEngine) (filter string, err error) {
 	tagItem := &tag.Tag{}
 	ok := false
@@ -423,17 +423,6 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 					filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, value)
 				}
 			}
-		} else if strings.HasPrefix(tagName, "Enum(") {
-			tagName = strings.TrimPrefix(tagName, "Enum(")
-			tagName = strings.TrimSuffix(tagName, ")")
-			tagItem, ok = tag.GetTag(tagName, db, table, "enum")
-			if ok {
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value)
-				}
-			}
 		} else {
 			if strings.Contains(op, "match") {
 				filter = fmt.Sprintf("%s(%s,%s)", op, postAsTag, value)
@@ -558,10 +547,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			switch table {
 			case "int_enum_map", "string_enum_map":
 				tagItem, ok := tag.GetTag("enum_tag_id", db, table, "default")
-				tagName := strings.Trim(t.Tag, "`")
-				if strings.HasPrefix(tagName, "enum(") {
-					tagItem, ok = tag.GetTag("enum_tag_name", db, table, "default")
-				}
 				if ok {
 					switch strings.ToLower(op) {
 					case "match":
@@ -1317,7 +1302,10 @@ type WhereFunction struct {
 	Value    string
 }
 
-func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
+func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, error) {
+	db := e.DB
+	table := e.Table
+	language := e.Language
 	opName := expr.(*sqlparser.ComparisonExpr).Operator
 	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
 	right := view.Expr{Value: ""}
@@ -1331,6 +1319,18 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		tagName = strings.Trim(tagName, "`")
 		tagEnum := strings.TrimSuffix(tagName, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
+		nameColumn := ""
+		if language != "" {
+			nameColumn = "name_" + language
+		} else {
+			cfgLang := ""
+			if config.Cfg.Language == "en" {
+				cfgLang = "en"
+			} else {
+				cfgLang = "zh"
+			}
+			nameColumn = "name_" + cfgLang
+		}
 		if db == "flow_tag" {
 			if strings.ToLower(opName) == "like" || strings.ToLower(opName) == "not like" {
 				f.Value = strings.ReplaceAll(f.Value, "*", "%")
@@ -1369,17 +1369,17 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 			if ok {
 				switch strings.ToLower(opName) {
 				case "match":
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value)
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameColumn, f.Value)
 				case "not match":
-					filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value) + ")"
+					filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameColumn, f.Value) + ")"
 				case "not ilike":
-					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", f.Value) + ")"
+					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "ilike", f.Value) + ")"
 				case "not in":
-					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value) + ")"
+					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "in", f.Value) + ")"
 				case "!=":
-					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ")"
+					filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value) + ")"
 				default:
-					filter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value)
+					filter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value)
 				}
 			}
 			return &view.Expr{Value: "(" + filter + ")"}, nil
@@ -1435,7 +1435,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 				return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 			}
-			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+			enumFileName := tagDescription.EnumFile
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
 			case "=":
 				//when enum function operator is '=' , add 'or tag = xxx'
@@ -1445,15 +1445,15 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 						// when value type is int, add toUInt64() function
 						if strings.Contains(tagName, "pod_group_type") {
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
-							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") OR " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ") OR " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						} else {
-							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}
 					} else {
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName)
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName)
 					}
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + f.Value
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + " OR " + tagName + " = " + f.Value
 				}
 			case "!=":
 				//when enum function operator is '!=', add 'and tag != xxx'
@@ -1463,37 +1463,37 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 						// when value type is int, add toUInt64() function
 						if strings.Contains(tagName, "pod_group_type") {
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
-							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ") AND " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						} else {
-							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}
 					} else {
 						if strings.Contains(tagName, "pod_group_type") {
-							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
+							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ")"
 						} else {
-							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName)
 						}
 					}
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
 				}
 			case "not match":
 				if strings.Contains(tagName, "pod_group_type") {
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName) + ")"
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameColumn, f.Value, enumFileName) + ")"
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, f.Value, enumFileName)
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, nameColumn, f.Value, enumFileName)
 				}
 			case "not in":
 				if strings.Contains(tagName, "pod_group_type") {
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value, enumFileName) + ")"
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "in", f.Value, enumFileName) + ")"
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName)
 				}
 			default:
 				if strings.Contains(opName, "match") {
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, f.Value, enumFileName)
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, nameColumn, f.Value, enumFileName)
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName)
 				}
 			}
 			return &view.Expr{Value: "(" + whereFilter + ")"}, nil
