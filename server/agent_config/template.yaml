@@ -1118,7 +1118,7 @@ inputs:
     # description:
     #   en: |-
     #     The type of matcher.
-    # upgrade_from: static_config.os-proc-regex.match-regex
+    # upgrade_from: static_config.os-proc-regex.match-type
     # ---
     # match_type: ""
     # ---
@@ -2006,6 +2006,7 @@ inputs:
       #     TODO
       #   ch: |-
       #     开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
+      # upgrade_from: static_config.packet-segmentation-reassembly
       packet_segmentation_reassembly: []
 
     # type: section
@@ -2648,10 +2649,10 @@ inputs:
         #     based unwinding for all processes. If a process does not contain frame pointers,
         #     the stack cannot be displayed correctly.
         #   ch: |-
-        #     默认设置为“false”，将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
-        #     设置为“true”将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
+        #     默认设置为“true”，将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
+        #     设置为“true”将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
         # upgrade_from: static_config.ebpf.dwarf-disabled
-        dwarf_disabled: false
+        dwarf_disabled: true
         # type: string
         # name:
         #   en: DWARF unwinding process matching regular expression
@@ -5271,7 +5272,7 @@ outputs:
       #     TODO
       # upgrade_from: l7_log_store_tap_types
       # TODO: 候选项需要特殊处理
-      l7_capture_network_types: []
+      l7_capture_network_types: [0]
       # type: int
       # name:
       #   en: Ignored Observation Points for L4

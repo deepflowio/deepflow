@@ -123,8 +123,7 @@ func postYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		body := map[string]interface{}{"data": string(bytes)}
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, body, service.DataTypeYAML)
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, bytes, service.DataTypeYAML)
 		routercommon.JsonResponse(c, string(data), err)
 	}
 }
@@ -137,8 +136,7 @@ func putYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		body := map[string]interface{}{"data": string(bytes)}
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, body, service.DataTypeYAML)
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, bytes, service.DataTypeYAML)
 		routercommon.JsonResponse(c, string(data), err)
 	}
 }

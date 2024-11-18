@@ -25,9 +25,10 @@ use gimli::{
 use log::{debug, trace};
 use object::{Object, ObjectSection};
 
-use super::maps::get_memory_mappings;
-
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    maps::get_memory_mappings,
+};
 
 const EH_FRAME_NAME: &'static str = ".eh_frame";
 

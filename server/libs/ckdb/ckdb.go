@@ -328,7 +328,7 @@ type Column struct {
 }
 
 func (c *Column) MakeModifyTimeZoneSQL(database, table, timeZone string) string {
-	if timeZone == "" || !c.Type.HasDFTimeZone() {
+	if timeZone == "" || timeZone == DF_TIMEZONE || !c.Type.HasDFTimeZone() {
 		return ""
 	}
 	newTimeZoneType := strings.ReplaceAll(c.Type.String(), DF_TIMEZONE, timeZone)

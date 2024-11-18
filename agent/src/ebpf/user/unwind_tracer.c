@@ -44,18 +44,16 @@
 
 extern int major, minor;
 
-bool dwarf_available(void) {
-    return major > 5 || (major == 5 && minor >= 2);
-}
+bool dwarf_available(void) { return major > 5 || (major == 5 && minor >= 2); }
 
-static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head,
-                                                   .next = &proc_events.head, },
+static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head, .next = &proc_events.head, },
                                          .m = PTHREAD_MUTEX_INITIALIZER };
 
 static pthread_mutex_t g_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static unwind_table_t *g_unwind_table = NULL;
 
-static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unwind_table);
+static pthread_mutex_t g_python_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
+static python_unwind_table_t *g_python_unwind_table = NULL;
 
 static struct {
     bool dwarf_enabled;
@@ -66,19 +64,12 @@ static struct {
     } dwarf_regex;
     int dwarf_process_map_size;
     int dwarf_shard_map_size;
-} g_unwind_config = {
-    .dwarf_enabled = false,
-    .dwarf_regex = {
-        .m = PTHREAD_MUTEX_INITIALIZER,
-        .exists = false,
-    },
-    .dwarf_process_map_size = 1024,
-    .dwarf_shard_map_size = 128,
-};
+} g_unwind_config = { .dwarf_enabled = false,
+                      .dwarf_regex = { .m = PTHREAD_MUTEX_INITIALIZER, .exists = false, },
+                      .dwarf_process_map_size = 1024,
+                      .dwarf_shard_map_size = 128, };
 
-bool get_dwarf_enabled(void) {
-    return g_unwind_config.dwarf_enabled;
-}
+bool get_dwarf_enabled(void) { return g_unwind_config.dwarf_enabled; }
 
 void set_dwarf_enabled(bool enabled) {
     if (!dwarf_available()) {
@@ -125,8 +116,7 @@ int set_dwarf_regex(const char *pattern) {
     int ret = regcomp(&g_unwind_config.dwarf_regex.regex, pattern, REG_EXTENDED);
     if (ret != 0) {
         char error_buffer[128];
-        regerror(ret, &g_unwind_config.dwarf_regex.regex, error_buffer,
-                 sizeof(error_buffer));
+        regerror(ret, &g_unwind_config.dwarf_regex.regex, error_buffer, sizeof(error_buffer));
         ebpf_warning("DWARF regex %s is invalid: %s", pattern, error_buffer);
         pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
         return -1;
@@ -141,9 +131,7 @@ int set_dwarf_regex(const char *pattern) {
     return 0;
 }
 
-int get_dwarf_process_map_size(void) {
-    return g_unwind_config.dwarf_process_map_size;
-}
+int get_dwarf_process_map_size(void) { return g_unwind_config.dwarf_process_map_size; }
 
 void set_dwarf_process_map_size(int size) {
     if (g_unwind_config.dwarf_process_map_size == size) {
@@ -153,9 +141,7 @@ void set_dwarf_process_map_size(int size) {
     ebpf_info(LOG_CP_TAG "DWARF process map size set to %d.\n", size);
 }
 
-int get_dwarf_shard_map_size(void) {
-    return g_unwind_config.dwarf_shard_map_size;
-}
+int get_dwarf_shard_map_size(void) { return g_unwind_config.dwarf_shard_map_size; }
 
 void set_dwarf_shard_map_size(int size) {
     if (g_unwind_config.dwarf_shard_map_size == size) {
@@ -170,13 +156,17 @@ static bool requires_dwarf_unwind_table(int pid) {
         return false;
     }
 
+    if (is_pid_match(FEATURE_DWARF_UNWINDING, pid)) {
+        return true;
+    }
+
     char *path = get_elf_path_by_pid(pid);
     if (path == NULL) {
         return false;
     }
 
-    // TBD: offcpu
-    bool need_unwind = is_feature_matched(FEATURE_PROFILE_ONCPU, pid, path) || extended_require_dwarf(pid, path);
+    bool need_unwind = is_pid_match(FEATURE_PROFILE_ONCPU, pid) || is_pid_match(FEATURE_PROFILE_OFFCPU, pid) ||
+                       is_pid_match(FEATURE_PROFILE_MEMORY, pid);
     if (!need_unwind) {
         free(path);
         return false;
@@ -200,6 +190,186 @@ static bool requires_dwarf_unwind_table(int pid) {
     free(path);
 
     return !frame_pointer_heuristic_check(pid);
+}
+
+int unwind_tracer_init(struct bpf_tracer *tracer) {
+    int32_t offset = read_offset_of_stack_in_task_struct();
+    if (offset < 0) {
+        ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
+        ebpf_warning("unwinder may not handle in kernel perf events correctly");
+    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+        ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
+        ebpf_warning("unwinder may not handle in kernel perf events correctly");
+    }
+
+    int process_map_fd = bpf_table_get_fd(tracer, MAP_PROCESS_SHARD_LIST_NAME);
+    int shard_map_fd = bpf_table_get_fd(tracer, MAP_UNWIND_ENTRY_SHARD_NAME);
+    if (process_map_fd < 0) {
+        ebpf_warning("create unwind table failed: map %s not found", MAP_PROCESS_SHARD_LIST_NAME);
+        return -1;
+    }
+    if (shard_map_fd < 0) {
+        ebpf_warning("create unwind table failed: map %s not found", MAP_UNWIND_ENTRY_SHARD_NAME);
+        return -1;
+    }
+
+    unwind_table_t *table = unwind_table_create(process_map_fd, shard_map_fd);
+    pthread_mutex_lock(&g_unwind_table_lock);
+    g_unwind_table = table;
+    pthread_mutex_unlock(&g_unwind_table_lock);
+
+    int unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_UNWIND_INFO_NAME);
+    int offsets_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_OFFSETS_NAME);
+    if (unwind_info_map_fd < 0 || offsets_map_fd < 0) {
+        ebpf_warning("Failed to get unwind info map fd or offsets map fd\n");
+        return -1;
+    }
+    python_unwind_table_t *python_table = python_unwind_table_create(unwind_info_map_fd, offsets_map_fd);
+    pthread_mutex_lock(&g_python_unwind_table_lock);
+    g_python_unwind_table = python_table;
+    pthread_mutex_unlock(&g_python_unwind_table_lock);
+
+    return 0;
+}
+
+/* *INDENT-OFF* */
+static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
+                                            .symbol = "PyEval_SaveThread",
+                                            .probe_func = URETPROBE_FUNC_NAME(python_save_tstate_addr),
+                                            .is_probe_ret = true, }, };
+/* *INDENT-ON* */
+
+static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
+    char *path = NULL;
+
+    if (pid <= 1)
+        goto out;
+
+    if (!is_user_process(pid))
+        goto out;
+
+    path = get_so_path_by_pid_and_name(pid, "python3");
+    if (!path) {
+        path = get_so_path_by_pid_and_name(pid, "python2");
+        if (!path) {
+            goto out;
+        }
+    }
+
+    ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
+    add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
+
+out:
+    free(path);
+    return;
+}
+
+void unwind_tracer_drop() {
+    pthread_mutex_lock(&g_unwind_table_lock);
+    if (g_unwind_table) {
+        unwind_table_unload_all(g_unwind_table);
+        unwind_table_destroy(g_unwind_table);
+        g_unwind_table = NULL;
+    }
+    pthread_mutex_unlock(&g_unwind_table_lock);
+
+    pthread_mutex_lock(&g_python_unwind_table_lock);
+    if (g_python_unwind_table) {
+        python_unwind_table_destroy(g_python_unwind_table);
+        g_python_unwind_table = NULL;
+    }
+    pthread_mutex_unlock(&g_python_unwind_table_lock);
+}
+
+void unwind_process_exec(int pid) {
+    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
+    if (tracer == NULL) {
+        return;
+    }
+
+    if (tracer->state != TRACER_RUNNING) {
+        return;
+    }
+
+    add_event_to_proc_list(&proc_events, tracer, pid, NULL);
+}
+
+// Process events in the queue
+void unwind_events_handle(void) {
+    if (!dwarf_available()) {
+        return;
+    }
+
+    struct process_create_event *event = NULL;
+    struct bpf_tracer *tracer = NULL;
+    int count = 0;
+    pthread_mutex_lock(&g_unwind_table_lock);
+    pthread_mutex_lock(&g_python_unwind_table_lock);
+    do {
+        event = get_first_event(&proc_events);
+        if (!event)
+            break;
+
+        if (get_sys_uptime() < event->expire_time) {
+            break;
+        }
+
+        tracer = event->tracer;
+        if (tracer && is_python_process(event->pid)) {
+            python_unwind_table_load(g_python_unwind_table, event->pid);
+            pthread_mutex_lock(&tracer->mutex_probes_lock);
+            python_parse_and_register(event->pid, tracer->tps);
+            tracer_uprobes_update(tracer);
+            tracer_hooks_process(tracer, HOOK_ATTACH, &count);
+            pthread_mutex_unlock(&tracer->mutex_probes_lock);
+        }
+
+        if (g_unwind_table && requires_dwarf_unwind_table(event->pid)) {
+            unwind_table_load(g_unwind_table, event->pid);
+        }
+
+        remove_event(&proc_events, event);
+        free(event);
+
+    } while (true);
+    pthread_mutex_unlock(&g_python_unwind_table_lock);
+    pthread_mutex_unlock(&g_unwind_table_lock);
+}
+
+// Process exit, reclaim resources
+void unwind_process_exit(int pid) {
+    if (!dwarf_available()) {
+        return;
+    }
+
+    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
+    if (tracer == NULL || tracer->state != TRACER_RUNNING) {
+        return;
+    }
+
+    struct list_head *p, *n;
+    struct process_create_event *e = NULL;
+    pthread_mutex_lock(&proc_events.m);
+    list_for_each_safe(p, n, &proc_events.head) {
+        e = container_of(p, struct process_create_event, list);
+        if (e->pid == pid) {
+            list_head_del(&e->list);
+            free(e);
+        }
+    }
+    pthread_mutex_unlock(&proc_events.m);
+
+    pthread_mutex_lock(&g_unwind_table_lock);
+    if (g_unwind_table) {
+        unwind_table_unload(g_unwind_table, pid);
+    }
+    pthread_mutex_unlock(&g_unwind_table_lock);
+
+    pthread_mutex_lock(&g_python_unwind_table_lock);
+    if (g_python_unwind_table) {
+        python_unwind_table_unload(g_python_unwind_table, pid);
+    }
+    pthread_mutex_unlock(&g_python_unwind_table_lock);
 }
 
 // Ensure exclusive access to *unwind_table before calling this function
@@ -233,131 +403,6 @@ static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unw
 
     closedir(fddir);
     return ETR_OK;
-}
-
-int unwind_tracer_init(struct bpf_tracer *tracer) {
-    int32_t offset = read_offset_of_stack_in_task_struct();
-    if (offset < 0) {
-        ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
-        ebpf_warning("unwinder may not handle in kernel perf events correctly");
-    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
-        ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
-        ebpf_warning("unwinder may not handle in kernel perf events correctly");
-    }
-
-    struct ebpf_map *process_map =
-        ebpf_obj__get_map_by_name(tracer->obj, MAP_PROCESS_SHARD_LIST_NAME);
-    struct ebpf_map *shard_map =
-        ebpf_obj__get_map_by_name(tracer->obj, MAP_UNWIND_ENTRY_SHARD_NAME);
-    if (!process_map) {
-        ebpf_warning("create unwind table failed: map %s not found", MAP_PROCESS_SHARD_LIST_NAME);
-        return -1;
-    }
-    if (!shard_map) {
-        ebpf_warning("create unwind table failed: map %s not found", MAP_UNWIND_ENTRY_SHARD_NAME);
-        return -1;
-    }
-
-    unwind_table_t *table = unwind_table_create(process_map->fd, shard_map->fd);
-    load_running_processes(tracer, table);
-    pthread_mutex_lock(&g_unwind_table_lock);
-    g_unwind_table = table;
-    pthread_mutex_unlock(&g_unwind_table_lock);
-
-    return 0;
-}
-
-void unwind_tracer_drop() {
-    if (!dwarf_available()) {
-        return;
-    }
-
-    pthread_mutex_lock(&g_unwind_table_lock);
-    if (g_unwind_table) {
-        unwind_table_unload_all(g_unwind_table);
-        unwind_table_destroy(g_unwind_table);
-        g_unwind_table = NULL;
-    }
-    pthread_mutex_unlock(&g_unwind_table_lock);
-}
-
-void unwind_process_exec(int pid) {
-    if (!dwarf_available()) {
-        return;
-    }
-
-    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
-    if (tracer == NULL) {
-        return;
-    }
-
-    if (tracer->state != TRACER_RUNNING) {
-        return;
-    }
-
-    if (!requires_dwarf_unwind_table(pid)) {
-        return;
-    }
-
-    add_event_to_proc_list(&proc_events, tracer, pid, NULL);
-}
-
-// Process events in the queue
-void unwind_events_handle(void) {
-    if (!dwarf_available()) {
-        return;
-    }
-
-    struct process_create_event *event = NULL;
-    pthread_mutex_lock(&g_unwind_table_lock);
-    do {
-        event = get_first_event(&proc_events);
-        if (!event)
-            break;
-
-        if (get_sys_uptime() < event->expire_time) {
-            break;
-        }
-
-        if (get_dwarf_enabled() && g_unwind_table) {
-            unwind_table_load(g_unwind_table, event->pid);
-        }
-
-        remove_event(&proc_events, event);
-        process_event_free(event);
-
-    } while (true);
-    pthread_mutex_unlock(&g_unwind_table_lock);
-}
-
-// Process exit, reclaim resources
-void unwind_process_exit(int pid) {
-    if (!dwarf_available()) {
-        return;
-    }
-
-    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
-    if (tracer == NULL || tracer->state != TRACER_RUNNING) {
-        return;
-    }
-
-    struct list_head *p, *n;
-    struct process_create_event *e = NULL;
-    pthread_mutex_lock(&proc_events.m);
-    list_for_each_safe(p, n, &proc_events.head) {
-        e = container_of(p, struct process_create_event, list);
-        if (e->pid == pid) {
-            list_head_del(&e->list);
-            free(e);
-        }
-    }
-    pthread_mutex_unlock(&proc_events.m);
-
-    pthread_mutex_lock(&g_unwind_table_lock);
-    if (g_unwind_table) {
-        unwind_table_unload(g_unwind_table, pid);
-    }
-    pthread_mutex_unlock(&g_unwind_table_lock);
 }
 
 void unwind_process_reload() {

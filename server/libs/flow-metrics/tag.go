@@ -166,6 +166,19 @@ func (d DirectionEnum) IsGateway() bool {
 	return SideType(d&_SIDE_TYPE_MASK)&(GatewaySide|GatewayHypervisorSide) != 0
 }
 
+func (d DirectionEnum) ToRole() uint8 {
+	switch d & _CLIENT_SERVER_MASK {
+	case ClientToServer:
+		return ROLE_CLIENT
+	case ServerToClient:
+		return ROLE_SERVER
+	case LocalToLocal:
+		return ROLE_LOCAL
+	default:
+		return ROLE_REST
+	}
+}
+
 type TAPSideEnum uint8
 
 const (
@@ -191,6 +204,8 @@ const (
 const (
 	ROLE_CLIENT = 0
 	ROLE_SERVER = 1
+	ROLE_LOCAL  = 2
+	ROLE_REST   = 3
 )
 
 var TAPSideEnumsString = []string{
@@ -340,6 +355,7 @@ type Field struct {
 func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 
+	aggr1H1DTable := true
 	var orderKeys []string
 	code := metricsTableCodes[id]
 	if code&L3EpcID != 0 {
@@ -348,6 +364,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		orderKeys = []string{timeKey, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0"}
 	} else if code&ACLGID != 0 {
 		orderKeys = []string{timeKey, "acl_gid"}
+		aggr1H1DTable = false
 	}
 	if code&ServerPort != 0 {
 		orderKeys = append(orderKeys, "server_port")
@@ -380,6 +397,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
+		Aggr1H1D:        aggr1H1DTable,
 	}
 }
 
@@ -393,6 +411,7 @@ func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int, coldStorages *ckdb.
 	t.ColdStorage = *coldStorages
 	t.PartitionFunc = ckdb.TimeFuncFourHour
 	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
+	t.Aggr1H1D = false
 
 	return &t
 }
@@ -602,6 +621,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",role=c2s")
 		} else if t.Role == ROLE_SERVER {
 			offset += copy(b[offset:], ",role=s2c")
+		} else if t.Role == ROLE_LOCAL {
+			offset += copy(b[offset:], ",role=local")
+		} else {
+			offset += copy(b[offset:], ",role=rest")
 		}
 	}
 	if t.Code&GPID != 0 {
@@ -923,7 +946,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端, 2: ip为本地，3: 其他"))
 	}
 
 	if code&GPID != 0 {
@@ -1368,11 +1391,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.L3EpcID = MarshalInt32WithSpecialID(p.Field.L3EpcId)
 	t.L3EpcID1 = MarshalInt32WithSpecialID(p.Field.L3EpcId1)
 	direction := DirectionEnum(p.Field.Direction)
-	if direction.IsClientToServer() {
-		t.Role = ROLE_CLIENT
-	} else {
-		t.Role = ROLE_SERVER
-	}
+	t.Role = direction.ToRole()
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
 	t.TAPSideStr = TAPSideEnum(p.Field.TapSide).String()
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)

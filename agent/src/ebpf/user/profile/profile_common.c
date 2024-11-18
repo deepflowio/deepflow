@@ -577,7 +577,7 @@ static void set_msg_kvp(struct profiler_context *ctx,
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
-	kvp->k.e_stack_id = 0;
+	kvp->k.e_stack_id = (u32) v->intpstack;
 
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 
@@ -662,6 +662,9 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->u_stack_id = (u32) v->userstack;
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
 		msg->u_stack_id ^= (u32) v->uprobe_addr ^ (u32) v->memory.class_id;
+	}
+	if (v->intpstack != 0) {
+		msg->u_stack_id ^= (u32) v->intpstack;
 	}
 	msg->k_stack_id = (u32) v->kernstack;
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
@@ -881,6 +884,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 		add_stack_id_to_bitmap(ctx, v->kernstack, stack_map);
 		add_stack_id_to_bitmap(ctx, v->userstack, v->flags & STACK_TRACE_FLAGS_DWARF ? custom_stack_map : stack_map);
+		if (v->intpstack != 0) {
+			add_stack_id_to_bitmap(ctx, v->intpstack, custom_stack_map);
+		}
 
 		/* Total iteration count for this iteration. */
 		(*count)++;

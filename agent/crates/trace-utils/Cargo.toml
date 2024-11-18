@@ -10,7 +10,9 @@ gimli = "0.31"
 libc = "0.2"
 log = "0.4"
 object = "0.36"
+regex.workspace = true
 rustc-demangle = "0.1"
+semver = "1.0"
 thiserror = "1.0"
 
 [build-dependencies]

@@ -3634,9 +3634,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.18"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
+checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "serde"
@@ -4302,7 +4302,9 @@ dependencies = [
  "libc",
  "log 0.4.22",
  "object 0.36.3",
+ "regex",
  "rustc-demangle",
+ "semver",
  "thiserror",
 ]
 

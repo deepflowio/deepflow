@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: mongo log was missing the request content [#8477](https://github.com/deepflowio/deepflow/pull/8477) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Default values in agent config [#8476](https://github.com/deepflowio/deepflow/pull/8476) by [rvql](https://github.com/rvql)
+* fix: ckwriter writing failure caused by not writing data for a long time [#8470](https://github.com/deepflowio/deepflow/pull/8470) by [lzf575](https://github.com/lzf575)
+* fix: Setting type, parser and default value [#8464](https://github.com/deepflowio/deepflow/pull/8464) by [rvql](https://github.com/rvql)
 * fix: agent - eBPF Adjust the control logic for modifying map size [#8456](https://github.com/deepflowio/deepflow/pull/8456) by [yinjiping](https://github.com/yinjiping)
 * fix: no need to retry after writing failure [#8453](https://github.com/deepflowio/deepflow/pull/8453) by [lzf575](https://github.com/lzf575)
 * fix: agent stuck when ntp is turned on [#8445](https://github.com/deepflowio/deepflow/pull/8445) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -234,6 +238,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: the role field adds the values local and rest [#8474](https://github.com/deepflowio/deepflow/pull/8474) by [lzf575](https://github.com/lzf575)
+* feat: agent - eBPF Support python unwind [#8407](https://github.com/deepflowio/deepflow/pull/8407) by [rvql](https://github.com/rvql)
+* feat: single-endpoints db support storing packet where the tap_side i… [#8468](https://github.com/deepflowio/deepflow/pull/8468) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Adapt to 4.19.90-2211.5.0.0178.22.uel20.x86_64 [#8461](https://github.com/deepflowio/deepflow/pull/8461) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent new rpc by default [#8455](https://github.com/deepflowio/deepflow/pull/8455) by [rvql](https://github.com/rvql)
 * feat: update trisolaris dynamic config [#8450](https://github.com/deepflowio/deepflow/pull/8450) by [askyrie](https://github.com/askyrie)
 * feat: Enable agent new rpc by default [#8449](https://github.com/deepflowio/deepflow/pull/8449) by [rvql](https://github.com/rvql)

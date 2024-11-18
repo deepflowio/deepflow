@@ -54,10 +54,14 @@
 #define MAP_PROCESS_SHARD_LIST_NAME     "__process_shard_list_table"
 #define MAP_UNWIND_ENTRY_SHARD_NAME     "__unwind_entry_shard_table"
 #define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
+#define MAP_PYTHON_UNWIND_INFO_NAME     "__python_unwind_info_map"
+#define MAP_PYTHON_OFFSETS_NAME         "__python_offsets_map"
+#define MAP_SYMBOL_TABLE_NAME          "__symbol_table"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
 #define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
+#define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
 #define PROG_OFFCPU_OUTPUT_FOR_PE   "df_PE_offcpu_output"
 
@@ -82,6 +86,7 @@ enum {
 
 enum {
 	PROG_DWARF_UNWIND_PE_IDX,
+	PROG_PYTHON_UNWIND_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	// TBD: PROG_OFFCPU_OUTPUT_PE_IDX,
 	PROG_MEMORY_OUTPUT_PE_IDX,
@@ -130,6 +135,8 @@ enum cfg_feature_idx {
 #define FEATURE_FLAG_PROFILE_MEMORY		(1 << FEATURE_PROFILE_MEMORY)
 #define FEATURE_FLAG_SOCKET_TRACER		(1 << FEATURE_SOCKET_TRACER)
 #define FEATURE_FLAG_DWARF_UNWINDING		(1 << FEATURE_DWARF_UNWINDING)
+
+#define FEATURE_FLAG_PROFILE				(FEATURE_FLAG_PROFILE_ONCPU | FEATURE_FLAG_PROFILE_OFFCPU | FEATURE_FLAG_PROFILE_MEMORY)
 
 /*
  * When the socket map is recycled, each socket message is recycled without sending

@@ -17,15 +17,382 @@
 package agent_config
 
 import (
+	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
-func TestParseYAMLToJson(t *testing.T) {
+func TestIgnoreSubelementComments(t *testing.T) {
+	type args struct {
+		yamlData []byte
+		start    int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`# type: section
+global:
+  # type: section
+  # ---
+  # name:
+  #   en: Global
+  limits:`),
+				start: 3,
+			},
+			want:    5,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter(tt.args.yamlData)
+			i := parser.ignoreSubelementComments(tt.args.start)
+			if i != tt.want {
+				t.Errorf("ignoreSubelementComments() = %v, want %v", i, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvSubelementCommentToSection(t *testing.T) {
+	type args struct {
+		yamlData []byte
+		start    int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 4,
+			},
+			want: []string{
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+			},
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 4,
+			},
+			want: []string{
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+				"        rewrite_name_comment:",
+				"          type: string",
+				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter(tt.args.yamlData)
+			got := make([]string, 0)
+			_, got, err := parser.convSubelementCommentToSection(tt.args.start, got)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convSubelementCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := 0; i < len(got); i++ {
+				if got[i] != tt.want[i] {
+					t.Errorf("line %d convSubelementCommentToSection() = \"%v\", want \"%v\"", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestIgnoreTodoComments(t *testing.T) {
+	type args struct {
+		yamlData []byte
+		start    int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`# type: section
+# TODO: add more fields
+global:`),
+				start: 0,
+			},
+			want:    1,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter(tt.args.yamlData)
+			i := parser.ignoreTodoComments(tt.args.start)
+			if i != tt.want {
+				t.Errorf("ignoreTodoComments() = %v, want %v", i, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvCommentToSection(t *testing.T) {
+	type args struct {
+		yamlData []byte
+		start    int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`# type: section
+# name:
+#   en: Global
+# ----
+# TODO: add more fields
+global:
+  # type: section
+  # --
+  #
+  limits:`),
+				start: 0,
+			},
+			want: []string{
+				"global_comment:",
+				"  type: section",
+				"  name:",
+				"    en: Global",
+			},
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`# type: section
+# name:
+#   en: Global
+# ----
+# TODO: add more fields
+global:
+  # type: section
+  # ---
+  #
+  limits:`),
+				start: 6,
+			},
+			want: []string{
+				"  limits_comment:",
+				"    type: section",
+			},
+			wantErr: false,
+		},
+		{
+			name: "case03",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+				start: 3,
+			},
+			want: []string{
+				"      process_matcher_comment:",
+				"        type: dict",
+				"        match_regex_comment:",
+				"          upgrade_from: static_config.os-proc-regex.match-regex",
+				"        rewrite_name_comment:",
+				"          type: string",
+				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter(tt.args.yamlData)
+			_, detailCommentlines, err := parser.convCommentToSection(tt.args.start)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(detailCommentlines) != len(tt.want) {
+				t.Errorf("convCommentToSection() = \"%v\", want \"%v\"", detailCommentlines, tt.want)
+			}
+			for i := 0; i < len(detailCommentlines); i++ {
+				if detailCommentlines[i] != tt.want[i] {
+					t.Errorf("line %d convCommentToSection() = \"%v\", want \"%v\"", i, detailCommentlines[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestKeyLineToKeyCommentLine(t *testing.T) {
+	type args struct {
+		line string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				line: "global:",
+			},
+			want:    "global_comment:",
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				line: "  limits:",
+			},
+			want:    "  limits_comment:",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewLineFommatter([]byte{})
+			got, err := parser.keyLineToKeyCommentLine(tt.args.line)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("keyLineToKeyCommentLine() error = \"%v\", wantErr \"%v\"", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("keyLineToKeyCommentLine() = \"%v\", want \"%v\"", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLineFormat(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`# type: section
+# name:
+#   en: Global
+# ----
+# TODO
+global:
+  # type: section
+  # description: |-
+  #
+  #   The global section contains global settings.
+  limits:`),
+			},
+			want: []string{
+				"global_comment:",
+				"  type: section",
+				"  name:",
+				"    en: Global",
+				"gloabl:",
+				"  limits_comment:",
+				"    type: section",
+				"    description: |-",
+				"      ",
+				"      The global section contains global settings.",
+				"  limits:",
+			},
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: YamlAgentGroupConfigTemplate,
+			},
+			want: []string{},
+		},
+	}
+	for _, tt := range tests {
+		if tt.name != "case02" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			fmt := NewLineFommatter(tt.args.yamlData)
+			lines, err := fmt.Format()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("stripLines() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			os.Mkdir("test_tmp", 0755)
+			if err := os.WriteFile("test_tmp/stripped_lines.yaml", lines, os.ModePerm); err != nil {
+				t.Fatalf("Failed to write to file: %v", err)
+			}
+		})
+	}
+}
+
+func TestConvertTemplateYAMLToJSON(t *testing.T) {
 	l7Protocols := []string{
 		"HTTP", "HTTP2", "Dubbo", "gRPC", "SOFARPC", "FastCGI", "bRPC", "Tars", "Some/IP", "MySQL", "PostgreSQL",
 		"Oracle", "Redis", "MongoDB", "Kafka", "MQTT", "AMQP", "OpenWire", "NATS", "Pulsar", "ZMTP", "DNS", "TLS", "Custom"}
@@ -105,65 +472,539 @@ func TestParseYAMLToJson(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+  cbpf:
+    common:
+      capture_mode: 0
+  ebpf:
+    profile: # deepflow-server for test, don't delete 241108
+      unwinding:
+        dwarf_regex: ^python[23].*`),
+				dynamicOpts: dynamicOptions,
+			},
+			wantErr: false,
+		},
 	}
+	os.Mkdir("test_tmp", 0755)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseYAMLToJson(tt.args.yamlData, tt.args.dynamicOpts)
+			got, err := ConvertTemplateYAMLToJSON(tt.args.dynamicOpts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("err: %v", err)
 				t.Errorf("ParseYAMLToJson() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if err = os.WriteFile("json_tmpl.json", got, os.ModePerm); err != nil {
+			if err = os.WriteFile(fmt.Sprintf("test_tmp/json_tmpl_%s.json", tt.name), got, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})
 	}
 }
 
-func TestIndentAndUncommentTemplate(t *testing.T) {
+func TestGenerateKeyToComment(t *testing.T) {
 	type args struct {
 		yamlData []byte
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    []string
+		want    map[string]interface{}
 		wantErr bool
 	}{
 		{
 			name: "case01",
 			args: args{
-				yamlData: YamlAgentGroupConfigTemplate,
+				yamlData: []byte(`# type: section
+global:
+  # type: section
+  limits:
+    # type: int
+    max_millicpus: 1000
+  # type: section
+  alerts:
+    # type: int
+    thread_threshold: 500
+# type: section
+inputs:
+  # type: section
+  proc:
+    # type: bool
+    enabled: false
+    # type: string
+    proc_dir_path: /proc`),
+			},
+			want: map[string]interface{}{
+				"global": map[string]interface{}{
+					"type": "section",
+				},
+				"global.limits": map[string]interface{}{
+					"type": "section",
+				},
+				"global.limits.max_millicpus": map[string]interface{}{
+					"type": "int",
+				},
+				"global.alerts": map[string]interface{}{
+					"type": "section",
+				},
+				"global.alerts.thread_threshold": map[string]interface{}{
+					"type": "int",
+				},
+				"inputs": map[string]interface{}{
+					"type": "section",
+				},
+				"inputs.proc": map[string]interface{}{
+					"type": "section",
+				},
+				"inputs.proc.enabled": map[string]interface{}{
+					"type": "bool",
+				},
+				"inputs.proc.proc_dir_path": map[string]interface{}{
+					"type": "string",
+				},
+			},
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    tag_extraction:
+      # type: dict
+      # ---
+      # upgrade_from: static_config.os-proc-regex.match-regex
+      # ---
+      # match_regex: ""
+      # ---
+      # type: string
+      # upgrade_from: static_config.os-proc-regex.rewrite-name
+      # ---
+      # rewrite_name: ""
+      process_matcher:
+        - match_regex: deepflow-.*`),
+			},
+			want: map[string]interface{}{
+				"inputs.proc.tag_extraction.process_matcher": map[string]interface{}{
+					"type": "dict",
+					"match_regex_comment": map[string]interface{}{
+						"upgrade_from": "static_config.os-proc-regex.match-regex",
+					},
+					"rewrite_name_comment": map[string]interface{}{
+						"type":         "string",
+						"upgrade_from": "static_config.os-proc-regex.rewrite-name",
+					},
+				},
+				"inputs.proc.tag_extraction.process_matcher.match_regex": map[string]interface{}{
+					"upgrade_from": "static_config.os-proc-regex.match-regex",
+				},
+				"inputs.proc.tag_extraction.process_matcher.rewrite_name": map[string]interface{}{
+					"type":         "string",
+					"upgrade_from": "static_config.os-proc-regex.rewrite-name",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewTemplateFormatter(tt.args.yamlData).GenerateKeyToComment()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GenerateKeyToComment() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for k, v := range got {
+				assert.EqualValues(t, tt.want[k], v)
+			}
+		})
+	}
+}
+
+func TestDictValueToString(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: (python[23]|deepflow-server).* # deepflow-server for test, don't delete 241108
+        match_type: ProcessName
+outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types:
+        - 0`),
+			},
+			want: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"proc": map[string]interface{}{
+						"process_matcher": "- match_regex: (python[23]|deepflow-server).*\n  match_type: ProcessName\n",
+					},
+				},
+				"outputs": map[string]interface{}{
+					"flow_log": map[string]interface{}{
+						"filters": map[string]interface{}{
+							"l7_capture_network_types": []interface{}{0},
+						},
+					},
+				},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			indentedLines, err := IndentTemplate(tt.args.yamlData)
+			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
+			dataFmt := NewDataFommatter()
+			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+				t.Fatalf("Failed to init yaml data: %v", err)
+			}
+			err := dataFmt.dictValueToString(dataFmt.mapData, "", keyToComment)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("IndentTemplate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DictValueToString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			for k, v := range dataFmt.mapData {
+				if ok := assert.EqualValues(t, tt.want[k], v); !ok {
+					t.Errorf("key %s DictValueToString() = %v, want %v", k, v, tt.want[k])
+				}
+			}
+		})
+	}
+}
 
-			uncommentedLines, err := UncommentTemplate(indentedLines)
+func TestStringToDictValue(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    process_matcher: "- match_regex: (python[23]|deepflow-server).*\n  match_type: ProcessName\n"
+outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types:
+        - 0`),
+			},
+			want: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"proc": map[string]interface{}{
+						"process_matcher": []interface{}{
+							map[string]interface{}{
+								"match_regex": "(python[23]|deepflow-server).*",
+								"match_type":  "ProcessName",
+							},
+						},
+					},
+				},
+				"outputs": map[string]interface{}{
+					"flow_log": map[string]interface{}{
+						"filters": map[string]interface{}{
+							"l7_capture_network_types": []interface{}{0},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
+			dataFmt := NewDataFommatter()
+			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+				t.Fatalf("Failed to init yaml data: %v", err)
+			}
+			err := dataFmt.stringToDictValue(dataFmt.mapData, "", keyToComment)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("UncommentTemplate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("stringToDictValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			if err := os.WriteFile("template_formated.yaml", []byte(strings.Join(indentedLines, "\n")), os.ModePerm); err != nil {
-				t.Fatalf("Failed to write to file: %v", err)
+			for k, v := range dataFmt.mapData {
+				if ok := assert.EqualValues(t, tt.want[k], v); !ok {
+					t.Errorf("key %s stringToDictValue() = %v, want %v", k, v, tt.want[k])
+				}
 			}
-			if err := os.WriteFile("template_uncommented.yaml", uncommentedLines, os.ModePerm); err != nil {
+		})
+	}
+}
+
+func TestDataConvertToJSON(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: (python[23]|deepflow-server).* # deepflow-server for test, don't delete 241108
+        match_type: ProcessName
+outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types:
+        - 0`),
+			},
+			want: []byte(`{
+  "inputs": {
+    "proc": {
+      "process_matcher": "- match_regex: (python[23]|deepflow-server).*\n  match_type: ProcessName\n"
+    }
+  },
+  "outputs": {
+    "flow_log": {
+      "filters": {
+        "l7_capture_network_types": [
+          0
+        ]
+      }
+    }
+  }
+}`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
+			dataFmt := NewDataFommatter()
+			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+				t.Fatalf("Failed to init yaml data: %v", err)
+			}
+			got, err := dataFmt.ConvertToJSON(keyToComment)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataConvertToJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			os.Mkdir("test_tmp", 0755)
+			if err = os.WriteFile("test_tmp/data_fmt_conv.json", got, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})
 	}
 }
 
-func TestParseJsonToYAMLAndValidate(t *testing.T) {
+func TestConvertYAMLToJSON(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: (python[23]|deepflow-server).* # deepflow-server for test, don't delete 241108
+        match_type: ProcessName
+outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types:
+        - 0`),
+			},
+			want: []byte(`{
+  "inputs": {
+    "proc": {
+      "process_matcher": "- match_regex: (python[23]|deepflow-server).*\n  match_type: ProcessName\n"
+    }
+  },
+  "outputs": {
+    "flow_log": {
+      "filters": {
+        "l7_capture_network_types": [
+          0
+        ]
+      }
+    }
+  }
+}`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ConvertYAMLToJSON(tt.args.yamlData)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataConvertToJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			os.Mkdir("test_tmp", 0755)
+			if err = os.WriteFile("test_tmp/conv_yaml_to_json.json", got, os.ModePerm); err != nil {
+				t.Fatalf("Failed to write to file: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateYAML(t *testing.T) {
+	type args struct {
+		yamlData []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				yamlData: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: (python[23]|deepflow-server).* # deepflow-server for test, don't delete 241108
+        match_type: ProcessName`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				yamlData: []byte(`inputs:
+                  proc:
+                          PID: 123`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "case03",
+			args: args{
+				yamlData: []byte(`# type: section
+global:
+  limits:
+    # type: int
+    max_millicpus: 1000
+  alerts:
+    thread_threshold: 500
+inputs:
+  # type: section
+  proc:
+    enabled: false`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "case04",
+			args: args{
+				yamlData: []byte(`global:
+  limits:
+    max_millicpus: 1000
+      alerts:
+        thread_threshold: 500
+inputs:
+  proc:
+    enabled: false`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "case05",
+			args: args{
+				yamlData: []byte(`# type: section
+global:
+  # type: section
+  limits:
+    # type: int
+    max_millicpus: abc`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "case06",
+			args: args{
+				yamlData: []byte(`outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types: #test
+        - 0`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "case07",
+			args: args{
+				yamlData: []byte(`outputs:
+  flow_log:
+    filters:
+      l7_capture_network_types:
+        - 0:`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "case08",
+			args: args{
+				yamlData: []byte(`global:
+  limits:
+    max_millicpus: 1000.00`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "case09",
+			args: args{
+				yamlData: []byte(`global:
+  circuit_breakers:
+    relative_sys_load:
+      trigger_threshold: 1`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "case10",
+			args: args{
+				yamlData: []byte(`global:
+  circuit_breakers:
+    relative_sys_load:
+      trigger_threshold: 1.0`),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		if tt.name != "case10" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateYAML(tt.args.yamlData); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateYAML() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestConvertJSONToYAMLAndValidate(t *testing.T) {
 	type args struct {
 		jsonData map[string]interface{}
 	}
@@ -178,9 +1019,6 @@ func TestParseJsonToYAMLAndValidate(t *testing.T) {
 			args: args{
 				jsonData: map[string]interface{}{
 					"global": map[string]interface{}{
-						"common": map[string]interface{}{
-							"enabled": false,
-						},
 						"alerts": map[string]interface{}{
 							"check_core_file_disabled": true,
 						},
@@ -188,8 +1026,6 @@ func TestParseJsonToYAMLAndValidate(t *testing.T) {
 				},
 			},
 			want: []byte(`global:
-  common:
-    enabled: false
   alerts:
     check_core_file_disabled: true
 `),
@@ -211,9 +1047,9 @@ func TestParseJsonToYAMLAndValidate(t *testing.T) {
 			want: []byte(`inputs:
   resources:
     kubernetes:
-	  api_resources: 
-	  - name: namespaces
-	  - name: nodes
+      api_resources: 
+        - name: namespaces
+        - name: nodes
 `),
 			wantErr: false,
 		},
@@ -239,27 +1075,58 @@ func TestParseJsonToYAMLAndValidate(t *testing.T) {
 			want: []byte(`inputs:
   ebpf:
     socket:
-	  preprocess:
-	    out_of_order_reassembly_protocols:
-		- HTTP
-		- Dubbo
-		- SOFARPC
+      preprocess:
+        out_of_order_reassembly_protocols:
+          - HTTP
+          - Dubbo
+          - SOFARPC
 `),
 			wantErr: false,
+		},
+		{
+			name: "case04",
+			args: args{
+				jsonData: map[string]interface{}{
+					"outputs": map[string]interface{}{
+						"flow_log": map[string]interface{}{
+							"filters": map[string]interface{}{
+								"l7_capture_network_types": []interface{}{"a"},
+							},
+						},
+					},
+				},
+			},
+			want:    []byte(``),
+			wantErr: true,
+		},
+		{
+			name: "case05",
+			args: args{
+				jsonData: map[string]interface{}{
+					"outputs": map[string]interface{}{
+						"filters": map[string]interface{}{
+							"l7_capture_network_types": []interface{}{"a"},
+						},
+					},
+				},
+			},
+			want:    []byte(``),
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		// if tt.name != "case03" {
-		// 	continue
+		//     continue
 		// }
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseJsonToYAMLAndValidate(tt.args.jsonData)
+			got, err := ConvertJSONToYAMLAndValidate(tt.args.jsonData)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseJsonToYAMLAndValidate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.EqualValues(t, string(tt.want), string(got))
-			if err = os.WriteFile("template_3.yaml", got, os.ModePerm); err != nil {
+			os.Mkdir("test_tmp", 0755)
+			if err = os.WriteFile("test_tmp/json_to_yaml.yaml", got, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})

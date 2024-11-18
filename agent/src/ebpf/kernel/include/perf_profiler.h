@@ -63,6 +63,7 @@ struct stack_trace_key_t {
 	char comm[TASK_COMM_LEN];
 	int kernstack;
 	int userstack;
+	int intpstack;
 	__u32 flags;
 	__u64 uprobe_addr;
 	__u64 timestamp;
@@ -82,5 +83,17 @@ struct stack_trace_key_t {
 typedef struct {
 	__u32 task_struct_stack_offset;
 } unwind_sysinfo_t;
+
+#define CLASS_NAME_LEN 32
+#define METHOD_NAME_LEN 64
+#define PATH_LEN 128
+
+typedef struct {
+	char class_name[CLASS_NAME_LEN];
+	char method_name[METHOD_NAME_LEN];
+	// char path[PATH_LEN];
+} symbol_t;
+
+#define MAX_SYMBOL_NUM 1024
 
 #endif /* DF_BPF_PERF_PROFILER_H */

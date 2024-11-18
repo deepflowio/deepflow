@@ -42,6 +42,8 @@ enum RegType {
 };
 typedef uint8_t RegType;
 
+typedef struct python_unwind_table_t python_unwind_table_t;
+
 typedef struct unwind_table_t unwind_table_t;
 
 typedef struct {
@@ -72,7 +74,97 @@ typedef struct {
     unwind_entry_t entries[UNWIND_ENTRIES_PER_SHARD];
 } unwind_entry_shard_t;
 
+typedef struct {
+    uint64_t thread_state_address;
+    uint8_t offsets_id;
+} python_unwind_info_t;
+
+typedef struct {
+    int64_t current_frame;
+} py_cframe_t;
+
+typedef struct {
+    int64_t co_filename;
+    int64_t co_firstlineno;
+    int64_t co_name;
+    int64_t co_varnames;
+} py_code_object_t;
+
+typedef struct {
+    int64_t f_back;
+    int64_t f_code;
+    int64_t f_lineno;
+    int64_t f_localsplus;
+} py_frame_object_t;
+
+typedef struct {
+    int64_t owner;
+} py_interpreter_frame_t;
+
+typedef struct {
+    int64_t tstate_head;
+} py_interpreter_state_t;
+
+typedef struct {
+    int64_t ob_type;
+} py_object_t;
+
+typedef struct {
+    int64_t interp_main;
+} py_runtime_state_t;
+
+typedef struct {
+    int64_t data;
+    int64_t size;
+} py_string_t;
+
+typedef struct {
+    int64_t cframe;
+    int64_t frame;
+    int64_t interp;
+    int64_t native_thread_id;
+    int64_t next;
+    int64_t thread_id;
+} py_thread_state_t;
+
+typedef struct {
+    int64_t ob_item;
+} py_tuple_object_t;
+
+typedef struct {
+    int64_t tp_name;
+} py_type_object_t;
+
+typedef struct {
+    py_cframe_t cframe;
+    py_code_object_t code_object;
+    py_frame_object_t frame_object;
+    py_interpreter_frame_t interpreter_frame;
+    py_interpreter_state_t interpreter_state;
+    py_object_t object;
+    py_runtime_state_t runtime_state;
+    py_string_t string;
+    py_thread_state_t thread_state;
+    py_tuple_object_t tuple_object;
+    py_type_object_t type_object;
+} python_offsets_t;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
+
+bool is_python_process(uint32_t pid);
+
+#define INCOMPLETE_PYTHON_STACK "[lost] incomplete python c stack"
+
+size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
+                                                  int32_t offsets_map_fd);
+
+void python_unwind_table_destroy(python_unwind_table_t *table);
+
+void python_unwind_table_load(python_unwind_table_t *table, uint32_t pid);
+
+void python_unwind_table_unload(python_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
 

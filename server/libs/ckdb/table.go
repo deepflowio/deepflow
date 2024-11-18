@@ -29,7 +29,84 @@ const (
 	ORG_ID_LEN        = 4 // length of 'xxxx'
 	ORG_ID_PREFIX_LEN = 5 // length of 'xxxx_'
 	MAX_ORG_ID        = 1024
+	AGGREGATION_1H    = "1h"
+	AGGREGATION_1D    = "1d"
+	DEFAULT_1H_TTL    = 24 * 30 // 30 day
+	DEFAULT_1D_TTL    = 24 * 30 // 30 day
 )
+
+type AggregationInterval uint8
+
+const (
+	AggregationMinute AggregationInterval = iota
+	AggregationHour
+	AggregationDay
+)
+
+func (a AggregationInterval) String() string {
+	switch a {
+	case AggregationMinute:
+		return "1m"
+	case AggregationHour:
+		return "1h"
+	case AggregationDay:
+		return "1d"
+	default:
+		return "unkunown aggregation interval"
+	}
+}
+
+func (a AggregationInterval) BaseTable() string {
+	switch a {
+	case AggregationMinute:
+		return "1s_local"
+	case AggregationHour:
+		return "1m_local"
+	case AggregationDay:
+		return "1h_agg"
+	default:
+		return "unkunown aggregation base table"
+	}
+}
+
+func (a AggregationInterval) ByconityBaseTable() string {
+	switch a {
+	case AggregationMinute:
+		return "1s"
+	case AggregationHour:
+		return "1m"
+	case AggregationDay:
+		return "1h_agg"
+	default:
+		return "unkunown aggregation byconity base table"
+	}
+}
+
+func (a AggregationInterval) PartitionBy() TimeFuncType {
+	switch a {
+	case AggregationMinute:
+		return TimeFuncTwelveHour
+	case AggregationHour:
+		return TimeFuncWeek
+	case AggregationDay:
+		return TimeFuncYYYYMM
+	default:
+		return TimeFuncWeek
+	}
+}
+
+func (a AggregationInterval) Aggregation() TimeFuncType {
+	switch a {
+	case AggregationMinute:
+		return TimeFuncMinute
+	case AggregationHour:
+		return TimeFuncHour
+	case AggregationDay:
+		return TimeFuncDay
+	default:
+		return TimeFuncHour
+	}
+}
 
 func IsDefaultOrgID(orgID uint16) bool {
 	if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
@@ -94,6 +171,7 @@ type Table struct {
 	Engine          EngineType   // 表引擎
 	OrderKeys       []string     // 排序的key
 	PrimaryKeyCount int          // 一级索引的key的个数, 从orderKeys中数前n个,
+	Aggr1H1D        bool         // 是否创建 1h/1d 表
 }
 
 func (t *Table) OrgDatabase(orgID uint16) string {
@@ -209,49 +287,6 @@ func (t *Table) MakeOrgGlobalTableCreateSQL(orgID uint16) string {
 	return t.makeGlobalTableCreateSQL(t.OrgDatabase(orgID))
 }
 
-// database 'xxxx_deepflow_system' adds 'deepflow_system' view pointing to the 'deepflow_system_agent' and 'deepflow_system_server' table
-func (t *Table) MakeViewsCreateSQLForDeepflowSystem(orgID uint16) []string {
-	createViewSqls := []string{}
-	orgDatabase := t.OrgDatabase(orgID)
-	if t.Database == "deepflow_system" && t.GlobalName == "deepflow_system_server" {
-		// recreate table view xxxx_deepflow_system.deepflow_system, for upgrade
-		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system", orgDatabase)
-		createViewSqls = append(createViewSqls, dropTable)
-
-		deepflowSystemServerView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system` AS SELECT * FROM %s.`deepflow_system_agent` UNION ALL SELECT * FROM deepflow_system.deepflow_system_server",
-			orgDatabase, orgDatabase)
-		if !IsDefaultOrgID(orgID) {
-			deepflowSystemServerView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server", orgDatabase)
-		}
-		createViewSqls = append(createViewSqls, deepflowSystemServerView)
-	}
-	if t.Database == "flow_tag" && t.GlobalName == "deepflow_system_server_custom_field" {
-		// recreate table xxxx_flow_tag.deepflow_system_custom_field, for upgrade
-		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system_custom_field", orgDatabase)
-		createViewSqls = append(createViewSqls, dropTable)
-
-		flowTagFieldView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system_custom_field` AS SELECT * FROM %s.`deepflow_system_agent_custom_field` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field",
-			orgDatabase, orgDatabase)
-		if !IsDefaultOrgID(orgID) {
-			flowTagFieldView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server_custom_field", orgDatabase)
-		}
-		createViewSqls = append(createViewSqls, flowTagFieldView)
-	}
-	if t.Database == "flow_tag" && t.GlobalName == "deepflow_system_server_custom_field_value" {
-		// recreate table xxxx_flow_tag.deepflow_system_custom_field_value, for upgrade
-		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system_custom_field_value", orgDatabase)
-		createViewSqls = append(createViewSqls, dropTable)
-
-		flowTagFieldValueView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system_custom_field_value` AS SELECT * FROM %s.`deepflow_system_agent_custom_field_value` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field_value",
-			orgDatabase, orgDatabase)
-		if !IsDefaultOrgID(orgID) {
-			flowTagFieldValueView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server_custom_field_value", orgDatabase)
-		}
-		createViewSqls = append(createViewSqls, flowTagFieldValueView)
-	}
-	return createViewSqls
-}
-
 func (t *Table) makePrepareTableInsertSQL(database string) string {
 	if t.DBType == CKDBTypeByconity {
 		t.LocalName = t.GlobalName
@@ -277,4 +312,216 @@ func (t *Table) MakePrepareTableInsertSQL() string {
 
 func (t *Table) MakeOrgPrepareTableInsertSQL(orgID uint16) string {
 	return t.makePrepareTableInsertSQL(t.OrgDatabase(orgID))
+}
+
+func stringSliceHas(items []string, item string) bool {
+	for _, s := range items {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *Table) makeTTLString(duration int) string {
+	if t.ColdStorage.Enabled {
+		return fmt.Sprintf("%s + toIntervalHour(%d), %s +  toIntervalHour(%d) TO %s '%s'",
+			t.TimeKey, duration,
+			t.TimeKey, t.ColdStorage.TTLToMove, t.ColdStorage.Type, t.ColdStorage.Name)
+	}
+	return fmt.Sprintf("%s + toIntervalHour(%d)", t.TimeKey, duration)
+}
+
+func isUnsummable(column *Column) bool {
+	if strings.HasSuffix(column.Name, "_max") ||
+		column.Name == "direction_score" {
+		return true
+	}
+	return false
+}
+
+func getAggr(column *Column) string {
+	if isUnsummable(column) {
+		return "avg"
+	}
+	return "sum"
+}
+
+func (t *Table) MakeAggrTableCreateSQL1H(orgID uint16) string {
+	return t.MakeAggrTableCreateSQL(orgID, AggregationHour, DEFAULT_1H_TTL)
+}
+
+func (t *Table) MakeAggrMVTableCreateSQL1H(orgID uint16) string {
+	return t.MakeAggrMVTableCreateSQL(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrLocalTableCreateSQL1H(orgID uint16) string {
+	return t.MakeAggrLocalTableCreateSQL(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrGlobalTableCreateSQL1H(orgID uint16) string {
+	return t.MakeAggrGlobalTableCreateSQL(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrTableCreateSQL1D(orgID uint16) string {
+	return t.MakeAggrTableCreateSQL(orgID, AggregationDay, DEFAULT_1D_TTL)
+}
+
+func (t *Table) MakeAggrMVTableCreateSQL1D(orgID uint16) string {
+	return t.MakeAggrMVTableCreateSQL(orgID, AggregationDay)
+}
+
+func (t *Table) MakeAggrLocalTableCreateSQL1D(orgID uint16) string {
+	return t.MakeAggrLocalTableCreateSQL(orgID, AggregationDay)
+}
+
+func (t *Table) MakeAggrGlobalTableCreateSQL1D(orgID uint16) string {
+	return t.MakeAggrGlobalTableCreateSQL(orgID, AggregationDay)
+}
+
+func (t *Table) tablePrefix() string {
+	return strings.Split(t.GlobalName, ".")[0]
+}
+
+func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInterval, ttlHour int) string {
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	columns := []string{}
+	orderKeys := t.OrderKeys
+	for _, c := range t.Columns {
+		// ignore fields starting with '_', such as _tid, _id
+		if strings.HasPrefix(c.Name, "_") {
+			continue
+		}
+		codec := ""
+		if c.Codec != CodecDefault {
+			codec = fmt.Sprintf("codec(%s)", c.Codec.String())
+		}
+
+		if c.Name == t.TimeKey {
+			c.Comment = t.Version
+		}
+
+		if c.GroupBy {
+			comment := ""
+			if c.Comment != "" {
+				comment = fmt.Sprintf("COMMENT '%s'", c.Comment)
+			}
+			columns = append(columns, fmt.Sprintf("%s %s %s %s", c.Name, c.Type.String(), comment, codec))
+		} else {
+			columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(%s, %s)", c.Name, getAggr(c), c.Type.String()))
+		}
+	}
+
+	engine := AggregatingMergeTree.String()
+	if t.DBType == CKDBTypeByconity {
+		engine = CnchAggregatingMergeTree.String()
+	}
+
+	return fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s
+				   (%s)
+				   ENGINE=%s
+				   PRIMARY KEY (%s)
+				   ORDER BY (%s)
+				   PARTITION BY %s
+				   TTL %s
+				   SETTINGS storage_policy = '%s'`,
+		tableAgg,
+		strings.Join(columns, ",\n"),
+		engine,
+		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
+		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
+		aggrInterval.PartitionBy().String(t.TimeKey),
+		t.makeTTLString(ttlHour),
+		t.StoragePolicy)
+}
+
+func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
+	tableMv := fmt.Sprintf("%s.`%s.%s_mv`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableBase := fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.BaseTable())
+
+	if t.DBType == CKDBTypeByconity {
+		tableBase = fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.ByconityBaseTable())
+	}
+
+	groupKeys := t.OrderKeys
+	columns := []string{}
+	for _, c := range t.Columns {
+		if strings.HasPrefix(c.Name, "_") {
+			continue
+		}
+		if c.GroupBy {
+			if c.Name == t.TimeKey {
+				columns = append(columns, fmt.Sprintf("%s AS %s", aggrInterval.Aggregation().String(t.TimeKey), t.TimeKey))
+			} else {
+				columns = append(columns, c.Name)
+			}
+			if !stringSliceHas(groupKeys, c.Name) {
+				groupKeys = append(groupKeys, c.Name)
+			}
+		} else {
+			if strings.Contains(tableBase, "_agg") {
+				columns = append(columns, fmt.Sprintf("%sMergeState(%s__agg) AS %s__agg", getAggr(c), c.Name, c.Name))
+			} else {
+				columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", getAggr(c), c.Name, c.Name))
+			}
+		}
+	}
+
+	return fmt.Sprintf(`CREATE MATERIALIZED VIEW IF NOT EXISTS %s TO %s
+			AS SELECT %s
+	                FROM %s
+			GROUP BY %s`,
+		tableMv, tableAgg,
+		strings.Join(columns, ",\n"),
+		tableBase,
+		strings.Join(groupKeys, ","))
+}
+
+func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableLocal := fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	if t.DBType == CKDBTypeByconity {
+		tableLocal = fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	}
+
+	columns := []string{}
+	groupKeys := t.OrderKeys
+	for _, c := range t.Columns {
+		if strings.HasPrefix(c.Name, "_") {
+			continue
+		}
+		if c.GroupBy {
+			columns = append(columns, c.Name)
+			if !stringSliceHas(groupKeys, c.Name) {
+				groupKeys = append(groupKeys, c.Name)
+			}
+		} else {
+			columns = append(columns, fmt.Sprintf("%sMerge(%s__agg) AS %s", getAggr(c), c.Name, c.Name))
+		}
+	}
+
+	return fmt.Sprintf(`
+CREATE VIEW IF NOT EXISTS %s
+AS SELECT
+%s
+FROM %s
+GROUP BY %s`,
+		tableLocal,
+		strings.Join(columns, ",\n"),
+		tableAgg,
+		strings.Join(groupKeys, ","))
+}
+
+func (t *Table) MakeAggrGlobalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
+	if t.DBType == CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
+	tableGlobal := fmt.Sprintf("%s.%s", t.tablePrefix(), aggrInterval.String())
+	tableLocal := fmt.Sprintf("%s.%s_local", t.tablePrefix(), aggrInterval.String())
+
+	engine := fmt.Sprintf(Distributed.String(), t.Cluster, t.OrgDatabase(orgID), tableLocal)
+	createTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE = %s",
+		t.OrgDatabase(orgID), tableGlobal, t.OrgDatabase(orgID), tableLocal, engine)
+	return createTable
 }

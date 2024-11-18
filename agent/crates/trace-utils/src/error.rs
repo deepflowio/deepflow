@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use semver::Version;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -26,6 +27,10 @@ pub enum Error {
     ElfParseError(#[from] gimli::Error),
     #[error(".eh_frame section not found in object file")]
     NoEhFrame,
+    #[error("Process#{0} is not `{1}`")]
+    BadInterpreterType(u32, &'static str),
+    #[error("Process#{0} {1} v{2} not supported")]
+    BadInterpreterVersion(u32, &'static str, Version),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

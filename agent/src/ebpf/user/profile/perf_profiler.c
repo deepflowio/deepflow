@@ -49,11 +49,12 @@
 #include "profile_common.h"
 #include "../proc.h"
 #include "../unwind_tracer.h"
+#include "trace_utils.h"
 
 #include "../perf_profiler_bpf_common.c"
 #include "../perf_profiler_bpf_5_2_plus.c"
 
-#define CP_PERF_PG_NUM	16
+#define CP_PERF_PG_NUM 16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
 #define DEEPFLOW_AGENT_NAME "deepflow-agent"
@@ -185,10 +186,9 @@ static void print_cp_data(stack_trace_msg_t * msg)
 		 "%s [cpdbg] type %d netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
 		 " %u cpu %u count %lu tiemstamp %lu datalen %u data %s\n",
-		 timestamp, msg->profiler_type, msg->netns_id,
-		 cid, msg->pid, msg->tid, msg->process_name, msg->comm,
-		 msg->stime, msg->u_stack_id,
-		 msg->k_stack_id, msg->cpu, msg->count,
+		 timestamp, msg->profiler_type, msg->netns_id, cid, msg->pid,
+		 msg->tid, msg->process_name, msg->comm, msg->stime,
+		 msg->u_stack_id, msg->k_stack_id, msg->cpu, msg->count,
 		 msg->time_stamp, msg->data_len, msg->data);
 
 	free(timestamp);
@@ -207,7 +207,6 @@ void cpdbg_process(stack_trace_msg_t * msg)
 	if (unlikely(cpdbg_enable)) {
 		if (!is_cpdbg_timeout())
 			print_cp_data(msg);
-
 	}
 	pthread_mutex_unlock(&cpdbg_mutex);
 }
@@ -230,7 +229,7 @@ static void oncpu_reader_work(void *arg)
 			goto exit;
 		}
 
-		/* 
+		/*
 		 * Waiting for the regular expression to be configured
 		 * and start working. Ensure the socket tracer is in
 		 * the 'running' state to prevent starting the profiler
@@ -285,7 +284,7 @@ static int stack_trace_map_capacity(struct bpf_tracer *tracer)
 {
 	/*
 	 * Calculation method for stack map capacity:
-	 * 
+	 *
 	 *  `scaling_factor * (ncpus * expected_stack_count_per_cpu)`
 	 *
 	 * scaling_factor:
@@ -337,11 +336,15 @@ static int create_profiler(struct bpf_tracer *tracer)
 			return ret;
 		}
 
-		if ((ret = maps_config(tracer, MAP_PROCESS_SHARD_LIST_NAME, get_dwarf_process_map_size()))) {
+		if ((ret =
+		     maps_config(tracer, MAP_PROCESS_SHARD_LIST_NAME,
+				 get_dwarf_process_map_size()))) {
 			return ret;
 		}
 
-		if ((ret = maps_config(tracer, MAP_UNWIND_ENTRY_SHARD_NAME, get_dwarf_shard_map_size()))) {
+		if ((ret =
+		     maps_config(tracer, MAP_UNWIND_ENTRY_SHARD_NAME,
+				 get_dwarf_shard_map_size()))) {
 			return ret;
 		}
 	}
@@ -356,9 +359,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "", NULL, 0);
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "", NULL, 0);
 
-	ret = create_work_thread("java_update",
-				 &java_syms_update_thread,
-				 (void *)java_syms_update_work, (void *)tracer);
+	ret =
+	    create_work_thread("java_update", &java_syms_update_thread,
+			       (void *)java_syms_update_work, (void *)tracer);
 
 	if (ret) {
 		goto error;
@@ -376,21 +379,21 @@ static int create_profiler(struct bpf_tracer *tracer)
 		 * the double buffering structure design.
 		 */
 		struct bpf_perf_reader *reader_a, *reader_b;
-		reader_a = create_perf_buffer_reader(tracer,
-						     MAP_PERF_PROFILER_BUF_A_NAME,
-						     reader_raw_cb,
-						     reader_lost_cb_a,
-						     PROFILE_PG_CNT_DEF, 1,
-						     PROFILER_READER_EPOLL_TIMEOUT);
+		reader_a =
+		    create_perf_buffer_reader(tracer,
+					      MAP_PERF_PROFILER_BUF_A_NAME,
+					      reader_raw_cb, reader_lost_cb_a,
+					      PROFILE_PG_CNT_DEF, 1,
+					      PROFILER_READER_EPOLL_TIMEOUT);
 		if (reader_a == NULL)
 			return ETR_NORESOURCE;
 
-		reader_b = create_perf_buffer_reader(tracer,
-						     MAP_PERF_PROFILER_BUF_B_NAME,
-						     reader_raw_cb,
-						     reader_lost_cb_b,
-						     PROFILE_PG_CNT_DEF, 1,
-						     PROFILER_READER_EPOLL_TIMEOUT);
+		reader_b =
+		    create_perf_buffer_reader(tracer,
+					      MAP_PERF_PROFILER_BUF_B_NAME,
+					      reader_raw_cb, reader_lost_cb_b,
+					      PROFILE_PG_CNT_DEF, 1,
+					      PROFILER_READER_EPOLL_TIMEOUT);
 		if (reader_b == NULL) {
 			free_perf_buffer_reader(reader_a);
 			return ETR_NORESOURCE;
@@ -476,8 +479,7 @@ static int cpdbg_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 	return 0;
 }
 
-static struct tracer_sockopts cpdbg_sockopts = {
-	.version = SOCKOPT_VERSION,
+static struct tracer_sockopts cpdbg_sockopts = {.version = SOCKOPT_VERSION,
 	.set_opt_min = SOCKOPT_SET_CPDBG_ADD,
 	.set_opt_max = SOCKOPT_SET_CPDBG_OFF,
 	.set = cpdbg_sockopt_set,
@@ -526,51 +528,52 @@ int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM])
 	return 0;
 }
 
-void output_profiler_status(struct bpf_tracer *t,
-		 	    void *context)
+void output_profiler_status(struct bpf_tracer *t, void *context)
 {
 	struct profiler_context *ctx = context;
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
 
 	u64 sample_drop_cnt = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, SAMPLE_CNT_DROP,
-				 (void *)&sample_drop_cnt)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, SAMPLE_CNT_DROP,
+	     (void *)&sample_drop_cnt)) {
 		ebpf_warning("Get map '%s' sample_drop_cnt failed.\n",
 			     ctx->state_map_name);
 	}
 
 	u64 output_err_cnt = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, ERROR_IDX,
-				 (void *)&output_err_cnt)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, ERROR_IDX, (void *)&output_err_cnt)) {
 		ebpf_warning("Get map '%s' output_err_cnt failed.\n",
 			     ctx->state_map_name);
 	}
 
 	u64 output_count = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, OUTPUT_CNT_IDX,
-				 (void *)&output_count)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, OUTPUT_CNT_IDX, (void *)&output_count)) {
 		ebpf_warning("Get map '%s' output_cnt failed.\n",
 			     ctx->state_map_name);
 	}
 
 	u64 iter_max_cnt = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, SAMPLE_ITER_CNT_MAX,
-				 (void *)&iter_max_cnt)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, SAMPLE_ITER_CNT_MAX,
+	     (void *)&iter_max_cnt)) {
 		ebpf_warning("Get map '%s' iter_max_cnt failed.\n",
 			     ctx->state_map_name);
 	}
 
 	u64 is_rt_kern = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, RT_KERN,
-				 (void *)&is_rt_kern)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, RT_KERN, (void *)&is_rt_kern)) {
 		ebpf_warning("Get map '%s' is_rt_kern failed.\n",
 			     ctx->state_map_name);
 	}
 
 	u64 is_enabled = 0;
-	if (!bpf_table_get_value(t, ctx->state_map_name, ENABLE_IDX,
-				 (void *)&is_enabled)) {
+	if (!bpf_table_get_value
+	    (t, ctx->state_map_name, ENABLE_IDX, (void *)&is_enabled)) {
 		ebpf_warning("Get map '%s' is_enabled failed.\n",
 			     ctx->state_map_name);
 	}
@@ -659,8 +662,8 @@ int check_profiler_running_pid(int pid)
 	} else {
 		ebpf_info("Recorded PID(%d) and its startup time(%lu) do not"
 			  " match(actual start time: %lu); this is an outdated"
-			  " process.\n", recorded_pid, recorded_start_time,
-			  actual_start_time);
+			  " process.\n",
+			  recorded_pid, recorded_start_time, actual_start_time);
 	}
 
 	return ETR_NOTEXIST;
@@ -680,8 +683,8 @@ int write_profiler_running_pid(void)
 {
 	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "w");
 	if (!file) {
-		ebpf_warning("fopen failed, with %s(%d)",
-			     strerror(errno), errno);
+		ebpf_warning("fopen failed, with %s(%d)", strerror(errno),
+			     errno);
 		return ETR_IO;
 	}
 
@@ -698,15 +701,15 @@ int write_profiler_running_pid(void)
 	return ETR_OK;
 }
 
-void build_prog_jump_tables(struct bpf_tracer *tracer) {
-	insert_prog_to_map(tracer,
-				    MAP_CP_PROGS_JMP_PE_NAME,
-				    PROG_DWARF_UNWIND_FOR_PE,
-				    PROG_DWARF_UNWIND_PE_IDX);
-	insert_prog_to_map(tracer,
-				    MAP_CP_PROGS_JMP_PE_NAME,
-				    PROG_ONCPU_OUTPUT_FOR_PE,
-				    PROG_ONCPU_OUTPUT_PE_IDX);
+void build_prog_jump_tables(struct bpf_tracer *tracer)
+{
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_DWARF_UNWIND_FOR_PE, PROG_DWARF_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_ONCPU_OUTPUT_FOR_PE, PROG_ONCPU_OUTPUT_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_PYTHON_UNWIND_FOR_PE,
+			   PROG_PYTHON_UNWIND_PE_IDX);
 	extended_prog_jump_tables(tracer);
 }
 
@@ -723,7 +726,8 @@ void build_prog_jump_tables(struct bpf_tracer *tracer) {
  */
 
 int start_continuous_profiler(int freq, int java_syms_update_delay,
-			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM])
+			      tracer_callback_t callback,
+			      void *cb_ctx[PROFILER_CTX_NUM])
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
@@ -747,16 +751,15 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
 	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
-			      MAP_PROFILER_STATE_NAME,
-			      MAP_STACK_A_NAME, MAP_STACK_B_NAME,
-			      MAP_CUSTOM_STACK_A_NAME, MAP_CUSTOM_STACK_B_NAME,
-			      false, true,
+			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
+			      MAP_STACK_B_NAME, MAP_CUSTOM_STACK_A_NAME,
+			      MAP_CUSTOM_STACK_B_NAME, false, true,
 			      NANOSEC_PER_SEC / freq,
 			      cb_ctx[PROFILER_CTX_ONCPU_IDX]);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
-	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
-	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
+	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN)
+	    || (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
 		java_syms_update_delay = JAVA_SYMS_UPDATE_DELAY_DEF;
 	set_java_syms_fetch_delay(java_syms_update_delay);
 	ebpf_info("set java_syms_update_delay : %lu\n", java_syms_update_delay);
@@ -780,12 +783,13 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	if (major > 5 || (major == 5 && minor >= 2)) {
 		k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
-		     "continuous-profiler-5.2_plus");
+			 "continuous-profiler-5.2_plus");
 		bpf_bin_buffer = (void *)perf_profiler_5_2_plus_ebpf_data;
 		buffer_sz = sizeof(perf_profiler_5_2_plus_ebpf_data);
 	} else {
 		k_type = K_TYPE_COMM;
-		snprintf(bpf_load_buffer_name, NAME_LEN, "continuous-profiler-common");
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "continuous-profiler-common");
 		bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
 		buffer_sz = sizeof(perf_profiler_common_ebpf_data);
 	}
@@ -803,8 +807,8 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
-			     bpf_bin_buffer, buffer_sz, tps, 0,
-			     release_profiler, create_profiler,
+			     bpf_bin_buffer, buffer_sz, tps,
+			     0, release_profiler, create_profiler,
 			     (void *)callback, cb_ctx, freq);
 	if (tracer == NULL)
 		return (-1);
@@ -815,7 +819,8 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 		}
 		build_prog_jump_tables(tracer);
 	} else {
-		ebpf_info("This kernel version does not support DWARF unwinding.");
+		ebpf_info
+		    ("This kernel version does not support DWARF/Python unwinding.");
 	}
 
 	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
@@ -832,9 +837,10 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 /*
  * Get running state of continuous profiler
  */
-bool continuous_profiler_running() {
-    struct bpf_tracer *t = get_profiler_tracer();
-    return t && t->state == TRACER_RUNNING;
+bool continuous_profiler_running()
+{
+	struct bpf_tracer *t = get_profiler_tracer();
+	return t && t->state == TRACER_RUNNING;
 }
 
 static u64 test_add_count, stack_count;
@@ -966,17 +972,30 @@ int disable_oncpu_profiler(void)
 	return 0;
 }
 
-bool oncpu_profiler_enabled(void) {
+bool oncpu_profiler_enabled(void)
+{
 	return g_enable_oncpu;
+}
+
+void profiler_match_pid_handle(int feat, int pid, enum match_pids_act act)
+{
+	if (feat == FEATURE_PROFILE_ONCPU || feat == FEATURE_PROFILE_OFFCPU
+	    || feat == FEATURE_PROFILE_MEMORY) {
+		if (act == MATCH_PID_ADD) {
+			unwind_process_exec(pid);
+		} else if (act == MATCH_PID_DEL) {
+			unwind_process_exit(pid);
+		}
+	}
 }
 
 #else /* defined AARCH64_MUSL */
 #include "../tracer.h"
 #include "perf_profiler.h"
 
-int start_continuous_profiler(int freq,
-			      int java_syms_update_delay,
-			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM])
+int start_continuous_profiler(int freq, int java_syms_update_delay,
+			      tracer_callback_t callback,
+			      void *cb_ctx[PROFILER_CTX_NUM])
 {
 	return (-1);
 }
@@ -984,7 +1003,8 @@ int start_continuous_profiler(int freq,
 /*
  * Get running state of continuous profiler
  */
-bool continuous_profiler_running() {
+bool continuous_profiler_running()
+{
 	return false;
 }
 
@@ -1032,11 +1052,16 @@ int disable_oncpu_profiler(void)
 	return 0;
 }
 
-bool oncpu_profiler_enabled(void) {
+bool oncpu_profiler_enabled(void)
+{
 	return false;
 }
 
 void print_cp_tracer_status(void)
+{
+}
+
+void profiler_match_pid_handle(int feat, int pid, enum match_pids_act act)
 {
 }
 

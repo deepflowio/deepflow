@@ -759,18 +759,16 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		return &view.Expr{Value: filter}, nil
 	} else if table == "alert_event" {
-		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 		tagName := strings.Trim(t.Tag, "`")
-
+		tagItem, ok := tag.GetTag(tagName, db, table, "default")
 		if !ok {
 			preAsTag, ok := asTagMap[t.Tag]
 			if ok {
-				// whereTag = preAsTag
-				tagName = preAsTag
-				tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
+				tagName = strings.Trim(preAsTag, "`")
+				tagItem, ok = tag.GetTag(tagName, db, table, "default")
 			}
 		}
-		noSuffixTag := strings.TrimSuffix(strings.Trim(t.Tag, "`"), "_0")
+		noSuffixTag := strings.TrimSuffix(tagName, "_0")
 		noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 		noIDTag := noSuffixTag
 		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
@@ -778,49 +776,16 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		if ok {
 			switch noIDTag {
-			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener",
-				"natgw", "lb", "host", "pod_node", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
-				"pod_ingress", "pod_service", "ip", "vpc", "l2_vpc":
+			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener", "natgw", "lb", "host", "pod_node", "region", "az",
+				"pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_ingress", "pod_service", "ip", "vpc", "l2_vpc",
+				"resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service", "auto_instance_type", "auto_service_type":
 				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 					filter = TransAlertEventNoSuffixFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
-				} else if noIDTag == "ip" {
-					filter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 				} else {
 					filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 				}
 			case "alert_policy", "user":
 				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
-			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
-				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
-					if strings.HasSuffix(noSuffixTag, "_id") {
-						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value)
-						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value)
-						}
-					} else {
-						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
-						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
-						}
-					}
-
-				} else {
-					if strings.HasSuffix(noSuffixTag, "_id") {
-						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
-						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-						}
-					} else {
-						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
-						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
-						}
-					}
-				}
 			default:
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
@@ -907,7 +872,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				}
 			}
 		}
-
 		return &view.Expr{Value: filter}, nil
 	} else {
 		if t.Tag == "tap_port" {

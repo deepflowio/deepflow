@@ -40,16 +40,17 @@ import (
 )
 
 type AgentParamData struct {
-	CtrlIP     string
-	CtrlMac    string
-	GroupID    string
-	ClusterID  string
-	TeamID     string
-	RpcIP      string
-	RpcPort    string
-	PluginType string
-	PluginName string
-	OrgID      uint32
+	K8SWatchPolicy int32
+	OrgID          uint32
+	CtrlIP         string
+	CtrlMac        string
+	GroupID        string
+	ClusterID      string
+	TeamID         string
+	RpcIP          string
+	RpcPort        string
+	PluginType     string
+	PluginName     string
 }
 
 type AgentSortedAcls []*agent.FlowAcl
@@ -190,6 +191,7 @@ func AgentCheckRegisterCommand() *cobra.Command {
 		Use:   "trisolaris.agent-check",
 		Short: "pull grpc data from deepflow-server",
 	}
+	trisolarisCmd.PersistentFlags().Int32VarP(&agentParamData.K8SWatchPolicy, "kwp", "", 0, "agent k8s watch policy: 0.normal 1.only 2.disabled")
 	trisolarisCmd.PersistentFlags().StringVarP(&agentParamData.CtrlIP, "cip", "", "", "agent ctrl ip")
 	trisolarisCmd.PersistentFlags().StringVarP(&agentParamData.CtrlMac, "cmac", "", "", "agent ctrl mac")
 	trisolarisCmd.PersistentFlags().StringVarP(&agentParamData.GroupID, "gid", "", "", "agent group ID")
@@ -231,15 +233,17 @@ func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
 	groupID := agentParamData.GroupID
 	clusterID := agentParamData.ClusterID
 	teamID := agentParamData.TeamID
+	k8sWatchPolicy := agent.KubernetesWatchPolicy(agentParamData.K8SWatchPolicy)
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), agentParamData)
 	c := agent.NewSynchronizerClient(conn)
 	reqData := &agent.SyncRequest{
-		CtrlIp:              &agentParamData.CtrlIP,
-		CtrlMac:             &agentParamData.CtrlMac,
-		AgentGroupIdRequest: &groupID,
-		KubernetesClusterId: &clusterID,
-		ProcessName:         &name,
-		TeamId:              &teamID,
+		CtrlIp:                &agentParamData.CtrlIP,
+		CtrlMac:               &agentParamData.CtrlMac,
+		AgentGroupIdRequest:   &groupID,
+		KubernetesClusterId:   &clusterID,
+		KubernetesWatchPolicy: &k8sWatchPolicy,
+		ProcessName:           &name,
+		TeamId:                &teamID,
 	}
 	var response *agent.SyncResponse
 	var err error
