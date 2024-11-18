@@ -273,7 +273,7 @@ static bool __inline check_socket_valid(struct socket_info_s *socket_info_ptr, i
 	if (is_socket_info_valid(socket_info_ptr)) {
 		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
 		void *check_socket;
-    bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
+		bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
 				      socket_info_ptr->sk + sk_off);
 		if (unlikely(check_socket != socket_info_ptr->socket)) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
