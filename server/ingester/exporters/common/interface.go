@@ -204,7 +204,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 		sb.WriteString(`":`)
 		if isString {
 			sb.WriteString(`"`)
-			sb.WriteString(utils.EscapeJSONString(valueStr))
+			utils.EscapeJsonStringToStringBuilder(sb, valueStr)
 			sb.WriteString(`"`)
 		} else if isStringSlice {
 			sb.WriteString("[")
