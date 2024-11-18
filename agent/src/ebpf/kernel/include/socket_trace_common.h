@@ -232,6 +232,20 @@ struct __io_event_buffer {
 	char filename[IO_FILEPATH_BUFF_SIZE];
 } __attribute__ ((packed));
 
+struct user_io_event_buffer {
+	__u32 bytes_count;
+
+	// 0: write
+	// 1: read
+	__u32 operation;
+
+	// nanosecond
+	__u64 latency;
+
+	// strings terminated with \0
+	char filename[IO_FILEPATH_BUFF_SIZE];
+} __attribute__ ((packed));
+
 // struct ebpf_proc_info -> offsets[]  arrays index.
 enum offsets_index {
 	OFFSET_IDX_GOID_RUNTIME_G,
