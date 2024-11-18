@@ -190,11 +190,23 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 			DB: db, Table: table, TagName: field,
 		}]
 		if getTagOK {
-			if tagOK {
-				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
-				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+			nameColumn := ""
+			if e.Language != "" {
+				nameColumn = "name_" + e.Language
 			} else {
-				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, tagEnum)
+				cfgLang := ""
+				if config.Cfg.Language == "en" {
+					cfgLang = "en"
+				} else {
+					cfgLang = "zh"
+				}
+				nameColumn = "name_" + cfgLang
+			}
+			if tagOK {
+				enumFileName := tagDescription.EnumFile
+				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, nameColumn, enumFileName)
+			} else {
+				dbFields[i] = fmt.Sprintf(tagDes.TagTranslator, nameColumn, tagEnum)
 			}
 		}
 
@@ -422,9 +434,13 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		}
 		// When using max, and min operators. The inner layer uses itself
 		if slices.Contains([]string{view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) {
+			field := f.Metrics.DBField
+			if f.Metrics.DBField == "time" {
+				field = "toUnixTimestamp(time)"
+			}
 			innerFunction = view.DefaultFunction{
 				Name:       f.Name,
-				Fields:     []view.Node{&view.Field{Value: f.Metrics.DBField}},
+				Fields:     []view.Node{&view.Field{Value: field}},
 				IgnoreZero: true,
 			}
 		}
@@ -588,6 +604,9 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		field := f.Metrics.DBField
 		if f.Name == view.FUNCTION_COUNT {
 			field = "1"
+		}
+		if slices.Contains([]string{view.FUNCTION_MAX, view.FUNCTION_MIN}, f.Name) && field == "time" {
+			field = "toUnixTimestamp(time)"
 		}
 		outFunc.SetFields([]view.Node{&view.Field{Value: field}})
 	}
@@ -916,30 +935,45 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		}
 		return f.getViewNode()
 	case TAG_FUNCTION_ENUM:
-		var tagFilter string
+		var tagTranslator string
 		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDes, getTagOK := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
 			DB: f.DB, Table: f.Table, TagName: f.Args[0],
 		}]
+		language := f.Engine.Language
+		nameColumn := ""
+		if language != "" {
+			nameColumn = "name_" + language
+		} else {
+			cfgLang := ""
+			if config.Cfg.Language == "en" {
+				cfgLang = "en"
+			} else {
+				cfgLang = "zh"
+			}
+			nameColumn = "name_" + cfgLang
+		}
 		if getTagOK {
 			if tagOK {
-				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				enumFileName := tagDescription.EnumFile
 				if tagEnum == "app_service" || tagEnum == "app_instance" {
 					enumFileName = tagEnum
+					tagTranslator = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+				} else {
+					tagTranslator = fmt.Sprintf(tagDes.TagTranslator, nameColumn, enumFileName)
 				}
-				tagFilter = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
 			} else {
-				tagFilter = fmt.Sprintf(tagDes.TagTranslator, tagEnum)
+				tagTranslator = fmt.Sprintf(tagDes.TagTranslator, nameColumn, tagEnum)
 			}
 		} else {
-			tagFilter = fmt.Sprintf("Enum(%s)", f.Args[0])
+			tagTranslator = fmt.Sprintf("Enum(%s)", f.Args[0])
 		}
 		if f.Alias == "" {
 			f.Alias = fmt.Sprintf("Enum(%s)", f.Args[0])
 		}
-		f.Withs = []view.Node{&view.With{Value: tagFilter, Alias: f.Alias}}
+		f.Withs = []view.Node{&view.With{Value: tagTranslator, Alias: f.Alias}}
 		return f.getViewNode()
 	}
 	values := make([]string, len(fields))
