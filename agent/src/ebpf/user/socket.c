@@ -826,6 +826,7 @@ static u32 copy_regular_file_data(void *dst, void *src, int len)
 	if (len <= 0)
 		return 0;
 
+	struct user_io_event_buffer u_event;
 	struct __io_event_buffer event;
 	memcpy(&event, src, sizeof(event));
 	char *buffer = event.filename;
@@ -864,12 +865,15 @@ static u32 copy_regular_file_data(void *dst, void *src, int len)
 	}
 
 copy_event:
+	buffer = u_event.filename;
 	memcpy(buffer, temp, temp_index + 1);
 	buffer_len = temp_index + 1;
-	event_len = offsetof(typeof(struct __io_event_buffer),
+	u_event.bytes_count = event.bytes_count;
+	u_event.operation = event.operation;
+	u_event.latency = event.latency;
+	event_len = offsetof(typeof(struct user_io_event_buffer),
 			     filename) + buffer_len;
-	event.len = buffer_len;
-	safe_buf_copy(dst, len, &event, event_len);
+	safe_buf_copy(dst, len, &u_event, event_len);
 
 	return event_len;
 }
@@ -2796,30 +2800,24 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 
 int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 {
-	struct {
-		__u32 bytes_count;
-		__u32 operation;
-		__u64 latency;
-		__u32 len;
-		char filename[IO_FILEPATH_BUFF_SIZE];
-	} __attribute__ ((packed)) event;
 
 	int bytes = 0;
+	struct user_io_event_buffer *event =
+	    (struct user_io_event_buffer *)data;
 
-	memcpy(&event, data, sizeof(event));
-
+	int path_len = strlen(event->filename) + 1;
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
-				 "\npath_length=[%d]\nfilename=[%s]\n",
-				 event.bytes_count, event.operation,
-				 event.latency, event.len, event.filename);
+				 "\nfilename=[%s](len %d)\n",
+				 event->bytes_count, event->operation,
+				 event->latency, event->filename, path_len);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
-			"\npath_length=[%u]\nfilename=[%s]\n",
-			event.bytes_count, event.operation,
-			event.latency, event.len, event.filename);
+			"\nfilename=[%s](len %d)\n",
+			event->bytes_count, event->operation,
+			event->latency, event->filename, path_len);
 
 		fflush(stdout);
 	}
