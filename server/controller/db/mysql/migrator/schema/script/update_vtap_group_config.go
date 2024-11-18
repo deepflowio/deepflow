@@ -33,6 +33,11 @@ func UpgradeVTapAgentConfig(db *gorm.DB) error {
 	if err := db.Find(&configs).Error; err != nil {
 		return fmt.Errorf("failed to get from vtap_group_configuration: %s", err.Error())
 	}
+	if len(configs) == 0 {
+		log.Infof("no vtap_group_configuration data to upgrade")
+		return nil
+	}
+
 	var domains []model.Domain
 	if err := db.Find(&domains).Error; err != nil {
 		return fmt.Errorf("failed to get from domain: %s", err.Error())
@@ -41,24 +46,42 @@ func UpgradeVTapAgentConfig(db *gorm.DB) error {
 	for _, domain := range domains {
 		domainLcuuidToID[domain.Lcuuid] = domain.ID
 	}
-	newConfigs := make([]agentconf.MySQLAgentGroupConfiguration, 0, len(configs))
-	for _, config := range configs {
+
+	var existedNewConfigs []agentconf.MySQLAgentGroupConfiguration
+	if err := db.Find(&existedNewConfigs).Error; err != nil {
+		return fmt.Errorf("failed to get from agent_group_configuration: %s", err.Error())
+	}
+	existedNewConfigInfo := make(map[string]bool)
+	for _, existedNewConfig := range existedNewConfigs {
+		existedNewConfigInfo[existedNewConfig.AgentGroupLcuuid] = true
+	}
+	newConfigs := make([]agentconf.MySQLAgentGroupConfiguration, len(configs))
+	for i, config := range configs {
+		if _, ok := existedNewConfigInfo[*config.VTapGroupLcuuid]; ok {
+			log.Infof("agent_group_configuration (agent_group_lcuuid: %s) already exists", *config.VTapGroupLcuuid)
+			continue
+		}
+
 		if config.YamlConfig != nil {
-			log.Infof("upgrade vtap_group_configuration %s: %s", *config.Lcuuid, *config.YamlConfig)
+			log.Infof("upgrade vtap_group_configuration (agent_group_lcuuid: %s): %s", *config.VTapGroupLcuuid, *config.YamlConfig)
 		}
 		upgradedYaml := " "
 		bytes, err := agentconf.Upgrade(&config, &agentconf.DomainData{LcuuidToID: domainLcuuidToID})
 		if err != nil {
-			return fmt.Errorf("failed to get upgraded yaml %s: %s", *config.Lcuuid, err.Error())
+			return fmt.Errorf("failed to get (agent_group_lcuuid: %s) upgraded yaml: %s", *config.VTapGroupLcuuid, err.Error())
 		}
 		upgradedYaml = string(bytes)
-		log.Infof("upgraded yaml %s: %s", *config.Lcuuid, upgradedYaml)
+		log.Infof("(agent_group_lcuuid: %s) upgraded yaml: %s", *config.VTapGroupLcuuid, upgradedYaml)
 		newConfig := agentconf.MySQLAgentGroupConfiguration{
 			Lcuuid:           *config.Lcuuid,
 			AgentGroupLcuuid: *config.VTapGroupLcuuid,
 			Yaml:             upgradedYaml,
 		}
-		newConfigs = append(newConfigs, newConfig)
+		newConfigs[i] = newConfig
+	}
+	if len(newConfigs) == 0 {
+		log.Infof("no agent_group_configuration data to insert")
+		return nil
 	}
 	if err := db.Create(&newConfigs).Error; err != nil {
 		return fmt.Errorf("failed to insert into agent_group_configuration : %s", err.Error())
