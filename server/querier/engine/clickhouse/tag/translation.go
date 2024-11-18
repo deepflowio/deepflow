@@ -969,10 +969,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"enum": NewTag(
-				"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))), dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))",
+				"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))), dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))",
 				"",
-				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
-				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
+				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
+				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
 			),
 		}
 	}
@@ -980,10 +980,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	for _, enumName := range INT_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
-				"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",
+				"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64("+enumName+")), "+enumName+")",
 				"",
-				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 			),
 		}
 	}
@@ -999,18 +999,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			_, ok := tagResourceMap[tagEnumNameSuffix]
 			if ok {
 				tagResourceMap[tagEnumNameSuffix]["enum"] = NewTag(
-					"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
+					"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 					"",
-					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 				)
 			} else {
 				tagResourceMap[tagEnumNameSuffix] = map[string]*Tag{
 					"enum": NewTag(
-						"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
+						"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 						"",
-						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 					),
 				}
 			}
@@ -1020,28 +1020,28 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// nullable int_enum tag do not return default value
 	tagResourceMap["span_kind"] = map[string]*Tag{
 		"enum": NewTag(
-			"if(isNull(span_kind), '', dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(assumeNotNull(span_kind))), span_kind))",
+			"if(isNull(span_kind), '', dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(assumeNotNull(span_kind))), span_kind))",
 			"",
-			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 		)}
 	for _, enumName := range STRING_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
-				"dictGetOrDefault('flow_tag.string_enum_map', 'name', ('%s',"+enumName+"), "+enumName+")",
+				"dictGetOrDefault('flow_tag.string_enum_map', '%s', ('%s',"+enumName+"), "+enumName+")",
 				"",
-				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
-				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s %s %s and tag_name='%s')",
+				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 			),
 		}
 	}
 	// tap_side & Enum(tap_side)
 	tagResourceMap["tap_side"] = map[string]*Tag{
 		"enum": NewTag(
-			"dictGetOrDefault('flow_tag.string_enum_map', 'name', ('%s',observation_point), observation_point)",
+			"dictGetOrDefault('flow_tag.string_enum_map', '%s', ('%s',observation_point), observation_point)",
 			"",
-			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
-			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s %s %s and tag_name='%s')",
+			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 		),
 		"default": NewTag(
 			"observation_point",
@@ -1053,10 +1053,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// tap_port_type & Enum(tap_port_type)
 	tagResourceMap["tap_port_type"] = map[string]*Tag{
 		"enum": NewTag(
-			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(capture_nic_type)), capture_nic_type)",
+			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(capture_nic_type)), capture_nic_type)",
 			"",
-			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 		),
 		"default": NewTag(
 			"capture_nic_type",
@@ -1997,20 +1997,20 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 	// enum(event_level)
 	tagResourceMap["event_level"] = map[string]*Tag{
 		"enum": NewTag(
-			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(event_level)), event_level)",
+			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(event_level)), event_level)",
 			"",
-			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 		),
 	}
 
 	//enum(policy_type)
 	tagResourceMap["policy_type"] = map[string]*Tag{
 		"enum": NewTag(
-			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(policy_type)), policy_type)",
+			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(policy_type)), policy_type)",
 			"",
-			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 		),
 	}
 
@@ -2095,14 +2095,14 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"",
 			"",
-			"name %s %s",
-			"%s (name, %s)",
+			"%s %s %s",
+			"%s (%s, %s)",
 		),
 		"enum": NewTag(
 			"",
 			"",
-			"name %s %s",
-			"%s (name, %s)",
+			"%s %s %s",
+			"%s (%s, %s)",
 		),
 	}
 

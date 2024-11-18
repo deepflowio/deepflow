@@ -17,12 +17,8 @@
 package tagrecorder
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
 
@@ -51,28 +47,29 @@ func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysql
 	}
 
 	for name, tagValues := range respMap {
-		tagName := strings.TrimSuffix(name, "."+config.Cfg.Language)
 		for _, valueAndName := range tagValues {
 			tagValue := valueAndName.([]interface{})[0]
-			tagDisplayName := valueAndName.([]interface{})[1]
-			tagDescription := valueAndName.([]interface{})[2]
-			tagValueInt, err := strconv.Atoi(tagValue.(string))
-			if err == nil {
+			tagDisplayNameZH := valueAndName.([]interface{})[1]
+			tagDisplayNameEN := valueAndName.([]interface{})[2]
+			tagDescriptionZH := valueAndName.([]interface{})[3]
+			tagDescriptionEN := valueAndName.([]interface{})[4]
+			tagValueInt, ok := tagValue.(int)
+			if ok {
 				key := IntEnumTagKey{
-					TagName:  tagName,
+					TagName:  name,
 					TagValue: tagValueInt,
 				}
 				keyToItem[key] = mysqlmodel.ChIntEnum{
-					TagName:     tagName,
-					Value:       tagValueInt,
-					Name:        tagDisplayName.(string),
-					Description: tagDescription.(string),
+					TagName:       name,
+					Value:         tagValueInt,
+					NameZH:        tagDisplayNameZH.(string),
+					NameEN:        tagDisplayNameEN.(string),
+					DescriptionZH: tagDescriptionZH.(string),
+					DescriptionEN: tagDescriptionEN.(string),
 				}
 			}
-
 		}
 	}
-
 	return keyToItem, true
 }
 
@@ -88,11 +85,17 @@ func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIntEnum) (m
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value
 	}
-	if oldItem.Name != newItem.Name {
-		updateInfo["name"] = newItem.Name
+	if oldItem.NameZH != newItem.NameZH {
+		updateInfo["name_zh"] = newItem.NameZH
 	}
-	if oldItem.Description != newItem.Description {
-		updateInfo["description"] = newItem.Description
+	if oldItem.NameEN != newItem.NameEN {
+		updateInfo["name_en"] = newItem.NameEN
+	}
+	if oldItem.DescriptionZH != newItem.DescriptionZH {
+		updateInfo["description_zh"] = newItem.DescriptionZH
+	}
+	if oldItem.DescriptionEN != newItem.DescriptionEN {
+		updateInfo["description_en"] = newItem.DescriptionEN
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
