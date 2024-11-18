@@ -492,7 +492,8 @@ impl EbpfCollector {
 
             // The timestamp provided by eBPF is in nanoseconds, and here it is
             // converted to microseconds.
-            (*sd).timestamp = (*sd).timestamp / 1000;
+            let p_ts: *mut u64 = ptr::addr_of_mut!((*sd).timestamp);
+            p_ts.write_unaligned(p_ts.read_unaligned() / 1000);
 
             let container_id =
                 CStr::from_ptr(ptr::addr_of!((*sd).container_id) as *const libc::c_char)
