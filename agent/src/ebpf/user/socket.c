@@ -138,7 +138,7 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
 static int update_offsets_table(struct bpf_tracer *t,
-				struct bpf_offset_param *offset);
+				bpf_offset_param_t * offset);
 static void datadump_process(void *data, int64_t boot_time);
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int socket_num, int trace_num,
@@ -514,12 +514,11 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 				   struct bpf_offset_param_array *array)
 {
 	int nr_cpus = get_num_possible_cpus();
-	struct bpf_offset_param values[nr_cpus];
+	bpf_offset_param_t values[nr_cpus];
 	if (!bpf_table_get_value(tracer, MAP_MEMBERS_OFFSET_NAME, 0, values))
 		return false;
 
-	struct bpf_offset_param *out_val =
-	    (struct bpf_offset_param *)(array + 1);
+	bpf_offset_param_t *out_val = (bpf_offset_param_t *) (array + 1);
 
 	int i;
 	for (i = 0; i < array->count; i++)
@@ -536,7 +535,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		return -1;
 
 	*outsize = sizeof(struct bpf_socktrace_params) +
-	    sizeof(struct bpf_offset_param) * sys_cpus_count;
+	    sizeof(bpf_offset_param_t) * sys_cpus_count;
 
 	*out = calloc(1, *outsize);
 	if (*out == NULL) {
@@ -822,6 +821,63 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	return ETR_OK;
 }
 
+static u32 copy_regular_file_data(void *dst, void *src, int len)
+{
+	if (len <= 0)
+		return 0;
+
+	struct user_io_event_buffer u_event;
+	struct __io_event_buffer event;
+	memcpy(&event, src, sizeof(event));
+	char *buffer = event.filename;
+	u32 buffer_len = event.len;
+	int event_len;
+	int i, temp_index = 0;
+	char temp[buffer_len + 1];
+	temp[0] = '\0';
+
+	/*
+	 * The path content is in the form "a\0b\0c\0" and needs to
+	 * be converted into the directory format "/c/b/a".
+	 *
+	 * e.g.:
+	 *
+	 * buffer "comm\019317\0task\032148\0/\0"
+	 * convert to "/32148/task/19317/comm"
+	 */
+	if (buffer_len <= 1)
+		goto copy_event;
+
+	char *p;
+	for (i = buffer_len - 2; i >= 0; i--) {
+		if (i == 0) {
+			p = &buffer[0];
+		} else {
+			if (buffer[i] != '\0')
+				continue;
+			p = &buffer[i + 1];
+		}
+
+		temp_index +=
+		    snprintf(temp + temp_index, sizeof(temp) - temp_index,
+			     "%s%s", p, (temp_index > 0 && i != 0) ? "/" : "");
+
+	}
+
+copy_event:
+	buffer = u_event.filename;
+	memcpy(buffer, temp, temp_index + 1);
+	buffer_len = temp_index + 1;
+	u_event.bytes_count = event.bytes_count;
+	u_event.operation = event.operation;
+	u_event.latency = event.latency;
+	event_len = offsetof(typeof(struct user_io_event_buffer),
+			     filename) + buffer_len;
+	safe_buf_copy(dst, len, &u_event, event_len);
+
+	return event_len;
+}
+
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
@@ -1036,8 +1092,8 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (submit_data->l7_protocal_hint >= PROTO_NUM)
 			submit_data->l7_protocal_hint = PROTO_UNKNOWN;
 
-		atomic64_inc(&tracer->
-			     proto_status[submit_data->l7_protocal_hint]);
+		atomic64_inc(&tracer->proto_status
+			     [submit_data->l7_protocal_hint]);
 		int offset = 0;
 		if (len > 0) {
 			if (sd->extra_data_count > 0) {
@@ -1046,9 +1102,15 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 					    sd->extra_data_count);
 				offset = sd->extra_data_count;
 			}
-
-			memcpy_fast(submit_data->cap_data + offset, sd->data,
-				    len);
+			if (sd->source == DATA_SOURCE_IO_EVENT) {
+				len =
+				    copy_regular_file_data(submit_data->cap_data
+							   + offset, sd->data,
+							   len);
+			} else {
+				memcpy_fast(submit_data->cap_data + offset,
+					    sd->data, len);
+			}
 			submit_data->cap_data[len + offset] = '\0';
 		}
 		submit_data->syscall_len += offset;
@@ -1363,7 +1425,7 @@ static void process_events_handle_main(__unused void *arg)
 static int update_offset_map_default(struct bpf_tracer *t,
 				     enum linux_kernel_type kern_type)
 {
-	struct bpf_offset_param offset;
+	bpf_offset_param_t offset;
 	memset(&offset, 0, sizeof(offset));
 
 	switch (kern_type) {
@@ -1396,6 +1458,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
+	offset.struct_dentry_d_parent_offset = 0x18;
 	offset.struct_dentry_name_offset = 0x28;
 	offset.struct_sock_family_offset = 0x10;
 	offset.struct_sock_saddr_offset = 0x4;
@@ -1411,6 +1474,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		ebpf_error("update_offset_map_default failed.\n");
 		return ETR_UPDATE_MAP_FAILD;
 	}
+
 	return ETR_OK;
 }
 
@@ -1479,6 +1543,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	}
 	int struct_dentry_name_offset =
 	    struct_dentry_name_offset_1 + struct_dentry_name_offset_2;
+	int struct_dentry_d_parent_offset =
+	    kernel_struct_field_offset(obj, "dentry", "d_parent");
 	int struct_sock_family_offset =
 	    kernel_struct_field_offset(obj, "sock_common", "skc_family");
 	int struct_sock_saddr_offset =
@@ -1508,7 +1574,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    struct_sock_ip6saddr_offset < 0 ||
 	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
 	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
-	    struct_sock_common_ipv6only_offset < 0) {
+	    struct_sock_common_ipv6only_offset < 0 ||
+	    struct_dentry_d_parent_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -1529,6 +1596,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_file_dentry_offset);
 	ebpf_info("    struct_dentry_name_offset: 0x%x\n",
 		  struct_dentry_name_offset);
+	ebpf_info("    struct_dentry_d_parent_offset: 0x%x\n",
+		  struct_dentry_d_parent_offset);
 	ebpf_info("    struct_sock_family_offset: 0x%x\n",
 		  struct_sock_family_offset);
 	ebpf_info("    struct_sock_saddr_offset: 0x%x\n",
@@ -1548,7 +1617,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	ebpf_info("    struct_sock_common_ipv6only_offset: 0x%x\n",
 		  struct_sock_common_ipv6only_offset);
 
-	struct bpf_offset_param offset;
+	bpf_offset_param_t offset;
 	offset.ready = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
@@ -1561,6 +1630,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
 	offset.struct_dentry_name_offset = struct_dentry_name_offset;
+	offset.struct_dentry_d_parent_offset = struct_dentry_d_parent_offset;
 	offset.struct_sock_family_offset = struct_sock_family_offset;
 	offset.struct_sock_saddr_offset = struct_sock_saddr_offset;
 	offset.struct_sock_daddr_offset = struct_sock_daddr_offset;
@@ -2510,10 +2580,10 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 
 // Update offsets tables for all cpus
 static int update_offsets_table(struct bpf_tracer *t,
-				struct bpf_offset_param *offset)
+				bpf_offset_param_t * offset)
 {
 	int nr_cpus = get_num_possible_cpus();
-	struct bpf_offset_param offs[nr_cpus];
+	bpf_offset_param_t offs[nr_cpus];
 	int i;
 	memset(&offs, 0, sizeof(offs));
 	for (i = 0; i < nr_cpus; i++) {
@@ -2532,7 +2602,7 @@ static bool is_adapt_success(struct bpf_tracer *t)
 	int i;
 
 	if (sys_cpus_count > 0) {
-		struct bpf_offset_param *offset;
+		bpf_offset_param_t *offset;
 		struct bpf_offset_param_array *array =
 		    malloc(sizeof(*array) + sizeof(*offset) * sys_cpus_count);
 		if (array == NULL) {
@@ -2547,7 +2617,7 @@ static bool is_adapt_success(struct bpf_tracer *t)
 			return false;
 		}
 
-		offset = (struct bpf_offset_param *)(array + 1);
+		offset = (bpf_offset_param_t *) (array + 1);
 		for (i = 0; i < sys_cpus_count; i++) {
 			if (!cpu_online[i])
 				continue;
@@ -2730,28 +2800,24 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 
 int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 {
-	struct {
-		__u32 bytes_count;
-		__u32 operation;
-		__u64 latency;
-		char filename[64];
-	} __attribute__ ((packed)) event;
 
 	int bytes = 0;
+	struct user_io_event_buffer *event =
+	    (struct user_io_event_buffer *)data;
 
-	memcpy(&event, data, sizeof(event));
-
+	int path_len = strlen(event->filename) + 1;
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
-				 "\nfilename=[%s]\n",
-				 event.bytes_count, event.operation,
-				 event.latency, event.filename);
+				 "\nfilename=[%s](len %d)\n",
+				 event->bytes_count, event->operation,
+				 event->latency, event->filename, path_len);
 	} else {
 		fprintf(stdout,
-			"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]\nfilename=[%s]\n",
-			event.bytes_count, event.operation,
-			event.latency, event.filename);
+			"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
+			"\nfilename=[%s](len %d)\n",
+			event->bytes_count, event->operation,
+			event->latency, event->filename, path_len);
 
 		fflush(stdout);
 	}
