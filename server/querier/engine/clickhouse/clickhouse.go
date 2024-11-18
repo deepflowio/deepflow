@@ -103,6 +103,7 @@ type CHEngine struct {
 	IsDerivative       bool
 	DerivativeGroupBy  []string
 	ORGID              string
+	Language           string
 }
 
 func init() {
@@ -119,6 +120,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	sql := args.Sql
 	e.Context = args.Context
 	e.NoPreWhere = args.NoPreWhere
+	e.Language = args.Language
 	e.ORGID = common.DEFAULT_ORG_ID
 	if args.ORGID != "" {
 		e.ORGID = args.ORGID
@@ -319,7 +321,7 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 			}
 		} else {
 			nameMetric := []interface{}{
-				name, true, displayName, displayName, displayName, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+				name, true, displayName, displayNameZH, displayNameEN, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
 				"Tag", metrics.METRICS_OPERATORS, permissions, table, "", "", "",
 			}
 			result.Values = append(result.Values, nameMetric)
@@ -402,6 +404,22 @@ func formatMetricByLanguage(language string, values []interface{}) {
 	}
 }
 
+func formatEnumTagByLanguage(language string, values []interface{}) {
+	for _, value := range values {
+		displaynameZH := value.([]interface{})[4].(string)
+		displaynameEN := value.([]interface{})[5].(string)
+		descriptionZH := value.([]interface{})[11].(string)
+		descriptionEN := value.([]interface{})[12].(string)
+		if language == chCommon.LanguageEN {
+			value.([]interface{})[3] = displaynameEN
+			value.([]interface{})[10] = descriptionEN
+		} else {
+			value.([]interface{})[3] = displaynameZH
+			value.([]interface{})[10] = descriptionZH
+		}
+	}
+}
+
 func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInfo *client.DebugInfo) (*common.Result, []string, bool, error) {
 	var visibilityFilterRegexp *regexp.Regexp
 	sqlSplit := strings.Fields(sql)
@@ -475,7 +493,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		}
 		return result, []string{}, true, err
 	case 4: // show tag X values from Y  X, Y not nil
-		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
+		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.Language, args.UseQueryCache)
 		e.DB = "flow_tag"
 		return result, sqlList, true, err
 	case 5: // show tags ...
@@ -510,9 +528,12 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		return nil, sqlList, true, err
 	case 9:
 		result, err := tagdescription.GetEnumTags(e.DB, table, sql)
+		if args.Language != "" {
+			formatTagByLanguage(args.Language, result.Values)
+		}
 		return result, []string{}, true, err
 	case 10:
-		sqlList, err := tagdescription.GetEnumTagAllValues(e.DB, table, sql)
+		sqlList, err := tagdescription.GetEnumTagAllValues(e.DB, table, sql, args.Language)
 		return nil, sqlList, true, err
 	}
 	return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
@@ -1819,7 +1840,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			}
 			outfunc := function.Trans(e.Model)
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
-			return stmt.Trans(node, w, e.AsTagMap, e.DB, e.Table)
+			return stmt.Trans(node, w, e)
 		}
 	case *sqlparser.FuncExpr:
 		args := []string{}

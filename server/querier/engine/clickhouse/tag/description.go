@@ -94,8 +94,6 @@ type TagDescription struct {
 	DisplayNameEN         string
 	Type                  string
 	EnumFile              string
-	EnumFileZH            string
-	EnumFileEN            string
 	Category              string
 	Description           string
 	DescriptionZH         string
@@ -109,7 +107,7 @@ type TagDescription struct {
 }
 
 func NewTagDescription(
-	name, clientName, serverName, displayName, displayNameZH, displayNameEN, tagType, enumFile, enumFileZH, enumFileEN, category string,
+	name, clientName, serverName, displayName, displayNameZH, displayNameEN, tagType, enumFile, category string,
 	permissions []bool, description, descriptionZH, descriptionEN, relatedTag string, deprecated bool, notSupportedOperators []string, table string,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
@@ -125,8 +123,6 @@ func NewTagDescription(
 		DisplayNameEN:         displayNameEN,
 		Type:                  tagType,
 		EnumFile:              enumFile,
-		EnumFileZH:            enumFileZH,
-		EnumFileEN:            enumFileEN,
 		Category:              category,
 		Operators:             operators,
 		Permissions:           permissions,
@@ -141,16 +137,22 @@ func NewTagDescription(
 }
 
 type TagEnum struct {
-	Value       interface{}
-	DisplayName interface{}
-	Description interface{}
+	Value         interface{}
+	DisplayNameZH interface{}
+	DisplayNameEN interface{}
+	DescriptionZH interface{}
+	DescriptionEN interface{}
+	TagType       interface{}
 }
 
-func NewTagEnum(value, displayName, description interface{}) *TagEnum {
+func NewTagEnum(value, displayNameZH, displayNameEN, descriptionZH, descriptionEN, tagType interface{}) *TagEnum {
 	return &TagEnum{
-		Value:       value,
-		DisplayName: displayName,
-		Description: description,
+		Value:         value,
+		DisplayNameZH: displayNameZH,
+		DisplayNameEN: displayNameEN,
+		DescriptionZH: descriptionZH,
+		DescriptionEN: descriptionEN,
+		TagType:       tagType,
 	}
 }
 
@@ -219,9 +221,6 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
 
 				enumFile := tag[4].(string)
-				enumFile = tag[4].(string) + "." + config.Cfg.Language
-				enumFileZH := tag[4].(string) + ".ch"
-				enumFileEN := tag[4].(string) + ".en"
 				displayName := tagLanguage[1].(string)
 				displayNameZH := tagLanguageZH[1].(string)
 				displayNameEN := tagLanguageEN[1].(string)
@@ -230,7 +229,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				desEN := tagLanguageEN[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName, displayNameZH, displayNameEN,
-					tag[3].(string), enumFile, enumFileZH, enumFileEN, tag[5].(string), permissions, des, desZH, desEN, "", deprecated, notSupportedOperators, table,
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, desZH, desEN, "", deprecated, notSupportedOperators, table,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -241,33 +240,73 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag enum值
 	tagEnumData, ok := tagData["enum"]
 	if ok {
+		tagMap := map[string][][6]interface{}{}
 		for tagEnumFile, enumData := range tagEnumData.(map[string]interface{}) {
-			tagEnums := []*TagEnum{}
-			tagIntEnums := []*TagEnum{}
-			tagStringEnums := []*TagEnum{}
-			// 根据tagEnumFile获取tagTypeToOperators
-			tagType, _ := enumFileToTagType[tagEnumFile]
-			if tagType == "" {
-				tagType, _ = enumFileToTagType[tagEnumFile+"."+config.Cfg.Language]
+			tagName := strings.TrimSuffix(tagEnumFile, ".ch")
+			tagName = strings.TrimSuffix(tagName, ".en")
+			values, ok := tagMap[tagName]
+			if !ok {
+				valuesLen := len(enumData.([][]interface{}))
+				values = make([][6]interface{}, valuesLen)
 			}
-			for _, enumValue := range enumData.([][]interface{}) {
+			// 根据tagEnumFile获取tagTypeToOperators
+			tagType, _ := enumFileToTagType[tagName]
+			for i, enumValue := range enumData.([][]interface{}) {
 				// 如果是int/int_enum，则将value转为interface
 				if tagType == "int" || tagType == "int_enum" || tagType == "bit_enum" {
 					value, _ := strconv.Atoi(enumValue[0].(string))
-					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
-					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1], enumValue[2]))
+					values[i][0] = value
+					if strings.HasSuffix(tagEnumFile, ".en") {
+						values[i][2] = enumValue[1]
+						values[i][4] = enumValue[2]
+					} else if strings.HasSuffix(tagEnumFile, ".ch") {
+						values[i][1] = enumValue[1]
+						values[i][3] = enumValue[2]
+					} else {
+						values[i][1] = enumValue[1]
+						values[i][2] = enumValue[1]
+						values[i][3] = enumValue[2]
+						values[i][4] = enumValue[2]
+					}
 				} else if tagType == "string_enum" {
-					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
-					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
+					values[i][0] = enumValue[0]
+					if strings.HasSuffix(tagEnumFile, ".en") {
+						values[i][2] = enumValue[1]
+						values[i][4] = enumValue[2]
+					} else if strings.HasSuffix(tagEnumFile, ".ch") {
+						values[i][1] = enumValue[1]
+						values[i][3] = enumValue[2]
+					} else {
+						values[i][1] = enumValue[1]
+						values[i][2] = enumValue[1]
+						values[i][3] = enumValue[2]
+						values[i][4] = enumValue[2]
+					}
 				}
+				values[i][5] = tagType
 			}
-			if len(tagIntEnums) != 0 {
-				TAG_INT_ENUMS[tagEnumFile] = tagIntEnums
+			tagMap[tagName] = values
+		}
+		for tagName, values := range tagMap {
+			tagEnums := []*TagEnum{}
+			tagIntEnums := []*TagEnum{}
+			tagStringEnums := []*TagEnum{}
+			for _, datas := range values {
+				tagType, _ := datas[5].(string)
+				if tagType == "string_enum" {
+					tagStringEnums = append(tagStringEnums, NewTagEnum(datas[0], datas[1], datas[2], datas[3], datas[4], datas[5]))
+				} else {
+					tagIntEnums = append(tagIntEnums, NewTagEnum(datas[0], datas[1], datas[2], datas[3], datas[4], datas[5]))
+				}
+				tagEnums = append(tagEnums, NewTagEnum(datas[0], datas[1], datas[2], datas[3], datas[4], datas[5]))
 			}
-			if len(tagStringEnums) != 0 {
-				TAG_STRING_ENUMS[tagEnumFile] = tagStringEnums
+			if len(tagIntEnums) > 0 {
+				TAG_INT_ENUMS[tagName] = tagIntEnums
 			}
-			TAG_ENUMS[tagEnumFile] = tagEnums
+			if len(tagStringEnums) > 0 {
+				TAG_STRING_ENUMS[tagName] = tagStringEnums
+			}
+			TAG_ENUMS[tagName] = tagEnums
 		}
 	} else {
 		return errors.New("get tag enum failed! ")
@@ -1108,7 +1147,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		for key, tagValue := range TAG_INT_ENUMS {
 			tagValues := []interface{}{}
 			for _, value := range tagValue {
-				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName, value.Description})
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayNameZH, value.DisplayNameEN, value.DescriptionZH, value.DescriptionEN})
 			}
 			response[key] = tagValues
 		}
@@ -1117,7 +1156,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		for key, tagValue := range TAG_STRING_ENUMS {
 			tagValues := []interface{}{}
 			for _, value := range tagValue {
-				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName, value.Description})
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayNameZH, value.DisplayNameEN, value.DescriptionZH, value.DescriptionEN})
 			}
 			response[key] = tagValues
 		}
@@ -1129,7 +1168,7 @@ func GetEnumTags(db, table, sql string) (*common.Result, error) {
 	response := &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "display_name_zh", "display_name_en", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+			"operators", "permissions", "description", "description_zh", "description_en", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -1142,7 +1181,7 @@ func GetEnumTags(db, table, sql string) (*common.Result, error) {
 				response.Values = append(response.Values,
 					[]interface{}{
 						tagDescription.Name, tagDescription.ClientName, tagDescription.ServerName, tagDescription.DisplayName, tagDescription.DisplayNameZH, tagDescription.DisplayNameEN, tagDescription.Type,
-						tagDescription.Category, tagDescription.Operators, tagDescription.Permissions, tagDescription.Description, tagDescription.RelatedTag, tagDescription.Deprecated, tagDescription.NotSupportedOperators, "",
+						tagDescription.Category, tagDescription.Operators, tagDescription.Permissions, tagDescription.Description, tagDescription.DescriptionZH, tagDescription.DescriptionEN, tagDescription.RelatedTag, tagDescription.Deprecated, tagDescription.NotSupportedOperators, "",
 					})
 			}
 
@@ -1151,7 +1190,7 @@ func GetEnumTags(db, table, sql string) (*common.Result, error) {
 	return response, nil
 }
 
-func GetEnumTagAllValues(db, table, sql string) ([]string, error) {
+func GetEnumTagAllValues(db, table, sql, language string) ([]string, error) {
 	sqlList := []string{}
 	sqlSplit := strings.Fields(sql)
 	tag := sqlSplit[2]
@@ -1162,42 +1201,48 @@ func GetEnumTagAllValues(db, table, sql string) ([]string, error) {
 		if tagDescription.Name == tag {
 			_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 			if !isEnumOK {
-				_, isEnumOK = TAG_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-			}
-			if !isEnumOK {
 				return sqlList, errors.New(fmt.Sprintf("tag %s is not enum", tag))
 			}
 			_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
-			if !isStringEnumOK {
-				_, isStringEnumOK = TAG_STRING_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-			}
 			if isStringEnumOK {
 				table = "string_enum_map"
-				tag_name = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				tag_name = tagDescription.EnumFile
 				if !slices.Contains(tag_names, "'"+tag_name+"'") {
 					tag_names = append(tag_names, "'"+tag_name+"'")
 				}
 			}
 			_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
-			if !isIntEnumOK {
-				_, isIntEnumOK = TAG_INT_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-			}
 			if isIntEnumOK {
 				table = "int_enum_map"
-				tag_name = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				tag_name = tagDescription.EnumFile
 				if !slices.Contains(tag_names, "'"+tag_name+"'") {
 					tag_names = append(tag_names, "'"+tag_name+"'")
 				}
 			}
 		}
 	}
-	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name IN (%s) GROUP BY value, display_name, description ORDER BY value ASC", table, strings.Join(tag_names, ","))
+	nameColumn := ""
+	descriptionColumn := ""
+	if language != "" {
+		nameColumn = "name_" + language
+		descriptionColumn = "description_" + language
+	} else {
+		cfgLang := ""
+		if config.Cfg.Language == "en" {
+			cfgLang = "en"
+		} else {
+			cfgLang = "zh"
+		}
+		nameColumn = "name_" + cfgLang
+		descriptionColumn = "description_" + cfgLang
+	}
+	sql = fmt.Sprintf("SELECT value, %s AS display_name, %s AS description FROM %s WHERE tag_name IN (%s) GROUP BY value, display_name, description ORDER BY value ASC", nameColumn, descriptionColumn, table, strings.Join(tag_names, ","))
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
 	return sqlList, nil
 }
 
-func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache bool) (*common.Result, []string, error) {
+func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQueryCache bool) (*common.Result, []string, error) {
 	var sqlList []string
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
@@ -1251,26 +1296,17 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
-		_, isEnumOK = TAG_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-	}
-	if !isEnumOK {
 		return GetTagResourceValues(db, table, sql)
 	}
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
-	if !isStringEnumOK {
-		_, isStringEnumOK = TAG_STRING_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-	}
 	if isStringEnumOK {
 		table = "string_enum_map"
-		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+		tag = tagDescription.EnumFile
 	}
 	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
-	if !isIntEnumOK {
-		_, isIntEnumOK = TAG_INT_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
-	}
 	if isIntEnumOK {
 		table = "int_enum_map"
-		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+		tag = tagDescription.EnumFile
 	}
 
 	var limitSql string
@@ -1301,8 +1337,23 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
 		orderBy = "length(display_name)"
 	}
+	nameColumn := ""
+	descriptionColumn := ""
+	if language != "" {
+		nameColumn = "name_" + language
+		descriptionColumn = "description_" + language
+	} else {
+		cfgLang := ""
+		if config.Cfg.Language == "en" {
+			cfgLang = "en"
+		} else {
+			cfgLang = "zh"
+		}
+		nameColumn = "name_" + cfgLang
+		descriptionColumn = "description_" + cfgLang
+	}
 	// querier will be called later, so there is no need to display the declaration db
-	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
+	sql = fmt.Sprintf("SELECT value, %s AS display_name, %s AS description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", nameColumn, descriptionColumn, table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
 	return nil, sqlList, nil
