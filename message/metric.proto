@@ -239,7 +239,7 @@ message IoEventData {
     uint32 bytes_count = 1;
     IoOperation operation = 2;
     uint64 latency = 3;
-    bytes filename = 4; // a bytes array ending with \0, length: 64
+    bytes filename = 4; // a bytes array ending with \0, length: is the actual length of the string
 }
 
 enum EventType {
