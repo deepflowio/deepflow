@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package service
+package vtap
 
 import (
 	"encoding/json"
@@ -27,8 +27,22 @@ import (
 	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/model"
 )
+
+type RemoteExecReq struct {
+	trident.RemoteExecRequest
+
+	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
+	OutputFilename string                `json:"output_filename"`
+	CMD            string                `json:"cmd" binding:"required"`
+}
+
+type RemoteExecResp struct {
+	Content        string                    `json:"content,omitempty"` // RUN_COMMAND
+	ErrorMessage   string                    `json:"-"`
+	RemoteCommand  []*trident.RemoteCommand  `json:"remote_commands,omitempty"`  // LIST_COMMAND
+	LinuxNamespace []*trident.LinuxNamespace `json:"linux_namespaces,omitempty"` // LIST_NAMESPACE
+}
 
 var (
 	agentCMDMutex   sync.RWMutex
@@ -121,7 +135,7 @@ type CMDResp struct {
 	RemoteCMDDoneCH      chan struct{}
 	LinuxNamespaceDoneCH chan struct{}
 
-	data *model.RemoteExecResp
+	data *RemoteExecResp
 }
 
 func NewAgentCMDResp(key string) (uint64, *CMDResp) {
@@ -133,7 +147,7 @@ func NewAgentCMDResp(key string) (uint64, *CMDResp) {
 			ExecDoneCH:           make(chan struct{}, 1),
 			RemoteCMDDoneCH:      make(chan struct{}, 1),
 			LinuxNamespaceDoneCH: make(chan struct{}, 1),
-			data:                 &model.RemoteExecResp{},
+			data:                 &RemoteExecResp{},
 		}
 		manager.requestIDToResp[manager.requestID] = resp
 		return manager.requestID, resp
@@ -284,7 +298,7 @@ func GetNamespacesWithoutLock(key string, requestID uint64) []*trident.LinuxName
 	return nil
 }
 
-func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, error) {
+func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
@@ -312,7 +326,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 	manager.ExecCH <- cmdReq
 
 	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
-	resp := &model.RemoteExecResp{}
+	resp := &RemoteExecResp{}
 	for {
 		select {
 		case <-cmdTimeout:
@@ -335,7 +349,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
 			if len(GetCommands(key, requestID)) != 0 {
-				return &model.RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
+				return &RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
 			}
 			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID), dbInfo.LogPrefixORGID)
 			return nil, errors.New(key)
@@ -343,7 +357,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 			if len(GetCommands(key, requestID)) != 0 && len(GetNamespaces(key, requestID)) != 0 {
 				log.Infof("len(commands)=%d, len(namespaces)=%d",
 					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)), dbInfo.LogPrefixORGID)
-				return &model.RemoteExecResp{
+				return &RemoteExecResp{
 					RemoteCommand:  GetCommands(key, requestID),
 					LinuxNamespace: GetNamespaces(key, requestID),
 				}, nil

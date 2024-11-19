@@ -30,7 +30,9 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/appender"
 	"github.com/deepflowio/deepflow/server/controller/http/common/registrant"
 	"github.com/deepflowio/deepflow/server/controller/http/router"
+	"github.com/deepflowio/deepflow/server/controller/http/router/agent"
 	"github.com/deepflowio/deepflow/server/controller/http/router/resource"
+	"github.com/deepflowio/deepflow/server/controller/http/router/vtap"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	trouter "github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
@@ -114,7 +116,6 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewPlugin(),
 		router.NewMail(),
 		router.NewDatabase(s.controllerConfig),
-		router.NewAgentCMD(s.controllerConfig),
 		router.NewAgentGroupConfig(s.controllerConfig),
 
 		// icon
@@ -122,6 +123,9 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 
 		// resource
 		resource.NewDomain(s.controllerConfig),
+
+		agent.NewAgentCMD(s.controllerConfig),
+		vtap.NewAgentCMD(s.controllerConfig), // TODO remove
 	}
 
 	// appends routers supported in CE or EE
