@@ -831,6 +831,17 @@ static u32 copy_regular_file_data(void *dst, void *src, int len)
 	memcpy(&event, src, sizeof(event));
 	char *buffer = event.filename;
 	u32 buffer_len = event.len;
+	u32 buf_offset = offsetof(typeof(struct user_io_event_buffer), filename);
+
+	/*
+	 * Due to the maximum length limitation of the data, the file
+	 * path may be truncated. Here, only the valid length is considered.
+	 */
+	if (buf_offset + buffer_len > len) {
+		buffer_len = len - buf_offset;
+	}
+
+	buffer[buffer_len - 1] = '\0';
 	int event_len;
 	int i, temp_index = 0;
 	char temp[buffer_len + 1];
@@ -871,6 +882,7 @@ copy_event:
 	u_event.bytes_count = event.bytes_count;
 	u_event.operation = event.operation;
 	u_event.latency = event.latency;
+	u_event.offset = event.offset;
 	event_len = offsetof(typeof(struct user_io_event_buffer),
 			     filename) + buffer_len;
 	safe_buf_copy(dst, len, &u_event, event_len);
@@ -1456,6 +1468,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		offset.struct_files_private_data_offset = 0xc0;
 
 	offset.struct_file_f_inode_offset = 0x20;
+	offset.struct_file_f_pos_offset = 0x68;
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
 	offset.struct_dentry_d_parent_offset = 0x18;
@@ -1523,6 +1536,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    kernel_struct_field_offset(obj, "file", "private_data");
 	int struct_file_f_inode_offset =
 	    kernel_struct_field_offset(obj, "file", "f_inode");
+	int struct_file_f_pos_offset =
+	    kernel_struct_field_offset(obj, "file", "f_pos");
 	int struct_inode_i_mode_offset =
 	    kernel_struct_field_offset(obj, "inode", "i_mode");
 	int struct_file_dentry_offset_1 =
@@ -1575,7 +1590,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
 	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
 	    struct_sock_common_ipv6only_offset < 0 ||
-	    struct_dentry_d_parent_offset < 0) {
+	    struct_dentry_d_parent_offset < 0 ||
+	    struct_file_f_pos_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -1590,6 +1606,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_files_private_data_offset);
 	ebpf_info("    struct_file_f_inode_offset: 0x%x\n",
 		  struct_file_f_inode_offset);
+	ebpf_info("    struct_file_f_pos_offset: 0x%x\n",
+		  struct_file_f_pos_offset);
 	ebpf_info("    struct_inode_i_mode_offset: 0x%x\n",
 		  struct_inode_i_mode_offset);
 	ebpf_info("    struct_file_dentry_offset: 0x%x\n",
@@ -1627,6 +1645,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_files_private_data_offset =
 	    struct_files_private_data_offset;
 	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
+	offset.struct_file_f_pos_offset = struct_file_f_pos_offset;
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
 	offset.struct_dentry_name_offset = struct_dentry_name_offset;
@@ -2808,15 +2827,15 @@ int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 	int path_len = strlen(event->filename) + 1;
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
-				 "bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
-				 "\nfilename=[%s](len %d)\n",
-				 event->bytes_count, event->operation,
+				 "bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
+				 "latency=[%lu]\nfilename=[%s](len %d)\n",
+				 event->bytes_count, event->operation, event->offset,
 				 event->latency, event->filename, path_len);
 	} else {
 		fprintf(stdout,
-			"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]"
-			"\nfilename=[%s](len %d)\n",
-			event->bytes_count, event->operation,
+			"bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
+			"latency=[%lu]\nfilename=[%s](len %d)\n",
+			event->bytes_count, event->operation, event->offset,
 			event->latency, event->filename, path_len);
 
 		fflush(stdout);

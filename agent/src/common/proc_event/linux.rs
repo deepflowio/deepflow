@@ -32,14 +32,16 @@ use crate::common::{
 };
 use crate::ebpf::SK_BPF_DATA;
 
-const FILENAME_MAX_PADDING: usize = 64;
+const FILENAME_MAX_PADDING: usize = 24;
 const IO_BYTES_COUNT_OFFSET: usize = 4;
 const IO_OPERATION_OFFSET: usize = 8;
 const IO_LATENCY_OFFSET: usize = 16;
+const IO_OFF_BYTES_OFFSET: usize = 24;
 struct IoEventData {
     bytes_count: u32, // Number of bytes read and written
     operation: u32,   // 0: write 1: read
     latency: u64,     // Function call delay, in nanoseconds
+    off_bytes: u64,   // The number of bytes of offset within the file content
     filename: Vec<u8>,
 }
 
@@ -58,7 +60,8 @@ impl TryFrom<&[u8]> for IoEventData {
             bytes_count: read_u32_le(&raw_data),
             operation: read_u32_le(&raw_data[IO_BYTES_COUNT_OFFSET..]),
             latency: read_u64_le(&raw_data[IO_OPERATION_OFFSET..]),
-            filename: raw_data[IO_LATENCY_OFFSET..]
+            off_bytes: read_u64_le(&raw_data[IO_LATENCY_OFFSET..]),
+            filename: raw_data[IO_OFF_BYTES_OFFSET..]
                 .iter()
                 .position(|&b| b == b'\0') // filename ending with '\0'
                 .map(|index| &raw_data[IO_LATENCY_OFFSET..][..index])
@@ -89,11 +92,12 @@ impl Debug for EventData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             EventData::IoEvent(d) => f.write_fmt(format_args!(
-                "IoEventData {{ filename: {}, operation: {}, bytes_count: {}, latency: {} }}",
+                "IoEventData {{ filename: {}, operation: {}, bytes_count: {}, latency: {}, off_bytes: {} }}",
                 str::from_utf8(&d.filename).unwrap_or(""),
                 d.operation,
                 d.bytes_count,
-                d.latency
+                d.latency,
+                d.off_bytes
             )),
             _ => f.write_str("other event"),
         }

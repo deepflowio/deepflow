@@ -225,6 +225,9 @@ struct __io_event_buffer {
 	// nanosecond
 	__u64 latency;
 
+	// The number of bytes of offset within the file content
+	__u64 offset;
+
 	// filename length
 	__u32 len;
 
@@ -241,6 +244,9 @@ struct user_io_event_buffer {
 
 	// nanosecond
 	__u64 latency;
+
+	// The number of bytes of offset within the file content
+	__u64 offset;
 
 	// strings terminated with \0
 	char filename[IO_FILEPATH_BUFF_SIZE];
@@ -332,7 +338,8 @@ struct member_fields_offset {
 	__u32 tcp_sock__copied_seq_offset;
 	__u32 tcp_sock__write_seq_offset;
 
-	__u32 struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
+	__u16 struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
+	__u16 struct_file_f_pos_offset;		// offsetof(struct file, f_pos)
 	__u32 struct_files_private_data_offset;	// offsetof(struct file, private_data)
 	__u32 struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
 	__u32 struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
