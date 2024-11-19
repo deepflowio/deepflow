@@ -1685,6 +1685,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	       != SOCK_CHECK_TYPE_ERROR))) {
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 		return trace_io_event_common(ctx, offset, args, direction, id);
+#else
+		return -1;
 #endif
 	}
 
