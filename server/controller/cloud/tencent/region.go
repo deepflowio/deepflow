@@ -40,11 +40,6 @@ func (t *Tencent) getRegions() ([]string, error) {
 			log.Infof("region (%s) not in include_regions", name, logger.NewORGPrefix(t.orgID))
 			continue
 		}
-		// 区域黑名单，如果当前区域在黑名单中，则跳过
-		if _, ok := t.excludeRegions[name]; ok {
-			log.Infof("region (%s) in exclude_regions", name, logger.NewORGPrefix(t.orgID))
-			continue
-		}
 		if rData.Get("RegionState").MustString() != "AVAILABLE" {
 			log.Debug("region request tencent api region state not is available", logger.NewORGPrefix(t.orgID))
 			continue

@@ -44,11 +44,6 @@ func (a *Aliyun) getRegions() ([]model.Region, error) {
 				log.Infof("region (%s) not in include_regions", localName, logger.NewORGPrefix(a.orgID))
 				continue
 			}
-			// 区域黑名单，如果当前区域在黑名单中，则跳过
-			if _, ok := a.excludeRegions[localName]; ok {
-				log.Infof("region (%s) in exclude_regions", localName, logger.NewORGPrefix(a.orgID))
-				continue
-			}
 
 			retRegion := model.Region{
 				Label: region.Get("RegionId").MustString(),

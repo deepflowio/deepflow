@@ -70,7 +70,6 @@ type VolcEngine struct {
 	secretID       string
 	secretKey      string
 	includeRegions map[string]bool
-	excludeRegions map[string]bool
 	azLcuuids      map[string]bool
 	httpClient     *http.Client
 }
@@ -115,7 +114,6 @@ func NewVolcEngine(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudCon
 		secretID:       secretID,
 		secretKey:      decryptSecretKey,
 		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
-		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		azLcuuids:      map[string]bool{},
 		httpClient: &http.Client{
 			Timeout: time.Duration(cfg.HTTPTimeout) * time.Second,

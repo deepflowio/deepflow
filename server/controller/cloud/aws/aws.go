@@ -54,7 +54,6 @@ type Aws struct {
 	httpClient            *http.BuildableClient
 	azLcuuidMap           map[string]int
 	includeRegions        map[string]bool
-	excludeRegions        map[string]bool
 	vpcOrSubnetToRouter   map[string]string
 	vmIDToPrivateIP       map[string]string
 	vpcIDToLcuuid         map[string]string
@@ -112,7 +111,6 @@ func NewAws(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*
 		apiDefaultRegion: cfg.AWSRegionName,
 		regionLcuuid:     regionLcuuid,
 		includeRegions:   cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
-		excludeRegions:   cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		credential:       awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
 
 		// 以下属性为获取资源所用的关联关系
