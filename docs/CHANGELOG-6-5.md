@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: panic when prepare write failed [#8524](https://github.com/deepflowio/deepflow/pull/8524) by [lzf575](https://github.com/lzf575)
 * fix: agent - eBPF Kernels below v5.2 cannot retrieve IO events [#8511](https://github.com/deepflowio/deepflow/pull/8511) by [yinjiping](https://github.com/yinjiping)
 * fix: mongo log was missing the request content [#8478](https://github.com/deepflowio/deepflow/pull/8478) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: ckwriter writing failure caused by not writing data for a long time [#8469](https://github.com/deepflowio/deepflow/pull/8469) by [lzf575](https://github.com/lzf575)
