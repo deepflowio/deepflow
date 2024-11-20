@@ -46,7 +46,6 @@ type Aliyun struct {
 	regionName     string
 	httpTimeout    int
 	includeRegions map[string]bool
-	excludeRegions map[string]bool
 	vpcIDToLcuuids map[string]string
 
 	// 消除公有云的无资源可用区使用
@@ -96,7 +95,6 @@ func NewAliyun(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig)
 		// TODO: 后期需要修改为从配置文件读取
 		regionName:     "cn-beijing",
 		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
-		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		httpTimeout:    cfg.HTTPTimeout,
 
 		azLcuuidToResourceNum: make(map[string]int),

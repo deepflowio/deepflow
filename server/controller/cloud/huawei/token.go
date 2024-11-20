@@ -120,10 +120,6 @@ func (h *HuaWei) refreshTokenMap() error {
 			log.Infof("exclude project: %s, not included", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
-		if _, ok := h.config.ExcludeRegions[name]; ok {
-			log.Infof("exclude project: %s", name, logger.NewORGPrefix(h.orgID))
-			continue
-		}
 
 		id := jp.Get("id").MustString()
 		token, err = h.getToken(name, id)
