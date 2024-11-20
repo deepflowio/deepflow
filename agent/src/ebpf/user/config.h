@@ -63,11 +63,13 @@
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
-#define PROG_OFFCPU_OUTPUT_FOR_PE   "df_PE_offcpu_output"
 
-#define MAP_CP_PROGS_JMP_KP_NAME	"__cp_progs_jmp_kp_map"
-#define PROG_DWARF_UNWIND_FOR_KP    "df_KP_dwarf_unwind"
-#define PROG_MEMORY_OUTPUT_FOR_KP   "df_KP_memory_output"
+#define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
+#define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"
+#define PROG_OFFCPU_PYTHON_UNWIND_FOR_KP     "df_KP_offcpu_python_unwind"
+#define PROG_OFFCPU_OUTPUT_FOR_KP            "df_KP_offcpu_output"
+#define PROG_MEMORY_DWARF_UNWIND_FOR_KP      "df_KP_memory_dwarf_unwind"
+#define PROG_MEMORY_OUTPUT_FOR_KP            "df_KP_memory_output"
 
 enum {
 	PROG_PROTO_INFER_TP_IDX,
@@ -88,13 +90,14 @@ enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
-	// TBD: PROG_OFFCPU_OUTPUT_PE_IDX,
-	PROG_MEMORY_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };
 
 enum {
-	PROG_DWARF_UNWIND_KP_IDX,
+	PROG_OFFCPU_DWARF_UNWIND_KP_IDX,
+	PROG_OFFCPU_PYTHON_UNWIND_KP_IDX,
+	PROG_OFFCPU_OUTPUT_KP_IDX,
+	PROG_MEMORY_DWARF_UNWIND_KP_IDX,
 	PROG_MEMORY_OUTPUT_KP_IDX,
 	CP_PROG_KP_NUM
 };
