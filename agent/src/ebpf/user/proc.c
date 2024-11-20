@@ -796,7 +796,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if (p->update_syms_table_time > 0
 			    && curr_time >= p->update_syms_table_time) {
 				if (p->is_java) {
-					java_expired_update(h, &kv, p);
+					//java_expired_update(h, &kv, p);
 					symbolizer_proc_unlock(p);
 					AO_DEC(&p->use);
 					return (void *)p->syms_cache;

@@ -236,7 +236,7 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 					symbolizer_proc_lock(p);
 					if (p->is_java
 					    && strstr(format_str, "perf-")) {
-						p->unknown_syms_found = true;
+						//p->unknown_syms_found = true;
 					}
 					symbolizer_proc_unlock(p);
 				}

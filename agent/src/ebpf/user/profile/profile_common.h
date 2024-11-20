@@ -181,4 +181,6 @@ bool check_profiler_regex(struct profiler_context *ctx, const char *name);
 // Check if the profiler is currently running.
 bool profiler_is_running(void);
 void set_bpf_rt_kern(struct bpf_tracer *t, struct profiler_context *ctx);
+void set_bpf_max_delay(struct bpf_tracer *t, struct profiler_context *ctx,
+                         u64 delay);
 #endif /*DF_USER_PROFILE_COMMON_H */
