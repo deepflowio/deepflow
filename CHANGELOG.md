@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: eBPF SELinux permission-related exit [#8534](https://github.com/deepflowio/deepflow/pull/8534) by [yinjiping](https://github.com/yinjiping)
+* fix: failed to downgrade agent_group_configuration [#8520](https://github.com/deepflowio/deepflow/pull/8520) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: panic when prepare write failed [#8523](https://github.com/deepflowio/deepflow/pull/8523) by [lzf575](https://github.com/lzf575)
 * fix: panic when app service tag write failed [#8521](https://github.com/deepflowio/deepflow/pull/8521) by [lzf575](https://github.com/lzf575)
 * fix: Python uprobe not registered for symbols in main executable [#8515](https://github.com/deepflowio/deepflow/pull/8515) by [rvql](https://github.com/rvql)
@@ -241,6 +243,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Add offset in IoEvent [#8532](https://github.com/deepflowio/deepflow/pull/8532) by [rvql](https://github.com/rvql)
+* feat: Change consts for offcpu dwarf/python unwind [#8525](https://github.com/deepflowio/deepflow/pull/8525) by [rvql](https://github.com/rvql)
+* feat: agent - eBPF Add file offset for io r/w events [#8514](https://github.com/deepflowio/deepflow/pull/8514) by [yinjiping](https://github.com/yinjiping)
 * feature: supports agent cmd api using agent.proto [#8513](https://github.com/deepflowio/deepflow/pull/8513) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: the role field adds the values local and rest [#8474](https://github.com/deepflowio/deepflow/pull/8474) by [lzf575](https://github.com/lzf575)
 * feat: agent - eBPF Support python unwind [#8407](https://github.com/deepflowio/deepflow/pull/8407) by [rvql](https://github.com/rvql)
