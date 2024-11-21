@@ -16,7 +16,7 @@
 
 use std::{
     fmt::{self, Debug, Formatter},
-    str,
+    slice, str,
 };
 
 use prost::Message;
@@ -32,7 +32,6 @@ use crate::common::{
 };
 use crate::ebpf::SK_BPF_DATA;
 
-const FILENAME_MAX_PADDING: usize = 24;
 const IO_BYTES_COUNT_OFFSET: usize = 4;
 const IO_OPERATION_OFFSET: usize = 8;
 const IO_LATENCY_OFFSET: usize = 16;
@@ -50,10 +49,9 @@ impl TryFrom<&[u8]> for IoEventData {
 
     fn try_from(raw_data: &[u8]) -> Result<Self, self::Error> {
         let length = raw_data.len();
-        if length <= FILENAME_MAX_PADDING {
+        if length < IO_OFF_BYTES_OFFSET {
             return Err(ParseEventData(format!(
-                "parse io event data failed, raw data length: {} < {}",
-                length, FILENAME_MAX_PADDING
+                "parse io event data failed, raw data length: {length} < {IO_OFF_BYTES_OFFSET}"
             )));
         }
         let io_event_data = Self {
@@ -61,12 +59,13 @@ impl TryFrom<&[u8]> for IoEventData {
             operation: read_u32_le(&raw_data[IO_BYTES_COUNT_OFFSET..]),
             latency: read_u64_le(&raw_data[IO_OPERATION_OFFSET..]),
             off_bytes: read_u64_le(&raw_data[IO_LATENCY_OFFSET..]),
-            filename: raw_data[IO_OFF_BYTES_OFFSET..]
-                .iter()
-                .position(|&b| b == b'\0') // filename ending with '\0'
-                .map(|index| &raw_data[IO_LATENCY_OFFSET..][..index])
-                .unwrap_or(&[])
-                .to_vec(),
+            filename: {
+                let data = &raw_data[IO_OFF_BYTES_OFFSET..];
+                match data.iter().position(|&b| b == b'\0') {
+                    Some(index) => data[..index].to_vec(),
+                    None => vec![],
+                }
+            },
         };
         Ok(io_event_data)
     }
@@ -78,6 +77,7 @@ impl From<IoEventData> for metric::IoEventData {
             bytes_count: io_event_data.bytes_count,
             operation: io_event_data.operation as i32,
             latency: io_event_data.latency,
+            off_bytes: io_event_data.off_bytes,
             filename: io_event_data.filename,
         }
     }
@@ -152,17 +152,14 @@ impl ProcEvent {
         event_type: EventType,
     ) -> Result<BoxedProcEvents, Error> {
         let data = &mut data.read_unaligned();
-        let cap_len = data.cap_len as usize;
-        let mut raw_data = vec![0u8; cap_len as usize]; // Copy from data.cap_data where stores event's data
-        data.cap_data
-            .copy_to_nonoverlapping(raw_data.as_mut_ptr() as *mut libc::c_char, cap_len);
+        let raw_data = slice::from_raw_parts(data.cap_data as *const u8, data.cap_len as usize);
 
         let mut event_data: EventData = EventData::OtherEvent;
         let start_time = data.timestamp * 1000; // The unit of data.timestamp is microsecond, and the unit of start_time is nanosecond
         let mut end_time = 0;
         match event_type {
             EventType::IoEvent => {
-                let io_event_data = IoEventData::try_from(raw_data.as_ref())?; // Try to parse IoEventData from data.cap_data
+                let io_event_data = IoEventData::try_from(raw_data)?; // Try to parse IoEventData from data.cap_data
                 end_time = start_time + io_event_data.latency;
                 event_data = EventData::IoEvent(io_event_data);
             }

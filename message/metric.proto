@@ -240,6 +240,7 @@ message IoEventData {
     IoOperation operation = 2;
     uint64 latency = 3;
     bytes filename = 4; // a bytes array ending with \0, length: is the actual length of the string
+    uint64 off_bytes = 5; // the number of bytes of offset within the file content
 }
 
 enum EventType {
