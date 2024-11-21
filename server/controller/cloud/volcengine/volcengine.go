@@ -201,6 +201,8 @@ func (v *VolcEngine) GetCloudData() (model.Resource, error) {
 		resource.VInterfaces = append(resource.VInterfaces, redisVInterfaces...)
 		resource.IPs = append(resource.IPs, redisIPs...)
 
+		resource.SubDomains = append(resource.SubDomains, v.getSubDomains(sess)...)
+
 		azs, err := v.getAZs(sess)
 		if err != nil {
 			return model.Resource{}, err
