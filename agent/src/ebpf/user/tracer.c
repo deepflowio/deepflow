@@ -581,8 +581,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 			     "5 restart pods\n");
 		}
 
-		ebpf_error("eBPF load failed, If you want to run normally, "
-			   "you can disable the eBPF feature.\n");
+		ebpf_warning("eBPF load failed, If you want to run normally, "
+			     "you can disable the eBPF feature.\n");
 		return ret;
 	}
 
