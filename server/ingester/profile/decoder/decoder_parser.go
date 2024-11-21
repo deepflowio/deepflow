@@ -86,9 +86,9 @@ func (p *Parser) Put(ctx context.Context, i *storage.PutInput) error {
 		atomic.AddInt64(&p.Counter.CompressedSize, int64(len(location)))
 
 		inProcesses := p.stackToInProcess(location, self, i.StartTime, i.Units.String(), eventType, i.SpyName, i.Key.Labels())
-		p.profileWriterCallback(inProcesses)
 		// in the same batch, app_service is the same and only needs to be written once.
 		p.appServiceTagWriterCallback(inProcesses[0].(*dbwriter.InProcessProfile))
+		p.profileWriterCallback(inProcesses)
 	})
 	return nil
 }
@@ -115,8 +115,8 @@ func (p *Parser) rawStackToInProcess(stack []byte, value uint64, startTime time.
 	}
 	// otherwise, do nothing, directly write into db
 	inProcess := p.stackToInProcess(data, value, startTime, units, p.processTracer.eventType, spyName, labels)
-	p.profileWriterCallback(inProcess)
 	p.appServiceTagWriterCallback(inProcess[0].(*dbwriter.InProcessProfile))
+	p.profileWriterCallback(inProcess)
 	return nil
 }
 

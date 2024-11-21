@@ -526,12 +526,12 @@ func (c *Cache) Write() error {
 	if c.batchSize == 0 {
 		return nil
 	}
-	var err error
 	conn := c.queueContext.conns[c.writeCounter%c.queueContext.connCount]
-	c.batch, err = conn.PrepareReuseBatch(context.Background(), c.prepare, c.batch)
+	batch, err := conn.PrepareReuseBatch(context.Background(), c.prepare, c.batch)
 	if err != nil {
 		return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
 	}
+	c.batch = batch
 
 	err = c.batch.Send()
 	c.batch.Reset()

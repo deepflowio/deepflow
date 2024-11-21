@@ -241,12 +241,25 @@ static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
 
 static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     char *path = NULL;
+    int n = 0;
 
     if (pid <= 1)
         goto out;
 
     if (!is_user_process(pid))
         goto out;
+
+    // Python symbols may reside in the main executable or libpython.so
+    // Check both
+    path = get_elf_path_by_pid(pid);
+    if (path) {
+        n = add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
+        if (n > 0) {
+            ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
+            free(path);
+            return;
+        }
+    }
 
     path = get_so_path_by_pid_and_name(pid, "python3");
     if (!path) {

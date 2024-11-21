@@ -25,9 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/http/service"
+	service "github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -177,7 +176,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	}
 }
 
-func handleResponse(resp *trident.RemoteExecResponse) {
+func handleResponse(resp *api.RemoteExecResponse) {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 	if resp.RequestId == nil {
 		log.Errorf("agent(key: %s) command resp request id not found", key, resp.RequestId)
