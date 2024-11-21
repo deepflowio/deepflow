@@ -625,6 +625,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"inactive_ip_enabled",
 		"l4_performance_enabled",
 		"l7_metrics_enabled",
+		"pod_cluster_internal_ip",
 
 		"static_config.ebpf.on-cpu-profile.cpu",
 		"static_config.ebpf.off-cpu-profile.cpu",
@@ -634,6 +635,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"global.communication.request_via_nat_ip",
 		"global.self_monitoring.log.log_backhaul_enabled",
 		"inputs.resources.private_cloud.hypervisor_resource_enabled",
+		"inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster",
 		"inputs.integration.enabled",
 		"outputs.flow_metrics.enabled",
 		"outputs.flow_metrics.filters.inactive_server_port_aggregation",

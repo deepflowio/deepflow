@@ -3151,7 +3151,7 @@ static __inline bool is_regular_file(int fd,
 	return S_ISREG(i_mode);
 }
 
-static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
+static __inline void set_file_metric_data(struct __io_event_buffer *buffer,
 					   int fd,
 					   struct member_fields_offset *off_ptr)
 {
@@ -3166,6 +3166,9 @@ static __inline void set_file_path_from_fd(struct __io_event_buffer *buffer,
 	void *file = fd_to_file(fd, offset);
 	if (file == NULL)
 		return;
+
+	bpf_probe_read_kernel(&buffer->offset, sizeof(buffer->offset),
+			      file + offset->struct_file_f_pos_offset);
 
 	void *dentry = NULL, *parent;
 	bpf_probe_read_kernel(&dentry, sizeof(dentry),
@@ -3247,7 +3250,7 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-	set_file_path_from_fd(buffer, data_args->fd, offset);
+	set_file_metric_data(buffer, data_args->fd, offset);
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)

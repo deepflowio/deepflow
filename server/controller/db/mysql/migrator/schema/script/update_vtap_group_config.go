@@ -55,8 +55,8 @@ func UpgradeVTapAgentConfig(db *gorm.DB) error {
 	for _, existedNewConfig := range existedNewConfigs {
 		existedNewConfigInfo[existedNewConfig.AgentGroupLcuuid] = true
 	}
-	newConfigs := make([]agentconf.MySQLAgentGroupConfiguration, len(configs))
-	for i, config := range configs {
+	newConfigs := make([]agentconf.MySQLAgentGroupConfiguration, 0)
+	for _, config := range configs {
 		if _, ok := existedNewConfigInfo[*config.VTapGroupLcuuid]; ok {
 			log.Infof("agent_group_configuration (agent_group_lcuuid: %s) already exists", *config.VTapGroupLcuuid)
 			continue
@@ -77,7 +77,7 @@ func UpgradeVTapAgentConfig(db *gorm.DB) error {
 			AgentGroupLcuuid: *config.VTapGroupLcuuid,
 			Yaml:             upgradedYaml,
 		}
-		newConfigs[i] = newConfig
+		newConfigs = append(newConfigs, newConfig)
 	}
 	if len(newConfigs) == 0 {
 		log.Infof("no agent_group_configuration data to insert")
