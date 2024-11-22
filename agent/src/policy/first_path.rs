@@ -248,6 +248,7 @@ pub struct FirstPath {
     fast: FastPath,
 
     fast_disable: bool,
+    memory_check_disable: bool,
 
     memory_limit: AtomicU64,
 }
@@ -261,7 +262,13 @@ impl FirstPath {
     const POLICY_LIMIT: u64 = 500000;
     const MEMORY_LIMIT: u64 = 1 << 20;
 
-    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> FirstPath {
+    pub fn new(
+        queue_count: usize,
+        level: usize,
+        map_size: usize,
+        fast_disable: bool,
+        memory_check_disable: bool,
+    ) -> FirstPath {
         FirstPath {
             group_ip_map: Some(AHashMap::new()),
             vector_4: Vector4::default(),
@@ -281,6 +288,7 @@ impl FirstPath {
 
             fast: FastPath::new(queue_count, map_size),
             fast_disable,
+            memory_check_disable,
             memory_limit: AtomicU64::new(0),
         }
     }
@@ -365,6 +373,10 @@ impl FirstPath {
     }
 
     fn memory_check(&self, size: u64) -> bool {
+        if self.memory_check_disable {
+            return true;
+        }
+
         let Ok(current) = get_memory_rss() else {
             warn!("Cannot check policy memory: Get process memory failed.");
             return true;
@@ -804,7 +816,7 @@ mod tests {
     }
 
     fn generate_table() -> PResult<FirstPath> {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false, false);
         let acl = Acl::new(
             1,
             vec![10],
