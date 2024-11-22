@@ -185,8 +185,8 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
 		s.ProcessKName = string(e.ProcessKname)
-		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id")
-		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
+		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id", "offset")
+		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)), strconv.Itoa(int(ioData.OffBytes)))
 		s.Bytes = ioData.BytesCount
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
