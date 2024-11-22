@@ -2034,6 +2034,7 @@ impl AgentComponents {
             user_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
             user_config.processors.packet.policy.forward_table_capacity,
             user_config.processors.packet.policy.fast_path_disabled,
+            candidate_config.capture_mode == PacketCaptureType::Analyzer,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);

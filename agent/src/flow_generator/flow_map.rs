@@ -334,7 +334,7 @@ impl FlowMap {
                 None
             },
             stats_collector,
-            capacity: config.capacity as usize,
+            capacity: config.flow_capacity() as usize,
             size: 0,
         }
     }
@@ -2547,7 +2547,7 @@ pub fn _new_flow_map_and_receiver(
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
 ) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
-    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
+    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =
