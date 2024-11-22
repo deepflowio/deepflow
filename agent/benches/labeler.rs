@@ -139,7 +139,7 @@ fn bench_labeler(c: &mut Criterion) {
 
 fn bench_policy(c: &mut Criterion) {
     fn generate_table() -> FirstPath {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false, false);
         let acl = Acl::new(
             1,
             vec![10],

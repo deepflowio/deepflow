@@ -17,12 +17,12 @@
 use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{fmt, u32};
 
 use arc_swap::{access::Map, ArcSwap};
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -43,7 +43,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::{ExtraLogFields, L7LogBlacklist, OracleParseConfig};
+use super::config::{ExtraLogFields, FlowGeneratorConfig, L7LogBlacklist, OracleParseConfig};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -428,6 +428,7 @@ impl PluginConfig {
 pub struct FlowConfig {
     pub vtap_id: u16,
     pub trident_type: TridentType,
+    pub tap_mode: TapMode,
     pub cloud_gateway_traffic: bool,
     pub collector_enabled: bool,
     pub l7_log_tap_types: [bool; 256],
@@ -480,6 +481,7 @@ impl From<&RuntimeConfig> for FlowConfig {
         FlowConfig {
             vtap_id: conf.vtap_id as u16,
             trident_type: conf.trident_type,
+            tap_mode: conf.tap_mode,
             cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             collector_enabled: conf.collector_enabled,
             l7_log_tap_types: {
@@ -596,6 +598,7 @@ impl fmt::Debug for FlowConfig {
                     .collect::<Vec<_>>(),
             )
             .field("capacity", &self.capacity)
+            .field("flow_capacity", &self.flow_capacity())
             .field("hash_slots", &self.hash_slots)
             .field("packet_delay", &self.packet_delay)
             .field("flush_interval", &self.flush_interval)
@@ -625,6 +628,16 @@ impl fmt::Debug for FlowConfig {
             .field("plugins", &self.plugins)
             .field("server_ports", &self.server_ports)
             .finish()
+    }
+}
+
+impl FlowConfig {
+    pub fn flow_capacity(&self) -> u32 {
+        let default_capacity = FlowGeneratorConfig::default().capacity;
+        match self.tap_mode {
+            TapMode::Analyzer if self.capacity <= default_capacity => u32::MAX,
+            _ => self.capacity,
+        }
     }
 }
 
