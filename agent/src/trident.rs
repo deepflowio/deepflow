@@ -1866,6 +1866,7 @@ impl AgentComponents {
             yaml_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
             yaml_config.forward_capacity,
             yaml_config.fast_path_disabled,
+            candidate_config.tap_mode == TapMode::Analyzer,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
