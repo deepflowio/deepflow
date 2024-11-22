@@ -161,6 +161,25 @@ func GetTagFilters(field string, tagFilters []config.TagFilter) []config.TagFilt
 	return tagFilter
 }
 
+func GetTagFiltersGroups(field string, tagFiltersGroups []config.TagFiltersGroup) []config.TagFiltersGroup {
+	hitFilterGroups := false
+	groups := make([]config.TagFiltersGroup, len(tagFiltersGroups))
+	for i, filterGroup := range tagFiltersGroups {
+		groups[i].TagFilterCondition = filterGroup.TagFilterCondition
+		for _, filter := range filterGroup.TagFilters {
+			if filter.FieldName == field {
+				groups[i].TagFilters = append(groups[i].TagFilters, filter)
+				hitFilterGroups = true
+			}
+		}
+	}
+
+	if hitFilterGroups {
+		return groups
+	}
+	return nil
+}
+
 func IsExportField(tag *config.StructTags, exportFieldCategoryBits uint64, exportFieldNames []string) bool {
 	if tag.Name == "" {
 		return false
@@ -184,7 +203,7 @@ func IsExportField(tag *config.StructTags, exportFieldCategoryBits uint64, expor
 }
 
 func (es *Exporters) initStructTags(item interface{}, dataSourceId uint32, exporterCfg *config.ExporterCfg) {
-	if exporterCfg.TagFieltertStructTags[dataSourceId] == nil {
+	if exporterCfg.TagFiltersStructTags[dataSourceId] == nil {
 		t := reflect.TypeOf(item)
 		if t.Kind() == reflect.Pointer {
 			t = t.Elem()
@@ -274,6 +293,7 @@ func (es *Exporters) initStructTags(item interface{}, dataSourceId uint32, expor
 				ToStringFunc:      toStringFunc,
 				UniversalTagMapID: universal_tag.StringToUniversalTagID(name),
 				TagFilters:        GetTagFilters(name, exporterCfg.TagFilters),
+				TagFiltersGroups:  GetTagFiltersGroups(name, exporterCfg.TagFiltersGroups),
 				TagDataSourceBits: dataSourceBits,
 			}
 			if enumFile != "" {
@@ -283,39 +303,81 @@ func (es *Exporters) initStructTags(item interface{}, dataSourceId uint32, expor
 			all = append(all, structTag)
 		}
 
-		tagFieltertStructTags := []config.StructTags{}
+		tagFiltersStructTags := []config.StructTags{}
+		tagFiltersGroupsStructTags := make([][]config.StructTags, len(exporterCfg.TagFiltersGroups))
 		exportFieldStructTags := []config.StructTags{}
 		for _, structTag := range all {
 			if len(structTag.TagFilters) > 0 {
-				tagFieltertStructTags = append(tagFieltertStructTags, structTag)
+				tagFiltersStructTags = append(tagFiltersStructTags, structTag)
+			}
+			for i := range structTag.TagFiltersGroups {
+				if len(structTag.TagFiltersGroups[i].TagFilters) > 0 {
+					tagFiltersGroupsStructTags[i] = append(tagFiltersGroupsStructTags[i], structTag)
+				}
 			}
 			if structTag.IsExportedField {
 				exportFieldStructTags = append(exportFieldStructTags, structTag)
 			}
 		}
-		exporterCfg.TagFieltertStructTags[dataSourceId] = tagFieltertStructTags
+		exporterCfg.TagFiltersStructTags[dataSourceId] = tagFiltersStructTags
+		exporterCfg.TagFiltersGroupsStructTags[dataSourceId] = tagFiltersGroupsStructTags
 		exporterCfg.ExportFieldStructTags[dataSourceId] = exportFieldStructTags
 
 		dsid := config.DataSourceID(dataSourceId)
-		log.Infof("export protocl %s datasource %s, get all structTags: %+v", exporterCfg.Protocol, dsid.String(), all)
-		log.Infof("export protocl %s datasource %s, get tagfilter structTags: %+v", exporterCfg.Protocol, dsid.String(), tagFieltertStructTags)
-		log.Infof("export protocl %s datasource %s, get exportfield structTags: %+v", exporterCfg.Protocol, dsid.String(), exportFieldStructTags)
+		log.Infof("export protocol %s datasource %s, get all structTags: %+v", exporterCfg.Protocol, dsid.String(), all)
+		log.Infof("export protocol %s datasource %s, get tagfilter structTags: %+v", exporterCfg.Protocol, dsid.String(), tagFiltersStructTags)
+		log.Infof("export protocol %s datasource %s, get tagfilters group structTags: %+v", exporterCfg.Protocol, dsid.String(), tagFiltersGroupsStructTags)
+		log.Infof("export protocol %s datasource %s, get exportfield structTags: %+v", exporterCfg.Protocol, dsid.String(), exportFieldStructTags)
 	}
 }
 
 func (es *Exporters) IsExportItem(item common.ExportItem, dataSourceId uint32, exporterCfg *config.ExporterCfg) bool {
 	es.initStructTags(item, dataSourceId, exporterCfg)
-
+	ret, shouldExit := true, false
 	conditionHandler := exporterCfg.TagFilterCondition.NewConditionHandler()
-	for _, structTag := range exporterCfg.TagFieltertStructTags[dataSourceId] {
+	for _, structTag := range exporterCfg.TagFiltersStructTags[dataSourceId] {
 		value := item.GetFieldValueByOffsetAndKind(structTag.Offset, structTag.DataKind, structTag.DataType)
 		for _, tagFilter := range structTag.TagFilters {
-			if canExit, ret := conditionHandler.Decision(tagFilter.MatchValue(value)); canExit {
-				return ret
+			if canExit, r := conditionHandler.Decision(tagFilter.MatchValue(value)); canExit {
+				ret = r
+				shouldExit = true
+				break
 			}
 		}
+		if shouldExit {
+			break
+		}
 	}
-	return true
+
+	// if 'tag-filters' is configured, the configuration of `tag-filter-groups` is ignored
+	if len(exporterCfg.TagFiltersStructTags[dataSourceId]) > 0 {
+		return ret
+	}
+
+	for i, groupStructTags := range exporterCfg.TagFiltersGroupsStructTags[dataSourceId] {
+		ret, shouldExit = true, false
+		conditionHandler := exporterCfg.TagFiltersGroups[i].TagFilterCondition.NewConditionHandler()
+		for _, structTag := range groupStructTags {
+			value := item.GetFieldValueByOffsetAndKind(structTag.Offset, structTag.DataKind, structTag.DataType)
+			for _, tagFilter := range structTag.TagFiltersGroups[i].TagFilters {
+				if canExit, r := conditionHandler.Decision(tagFilter.MatchValue(value)); canExit {
+					ret = r
+					shouldExit = true
+					break
+				}
+			}
+
+			if shouldExit {
+				break
+			}
+		}
+
+		// there is an OR relationship between 'tag-filter-groups'. If one of them is true, it can be returned.
+		if ret && len(groupStructTags) > 0 {
+			return ret
+		}
+	}
+	return ret
 }
 
 func (es *Exporters) getPutCache(dataSourceId, decoderId, exporterId int) *ExportersCache {
