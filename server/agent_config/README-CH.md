@@ -3455,12 +3455,14 @@ inputs:
 上面的 "Driver: igb_uio" 说明是DPDP纳管的设备 (除此之外还有"vfio-pci", "uio_pci_generic"
 也被DPDK纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
 
+可以使用 deepflow 提供的可持续剖析功能对 DPDK 应用做函数剖析查看具体接口名字，也可以使用 perf 命令在agent所在节点上运行 `perf record -F97 -a -g -p <dpdk应用进程号> -- sleep 30`，`perf script | grep -E 'recv|xmit'` 来确认驱动接口。
+
      下面列出了不同驱动对应的接口名称，仅供参考:
       1. Physical NIC Drivers:
           - Intel Drivers:
             - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
-              - rx: ixgbe_recv_pkts
-              - tx: ixgbe_xmit_pkts
+              - rx: ixgbe_recv_pkts, ixgbe_recv_pkts_vec
+              - tx: ixgbe_xmit_pkts, ixgbe_xmit_fixed_burst_vec, ixgbe_xmit_pkts_vec
             - i40e:    Supports Intel X710, XL710 series NICs.
               - rx: i40e_recv_pkts
               - tx: i40e_xmit_pkts
