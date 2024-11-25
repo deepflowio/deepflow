@@ -243,6 +243,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add offset attribute to IO event [#8537](https://github.com/deepflowio/deepflow/pull/8537) by [lzf575](https://github.com/lzf575)
 * feat: Add offset in IoEvent [#8532](https://github.com/deepflowio/deepflow/pull/8532) by [rvql](https://github.com/rvql)
 * feat: Change consts for offcpu dwarf/python unwind [#8525](https://github.com/deepflowio/deepflow/pull/8525) by [rvql](https://github.com/rvql)
 * feat: agent - eBPF Add file offset for io r/w events [#8514](https://github.com/deepflowio/deepflow/pull/8514) by [yinjiping](https://github.com/yinjiping)
