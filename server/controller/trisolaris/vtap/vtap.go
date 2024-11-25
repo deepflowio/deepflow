@@ -521,6 +521,13 @@ func (v *VTapInfo) getAgentConfigs() {
 		return
 	}
 
+	for _, c := range configs {
+		if c.ProcessThreshold == nil {
+			continue
+		}
+		log.Infof(v.Logf("kangxiang=>db=> %s-%d", *c.VTapGroupLcuuid, *c.ProcessThreshold))
+	}
+
 	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
 	vtapGroupLcuuidToLocalConfig := make(map[string]string)
 	vtapGroupLcuuidToEAHPEnabled := make(map[string]*int)
@@ -573,6 +580,12 @@ func (v *VTapInfo) getAgentConfigs() {
 		if config.VTapGroupLcuuid != nil {
 			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
 		}
+	}
+	for gLcuuid, cache := range vtapGroupLcuuidToConfiguration {
+		if cache.ProcessThreshold == nil {
+			continue
+		}
+		log.Infof(v.Logf("kangxiang=>cache=> %s-%d", gLcuuid, *cache.ProcessThreshold))
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
 	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig

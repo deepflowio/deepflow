@@ -1364,6 +1364,9 @@ func (c *VTapCache) updateVTapConfig(cfg *VTapConfig) {
 	if cfg == nil {
 		return
 	}
+	if cfg.ProcessThreshold != nil {
+		log.Infof(c.vTapInfo.Logf("kangxiang=>updateVTapConfig=> %d", *cfg.ProcessThreshold))
+	}
 	c.config.Store(cfg)
 }
 
