@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: the policy does not check memory in analyzer mode [#8540](https://github.com/deepflowio/deepflow/pull/8540) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: eBPF SELinux permission-related exit [#8534](https://github.com/deepflowio/deepflow/pull/8534) by [yinjiping](https://github.com/yinjiping)
 * fix: failed to downgrade agent_group_configuration [#8520](https://github.com/deepflowio/deepflow/pull/8520) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: panic when prepare write failed [#8523](https://github.com/deepflowio/deepflow/pull/8523) by [lzf575](https://github.com/lzf575)
@@ -243,6 +244,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Supplement the DPDK configuration description [#8543](https://github.com/deepflowio/deepflow/pull/8543) by [yinjiping](https://github.com/yinjiping)
 * feat: add offset attribute to IO event [#8537](https://github.com/deepflowio/deepflow/pull/8537) by [lzf575](https://github.com/lzf575)
 * feat: Add offset in IoEvent [#8532](https://github.com/deepflowio/deepflow/pull/8532) by [rvql](https://github.com/rvql)
 * feat: Change consts for offcpu dwarf/python unwind [#8525](https://github.com/deepflowio/deepflow/pull/8525) by [rvql](https://github.com/rvql)
