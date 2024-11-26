@@ -3393,6 +3393,9 @@ impl UserConfig {
         self.global.communication.proxy_controller_ip = "127.0.0.1".to_string();
         self.global.communication.proxy_controller_port = 30035;
         self.global.ntp.enabled = false;
+        self.inputs.cbpf.af_packet.interface_regex = "".to_string();
+        self.outputs.flow_metrics.filters.apm_metrics = true;
+        self.outputs.flow_metrics.filters.npm_metrics = true;
         self.outputs.socket.data_socket_type = agent::SocketType::File;
         self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
         self.outputs.flow_log.filters.l7_capture_network_types = vec![3];
