@@ -103,7 +103,7 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/IBM/sarama v1.43.0
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
-	github.com/bytedance/sonic v1.11.8
+	github.com/bytedance/sonic v1.12.5
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import v0.0.0-00010101000000-000000000000
@@ -130,7 +130,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
