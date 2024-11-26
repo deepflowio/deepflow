@@ -254,8 +254,14 @@ func sendStatsd(bp client.BatchPoints) {
 				dfStats.TagValues = append(dfStats.TagValues, point.Tags()[v])
 			}
 
-			for k := range fields {
-				dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, k)
+			for k, v := range fields {
+				switch v.(type) {
+				case string:
+					dfStats.TagNames = append(dfStats.TagNames, k)
+					dfStats.TagValues = append(dfStats.TagValues, v.(string))
+				default:
+					dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, k)
+				}
 			}
 			sort.Slice(dfStats.MetricsFloatNames, func(i, j int) bool {
 				return dfStats.MetricsFloatNames[i] < dfStats.MetricsFloatNames[j]
