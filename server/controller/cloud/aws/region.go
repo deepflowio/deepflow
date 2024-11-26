@@ -49,11 +49,6 @@ func (a *Aws) getRegions() ([]string, error) {
 			log.Infof("region (%s) not in include_regions", name, logger.NewORGPrefix(a.orgID))
 			continue
 		}
-		// 区域黑名单，如果当前区域在黑名单中，则跳过
-		if _, ok := a.excludeRegions[name]; ok {
-			log.Infof("region (%s) in exclude_regions", name, logger.NewORGPrefix(a.orgID))
-			continue
-		}
 		regions = append(regions, name)
 	}
 	log.Debug("get regions complete", logger.NewORGPrefix(a.orgID))

@@ -1748,23 +1748,24 @@ inputs:
       # name: DPDK
       # description:
       dpdk:
-        # type: bool
-        # name: Enabled
+        # type: string
+        # name: source
         # unit:
         # range: []
-        # enum_options: []
+        # enum_options: [None, eBPF, pdump]
         # modification: agent_restart
         # ee_feature: true
         # description:
         #   en: |-
-        #     The DPDK RecvEngine is only started when this configuration item is turned on.
-        #     Note that you also need to set capture_mode to 1. Please refer to
-        #     https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+        #     Currently, there are two ways to collect DPDK traffic, including:
+        #     - pdump: See details https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+        #     - eBPF: Use eBPF Uprobe to obtain DPDK traffic
         #   ch: |-
-        #     TODO
-        # upgrade_from: static_config.dpdk-enabled
+        #     目前支持两种采集 DPDK 流量的方式，包括：
+        #     - pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+        #     - eBPF: 使用 eBPF Uprobe的方式获取 DPDK 流量
         # TODO: 待整理。
-        enabled: false
+        source: None
       # type: section
       # name: Libpcap
       # description:
@@ -2182,20 +2183,6 @@ inputs:
         # name: DPDK
         # description:
         dpdk:
-          # type: bool
-          # name: Enabled
-          # unit:
-          # range: []
-          # enum_options: []
-          # modification: agent_restart
-          # ee_feature: true
-          # description:
-          #   en: |-
-          #     The toggle for enabling DPDK packet capture feature.
-          #   ch: |-
-          #     DPDK 数据包采集特性的开启开关
-          # upgrade_from:
-          enabled: false
           # type: string
           # name:
           #   en: DPDK Application Command Name
@@ -2210,11 +2197,11 @@ inputs:
           #     Set the command name of the DPDK application, eBPF will automatically
           #     locate and trace packets for data collection.
           #
-          #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk` 
+          #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
           #   ch: |-
           #     设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
           #
-          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk` 
+          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
           # upgrade_from:
           command: ""
           # type: string
@@ -2228,7 +2215,7 @@ inputs:
           # ee_feature: true
           # description:
           #   en: |-
-          #     Fill in the appropriate packet reception hook point according to the actual network card driver. 
+          #     Fill in the appropriate packet reception hook point according to the actual network card driver.
           #     You can use the command 'lspci -vmmk' to find the network card driver type. For example:
           #     ```
           #     Slot:   04:00.0
@@ -2264,7 +2251,7 @@ inputs:
           #              - tx: i40e_xmit_pkts
           #            - ice:     Supports Intel E810 series NICs.
           #              - rx: ice_recv_pkts
-          #              - tx: ice_xmit_pkts 
+          #              - tx: ice_xmit_pkts
           #          - Mellanox Drivers:
           #            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
           #              - rx: mlx4_rx_burst
@@ -2320,7 +2307,7 @@ inputs:
           #              - tx: i40e_xmit_pkts
           #            - ice:     Supports Intel E810 series NICs.
           #              - rx: ice_recv_pkts
-          #              - tx: ice_xmit_pkts 
+          #              - tx: ice_xmit_pkts
           #          - Mellanox Drivers:
           #            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
           #              - rx: mlx4_rx_burst
@@ -2337,7 +2324,7 @@ inputs:
           #            - virtio:  Supports Virtio-based virtual network interfaces.
           #              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
           #                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
-          #              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts, 
+          #              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts,
           #          - VMXNET3 Driver:
           #            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
           #              - rx: vmxnet3_recv_pkts

@@ -59,6 +59,8 @@ pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
+#[cfg(target_os = "linux")]
+use special_recv_engine::DpdkFromEbpf;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use self::base_dispatcher::TapInterfaceWhitelist;
@@ -73,7 +75,7 @@ use crate::{
     },
     config::{
         handler::{CollectorAccess, FlowAccess, LogParserAccess},
-        DispatcherConfig,
+        DispatcherConfig, DpdkSource,
     },
     exception::ExceptionHandler,
     flow_generator::AppProto,
@@ -89,8 +91,9 @@ use crate::{
 use public::netns::NsFile;
 use public::{
     buffer::{BatchedBox, BatchedBuffer},
+    packet,
     proto::agent::{AgentType, IfMacSource, PacketCaptureType},
-    queue::DebugSender,
+    queue::{DebugSender, Receiver},
     utils::net::{Link, MacAddr},
     LeakyBucket,
 };
@@ -547,7 +550,7 @@ pub struct Options {
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
     pub capture_mode: PacketCaptureType,
-    pub dpdk_enabled: bool,
+    pub dpdk_source: DpdkSource,
     pub libpcap_enabled: bool,
     pub dispatcher_queue: bool,
     pub packet_fanout_mode: u32,
@@ -560,6 +563,7 @@ pub struct Options {
     pub vhost_socket_path: String,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub cpu_set: CpuSet,
+    pub dpdk_ebpf_receiver: Option<Receiver<Box<packet::Packet<'static>>>>,
 }
 
 impl Options {
@@ -1208,10 +1212,18 @@ impl DispatcherBuilder {
         options: &Arc<Mutex<Options>>,
         queue_debugger: &Arc<QueueDebugger>,
     ) -> Result<RecvEngine> {
+        #[cfg(not(target_os = "linux"))]
         let options = options.lock().unwrap();
+        #[cfg(target_os = "linux")]
+        let mut options = options.lock().unwrap();
         match capture_mode {
             #[cfg(target_os = "linux")]
             PacketCaptureType::Mirror if !options.vhost_socket_path.is_empty() => {
+                info!(
+                    "Vhostuser init with: {} {}",
+                    options.vhost_socket_path,
+                    options.vhost_queue_size()
+                );
                 Ok(RecvEngine::VhostUser(VhostUser::new(
                     options.vhost_socket_path.clone(),
                     options.vhost_queue_size(),
@@ -1245,15 +1257,41 @@ impl DispatcherBuilder {
                 .map_err(|e| error::Error::Libpcap(e.to_string()))?;
                 Ok(RecvEngine::Libpcap(Some(libpcap)))
             }
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            PacketCaptureType::Mirror if options.dpdk_enabled => {
+            #[cfg(target_os = "linux")]
+            PacketCaptureType::Mirror if options.dpdk_source == DpdkSource::PDump => {
                 #[cfg(target_arch = "s390x")]
                 return Err(Error::ConfigInvalid(
                     "cpu arch s390x does not support DPDK!".into(),
                 ));
                 #[cfg(not(target_arch = "s390x"))]
                 {
+                    info!("Dpdk init with: {:?}", options.dpdk_source);
                     Ok(RecvEngine::Dpdk(Dpdk::new(None, None, options.snap_len)))
+                }
+            }
+            #[cfg(target_os = "linux")]
+            PacketCaptureType::Mirror | PacketCaptureType::Analyzer
+                if options.dpdk_source == DpdkSource::Ebpf =>
+            {
+                #[cfg(target_arch = "s390x")]
+                return Err(Error::ConfigInvalid(
+                    "cpu arch s390x does not support DPDK!".into(),
+                ));
+                #[cfg(not(target_arch = "s390x"))]
+                {
+                    if options.dpdk_ebpf_receiver.is_none() {
+                        warn!(
+                            "Create dpdk with {:?} again, restart agent ...",
+                            options.dpdk_source
+                        );
+                        crate::utils::notify_exit(1);
+                        return Err(Error::ConfigInvalid("Restart agent...".into()));
+                    }
+                    info!("Dpdk init with: {:?}", options.dpdk_source);
+                    Ok(RecvEngine::DpdkFromEbpf(DpdkFromEbpf::new(
+                        options.dpdk_ebpf_receiver.take().unwrap(),
+                        Duration::from_millis(100),
+                    )))
                 }
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]

@@ -80,6 +80,7 @@ use public::{
     debug::QueueDebugger,
     l7_protocol::{L7Protocol, L7ProtocolChecker},
     leaky_bucket::LeakyBucket,
+    packet,
     proto::{
         agent::{AgentType, Exception},
         metric,
@@ -470,6 +471,7 @@ pub struct EbpfCollector {
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
+static mut DPDK_SENDER: Option<DebugSender<Box<packet::Packet>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut POLICY_GETTER: Option<PolicyGetter> = None;
@@ -490,15 +492,34 @@ impl EbpfCollector {
                 return;
             }
 
+            let sd = &mut sd.read_unaligned();
+            #[cfg(feature = "extended_observability")]
+            if sd.source == ebpf::DATA_SOURCE_DPDK {
+                let mut temp =
+                    slice::from_raw_parts_mut(sd.cap_data as *mut u8, sd.cap_len as usize).to_vec();
+                let ptr = temp.as_mut_ptr();
+                std::mem::forget(temp);
+
+                let packet = packet::Packet {
+                    timestamp: Duration::from_nanos(sd.timestamp),
+                    capture_length: sd.syscall_len as isize,
+                    if_index: 0,
+                    data: slice::from_raw_parts_mut(ptr, sd.cap_len as usize),
+                    raw: Some(ptr),
+                };
+                if let Err(e) = DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
+                    warn!("meta packet send ebpf error: {:?}", e);
+                }
+                return;
+            }
+
             // The timestamp provided by eBPF is in nanoseconds, and here it is
             // converted to microseconds.
-            let p_ts: *mut u64 = ptr::addr_of_mut!((*sd).timestamp);
-            p_ts.write_unaligned(p_ts.read_unaligned() / 1000);
+            sd.timestamp = sd.timestamp / 1000;
 
             let container_id =
-                CStr::from_ptr(ptr::addr_of!((*sd).container_id) as *const libc::c_char)
-                    .to_string_lossy();
-            let event_type = EventType::from(ptr::addr_of!((*sd).source).read_unaligned());
+                CStr::from_ptr(sd.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
+            let event_type = EventType::from(sd.source);
             if event_type != EventType::OtherEvent {
                 // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
                 let event = ProcEvent::from_ebpf(sd, event_type);
@@ -618,6 +639,7 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
+        dpdk_sender: DebugSender<Box<packet::Packet<'static>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         policy_getter: PolicyGetter,
@@ -630,6 +652,7 @@ impl EbpfCollector {
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
+            DPDK_SENDER = Some(dpdk_sender);
             PROC_EVENT_SENDER = Some(proc_event_sender);
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             POLICY_GETTER = Some(policy_getter);
@@ -842,6 +865,10 @@ impl EbpfCollector {
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 
+        // set ebpf dpdk enabled
+        #[cfg(feature = "extended_observability")]
+        ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
+
         if ebpf::running_socket_tracer(
             Self::ebpf_l7_callback,                              /* 回调接口 rust -> C */
             config.ebpf.tunning.userspace_worker_threads as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -1004,6 +1031,40 @@ impl EbpfCollector {
             }
         }
 
+        // ebpf dpdk init
+        #[cfg(feature = "extended_observability")]
+        if config.dpdk_enabled {
+            let dpdk = &config.ebpf.socket.uprobe.dpdk;
+            if !dpdk.command.is_empty() {
+                ebpf::set_dpdk_cmd_name(
+                    CString::new(dpdk.command.as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            }
+            if !dpdk.rx_hooks.is_empty() {
+                ebpf::set_dpdk_hooks(
+                    ebpf::DPDK_HOOK_TYPE_RECV as c_int,
+                    CString::new(dpdk.rx_hooks.as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            }
+            if !dpdk.tx_hooks.is_empty() {
+                ebpf::set_dpdk_hooks(
+                    ebpf::DPDK_HOOK_TYPE_XMIT as c_int,
+                    CString::new(dpdk.tx_hooks.as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            }
+
+            ebpf::dpdk_trace_start();
+        }
+
         ebpf::bpf_tracer_finish();
 
         Ok(handle)
@@ -1072,6 +1133,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
+        dpdk_sender: DebugSender<Box<packet::Packet<'static>>>,
         output: DebugSender<Box<AppProto>>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
@@ -1101,6 +1163,7 @@ impl EbpfCollector {
         let config_handle = Self::ebpf_init(
             &ebpf_config,
             sender,
+            dpdk_sender,
             proc_event_output,
             ebpf_profile_sender,
             policy_getter,
@@ -1192,7 +1255,7 @@ impl EbpfCollector {
                 s.set_report_interval(ecfg.memory.report_interval);
             }
         }
-        if config.l7_log_enabled() {
+        if config.l7_log_enabled() || config.dpdk_enabled {
             self.start();
             Self::ebpf_on_config_change(config.l7_log_packet_size);
         } else {

@@ -59,7 +59,7 @@ use crate::{
     config::PcapStream,
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig},
-        Config, ConfigError, UserConfig,
+        Config, ConfigError, DpdkSource, UserConfig,
     },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
@@ -117,8 +117,6 @@ use integration_skywalking::SkyWalkingExtra;
 use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
-#[cfg(target_os = "linux")]
-use public::netns;
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
@@ -131,6 +129,8 @@ use public::{
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
+#[cfg(target_os = "linux")]
+use public::{netns, packet, queue::Receiver};
 
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u64 = 5; // Potential delay from other processing steps in flow_map
@@ -1107,6 +1107,8 @@ fn component_on_config_change(
                     components.kubernetes_poller.clone(),
                     #[cfg(target_os = "linux")]
                     libvirt_xml_extractor.clone(),
+                    #[cfg(target_os = "linux")]
+                    None,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1146,7 +1148,7 @@ fn component_on_config_change(
                     .vhost_user
                     .vhost_socket_path
                     .is_empty()
-                    || conf.dpdk_enabled)
+                    || conf.dpdk_source != DpdkSource::None)
             {
                 return;
             }
@@ -1215,6 +1217,8 @@ fn component_on_config_change(
                     components.kubernetes_poller.clone(),
                     #[cfg(target_os = "linux")]
                     libvirt_xml_extractor.clone(),
+                    #[cfg(target_os = "linux")]
+                    None,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1588,7 +1592,6 @@ pub struct AgentComponents {
     pub last_dispatcher_component_id: usize,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_listener: Arc<ProcessListener>,
-
     max_memory: u64,
     capture_mode: PacketCaptureType,
     agent_mode: RunningMode,
@@ -1985,7 +1988,7 @@ impl AgentComponents {
                 .vhost_user
                 .vhost_socket_path
                 .is_empty()
-                || candidate_config.dispatcher.dpdk_enabled)
+                || candidate_config.dispatcher.dpdk_source != DpdkSource::None)
         {
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
@@ -2331,6 +2334,24 @@ impl AgentComponents {
             bpf_syntax_str,
         }));
 
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let queue_size = config_handler.ebpf().load().queue_size;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let queue_name = "0-ebpf-dpdk-to-dispatcher";
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let (dpdk_ebpf_sender, dpdk_ebpf_receiver, counter) =
+            queue::bounded_with_debug(queue_size, queue_name, &queue_debugger);
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        stats_collector.register_countable(
+            &stats::QueueStats {
+                id: 0,
+                module: queue_name,
+            },
+            Countable::Owned(Box::new(counter)),
+        );
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let mut dpdk_ebpf_receiver = Some(dpdk_ebpf_receiver);
+
         let mut tap_interfaces = vec![];
         for (i, entry) in interfaces_and_ns.into_iter().enumerate() {
             #[cfg(target_os = "linux")]
@@ -2369,6 +2390,8 @@ impl AgentComponents {
                 kubernetes_poller.clone(),
                 #[cfg(target_os = "linux")]
                 libvirt_xml_extractor.clone(),
+                #[cfg(target_os = "linux")]
+                dpdk_ebpf_receiver.take(),
             )?;
             dispatcher_components.push(dispatcher_component);
         }
@@ -2564,6 +2587,7 @@ impl AgentComponents {
                 config_handler.flow(),
                 config_handler.collector(),
                 policy_getter,
+                dpdk_ebpf_sender,
                 log_sender,
                 l7_stats_sender,
                 proc_event_sender,
@@ -3155,6 +3179,7 @@ fn build_dispatchers(
     #[cfg(target_os = "linux")] netns: netns::NsFile,
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    #[cfg(target_os = "linux")] dpdk_ebpf_receiver: Option<Receiver<Box<packet::Packet<'static>>>>,
 ) -> Result<DispatcherComponent> {
     let candidate_config = &config_handler.candidate_config;
     let user_config = &candidate_config.user_config;
@@ -3278,7 +3303,8 @@ fn build_dispatchers(
             .cbpf
             .special_network
             .dpdk
-            .enabled
+            .source
+            != DpdkSource::None
     {
         vec![]
     } else {
@@ -3309,7 +3335,7 @@ fn build_dispatchers(
             controller_tls_port: static_config.controller_tls_port,
             libpcap_enabled: user_config.inputs.cbpf.special_network.libpcap.enabled,
             snap_len: dispatcher_config.capture_packet_size as usize,
-            dpdk_enabled: dispatcher_config.dpdk_enabled,
+            dpdk_source: dispatcher_config.dpdk_source,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
             packet_fanout_mode: user_config.inputs.cbpf.af_packet.tunning.packet_fanout_mode,
             vhost_socket_path: user_config
@@ -3321,6 +3347,8 @@ fn build_dispatchers(
                 .clone(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             cpu_set: dispatcher_config.cpu_set,
+            #[cfg(target_os = "linux")]
+            dpdk_ebpf_receiver,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
