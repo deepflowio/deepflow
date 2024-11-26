@@ -62,7 +62,6 @@ type Tencent struct {
 	uuidGenerate         string
 	httpTimeout          int
 	includeRegions       map[string]bool
-	excludeRegions       map[string]bool
 	credential           *tcommon.Credential
 	natIDs               []string
 	azLcuuidMap          map[string]int
@@ -127,7 +126,6 @@ func NewTencent(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig
 		httpTimeout:    cfg.HTTPTimeout,
 		regionLcuuid:   regionLcuuid,
 		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
-		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		credential:     tcommon.NewCredential(secretID, decryptSecretKey),
 
 		// 以下属性为获取资源所用的关联关系

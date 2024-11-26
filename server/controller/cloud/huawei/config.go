@@ -41,7 +41,6 @@ type Config struct {
 	ProjectName    string
 	Domain         string // 用于构造访问华为云的endpoint，需与DeepFlow自身domain做区分
 	IncludeRegions map[string]bool
-	ExcludeRegions map[string]bool
 }
 
 func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
@@ -97,6 +96,5 @@ func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
 		return
 	}
 	c.IncludeRegions = cloudcommon.UniqRegions(jConf.Get("include_regions").MustString())
-	c.ExcludeRegions = cloudcommon.UniqRegions(jConf.Get("exclude_regions").MustString())
 	return
 }

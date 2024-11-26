@@ -61,11 +61,6 @@ func (v *VolcEngine) getRegions() ([]string, error) {
 			log.Infof("region (%s) not in include_regions", regionID, logger.NewORGPrefix(v.orgID))
 			continue
 		}
-		// 区域黑名单，如果当前区域在黑名单中，则跳过
-		if _, ok := v.excludeRegions[regionID]; ok {
-			log.Infof("region (%s) in exclude_regions", regionID, logger.NewORGPrefix(v.orgID))
-			continue
-		}
 		regionIDs = append(regionIDs, regionID)
 	}
 	log.Debug("get regions complete", logger.NewORGPrefix(v.orgID))
