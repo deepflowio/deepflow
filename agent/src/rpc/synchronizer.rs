@@ -1659,6 +1659,16 @@ impl Synchronizer {
                             continue;
                         }
                     };
+                let mut user_config = UserConfig::from(&runtime_config);
+                let dynamic_config = DynamicConfig {
+                    enabled: Some(runtime_config.enabled),
+                    vpc_id: Some(runtime_config.epc_id),
+                    agent_id: Some(runtime_config.vtap_id as u32),
+                    agent_type: Some(runtime_config.trident_type.into()),
+                    ..Default::default()
+                };
+
+                user_config.set_dynamic_config(&dynamic_config);
 
                 for listener in flow_acl_listener.lock().unwrap().iter_mut() {
                     let _ = listener.flow_acl_change(
@@ -1677,13 +1687,12 @@ impl Synchronizer {
                 let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);
                 let (agent_state, cvar) = &*agent_state;
                 if !runtime_config.enabled {
-                    *agent_state.lock().unwrap() = trident::State::Disabled(Some((
-                        UserConfig::from(&runtime_config),
-                        DynamicConfig::default(),
-                    )));
+                    *agent_state.lock().unwrap() =
+                        trident::State::Disabled(Some((user_config, dynamic_config)));
                 } else {
                     *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
-                        user_config: UserConfig::from(&runtime_config),
+                        user_config,
+                        dynamic_config,
                         ..Default::default()
                     });
                 }
@@ -2680,7 +2689,7 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                let runtime_config =
+                let mut runtime_config =
                     match UserConfig::load_from_file(standalone_runtime_config.as_path()) {
                         Ok(c) => c,
                         Err(e) => {
@@ -2693,11 +2702,19 @@ impl Synchronizer {
                             continue;
                         }
                     };
+                let dynamic_config = DynamicConfig {
+                    enabled: Some(true),
+                    vpc_id: Some(3302),
+                    agent_id: Some(3302),
+                    agent_type: Some(AgentType::TtProcess.into()),
+                    ..Default::default()
+                };
+                runtime_config.set_dynamic_config(&dynamic_config);
 
                 for listener in flow_acl_listener.lock().unwrap().iter_mut() {
                     let _ = listener.flow_acl_change(
                         runtime_config.global.common.agent_type,
-                        0,
+                        dynamic_config.vpc_id() as i32,
                         &vec![],
                         &vec![],
                         &vec![],
@@ -2713,25 +2730,12 @@ impl Synchronizer {
                     .proactive_request_interval;
                 let (agent_state, cvar) = &*agent_state;
                 if !runtime_config.global.common.enabled {
-                    *agent_state.lock().unwrap() = trident::State::Disabled(Some((
-                        runtime_config,
-                        DynamicConfig {
-                            kubernetes_api_enabled: None,
-                            region_id: None,
-                            pod_cluster_id: None,
-                            vpc_id: None,
-                            agent_id: None,
-                            team_id: None,
-                            organize_id: None,
-                            secret_key: None,
-                            enabled: None,
-                            agent_type: None,
-                            hostname: None,
-                        },
-                    )));
+                    *agent_state.lock().unwrap() =
+                        trident::State::Disabled(Some((runtime_config, dynamic_config)));
                 } else {
                     *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                         user_config: runtime_config,
+                        dynamic_config,
                         ..Default::default()
                     });
                 }
