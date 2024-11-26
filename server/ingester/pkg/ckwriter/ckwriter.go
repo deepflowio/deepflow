@@ -184,7 +184,8 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 		return err
 	}
 
-	if t.Aggr1H1D {
+	// after Byconity creates the '1h' and '1d' tables, the query for the '1m' table will fail
+	if t.Aggr1H1D && t.DBType != ckdb.CKDBTypeByconity {
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1H(orgID)); err != nil {
 			log.Warningf("create 1h agg table failed: %s", err)
 		}
