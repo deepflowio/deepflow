@@ -159,6 +159,13 @@ const (
 	FLOW_HEADER_LEN     = FLOW_VTAPID_OFFSET + 2
 )
 
+const (
+	MESSAGE_ENCODER_RAW = iota
+	MESSAGE_ENCODER_ZLIB
+	MESSAGE_ENCODER_GZIP
+	MESSAGE_ENCODER_ZSTD
+)
+
 type BaseHeader struct {
 	FrameSize uint32      // tcp发送时，需要按此长度收齐数据后，再decode (FrameSize总长度，包含了 BaseHeader的长度)
 	Type      MessageType // 消息类型

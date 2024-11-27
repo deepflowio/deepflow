@@ -2366,6 +2366,20 @@ impl Default for Npb {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OutputCompression {
+    pub application_log: bool,
+}
+
+impl Default for OutputCompression {
+    fn default() -> Self {
+        Self {
+            application_log: true,
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Outputs {
@@ -2373,6 +2387,7 @@ pub struct Outputs {
     pub flow_log: OutputsFlowLog,
     pub flow_metrics: FlowMetrics,
     pub npb: Npb,
+    pub compression: OutputCompression,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
