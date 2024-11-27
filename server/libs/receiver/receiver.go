@@ -18,6 +18,9 @@ package receiver
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -29,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/libs/app"
@@ -763,9 +767,52 @@ func (r *Receiver) ProcessUDPServer() {
 			recvBuffer.VtapID = vtapID
 			recvBuffer.TeamID = teamID
 			recvBuffer.OrgID = orgID
+			// udp message containes header size
+			decodeBuffer, err := r.DecodeBuffer(flowHeader.Encoder, recvBuffer.Buffer, headerLen)
+			if err == nil {
+				recvBuffer.Buffer = decodeBuffer
+			}
 			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
+}
+
+func (r *Receiver) DecodeBuffer(encoder uint8, receiveBuffer []byte, headerOffset int) ([]byte, error) {
+	var err error
+	buf := bytes.NewBuffer(receiveBuffer[headerOffset:])
+	var reader io.ReadCloser
+	switch encoder {
+	case datatype.MESSAGE_ENCODER_ZLIB: // zlib
+		reader, err = zlib.NewReader(buf)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	case datatype.MESSAGE_ENCODER_GZIP: // gzip
+		reader, err = gzip.NewReader(buf)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	case datatype.MESSAGE_ENCODER_ZSTD: // zstd
+		// zstd Reader did not implement io.ReadCloser
+		reader, err := zstd.NewReader(buf)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	default: // raw
+		return receiveBuffer, nil
+	}
+
+	result := make([]byte, headerOffset, len(receiveBuffer))
+	copy(result[:headerOffset], receiveBuffer[:headerOffset])
+
+	writer := bytes.NewBuffer(result)
+	if _, err := io.Copy(writer, reader); err != nil {
+		return receiveBuffer, err
+	}
+	return writer.Bytes(), nil
 }
 
 func (r *Receiver) ProcessTCPServer() {
@@ -929,6 +976,10 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			recvBuffer.VtapID = vtapID
 			recvBuffer.TeamID = teamID
 			recvBuffer.OrgID = orgID
+			decodeBuffer, err := r.DecodeBuffer(flowHeader.Encoder, recvBuffer.Buffer, 0)
+			if err == nil {
+				recvBuffer.Buffer = decodeBuffer
+			}
 			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}

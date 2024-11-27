@@ -1295,6 +1295,7 @@ impl Default for FeatureControl {
 pub struct Compression {
     pub trace: bool,
     pub profile: bool,
+    pub application_log: bool,
 }
 
 impl Default for Compression {
@@ -1302,6 +1303,7 @@ impl Default for Compression {
         Self {
             trace: true,
             profile: true,
+            application_log: true,
         }
     }
 }

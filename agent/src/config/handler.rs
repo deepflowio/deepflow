@@ -1484,8 +1484,9 @@ impl L7LogDynamicConfig {
 pub struct MetricServerConfig {
     pub enabled: bool,
     pub port: u16,
-    pub compressed: bool,
+    pub compressed: bool, // trace_compressed 
     pub profile_compressed: bool,
+    pub application_log_compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2049,6 +2050,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 port: conf.inputs.integration.listen_port,
                 compressed: conf.inputs.integration.compression.trace,
                 profile_compressed: conf.inputs.integration.compression.profile,
+                application_log_compressed: conf.inputs.integration.compression.application_log,
             },
             agent_type: conf.global.common.agent_type,
             port_config: PortConfig {

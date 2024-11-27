@@ -37,6 +37,7 @@ use super::{get_sender_id, QUEUE_BATCH_SIZE};
 
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
+use crate::trident::SenderEncoder;
 use crate::utils::stats::{
     self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
 };
@@ -106,6 +107,7 @@ struct Header {
 }
 
 impl Header {
+    const HEADER_LEN: usize = 19;
     fn encode(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self.frame_size.to_be_bytes().as_slice());
         buffer.push(self.msg_type.into());
@@ -129,7 +131,7 @@ struct Encoder<T> {
 
 impl<T: Sendable> Encoder<T> {
     const BUFFER_LEN: usize = 256 << 10;
-    pub fn new(id: usize, msg_type: SendMessageType, agent_id: u16) -> Self {
+    pub fn new(id: usize, msg_type: SendMessageType, agent_id: u16, encoder: u8) -> Self {
         Self {
             id,
             buffer: Vec::with_capacity(Self::BUFFER_LEN),
@@ -142,7 +144,7 @@ impl<T: Sendable> Encoder<T> {
                 agent_id: agent_id,
                 reserved_1: 0,
                 reserved_2: 0,
-                encoder: 0,
+                encoder: encoder,
             },
             _marker: PhantomData,
         }
@@ -162,8 +164,10 @@ impl<T: Sendable> Encoder<T> {
         let offset = self.buffer.len();
         self.buffer.extend_from_slice([0u8; 4].as_slice());
         match s.encode(&mut self.buffer) {
-            Ok(size) => self.buffer[offset..offset + 4]
-                .copy_from_slice((size as u32).to_le_bytes().as_slice()),
+            Ok(size) => {
+                self.buffer[offset..offset + 4]
+                    .copy_from_slice((size as u32).to_le_bytes().as_slice());
+            }
             Err(e) => debug!("encode failed {}", e),
         };
     }
@@ -196,6 +200,25 @@ impl<T: Sendable> Encoder<T> {
         }
     }
 
+    pub fn compress_buffer(&mut self) {
+        let buffer_len = self.buffer_len();
+        match SenderEncoder::from(self.header.encoder)
+            .encode(&mut self.buffer[Header::HEADER_LEN..])
+        {
+            Ok(result) => {
+                if self.header.encoder != u8::from(SenderEncoder::Raw) {
+                    self.buffer.truncate(Header::HEADER_LEN);
+                    self.buffer.extend_from_slice(&result);
+                    self.buffer.shrink_to(Header::HEADER_LEN + result.len());
+                }
+                debug!("compressed from {} to {}", buffer_len, result.len());
+            }
+            Err(e) => {
+                error!("compression failed {}", e);
+            }
+        };
+    }
+
     pub fn buffer_len(&self) -> usize {
         self.buffer.len()
     }
@@ -222,6 +245,7 @@ pub struct UniformSenderThread<T> {
     exception_handler: ExceptionHandler,
 
     private_shared_conn: Option<Arc<Mutex<Connection>>>,
+    sender_encoder: SenderEncoder,
 }
 
 impl<T: Sendable> UniformSenderThread<T> {
@@ -232,6 +256,7 @@ impl<T: Sendable> UniformSenderThread<T> {
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
         private_shared_conn: Option<Arc<Mutex<Connection>>>,
+        sender_encoder: SenderEncoder,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -244,6 +269,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             stats,
             exception_handler,
             private_shared_conn,
+            sender_encoder,
         }
     }
 
@@ -265,6 +291,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             self.stats.clone(),
             self.exception_handler.clone(),
             self.private_shared_conn.clone(),
+            self.sender_encoder,
         );
         self.thread_handle = Some(
             thread::Builder::new()
@@ -381,6 +408,7 @@ impl<T: Sendable> UniformSender<T> {
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
         private_shared_conn: Option<Arc<Mutex<Connection>>>,
+        sender_encoder: SenderEncoder,
     ) -> Self {
         let cfg = config.load();
         Self {
@@ -388,7 +416,12 @@ impl<T: Sendable> UniformSender<T> {
             name,
             input,
             counter: Arc::new(SenderCounter::default()),
-            encoder: Encoder::new(0, SendMessageType::TaggedFlow, cfg.agent_id),
+            encoder: Encoder::new(
+                0,
+                SendMessageType::TaggedFlow,
+                cfg.agent_id,
+                u8::from(sender_encoder),
+            ),
             config,
             private_conn: Mutex::new(Connection::new()),
             private_shared_conn,
@@ -468,6 +501,7 @@ impl<T: Sendable> UniformSender<T> {
     fn flush_encoder(&mut self) {
         self.cached = true;
         if self.encoder.buffer_len() > 0 {
+            self.encoder.compress_buffer();
             self.encoder.set_header_frame_size();
             self.send_buffer();
             self.encoder.reset_buffer();
