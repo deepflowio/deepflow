@@ -2876,7 +2876,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | string |
 
 **Description**:
 
@@ -3554,15 +3554,15 @@ You can use the command 'lspci -vmmk' to find the network card driver type. For 
      Rev:    02
      Driver: igb_uio
      Module: i40e
-     
-In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other options include 
-"vfio-pci" and "uio_pci_generic", which are also managed by DPDK). The actual driver is 'i40e' 
+
+In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other options include
+"vfio-pci" and "uio_pci_generic", which are also managed by DPDK). The actual driver is 'i40e'
 (derived from 'Module: i40e').
 
-You can use the sustainable profiling feature provided by DeepFlow to perform function profiling on the DPDK application and check the specific interface names. Alternatively, you can run the `perf` command on the node where the agent is located:  
-`perf record -F97 -a -g -p <DPDK application PID> -- sleep 30`  
-and then use  
-`perf script | grep -E 'recv|xmit'`  
+You can use the sustainable profiling feature provided by DeepFlow to perform function profiling on the DPDK application and check the specific interface names. Alternatively, you can run the `perf` command on the node where the agent is located:
+`perf record -F97 -a -g -p <DPDK application PID> -- sleep 30`
+and then use
+`perf script | grep -E 'recv|xmit'`
 to confirm the driver interfaces.
 
      Below are some common interface names for different drivers, for reference only:
