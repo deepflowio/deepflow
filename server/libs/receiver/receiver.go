@@ -18,6 +18,9 @@ package receiver
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -29,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/libs/app"
@@ -763,9 +767,53 @@ func (r *Receiver) ProcessUDPServer() {
 			recvBuffer.VtapID = vtapID
 			recvBuffer.TeamID = teamID
 			recvBuffer.OrgID = orgID
+			decodeBuffer, err := r.decompressBuffer(flowHeader.Encoder, recvBuffer.Buffer, recvBuffer.Begin, recvBuffer.End)
+			if err == nil && flowHeader.Encoder != datatype.MESSAGE_ENCODER_RAW {
+				// udp message contains header size
+				recvBuffer.End = len(decodeBuffer) + headerLen
+				copy(recvBuffer.Buffer[headerLen:], decodeBuffer)
+			}
 			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
+}
+
+func (r *Receiver) decompressBuffer(encoder uint8, receiveBuffer []byte, start, end int) ([]byte, error) {
+	if encoder == datatype.MESSAGE_ENCODER_RAW {
+		return receiveBuffer, nil
+	}
+	encodeBuffer := bytes.NewBuffer(receiveBuffer[start:end])
+	var reader io.ReadCloser
+	var err error
+	switch encoder {
+	case datatype.MESSAGE_ENCODER_ZLIB: // zlib
+		reader, err = zlib.NewReader(encodeBuffer)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	case datatype.MESSAGE_ENCODER_GZIP: // gzip
+		reader, err = gzip.NewReader(encodeBuffer)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	case datatype.MESSAGE_ENCODER_ZSTD: // zstd
+		// zstd Reader did not implement io.ReadCloser
+		reader, err := zstd.NewReader(encodeBuffer)
+		if err != nil {
+			return receiveBuffer, err
+		}
+		defer reader.Close()
+	}
+
+	result := make([]byte, 0, len(receiveBuffer))
+	writer := bytes.NewBuffer(result)
+	if _, err := io.Copy(writer, reader); err != nil {
+		log.Errorf("decompressed buffer error: %v", err)
+		return receiveBuffer, err
+	}
+	return writer.Bytes(), nil
 }
 
 func (r *Receiver) ProcessTCPServer() {
@@ -929,6 +977,12 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			recvBuffer.VtapID = vtapID
 			recvBuffer.TeamID = teamID
 			recvBuffer.OrgID = orgID
+			decodeBuffer, err := r.decompressBuffer(flowHeader.Encoder, recvBuffer.Buffer, recvBuffer.Begin, recvBuffer.End)
+			if err == nil && flowHeader.Encoder != datatype.MESSAGE_ENCODER_RAW {
+				// after decompressed, should update buffer end here for decoder
+				recvBuffer.End = len(decodeBuffer)
+				recvBuffer.Buffer = decodeBuffer
+			}
 			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
