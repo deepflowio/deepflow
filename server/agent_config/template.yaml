@@ -5676,6 +5676,30 @@ outputs:
     #     设置 deepflow-agent 做 NPB 分发的最大吞吐率。
     # upgrade_from: max_npb_bps
     max_tx_throughput: 1000
+  # type: section
+  # name:
+  #   en: Compression
+  #   ch: 压缩
+  # description:
+  compression:
+    # type: bool
+    # name:
+    #   en: Application_Log
+    #   ch: Application_Log
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to compress the integrated application log data received by deepflow-agent. The compression
+    #     ratio is about 5:1~20:1. Turning on this feature will result in higher CPU consumption
+    #     of deepflow-agent.
+    #   ch: |-
+    #     开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
+    #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
+    application_log: true
 
 # type: section
 # name:
