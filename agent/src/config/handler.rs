@@ -1488,6 +1488,7 @@ pub struct MetricServerConfig {
     pub port: u16,
     pub compressed: bool,
     pub profile_compressed: bool,
+    pub application_log_compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2052,6 +2053,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 port: conf.inputs.integration.listen_port,
                 compressed: conf.inputs.integration.compression.trace,
                 profile_compressed: conf.inputs.integration.compression.profile,
+                application_log_compressed: conf.outputs.compression.application_log,
             },
             agent_type: conf.global.common.agent_type,
             port_config: PortConfig {
@@ -4121,6 +4123,14 @@ impl ConfigHandler {
                 npb.target_port, new_npb.target_port
             );
             npb.target_port = new_npb.target_port;
+            restart_agent = !first_run;
+        }
+        if outputs.compression != new_outputs.compression {
+            info!(
+                "Update outputs.compression from {:?} to {:?}.",
+                outputs.compression, new_outputs.compression
+            );
+            outputs.compression = new_outputs.compression.clone();
             restart_agent = !first_run;
         }
 

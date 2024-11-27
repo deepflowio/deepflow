@@ -36,6 +36,7 @@ use crate::{
     config::handler::{LogAccess, LogConfig, SenderAccess},
     exception::ExceptionHandler,
     sender::uniform_sender::{Connection, UniformSenderThread},
+    trident::SenderEncoder,
 };
 
 macro_rules! write_message {
@@ -123,6 +124,7 @@ impl RemoteLogWriter {
             stats_collector,
             exception_handler,
             Some(shared_conn),
+            SenderEncoder::Raw,
         );
         uniform_sender.start();
         Self {
