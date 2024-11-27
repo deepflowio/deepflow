@@ -5152,6 +5152,7 @@ inputs:
 开启后，deepflow-agent 将对集成的剖析数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
+
 ### Prometheus 额外 Label {#inputs.integration.prometheus_extra_labels}
 
 deepflow-agent 支持从 Prometheus RemoteWrite 的 http header 中获取额外的 label。
@@ -8496,6 +8497,35 @@ outputs:
 **详细描述**:
 
 设置 deepflow-agent 做 NPB 分发的最大吞吐率。
+
+## 压缩 {#outputs.compression}
+
+## 应用日志 {#outputs.compression.application_log}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.application_log`
+
+**默认值**:
+```yaml
+outputs:
+  compression:
+    application_log: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
 # 插件 {#plugins}
 

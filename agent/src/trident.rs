@@ -17,6 +17,7 @@
 use std::env;
 use std::fmt;
 use std::fs;
+use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -32,12 +33,18 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
+use flate2::{
+    write::{GzEncoder, ZlibEncoder},
+    Compression,
+};
 use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
 use log::{debug, info, warn};
+use num_enum::{FromPrimitive, IntoPrimitive};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
+use zstd::Encoder as ZstdEncoder;
 
 use crate::{
     collector::{
@@ -233,6 +240,46 @@ impl From<&AgentId> for agent::AgentId {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, FromPrimitive, IntoPrimitive, num_enum::Default)]
+#[repr(u8)]
+pub enum SenderEncoder {
+    #[num_enum(default)]
+    Raw = 0,
+
+    Zlib = 1,
+    Gzip = 2,
+    Zstd = 3,
+}
+
+impl SenderEncoder {
+    pub fn encode(&self, encode_buffer: &[u8]) -> std::io::Result<Option<Vec<u8>>> {
+        let result = match self {
+            Self::Raw => None,
+            Self::Zlib => {
+                let mut encoder = ZlibEncoder::new(
+                    Vec::with_capacity(encode_buffer.len()),
+                    Compression::default(),
+                );
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+            Self::Gzip => {
+                let mut encoder = GzEncoder::new(
+                    Vec::with_capacity(encode_buffer.len()),
+                    Compression::default(),
+                );
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+            Self::Zstd => {
+                let mut encoder = ZstdEncoder::new(Vec::with_capacity(encode_buffer.len()), 0)?;
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+        };
+        Ok(result)
+    }
+}
 pub struct Trident {
     state: AgentState,
     handle: Option<JoinHandle<()>>,
@@ -312,6 +359,7 @@ impl Trident {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(log_stats_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
         stats_sender.start();
 
@@ -2162,6 +2210,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let metrics_queue_name = "3-doc-to-collector-sender";
@@ -2184,6 +2233,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
@@ -2206,6 +2256,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let analyzer_ip = if candidate_config
@@ -2273,6 +2324,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(pcap_packet_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -2298,6 +2350,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(pcap_packet_shared_connection),
+            SenderEncoder::Raw,
         );
 
         let bpf_builder = bpf::Builder {
@@ -2408,6 +2461,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let profile_queue_name = "1-profile-to-sender";
@@ -2430,6 +2484,9 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            // profiler compress is a special one, it requires compressed and directly write into db
+            // so we compress profile data inside and not compress secondly
+            SenderEncoder::Raw,
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
@@ -2455,6 +2512,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.application_log_compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let skywalking_queue_name = "1-skywalking-to-sender";
@@ -2481,6 +2543,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let datadog_queue_name = "1-datadog-to-sender";
@@ -2507,6 +2574,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
@@ -2631,6 +2703,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
@@ -2689,6 +2766,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
 
         let telegraf_queue_name = "1-telegraf-to-sender";
@@ -2715,6 +2793,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection),
+            SenderEncoder::Raw,
         );
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
@@ -2741,6 +2820,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(

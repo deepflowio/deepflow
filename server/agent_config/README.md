@@ -5309,6 +5309,7 @@ Whether to compress the integrated profile data received by deepflow-agent. The 
 ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
 of deepflow-agent.
 
+
 ### Prometheus Extra Labels {#inputs.integration.prometheus_extra_labels}
 
 Support for getting extra labels from headers in http requests from RemoteWrite.
@@ -8793,6 +8794,36 @@ outputs:
 **Description**:
 
 Maximum traffic rate allowed for npb sender.
+
+## Compression {#outputs.compression}
+
+## ApplicationLog {#outputs.compression.application_log}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.application_log`
+
+**Default value**:
+```yaml
+outputs:
+  compression:
+    application_log: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the integrated application log data received by deepflow-agent. The compression
+ratio is about 5:1~20:1. Turning on this feature will result in higher CPU consumption
+of deepflow-agent.
 
 # Plugins {#plugins}
 
