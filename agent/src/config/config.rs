@@ -917,8 +917,8 @@ impl Default for EbpfSocketUprobeGolang {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct EbpfSocketUprobeDpdk {
     pub command: String,
-    pub rx_hooks: String,
-    pub tx_hooks: String,
+    pub rx_hooks: Vec<String>,
+    pub tx_hooks: Vec<String>,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -2215,9 +2215,17 @@ where
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct GlobalCommon {
+    pub kubernetes_api_enabled: bool,
     pub enabled: bool,
+    pub region_id: u32,
+    pub pod_cluster_id: u32,
+    pub vpc_id: u32,
+    pub agent_id: u32,
+    pub team_id: u32,
+    pub organize_id: u32,
     #[serde(deserialize_with = "to_agent_type")]
     pub agent_type: agent::AgentType,
+    pub secret_key: String,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -2559,7 +2567,15 @@ impl From<&RuntimeConfig> for UserConfig {
                     data_file_dir: rc.yaml_config.standalone_data_file_dir.clone(),
                 },
                 common: GlobalCommon {
+                    kubernetes_api_enabled: rc.kubernetes_api_enabled,
+                    region_id: rc.region_id,
+                    pod_cluster_id: rc.pod_cluster_id,
+                    vpc_id: rc.epc_id,
+                    team_id: rc.team_id,
+                    agent_id: rc.vtap_id as u32,
                     enabled: rc.enabled,
+                    organize_id: rc.organize_id,
+                    secret_key: rc.secret_key.clone(),
                     agent_type: agent::AgentType::from_str_name(rc.trident_type.as_str_name())
                         .unwrap_or(agent::AgentType::TtUnknown),
                 },
@@ -3502,8 +3518,16 @@ impl UserConfig {
     }
 
     pub fn set_dynamic_config(&mut self, dynamic_config: &DynamicConfig) {
-        self.global.common.agent_type = dynamic_config.agent_type();
+        self.global.common.kubernetes_api_enabled = dynamic_config.kubernetes_api_enabled();
         self.global.common.enabled = dynamic_config.enabled();
+        self.global.common.region_id = dynamic_config.region_id();
+        self.global.common.pod_cluster_id = dynamic_config.pod_cluster_id();
+        self.global.common.vpc_id = dynamic_config.vpc_id();
+        self.global.common.agent_id = dynamic_config.agent_id();
+        self.global.common.team_id = dynamic_config.team_id();
+        self.global.common.organize_id = dynamic_config.organize_id();
+        self.global.common.agent_type = dynamic_config.agent_type();
+        self.global.common.secret_key = dynamic_config.secret_key().to_string();
         self.global.self_monitoring.hostname = dynamic_config.hostname().to_string();
     }
 }
