@@ -51,7 +51,11 @@ pub fn round_to_minute(t: Duration) -> Duration {
     Duration::from_secs(t.as_secs() / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE)
 }
 
-pub fn check_active(now: u64, possible_host: &mut PossibleHost, flow: &MiniFlow) -> (bool, bool) {
+pub fn check_active(
+    now: u64,
+    possible_host: &mut Option<PossibleHost>,
+    flow: &MiniFlow,
+) -> (bool, bool) {
     (
         check_active_host(now, possible_host, &flow.peers[0], &flow.flow_key.ip_src),
         check_active_host(now, possible_host, &flow.peers[1], &flow.flow_key.ip_dst),
@@ -60,7 +64,7 @@ pub fn check_active(now: u64, possible_host: &mut PossibleHost, flow: &MiniFlow)
 
 pub fn check_active_host(
     now: u64,
-    possible_host: &mut PossibleHost,
+    possible_host: &mut Option<PossibleHost>,
     flow_metric: &PeerInfo,
     ip: &IpAddr,
 ) -> bool {
@@ -71,12 +75,16 @@ pub fn check_active_host(
     if flow_metric.is_device {
         return true;
     }
-    if flow_metric.has_packets {
-        // 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
-        possible_host.add(now, ip, flow_metric.l3_epc_id);
-        true
+    if let Some(possible_host) = possible_host {
+        if flow_metric.has_packets {
+            // 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
+            possible_host.add(now, ip, flow_metric.l3_epc_id);
+            true
+        } else {
+            possible_host.check(ip, flow_metric.l3_epc_id)
+        }
     } else {
-        possible_host.check(ip, flow_metric.l3_epc_id)
+        false
     }
 }
 

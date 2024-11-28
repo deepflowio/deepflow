@@ -5453,6 +5453,21 @@ outputs:
       npm_metrics: true
       # type: bool
       # name:
+      #   en: NPM Concurrent Metrics
+      #   ch: NPM 活跃连接指标
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When closed, deepflow-agent does not calculate metrics concurrent.
+      #   ch: |-
+      #     当关闭时，deepflow-agent 不计算活跃连接指标。
+      npm_metrics_concurrent: true
+      # type: bool
+      # name:
       #   en: APM Metrics
       #   ch: APM 指标
       # unit:
