@@ -87,7 +87,7 @@ use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7Protocol;
-use public::proto::agent::{self, AgentType, DynamicConfig, PacketCaptureType};
+use public::proto::agent::{self, AgentType, PacketCaptureType};
 use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
@@ -488,11 +488,10 @@ pub struct FlowConfig {
     pub packet_segmentation_reassembly: HashSet<u16>,
 }
 
-impl From<(&UserConfig, &DynamicConfig)> for FlowConfig {
-    fn from(conf: (&UserConfig, &DynamicConfig)) -> Self {
-        let (conf, dynamic_config) = conf;
+impl From<&UserConfig> for FlowConfig {
+    fn from(conf: &UserConfig) -> Self {
         FlowConfig {
-            agent_id: dynamic_config.agent_id() as u16,
+            agent_id: conf.global.common.agent_id as u16,
             agent_type: conf.global.common.agent_type,
             capture_mode: conf.inputs.cbpf.common.capture_mode,
             cloud_gateway_traffic: conf
@@ -1524,29 +1523,16 @@ impl Default for ModuleConfig {
                 ..Default::default()
             },
             UserConfig::standalone_default(),
-            DynamicConfig {
-                kubernetes_api_enabled: None,
-                region_id: None,
-                pod_cluster_id: None,
-                vpc_id: None,
-                agent_id: None,
-                team_id: None,
-                organize_id: None,
-                secret_key: None,
-                agent_type: None,
-                enabled: None,
-                hostname: None,
-            },
         ))
         .unwrap()
     }
 }
 
-impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
+impl TryFrom<(Config, UserConfig)> for ModuleConfig {
     type Error = ConfigError;
 
-    fn try_from(conf: (Config, UserConfig, DynamicConfig)) -> Result<Self, Self::Error> {
-        let (static_config, conf, dynamic_config) = conf;
+    fn try_from(conf: (Config, UserConfig)) -> Result<Self, Self::Error> {
+        let (static_config, conf) = conf;
         let controller_ip = static_config.controller_ips[0].parse::<IpAddr>().unwrap();
         let dest_ip = if conf.global.communication.ingester_ip.len() > 0 {
             conf.global.communication.ingester_ip.clone()
@@ -1642,7 +1628,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     &conf.inputs.cbpf.preprocess.tunnel_trim_protocols,
                 ),
                 agent_type: conf.global.common.agent_type,
-                agent_id: dynamic_config.agent_id() as u16,
+                agent_id: conf.global.common.agent_id as u16,
                 capture_socket_type,
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.clone(),
@@ -1658,8 +1644,8 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 af_packet_version: capture_socket_type.into(),
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
-                region_id: dynamic_config.region_id(),
-                pod_cluster_id: dynamic_config.pod_cluster_id(),
+                region_id: conf.global.common.region_id,
+                pod_cluster_id: conf.global.common.pod_cluster_id,
                 enabled: conf.global.common.enabled,
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
                 bond_group: if conf.inputs.cbpf.af_packet.bond_interfaces.is_empty() {
@@ -1675,9 +1661,9 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
             sender: SenderConfig {
                 mtu: conf.outputs.npb.max_mtu,
                 dest_ip: dest_ip.clone(),
-                agent_id: dynamic_config.agent_id() as u16,
-                team_id: dynamic_config.team_id(),
-                organize_id: dynamic_config.organize_id(),
+                agent_id: conf.global.common.agent_id as u16,
+                team_id: conf.global.common.team_id,
+                organize_id: conf.global.common.organize_id,
                 dest_port: conf.global.communication.ingester_port,
                 npb_port: conf.outputs.npb.target_port,
                 vxlan_flags: conf.outputs.npb.custom_vxlan_flags,
@@ -1728,7 +1714,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 l4_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l4_throttle,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_type: conf.global.common.agent_type,
-                agent_id: dynamic_config.agent_id() as u16,
+                agent_id: conf.global.common.agent_id as u16,
                 l4_log_store_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l4_capture_network_types,
                 ),
@@ -1773,15 +1759,15 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     .parse()
                     .unwrap_or_default(),
                 kubernetes_poller_type: conf.inputs.resources.kubernetes.pod_mac_collection_method,
-                agent_id: dynamic_config.agent_id() as u16,
+                agent_id: conf.global.common.agent_id as u16,
                 enabled: conf
                     .inputs
                     .resources
                     .private_cloud
                     .hypervisor_resource_enabled,
                 agent_type: conf.global.common.agent_type,
-                epc_id: dynamic_config.vpc_id(),
-                kubernetes_api_enabled: dynamic_config.kubernetes_api_enabled(),
+                epc_id: conf.global.common.vpc_id,
+                kubernetes_api_enabled: conf.global.common.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.inputs.resources.kubernetes.api_list_page_size,
                 kubernetes_api_list_interval: conf
                     .inputs
@@ -1837,7 +1823,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.to_string(),
             },
-            flow: (&conf, &dynamic_config).into(),
+            flow: (&conf).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l7_throttle,
                 l7_log_session_aggr_timeout: conf
@@ -1958,7 +1944,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                 ),
             },
             debug: DebugConfig {
-                agent_id: dynamic_config.agent_id() as u16,
+                agent_id: conf.global.common.agent_id as u16,
                 enabled: conf.global.self_monitoring.debug.enabled,
                 controller_ips: static_config
                     .controller_ips
@@ -1989,8 +1975,8 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
             ebpf: EbpfConfig {
                 collector_enabled: conf.outputs.flow_metrics.enabled,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
-                agent_id: dynamic_config.agent_id() as u16,
-                epc_id: dynamic_config.vpc_id(),
+                agent_id: conf.global.common.agent_id as u16,
+                epc_id: conf.global.common.vpc_id,
                 l7_log_session_timeout: conf
                     .processors
                     .request_log
@@ -2093,24 +2079,8 @@ pub struct ConfigHandler {
 
 impl ConfigHandler {
     pub fn new(config: Config, ctrl_ip: IpAddr, ctrl_mac: MacAddr) -> Self {
-        let candidate_config = ModuleConfig::try_from((
-            config.clone(),
-            UserConfig::standalone_default(),
-            DynamicConfig {
-                kubernetes_api_enabled: None,
-                region_id: None,
-                pod_cluster_id: None,
-                vpc_id: None,
-                agent_id: None,
-                team_id: None,
-                organize_id: None,
-                secret_key: None,
-                enabled: None,
-                hostname: None,
-                agent_type: None,
-            },
-        ))
-        .unwrap();
+        let candidate_config =
+            ModuleConfig::try_from((config.clone(), UserConfig::standalone_default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2562,7 +2532,6 @@ impl ConfigHandler {
     pub fn on_config(
         &mut self,
         user_config: UserConfig,
-        dynamic_config: DynamicConfig,
         exception_handler: &ExceptionHandler,
         mut components: Option<&mut AgentComponents>,
         #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
@@ -2574,9 +2543,7 @@ impl ConfigHandler {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
         let config = &mut candidate_config.user_config;
-        let mut new_config: ModuleConfig = (static_config.clone(), user_config, dynamic_config)
-            .try_into()
-            .unwrap();
+        let mut new_config: ModuleConfig = (static_config.clone(), user_config).try_into().unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = vec![];
         let mut restart_dispatcher = false;
         let mut restart_agent = false;
@@ -3578,6 +3545,13 @@ impl ConfigHandler {
 
         let common = &mut config.global.common;
         let new_common = &mut new_config.user_config.global.common;
+        if common.kubernetes_api_enabled != new_common.kubernetes_api_enabled {
+            info!(
+                "Update global.common.kubernetes_api_enabled from {:?} to {:?}.",
+                common.enabled, new_common.enabled
+            );
+            common.kubernetes_api_enabled = new_common.kubernetes_api_enabled;
+        }
         if common.enabled != new_common.enabled {
             info!(
                 "Update global.common.enabled from {:?} to {:?}.",
@@ -3590,12 +3564,61 @@ impl ConfigHandler {
                 Self::stop_dispatcher
             });
         }
+        if common.region_id != new_common.region_id {
+            info!(
+                "Update global.common.region_id from {:?} to {:?}.",
+                common.region_id, new_common.region_id
+            );
+            common.region_id = new_common.region_id;
+        }
+        if common.pod_cluster_id != new_common.pod_cluster_id {
+            info!(
+                "Update global.common.region_id from {:?} to {:?}.",
+                common.pod_cluster_id, new_common.pod_cluster_id
+            );
+            common.pod_cluster_id = new_common.pod_cluster_id;
+        }
+        if common.vpc_id != new_common.vpc_id {
+            info!(
+                "Update global.common.vpc_id from {:?} to {:?}.",
+                common.vpc_id, new_common.vpc_id
+            );
+            common.vpc_id = new_common.vpc_id;
+        }
+        if common.agent_id != new_common.agent_id {
+            info!(
+                "Update global.common.agent_id from {:?} to {:?}.",
+                common.agent_id, new_common.agent_id
+            );
+            common.agent_id = new_common.agent_id;
+        }
+        if common.team_id != new_common.team_id {
+            info!(
+                "Update global.common.team_id from {:?} to {:?}.",
+                common.team_id, new_common.team_id
+            );
+            common.team_id = new_common.team_id;
+        }
+        if common.organize_id != new_common.organize_id {
+            info!(
+                "Update global.common.organize_id from {:?} to {:?}.",
+                common.organize_id, new_common.organize_id
+            );
+            common.organize_id = new_common.organize_id;
+        }
         if common.agent_type != new_common.agent_type {
             info!(
                 "Update global.common.agent_type from {:?} to {:?}.",
                 common.agent_type, new_common.agent_type
             );
             common.agent_type = new_common.agent_type;
+        }
+        if common.secret_key != new_common.secret_key {
+            info!(
+                "Update global.common.secret_key from {:?} to {:?}.",
+                common.secret_key, new_common.secret_key
+            );
+            common.secret_key = new_common.secret_key.clone();
         }
 
         let communication = &mut config.global.communication;

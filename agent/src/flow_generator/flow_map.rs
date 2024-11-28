@@ -89,7 +89,7 @@ use public::{
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
     packet::SECONDS_IN_MINUTE,
-    proto::agent::{AgentType, DynamicConfig},
+    proto::agent::AgentType,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
@@ -2564,23 +2564,7 @@ pub fn _new_flow_map_and_receiver(
             app_proto_log_enabled: true,
             ignore_idc_vlan: ignore_idc_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
-            ..((
-                &UserConfig::standalone_default(),
-                &DynamicConfig {
-                    kubernetes_api_enabled: None,
-                    region_id: None,
-                    pod_cluster_id: None,
-                    vpc_id: None,
-                    agent_id: None,
-                    team_id: None,
-                    organize_id: None,
-                    secret_key: None,
-                    enabled: None,
-                    hostname: None,
-                    agent_type: None,
-                },
-            ))
-                .into()
+            ..(&UserConfig::standalone_default()).into()
         },
         ..Default::default()
     };
