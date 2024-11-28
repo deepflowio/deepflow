@@ -8382,6 +8382,33 @@ outputs:
 
 When closed, deepflow-agent only collects some basic throughput metrics.
 
+#### NPM Metrics {#outputs.flow_metrics.filters.npm_metrics_concurrent}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_metrics.filters.npm_metrics_concurrent`
+
+**Default value**:
+```yaml
+outputs:
+  flow_metrics:
+    filters:
+      npm_metrics_concurrent: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When closed, deepflow-agent does not calculate metrics concurrent.
+
 #### APM Metrics {#outputs.flow_metrics.filters.apm_metrics}
 
 **Tags**:
