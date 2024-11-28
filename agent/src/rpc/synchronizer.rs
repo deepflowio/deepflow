@@ -1121,7 +1121,6 @@ impl Synchronizer {
         } else {
             *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                 user_config: UserConfig::from(&runtime_config),
-                dynamic_config,
                 blacklist,
                 vm_mac_addrs: macs,
                 gateway_vmac_addrs,
@@ -1692,7 +1691,6 @@ impl Synchronizer {
                 } else {
                     *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                         user_config,
-                        dynamic_config,
                         ..Default::default()
                     });
                 }
@@ -2363,7 +2361,6 @@ impl Synchronizer {
         } else {
             *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                 user_config,
-                dynamic_config: resp.dynamic_config.clone().unwrap(),
                 blacklist,
                 vm_mac_addrs: macs,
                 gateway_vmac_addrs,
@@ -2735,7 +2732,6 @@ impl Synchronizer {
                 } else {
                     *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                         user_config: runtime_config,
-                        dynamic_config,
                         ..Default::default()
                     });
                 }

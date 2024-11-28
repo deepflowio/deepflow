@@ -735,7 +735,7 @@ mod tests {
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
     use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
-    use public::proto::agent::{AgentType, DynamicConfig};
+    use public::proto::agent::AgentType;
 
     use packet_sequence_block::PacketSequenceBlock;
 
@@ -832,23 +832,7 @@ mod tests {
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
 
-        let config = (
-            &UserConfig::default(),
-            &DynamicConfig {
-                kubernetes_api_enabled: None,
-                region_id: None,
-                pod_cluster_id: None,
-                vpc_id: None,
-                agent_id: None,
-                team_id: None,
-                organize_id: None,
-                secret_key: None,
-                enabled: None,
-                agent_type: None,
-                hostname: None,
-            },
-        )
-            .into();
+        let config = (&UserConfig::default()).into();
         for (flags, direction) in packets {
             let _ = flow_map.update_flow_state_machine(&config, &mut flow_node, flags, direction);
         }
@@ -918,23 +902,7 @@ mod tests {
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
 
-        let config = (
-            &UserConfig::default(),
-            &DynamicConfig {
-                kubernetes_api_enabled: None,
-                region_id: None,
-                pod_cluster_id: None,
-                vpc_id: None,
-                agent_id: None,
-                team_id: None,
-                organize_id: None,
-                secret_key: None,
-                enabled: None,
-                agent_type: None,
-                hostname: None,
-            },
-        )
-            .into();
+        let config = (&UserConfig::default()).into();
         for data in init_test_case() {
             flow_node.flow_state = data.cur_state;
             let closed = flow_map.update_flow_state_machine(
