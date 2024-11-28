@@ -301,6 +301,18 @@ type TagFilter struct {
 	RegexpComplied *regexp.Regexp
 }
 
+type TagFiltersGroup struct {
+	TagFilterCondition TagFilterCondition `yaml:"tag-filter-condition"`
+	TagFilters         []TagFilter        `yaml:"tag-filters"`
+}
+
+func (t *TagFiltersGroup) Validate() {
+	t.TagFilterCondition.Validate()
+	for i := range t.TagFilters {
+		t.TagFilters[i].Validate()
+	}
+}
+
 func (t *TagFilter) Validate() {
 	t.OperatorId = operatorStringToID(t.Operator)
 	if t.OperatorId == EQ || t.OperatorId == NEQ || t.OperatorId == IN || t.OperatorId == NOT_IN {
@@ -420,7 +432,8 @@ type StructTags struct {
 	TagDataSourceBits uint32            // gen from 'TagDatasourceStr'
 
 	// the field has tagFilter, if it is not nil, should caculate filter
-	TagFilters []TagFilter // gen from 'ExporterCfg.TagFilters'
+	TagFilters       []TagFilter       // gen from 'ExporterCfg.TagFilters'
+	TagFiltersGroups []TagFiltersGroup // gen from 'ExporterCfg.TagFiltersGroup'
 
 	IsExportedField bool // gen from 'ExporterCfg.ExportFields'
 }
@@ -445,15 +458,20 @@ type ExporterCfg struct {
 	EnumTranslateToNameDisabled         bool `yaml:"enum-translate-to-name-disabled"`
 	UniversalTagTranslateToNameDisabled bool `yaml:"universal-tag-translate-to-name-disabled"`
 
-	TagFilterCondition      TagFilterCondition `yaml:"tag-filter-condition"`
-	TagFilters              []TagFilter        `yaml:"tag-filters"`
-	ExportFields            []string           `yaml:"export-fields"`
-	ExportFieldCategoryBits uint64             // gen by `ExportFields`
-	ExportFieldNames        []string           // gen by `ExportFields`
-	ExportFieldK8s          []string           // gen by `ExportFields`
+	// Deprecated, use 'tag-filters-groups'
+	TagFilterCondition TagFilterCondition `yaml:"tag-filter-condition"`
+	// Deprecated, use 'tag-filters-groups'
+	TagFilters []TagFilter `yaml:"tag-filters"`
 
-	ExportFieldStructTags [MAX_DATASOURCE_ID][]StructTags // gen by `ExportFields` and init when exporting item first time
-	TagFieltertStructTags [MAX_DATASOURCE_ID][]StructTags // gen by `TagFilters`  and init when exporting item first time
+	TagFiltersGroups        []TagFiltersGroup `yaml:"tag-filters-groups"`
+	ExportFields            []string          `yaml:"export-fields"`
+	ExportFieldCategoryBits uint64            // gen by `ExportFields`
+	ExportFieldNames        []string          // gen by `ExportFields`
+	ExportFieldK8s          []string          // gen by `ExportFields`
+
+	ExportFieldStructTags      [MAX_DATASOURCE_ID][]StructTags   // gen by `ExportFields` and init when exporting item first time
+	TagFiltersStructTags       [MAX_DATASOURCE_ID][]StructTags   // gen by `TagFilters`  and init when exporting item first time
+	TagFiltersGroupsStructTags [MAX_DATASOURCE_ID][][]StructTags // gen by `TagFiltersGroups` and init when exporting item first time
 
 	// private configuration
 	ExtraHeaders map[string]string `yaml:"extra-headers"`
@@ -547,9 +565,16 @@ func (cfg *ExporterCfg) Validate() error {
 	for i := range cfg.TagFilters {
 		cfg.TagFilters[i].Validate()
 	}
+	if len(cfg.TagFilters) > 0 {
+		log.Warning("The 'tag-filters' setting will be deprecated, use 'tag-filters-groups' instead.")
+	}
 
 	cfg.TagFilterCondition.Validate()
 	cfg.Sasl.Validate()
+
+	for i := range cfg.TagFiltersGroups {
+		cfg.TagFiltersGroups[i].Validate()
+	}
 
 	return nil
 }

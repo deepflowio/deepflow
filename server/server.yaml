@@ -757,14 +757,27 @@ ingester:
   #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
-  #  tag-filter-condition:
-  #    # Condition type, default is "and"
-  #    # and: Logical AND between tag-filters / or: Logical OR between tag-filters
-  #    type: "and"
-  #  tag-filters:
-  #  #- field-name: signal_source # database column name
-  #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
-  #  #  field-values: [3]         # vlaues
+  #  tag-filters-groups: # 'OR' relationship between all 'tag-filters-groups'
+  #  #- tag-filter-condition: # relationship between all 'tag-filters'
+  #       # Condition type, default is "and", "and": Logical AND between 'tag-filters' , "or": Logical OR between 'tag-filters'
+  #  #    type: and #  Condition type, default is "and"
+  #  #  tag-filters:
+  #  #  - field-name: region_id_0
+  #  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #    field-values: [3, 4]         # vlaues
+  #  #  - field-name: az_id_0
+  #  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #    field-values: [3]         # vlaues
+  #  #- tag-filter-condition: # relationship between all 'tag-filters'
+  #       # Condition type, default is "and", "and": Logical AND between 'tag-filters' , "or": Logical OR between 'tag-filters'
+  #  #    type: and
+  #  #  tag-filters:
+  #  #  - field-name: region_id_1
+  #  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #    field-values: [3]         # vlaues
+  #  #  - field-name: az_id_1
+  #  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #    field-values: [3]         # vlaues
   #  export-fields: # field_name or $category
   #  - $tag
   #  - $metrics
@@ -792,7 +805,7 @@ ingester:
   #  queue-size: 100000
   #  batch-size: 1024
   #  flush-timeout: 10
-  #  tag-filters:
+  #  tag-filters-groups: # 'OR' relationship between all 'tag-filters-groups'
   #  export-fields:
   #  - $tag
   #  - $metrics
@@ -813,7 +826,7 @@ ingester:
   #  queue-size: 100000
   #  batch-size: 32
   #  flush-timeout: 10
-  #  tag-filters:
+  #  tag-filters-groups: # 'OR' relationship between all 'tag-filters-groups'
   #  export-fields:
   #  - $tag
   #  - $metrics
