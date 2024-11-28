@@ -140,6 +140,7 @@ pub struct CollectorConfig {
     pub agent_id: u16,
     pub cloud_gateway_traffic: bool,
     pub packet_delay: Duration,
+    pub npm_metrics_concurrent: bool,
 }
 
 impl fmt::Debug for CollectorConfig {
@@ -185,6 +186,7 @@ impl fmt::Debug for CollectorConfig {
             .field("agent_id", &self.agent_id)
             .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
             .field("packet_delay", &self.packet_delay)
+            .field("npm_metrics_concurrent", &self.npm_metrics_concurrent)
             .finish()
     }
 }
@@ -1735,6 +1737,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .flow_log
                     .time_window
                     .max_tolerable_packet_delay,
+                npm_metrics_concurrent: conf.outputs.flow_metrics.filters.npm_metrics_concurrent,
             },
             handler: HandlerConfig {
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
@@ -4013,6 +4016,7 @@ impl ConfigHandler {
                 filters.inactive_ip_aggregation, new_filters.inactive_ip_aggregation
             );
             filters.inactive_ip_aggregation = new_filters.inactive_ip_aggregation;
+            restart_dispatcher = true;
         }
         if filters.inactive_server_port_aggregation != new_filters.inactive_server_port_aggregation
         {
@@ -4026,6 +4030,14 @@ impl ConfigHandler {
                 filters.npm_metrics, new_filters.npm_metrics
             );
             filters.npm_metrics = new_filters.npm_metrics;
+        }
+        if filters.npm_metrics_concurrent != new_filters.npm_metrics_concurrent {
+            info!(
+                "Update outputs.flow_metrics.filters.npm_metrics_concurrent from {:?} to {:?}.",
+                filters.npm_metrics_concurrent, new_filters.npm_metrics_concurrent
+            );
+            filters.npm_metrics_concurrent = new_filters.npm_metrics_concurrent;
+            restart_dispatcher = true;
         }
         if filters.second_metrics != new_filters.second_metrics {
             info!(

@@ -2270,6 +2270,7 @@ pub struct FlowMetricsFilters {
     pub inactive_server_port_aggregation: bool,
     pub inactive_ip_aggregation: bool,
     pub npm_metrics: bool,
+    pub npm_metrics_concurrent: bool,
     pub apm_metrics: bool,
     pub second_metrics: bool,
 }
@@ -2280,6 +2281,7 @@ impl Default for FlowMetricsFilters {
             inactive_server_port_aggregation: false,
             inactive_ip_aggregation: false,
             npm_metrics: true,
+            npm_metrics_concurrent: true,
             apm_metrics: true,
             second_metrics: true,
         }
@@ -2637,6 +2639,7 @@ impl UserConfig {
         self.inputs.cbpf.af_packet.interface_regex = "".to_string();
         self.outputs.flow_metrics.filters.apm_metrics = true;
         self.outputs.flow_metrics.filters.npm_metrics = true;
+        self.outputs.flow_metrics.filters.npm_metrics_concurrent = true;
         self.outputs.socket.data_socket_type = agent::SocketType::File;
         self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
         self.outputs.flow_log.filters.l7_capture_network_types = vec![3];
