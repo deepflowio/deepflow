@@ -497,7 +497,7 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 				groupKeys = append(groupKeys, c.Name)
 			}
 		} else {
-			columns = append(columns, fmt.Sprintf("%sMerge(%s__agg) AS %s", getAggr(c), c.Name, c.Name))
+			columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 		}
 	}
 
@@ -505,12 +505,10 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 CREATE VIEW IF NOT EXISTS %s
 AS SELECT
 %s
-FROM %s
-GROUP BY %s`,
+FROM %s`,
 		tableLocal,
 		strings.Join(columns, ",\n"),
-		tableAgg,
-		strings.Join(groupKeys, ","))
+		tableAgg)
 }
 
 func (t *Table) MakeAggrGlobalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
