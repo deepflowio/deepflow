@@ -2315,6 +2315,7 @@ pub struct FlowMetricsFilters {
     pub inactive_server_port_aggregation: bool,
     pub inactive_ip_aggregation: bool,
     pub npm_metrics: bool,
+    pub npm_metrics_concurrent: bool,
     pub apm_metrics: bool,
     pub second_metrics: bool,
 }
@@ -2325,6 +2326,7 @@ impl Default for FlowMetricsFilters {
             inactive_server_port_aggregation: false,
             inactive_ip_aggregation: false,
             npm_metrics: true,
+            npm_metrics_concurrent: true,
             apm_metrics: true,
             second_metrics: true,
         }
@@ -3001,6 +3003,7 @@ impl From<&RuntimeConfig> for UserConfig {
                         inactive_server_port_aggregation: rc.inactive_server_port_enabled,
                         inactive_ip_aggregation: rc.inactive_ip_enabled,
                         npm_metrics: rc.l4_performance_enabled,
+                        npm_metrics_concurrent: true,
                         apm_metrics: rc.l7_metrics_enabled,
                         second_metrics: rc.vtap_flow_1s_enabled,
                     },
@@ -3097,8 +3100,16 @@ impl From<&RuntimeConfig> for UserConfig {
                     },
                     tag_extraction: RequestLogTagExtraction {
                         tracing_tag: TracingTag {
-                            http_real_client: rc.http_log_proxy_client.split(',').map(|s| s.to_string()).collect(),
-                            x_request_id: rc.http_log_x_request_id.split(',').map(|s| s.to_string()).collect(),
+                            http_real_client: rc
+                                .http_log_proxy_client
+                                .split(',')
+                                .map(|s| s.to_string())
+                                .collect(),
+                            x_request_id: rc
+                                .http_log_x_request_id
+                                .split(',')
+                                .map(|s| s.to_string())
+                                .collect(),
                             apm_trace_id: rc
                                 .http_log_trace_id
                                 .split(',')
@@ -3449,6 +3460,7 @@ impl UserConfig {
         self.inputs.cbpf.af_packet.interface_regex = "".to_string();
         self.outputs.flow_metrics.filters.apm_metrics = true;
         self.outputs.flow_metrics.filters.npm_metrics = true;
+        self.outputs.flow_metrics.filters.npm_metrics_concurrent = true;
         self.outputs.socket.data_socket_type = agent::SocketType::File;
         self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
         self.outputs.flow_log.filters.l7_capture_network_types = vec![3];

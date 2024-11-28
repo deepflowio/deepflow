@@ -8091,6 +8091,33 @@ outputs:
 
 网络指标的采集开关。关闭后 deepflow-agent 停止采集除基本的吞吐类指标外的其他网络指标。
 
+#### NPM 指标 {#outputs.flow_metrics.filters.npm_metrics_concurrent}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_metrics.filters.npm_metrics_concurrent`
+
+**默认值**:
+```yaml
+outputs:
+  flow_metrics:
+    filters:
+      npm_metrics_concurrent: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当关闭时，deepflow-agent 不计算活跃连接指标。
+
 #### APM 指标 {#outputs.flow_metrics.filters.apm_metrics}
 
 **标签**:
