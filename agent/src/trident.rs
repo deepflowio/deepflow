@@ -139,7 +139,6 @@ const QG_PROCESS_MAX_DELAY: u64 = 5; // FIXME: Potential delay from processing s
 #[derive(Debug, Default)]
 pub struct ChangedConfig {
     pub user_config: UserConfig,
-    pub dynamic_config: DynamicConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
     pub gateway_vmac_addrs: Vec<MacAddr>,
@@ -757,7 +756,6 @@ impl Trident {
                         let agent_id = synchronizer.agent_id.read().clone();
                         let callbacks = config_handler.on_config(
                             c.0,
-                            c.1,
                             &exception_handler,
                             None,
                             #[cfg(target_os = "linux")]
@@ -807,7 +805,6 @@ impl Trident {
 
             let ChangedConfig {
                 user_config,
-                dynamic_config,
                 blacklist,
                 vm_mac_addrs,
                 gateway_vmac_addrs,
@@ -835,7 +832,6 @@ impl Trident {
                 None => {
                     let callbacks = config_handler.on_config(
                         user_config,
-                        dynamic_config,
                         &exception_handler,
                         None,
                         #[cfg(target_os = "linux")]
@@ -898,7 +894,6 @@ impl Trident {
                     let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = config_handler
                         .on_config(
                             user_config,
-                            dynamic_config,
                             &exception_handler,
                             Some(components),
                             #[cfg(target_os = "linux")]
@@ -947,7 +942,6 @@ impl Trident {
                 _ => {
                     config_handler.on_config(
                         user_config,
-                        dynamic_config,
                         &exception_handler,
                         None,
                         #[cfg(target_os = "linux")]

@@ -1046,7 +1046,7 @@ impl EbpfCollector {
             if !dpdk.rx_hooks.is_empty() {
                 ebpf::set_dpdk_hooks(
                     ebpf::DPDK_HOOK_TYPE_RECV as c_int,
-                    CString::new(dpdk.rx_hooks.as_bytes())
+                    CString::new(dpdk.rx_hooks.join(",").as_bytes())
                         .unwrap()
                         .as_c_str()
                         .as_ptr(),
@@ -1055,7 +1055,7 @@ impl EbpfCollector {
             if !dpdk.tx_hooks.is_empty() {
                 ebpf::set_dpdk_hooks(
                     ebpf::DPDK_HOOK_TYPE_XMIT as c_int,
-                    CString::new(dpdk.tx_hooks.as_bytes())
+                    CString::new(dpdk.tx_hooks.join(",").as_bytes())
                         .unwrap()
                         .as_c_str()
                         .as_ptr(),
