@@ -49,6 +49,8 @@ func ReleaseDFStats(s *Stats) {
 	}
 	s.Name = ""
 	s.Timestamp = 0
+	s.OrgId = 0
+	s.TeamId = 0
 	s.TagNames = s.TagNames[:0]
 	s.TagValues = s.TagValues[:0]
 	s.MetricsFloatNames = s.MetricsFloatNames[:0]

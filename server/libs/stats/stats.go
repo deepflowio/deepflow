@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,11 @@ import (
 var log = logging.MustGetLogger("stats")
 
 var remoteType = REMOTE_TYPE_DFSTATSD
+
+const (
+	TENANT_ORG_ID  = "tenant_org_id"
+	TENANT_TEAM_ID = "tenant_team_id"
+)
 
 type StatSource struct {
 	modulePrefix string
@@ -245,7 +251,15 @@ func sendStatsd(bp client.BatchPoints) {
 			dfStats.Timestamp = uint64(point.Time().Unix())
 			dfStats.Name = strings.ReplaceAll(module, "-", "_")
 			for k := range point.Tags() {
-				dfStats.TagNames = append(dfStats.TagNames, k)
+				if k == TENANT_ORG_ID {
+					v, _ := strconv.Atoi(point.Tags()[k])
+					dfStats.OrgId = uint32(v)
+				} else if k == TENANT_TEAM_ID {
+					v, _ := strconv.Atoi(point.Tags()[k])
+					dfStats.TeamId = uint32(v)
+				} else {
+					dfStats.TagNames = append(dfStats.TagNames, k)
+				}
 			}
 			sort.Slice(dfStats.TagNames, func(i, j int) bool {
 				return dfStats.TagNames[i] < dfStats.TagNames[j]
