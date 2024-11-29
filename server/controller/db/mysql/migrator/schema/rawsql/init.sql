@@ -266,7 +266,8 @@ CREATE TABLE IF NOT EXISTS vm (
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL,
     PRIMARY KEY (id,domain),
-    INDEX state_server_index(state, launch_server)
+    INDEX state_server_index(state, launch_server),
+    INDEX id_index(`id`)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 DELETE FROM vm;
 
@@ -313,7 +314,9 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    INDEX ip_index(`ip`),
+    INDEX vifid_index(`vifid`)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vinterface_ip;
 
@@ -345,7 +348,9 @@ CREATE TABLE IF NOT EXISTS ip_resource (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id,domain)
+    PRIMARY KEY (id,domain),
+    INDEX ip_index(`ip`),
+    INDEX vifid_index(`vifid`)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM ip_resource;
 
@@ -772,7 +777,8 @@ CREATE TABLE IF NOT EXISTS pod (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
+    deleted_at          DATETIME DEFAULT NULL,
+    INDEX domain_index(`domain`)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod;
 
@@ -854,7 +860,8 @@ CREATE TABLE IF NOT EXISTS pod_service (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
+    deleted_at          DATETIME DEFAULT NULL,
+    INDEX domain_index(`domain`)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_service;
 
@@ -1850,7 +1857,8 @@ CREATE TABLE IF NOT EXISTS ch_device (
     domain_id               INTEGER,
     sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (devicetype, deviceid)
+    PRIMARY KEY (devicetype, deviceid),
+    INDEX updated_at_index(`updated_at`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_device;
 INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) values(63999, 63999, "Internet", -1, 0, 0, 0);
@@ -1909,7 +1917,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX updated_at_index(`updated_at`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_label;
 
