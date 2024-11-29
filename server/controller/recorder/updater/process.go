@@ -60,12 +60,13 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
-			db.NewProcess().SetMetadata(wholeCache.GetMetadata()),
+			db.NewProcess(),
 			wholeCache.DiffBaseDataSet.Process,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -134,6 +135,10 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 	return dbItem, true
 }
 
+func (p *Process) getUpdateableFields() []string {
+	return []string{"name", "os_app_tags", "container_id", "devicetype", "deviceid"}
+}
+
 func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.ProcessFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.ProcessFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -153,7 +158,27 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	if diffBase.DeviceType != deviceType || diffBase.DeviceID != deviceID {
 		mapInfo["devicetype"] = deviceType
 		mapInfo["deviceid"] = deviceID
+		structInfo.DeviceType.Set(diffBase.DeviceType, deviceType)
+		structInfo.DeviceID.Set(diffBase.DeviceID, deviceID)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *Process) setUpdatedFields(dbItem *mysqlmodel.Process, updateInfo *message.ProcessFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.OSAPPTags.IsDifferent() {
+		dbItem.OSAPPTags = updateInfo.OSAPPTags.GetNew()
+	}
+	if updateInfo.ContainerID.IsDifferent() {
+		dbItem.ContainerID = updateInfo.ContainerID.GetNew()
+	}
+	if updateInfo.DeviceType.IsDifferent() {
+		dbItem.DeviceType = updateInfo.DeviceType.GetNew()
+	}
+	if updateInfo.DeviceID.IsDifferent() {
+		dbItem.DeviceID = updateInfo.DeviceID.GetNew()
+	}
 }

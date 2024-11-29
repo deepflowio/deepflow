@@ -59,12 +59,13 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			wholeCache,
-			db.NewPodService().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodService(),
 			wholeCache.DiffBaseDataSet.PodServices,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -129,6 +130,11 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	return dbItem, true
 }
 
+func (s *PodService) getUpdateableFields() []string {
+	return []string{
+		"pod_ingress_id", "name", "label", "annotation", "selector", "external_ip", "service_cluster_ip", "region"}
+}
+
 func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.PodServiceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodServiceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -183,4 +189,34 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (s *PodService) setUpdatedFields(dbItem *mysqlmodel.PodService, updateInfo *message.PodServiceFieldsUpdate) {
+	if updateInfo.PodIngressID.IsDifferent() {
+		dbItem.PodIngressID = updateInfo.PodIngressID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.Annotation.IsDifferent() {
+		dbItem.Annotation = updateInfo.Annotation.GetNew()
+	}
+	if updateInfo.Selector.IsDifferent() {
+		dbItem.Selector = updateInfo.Selector.GetNew()
+	}
+	if updateInfo.ExternalIP.IsDifferent() {
+		dbItem.ExternalIP = updateInfo.ExternalIP.GetNew()
+	}
+	if updateInfo.ServiceClusterIP.IsDifferent() {
+		dbItem.ServiceClusterIP = updateInfo.ServiceClusterIP.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	// if updateInfo.AZLcuuid.IsDifferent() {
+	// 	dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	// }
 }

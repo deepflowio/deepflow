@@ -59,12 +59,13 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
-			db.NewVMPodNodeConnection().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVMPodNodeConnection(),
 			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -94,6 +95,15 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 }
 
 // 保留接口
+func (c *VMPodNodeConnection) getUpdateableFields() []string {
+	return nil
+}
+
+// 保留接口
 func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (*message.VMPodNodeConnectionFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (c *VMPodNodeConnection) setUpdatedFields(dbItem *mysqlmodel.VMPodNodeConnection, updateInfo *message.VMPodNodeConnectionFieldsUpdate) {
 }

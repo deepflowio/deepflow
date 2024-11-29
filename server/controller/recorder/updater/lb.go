@@ -59,12 +59,13 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
-			db.NewLB().SetMetadata(wholeCache.GetMetadata()),
+			db.NewLB(),
 			wholeCache.DiffBaseDataSet.LBs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -97,6 +98,10 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysqlmodel.LB, bool
 	return dbItem, true
 }
 
+func (l *LB) getUpdateableFields() []string {
+	return []string{"name", "model", "vip", "region"}
+}
+
 func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (*message.LBFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LBFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -118,4 +123,19 @@ func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (l *LB) setUpdatedFields(dbItem *mysqlmodel.LB, updateInfo *message.LBFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Model.IsDifferent() {
+		dbItem.Model = updateInfo.Model.GetNew()
+	}
+	if updateInfo.VIP.IsDifferent() {
+		dbItem.VIP = updateInfo.VIP.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
 }

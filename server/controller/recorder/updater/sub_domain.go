@@ -59,12 +59,13 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,
-			db.NewSubDomain().SetMetadata(wholeCache.GetMetadata()),
+			db.NewSubDomain(),
 			wholeCache.DiffBaseDataSet.SubDomains,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -86,6 +87,10 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 	return dbItem, true
 }
 
+func (d *SubDomain) getUpdateableFields() []string {
+	return []string{"name"}
+}
+
 func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (*message.SubDomainFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.SubDomainFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -94,4 +99,10 @@ func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (d *SubDomain) setUpdatedFields(dbItem *mysqlmodel.SubDomain, updateInfo *message.SubDomainFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
 }

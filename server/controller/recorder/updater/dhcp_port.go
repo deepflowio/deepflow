@@ -59,12 +59,13 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,
-			db.NewDHCPPort().SetMetadata(wholeCache.GetMetadata()),
+			db.NewDHCPPort(),
 			wholeCache.DiffBaseDataSet.DHCPPorts,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -91,6 +92,10 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysqlmo
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (p *DHCPPort) getUpdateableFields() []string {
+	return []string{"epc_id", "name", "region", "az"}
 }
 
 func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (*message.DHCPPortFieldsUpdate, map[string]interface{}, bool) {
@@ -123,4 +128,19 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cl
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *DHCPPort) setUpdatedFields(dbItem *mysqlmodel.DHCPPort, updateInfo *message.DHCPPortFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
 }

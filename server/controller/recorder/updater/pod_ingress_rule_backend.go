@@ -59,12 +59,13 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			wholeCache,
-			db.NewPodIngressRuleBackend().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodIngressRuleBackend(),
 			wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -112,7 +113,17 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 	return dbItem, true
 }
 
+// TODO refactor
+// 保留接口
+func (b *PodIngressRuleBackend) getUpdateableFields() []string {
+	return nil
+}
+
 // 保留接口
 func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (*message.PodIngressRuleBackendFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (b *PodIngressRuleBackend) setUpdatedFields(dbItem *mysqlmodel.PodIngressRuleBackend, updateInfo *message.PodIngressRuleBackendFieldsUpdate) {
 }

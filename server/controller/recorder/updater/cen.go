@@ -60,12 +60,13 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
-			db.NewCEN().SetMetadata(wholeCache.GetMetadata()),
+			db.NewCEN(),
 			wholeCache.DiffBaseDataSet.CENs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -97,6 +98,10 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysqlmodel.CEN, b
 	return dbItem, true
 }
 
+func (c *CEN) getUpdateableFields() []string {
+	return []string{"name", "epc_ids"}
+}
+
 func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.CENFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.CENFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -123,4 +128,13 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (c *CEN) setUpdatedFields(dbItem *mysqlmodel.CEN, updateInfo *message.CENFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.VPCIDs.IsDifferent() {
+		dbItem.VPCIDs = rcommon.IntSliceToString(updateInfo.VPCIDs.GetNew())
+	}
 }

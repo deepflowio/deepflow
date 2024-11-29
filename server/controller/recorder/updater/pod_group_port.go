@@ -59,12 +59,13 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			wholeCache,
-			db.NewPodGroupPort().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodGroupPort(),
 			wholeCache.DiffBaseDataSet.PodGroupPorts,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -104,6 +105,10 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 	return dbItem, true
 }
 
+func (p *PodGroupPort) getUpdateableFields() []string {
+	return []string{"name"}
+}
+
 func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (*message.PodGroupPortFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodGroupPortFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -112,4 +117,12 @@ func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloud
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *PodGroupPort) setUpdatedFields(dbItem *mysqlmodel.PodGroupPort, updateInfo *message.PodGroupPortFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		log.Infof("old name: %s, new name: %s", dbItem.Name, updateInfo.Name.GetNew())
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	log.Infof("tmp PodGroupPort setUpdatedFields: %+v", dbItem)
 }

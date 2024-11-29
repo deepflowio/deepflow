@@ -59,12 +59,13 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
-			db.NewRDSInstance().SetMetadata(wholeCache.GetMetadata()),
+			db.NewRDSInstance(),
 			wholeCache.DiffBaseDataSet.RDSInstances,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -100,6 +101,10 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
+func (r *RDSInstance) getUpdateableFields() []string {
+	return []string{"name", "state", "series", "model", "region", "az"}
+}
+
 func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.RDSInstanceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RDSInstanceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -129,4 +134,25 @@ func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudIt
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (r *RDSInstance) setUpdatedFields(dbItem *mysqlmodel.RDSInstance, updateInfo *message.RDSInstanceFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.State.IsDifferent() {
+		dbItem.State = updateInfo.State.GetNew()
+	}
+	if updateInfo.Series.IsDifferent() {
+		dbItem.Series = updateInfo.Series.GetNew()
+	}
+	if updateInfo.Model.IsDifferent() {
+		dbItem.Model = updateInfo.Model.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
 }

@@ -60,12 +60,13 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,
-			db.NewFloatingIP().SetMetadata(wholeCache.GetMetadata()),
+			db.NewFloatingIP(),
 			wholeCache.DiffBaseDataSet.FloatingIPs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -118,6 +119,10 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 	return dbItem, true
 }
 
+func (f *FloatingIP) getUpdateableFields() []string {
+	return []string{"epc_id", "region"}
+}
+
 func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (*message.FloatingIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.FloatingIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -139,4 +144,13 @@ func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (f *FloatingIP) setUpdatedFields(dbItem *mysqlmodel.FloatingIP, updateInfo *message.FloatingIPFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
 }
