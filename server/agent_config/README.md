@@ -3100,15 +3100,15 @@ Upgrade from old version: `max_collect_pps`
 inputs:
   cbpf:
     tunning:
-      max_capture_pps: 200
+      max_capture_pps: 200000
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Unit | Kpps |
-| Range | [1, 1000000] |
+| Unit | pps |
+| Range | [1, 10000000] |
 
 **Description**:
 
