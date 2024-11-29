@@ -35,3 +35,14 @@ func AdminPermissionVerificationMiddleware() gin.HandlerFunc {
 		ctx.Next()
 	}
 }
+
+func DefaultORGVerificationMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		orgID, _ := ctx.Get(common.HEADER_KEY_X_ORG_ID)
+		if orgID.(int) != common.DEFAULT_ORG_ID {
+			routercommon.StatusForbiddenResponse(ctx, fmt.Sprintf("only default orginazation can operate"))
+			ctx.Abort()
+		}
+		ctx.Next()
+	}
+}

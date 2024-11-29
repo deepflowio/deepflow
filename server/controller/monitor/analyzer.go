@@ -462,7 +462,9 @@ func (c *AnalyzerCheck) SyncDefaultOrgData() {
 	if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(analyzers, SyncAnalyzerExcludeField); err != nil {
+	if err := mysql.SyncDefaultORGData("id", analyzers,
+		mysql.WithExcludeFields(SyncAnalyzerExcludeField),
+	); err != nil {
 		log.Error(err)
 	}
 }
