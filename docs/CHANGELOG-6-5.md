@@ -94,8 +94,8 @@
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
 
 #### Performance
+* perf: modify materialized view local table without group by [#8574](https://github.com/deepflowio/deepflow/pull/8574) by [lzf575](https://github.com/lzf575)
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7266](https://github.com/deepflowio/deepflow/pull/7266) by [lzf575](https://github.com/lzf575)
-
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
