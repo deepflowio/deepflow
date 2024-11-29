@@ -546,39 +546,86 @@ pub(super) struct TapTypeHandler {
 }
 
 impl TapTypeHandler {
+    const OUTER_VLAN: u16 = 8;
+    const INNER_VLAN: u16 = 9;
+
     // returns tap_type, ethernet_type and l2_len
     pub(super) fn get_l2_info(&self, packet: &[u8]) -> Result<(TapType, EthernetType, usize)> {
         let mut eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE..]);
         let mut tap_type = self.default_tap_type;
-        let mut l2_len = ETH_HEADER_SIZE;
-        if eth_type == EthernetType::DOT1Q && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+        let mut l2_opt_size = 0;
+        let (outer_vlan_tag, inner_vlan_tag) = if eth_type == EthernetType::DOT1Q
+            && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE
+        {
             let vlan_tag = read_u16_be(&packet[ETH_HEADER_SIZE..]);
-            eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..]);
-            // tap_type从qinq外层的vlan获取
-            let pcp = (vlan_tag >> 13) & 0x7;
-            if pcp == self.mirror_traffic_pcp && self.tap_mode == TapMode::Analyzer {
-                let vid = vlan_tag & VLAN_ID_MASK;
-                if let Some(t) = self.tap_typer.get_tap_type_by_vlan(vid) {
+            l2_opt_size += VLAN_HEADER_SIZE;
+            eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + l2_opt_size..]);
+            if eth_type == EthernetType::DOT1Q
+                && packet.len() >= ETH_HEADER_SIZE + 2 * VLAN_HEADER_SIZE
+            {
+                l2_opt_size += VLAN_HEADER_SIZE;
+                eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + l2_opt_size..]);
+                (
+                    vlan_tag,
+                    read_u16_be(&packet[ETH_HEADER_SIZE + VLAN_HEADER_SIZE..]),
+                )
+            } else {
+                (vlan_tag, vlan_tag)
+            }
+        } else {
+            (0, 0)
+        };
+
+        if self.tap_mode == TapMode::Analyzer {
+            if l2_opt_size == 0 {
+                if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
                     if t != TapType::Unknown {
                         tap_type = t;
                     }
                 }
-            }
-            l2_len += VLAN_HEADER_SIZE;
-            if eth_type == EthernetType::DOT1Q
-                && packet.len() >= ETH_HEADER_SIZE + 2 * VLAN_HEADER_SIZE
-            {
-                eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + 2 * VLAN_HEADER_SIZE..]);
-                l2_len += VLAN_HEADER_SIZE;
-            }
-        } else if self.tap_mode == TapMode::Analyzer {
-            if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
-                if t != TapType::Unknown {
-                    tap_type = t;
-                }
+            } else {
+                match self.mirror_traffic_pcp {
+                    Self::OUTER_VLAN => {
+                        if let Some(t) = self
+                            .tap_typer
+                            .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
+                        {
+                            if t != TapType::Unknown {
+                                tap_type = t;
+                            }
+                        }
+                    }
+                    Self::INNER_VLAN => {
+                        if let Some(t) = self
+                            .tap_typer
+                            .get_tap_type_by_vlan(inner_vlan_tag & VLAN_ID_MASK)
+                        {
+                            if t != TapType::Unknown {
+                                tap_type = t;
+                            }
+                        }
+                    }
+                    _ => {
+                        if (outer_vlan_tag >> 13) & 0x7 == self.mirror_traffic_pcp {
+                            if let Some(t) = self
+                                .tap_typer
+                                .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
+                            {
+                                if t != TapType::Unknown {
+                                    tap_type = t;
+                                }
+                            }
+                        }
+                    }
+                };
             }
         }
-        Ok((tap_type, EthernetType::from(eth_type), l2_len))
+
+        Ok((
+            tap_type,
+            EthernetType::from(eth_type),
+            ETH_HEADER_SIZE + l2_opt_size,
+        ))
     }
 }
 

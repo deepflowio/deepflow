@@ -995,6 +995,7 @@ pub struct Flow {
     pub direction_score: u8,
     pub pod_id: u32,
     pub request_domain: String,
+    pub need_to_store: bool,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
