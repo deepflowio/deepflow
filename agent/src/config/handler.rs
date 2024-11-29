@@ -54,7 +54,6 @@ use super::{
     },
     ConfigError, KubernetesPollerType,
 };
-use crate::common::decapsulate::TunnelType;
 use crate::dispatcher::recv_engine;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
@@ -1614,15 +1613,9 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 dpdk_source: conf.inputs.cbpf.special_network.dpdk.source,
                 dispatcher_queue: conf.inputs.cbpf.tunning.dispatcher_queue_enabled,
                 l7_log_packet_size: conf.processors.request_log.tunning.payload_truncation,
-                tunnel_type_bitmap: TunnelTypeBitmap::new(
-                    &conf
-                        .inputs
-                        .cbpf
-                        .preprocess
-                        .tunnel_decap_protocols
-                        .iter()
-                        .map(|x| TunnelType::from(*x as i32))
-                        .collect(),
+                tunnel_type_bitmap: TunnelTypeBitmap::from_slices(
+                    &conf.inputs.cbpf.preprocess.tunnel_decap_protocols,
+                    &conf.inputs.cbpf.preprocess.tunnel_trim_protocols,
                 ),
                 tunnel_type_trim_bitmap: TunnelTypeBitmap::from_strings(
                     &conf.inputs.cbpf.preprocess.tunnel_trim_protocols,
@@ -4563,6 +4556,8 @@ impl ConfigHandler {
             restart_agent = !first_run;
         }
 
+        candidate_config.enabled = new_config.enabled;
+        candidate_config.capture_mode = new_config.capture_mode;
         if candidate_config.dispatcher != new_config.dispatcher {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             {
