@@ -255,7 +255,7 @@ impl SubQuadGen {
         app_meter: &AppMeter,
         endpoint_hash: u32,
         time_in_second: Duration,
-        possible_host: &mut PossibleHost,
+        possible_host: &mut Option<PossibleHost>,
     ) {
         if time_in_second < self.window_start {
             self.counter
@@ -505,7 +505,7 @@ pub struct L7QuadrupleGenerator {
     name: String,
     second_quad_gen: Option<SubQuadGen>,
     minute_quad_gen: Option<SubQuadGen>,
-    possible_host: PossibleHost,
+    possible_host: Option<PossibleHost>,
     config: CollectorAccess,
     running: Arc<AtomicBool>,
     ntp_diff: Arc<AtomicI64>,
@@ -521,7 +521,7 @@ impl L7QuadrupleGenerator {
         metrics_type: MetricsType,
         second_delay_seconds: u64,
         minute_delay_seconds: u64,
-        possible_host_size: usize,
+        _possible_host_size: usize,
         config: CollectorAccess,
         running: Arc<AtomicBool>,
         ntp_diff: Arc<AtomicI64>,
@@ -607,7 +607,7 @@ impl L7QuadrupleGenerator {
             name: "quadruple_generator".to_string(),
             second_quad_gen,
             minute_quad_gen,
-            possible_host: PossibleHost::new(possible_host_size),
+            possible_host: None,
             config,
             running,
             ntp_diff,
