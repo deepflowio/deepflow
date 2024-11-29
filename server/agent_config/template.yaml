@@ -1935,7 +1935,7 @@ inputs:
       #   en: Max Capture PPS
       #   ch: 最大采集 PPS
       # unit: pps
-      # range: [1, 1000000]
+      # range: [1, 10000000]
       # enum_options: []
       # modification: hot_update
       # ee_feature: false

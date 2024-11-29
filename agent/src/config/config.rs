@@ -915,6 +915,7 @@ impl Default for EbpfSocketUprobeGolang {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct EbpfSocketUprobeDpdk {
     pub command: String,
     pub rx_hooks: Vec<String>,
@@ -2482,7 +2483,7 @@ pub struct UserConfig {
 
 impl From<&RuntimeConfig> for UserConfig {
     fn from(rc: &RuntimeConfig) -> Self {
-        let mut user_config = Self {
+        Self {
             global: Global {
                 limits: Limits {
                     max_millicpus: rc.max_millicpus,
@@ -3246,9 +3247,7 @@ impl From<&RuntimeConfig> for UserConfig {
             dev: Dev {
                 feature_flags: rc.yaml_config.feature_flags.clone(),
             },
-        };
-        user_config.modify();
-        user_config
+        }
     }
 }
 
@@ -3480,20 +3479,6 @@ impl UserConfig {
         Ok(())
     }
 
-    fn modify_decap_types(&mut self) {
-        for tunnel_type in &self.inputs.cbpf.preprocess.tunnel_trim_protocols {
-            self.inputs
-                .cbpf
-                .preprocess
-                .tunnel_decap_protocols
-                .push(TunnelType::from(tunnel_type.as_str()) as u8)
-        }
-    }
-
-    fn modify(&mut self) {
-        self.modify_decap_types();
-    }
-
     fn set_standalone(&mut self) {
         self.global.common.enabled = true;
         self.global.communication.ingester_ip = "127.0.0.1".to_string();
@@ -3507,7 +3492,6 @@ impl UserConfig {
         self.outputs.socket.data_socket_type = agent::SocketType::File;
         self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
         self.outputs.flow_log.filters.l7_capture_network_types = vec![3];
-        self.modify();
     }
 
     pub fn standalone_default() -> Self {
