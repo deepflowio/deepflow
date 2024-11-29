@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: trim-tunnel-type has not taken effect [#8577](https://github.com/deepflowio/deepflow/pull/8577) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the policy does not check memory in analyzer mode [#8540](https://github.com/deepflowio/deepflow/pull/8540) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: eBPF SELinux permission-related exit [#8534](https://github.com/deepflowio/deepflow/pull/8534) by [yinjiping](https://github.com/yinjiping)
 * fix: failed to downgrade agent_group_configuration [#8520](https://github.com/deepflowio/deepflow/pull/8520) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -527,6 +528,7 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: modify materialized view local table without group by [#8575](https://github.com/deepflowio/deepflow/pull/8575) by [lzf575](https://github.com/lzf575)
 * perf: improve the performance of json string escape [#8508](https://github.com/deepflowio/deepflow/pull/8508) by [lzf575](https://github.com/lzf575)
 * perf: use template instead of Interface{} in LockFreePool [#8372](https://github.com/deepflowio/deepflow/pull/8372) by [lzf575](https://github.com/lzf575)
 * perf: reduce ckwriter memory [#8417](https://github.com/deepflowio/deepflow/pull/8417) by [lzf575](https://github.com/lzf575)
