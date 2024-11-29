@@ -175,8 +175,8 @@ func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t
 				strings.ReplaceAll(column.Name, "count", "sum"), strings.ReplaceAll(column.Name, "sum", "count"), // 总是取 xxx_sum/xxx_count 的值
 				column.Name, AGG.String())
 		case LOCAL:
-			// 例如： argMaxMerge(rtt_count__agg) as rtt_count,
-			return fmt.Sprintf("%sMerge(%s__%s) AS %s", aggrFunc, column.Name, AGG.String(), column.Name)
+			// 例如： finalizeAggregation(rtt_count__agg) as rtt_count,
+			return fmt.Sprintf("finalizeAggregation(%s__%s) AS %s", column.Name, AGG.String(), column.Name)
 		}
 	} else {
 		var aggr string
@@ -197,7 +197,7 @@ func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t
 		case MV:
 			return fmt.Sprintf("%sState(%s) AS %s__%s", aggr, column.Name, column.Name, AGG.String())
 		case LOCAL:
-			return fmt.Sprintf("%sMerge(%s__%s) AS %s", aggr, column.Name, AGG.String(), column.Name)
+			return fmt.Sprintf("finalizeAggregation(%s__%s) AS %s", column.Name, AGG.String(), column.Name)
 		}
 	}
 
@@ -441,12 +441,10 @@ func MakeCreateTableLocal(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsumma
 CREATE VIEW IF NOT EXISTS %s
 AS SELECT
 %s
-FROM %s
-GROUP BY %s`,
+FROM %s`,
 		tableLocal,
 		strings.Join(columns, ",\n"),
-		tableAgg,
-		strings.Join(groupKeys, ","))
+		tableAgg)
 }
 
 func MakeGlobalTableCreateSQL(t *ckdb.Table, db, dstTable string) string {
