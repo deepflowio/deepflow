@@ -110,24 +110,32 @@ impl TunnelTypeBitmap {
         bitmap
     }
 
-    pub fn from_slice(tunnel_types: &Vec<usize>) -> Self {
-        let mut bitmap = TunnelTypeBitmap(0);
-        for tunnel_type in tunnel_types.iter() {
-            bitmap.0 |= 1 << *tunnel_type as u16;
-        }
-        bitmap
-    }
-
-    pub fn from_strings(tunnel_types: &Vec<String>) -> Self {
-        let mut bitmap = TunnelTypeBitmap(0);
+    fn init_from_strings(&mut self, tunnel_types: &Vec<String>) {
         for s in tunnel_types {
             let tunnel_type = TunnelType::from(s.as_str());
             if tunnel_type == TunnelType::None {
                 warn!("Unknown tunnel type {}.", s);
                 continue;
             }
-            bitmap.add(tunnel_type);
+            self.add(tunnel_type);
         }
+    }
+
+    pub fn from_slices(tunnel_types: &Vec<u8>, trim_tunnel_types: &Vec<String>) -> Self {
+        let mut bitmap = TunnelTypeBitmap(0);
+        for tunnel_type in tunnel_types.iter() {
+            bitmap.0 |= 1 << *tunnel_type as u16;
+        }
+
+        bitmap.init_from_strings(trim_tunnel_types);
+
+        bitmap
+    }
+
+    pub fn from_strings(tunnel_types: &Vec<String>) -> Self {
+        let mut bitmap = TunnelTypeBitmap(0);
+
+        bitmap.init_from_strings(tunnel_types);
 
         bitmap
     }
