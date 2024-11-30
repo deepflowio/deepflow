@@ -23,7 +23,7 @@
 #define DF_UTILS_H
 
 #include <arpa/inet.h>
-#include "../../user/utils.h"
+#include "../../user/common_utils.h"
 
 #undef __inline
 #define __inline inline __attribute__((__always_inline__))

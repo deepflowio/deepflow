@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include "../../config.h"
-#include "../../common.h"
+#include "../../utils.h"
 #include "../../mem.h"
 #include "../../log.h"
 #include "../../types.h"

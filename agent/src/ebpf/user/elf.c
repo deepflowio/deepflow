@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include "elf.h"
 

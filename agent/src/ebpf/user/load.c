@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "config.h"
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include "elf.h"
 #include <bcc/linux/bpf.h>
@@ -472,6 +472,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 	} else if (!memcmp(desc->name, "fentry/", 7) ||
 		   !memcmp(desc->name, "fexit/", 6)) {
 		prog_type = BPF_PROG_TYPE_TRACING;
+	} else if (!memcmp(desc->name, "xdp", 3)) {
+		prog_type = BPF_PROG_TYPE_XDP;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}
@@ -823,7 +825,7 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		     map_name, obj->maps_cnt, new_map->elf_offset,
 		     new_map->def.type, new_map->def.key_size,
 		     new_map->def.value_size, new_map->def.max_entries,
-		     new_map->def.feat);
+		     new_map->def.feat_flags);
 	}
 
 	return ETR_OK;

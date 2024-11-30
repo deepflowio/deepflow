@@ -26,7 +26,7 @@
 #include <dlfcn.h>
 #include <dirent.h>
 #include "../../config.h"
-#include "../../common.h"
+#include "../../utils.h"
 #include "../../log.h"
 #include "../../mem.h"
 #include "../../vec.h"

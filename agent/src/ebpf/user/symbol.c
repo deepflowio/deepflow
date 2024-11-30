@@ -38,7 +38,7 @@
 #include "config.h"
 #include "elf.h"
 #include "log.h"
-#include "common.h"
+#include "utils.h"
 #include "symbol.h"
 #include "tracer.h"
 #include "load.h"

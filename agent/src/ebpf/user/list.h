@@ -19,7 +19,7 @@
 
 #include <stdlib.h>
 #include <stddef.h>
-#include "common.h"
+#include "utils.h"
 
 struct list_head {
 	struct list_head *next;

@@ -37,6 +37,7 @@ GNU_CC ?= gcc
 MUSL_CC ?= musl-gcc
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
+EXTDIR := $(OBJDIR)/user/extended
 
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
@@ -71,7 +72,7 @@ CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="versi
 CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
 LIBTRACE := libtrace.a
 OBJS := user/elf.o \
-	user/common.o \
+	user/utils.o \
 	user/symbol.o \
 	user/proc.o \
 	user/go_tracer.o \
@@ -91,8 +92,8 @@ OBJS := user/elf.o \
 	user/vec.o \
 	user/bihash.o \
 	user/profile/profile_common.o \
-	$(patsubst %.c,%.o,$(wildcard user/extended/*.c)) \
-	$(patsubst %.c,%.o,$(wildcard user/extended/profile/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard $(EXTDIR)/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard $(EXTDIR)/profile/*.c)) \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
 	user/profile/java/jvm_symbol_collect.o \
@@ -107,7 +108,7 @@ JAVA_AGENT_SRC := user/profile/java/symbol_collect_agent.c
 JAVA_AGENT_MACROS := -DAGENT_LIB_NAME="\"$(JAVA_AGENT_GNU_SO)\"" -DAGENT_MUSL_LIB_NAME="\"$(JAVA_AGENT_MUSL_SO)\""
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -I/usr/include/bcc -I../../../crates/trace-utils/src/
+CFLAGS ?= -std=gnu99 -g -O0 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -I/usr/include/bcc -I../../../crates/trace-utils/src/
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)
@@ -127,7 +128,7 @@ CFLAGS += -I../../crates/trace-utils/src
 #  where the error occurred.
 # -DDF_MEM_DEBUG Used for memory leak detection, to check for memory
 #  leak issues during the debugging phase.
-CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -I/usr/lib/jvm/java/include -I/usr/lib/jvm/java/include/linux -I.
+CFLAGS += $(MACHINE_CFLAGS) -DBPF_DEBUG -fno-omit-frame-pointer -I/usr/lib/jvm/java/include -I/usr/lib/jvm/java/include/linux -I.
 ifeq ($(findstring musl,$(CC)),musl)
     IS_MUSL := 1
     ifeq ($(findstring aarch64,$(ARCH)),aarch64)
@@ -139,14 +140,16 @@ endif
 
 all: build
 
-SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
-	user/socket_trace_bpf_3_10_0.c \
+SOCKET_TRACE_ELFS :=
+#user/socket_trace_bpf_common.c
+#	user/socket_trace_bpf_3_10_0.c \
 	user/socket_trace_bpf_5_2_plus.c \
 	user/socket_trace_bpf_kfunc.c \
 	user/socket_trace_bpf_kylin.c \
 	user/socket_trace_bpf_rt.c
 
-PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
+PERF_PROFILER_ELFS :=
+#user/perf_profiler_bpf_common.c \
 	user/perf_profiler_bpf_5_2_plus.c \
 
 ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS)
@@ -162,6 +165,11 @@ define check_clang
         fi
 	@rm -rf data
 endef
+
+ext-bpf: $(EXTDIR)/bpf/.ebpf-compile.ok
+$(EXTDIR)/bpf/.ebpf-compile.ok: tools/bintobuffer
+	@make -C $(EXTDIR)/bpf -f extended.bpf.mk --no-print-directory
+	@touch $@
 
 user/socket_trace_bpf_common.c: tools/bintobuffer kernel/socket_trace.bpf.c
 	$(call check_clang)
@@ -228,15 +236,15 @@ $(JAVA_AGENT_MUSL_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 	@rm -rf user/profile/java_agent_so_musl.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_musl.c java_agent_so_musl
 
-build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
+build: $(ELFFILES) $(EXTDIR)/bpf/.ebpf-compile.ok $(JAVA_TOOL) $(LIBTRACE)
 
 tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 
@@ -320,9 +328,15 @@ clean:
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target
 	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) tools/bintobuffer
+	$(Q)make -C $(EXTDIR)/bpf -f extended.bpf.mk clean --no-print-directory
+	$(Q)rm -rf $(EXTDIR)/bpf/.ebpf-compile.ok
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
 
-.PHONY: all build clean tools test rust-sample .socket-tracer .profiler
+ext-test: $(ELFFILES) $(LIBTRACE)
+	$(Q)$(MAKE) -C $(EXTDIR)/test clean --no-print-directory
+	$(Q)$(MAKE) -C $(EXTDIR)/test --no-print-directory
+
+.PHONY: all build ext-bpf clean tools test rust-sample .socket-tracer .profiler
 
