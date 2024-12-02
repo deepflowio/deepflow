@@ -50,11 +50,9 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, TagFilterOperator, UserConfig,
-        YamlConfig,
     },
     ConfigError, KubernetesPollerType,
 };
-use crate::dispatcher::recv_engine;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
@@ -396,7 +394,7 @@ impl PluginConfig {
         rt.block_on(async {
             for (name, ptype) in self.names.iter() {
                 log::trace!("get {:?} plugin {}", ptype, name);
-                match session.get_plugin(name, *ptype, agent_id).await {
+                match session.grpc_get_plugin(name, *ptype, agent_id).await {
                     Ok(prog) => match ptype {
                         agent::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
                         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -4910,24 +4908,6 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
-    }
-}
-
-impl YamlConfig {
-    pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
-        if self.fast_path_map_size > 0 {
-            return self.fast_path_map_size;
-        }
-
-        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
-    }
-
-    fn get_af_packet_blocks(&self, capture_mode: agent::PacketCaptureType, mem_size: u64) -> usize {
-        if capture_mode == PacketCaptureType::Analyzer || self.af_packet_blocks_enabled {
-            self.af_packet_blocks.max(8)
-        } else {
-            (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
-        }
     }
 }
 

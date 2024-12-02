@@ -25,7 +25,6 @@ use crate::{
 };
 
 use public::proto::agent as pb;
-use public::proto::trident;
 
 pub struct Querier {
     override_os_hostname: Option<String>,
@@ -63,22 +62,7 @@ impl Querier {
         self.digest()
     }
 
-    pub fn generate_message(&self, config: &PlatformConfig) -> trident::GenesisSyncRequest {
-        let platform_data = trident::GenesisPlatformData {
-            platform_enabled: Some(config.enabled),
-            raw_hostname: self.raw_hostname.clone(),
-            raw_ip_netns: vec!["default".into()],
-            raw_ip_addrs: self.raw_ip_addrs.clone(),
-            ..Default::default()
-        };
-
-        trident::GenesisSyncRequest {
-            platform_data: Some(platform_data),
-            ..Default::default()
-        }
-    }
-
-    pub fn generate_agent_message(&self, config: &PlatformConfig) -> pb::GenesisSyncRequest {
+    pub fn generate_message(&self, config: &PlatformConfig) -> pb::GenesisSyncRequest {
         let platform_data = pb::GenesisPlatformData {
             platform_enabled: Some(config.enabled),
             raw_hostname: self.raw_hostname.clone(),

@@ -121,10 +121,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::{
-        agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
-        trident,
-    },
+    proto::agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -227,17 +224,6 @@ impl fmt::Display for AgentId {
 }
 
 impl From<&AgentId> for agent::AgentId {
-    fn from(id: &AgentId) -> Self {
-        Self {
-            ip: Some(id.ip.to_string()),
-            mac: Some(id.mac.to_string()),
-            team_id: Some(id.team_id.clone()),
-        }
-    }
-}
-
-// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
-impl From<&AgentId> for trident::AgentId {
     fn from(id: &AgentId) -> Self {
         Self {
             ip: Some(id.ip.to_string()),
@@ -515,7 +501,6 @@ impl Trident {
             config_handler.static_config.controller_ips.clone(),
             exception_handler.clone(),
             &stats_collector,
-            config_handler.static_config.new_rpc,
         ));
 
         let runtime = Arc::new(
@@ -565,7 +550,6 @@ impl Trident {
             config_path,
             agent_id_tx.clone(),
             ntp_diff,
-            config_handler.static_config.new_rpc,
         ));
         stats_collector.register_countable(
             &stats::NoTagModule("ntp"),
