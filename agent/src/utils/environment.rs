@@ -38,10 +38,7 @@ use crate::{
 };
 
 use public::{
-    proto::{
-        agent::{AgentType, Exception, KubernetesWatchPolicy},
-        trident::KubernetesWatchPolicy as OldKubernetesWatchPolicy,
-    },
+    proto::agent::{AgentType, Exception, KubernetesWatchPolicy},
     utils::net::{
         addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
         LinkFlags, MacAddr,
@@ -293,16 +290,6 @@ impl KubeWatchPolicy {
 }
 
 impl From<KubeWatchPolicy> for KubernetesWatchPolicy {
-    fn from(p: KubeWatchPolicy) -> Self {
-        match p {
-            KubeWatchPolicy::Normal => Self::KwpNormal,
-            KubeWatchPolicy::WatchOnly => Self::KwpWatchOnly,
-            KubeWatchPolicy::WatchDisabled => Self::KwpWatchDisabled,
-        }
-    }
-}
-
-impl From<KubeWatchPolicy> for OldKubernetesWatchPolicy {
     fn from(p: KubeWatchPolicy) -> Self {
         match p {
             KubeWatchPolicy::Normal => Self::KwpNormal,

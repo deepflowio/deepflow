@@ -51,6 +51,3 @@ controller-ips:
 
 ## Disabled cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits
 #cgroups-disabled: false
-
-## If it is true, it means that the communication with the server uses the new RPC interface
-#new-rpc: true
