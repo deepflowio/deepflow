@@ -210,7 +210,7 @@ impl AnalyzerModeDispatcher {
             Some(vmac) => (true, u64::from(*vmac) as u32),
             None => (false, 0),
         };
-        let mut tap_port = TapPort::from_id(tunnel_info.tunnel_type, id as u32);
+        let mut tap_port = TapPort::from_id(tunnel_info.tunnel_type, id as u32, tunnel_info.from);
         let is_unicast = tunnel_info.tier > 0 || !MacAddr::is_multicast(overlay_packet); // Consider unicast when there is a tunnel
 
         if src_remote && dst_remote && is_unicast {
