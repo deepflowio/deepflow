@@ -561,6 +561,8 @@ pub struct Options {
     pub controller_tls_port: u16,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub cpu_set: CpuSet,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fanout_enabled: bool,
 }
 
 pub struct Pipeline {
@@ -1132,28 +1134,8 @@ impl DispatcherBuilder {
             TapMode::Analyzer => {
                 #[cfg(target_os = "linux")]
                 {
-                    base.bpf_options
-                        .lock()
-                        .unwrap()
-                        .bpf_syntax
-                        .push(BpfSyntax::LoadExtension(LoadExtension {
-                            num: Extension::ExtType,
-                        }));
-                    base.bpf_options
-                        .lock()
-                        .unwrap()
-                        .bpf_syntax
-                        .push(BpfSyntax::JumpIf(JumpIf {
-                            cond: JumpTest::JumpNotEqual,
-                            val: public::enums::LinuxSllPacketType::Outgoing as u32,
-                            skip_true: 1,
-                            ..Default::default()
-                        }));
-                    base.bpf_options
-                        .lock()
-                        .unwrap()
-                        .bpf_syntax
-                        .push(BpfSyntax::RetConstant(RetConstant { val: 0 })); // Do not capture tx direction traffic
+                    // Do not capture tx direction traffic
+                    base.add_skip_outgoing();
                 }
                 #[cfg(target_os = "windows")]
                 {
@@ -1262,7 +1244,7 @@ impl DispatcherBuilder {
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
                     iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
-                    packet_fanout_mode: if options.tap_mode == TapMode::Local {
+                    packet_fanout_mode: if options.fanout_enabled {
                         Some(options.packet_fanout_mode)
                     } else {
                         None

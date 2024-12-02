@@ -221,7 +221,7 @@ impl Tpacket {
             return Ok(());
         }
         let Some(packet_fanout_mode) = self.opts.packet_fanout_mode else {
-            info!("Packet fanout can only be set in TapMode::Local mode");
+            info!("Packet fanout disabled.");
             return Ok(());
         };
         // The first 16 bits encode the fanout group ID, and the second set of 16 bits encode the fanout mode and options.
