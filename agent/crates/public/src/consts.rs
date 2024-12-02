@@ -357,6 +357,20 @@ pub const TCP_DST_OFFSET: usize = IPV4_PACKET_SIZE + tcp::DST_OFFSET; // 36
 pub const TCP6_SRC_OFFSET: usize = IPV6_PACKET_SIZE + tcp::SRC_OFFSET; // 54
 pub const TCP6_DST_OFFSET: usize = IPV6_PACKET_SIZE + tcp::DST_OFFSET; // 56
 
+pub const LE_IPV4_PROTO_TYPE_I: u16 = 0x0008; // 0x0008's LittleEndian
+pub const LE_IPV6_PROTO_TYPE_I: u16 = 0xDD86; // 0x86dd's LittleEndian
+pub const LE_ERSPAN_PROTO_TYPE_II: u16 = 0xBE88; // 0x88BE's LittleEndian
+pub const LE_ERSPAN_PROTO_TYPE_III: u16 = 0xEB22; // 0x22EB's LittleEndian
+pub const LE_VXLAN_PROTO_UDP_DPORT: u16 = 0xB512; // 0x12B5(4789)'s LittleEndian
+pub const LE_GPE_VXLAN_PROTO_UDP_DPORT: u16 = 0xB612; // 0x12B6(4790)'s LittleEndian
+pub const LE_VXLAN_PROTO_UDP_DPORT2: u16 = 0x1821; // 0x2118(8472)'s LittleEndian
+pub const LE_VXLAN_PROTO_UDP_DPORT3: u16 = 0x801A; // 0x1A80(6784)'s LittleEndian
+pub const LE_TRANSPARENT_ETHERNET_BRIDGEING: u16 = 0x5865; // 0x6558(25944)'s LittleEndian
+pub const LE_GENEVE_PROTO_UDP_DPORT: u16 = 0xc117; // 0x17c1(6081)'s LittleEndian
+
+pub const VXLAN_FLAGS: u8 = 8;
+pub const TUNNEL_TIER_LIMIT: u8 = 2;
+
 pub const VXLAN_FLAGS_OFFSET: usize = UDP_PACKET_SIZE + vxlan::FLAGS_OFFSET;
 pub const VXLAN_SEQ_OFFSET: usize = UDP_PACKET_SIZE + vxlan::SEQUENCE_OFFSET;
 pub const VXLAN_VNI_OFFSET: usize = UDP_PACKET_SIZE + vxlan::VNI_OFFSET;
@@ -365,6 +379,51 @@ pub const VXLAN6_FLAGS_OFFSET: usize = UDP6_PACKET_SIZE + vxlan::FLAGS_OFFSET;
 pub const VXLAN6_SEQ_OFFSET: usize = UDP6_PACKET_SIZE + vxlan::SEQUENCE_OFFSET;
 pub const VXLAN6_VNI_OFFSET: usize = UDP6_PACKET_SIZE + vxlan::VNI_OFFSET;
 pub const VXLAN6_DIRECTION_OFFSET: usize = UDP6_PACKET_SIZE + vxlan::DIRECTION_OFFSET;
+
+// GPE_VXLAN:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |R|R|Ver|I|P|B|O|       Reserved                |Next Protocol  |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                VXLAN Network Identifier (VNI) |   Reserved    |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+pub const GPE_VXLAN_FLAGS_INSTANCE_MASK: u8 = 0x8;
+pub const GPE_VXLAN_FLAGS_PROTOCOL_MASK: u8 = 0x4;
+pub const GPE_VXLAN_FLAGS_VERSION_MASK: u8 = 0x30;
+
+pub const GPE_VXLAN_NEXT_PROTOCOL_NSH: u8 = 4;
+
+pub const GPE_VXLAN_FLAGS_OFFSET: usize = 0;
+pub const GPE_VXLAN_NEXT_PROTOCOL_OFFSET: usize = 3;
+pub const GPE_VXLAN_VNI_OFFSET: usize = 4;
+
+pub const GPE_VXLAN_HEADER_SIZE: usize = 8;
+pub const GEP_VXLAN_GRE_HEADER_SIZE: usize = 8;
+
+// NSH(Network Service Header):
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |Ver|O|U|    TTL    |   Length  |U|U|U|U|MD Type| Next Protocol |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                Service Path Header                            |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                                                               |
+// ~                Context Header(s)                              ~
+// |                                                               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+pub const NSH_HEADER_SIZE: usize = 8;
+
+pub const NSH_FLAGS_OFFSET: usize = 0;
+pub const NSH_NEXT_PROTOCOL_OFFSET: usize = 3;
+
+pub const NSH_FLAGS_BITS_MASK: u16 = 0xf000;
+pub const NSH_FLAGS_LENGTH_MASK: u16 = 0x3f;
+
+pub const NSH_NEXT_PROTOCOL_IPV4: u8 = 1;
 
 pub const GRE4_PROTO_OFFSET: usize = IPV4_PACKET_SIZE + erspan::GRE_PROTO_OFFSET;
 pub const GRE6_PROTO_OFFSET: usize = IPV6_PACKET_SIZE + erspan::GRE_PROTO_OFFSET;

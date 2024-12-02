@@ -170,7 +170,8 @@ capture_socket_type: 0
 tap_mode: 0
 
 # Decapsulation Tunnel Protocols
-# Default: [1, 2], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (IPIP), 3 (GRE), 4 (Geneve)
+# Default: [1, 2], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (IPIP), 3 (GRE), 4 (Geneve) 5 (VXLAN-NSH)
+# Note: Only the Enterprise Edition supports decap GRE and VXLAN-NSH.
 decap_type:
 - 1
 - 2
@@ -1010,6 +1011,13 @@ static_config:
   #   that the VNI bit is set, the value configured here will be used after |= 0x8.
   vxlan-flags: 0xff
 
+  # Capture bpf without npb filter.
+  # Default: false. Range: [true, false]
+  # Note:
+  #   If the NIC on the data plane has ERSPAN tunnel traffic but does not NPB traffic,
+  # enable the switch to collect ERSPAN traffic.
+  skip-npb-bpf: false
+
   # NPB Packet ignoring VLAN Header in overlay
   # Default: false. Range: [true, false]
   # Note:
@@ -1023,6 +1031,7 @@ static_config:
   # Remove Tunnel Header
   # Default: [], Range: [ERSPAN, VXLAN, TEB]
   # Note: Whether to remove the tunnel header in mirrored traffic.
+  #   Only the Enterprise Edition supports decap ERSPAN and TEB.
   trim-tunnel-types: []
 
   ##########

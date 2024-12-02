@@ -2367,6 +2367,35 @@ inputs:
 内核的 BPF 包过滤能力，而是获取全流量的数据包之后由采集器程序进行过滤。注意，打开此开关将明显
 增加 deepflow-agent 的资源消耗。
 
+#### 跳过 NPB BPF {#inputs.cbpf.af_packet.skip_npb_bpf}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.skip_npb_bpf`
+
+Upgrade from old version: `static_config.skip-npb-bpf`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      skip_npb_bpf: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+如果采集网卡中有 ERSPAN 流量但是没有分发流量，开启这个开关来采集 ERSPAN 流量。
+
 #### 调优 {#inputs.cbpf.af_packet.tunning}
 
 ##### Socket 版本 {#inputs.cbpf.af_packet.tunning.socket_version}
@@ -2948,6 +2977,7 @@ inputs:
 | 2 | IPIP |
 | 3 | GRE |
 | 4 | Geneve |
+| 5 | VXLAN-NSH |
 
 **模式**:
 | Key  | Value                        |
@@ -2956,7 +2986,7 @@ inputs:
 
 **详细描述**:
 
-deepflow-agent 需要对数据包解封装的隧道协议。
+deepflow-agent 需要对数据包解封装的隧道协议，仅企业版本支持解析 GRE 和 VXLAN-NSH。
 
 #### 隧道头剥离协议 {#inputs.cbpf.preprocess.tunnel_trim_protocols}
 
@@ -2993,6 +3023,7 @@ inputs:
 **详细描述**:
 
 流量镜像（虚拟或物理）模式下，deepflow-agent 需要剥离的隧道头协议类型。
+仅企业版支持解析 ERSPAN 和 TEB。
 
 #### TCP分段重组开关 {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
 

@@ -573,6 +573,7 @@ pub struct Options {
     pub fanout_enabled: bool,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub promisc: bool,
+    pub skip_npb_bpf: bool,
 }
 
 impl Options {
