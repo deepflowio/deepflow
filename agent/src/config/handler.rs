@@ -335,6 +335,7 @@ pub struct DispatcherConfig {
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
     pub capture_bpf: String,
+    pub skip_npb_bpf: bool,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1503,6 +1504,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 proxy_controller_ip,
                 proxy_controller_port: conf.proxy_controller_port,
                 capture_bpf: conf.capture_bpf.to_string(),
+                skip_npb_bpf: conf.yaml_config.skip_npb_bpf,
                 max_memory: conf.max_memory,
                 af_packet_blocks: conf
                     .yaml_config

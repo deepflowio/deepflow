@@ -88,6 +88,7 @@ pub(crate) struct Builder {
     pub proxy_controller_port: u16,
     pub controller_tls_port: u16,
     pub analyzer_source_ip: IpAddr,
+    pub skip_npb_bpf: bool,
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -725,7 +726,9 @@ impl Builder {
         // 不采集和TSDB通信的流量
         bpf_builder.appends(&mut self.skip_ipv4_tsdb());
         // 不采集分发流量
-        bpf_builder.appends(&mut self.skip_ipv4_npb());
+        if self.skip_npb_bpf {
+            bpf_builder.appends(&mut self.skip_ipv4_npb());
+        }
 
         return bpf_builder.build();
     }
@@ -736,7 +739,9 @@ impl Builder {
         // 不采集和TSDB通信的流量
         bpf_builder.appends(&mut self.skip_ipv6_tsdb());
         // 不采集分发流量
-        bpf_builder.appends(&mut self.skip_ipv6_npb());
+        if self.skip_npb_bpf {
+            bpf_builder.appends(&mut self.skip_ipv6_npb());
+        }
 
         return bpf_builder.build();
     }
@@ -779,26 +784,28 @@ impl Builder {
             ip_version, self.analyzer_source_ip, self.analyzer_port
         ));
 
-        // 不采集分发的VXLAN流量
-        conditions.push(format!(
-            "not (udp and dst port {} and udp[8:1]={:#x})",
-            self.npb_port, self.vxlan_flags
-        ));
+        if self.skip_npb_bpf {
+            // 不采集分发的VXLAN流量
+            conditions.push(format!(
+                "not (udp and dst port {} and udp[8:1]={:#x})",
+                self.npb_port, self.vxlan_flags
+            ));
 
-        // 不采集分发的TCP流量
-        conditions.push(format!("not (tcp and port {})", self.npb_port,));
+            // 不采集分发的TCP流量
+            conditions.push(format!("not (tcp and port {})", self.npb_port,));
 
-        // 不采集分发的ERSPANIII
-        conditions.push(format!(
-            "not (ip[9:1]={:#x} and ip[22:2]={:#x})",
-            u8::from(IpProtocol::GRE),
-            GRE_PROTO_ERSPAN_III
-        ));
-        conditions.push(format!(
-            "not (ip6[6:1]={:#x} and ip6[42:2]={:#x})",
-            u8::from(IpProtocol::GRE),
-            GRE_PROTO_ERSPAN_III
-        ));
+            // 不采集分发的ERSPANIII
+            conditions.push(format!(
+                "not (ip[9:1]={:#x} and ip[22:2]={:#x})",
+                u8::from(IpProtocol::GRE),
+                GRE_PROTO_ERSPAN_III
+            ));
+            conditions.push(format!(
+                "not (ip6[6:1]={:#x} and ip6[42:2]={:#x})",
+                u8::from(IpProtocol::GRE),
+                GRE_PROTO_ERSPAN_III
+            ));
+        }
 
         conditions.join(" and ")
     }
@@ -820,6 +827,7 @@ mod tests {
             proxy_controller_port: 7788,
             analyzer_port: 8899,
             analyzer_source_ip: "1.2.3.4".parse::<IpAddr>().unwrap(),
+            skip_npb_bpf: true,
         };
 
         let syntax = builder.build_pcap_syntax();
@@ -909,6 +917,7 @@ mod tests {
             analyzer_source_ip: "9999:aaaa:bbbb:cccc:dddd:eeee:ffff:0000"
                 .parse::<IpAddr>()
                 .unwrap(),
+            skip_npb_bpf: true,
         };
 
         let syntax = builder.build_pcap_syntax();

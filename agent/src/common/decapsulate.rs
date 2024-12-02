@@ -28,6 +28,8 @@ use serde::Serialize;
 
 use public::proto::trident::DecapType;
 
+use tunnel::{decapsulate_erspan, decapsulate_gpe_vxlan, decapsulate_teb, decapsulate_tencent_gre};
+
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TunnelType {
@@ -37,8 +39,9 @@ pub enum TunnelType {
     Ipip = DecapType::Ipip as u8,
     TencentGre = DecapType::Tencent as u8,
     Geneve = DecapType::Geneve as u8,
-    Erspan = DecapType::Geneve as u8 + 1,
-    Teb = DecapType::Geneve as u8 + 2,
+    VxlanNsh = DecapType::VxlanNsh as u8,
+    Erspan = DecapType::VxlanNsh as u8 + 1,
+    Teb = DecapType::VxlanNsh as u8 + 2,
 }
 
 impl From<DecapType> for TunnelType {
@@ -49,6 +52,7 @@ impl From<DecapType> for TunnelType {
             DecapType::Ipip => TunnelType::Ipip,
             DecapType::Tencent => TunnelType::TencentGre,
             DecapType::Geneve => TunnelType::Geneve,
+            DecapType::VxlanNsh => TunnelType::VxlanNsh,
         }
     }
 }
@@ -61,6 +65,7 @@ impl fmt::Display for TunnelType {
             TunnelType::Ipip => write!(f, "IPIP"),
             TunnelType::TencentGre => write!(f, "GRE"),
             TunnelType::Geneve => write!(f, "Geneve"),
+            TunnelType::VxlanNsh => write!(f, "VXLAN-NSH"),
             TunnelType::Erspan => write!(f, "ERSPAN"),
             TunnelType::Teb => write!(f, "TEB"),
         }
@@ -74,6 +79,7 @@ impl From<&str> for TunnelType {
             "VXLAN" => TunnelType::Vxlan,
             "ERSPAN" => TunnelType::Erspan,
             "TEB" => TunnelType::Teb,
+            "VXLAN-NSH" => TunnelType::VxlanNsh,
             _ => TunnelType::None,
         }
     }
@@ -157,19 +163,6 @@ impl fmt::Display for TunnelTypeBitmap {
     }
 }
 
-const LE_IPV4_PROTO_TYPE_I: u16 = 0x0008; // 0x0008's LittleEndian
-const LE_IPV6_PROTO_TYPE_I: u16 = 0xDD86; // 0x86dd's LittleEndian
-const LE_ERSPAN_PROTO_TYPE_II: u16 = 0xBE88; // 0x88BE's LittleEndian
-const LE_ERSPAN_PROTO_TYPE_III: u16 = 0xEB22; // 0x22EB's LittleEndian
-const LE_VXLAN_PROTO_UDP_DPORT: u16 = 0xB512; // 0x12B5(4789)'s LittleEndian
-const LE_VXLAN_PROTO_UDP_DPORT2: u16 = 0x1821; // 0x2118(8472)'s LittleEndian
-const LE_VXLAN_PROTO_UDP_DPORT3: u16 = 0x801A; // 0x1A80(6784)'s LittleEndian
-const LE_TRANSPARENT_ETHERNET_BRIDGEING: u16 = 0x5865; // 0x6558(25944)'s LittleEndian
-const LE_GENEVE_PROTO_UDP_DPORT: u16 = 0xc117; // 0x17c1(6081)'s LittleEndian
-
-const VXLAN_FLAGS: u8 = 8;
-const TUNNEL_TIER_LIMIT: u8 = 2;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TunnelInfo {
     pub src: Ipv4Addr,
@@ -180,6 +173,7 @@ pub struct TunnelInfo {
     pub tunnel_type: TunnelType,
     pub tier: u8,
     pub is_ipv6: bool,
+    pub from: u32, // tunnel source ip
 }
 
 impl Default for TunnelInfo {
@@ -193,11 +187,22 @@ impl Default for TunnelInfo {
             tunnel_type: TunnelType::default(),
             tier: 0,
             is_ipv6: false,
+            from: 0,
         }
     }
 }
 
 impl TunnelInfo {
+    pub fn reset_and_retain_erspan_from(&mut self) {
+        let from = if self.tunnel_type == TunnelType::Erspan {
+            u32::from_be_bytes(self.src.octets())
+        } else {
+            0
+        };
+        *self = Default::default();
+        self.from = from;
+    }
+
     fn decapsulate_addr(&mut self, l3_packet: &[u8]) {
         self.src = Ipv4Addr::from(bytes::read_u32_be(
             &l3_packet[FIELD_OFFSET_SIP - ETH_HEADER_SIZE..],
@@ -219,7 +224,7 @@ impl TunnelInfo {
 
     pub fn decapsulate_udp(
         &mut self,
-        packet: &[u8],
+        packet: &mut [u8],
         l2_len: usize,
         tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
@@ -236,6 +241,9 @@ impl TunnelInfo {
                 if tunnel_types.has(TunnelType::Vxlan) =>
             {
                 return self.decapsulate_vxlan(packet, l2_len);
+            }
+            LE_GPE_VXLAN_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::VxlanNsh) => {
+                return self.decapsulate_gpe_vxlan(packet, l2_len);
             }
             LE_GENEVE_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::Geneve) => {
                 return self.decapsulate_geneve(packet, l2_len);
@@ -255,6 +263,22 @@ impl TunnelInfo {
         }
 
         0
+    }
+
+    pub fn decapsulate_gpe_vxlan(&mut self, packet: &mut [u8], l2_len: usize) -> usize {
+        let Some((offset, id)) = decapsulate_gpe_vxlan(packet, l2_len) else {
+            return 0;
+        };
+
+        if self.tier == 0 {
+            self.decapsulate_addr(&packet[l2_len..]);
+            self.decapsulate_mac(packet);
+            self.tunnel_type = TunnelType::VxlanNsh;
+            self.id = id;
+        }
+        self.tier += 1;
+
+        offset
     }
 
     pub fn decapsulate_vxlan(&mut self, packet: &[u8], l2_len: usize) -> usize {
@@ -303,60 +327,21 @@ impl TunnelInfo {
         gre_protocol_type: u16,
         ip_header_size: usize,
     ) -> usize {
-        let l3_packet = &packet[l2_len..];
-        match gre_protocol_type {
-            // ERSPAN I
-            LE_ERSPAN_PROTO_TYPE_II if flags == 0 => {
-                // 仅保存最外层的隧道信息
-                if self.tier == 0 {
-                    self.decapsulate_addr(l3_packet);
-                    self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::Erspan;
-                }
-                self.tier += 1;
-                ip_header_size + GRE_HEADER_SIZE_DECAP + ERSPAN_I_HEADER_SIZE
-            }
-            // ERSPAN II
-            LE_ERSPAN_PROTO_TYPE_II => {
-                let gre_header_size =
-                    GRE_HEADER_SIZE_DECAP + TunnelInfo::calc_gre_option_size(flags);
-                if self.tier == 0 {
-                    self.decapsulate_addr(l3_packet);
-                    self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::Erspan;
-                    self.id = bytes::read_u32_be(
-                        &l3_packet[ip_header_size + gre_header_size + ERSPAN_ID_OFFSET..],
-                    ) & 0x3ff;
-                }
-                self.tier += 1;
-                ip_header_size + gre_header_size + ERSPAN_II_HEADER_SIZE
-            }
-            LE_ERSPAN_PROTO_TYPE_III => {
-                let gre_header_size =
-                    GRE_HEADER_SIZE_DECAP + TunnelInfo::calc_gre_option_size(flags);
-                // 仅保存最外层的隧道信息
-                if self.tier == 0 {
-                    self.decapsulate_addr(l3_packet);
-                    self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::Erspan;
-                    self.id = bytes::read_u32_be(
-                        &l3_packet[ip_header_size + gre_header_size + ERSPAN_ID_OFFSET..],
-                    ) & 0x3ff;
-                }
-                self.tier += 1;
+        let Some((offset, id)) =
+            decapsulate_erspan(packet, l2_len, flags, gre_protocol_type, ip_header_size)
+        else {
+            return 0;
+        };
 
-                let flag =
-                    l3_packet[ip_header_size + gre_header_size + ERSPAN_III_FLAGS_OFFSET] & 0x1;
-                if flag == 0 {
-                    return ip_header_size + gre_header_size + ERSPAN_III_HEADER_SIZE;
-                }
-                ip_header_size
-                    + gre_header_size
-                    + ERSPAN_III_HEADER_SIZE
-                    + ERSPAN_III_SUBHEADER_SIZE
-            }
-            _ => 0,
+        if self.tier == 0 {
+            self.decapsulate_addr(&packet[l2_len..]);
+            self.decapsulate_mac(packet);
+            self.tunnel_type = TunnelType::Erspan;
+            self.id = id;
         }
+        self.tier += 1;
+
+        offset
     }
 
     pub fn is_gre_pseudo_inner_mac(mac: u64) -> bool {
@@ -371,63 +356,21 @@ impl TunnelInfo {
         gre_protocol_type: u16,
         ip_header_size: usize,
     ) -> usize {
-        // TCE GRE：Version 0、Version 1两种
-        if flags & GRE_FLAGS_VER_MASK > 1 {
+        let Some((offset, id)) =
+            decapsulate_tencent_gre(packet, l2_len, flags, gre_protocol_type, ip_header_size)
+        else {
             return 0;
-        }
-
-        let has_key = flags & GRE_FLAGS_KEY_MASK > 0;
-        let gre_header_size = GRE_HEADER_SIZE_DECAP + TunnelInfo::calc_gre_option_size(flags);
-        let mut gre_key_offset = GRE_KEY_OFFSET;
-        if flags & GRE_FLAGS_CSUM_MASK != 0 {
-            gre_key_offset += GRE_CSUM_LEN;
-        }
+        };
 
         if self.tier == 0 {
+            self.decapsulate_addr(&packet[l2_len..]);
             self.decapsulate_mac(packet);
-        }
-        let l3_packet = &mut packet[l2_len..];
-        // 仅保存最外层的隧道信息
-        if self.tier == 0 {
-            self.decapsulate_addr(l3_packet);
             self.tunnel_type = TunnelType::TencentGre;
-            if has_key {
-                self.id = bytes::read_u32_be(&l3_packet[ip_header_size + gre_key_offset..]);
-            }
+            self.id = id;
         }
         self.tier += 1;
-        let overlay_offset = gre_header_size + ip_header_size - ETH_HEADER_SIZE; // 伪造L2层信息
 
-        // NOTICE:
-        //     这里需要将TunnelID封装为Mac Suffix，策略FastPath需要不同的MAC区分不同的VPC。
-        // 腾讯GRE流量是通过TunnelID来确认其对应的EPC ID的，这个将TunnelID用作MAC后缀，同
-        // 样能在FastPath里面区分不同的VPC。
-        //     这样的伪造MAC可以通过IsGrePseudoInnerMac函数判断
-        let mut macs = if gre_protocol_type == LE_IPV4_PROTO_TYPE_I {
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x8, 0]
-        } else {
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x86, 0xdd]
-        };
-        if has_key {
-            // L2 Header
-            //
-            // 0                 4            6                10           12             14
-            // +-----------------+------------+----------------+------------+--------------+
-            // |                 | 2-Byte Key |                | 2-Byte Key | 0x800/0x86dd |
-            // +-----------------+------------+----------------+------------+--------------+
-            // | Dest MAC                     | Source MAC                  | EthType      |
-            macs[4..6].copy_from_slice(
-                &l3_packet
-                    [ip_header_size + gre_key_offset + 2..ip_header_size + gre_key_offset + 4],
-            );
-            macs[10..12].copy_from_slice(
-                &l3_packet[ip_header_size + gre_key_offset..ip_header_size + gre_key_offset + 2],
-            );
-        }
-
-        l3_packet[overlay_offset..overlay_offset + 14].copy_from_slice(&macs[..]);
-
-        overlay_offset
+        offset
     }
 
     pub fn decapsulate_teb(
@@ -437,26 +380,19 @@ impl TunnelInfo {
         flags: u16,
         ip_header_size: usize,
     ) -> usize {
-        if flags & GRE_FLAGS_VER_MASK != 0 || flags & GRE_FLAGS_KEY_MASK == 0 {
+        let Some((offset, id)) = decapsulate_teb(packet, l2_len, flags, ip_header_size) else {
             return 0;
-        }
-
-        let gre_header_size = GRE_HEADER_SIZE_DECAP + TunnelInfo::calc_gre_option_size(flags);
-        let mut gre_key_offset = GRE_KEY_OFFSET;
-        if flags & GRE_FLAGS_CSUM_MASK != 0 {
-            gre_key_offset += GRE_CSUM_LEN;
-        }
-
-        let l3_packet = &packet[l2_len..];
+        };
         // 仅保存最外层的隧道信息
         if self.tier == 0 {
-            self.decapsulate_addr(l3_packet);
+            self.decapsulate_addr(&packet[l2_len..]);
             self.decapsulate_mac(packet);
             self.tunnel_type = TunnelType::Teb;
-            self.id = bytes::read_u32_be(&l3_packet[ip_header_size + gre_key_offset..]);
+            self.id = id;
         }
         self.tier += 1;
-        gre_header_size + ip_header_size
+
+        offset
     }
 
     pub fn decapsulate_gre(
@@ -821,6 +757,7 @@ mod tests {
             tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap"),
@@ -857,6 +794,7 @@ mod tests {
             tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
@@ -893,6 +831,7 @@ mod tests {
             tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
@@ -922,6 +861,7 @@ mod tests {
             tunnel_type: TunnelType::Vxlan,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
@@ -951,6 +891,7 @@ mod tests {
             tunnel_type: TunnelType::Vxlan,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
             Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ff-vxlan.pcap"), None).into();
@@ -961,87 +902,6 @@ mod tests {
         let offset = actual.decapsulate(packet, l2_len, &bitmap);
 
         assert_eq!(offset, 36);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_decapsulate_tencent_gre_nokey() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::TencentGre, TunnelType::Vxlan]);
-        let expected = TunnelInfo {
-            src: Ipv4Addr::new(10, 184, 17, 156),
-            dst: Ipv4Addr::new(10, 128, 48, 25),
-            mac_src: 0x381fc0f2,
-            mac_dst: 0xdd09cd02,
-            id: 65877,
-            tunnel_type: TunnelType::Vxlan,
-            tier: 2,
-            is_ipv6: false,
-        };
-        let expected_overlay = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 69, 0, 0, 52, 237, 62, 64, 0, 63, 6, 184,
-            251, 10, 185, 192, 25, 10, 129, 192, 54,
-        ];
-
-        let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("gre-nokey.pcap"), None).into();
-        let packet = packets[0].as_mut_slice();
-
-        let mut actual = TunnelInfo::default();
-        let expected_offset = 82;
-        let mut actual_offset = 0;
-        for l2_len in vec![22, 14] {
-            let offset = actual.decapsulate(&mut packet[actual_offset..], l2_len, &bitmap);
-            if actual.tunnel_type == TunnelType::None {
-                break;
-            }
-            if actual_offset + offset > packet.len() {
-                break;
-            }
-            actual_offset += l2_len + offset;
-        }
-
-        let actual_overlay: [u8; 34] = packet[actual_offset..actual_offset + 34]
-            .try_into()
-            .unwrap();
-        assert_eq!(expected_overlay, actual_overlay);
-        assert_eq!(actual, expected);
-        assert_eq!(actual_offset, expected_offset);
-    }
-
-    #[test]
-    fn test_decapsulate_tencent_gre() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::TencentGre]);
-        let expected = TunnelInfo {
-            src: Ipv4Addr::new(10, 19, 0, 21),
-            dst: Ipv4Addr::new(10, 21, 64, 5),
-            mac_src: 0xbffac801,
-            mac_dst: 0x06246b71,
-            id: 0x10285,
-            tunnel_type: TunnelType::TencentGre,
-            tier: 1,
-            is_ipv6: false,
-        };
-        let expected_overlay = [
-            0x00, 0x00, 0x00, 0x00, 0x02, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08, 0x00,
-            0x45, 0x00, 0x00, 0x28, 0x87, 0x93, 0x40, 0x00, 0x40, 0x06, 0xa8, 0xe7, 0x0a, 0x01,
-            0xfb, 0x29, 0x0a, 0x01, 0xfb, 0x29,
-        ];
-
-        let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("tencent-gre.pcap"), None).into();
-        let packet = packets[0].as_mut_slice();
-
-        let l2_len = 14;
-        let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, &bitmap);
-        let expected_offset = 18;
-
-        let actual_overlay: [u8; 34] = packet
-            [l2_len + expected_offset..l2_len + expected_offset + 34]
-            .try_into()
-            .unwrap();
-        assert_eq!(expected_overlay, actual_overlay);
-        assert_eq!(offset, expected_offset);
         assert_eq!(actual, expected);
     }
 
@@ -1057,6 +917,7 @@ mod tests {
             tunnel_type: TunnelType::Teb,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap"),
@@ -1086,6 +947,7 @@ mod tests {
             tunnel_type: TunnelType::Vxlan,
             tier: 1,
             is_ipv6: true,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
             Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"), None).into();
@@ -1112,6 +974,7 @@ mod tests {
             tunnel_type: TunnelType::Ipip,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
             Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"), None).into();
@@ -1160,6 +1023,7 @@ mod tests {
             tunnel_type: TunnelType::Geneve,
             tier: 1,
             is_ipv6: false,
+            from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
             Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("geneve.pcap"), None).into();
@@ -1168,6 +1032,30 @@ mod tests {
         let mut actual = TunnelInfo::default();
         let offset = actual.decapsulate(packet, 14, &bitmap);
         assert_eq!(offset, IPV4_HEADER_SIZE + 24);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_decapsulate_vxlan_nsh() {
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::VxlanNsh]);
+        let expected = TunnelInfo {
+            src: Ipv4Addr::new(29, 29, 14, 47),
+            dst: Ipv4Addr::new(29, 29, 14, 211),
+            mac_src: 0xfd12f40e,
+            mac_dst: 0x5e000109,
+            id: 0,
+            tunnel_type: TunnelType::VxlanNsh,
+            tier: 1,
+            is_ipv6: false,
+            from: 0,
+        };
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("vxlan-nsh.pcap"), None).into();
+        let packet = packets[0].as_mut_slice();
+
+        let mut actual = TunnelInfo::default();
+        let offset = actual.decapsulate(packet, 14, &bitmap);
+        assert_eq!(offset, 74);
         assert_eq!(actual, expected);
     }
 }
