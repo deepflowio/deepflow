@@ -34,7 +34,7 @@ pub use mq::{
     OpenWireLog, PulsarInfo, PulsarLog, ZmtpInfo, ZmtpLog,
 };
 use num_enum::TryFromPrimitive;
-pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator, SLOT_WIDTH};
+pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
     SofaRpcLog, SomeIpInfo, SomeIpLog, TarsInfo, TarsLog, SOFA_NEW_RPC_TRACE_CTX_KEY,

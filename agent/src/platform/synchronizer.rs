@@ -42,7 +42,6 @@ use crate::{
 };
 
 use public::proto::agent::{self, Exception};
-use public::proto::trident;
 
 use super::querier::Querier;
 
@@ -208,17 +207,10 @@ impl Synchronizer {
             digest: 0,
         };
 
-        let handle = if interior.session.get_new_rpc() {
-            thread::Builder::new()
-                .name("platform-synchronizer".to_owned())
-                .spawn(move || Self::agent_process(interior))
-                .unwrap()
-        } else {
-            thread::Builder::new()
-                .name("platform-synchronizer".to_owned())
-                .spawn(move || Self::process(interior))
-                .unwrap()
-        };
+        let handle = thread::Builder::new()
+            .name("platform-synchronizer".to_owned())
+            .spawn(move || Self::process(interior))
+            .unwrap();
         *self.thread.lock().unwrap() = Some(handle);
 
         info!("PlatformSynchronizer started");
@@ -270,22 +262,22 @@ impl Synchronizer {
 
             loop {
                 let msg = if args.version == args.peer_version {
-                    trident::GenesisSyncRequest {
+                    agent::GenesisSyncRequest {
                         version: Some(args.version),
-                        trident_type: Some(config.agent_type as i32),
+                        agent_type: Some(config.agent_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.agent_id as u32),
+                        agent_id: Some(config.agent_id as u32),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..Default::default()
                     }
                 } else {
                     info!("local version is {}, will send whole message", args.version);
-                    trident::GenesisSyncRequest {
+                    agent::GenesisSyncRequest {
                         version: Some(args.version),
-                        trident_type: Some(config.agent_type as i32),
+                        agent_type: Some(config.agent_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.agent_id as u32),
+                        agent_id: Some(config.agent_id as u32),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..querier.generate_message(&config)
@@ -299,122 +291,6 @@ impl Synchronizer {
                 match args
                     .runtime
                     .block_on(args.session.grpc_genesis_sync_with_statsd(msg))
-                {
-                    Ok(res) => {
-                        let res = res.into_inner();
-                        args.peer_version = res.version();
-                        if args.version != args.peer_version {
-                            // resync when versions mismatch
-                            info!(
-                                "local version {}, remote version {}, about to resync",
-                                args.version, args.peer_version
-                            );
-                            continue;
-                        } else {
-                            if Self::wait_timeout(&args.running, &args.timer, config.sync_interval)
-                            {
-                                break 'outer;
-                            }
-                            continue 'outer;
-                        }
-                    }
-                    Err(e) => {
-                        args.exception_handler.set(Exception::ControllerSocketError);
-                        error!(
-                            "send platform {} with genesis_sync grpc call failed: {}",
-                            if args.version == args.peer_version {
-                                "heartbeat"
-                            } else {
-                                "information"
-                            },
-                            e
-                        );
-                        if Self::wait_timeout(&args.running, &args.timer, config.sync_interval) {
-                            break 'outer;
-                        }
-                        continue 'outer;
-                    }
-                }
-            }
-        }
-    }
-
-    // FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
-    fn agent_process(mut args: Interior) {
-        let init_version = args.version;
-
-        let mut querier = Querier::new(
-            args.override_os_hostname.clone(),
-            #[cfg(target_os = "linux")]
-            args.xml_extractor.clone(),
-        );
-
-        'outer: loop {
-            let config = args.config.load();
-            let (ctrl_ip, team_id) = {
-                let id = args.agent_id.read();
-                (id.ip.to_string(), id.team_id.clone())
-            };
-
-            #[cfg(target_os = "linux")]
-            if args
-                .kubernetes_poller_updated
-                .swap(false, Ordering::Acquire)
-            {
-                if let Some(poller) = args.kubernetes_poller.lock().unwrap().clone() {
-                    info!("updated kubernetes poller");
-                    querier.set_kubernetes_poller(poller);
-                }
-            }
-
-            let digest = querier.update(&config);
-            if args.digest != digest {
-                args.digest = digest;
-                args.version += 1;
-                info!("Platform information changed to version {}", args.version);
-            }
-
-            if args.version == init_version {
-                // 避免信息同步先于信息采集
-                // ====
-                // wait 5 seconds to check version change
-                if Self::wait_timeout(&args.running, &args.timer, Duration::from_secs(5)) {
-                    break;
-                }
-                continue;
-            }
-
-            loop {
-                let msg = if args.version == args.peer_version {
-                    agent::GenesisSyncRequest {
-                        version: Some(args.version),
-                        agent_type: Some(config.agent_type as i32),
-                        source_ip: Some(ctrl_ip.clone()),
-                        agent_id: Some(config.agent_id as u32),
-                        kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
-                        team_id: Some(team_id.clone()),
-                        ..Default::default()
-                    }
-                } else {
-                    info!("local version is {}, will send whole message", args.version);
-                    agent::GenesisSyncRequest {
-                        version: Some(args.version),
-                        agent_type: Some(config.agent_type as i32),
-                        source_ip: Some(ctrl_ip.clone()),
-                        agent_id: Some(config.agent_id as u32),
-                        kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
-                        team_id: Some(team_id.clone()),
-                        ..querier.generate_agent_message(&config)
-                    }
-                };
-
-                debug!(
-                    "syncing version {} -> {} to remote",
-                    args.version, args.peer_version
-                );
-                match args
-                    .runtime
-                    .block_on(args.session.agent_grpc_genesis_sync_with_statsd(msg))
                 {
                     Ok(res) => {
                         let res = res.into_inner();

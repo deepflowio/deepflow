@@ -21,7 +21,7 @@ pub mod handler;
 pub use config::ApiResources;
 pub use config::{
     AgentIdType, Config, ConfigError, DpdkSource, KubernetesPollerType, OracleConfig, PcapStream,
-    ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, UserConfig, K8S_CA_CRT_PATH,
+    ProcessMatcher, PrometheusExtraLabels, UserConfig, K8S_CA_CRT_PATH,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use handler::FlowAccess;
