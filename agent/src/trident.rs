@@ -878,6 +878,8 @@ impl Trident {
                         &synchronizer,
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
+                        #[cfg(target_os = "linux")]
+                        false,
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -979,6 +981,7 @@ fn component_on_config_change(
     tap_types: Vec<trident::TapType>,
     synchronizer: &Arc<Synchronizer>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    #[cfg(target_os = "linux")] fanout_enabled: bool,
 ) {
     let conf = &config_handler.candidate_config.dispatcher;
     match conf.tap_mode {
@@ -1002,8 +1005,13 @@ fn component_on_config_change(
         }
         TapMode::Mirror | TapMode::Analyzer => {
             for d in components.dispatcher_components.iter() {
+                let links = get_listener_links(
+                    conf,
+                    #[cfg(target_os = "linux")]
+                    &netns::NsFile::Root,
+                );
                 d.dispatcher_listener.on_tap_interface_change(
-                    &vec![],
+                    &links,
                     conf.if_mac_source,
                     conf.trident_type,
                     &blacklist,
@@ -1091,6 +1099,8 @@ fn component_on_config_change(
                     components.kubernetes_poller.clone(),
                     #[cfg(target_os = "linux")]
                     libvirt_xml_extractor.clone(),
+                    #[cfg(target_os = "linux")]
+                    fanout_enabled,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1783,43 +1793,42 @@ impl AgentComponents {
         }
 
         #[cfg(target_os = "linux")]
-        let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local
-            && candidate_config.dispatcher.extra_netns_regex == ""
-        {
+        let mut packet_fanout_count = if candidate_config.dispatcher.extra_netns_regex == "" {
             yaml_config.local_dispatcher_count
         } else {
             1
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
-        let local_dispatcher_count = 1;
+        let packet_fanout_count = 1;
 
-        if interfaces_and_ns.is_empty() {
-            let links = get_listener_links(
-                &candidate_config.dispatcher,
-                #[cfg(target_os = "linux")]
-                &netns::NsFile::Root,
-            );
-            if candidate_config.tap_mode != TapMode::Local {
+        let links = get_listener_links(
+            &candidate_config.dispatcher,
+            #[cfg(target_os = "linux")]
+            &netns::NsFile::Root,
+        );
+        if interfaces_and_ns.is_empty() && !links.is_empty() {
+            if packet_fanout_count > 1 || candidate_config.tap_mode == TapMode::Local {
+                for _ in 0..packet_fanout_count {
+                    #[cfg(target_os = "linux")]
+                    interfaces_and_ns.push((links.clone(), netns::NsFile::Root));
+                    #[cfg(any(target_os = "windows", target_os = "android"))]
+                    interfaces_and_ns.push(links.clone());
+                }
+            } else {
                 for l in links {
                     #[cfg(target_os = "linux")]
                     interfaces_and_ns.push((vec![l], netns::NsFile::Root));
                     #[cfg(any(target_os = "windows", target_os = "android"))]
                     interfaces_and_ns.push(vec![l]);
                 }
-            } else {
-                for _ in 0..local_dispatcher_count {
-                    #[cfg(target_os = "linux")]
-                    interfaces_and_ns.push((links.clone(), netns::NsFile::Root));
-                    #[cfg(any(target_os = "windows", target_os = "android"))]
-                    interfaces_and_ns.push(links.clone());
-                }
             }
         }
         #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode == TapMode::Mirror
+        if candidate_config.tap_mode != TapMode::Local
             && (!yaml_config.vhost_socket_path.is_empty()
                 || candidate_config.dispatcher.dpdk_enabled)
         {
+            packet_fanout_count = 1;
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
 
@@ -2162,6 +2171,10 @@ impl AgentComponents {
                 kubernetes_poller.clone(),
                 #[cfg(target_os = "linux")]
                 libvirt_xml_extractor.clone(),
+                #[cfg(target_os = "linux")]
+                {
+                    packet_fanout_count > 1
+                },
             )?;
             dispatcher_components.push(dispatcher_component);
         }
@@ -2857,6 +2870,7 @@ fn build_dispatchers(
     #[cfg(target_os = "linux")] netns: netns::NsFile,
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    #[cfg(target_os = "linux")] fanout_enabled: bool,
 ) -> Result<DispatcherComponent> {
     let candidate_config = &config_handler.candidate_config;
     let yaml_config = &candidate_config.yaml_config;
@@ -2961,12 +2975,12 @@ fn build_dispatchers(
         )),
     ]));
 
-    let pcap_interfaces =
-        if candidate_config.tap_mode == TapMode::Mirror && yaml_config.dpdk_enabled {
-            vec![]
-        } else {
-            links.clone()
-        };
+    let pcap_interfaces = if candidate_config.tap_mode != TapMode::Local && yaml_config.dpdk_enabled
+    {
+        vec![]
+    } else {
+        links.clone()
+    };
 
     let dispatcher_builder = DispatcherBuilder::new()
         .id(id)
@@ -2993,6 +3007,8 @@ fn build_dispatchers(
             vhost_socket_path: yaml_config.vhost_socket_path.clone(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             cpu_set: dispatcher_config.cpu_set,
+            #[cfg(target_os = "linux")]
+            fanout_enabled,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
@@ -3015,7 +3031,7 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(if candidate_config.tap_mode != TapMode::Local {
+        .src_interface(if cfg!(target_os = "linux") && !fanout_enabled {
             src_link.name.clone()
         } else {
             "".into()
