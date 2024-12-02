@@ -1649,6 +1649,23 @@ inputs:
       #     增加 deepflow-agent 的资源消耗。
       # upgrade_from: static_config.bpf-disabled
       bpf_filter_disabled: false
+      # type: bool
+      # name:
+      #   en: Skip NPB BPF
+      #   ch: 跳过 NPB BPF
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     If the NIC on the data plane has ERSPAN tunnel traffic but does not NPB traffic,
+      #     enable the switch to collect ERSPAN traffic.
+      #   ch: |-
+      #     如果采集网卡中有 ERSPAN 流量但是没有分发流量，开启这个开关来采集 ERSPAN 流量。
+      # upgrade_from: static_config.skip-npb-bpf
+      skip_npb_bpf: false
       # type: section
       # name:
       #   en: Tunning
@@ -2018,13 +2035,14 @@ inputs:
       #   - 2: IPIP
       #   - 3: GRE
       #   - 4: Geneve
+      #   - 5: VXLAN-NSH
       # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
-      #     Decapsulation tunnel protocols.
+      #     Decapsulation tunnel protocols, Only the Enterprise Edition supports decap GRE and VXLAN-NSH.
       #   ch: |-
-      #     deepflow-agent 需要对数据包解封装的隧道协议。
+      #     deepflow-agent 需要对数据包解封装的隧道协议，仅企业版本支持解析 GRE 和 VXLAN-NSH。
       # upgrade_from: decap_type
       tunnel_decap_protocols: [1, 2]
       # type: string
@@ -2039,8 +2057,10 @@ inputs:
       # description:
       #   en: |-
       #     Whether to remove the tunnel header in mirrored traffic.
+      #     Only the Enterprise Edition supports decap ERSPAN and TEB.
       #   ch: |-
       #     流量镜像（虚拟或物理）模式下，deepflow-agent 需要剥离的隧道头协议类型。
+      #     仅企业版支持解析 ERSPAN 和 TEB。
       # upgrade_from: static_config.trim-tunnel-types
       tunnel_trim_protocols: []
 

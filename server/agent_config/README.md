@@ -2421,6 +2421,36 @@ will not use the filtering capabilities of BPF, and will filter by itself after
 capturing full traffic. Note that this may significantly increase the resource
 overhead of deepflow-agent.
 
+#### Skip NPB BPF {#inputs.cbpf.af_packet.skip_npb_bpf}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.skip_npb_bpf`
+
+Upgrade from old version: `static_config.skip-npb-bpf`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      skip_npb_bpf: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+If the NIC on the data plane has ERSPAN tunnel traffic but does not NPB traffic,
+enable the switch to collect ERSPAN traffic.
+
 #### Tunning {#inputs.cbpf.af_packet.tunning}
 
 ##### Socket Version {#inputs.cbpf.af_packet.tunning.socket_version}
@@ -3015,6 +3045,7 @@ inputs:
 | 2 | IPIP |
 | 3 | GRE |
 | 4 | Geneve |
+| 5 | VXLAN-NSH |
 
 **Schema**:
 | Key  | Value                        |
@@ -3023,7 +3054,7 @@ inputs:
 
 **Description**:
 
-Decapsulation tunnel protocols.
+Decapsulation tunnel protocols, Only the Enterprise Edition supports decap GRE and VXLAN-NSH.
 
 #### Tunnel Trim Protocols {#inputs.cbpf.preprocess.tunnel_trim_protocols}
 
@@ -3060,6 +3091,7 @@ inputs:
 **Description**:
 
 Whether to remove the tunnel header in mirrored traffic.
+Only the Enterprise Edition supports decap ERSPAN and TEB.
 
 #### Packet Segmentation Reassembly {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
 
