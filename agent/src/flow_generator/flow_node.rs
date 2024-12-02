@@ -281,19 +281,13 @@ impl FlowNode {
             && flow_key.port_src == meta_lookup_key.src_port
             && flow_key.port_dst == meta_lookup_key.dst_port
         {
-            // l3 protocols, such as icmp, can determine the direction of packets according
-            // to icmp type, so there is no need to correct the direction of packets
-            if meta_lookup_key.is_tcp() || meta_lookup_key.is_udp() {
-                meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
-            }
+            meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
         } else if flow_key.ip_src == meta_lookup_key.dst_ip
             && flow_key.ip_dst == meta_lookup_key.src_ip
             && flow_key.port_src == meta_lookup_key.dst_port
             && flow_key.port_dst == meta_lookup_key.src_port
         {
-            if meta_lookup_key.is_tcp() || meta_lookup_key.is_udp() {
-                meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
-            }
+            meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
         } else {
             return false;
         }
