@@ -33,6 +33,8 @@ use super::{
     recv_engine::{self, bpf, RecvEngine},
     BpfOptions, Options, PacketCounter, Pipeline,
 };
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use recv_engine::af_packet::{bpf::*, BpfSyntax};
 
 use special_recv_engine::Libpcap;
 
@@ -415,6 +417,27 @@ impl BaseDispatcher {
     #[cfg(target_arch = "s390x")]
     fn is_engine_dpdk(&self) -> bool {
         false
+    }
+
+    pub fn add_skip_outgoing(&self) {
+        let mut syntax = vec![
+            BpfSyntax::LoadExtension(LoadExtension {
+                num: Extension::ExtType,
+            }),
+            BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: public::enums::LinuxSllPacketType::Outgoing as u32,
+                skip_true: 1,
+                ..Default::default()
+            }),
+            BpfSyntax::RetConstant(RetConstant { val: 0 }),
+        ];
+
+        self.bpf_options
+            .lock()
+            .unwrap()
+            .bpf_syntax
+            .append(&mut syntax);
     }
 
     pub(super) fn init(&mut self) -> Result<()> {
