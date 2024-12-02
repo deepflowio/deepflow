@@ -188,6 +188,7 @@ enum DecapType {
     DECAP_TYPE_IPIP = 2;
     DECAP_TYPE_TENCENT = 3;
     DECAP_TYPE_GENEVE = 4;
+    DECAP_TYPE_VXLAN_NSH = 5;
 }
 
 enum SystemLoadMetric {
