@@ -330,6 +330,7 @@ pub struct DispatcherConfig {
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
     pub capture_bpf: String,
+    pub skip_npb_bpf: bool,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1636,6 +1637,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.clone(),
                 tap_interface_regex: conf.inputs.cbpf.af_packet.interface_regex.clone(),
+                skip_npb_bpf: conf.inputs.cbpf.af_packet.skip_npb_bpf,
                 if_mac_source: conf.inputs.resources.private_cloud.vm_mac_source.into(),
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.global.communication.ingester_port,
@@ -2599,6 +2601,14 @@ impl ConfigHandler {
                 af_packet.bpf_filter_disabled, new_af_packet.bpf_filter_disabled
             );
             af_packet.bpf_filter_disabled = new_af_packet.bpf_filter_disabled;
+            restart_agent = !first_run;
+        }
+        if af_packet.skip_npb_bpf != new_af_packet.skip_npb_bpf {
+            info!(
+                "Update inputs.cbpf.af_packet.skip_npb_bpf from {:?} to {:?}.",
+                af_packet.skip_npb_bpf, new_af_packet.skip_npb_bpf
+            );
+            af_packet.skip_npb_bpf = new_af_packet.skip_npb_bpf;
             restart_agent = !first_run;
         }
         if af_packet.bond_interfaces != new_af_packet.bond_interfaces {

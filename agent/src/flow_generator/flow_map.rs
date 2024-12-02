@@ -33,6 +33,7 @@ use std::{
 use ahash::AHashMap;
 use log::{debug, warn};
 use lru::LruCache;
+use pnet::packet::icmp::IcmpTypes;
 
 use super::{
     app_table::AppTable,
@@ -1344,6 +1345,10 @@ impl FlowMap {
                 }
             }
             node.tagged_flow.flow.direction_score = direction_score;
+        } else if let ProtocolData::IcmpData(icmp_data) = &meta_packet.protocol_data {
+            if icmp_data.icmp_type == IcmpTypes::EchoReply.0 {
+                node.tagged_flow.flow.reverse(true);
+            }
         }
 
         /*

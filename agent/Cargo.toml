@@ -100,6 +100,7 @@ thiserror = "1.0"
 time = "0.3.9"
 tokio = { version = "1.20.1", features = ["full"] }
 tonic = "0.8.1"
+tunnel = { path = "plugins/tunnel" }
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 zstd = "0.13.2"
