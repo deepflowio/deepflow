@@ -19,8 +19,8 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
-#ifndef DF_USER_UTILS_H
-#define DF_USER_UTILS_H
+#ifndef DF_USER_COMM_UTILS_H
+#define DF_USER_COMM_UTILS_H
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
@@ -72,4 +72,4 @@ do {									\
 	(M)[__idx] &= (~(1 << (__n & __mask)));				\
 } while (0)
 
-#endif /* DF_USER_UTILS_H */
+#endif /* DF_USER_COMM_UTILS_H */

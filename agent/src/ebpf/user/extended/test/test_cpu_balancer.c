@@ -31,7 +31,7 @@
 int main(void)
 {
 	bpf_tracer_init(NULL, true);
-	set_cpu_balancer_nics("p1p1");
+	set_cpu_balancer_nics("p1p1", 4096, "1,2,3", "4,5,6,7");
 	cpu_balancer_start();
 	cpu_balancer_destroy();
 	return 0;

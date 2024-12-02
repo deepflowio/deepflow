@@ -1811,6 +1811,52 @@ int get_nic_ring_size(const char *nic_name, size_t * rx_sz, size_t * tx_sz)
 	return 0;
 }
 
+int set_nic_ring_size(const char *nic_name, size_t rx_sz, size_t tx_sz)
+{
+	int sockfd;
+	struct ifreq ifr;
+	struct ethtool_ringparam ering;
+
+	// Check if at least one of rx_sz or tx_sz is valid (greater than 0)
+	if (rx_sz <= 0 && tx_sz <= 0) {
+		ebpf_warning
+		    ("Error: At least one of rx_sz or tx_sz must be greater than 0.\n");
+		return -1;
+	}
+	// Open a socket for ioctl
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sockfd < 0) {
+		ebpf_warning("Socket creation failed, with %s(%d)\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+	// Prepare the ethtool request
+	memset(&ifr, 0, sizeof(ifr));
+	memset(&ering, 0, sizeof(ering));
+	strncpy(ifr.ifr_name, nic_name, IFNAMSIZ - 1);
+
+	ering.cmd = ETHTOOL_SRingPARAM;
+	ifr.ifr_data = (caddr_t) & ering;
+
+	// Only set rx_sz if it's greater than 0
+	if (rx_sz > 0) {
+		ering.rx_pending = rx_sz;
+	}
+	// Only set tx_sz if it's greater than 0
+	if (tx_sz > 0) {
+		ering.tx_pending = tx_sz;
+	}
+	// Send the ioctl to set ring parameters
+	if (ioctl(sockfd, SIOCETHTOOL, &ifr) == -1) {
+		perror("ioctl failed");
+		close(sockfd);
+		return -1;
+	}
+	// Successfully set the ring sizes
+	close(sockfd);
+	return 0;
+}
+
 int is_promiscuous_mode(const char *nic_name)
 {
 	int sock;

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef DF_COMMON_H
-#define DF_COMMON_H
+#ifndef DF_UTILS_H
+#define DF_UTILS_H
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
@@ -305,4 +305,22 @@ int retrieve_pci_info_by_nic(const char *nic_name, char *pci_device_address,
 int get_nic_channels(const char *nic_name, int *rx_channels, int *tx_channels);
 int get_nic_ring_size(const char *nic_name, size_t * rx_sz, size_t * tx_sz);
 int is_promiscuous_mode(const char *nic_name);
-#endif /* DF_COMMON_H */
+/**
+ * @brief Sets the ring buffer sizes for a specified NIC (Network Interface Card).
+ *
+ * This function adjusts the RX (receive) and TX (transmit) ring sizes for a given NIC. 
+ * It only sets the ring size for RX or TX if the respective size is greater than 0.
+ * If both `rx_sz` and `tx_sz` are 0, the function will not modify any ring sizes.
+ *
+ * @param nic_name The name of the network interface card (e.g., "eth0").
+ * @param rx_sz The size of the receive ring buffer (must be greater than 0 to be set).
+ * @param tx_sz The size of the transmit ring buffer (must be greater than 0 to be set).
+ * 
+ * @return 0 on success, -1 on failure.
+ * 
+ * @note This function uses `ioctl` with the `SIOCETHTOOL` command to set the ring sizes.
+ *       The function will only attempt to modify RX and/or TX ring sizes if the 
+ *       corresponding parameters are greater than 0. If both sizes are 0, no action is taken.
+ */
+int set_nic_ring_size(const char *nic_name, size_t rx_sz, size_t tx_sz);
+#endif /* DF_UTILS_H */

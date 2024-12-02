@@ -54,34 +54,61 @@ void print_cpu_balancer_status(void)
 	//
 }
 
-int set_cpu_balancer_nics(const char *nic_list)
+static inline bool is_invalid_str(char *s)
 {
-	if (nic_list[0] == '\0')
-		return -1;
+	return !(s != NULL && *s != '\0');
+}
 
-	int len = strlen(nic_list) + 1;
-	char *list_tmp = calloc(sizeof(char), len);
-	if (list_tmp == NULL) {
-		cpulb_warning("calloc() failed.\n");
+int set_cpu_balancer_nics(const char *nic_name, size_t ring_size,
+			  const char *nic_cpus, const char *xdp_cpus)
+{
+	if (is_invalid_str(nic_name)) {
+		cpulb_warning("nic_name cannot be empty.\n");
 		return -1;
 	}
 
-	memcpy(list_tmp, nic_list, len);
+	if (ring_size <= 0) {
+		cpulb_warning("ring_size must be greater than 0.\n");
+		return -1;
+	}
+
+	if (is_invalid_str(nic_cpus)) {
+		cpulb_warning("nic_cpus cannot be empty.\n");
+		return -1;
+	}
+
+	if (is_invalid_str(xdp_cpus)) {
+		cpulb_warning("xdp_cpus cannot be empty.\n");
+		return -1;
+	}
+
 	struct cpu_balancer_nic nic;
-	char *token = strtok(list_tmp, ",");
-	while (token != NULL) {
-		memset(&nic, 0, sizeof(nic));
-		char *p = trim(token);
-		snprintf(nic.name, sizeof(nic.name), "%s", p);
-		int ret = VEC_OK;
-		vec_add1(g_cpu_nics, nic, ret);
-		if (ret != VEC_OK) {
-			cpulb_warning("vec add failed.\n");
-		}
-		token = strtok(NULL, ",");
+	memset(&nic, 0, sizeof(nic));
+	snprintf(nic.name, sizeof(nic.name), "%s", nic_name);
+	nic.ring_size = ring_size;
+	int len = strlen(nic_cpus) + 1;
+	nic.nic_cpus = malloc(len);
+	if (nic.nic_cpus == NULL) {
+		cpulb_warning("malloc() failed.\n");
+		return -1;
+	}
+	snprintf(nic.nic_cpus, len, "%s", nic_cpus);
+
+	len = strlen(xdp_cpus) + 1;
+	nic.xdp_cpus = malloc(len);
+	if (nic.xdp_cpus == NULL) {
+		free(nic.nic_cpus);
+		cpulb_warning("malloc() failed.\n");
+		return -1;
+	}
+	snprintf(nic.xdp_cpus, len, "%s", xdp_cpus);
+
+	int ret = VEC_OK;
+	vec_add1(g_cpu_nics, nic, ret);
+	if (ret != VEC_OK) {
+		cpulb_warning("vec add failed.\n");
 	}
 
-	free(list_tmp);
 	return 0;
 }
 
@@ -103,8 +130,9 @@ static int release_cpu_balancer(struct bpf_tracer *tracer)
 	return ETR_OK;
 }
 
-static void print_nic_info(struct cpu_balancer_nic *nic)
+static void configure_nic_cpu_balance(struct cpu_balancer_nic *nic)
 {
+	
 	retrieve_pci_info_by_nic(nic->name, nic->pci_device_address,
 				 nic->driver, &nic->numa_node);
 	get_nic_channels(nic->name, &nic->rx_channels, &nic->tx_channels);
@@ -112,10 +140,11 @@ static void print_nic_info(struct cpu_balancer_nic *nic)
 	nic->promisc = is_promiscuous_mode(nic->name);
 	cpulb_info("Device:%-8s Address:%-14s Driver:%-8s "
 		   "Rx-Channels:%-4d Tx-Channels:%-4d RX-Ring-Size:%-5ld TX-Ring-Size:%-5ld "
-		   "PROMISC:%-3d NumaNode:%d\n",
+		   "PROMISC:%-3d NumaNode:%-3d Nic-CPUs:%s XDP-CPUs:%s\n",
 		   nic->name, nic->pci_device_address, nic->driver,
 		   nic->rx_channels, nic->tx_channels, nic->rx_ring_size,
-		   nic->tx_ring_size, nic->promisc, nic->numa_node);
+		   nic->tx_ring_size, nic->promisc, nic->numa_node,
+		   nic->nic_cpus, nic->xdp_cpus);
 
 #ifdef PRINT_PCI_INFO
 	int ret;
@@ -162,7 +191,7 @@ int cpu_balancer_start(void)
 
 	struct cpu_balancer_nic *nic_p;
 	vec_foreach(nic_p, g_cpu_nics) {
-		print_nic_info(nic_p);
+		configure_nic_cpu_balance(nic_p);
 	}
 
 	char bpf_load_buffer_name[NAME_LEN];
@@ -211,6 +240,14 @@ int cpu_balancer_destroy(void)
 
 	release_bpf_tracer(tracer_name);
 	g_tracer = NULL;
+
+	struct cpu_balancer_nic *nic_p;
+	vec_foreach(nic_p, g_cpu_nics) {
+		if (nic_p->nic_cpus)
+			free(nic_p->nic_cpus);
+		if (nic_p->xdp_cpus)
+			free(nic_p->xdp_cpus);
+	}
 
 	vec_free(g_cpu_nics);
 	return 0;
