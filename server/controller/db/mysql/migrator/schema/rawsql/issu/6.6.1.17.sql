@@ -1,0 +1,21 @@
+-- Tractions are needed for these commands to avoid manual rollback if error occurs.
+START TRANSACTION;
+-- modify start, add upgrade sql
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: tag.type = device_ip_connection', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.count\",\"METRIC_NAME\":\"metrics.count\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Sum\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Sum(metrics.count)\",\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.count)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[{\"key\":\"tag.type\",\"op\":\"=\",\"val\":[\"device_ip_connection\"]}],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_relation_exception\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.count`) AS `Sum(metrics.count)`\",\"WHERE\":\"`tag.type`=\'device_ip_connection\'\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"Sum(`metrics.count`) AS `Sum(metrics.count)`\"]}]}',
+    '云资源关联关系异常 (实例与IP)',  0, 1, 1, 1, '{\"displayName\":\"Sum(metrics.count)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":1}', @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: tag.type = chost_pod_node_connection', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.count\",\"METRIC_NAME\":\"metrics.count\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Sum\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Sum(metrics.count)\",\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.count)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[{\"key\":\"tag.type\",\"op\":\"=\",\"val\":[\"chost_pod_node_connection\"]}],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_relation_exception\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.count`) AS `Sum(metrics.count)`\",\"WHERE\":\"`tag.type`=\'chost_pod_node_connection\'\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"Sum(`metrics.count`) AS `Sum(metrics.count)`\"]}]}',
+    '云资源关联关系异常 (云服务器与容器节点)',  0, 1, 1, 1, '{\"displayName\":\"Sum(metrics.count)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":1}', @lcuuid);
+-- update db_version to latest, remember update DB_VERSION_EXPECTED in migration/version.go
+UPDATE db_version SET version='6.6.1.17';
+-- modify end
+
+COMMIT;
