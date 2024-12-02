@@ -32,14 +32,6 @@ global:
     max_millicpus: 1000
     # type: int
     # name:
-    #   en: CPU Limit (Cores)
-    #   ch: CPU 限制 (Cores)
-    # upgrade_from: max_cpus
-    # deprecated: true
-    # TODO: 此配置项与 max_millicpus 合并
-    max_cpus: 1
-    # type: int
-    # name:
     #   en: Memory Limit
     #   ch: 内存限制
     # unit: MiB
@@ -101,7 +93,6 @@ global:
     #   ch: |-
     #     用于 deepflow-agent 控制自身运行日志在本地的留存时长。
     # upgrade_from: log_retention
-    # TODO: 以前的单位是天，改为 duration
     local_log_retention: 300d
   # type: section
   # name:
@@ -316,21 +307,20 @@ global:
       #     When the outbound throughput of the NPB interface reaches or exceeds
       #     the threshold, the broker will be stopped, after that the broker will
       #     be resumed if the throughput is lower than
-      #     `(trigger_threshold - outputs.npb.max_npb_throughput)*90%`
+      #     `(trigger_threshold - outputs.npb.max_tx_throughput)*90%`
       #     within 5 consecutive monitoring intervals.
       #
       #     Attention: When configuring this value, it must be greater than
-      #     `outputs.npb.max_npb_throughput`. Set to 0 will disable this feature.
+      #     `outputs.npb.max_tx_throughput`. Set to 0 will disable this feature.
       #   ch: |-
       #     如果流量分发所用网络接口的出方向吞吐量达到或超出此阈值，deepflow-agent 停止流量
       #     分发；如果该网络接口的出方向吞吐量连续 5 个监控周期低于`(trigger_threshold -
-      #     outputs.npb.max_npb_throughput)*90%`，deepflow-agent 恢复流量分发。
+      #     outputs.npb.max_tx_throughput)*90%`，deepflow-agent 恢复流量分发。
       #
       #     注意：
       #     1. 取值为 0 时，该特性不生效；
-      #     2. 若取非 0 值，必须大于 `max_npb_throughput`。
+      #     2. 若取非 0 值，必须大于 `max_tx_throughput`。
       # upgrade_from: max_tx_bandwidth
-      # TODO: 待核实————‘outputs.npb.max_npb_throughput’是否存在？
       trigger_threshold: 0
       # type: duration
       # name:
@@ -347,7 +337,6 @@ global:
       #   ch: |-
       #     deepflow-agent 对流量分发所使用网络接口的出方向吞吐量指标的监控周期。
       # upgrade_from: bandwidth_probe_interval
-      # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
       throughput_monitoring_interval: 10s
   # type: section
   # name:
@@ -369,21 +358,20 @@ global:
     # description:
     #   en: |-
     #     CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-    #     without being migrated to other processors. Example:
+    #     without being migrated to other processors. Invalid ID will be ignored. Example:
     #     ```yaml
     #     global:
     #       tunning:
     #         cpu_affinity: [1, 3, 5, 7, 9]
     #     ```
     #   ch: |-
-    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。举例：
+    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。举例：
     #     ```yaml
     #     global:
     #       tunning:
     #         cpu_affinity: [1, 3, 5, 7, 9]
     #     ```
     # upgrade_from: static_config.cpu-affinity
-    # TODO: （1）CPU 亲和性是操作系统的行为还是deepflow-agent的行为？（2）如果配置的ID不存在会有什么影响？
     cpu_affinity: []
     # type: int
     # name:
@@ -418,8 +406,7 @@ global:
     #   ch: |-
     #     开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
     # upgrade_from: static_config.memory-trim-disabled
-    # TODO: 注意换成了正向的开关，字面值变了但默认行为没变
-    idle_memory_trimming: false
+    idle_memory_trimming: true
     # type: duration
     # name:
     #   en: Resource Monitoring Interval
@@ -472,7 +459,6 @@ global:
     #   ch: |-
     #     deepflow-agent 是否向 deepflow-server 做 NTP 同步的开关。
     # upgrade_from: ntp_enabled
-    # TODO: 原来是 int，需要改为 bool
     enabled: false
     # type: duration
     # name:
@@ -532,7 +518,6 @@ global:
     #   ch: |-
     #     deepflow-agent 以设置的时间间隔周期性向 deepflow-server 请求配置数据和标签信息。
     # upgrade_from: sync_interval
-    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
     proactive_request_interval: 60s
     # type: duration
     # name:
@@ -552,7 +537,6 @@ global:
     #     `最大逃逸时长`是指 deepflow-agent 与 deepflow-server 失联后，自主运行的最长
     #     时间；超过该时长后，仍未与 server 恢复联系，agent 自动进入 disabled 状态。
     # upgrade_from: max_escape_seconds
-    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
     max_escape_duration: 3600s
     # type: ip
     # name:
@@ -667,7 +651,6 @@ global:
     #   ch: |-
     #     TODO
     # upgrade_from: nat_ip_enabled
-    # TODO: 原来是 int，需要改为 bool
     # TODO: 待明确与 controller_ip 的关系。
     request_via_nat_ip: false
   # type: section
@@ -733,7 +716,6 @@ global:
       #   ch: |-
       #     开启后，deepflow-agent 将向 deepflow-server 回传运行日志。
       # upgrade_from: rsyslog_enabled
-      # TODO: 原来是 int，需要改为 bool
       log_backhaul_enabled: true
     # type: section
     # name:
@@ -790,13 +772,12 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Default value `0` means use a random client port number.
+      #     Default value `0` means use a random listen port number.
       #     Only available for Trident (Golang version of Agent).
       #   ch: |-
       #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。用于配置
       #     trident 用于诊断的 UDP 监听端口，默认值为 0 ，表示使用随机的端口。
       # upgrade_from: static_config.debug-listen-port
-      # TODO: trident主动监听？英文中描述是“client port number”，感觉不太对。
       local_udp_port: 0
       # type: bool
       # name:
@@ -859,7 +840,6 @@ global:
     #     不同的数据文件，每种数据最多可产生 2 个数据文件。
     # upgrade_from: static_config.standalone-data-file-size
     # TODO: 独立运行模式下，该参数配置在 server 端如何下发到采集器上呢？
-    # TODO: 增加了最小、最大值
     max_data_file_size: 200
     # type: string
     # name:
@@ -939,7 +919,6 @@ inputs:
     #   ch: |-
     #     进程和 Socket 信息同步的时间周期。
     # upgrade_from: static_config.os-proc-socket-sync-interval
-    # TODO: 从数字改为了 duration，增加了最小、最大值
     sync_interval: 10s
     # type: duration
     # name:
@@ -952,12 +931,10 @@ inputs:
     # ee_feature: false
     # description:
     #   en: |-
-    #     Socket and Process uptime threshold
+    #     Socket and Process will not be reported if their uptime is lower than this threshold.
     #   ch: |-
-    #     如果进程的活跃时间低于该参数值，deepflow-agent 将不上报该进程的信息。
+    #     如果接口或进程的活跃时间低于该参数值，deepflow-agent 将不上报该接口或进程的信息。
     # upgrade_from: static_config.os-proc-socket-min-lifetime
-    # TODO: 从数字改为了 duration，增加了最小、最大值
-    # TODO: lifetime 是否同样对 socket 信息有效？【是的】
     min_lifetime: 3s
     # type: section
     # name:
@@ -1150,7 +1127,6 @@ inputs:
     # description:
     #   en: |-
     #     Default value `[]` match all usernames.
-    # TODO: 6.6 新增
     # ---
     # match_usernames: []
     # ---
@@ -1166,7 +1142,6 @@ inputs:
     # description:
     #   en: |-
     #     Default value true means only match processes in container.
-    # TODO: 6.6 新增
     # ---
     # only_in_container: true
     # ---
@@ -1183,7 +1158,6 @@ inputs:
     #   en: |-
     #     Default value false means match processes with or without tags.
     # upgrade_from: static_config.os-proc-sync-tagged-only
-    # TODO: 放到内层来来了
     # ---
     # only_with_tag: false
     # ---
@@ -1200,7 +1174,6 @@ inputs:
     #   en: |-
     #     Whether to ingore matched processes..
     # upgrade_from: static_config.os-proc-regex.action
-    # TODO: 注意类型变成了 bool
     # ---
     # ignore: false
     # ---
@@ -1247,7 +1220,6 @@ inputs:
     #   en: |-
     #     Enabled feature list.
     # upgrade_from: static_config.ebpf.on-cpu-profile.regex, static_config.ebpf.off-cpu-profile.regex
-    # TODO: 注意功能升级
     # ---
     # enabled_features: []
     process_matcher:
@@ -1375,7 +1347,6 @@ inputs:
         #     当 deepflow-agent 在 Java 进程的函数调用栈中发现未能解析的函数名时，将触发进程函数符号表的再生成
         #     过程，而由于 Java 使用了 JIT 编译机制，符号表的再生成过程将延迟一定的时间。
         #
-        #     TODO
         # upgrade_from: static_config.ebpf.java-symbol-file-refresh-defer-interval
         # TODO: 待确认——该 duration 是否用于控制符号表再生成的延迟时间？
         refresh_defer_duration: 60s
@@ -1524,7 +1495,7 @@ inputs:
       #   en: |-
       #     The slave interfaces of one bond interface.
       #   ch: |-
-      #     TODO
+      #     Bond 网卡的从网卡列表。
       # upgrade_from: static_config.tap-interface-bond-groups.tap-interfaces
       # TODO: 待理解场景。
       # ---
@@ -1591,7 +1562,6 @@ inputs:
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.mirror-traffic-pcp
-      # TODO: 名字中是pap，是否是笔误？
       # TODO: 用途待明确，英文内容不是很理解。
       vlan_pcp_in_physical_mirror_traffic: 0
       # type: bool
@@ -1659,7 +1629,6 @@ inputs:
         #   ch: |-
         #     `本地流量`和`虚拟网络镜像`模式下，需开启此开关，并配置 `afpacket-blocks` 参数。
         # upgrade_from: static_config.afpacket-blocks-enabled
-        # TODO: capture_mode != 2，是否必须开启此开关，并配置'afpacket-blocks'参数？
         ring_blocks_enabled: false
         # type: int
         # name: Ring Blocks
@@ -1677,8 +1646,6 @@ inputs:
         #     配置此参数后，deepflow-agent 将分配指定数量的 block 用于 AF_PACKET，每个 block 的
         #     大小固定为 1 MByte。
         # upgrade_from: static_config.afpacket-blocks
-        # TODO: 以前的最大值不限制，现在增加了 1000000 的限制
-        # TODO: 待确认中英文描述
         ring_blocks: 128
         # type: int
         # name:
@@ -1692,8 +1659,8 @@ inputs:
         # description:
         #   en: |-
         #     The configuration takes effect when capture_mode is 0 and extra_netns_regex is null,
-        #     PACKET_FANOUT is to enable load balancing and parallel processing, which can improve
-        #     the performance and scalability of network applications. When the `local-dispatcher-count`
+        #     PACKET_FANOUT is to enable load balancing and parallel processing, scaling dispatcher for
+        #     better performance of handling network applications. When the `local-dispatcher-count`
         #     is greater than 1, multiple dispatcher threads will be launched, consuming more CPU and
         #     memory. Increasing the `local-dispatcher-count` helps to reduce the operating system's
         #     software interrupts on multi-core CPU servers.
@@ -1701,13 +1668,11 @@ inputs:
         #     Attention: only valid for `traffic_capture_mode` = Local
         #   ch: |-
         #     数据包 Fanout 的路数大于 1 时，deepflow-agent 将开启多个 dispatcher 线程，并把数据包分散到多个处理
-        #     线程并行处理，以优化应用的的性能和弹性。增加`packet_fanout_count`可以降低多核服务器的操作系统软中断数
-        #     量，但会消耗更多的 CPU 和内存。
+        #     线程并行处理，弹性扩展 dispatcher 以优化网络应用的处理性能。增加`packet_fanout_count`可以降低
+        #     多核服务器的操作系统软中断数量，但会消耗更多的 CPU 和内存。
         #
         #     注意：参数仅在`capture_mode`为 0，且`extra_netns_regex`为空时有效。
         # upgrade_from: static_config.local-dispatcher-count
-        # TODO: 【待确定】另外以前没有最大值，现在加上了 64 的限制
-        # TODO: 提升什么的性能和弹性？application or agent ？
         packet_fanout_count: 1
         # type: int
         # name:
@@ -1902,13 +1867,16 @@ inputs:
       # ee_feature: true
       # description:
       #   en: |-
+      #     In analyzer mode, raw packets will go through a queue before being processed.
+      #     To avoid memory allocation for each packet, a memory block of size
+      #     raw_packet_buffer_block_size is allocated for multiple packets.
       #     Larger value will reduce memory allocation for raw packet, but will also
       #     delay memory free.
       #   ch: |-
-      #     TODO
+      #     Analyzer 模式下采集到的包进入队列前需要分配内存暂存。为避免每个包进行内存申请，每次开辟
+      #     raw_packet_buffer_block_size 大小的内存块给数个包使用。
+      #     更大的配置可以减少内存分配，但会延迟内存释放。
       # upgrade_from: static_config.analyzer-raw-packet-block-size
-      # TODO: 以前没有限定最大值，此次加了最大值
-      # TODO: 待明确中文释义。
       raw_packet_buffer_block_size: 65536
       # type: int
       # name:
@@ -1926,9 +1894,11 @@ inputs:
       #     - 0.2-packet-to-flowgenerator
       #     - 0.3-packet-to-pipeline
       #   ch: |-
-      #     TODO
+      #     以下队列的长度（仅在 capture_mode = 2 时有效）：
+      #     - 0.1-bytes-to-parse
+      #     - 0.2-packet-to-flowgenerator
+      #     - 0.3-packet-to-pipeline
       # upgrade_from: static_config.analyzer-queue-size
-      # TODO: 待明确中文释义。
       raw_packet_queue_size: 131072
       # type: int
       # name:
@@ -1988,9 +1958,8 @@ inputs:
       #   en: |-
       #     Whether to remove the tunnel header in mirrored traffic.
       #   ch: |-
-      #     流量镜像模式下，deepflow-agent 需要剥离的隧道头协议类型。
+      #     流量镜像（虚拟或物理）模式下，deepflow-agent 需要剥离的隧道头协议类型。
       # upgrade_from: static_config.trim-tunnel-types
-      # TODO: “虚拟网络镜像”、“物理网络镜像”是否均适用？【是的】
       tunnel_trim_protocols: []
 
       # type: int
@@ -2004,7 +1973,7 @@ inputs:
       # ee_feature: true
       # description:
       #   en: |-
-      #     TODO
+      #     Consecutive TCP packets will be aggregated together for application log parsing.
       #   ch: |-
       #     开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
       # upgrade_from: static_config.packet-segmentation-reassembly
@@ -2680,7 +2649,7 @@ inputs:
         #   en: DWARF unwinding process map size
         #   ch: DWARF 回溯进程表容量
         # unit:
-        # range: []
+        # range: [1, 131072]
         # enum_options: []
         # modification: hot_update
         # ee_feature: false
@@ -2702,7 +2671,7 @@ inputs:
         #   en: DWARF unwinding shard map size
         #   ch: DWARF 回溯分片表容量
         # unit:
-        # range: []
+        # range: [1, 4096]
         # enum_options: []
         # modification: hot_update
         # ee_feature: false
