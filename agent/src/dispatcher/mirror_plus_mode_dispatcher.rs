@@ -79,11 +79,16 @@ impl MirrorPlusModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, trident_type: TridentType) {
+    pub fn on_tap_interface_change(
+        &self,
+        links: &[Link],
+        _: IfMacSource,
+        trident_type: TridentType,
+    ) {
         let mut old_trident_type = self.trident_type.write().unwrap();
         *old_trident_type = trident_type;
         self.base
-            .on_tap_interface_change(vec![], IfMacSource::IfMac);
+            .on_tap_interface_change(links.to_vec(), IfMacSource::IfMac);
     }
 
     pub fn on_vm_change_with_bridge_macs(

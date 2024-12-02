@@ -83,9 +83,9 @@ impl AnalyzerModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource) {
+    pub fn on_tap_interface_change(&self, links: &[Link], _: IfMacSource) {
         self.base
-            .on_tap_interface_change(vec![], IfMacSource::IfMac);
+            .on_tap_interface_change(links.to_vec(), IfMacSource::IfMac);
     }
 
     pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr], gateway_vmac_addrs: &[MacAddr]) {
@@ -609,6 +609,10 @@ impl AnalyzerModeDispatcher {
                 if_index: 0,
             };
             batch.push(info);
+
+            drop(packet);
+
+            base.check_and_update_bpf();
         }
         if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
