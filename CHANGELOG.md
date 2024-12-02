@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: TODOs in agent config [#8590](https://github.com/deepflowio/deepflow/pull/8590) by [rvql](https://github.com/rvql)
 * fix: trim-tunnel-type has not taken effect [#8577](https://github.com/deepflowio/deepflow/pull/8577) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the policy does not check memory in analyzer mode [#8540](https://github.com/deepflowio/deepflow/pull/8540) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: eBPF SELinux permission-related exit [#8534](https://github.com/deepflowio/deepflow/pull/8534) by [yinjiping](https://github.com/yinjiping)
@@ -245,6 +246,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feature: adds system alarm of recorder cleaner [#8565](https://github.com/deepflowio/deepflow/pull/8565) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - eBPF Supplement the DPDK configuration description [#8543](https://github.com/deepflowio/deepflow/pull/8543) by [yinjiping](https://github.com/yinjiping)
 * feat: add offset attribute to IO event [#8537](https://github.com/deepflowio/deepflow/pull/8537) by [lzf575](https://github.com/lzf575)
 * feat: Add offset in IoEvent [#8532](https://github.com/deepflowio/deepflow/pull/8532) by [rvql](https://github.com/rvql)
