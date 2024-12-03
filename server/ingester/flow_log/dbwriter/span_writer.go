@@ -27,7 +27,6 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/tracetree"
-	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (
@@ -42,7 +41,8 @@ func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		t.TraceId,
 		t.TraceIdIndex,
-		utils.String(t.EncodedSpan),
+		// need to copy it first when writing, otherwise if the memory is released after writing to the CK Block before it is sent to clickhouse, it will cause problems.
+		string(t.EncodedSpan),
 	)
 }
 
