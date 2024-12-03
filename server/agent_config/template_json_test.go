@@ -665,7 +665,7 @@ outputs:
 		t.Run(tt.name, func(t *testing.T) {
 			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 			dataFmt := NewDataFommatter()
-			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}
 			err := dataFmt.dictValueToString(dataFmt.mapData, "", keyToComment)
@@ -730,7 +730,7 @@ outputs:
 		t.Run(tt.name, func(t *testing.T) {
 			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 			dataFmt := NewDataFommatter()
-			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}
 			err := dataFmt.stringToDictValue(dataFmt.mapData, "", keyToComment)
@@ -794,10 +794,10 @@ outputs:
 		t.Run(tt.name, func(t *testing.T) {
 			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 			dataFmt := NewDataFommatter()
-			if err := dataFmt.Init(tt.args.yamlData); err != nil {
+			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}
-			got, err := dataFmt.ConvertToJSON(keyToComment)
+			got, err := dataFmt.mapToJSON(keyToComment)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataConvertToJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1047,7 +1047,7 @@ func TestConvertJSONToYAMLAndValidate(t *testing.T) {
 			want: []byte(`inputs:
   resources:
     kubernetes:
-      api_resources: 
+      api_resources:
         - name: namespaces
         - name: nodes
 `),
@@ -1113,10 +1113,50 @@ func TestConvertJSONToYAMLAndValidate(t *testing.T) {
 			want:    []byte(``),
 			wantErr: true,
 		},
+		{
+			name: "case06",
+			args: args{
+				jsonData: map[string]interface{}{
+					"processors": map[string]interface{}{
+						"flow_log": map[string]interface{}{
+							"tunning": map[string]interface{}{
+								"concurrent_flow_limit": 63000000,
+							},
+						},
+					},
+				},
+			},
+			want: []byte(`processors:
+  flow_log:
+    tunning:
+      concurrent_flow_limit: 63000000
+`),
+			wantErr: false,
+		},
+		{
+			name: "case07",
+			args: args{
+				jsonData: map[string]interface{}{
+					"inputs": map[string]interface{}{
+						"resources": map[string]interface{}{
+							"kubernetes": map[string]interface{}{
+								"kubernetes_namespace": "111",
+							},
+						},
+					},
+				},
+			},
+			want: []byte(`inputs:
+  resources:
+    kubernetes:
+      kubernetes_namespace: "111"
+`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
-		// if tt.name != "case03" {
-		//     continue
+		// if tt.name != "case02" {
+		// 	continue
 		// }
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ConvertJSONToYAMLAndValidate(tt.args.jsonData)
