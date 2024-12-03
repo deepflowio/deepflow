@@ -960,7 +960,7 @@ mod tests {
 
             let config = LogParserConfig {
                 l7_log_dynamic: L7LogDynamicConfig::new(
-                    "".to_owned(),
+                    vec![],
                     vec![],
                     vec![
                         TraceType::Customize("EagleEye-TraceID".to_string()),
@@ -1060,7 +1060,7 @@ mod tests {
 
         let config = LogParserConfig {
             l7_log_dynamic: L7LogDynamicConfig::new(
-                "".to_owned(),
+                vec![],
                 vec![],
                 vec![
                     TraceType::Customize("EagleEye-TraceID".to_string()),

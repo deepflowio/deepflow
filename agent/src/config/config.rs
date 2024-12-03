@@ -344,21 +344,6 @@ where
     Ok(s.as_str().into())
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub enum ProcessMatchAction {
-    Accept,
-    Drop,
-}
-
-impl From<&str> for ProcessMatchAction {
-    fn from(value: &str) -> Self {
-        match value {
-            OS_PROC_REGEXP_MATCH_ACTION_DROP => ProcessMatchAction::Drop,
-            _ => ProcessMatchAction::Accept,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 pub struct ProcessMatcher {
@@ -373,7 +358,6 @@ pub struct ProcessMatcher {
     pub ignore: bool,
     pub rewrite_name: String,
     pub enabled_features: Vec<String>,
-    pub action: ProcessMatchAction,
 }
 
 impl Eq for ProcessMatcher {}
@@ -389,7 +373,6 @@ impl PartialEq for ProcessMatcher {
             && self.ignore == other.ignore
             && self.rewrite_name == other.rewrite_name
             && self.enabled_features == other.enabled_features
-            && self.action == other.action
     }
 }
 
@@ -411,20 +394,15 @@ where
 impl Default for ProcessMatcher {
     fn default() -> Self {
         Self {
-            match_regex: Regex::new("deepflow-.*").unwrap(),
-            match_type: ProcessMatchType::Cmd,
+            match_regex: Regex::new("").unwrap(),
+            match_type: "".into(),
             match_languages: vec![],
             match_usernames: vec![],
-            only_in_container: false,
+            only_in_container: true,
             only_with_tag: false,
             ignore: false,
             rewrite_name: "".to_string(),
-            enabled_features: vec![
-                "ebpf.profile.on_cpu".to_string(),
-                "ebpf.profile.off_cpu".to_string(),
-                "proc.gprocess_info".to_string(),
-            ],
-            action: ProcessMatchAction::Accept,
+            enabled_features: vec![],
         }
     }
 }
@@ -456,22 +434,22 @@ impl ProcessMatcher {
         let Ok(mut process_data) = ProcessData::try_from(process) else {
             return None;
         };
-        let mut match_replace_fn =
-            |reg: &Regex, act: &ProcessMatchAction, s: &String, replace: &String| {
-                if reg.is_match(s.as_str()) {
-                    if act == &ProcessMatchAction::Accept && !replace.is_empty() {
-                        process_data.name = reg.replace_all(s.as_str(), replace).to_string();
-                    }
-                    true
-                } else {
-                    false
+        let mut match_replace_fn = |reg: &Regex, ignored: bool, s: &String, replace: &String| {
+            if reg.is_match(s.as_str()) {
+                if !ignored && !replace.is_empty() {
+                    process_data.name = reg.replace_all(s.as_str(), replace).to_string();
                 }
-            };
+                true
+            } else {
+                false
+            }
+        };
+
         let replace = env_rewrite(self.rewrite_name.clone());
 
         match self.match_type {
             ProcessMatchType::Cmd => {
-                if match_replace_fn(&self.match_regex, &self.action, &process_data.cmd, &replace) {
+                if match_replace_fn(&self.match_regex, self.ignore, &process_data.cmd, &replace) {
                     Some(process_data)
                 } else {
                     None
@@ -480,7 +458,7 @@ impl ProcessMatcher {
             ProcessMatchType::CmdWithArgs => {
                 if match_replace_fn(
                     &self.match_regex,
-                    &self.action,
+                    self.ignore,
                     &process_data.cmd_with_args.join(" "),
                     &replace,
                 ) {
@@ -492,7 +470,7 @@ impl ProcessMatcher {
             ProcessMatchType::ProcessName => {
                 if match_replace_fn(
                     &self.match_regex,
-                    &self.action,
+                    self.ignore,
                     &process_data.process_name,
                     &replace,
                 ) {
@@ -610,7 +588,16 @@ impl Default for Proc {
             sync_interval: Duration::from_secs(10),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
-            process_matcher: vec![ProcessMatcher::default()],
+            process_matcher: vec![ProcessMatcher {
+                match_regex: Regex::new("deepflow-.*").unwrap(),
+                only_in_container: false,
+                enabled_features: vec![
+                    "ebpf.profile.on_cpu".to_string(),
+                    "ebpf.profile.off_cpu".to_string(),
+                    "proc.gprocess_info".to_string(),
+                ],
+                ..Default::default()
+            }],
             symbol_table: SymbolTable::default(),
         }
     }
@@ -1466,7 +1453,6 @@ where
 pub struct TcpHeader {
     pub block_size: usize,
     pub sender_queue_size: usize,
-    pub sender_queue_count: usize,
     #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub header_fields_flag: u8,
 }
@@ -1476,7 +1462,6 @@ impl Default for TcpHeader {
         Self {
             block_size: 256,
             sender_queue_size: 65536,
-            sender_queue_count: 1,
             header_fields_flag: 0b0000_0000,
         }
     }
@@ -1681,8 +1666,8 @@ impl Default for Timeouts {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TracingTag {
-    pub http_real_client: String,
-    pub x_request_id: String,
+    pub http_real_client: Vec<String>,
+    pub x_request_id: Vec<String>,
     pub apm_trace_id: Vec<String>,
     pub apm_span_id: Vec<String>,
 }
@@ -1690,8 +1675,8 @@ pub struct TracingTag {
 impl Default for TracingTag {
     fn default() -> Self {
         Self {
-            http_real_client: "X_Forwarded_For".to_string(),
-            x_request_id: "X_Request_ID".to_string(),
+            http_real_client: vec!["X_Forwarded_For".to_string()],
+            x_request_id: vec!["X_Request_ID".to_string()],
             apm_trace_id: vec!["traceparent".to_string(), "sw8".to_string()],
             apm_span_id: vec!["traceparent".to_string(), "sw8".to_string()],
         }
@@ -2324,14 +2309,12 @@ impl Default for Throttles {
 #[serde(default)]
 pub struct OutputsFlowLogTunning {
     pub collector_queue_size: usize,
-    pub collector_queue_count: usize,
 }
 
 impl Default for OutputsFlowLogTunning {
     fn default() -> Self {
         Self {
             collector_queue_size: 65536,
-            collector_queue_count: 1,
         }
     }
 }
@@ -2370,14 +2353,12 @@ impl Default for FlowMetricsFilters {
 #[serde(default)]
 pub struct FlowMetricsTunning {
     pub sender_queue_size: usize,
-    pub sender_queue_count: usize,
 }
 
 impl Default for FlowMetricsTunning {
     fn default() -> Self {
         Self {
             sender_queue_size: 65536,
-            sender_queue_count: 1,
         }
     }
 }
@@ -3540,8 +3521,6 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_pro
 pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS: &'static str = "cmdline_with_args";
 
-pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
-pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
 // use for proc scan match and replace
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
@@ -5285,21 +5264,18 @@ log_backhaul_enabled: false
         let yaml = r#"
 block_size: 512
 sender_queue_size: 131072
-sender_queue_count: 2
 header_fields_flag: "0b1010_1010"
 "#;
         let tcp_header: TcpHeader = serde_yaml::from_str(yaml).unwrap();
 
         assert_eq!(tcp_header.block_size, 512);
         assert_eq!(tcp_header.sender_queue_size, 131072);
-        assert_eq!(tcp_header.sender_queue_count, 2);
         assert_eq!(tcp_header.header_fields_flag, 0b1010_1010);
 
         // Test with decimal input for header_fields_flag
         let yaml = r#"
 block_size: 256
 sender_queue_size: 65536
-sender_queue_count: 1
 header_fields_flag: "170"
 "#;
         let tcp_header: TcpHeader = serde_yaml::from_str(yaml).unwrap();
@@ -5310,7 +5286,6 @@ header_fields_flag: "170"
         let yaml_invalid = r#"
 block_size: 256
 sender_queue_size: 65536
-sender_queue_count: 1
 header_fields_flag: "invalid"
 "#;
         let result: Result<TcpHeader, _> = serde_yaml::from_str(yaml_invalid);

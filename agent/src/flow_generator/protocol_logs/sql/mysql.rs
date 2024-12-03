@@ -1277,7 +1277,7 @@ mod tests {
         ];
         let mut info = MysqlInfo::default();
         let config = L7LogDynamicConfig::new(
-            "".to_owned(),
+            vec![],
             vec![],
             vec![
                 TraceType::TraceParent,
