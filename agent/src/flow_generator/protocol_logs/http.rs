@@ -1402,7 +1402,7 @@ impl HttpLog {
                 info.x_request_id_1 = val.to_owned();
             }
         }
-        if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
+        if direction == PacketDirection::ClientToServer && config.proxy_client.contains(key) {
             info.client_ip = Some(val.to_owned());
         }
 
@@ -1733,7 +1733,7 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let config = L7LogDynamicConfig::new(
-            "x-forwarded-for".to_owned(),
+            vec!["x-forwarded-for".to_owned()],
             vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],

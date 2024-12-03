@@ -3667,7 +3667,7 @@ processors:
       #   en: Fast-path Map Size
       #   ch: Fast-path 字典大小
       # unit:
-      # range: []
+      # range: [0, 10000000]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
@@ -3675,10 +3675,11 @@ processors:
       #   en: |-
       #     When set to 0, deepflow-agent will automatically adjust the map size
       #     according to max_memory.
+      #     Note: In practice, it should not be set to less than 8000.
       #   ch: |-
       #     设置为`0`时，deepflow-agent 根据 `max_memory` 参数自动调整 Fast-path 字典大小。
+      #     注意：实践中不应配置小于 8000 的值。
       # upgrade_from: static_config.fast-path-map-size
-      # TODO: 需要确认允许的范围
       fast_path_map_size: 0
       # type: bool
       # name:
@@ -3776,23 +3777,6 @@ processors:
       # TODO: 增加了最大值
       # TODO: 该参数在什么样情况下需要调整呢？
       sender_queue_size: 65536
-      # type: int
-      # name:
-      #   en: Sender Queue Count
-      #   ch: Sender 队列数量
-      # unit:
-      # range: [1, 64]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: true
-      # description:
-      #   en: |-
-      #     The number of replicas for each output queue of the PacketSequence.
-      #   ch: |-
-      #     TCP 包时序数据发送队列的数量。
-      # upgrade_from: static_config.packet-sequence-queue-count
-      # TODO: 增加了最大值
-      sender_queue_count: 1
       # type: int
       # name:
       #   en: Header Fields Flag
@@ -3976,7 +3960,6 @@ processors:
       #     协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
       # upgrade_from: static_config.l7-protocol-inference-max-fail-count
       # TODO: Function Data 也能用于识别协议类型吗？
-      # TODO: 增加了最小、最大值
       inference_max_retries: 5
       # type: duration
       # name:
@@ -3998,7 +3981,6 @@ processors:
       #     后续数据的应用协议采集过程。为避免误判，应用协议类型的标记结果会周期性更新。该参数控制应用协议的更
       #     新周期。
       # upgrade_from: static_config.l7-protocol-inference-ttl
-      # TODO: 增加了最小、最大值
       inference_result_ttl: 60s
       # type: string
       # name:
@@ -4020,7 +4002,6 @@ processors:
       #     deepflow-agent 仅对列表内的应用协议进行数据采集。通过该参数可以控制 agent 的数据采集范围以
       #     降低资源消耗。
       # upgrade_from: static_config.l7-protocol-enabled
-      # TODO: 确认一下 SofaRPC 的拼写
       enabled_protocols:
         - HTTP
         - HTTP2
@@ -4124,7 +4105,6 @@ processors:
       #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       # TODO: 格式改成和 l7-log-blacklist 一样，不用 dict 了，这样 key 更明确，且默认值的行为更明确。
-      # TODO: 确认一下 SofaRPC 的拼写
       # TODO: 注意这个配置项有下一级配置，但它不是 section 类型的
       port_number_prefilters:
         HTTP: 1-65535
@@ -4184,10 +4164,9 @@ processors:
       #
       #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
-      #     控制不同应用协议数据采集时的 Tag。
+      #     控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
       # upgrade_from: static_config.l7-log-blacklist
       # TODO: gRPC 要和 HTTP2 合并吗？需要增加 Custom 协议。
-      # TODO: 确认一下 SofaRPC 的拼写
       tag_filters:
         # type: dict
         # name:
@@ -4412,8 +4391,7 @@ processors:
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`http_proxy_client`字段中，作为调用链追踪的特征值。
         # upgrade_from: http_log_proxy_client
-        # TODO: 支持数组吗？应该要支持。
-        http_real_client: X_Forwarded_For
+        http_real_client: [X_Forwarded_For]
         # type: string
         # name: X-Request-ID
         # unit:
@@ -4431,8 +4409,7 @@ processors:
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`x_request_id`字段中，作为调用链追踪的特征值。
         # upgrade_from: http_log_x_request_id
-        # TODO: 支持数组吗？应该要支持。
-        x_request_id: X_Request_ID
+        x_request_id: [X_Request_ID]
         # type: string
         # name: APM TraceID
         # unit:
@@ -4450,7 +4427,6 @@ processors:
         #     的结果填充到应用调用日志的`trace_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
         #     特征字段，中间用`,`分隔。
         # upgrade_from: http_log_trace_id
-        # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
         apm_trace_id: [traceparent, sw8]
         # type: string
         # name: APM SpanID
@@ -4469,7 +4445,6 @@ processors:
         #     的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
         #     特征字段，中间用`,`分隔。
         # upgrade_from: http_log_span_id
-        # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
         apm_span_id: [traceparent, sw8]
       # type: section
       # name:
@@ -4587,9 +4562,21 @@ processors:
       #
       #     Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
-      #     配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
+      #     配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。
+      #
+      #     示例:
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         tag_extraction:
+      #           custom_fields:
+      #             HTTP:
+      #             - field-name: "user-agent"
+      #             - field-name: "cookie"
+      #     ```
+      #
+      #     注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
       # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields
-      # TODO: http 和 http2 的大小写调整了一下。
       custom_fields:
         # type: dict
         # name:
@@ -4617,7 +4604,20 @@ processors:
         #
         #     Attention: use `HTTP2` for `gRPC` Protocol.
         #   ch: |-
-        #     TODO
+        #     配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。
+        #
+        #     示例:
+        #     ```yaml
+        #     processors:
+        #       request_log:
+        #         tag_extraction:
+        #           custom_fields:
+        #             HTTP:
+        #             - field_name: "user-agent"
+        #             - field_name: "cookie"
+        #     ```
+        #
+        #     注意：如需配置`gRPC`协议，使用`HTTP2`。
         # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields.$protocol
         # ---
         # type: string
@@ -4633,7 +4633,7 @@ processors:
         #   en: |-
         #     Field name.
         #   ch: |-
-        #     TODO
+        #     字段名
         # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields.$protocol.field-name
         # ---
         # field_name: ""
@@ -4652,10 +4652,15 @@ processors:
       #   en: |-
       #     For the sake of data security, the data of the protocol that needs
       #     to be desensitized is configured here and is not processed by default.
+      #     Obfuscated fields mainly include:
+      #     - Authorization information
+      #     - Value information in various statements
       #   ch: |-
       #     配置该参数后，deepflow-agent 将在采集时对特定应用协议的关键数据做脱敏处理。
+      #     脱敏字段主要包括：
+      #     - 授权信息
+      #     - 各类语句中的 value 信息
       # upgrade_from: static_config.l7-protocol-advanced-features.obfuscate-enabled-protocols
-      # TODO: 哪些字段做脱敏？
       obfuscate_protocols: [Redis]
     # type: section
     # name:
@@ -4716,9 +4721,19 @@ processors:
       #       Used to record the number of times eviction is triggered due to reaching the
       #       LRU capacity limit.
       #   ch: |-
-      #     TODO
+      #     默认情况下，2 分钟缓存窗口中的单向 l7_flow_log 将被聚合成双向的 request_log（会话）。
+      #     聚合时的槽位大小为 5 秒。该配置用于指定每个时间槽中最多可以缓存多少个单向的 l7_flow_log 条目。
+      #
+      #     如果某个时间槽中的 l7_flow_log 条目数量超过该配置，则该时间槽中 10% 的 l7_flow_log 条目将被
+      #     LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目不会被丢弃，而是作为单向的 request_log
+      #     发送给 deepflow-server。
+      #
+      #     以下指标可以作为调整该配置的参考数据：
+      #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+      #       用于记录当前时刻所有时间槽中缓存的 request_resource 字段占用的总内存，单位为字节。
+      #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+      #       用于记录达到 LRU 容量限制并触发淘汰的次数。
       # upgrade_from: static_config.l7-log-session-slot-capacity
-      # TODO: 增加了最大值
       session_aggregate_slot_capacity: 1024
 
       # type: bool
@@ -4761,9 +4776,15 @@ processors:
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
-      # description: |-
-      #   Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
-      # TODO: 英文释义待理解，使用场景待分析。
+      # description:
+      #   en: |-
+      #     The timestamp carried by the packet captured by AF_PACKET may be delayed
+      #     from the current clock, especially in heavy traffic scenarios, which may be
+      #     as high as nearly 10s.
+      #     This also affects FlowMap aggregation window size.
+      #   ch: |-
+      #     捕获的包携带的时间戳可能比当前时间晚，尤其是在流量高峰期可能延迟高达 10s。
+      #     该配置也会影响 FlowMap 聚合窗口的大小。
       # upgrade_from: static_config.packet-delay
       max_tolerable_packet_delay: 1s
       # type: duration
@@ -4777,12 +4798,12 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+      #     Extra tolerance for QuadrupleGenerator receiving flows.
+      #     Affects 1s/1m QuadrupleGenerator aggregation window size.
       #   ch: |-
-      #     TODO
+      #     QuadrupleGenerator 接收 flow 的额外时间延迟。
+      #     该配置会影响秒级和分钟级 QuadrupleGenerator 聚合窗口的大小。
       # upgrade_from: static_config.second-flow-extra-delay-second
-      # TODO: 增加了最小、最大限制
-      # TODO: 英文释义待理解，使用场景待分析。
       extra_tolerable_flow_delay: 0s
     # type: section
     # name:
@@ -4805,7 +4826,6 @@ processors:
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.flow.flush-interval
-      # TODO: 增加了最小、最大值
       # TODO: 英文释义待理解，使用场景待分析。
       flow_flush_interval: 1s
       # type: section
@@ -4910,7 +4930,6 @@ processors:
         #   ch: |-
         #     TCP 状态机的建连状态超时时长。
         # upgrade_from: static_config.flow.established-timeout
-        # TODO: 增加了最小、最大值。描述信息要修改
         # TODO: 待确认。
         established: 300s
         # type: duration
@@ -4924,9 +4943,8 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Closing Reset.
         #   ch: |-
-        #     TODO
+        #     Closing Reset 类型的 TCP 状态机超时。
         # upgrade_from: static_config.flow.closing-rst-timeout
-        # TODO: 增加了最小、最大值。描述信息要修改
         closing_rst: 35s
         # type: duration
         # name: Opening RST
@@ -4939,9 +4957,8 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Opening Reset.
         #   ch: |-
-        #     TODO
+        #     Opening Reset 类型的 TCP 状态机超时。
         # upgrade_from: static_config.flow.opening-rst-timeout
-        # TODO: 增加了最小、最大值。描述信息要修改
         opening_rst: 1s
         # type: duration
         # name: Others
@@ -4954,9 +4971,8 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Others.
         #   ch: |-
-        #     TODO
+        #     其他类型的 TCP 状态机超时。
         # upgrade_from: static_config.flow.others-timeout
-        # TODO: 增加了最小、最大值。描述信息要修改
         others: 5s
     # type: section
     # name:
@@ -4979,9 +4995,9 @@ processors:
       #     is also widely used in other hash tables such as QuadrupleGenerator,
       #     Collector, etc.
       #   ch: |-
-      #     TODO
+      #     由于 FlowAggregator 是所有处理流程的第一步，该值也被广泛用于其他哈希表，如
+      #     QuadrupleGenerator、Collector 等。
       # upgrade_from: static_config.flow.flow-slots-size
-      # TODO: 增加了最小、最大值
       flow_map_hash_slots: 131072
       # type: int
       # name:
@@ -4998,9 +5014,10 @@ processors:
       #     the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
       #     is not enough, it will be unable to calculate the rrt of l7.
       #   ch: |-
-      #     TODO
+      #     FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
+      #     例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
+      #     将无法计算 L7 的 RRT。
       # upgrade_from: static_config.flow.flow-count-limit
-      # TODO: 增加了最小、最大值
       concurrent_flow_limit: 65535
       # type: int
       # name:
@@ -5019,7 +5036,6 @@ processors:
       #   ch: |-
       #     FlowMap 内存池的大小。
       # upgrade_from: static_config.flow.memory-pool-size
-      # TODO: 增加了最小、最大值
       memory_pool_size: 65536
       # type: int
       # name:
@@ -5039,9 +5055,12 @@ processors:
       #     MMAP_THRESHOLD is 128K, allocating chunks larger than 128K will
       #     result in calling mmap and more page faults.
       #   ch: |-
-      #     待理解
+      #     目前只影响 TaggedFlow 批量分配。
+      #     为避免大量的 malloc 调用，生命周期短且数量多的结构体用批量分配进行优化。
+      #     一次分配的总内存大小不会超过这个限制。
+      #     由于默认的 MMAP_THRESHOLD 是 128K，分配的内存块超过 128K 会导致
+      #     mmap 调用和页错误增加，反而降低性能，所以不推荐将该配置设置大于 128K。
       # upgrade_from: static_config.batched-buffer-size-limit
-      # TODO: 增加了最大值
       max_batched_buffer_size: 131072
       # type: int
       # name:
@@ -5057,9 +5076,9 @@ processors:
       #     The length of the following queues:
       #     - 2-second-flow-to-minute-aggrer
       #   ch: |-
-      #     2-second-flow-to-minute-aggrer 的队列大小。
+      #     以下队列的大小：
+      #     - 2-second-flow-to-minute-aggrer
       # upgrade_from: static_config.flow.flow-aggr-queue-size
-      # TODO: 增加了最大值
       flow_aggregator_queue_size: 65535
       # type: int
       # name:
@@ -5077,9 +5096,11 @@ processors:
       #     - 1-tagged-flow-to-app-protocol-logs
       #     - 0-{flow_type}-{port}-packet-to-tagged-flow (flow_type: sflow, netflow)
       #   ch: |-
-      #     TODO
+      #     以下队列的大小：
+      #     - 1-tagged-flow-to-quadruple-generator
+      #     - 1-tagged-flow-to-app-protocol-logs
+      #     - 0-{flow_type}-{port}-packet-to-tagged-flow (flow_type: sflow, netflow)
       # upgrade_from: static_config.flow-queue-size
-      # TODO: 以前没有设最大值，现在加上了
       flow_generator_queue_size: 65536
       # type: int
       # name:
@@ -5096,9 +5117,10 @@ processors:
       #     - 2-flow-with-meter-to-second-collector
       #     - 2-flow-with-meter-to-minute-collector
       #   ch: |-
-      #     TODO
+      #     以下队列的大小：
+      #     - 2-flow-with-meter-to-second-collector
+      #     - 2-flow-with-meter-to-minute-collector
       # upgrade_from: static_config.quadruple-queue-size
-      # TODO: 以前没有设最大值，现在加上了
       quadruple_generator_queue_size: 262144
 
 # type: section
@@ -5213,9 +5235,8 @@ outputs:
       #     The list of TAPs to collect l4_flow_log, you can also set a list of TAPs to
       #     be collected.
       #   ch: |-
-      #     TODO
+      #     将被存储的流日志采集网络类型列表。
       # upgrade_from: l4_log_tap_types
-      # TODO: 候选项需要特殊处理
       l4_capture_network_types: [0]
       # type: int
       # name:
@@ -5238,9 +5259,8 @@ outputs:
       #     The list of TAPs to collect l7_flow_log, you can also set a list of TAPs to
       #     be collected.
       #   ch: |-
-      #     TODO
+      #     将被存储的调用日志采集网络类型列表。
       # upgrade_from: l7_log_store_tap_types
-      # TODO: 候选项需要特殊处理
       l7_capture_network_types: [0]
       # type: int
       # name:
@@ -5380,11 +5400,12 @@ outputs:
       # description:
       #   en: |-
       #     The maximum number of rows of l4_flow_log sent per second, when the actual
-      #     number of rows exceeds this value, sampling is triggered.
+      #     number of upstream rows exceeds this value, reservoir sampling is applied to
+      #     limit the actual number of rows sent.
       #   ch: |-
-      #     deepflow-agent 每秒发送的 l4_flow_log 数量上限，实际发送数量超出参数值后，将开启采样。
+      #     deepflow-agent 每秒发送的 l4_flow_log 数量上限，实际产生的日志数量超过阈值时，将
+      #     使用水库采样限制实际发送数量不超过阈值。
       # upgrade_from: l4_log_collect_nps_threshold
-      # TODO: 超出数量后是开启采样吗？是否是丢弃？如果是采样是否意味着发送数量能够超过此值？
       l4_throttle: 10000
       # type: int
       # name:
@@ -5428,28 +5449,7 @@ outputs:
       #     - 3-flow-to-collector-sender
       #     - 3-protolog-to-collector-sender
       # upgrade_from: static_config.flow-sender-queue-size
-      # TODO: 增加了最大值限制
       collector_queue_size: 65536
-      # type: int
-      # name:
-      #   en: Collector Queue Count
-      #   ch: Collector 队列数量
-      # unit:
-      # range: [1, 64]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     The number of replicas for each output queue of the
-      #     FlowAggregator/SessionAggregator.
-      #   ch: |-
-      #     设置如下队列的数量：
-      #     - 3-flow-to-collector-sender
-      #     - 3-protolog-to-collector-sender
-      # upgrade_from: static_config.flow-sender-queue-count
-      # TODO: 中文描述待检查。
-      collector_queue_count: 1
   # type: section
   # name:
   #   en: Flow Metrics
@@ -5473,7 +5473,6 @@ outputs:
     #     指标数据采集总开关。关闭后 deepflow-agent 将停止所有应用调用指标、网络指标、应用
     #     调用日志、流日志、TCP 包时序数据、Pcap 数据的采集。
     # upgrade_from: collector_enabled
-    # TODO: 原来是 int，需要改为 bool
     enabled: true
     # type: section
     # name:
@@ -5501,8 +5500,6 @@ outputs:
       #     做聚合处理，所有非活跃端口的数据聚合生成一条'server_port = 0'的指标，而不再生成每个
       #     server_port 单独的指标。
       # upgrade_from: inactive_server_port_enabled
-      # TODO: 原来是 int，需要改为 bool
-      # TODO: 注意字面默认值改了，但是默认行为没改，因为逻辑反过来了
       # TODO: 非活跃端口的判别标准是仅接收数据，不发送数据吗？是不是不太对？server port本来就不发送数据吧？
       inactive_server_port_aggregation: false
       # type: bool
@@ -5524,8 +5521,6 @@ outputs:
       #     开启功能后 deepflow-agent 将对非活跃 IP（仅接收数据，不发送数据）的指标数据采集做聚合
       #     处理，所有非活跃 IP 的数据聚合生成一条'ip = 0'的指标，而不再生成每个 IP 单独的指标。
       # upgrade_from: inactive_ip_enabled
-      # TODO: 原来是 int，需要改为 bool
-      # TODO: 注意字面默认值改了，但是默认行为没改，因为逻辑反过来了
       # TODO: 非活跃 IP 的判别标准是仅接收数据，不发送数据吗？是不是不太对？很多 IP 仅做服务端的吧？
       inactive_ip_aggregation: false
       # type: bool
@@ -5543,7 +5538,6 @@ outputs:
       #   ch: |-
       #     网络指标的采集开关。关闭后 deepflow-agent 停止采集除基本的吞吐类指标外的其他网络指标。
       # upgrade_from: l4_performance_enabled
-      # TODO: 原来是 int，需要改为 bool
       npm_metrics: true
       # type: bool
       # name:
@@ -5560,7 +5554,6 @@ outputs:
       #   ch: |-
       #     应用调用指标的采集开关。关闭后 deepflow-agent 停止采集全部应用调用指标。
       # upgrade_from: l7_metrics_enabled
-      # TODO: 原来是 int，需要改为 bool
       apm_metrics: true
       # type: bool
       # name:
@@ -5577,7 +5570,6 @@ outputs:
       #   ch: |-
       #     秒级指标的采集开关。关闭后 deepflow-agent 将停止采集秒粒度的网络指标和应用调用指标。
       # upgrade_from: vtap_flow_1s_enabled
-      # TODO: 原来是 int，需要改为 bool
       second_metrics: true
     # type: section
     # name:
@@ -5597,32 +5589,13 @@ outputs:
       # description:
       #   en: |-
       #     The length of the following queues:
-      #     - 2-doc-to-collector-sender
+      #     - 3-doc-to-collector-sender
       #   ch: |-
       #     配置如下队列的大小:
-      #     - 2-doc-to-collector-sender
+      #     - 3-doc-to-collector-sender
       # upgrade_from: static_config.collector-sender-queue-size
-      # TODO: 增加了最大值限制
       # TODO: 队列的调优分散在许多不同地方，建议放到一起，便于理解和使用。
       sender_queue_size: 65536
-      # type: int
-      # name:
-      #   en: Sender Queue Count
-      #   ch: Sender 队列数量
-      # unit:
-      # range: [1, 64]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     The number of replicas for each output queue of the collector.
-      #   ch: |-
-      #     配置如下队列的数量：TODO
-      # upgrade_from: static_config.collector-sender-queue-count
-      # TODO: 增加了最大值限制
-      # TODO: 待确认队列的列表。
-      sender_queue_count: 1
   # type: section
   # name: NPB (Network Packet Broker)
   # description:
@@ -5638,7 +5611,7 @@ outputs:
     # ee_feature: true
     # description:
     #   en: |-
-    #     Maximum MTU allowed when using UDP to transfer data.
+    #     Maximum MTU allowed when using UDP for NPB.
     #
     #     Attention: Public cloud service providers may modify the content of the
     #     tail of the UDP packet whose packet length is close to 1500 bytes. When
@@ -5647,7 +5620,6 @@ outputs:
     #     NPB 分发时的 UDP 传输的 MTU 值。注意：当 UDP 报文长度接近 1500 字节后，云平台可能会
     #     修改数据包的尾部数据，因此建议`max_mtu`的值小于 1500。
     # upgrade_from: mtu
-    # TODO: 英文描述中这里的 MTU 是所有的 UDP 数据传输，从参数名理解是 NPB 的 UDP 数据的 MTU，两者不一致，待确认。
     max_mtu: 1500
     # type: int
     # name:
@@ -5707,7 +5679,6 @@ outputs:
     #   ch: |-
     #     NPB 数据去重开关。开启开关后，将对 NPB 分发做全局去重，避免一份流量在客户端、服务端分发两次。
     # upgrade_from: npb_dedup_enabled
-    # TODO: 原来是 int，需要改为 bool
     traffic_global_dedup: true
     # type: int
     # name:
@@ -5804,7 +5775,6 @@ plugins:
   #   ch: |-
   #     需要加载的 Wasm 插件列表。
   # upgrade_from: wasm_plugins
-  # TODO: 候选项需要特殊处理
   wasm_plugins: []
   # type: string
   # name:
@@ -5823,7 +5793,6 @@ plugins:
   #   ch: |-
   #     需要加载的 so 插件列表。
   # upgrade_from: so_plugins
-  # TODO: 候选项需要特殊处理
   so_plugins: []
 
 # type: section

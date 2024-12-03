@@ -2314,7 +2314,7 @@ mod tests {
             param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
-                "".to_owned(),
+                vec![],
                 vec![],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
@@ -2393,7 +2393,7 @@ mod tests {
     fn check_parse_sw8_header() {
         let payload = b"\x00\x03sw8\x09\x00\x1E1-VFJBQ0VJRA==-U0VHTUVOVElE-3-";
         let config = L7LogDynamicConfig::new(
-            "".to_owned(),
+            vec![],
             vec![],
             vec![TraceType::Sw8, TraceType::TraceParent],
             vec![TraceType::Sw8, TraceType::TraceParent],

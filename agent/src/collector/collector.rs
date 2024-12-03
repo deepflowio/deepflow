@@ -486,7 +486,8 @@ impl Stash {
             }
         }
 
-        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && !config.inactive_ip_enabled {
+        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && config.inactive_ip_aggregation
+        {
             self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -518,7 +519,7 @@ impl Stash {
                 acc_flow.is_active_host1
             };
             // single_stats: Do not count the inactive end (Internet/private network IP with no response packet)
-            if config.inactive_ip_enabled || is_active_host {
+            if !config.inactive_ip_aggregation || is_active_host {
                 let flow_meter = if ep == FLOW_METRICS_PEER_DST {
                     acc_flow.flow_meter.to_reversed()
                 } else {
@@ -630,7 +631,7 @@ impl Stash {
             if m.flow.close_type != CloseType::Unknown
                 && m.flow.close_type != CloseType::ForcedReport
             {
-                if !m.is_active_host0 && !m.is_active_host1 && !config.inactive_ip_enabled {
+                if !m.is_active_host0 && !m.is_active_host1 && config.inactive_ip_aggregation {
                     self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
                     return;
                 }
@@ -685,7 +686,7 @@ impl Stash {
             None => return,
         };
 
-        if !meter.is_active_host0 && !meter.is_active_host1 && !config.inactive_ip_enabled {
+        if !meter.is_active_host0 && !meter.is_active_host1 && config.inactive_ip_aggregation {
             self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -713,7 +714,7 @@ impl Stash {
                 meter.is_active_host1
             };
             // single_stats: Do not count the inactive end (Internet/private network IP with no response packet)
-            if config.inactive_ip_enabled || is_active_host {
+            if !config.inactive_ip_aggregation || is_active_host {
                 let mut tagger = get_single_tagger(
                     self.global_thread_id,
                     &flow,
@@ -921,11 +922,11 @@ impl Stash {
     }
 }
 
-// server_port is ignored when is_active_service and inactive_server_port_enabled is turned off
-// is_active_service and SFlow,NetFlow data, ignoring service port
+// server_port is ignored when service is not active and inactive_server_port_aggregation is turned on
+// is_active_service and SFlow, NetFlow data, ignoring service port
 // ignore the server for non-TCP/UDP traffic
-fn ignore_server_port(flow: &MiniFlow, inactive_server_port_enabled: bool) -> bool {
-    (!flow.is_active_service && !inactive_server_port_enabled)
+fn ignore_server_port(flow: &MiniFlow, inactive_server_port_aggregation: bool) -> bool {
+    (!flow.is_active_service && inactive_server_port_aggregation)
         || (flow.flow_key.proto != IpProtocol::TCP && flow.flow_key.proto != IpProtocol::UDP)
 }
 
@@ -957,7 +958,7 @@ fn get_single_tagger(
             }
         }
         RunningMode::Managed => {
-            if !config.inactive_ip_enabled {
+            if config.inactive_ip_aggregation {
                 if !is_active_host {
                     unspecified_ip(is_ipv6)
                 } else {
@@ -997,7 +998,7 @@ fn get_single_tagger(
         tap_type: flow_key.tap_type,
         // If the resource is located on the client, the service port is ignored
         server_port: if ep == FLOW_METRICS_PEER_SRC
-            || ignore_server_port(flow, config.inactive_server_port_enabled)
+            || ignore_server_port(flow, config.inactive_server_port_aggregation)
         {
             0
         } else {
@@ -1055,7 +1056,7 @@ fn get_edge_tagger(
         RunningMode::Standalone => (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip),
         RunningMode::Managed => {
             let (mut src_ip, mut dst_ip) = (flow.peers[0].nat_real_ip, flow.peers[1].nat_real_ip);
-            if !config.inactive_ip_enabled {
+            if config.inactive_ip_aggregation {
                 if !is_active_host0 {
                     src_ip = unspecified_ip(is_ipv6);
                 }
@@ -1110,7 +1111,7 @@ fn get_edge_tagger(
         tap_side: TapSide::from(direction),
         tap_port: flow_key.tap_port,
         tap_type: flow_key.tap_type,
-        server_port: if ignore_server_port(flow, config.inactive_server_port_enabled) {
+        server_port: if ignore_server_port(flow, config.inactive_server_port_aggregation) {
             0
         } else {
             dst_ep.nat_real_port
