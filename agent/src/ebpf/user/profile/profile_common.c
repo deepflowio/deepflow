@@ -127,6 +127,26 @@ void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 		  enable_flag);
 }
 
+void set_bpf_max_delay(struct bpf_tracer *t, struct profiler_context *ctx,
+			 u64 delay)
+{
+	if (ctx->profiler_stop == 1)
+		return;
+
+	if (bpf_table_set_value(t, ctx->state_map_name,
+				MAX_DELAY, &delay) == false) {
+		ebpf_warning("%sprofiler state map update error."
+			     "(%s max delay %lu) - %s\n",
+			     ctx->tag, ctx->state_map_name, delay,
+			     strerror(errno));
+		return;
+	}
+
+	ebpf_info("%s%s() success, interrupt check max delay:%dms\n", ctx->tag, __func__,
+		  delay);
+}
+
+// set_bpf_max_delay(
 void set_bpf_rt_kern(struct bpf_tracer *t, struct profiler_context *ctx)
 {
 	if (ctx->profiler_stop == 1)
@@ -638,6 +658,7 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->pid = v->tgid;
 	msg->tid = v->pid;
 	msg->cpu = v->cpu;
+	msg->delay_ms = v->duration_ns;
 	msg->u_stack_id = (u32) v->userstack;
 	msg->k_stack_id = (u32) v->kernstack;
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
@@ -693,14 +714,14 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	if (ctx->use_delta_time) {
 		// If sampling is used
-		if (ctx->sample_period > 0) {
-			msg->count = ctx->sample_period / 1000;
-		} else {
+		//if (ctx->sample_period > 0) {
+		//	msg->count = ctx->sample_period / 1000;
+		//} else {
 			// Using microseconds for storage.
-			msg->count = v->duration_ns / 1000;
-		}
+		//	msg->count = v->duration_ns / 1000;
+		//}
 	} else {
-		msg->count = 1;
+		//msg->count = 1;
 	}
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);
 
@@ -737,19 +758,6 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 	     (stack_trace_msg_hash_kv *) & kv) == 0) {
 		__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-		if (ctx->use_delta_time) {
-			if (ctx->sample_period > 0) {
-				((stack_trace_msg_t *) kv.msg_ptr)->count +=
-				    (ctx->sample_period / 1000);
-			} else {
-				// Using microseconds for storage.
-				((stack_trace_msg_t *) kv.msg_ptr)->count +=
-				    (v->duration_ns / 1000);
-			}
-
-		} else {
-			((stack_trace_msg_t *) kv.msg_ptr)->count++;
-		}
 		return;
 	}
 
@@ -807,8 +815,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 * that it is an invalid value, the  CPUID will not be included in
 		 * the aggregation.
 		 */
-		if (ctx->cpu_aggregation_flag == 0)
-			v->cpu = CPU_INVALID;
+		//if (ctx->cpu_aggregation_flag == 0)
+		//	v->cpu = CPU_INVALID;
 
 		/*
 		 * Uniform idle process names to reduce the aggregated count of stack
@@ -940,16 +948,6 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->use_delta_time) {
-				if (ctx->sample_period > 0) {
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count +=
-					    (ctx->sample_period / 1000);
-				} else {
-					// Using microseconds for storage.
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count += (v->duration_ns / 1000);
-				}
-
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
 			}

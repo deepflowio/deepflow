@@ -408,9 +408,9 @@ int program__attach_perf_event(int prog_fd, uint32_t ev_type,
 		}
 
 		fds[i] = fd;
-		ebpf_debug
-		    ("attach perf event sample_freq %d pid %d cpu %d done\n",
-		     sample_freq, pid, i);
+		ebpf_info
+		    ("attach perf event sample_period %d sample_freq %d pid %d cpu %d done\n",
+		     sample_period, sample_freq, pid, i);
 	}
 
 	memcpy((void *)attach_fds, (void *)fds, sizeof(fds));
