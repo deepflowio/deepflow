@@ -515,10 +515,6 @@ impl BaseDispatcher {
         }
 
         let tap_interfaces = self.tap_interfaces.lock().unwrap();
-        if tap_interfaces.len() == 0 {
-            return;
-        }
-
         let bpf_options = self.bpf_options.lock().unwrap();
         if let Err(e) = self.engine.set_bpf(
             bpf_options.get_bpf_instructions(
