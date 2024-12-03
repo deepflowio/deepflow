@@ -18,11 +18,11 @@ package agent_config
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/baidubce/bce-sdk-go/util/log"
+	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 )
 
@@ -495,7 +495,7 @@ func NewMigrationToolData(domainData *DomainData) (MigrationToolData, error) {
 
 		domainData: domainData,
 	}
-	err = p.DataFomatter.Init(formattedLines)
+	err = p.DataFomatter.LoadYAMLData(formattedLines)
 	if err != nil {
 		return p, err
 	}
