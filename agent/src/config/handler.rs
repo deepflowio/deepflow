@@ -129,8 +129,8 @@ pub type PortAccess = Access<PortConfig>;
 #[derive(Clone, PartialEq, Eq)]
 pub struct CollectorConfig {
     pub enabled: bool,
-    pub inactive_server_port_enabled: bool,
-    pub inactive_ip_enabled: bool,
+    pub inactive_server_port_aggregation: bool,
+    pub inactive_ip_aggregation: bool,
     pub vtap_flow_1s_enabled: bool,
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
@@ -147,10 +147,10 @@ impl fmt::Debug for CollectorConfig {
         f.debug_struct("CollectorConfig")
             .field("enabled", &self.enabled)
             .field(
-                "inactive_server_port_enabled",
-                &self.inactive_server_port_enabled,
+                "inactive_server_port_aggregation",
+                &self.inactive_server_port_aggregation,
             )
-            .field("inactive_ip_enabled", &self.inactive_ip_enabled)
+            .field("inactive_ip_aggregation", &self.inactive_ip_aggregation)
             .field("vtap_flow_1s_enabled", &self.vtap_flow_1s_enabled)
             .field(
                 "l4_log_store_tap_types",
@@ -207,7 +207,6 @@ pub struct EnvironmentConfig {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SenderConfig {
-    pub mtu: u32,
     pub dest_ip: String,
     pub agent_id: u16,
     pub team_id: u32,
@@ -1370,7 +1369,7 @@ impl Default for TraceType {
 #[derive(Default, Clone)]
 pub struct L7LogDynamicConfig {
     // in lowercase
-    pub proxy_client: String,
+    pub proxy_client: HashSet<String>,
     // in lowercase
     pub x_request_id: HashSet<String>,
 
@@ -1419,16 +1418,20 @@ impl Eq for L7LogDynamicConfig {}
 
 impl L7LogDynamicConfig {
     pub fn new(
-        mut proxy_client: String,
+        proxy_client: Vec<String>,
         x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
     ) -> Self {
-        proxy_client.make_ascii_lowercase();
-
         let mut expected_headers_set = get_expected_headers();
-        expected_headers_set.insert(proxy_client.as_bytes().to_vec());
+
+        let mut proxy_client_set = HashSet::new();
+        for client in proxy_client.iter() {
+            let client = client.trim();
+            expected_headers_set.insert(client.as_bytes().to_vec());
+            proxy_client_set.insert(client.to_string());
+        }
         let mut x_request_id_set = HashSet::new();
         for t in x_request_id.iter() {
             let t = t.trim();
@@ -1457,7 +1460,7 @@ impl L7LogDynamicConfig {
         }
 
         Self {
-            proxy_client,
+            proxy_client: proxy_client_set,
             x_request_id: x_request_id_set,
             trace_types,
             span_types,
@@ -1650,7 +1653,6 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
-                mtu: conf.outputs.npb.max_mtu,
                 dest_ip: dest_ip.clone(),
                 agent_id: conf.global.common.agent_id as u16,
                 team_id: conf.global.common.team_id,
@@ -1695,12 +1697,12 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             },
             collector: CollectorConfig {
                 enabled: conf.outputs.flow_metrics.enabled,
-                inactive_server_port_enabled: conf
+                inactive_server_port_aggregation: conf
                     .outputs
                     .flow_metrics
                     .filters
                     .inactive_server_port_aggregation,
-                inactive_ip_enabled: conf.outputs.flow_metrics.filters.inactive_ip_aggregation,
+                inactive_ip_aggregation: conf.outputs.flow_metrics.filters.inactive_ip_aggregation,
                 vtap_flow_1s_enabled: conf.outputs.flow_metrics.filters.second_metrics,
                 l4_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l4_throttle,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
@@ -1833,14 +1835,16 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .tag_extraction
                         .tracing_tag
                         .http_real_client
-                        .to_ascii_lowercase(),
+                        .iter()
+                        .map(|x| x.to_ascii_lowercase())
+                        .collect(),
                     conf.processors
                         .request_log
                         .tag_extraction
                         .tracing_tag
                         .x_request_id
-                        .split(',')
-                        .map(|x| x.to_lowercase())
+                        .iter()
+                        .map(|x| x.to_ascii_lowercase())
                         .collect(),
                     conf.processors
                         .request_log
@@ -3992,14 +3996,6 @@ impl ConfigHandler {
 
         let tunning = &mut flow_log.tunning;
         let new_tunning = &mut new_flow_log.tunning;
-        if tunning.collector_queue_count != new_tunning.collector_queue_count {
-            info!(
-                "Update outputs.flow_log.tunning.collector_queue_count from {:?} to {:?}.",
-                tunning.collector_queue_count, new_tunning.collector_queue_count
-            );
-            tunning.collector_queue_count = new_tunning.collector_queue_count;
-            restart_agent = !first_run;
-        }
         if tunning.collector_queue_size != new_tunning.collector_queue_size {
             info!(
                 "Update outputs.flow_log.tunning.collector_queue_size from {:?} to {:?}.",
@@ -4056,14 +4052,6 @@ impl ConfigHandler {
         }
         let tunning = &mut outputs.flow_metrics.tunning;
         let new_tunning = &mut new_outputs.flow_metrics.tunning;
-        if tunning.sender_queue_count != new_tunning.sender_queue_count {
-            info!(
-                "Update outputs.flow_metrics.tunning.sender_queue_count from {:?} to {:?}.",
-                tunning.sender_queue_count, new_tunning.sender_queue_count
-            );
-            tunning.sender_queue_count = new_tunning.sender_queue_count;
-            restart_agent = !first_run;
-        }
         if tunning.sender_queue_size != new_tunning.sender_queue_size {
             info!(
                 "Update outputs.flow_metrics.tunning.sender_queue_size from {:?} to {:?}.",
@@ -4256,14 +4244,6 @@ impl ConfigHandler {
                 tcp_header.header_fields_flag, new_tcp_header.header_fields_flag
             );
             tcp_header.header_fields_flag = new_tcp_header.header_fields_flag;
-            restart_agent = !first_run;
-        }
-        if tcp_header.sender_queue_count != new_tcp_header.sender_queue_count {
-            info!(
-                "Update processors.packet.tcp_header.sender_queue_count from {:?} to {:?}.",
-                tcp_header.sender_queue_count, new_tcp_header.sender_queue_count
-            );
-            tcp_header.sender_queue_count = new_tcp_header.sender_queue_count;
             restart_agent = !first_run;
         }
         if tcp_header.sender_queue_size != new_tcp_header.sender_queue_size {

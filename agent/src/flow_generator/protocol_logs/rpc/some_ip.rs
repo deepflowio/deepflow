@@ -329,7 +329,7 @@ mod tests {
             param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
-                "".to_owned(),
+                vec![],
                 vec![],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
