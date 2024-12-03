@@ -1662,7 +1662,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 npb_vlan: conf.outputs.npb.raw_udp_vlan_tag,
                 npb_vlan_mode: conf.outputs.npb.extra_vlan_header.into(),
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
-                npb_bps_threshold: conf.outputs.npb.max_tx_throughput, // npb_bps_threshold 是否等同于 max_tx_throughput，原来的 max_npb_bps 没有用到，且单位不同
+                npb_bps_threshold: conf.outputs.npb.max_tx_throughput,
                 npb_socket_type: conf.outputs.socket.npb_socket_type,
                 server_tx_bandwidth_threshold: conf
                     .global

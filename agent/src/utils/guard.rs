@@ -150,7 +150,7 @@ impl Guard {
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
-        memory_trim_disabled: bool,
+        memory_trim_enabled: bool,
         cgroups_disabled: bool,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
@@ -164,7 +164,7 @@ impl Guard {
             exception_handler,
             cgroup_mount_path,
             is_cgroup_v2,
-            memory_trim_disabled,
+            memory_trim_disabled: !memory_trim_enabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
             cgroups_disabled,
