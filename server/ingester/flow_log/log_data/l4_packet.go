@@ -22,7 +22,6 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const BLOCK_HEAD_SIZE = 16
@@ -38,7 +37,7 @@ type L4Packet struct {
 	OrgId       uint16
 	TeamID      uint16
 	PacketCount uint32
-	PacketBatch []byte
+	PacketBatch string
 }
 
 func L4PacketColumns() []*ckdb.Column {
@@ -62,7 +61,7 @@ func (s *L4Packet) WriteBlock(block *ckdb.Block) {
 	block.Write(s.VtapID)
 	block.Write(s.TeamID)
 	block.Write(s.PacketCount)
-	block.Write(utils.String(s.PacketBatch))
+	block.Write(s.PacketBatch)
 }
 
 func (s *L4Packet) OrgID() uint16 {
@@ -90,9 +89,7 @@ func ReleaseL4Packet(l *L4Packet) {
 	if l == nil {
 		return
 	}
-	t := l.PacketBatch[:0]
 	*l = L4Packet{}
-	l.PacketBatch = t
 	poolL4Packet.Put(l)
 }
 
@@ -109,7 +106,7 @@ func DecodePacketSequence(vtapID, orgId, teamId uint16, decoder *codec.SimpleDec
 	// sequence packet defaults to a maximum of 5s timeout sending, so the minimum value of StartTime is EndTime - 5s
 	l4Packet.StartTime = l4Packet.EndTime - 5*US_TO_S_DEVISOR
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
-	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-BLOCK_HEAD_SIZE)...)
+	l4Packet.PacketBatch = string(decoder.ReadBytesN(int(blockSize) - BLOCK_HEAD_SIZE))
 
 	l4Packet.OrgId, l4Packet.TeamID = orgId, teamId
 

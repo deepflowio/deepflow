@@ -22,7 +22,6 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
-	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (
@@ -67,7 +66,8 @@ func (s *PcapStore) WriteBlock(block *ckdb.Block) {
 		s.FlowID,
 		s.VtapID,
 		s.PacketCount,
-		utils.String(s.PacketBatch),
+		// need to copy it first when writing, otherwise if the memory is released after writing to the CK Block before it is sent to clickhouse, it will cause problems.
+		string(s.PacketBatch),
 		s.AclGids,
 		s.TeamID,
 	)
