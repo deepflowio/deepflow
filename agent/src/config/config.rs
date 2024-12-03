@@ -788,7 +788,7 @@ impl Default for CbpfTunning {
             max_capture_packet_size: 65535,
             raw_packet_buffer_block_size: 65536,
             raw_packet_queue_size: 131072,
-            max_capture_pps: 200000,
+            max_capture_pps: 2000000,
         }
     }
 }
@@ -1827,8 +1827,8 @@ pub struct ProcessorsFlowLogTunning {
 impl Default for ProcessorsFlowLogTunning {
     fn default() -> Self {
         Self {
-            flow_map_hash_slots: 131072,
-            concurrent_flow_limit: 65535,
+            flow_map_hash_slots: 13107200,
+            concurrent_flow_limit: 6553500,
             memory_pool_size: 65536,
             max_batched_buffer_size: 131072,
             flow_aggregator_queue_size: 65535,
