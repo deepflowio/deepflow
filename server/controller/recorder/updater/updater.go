@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msg "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
@@ -39,11 +40,16 @@ type ResourceUpdater interface {
 	HandleDelete()
 
 	Publisher
+	StatsdBuilder
 }
 
 type Publisher interface {
 	GetChanged() bool
 	GetResourceType() string
+}
+
+type StatsdBuilder interface {
+	BuildStatsd(statsd.Statsd) ResourceUpdater
 }
 
 type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
@@ -71,6 +77,8 @@ type UpdaterBase[
 ] struct {
 	metadata    *common.Metadata
 	msgMetadata *message.Metadata
+
+	statsd statsd.Statsd
 
 	resourceType string
 
@@ -135,6 +143,11 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 		return
 	}
 	u.pubsub = ps.(pubsub.ResourcePubSub[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT])
+}
+
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) BuildStatsd(statsd statsd.Statsd) ResourceUpdater {
+	u.statsd = statsd
+	return u
 }
 
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) setDataGenerator(dataGenerator DataGenerator[CT, MT, BT, MFUPT, MFUT]) {
