@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: bpf does not take effect in analyzer mode [#8609](https://github.com/deepflowio/deepflow/pull/8609) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: errors occurred when modifying some agent group configuration [#8605](https://github.com/deepflowio/deepflow/pull/8605) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: TODOs in agent config [#8597](https://github.com/deepflowio/deepflow/pull/8597) by [rvql](https://github.com/rvql)
 * fix: pcap,l4_packet,spantrace data exception [#8595](https://github.com/deepflowio/deepflow/pull/8595) by [lzf575](https://github.com/lzf575)
@@ -19,5 +20,6 @@
 
 
 #### NEW FEATURE
+* feat: supports creating 1h, 1d aggregate data source when using ByConity [#8615](https://github.com/deepflowio/deepflow/pull/8615) by [lzf575](https://github.com/lzf575)
 * feature: adds index to some tables [#8598](https://github.com/deepflowio/deepflow/pull/8598) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feature: adds system alarm of recorder cleaner [#8588](https://github.com/deepflowio/deepflow/pull/8588) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
