@@ -73,10 +73,8 @@ func (a AggregationInterval) ByconityBaseTable() string {
 	switch a {
 	case AggregationMinute:
 		return "1s"
-	case AggregationHour:
+	case AggregationHour, AggregationDay:
 		return "1m"
-	case AggregationDay:
-		return "1h_agg"
 	default:
 		return "unkunown aggregation byconity base table"
 	}
