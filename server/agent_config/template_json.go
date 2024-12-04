@@ -41,11 +41,11 @@ func ConvertYAMLToJSON(yamlData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("generate key to comment error: %v", err)
 	}
 	dataFmt := NewDataFommatter()
-	err = dataFmt.Init(yamlData)
+	err = dataFmt.LoadYAMLData(yamlData)
 	if err != nil {
 		return nil, fmt.Errorf("new data formatter error: %v", err)
 	}
-	return dataFmt.ConvertToJSON(keyToComment)
+	return dataFmt.mapToJSON(keyToComment)
 }
 
 func ValidateYAML(yamlData []byte) error {
@@ -54,14 +54,14 @@ func ValidateYAML(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("generate key to comment error: %v", err)
 	}
-	tmplFmt.DataFomatter.fmtValAndRefresh(KeyToComment, true)
+	tmplFmt.DataFomatter.fmtMapValAndRefresh(KeyToComment, true)
 
 	dataFmt := NewDataFommatter()
-	err = dataFmt.Init(yamlData)
+	err = dataFmt.LoadYAMLData(yamlData)
 	if err != nil {
 		return fmt.Errorf("new data formatter error: %v", err)
 	}
-	err = dataFmt.fmtValAndRefresh(KeyToComment, true)
+	err = dataFmt.fmtMapValAndRefresh(KeyToComment, true)
 	if err != nil {
 		return fmt.Errorf("convert value and refresh error: %v", err)
 	}
@@ -70,28 +70,20 @@ func ValidateYAML(yamlData []byte) error {
 }
 
 func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error) {
-	var buf strings.Builder
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	err := enc.Encode(jsonData)
-	if err != nil {
-		return nil, err
-	}
-	yamlData := []byte(buf.String())
-
 	tmplFmt := NewTemplateFormatter(YamlAgentGroupConfigTemplate)
 	KeyToComment, err := tmplFmt.GenerateKeyToComment()
 	if err != nil {
 		return nil, fmt.Errorf("generate key to comment error: %v", err)
 	}
-	tmplFmt.DataFomatter.fmtValAndRefresh(KeyToComment, true)
+	tmplFmt.DataFomatter.fmtMapValAndRefresh(KeyToComment, true)
 
 	dataFmt := NewDataFommatter()
-	err = dataFmt.Init(yamlData)
+	dataFmt.setKeyToComment(KeyToComment)
+	err = dataFmt.LoadMapData(jsonData)
 	if err != nil {
 		return nil, fmt.Errorf("new data formatter error: %v", err)
 	}
-	err = dataFmt.fmtValAndRefresh(KeyToComment, true)
+	err = dataFmt.fmtMapValAndRefresh(KeyToComment, true)
 	if err != nil {
 		return nil, fmt.Errorf("convert value and refresh error: %v", err)
 	}
@@ -100,19 +92,7 @@ func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, erro
 		return nil, err
 	}
 
-	err = dataFmt.fmtValAndRefresh(KeyToComment, false)
-	if err != nil {
-		return nil, fmt.Errorf("convert value and refresh error: %v", err)
-	}
-
-	buf.Reset()
-	err = enc.Encode(dataFmt.mapData)
-	if err != nil {
-		return nil, err
-	}
-	yamlData = []byte(buf.String())
-
-	return yamlData, nil
+	return dataFmt.formattedYAMLData, nil
 }
 
 func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
@@ -160,7 +140,10 @@ func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
 		}
 		// TODO validate sequence content by comment
 	case yaml.ScalarNode:
-		if nodeTemplate.Tag == "!!float" && node.Tag == "!!int" {
+		if nodeTemplate.Tag == "!!null" { // TODO more strict validation
+			return nil
+		}
+		if (nodeTemplate.Tag == "!!float" && node.Tag == "!!int") || (nodeTemplate.Tag == "!!int" && node.Tag == "!!float") {
 			return nil
 		}
 		if node.Tag != nodeTemplate.Tag {
@@ -182,7 +165,7 @@ func validateNodeAgainstTemplate(node, nodeTemplate *yaml.Node) error {
 }
 
 func ConvertTemplateYAMLToJSON(d DynamicOptions) ([]byte, error) {
-	return NewTemplateFormatter(YamlAgentGroupConfigTemplate).ConvertToJSON(d)
+	return NewTemplateFormatter(YamlAgentGroupConfigTemplate).mapToJSON(d)
 }
 
 type KeyToComment map[string]map[string]interface{}
@@ -198,19 +181,19 @@ func NewTemplateFormatter(data []byte) *TemplateFormatter {
 	}
 }
 
-func (f *TemplateFormatter) ConvertToJSON(d DynamicOptions) ([]byte, error) {
+func (f *TemplateFormatter) mapToJSON(d DynamicOptions) ([]byte, error) {
 	formattedLines, err := f.lineFmt.Format()
 	if err != nil {
 		return nil, fmt.Errorf("format template yaml lines error: %v", err)
 	}
 
-	err = f.DataFomatter.Init(formattedLines)
+	err = f.DataFomatter.LoadYAMLData(formattedLines)
 	if err != nil {
-		return nil, fmt.Errorf("init data formatter error: %v", err)
+		return nil, fmt.Errorf("LoadYAMLData data formatter error: %v", err)
 	}
 	keyToComment := make(KeyToComment)
 	f.generateKeyComment(f.mapData, "", keyToComment)
-	err = f.DataFomatter.fmtValAndRefresh(keyToComment, true)
+	err = f.DataFomatter.fmtMapValAndRefresh(keyToComment, true)
 	if err != nil {
 		return nil, fmt.Errorf("convert dict value to string error: %v", err)
 	}
@@ -348,9 +331,9 @@ func (f *TemplateFormatter) GenerateKeyToComment() (KeyToComment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("format template yaml lines error: %v", err)
 	}
-	err = f.DataFomatter.Init(formattedLines)
+	err = f.DataFomatter.LoadYAMLData(formattedLines)
 	if err != nil {
-		return nil, fmt.Errorf("init data formatter error: %v", err)
+		return nil, fmt.Errorf("LoadYAMLData data formatter error: %v", err)
 	}
 
 	keyToComment := make(KeyToComment)
@@ -543,15 +526,58 @@ func (f *LineFomatter) ignoreTodoComments(start int) (end int) {
 type DynamicOptions map[string]*yaml.Node
 
 type DataFomatter struct {
-	mapData  map[string]interface{}
-	yamlNode *yaml.Node
+	keyToComment KeyToComment
+
+	formattedYAMLData []byte // 与 template.yaml 文件格式一致的 yaml 数据
+	mapData           map[string]interface{}
+	yamlNode          *yaml.Node
 }
 
 func NewDataFommatter() *DataFomatter {
 	return &DataFomatter{}
 }
 
-func (f *DataFomatter) Init(yamlData []byte) error {
+func (f *DataFomatter) setKeyToComment(keyToComment KeyToComment) {
+	f.keyToComment = keyToComment
+}
+
+func (f *DataFomatter) LoadMapData(data map[string]interface{}) error {
+	f.mapData = data
+	yamlData, err := f.mapToYAML()
+	if err != nil {
+		return fmt.Errorf("convert json to yaml error: %v", err)
+	}
+
+	var yamlNode yaml.Node
+	err = yaml.Unmarshal(yamlData, &yamlNode)
+	if err != nil {
+		return fmt.Errorf("unmarshal yaml to node error: %v", err)
+	}
+
+	err = f.stringToDictValue(f.mapData, "", f.keyToComment)
+	if err != nil {
+		return fmt.Errorf("convert dict value to string error: %v", err)
+	}
+	f.formattedYAMLData, err = f.mapToYAML()
+	if err != nil {
+		return fmt.Errorf("convert json to yaml error: %v", err)
+	}
+
+	return nil
+}
+
+func (f *DataFomatter) mapToYAML() ([]byte, error) {
+	var buf strings.Builder
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	err := enc.Encode(f.mapData)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(buf.String()), nil
+}
+
+func (f *DataFomatter) LoadYAMLData(yamlData []byte) error {
 	var mapData map[string]interface{}
 	err := yaml.Unmarshal(yamlData, &mapData)
 	if err != nil {
@@ -567,8 +593,8 @@ func (f *DataFomatter) Init(yamlData []byte) error {
 	return nil
 }
 
-func (f *DataFomatter) ConvertToJSON(keyToComment KeyToComment) ([]byte, error) {
-	err := f.fmtValAndRefresh(keyToComment, true)
+func (f *DataFomatter) mapToJSON(keyToComment KeyToComment) ([]byte, error) {
+	err := f.fmtMapValAndRefresh(keyToComment, true)
 	if err != nil {
 		return nil, fmt.Errorf("convert value and refresh error: %v", err)
 	}
@@ -579,7 +605,7 @@ func (f *DataFomatter) ConvertToJSON(keyToComment KeyToComment) ([]byte, error) 
 	return bytes, nil
 }
 
-func (f *DataFomatter) fmtValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
+func (f *DataFomatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
 	var err error
 	if dictValToStr {
 		err = f.dictValueToString(f.mapData, "", keyToComment)
@@ -595,10 +621,12 @@ func (f *DataFomatter) fmtValAndRefresh(keyToComment KeyToComment, dictValToStr 
 		if err != nil {
 			return fmt.Errorf("marshal map to yaml error: %v", err)
 		}
-		err = yaml.Unmarshal(yamlBytes, f.yamlNode)
+		var yamlNode yaml.Node
+		err = yaml.Unmarshal(yamlBytes, &yamlNode)
 		if err != nil {
 			return fmt.Errorf("unmarshal yaml to node error: %v", err)
 		}
+		f.yamlNode = &yamlNode
 	}
 	return nil
 }
@@ -633,13 +661,13 @@ func (f *DataFomatter) stringToDictValue(data interface{}, ancestors string, key
 			newAncestors := f.appendAncestor(ancestors, key)
 			if !f.isKeyComment(key) {
 				if f.isDictValue(keyToComment[newAncestors]) {
-					fmt.Printf("string to dict value: %#v\n", value)
 					var valueMap map[string]interface{}
 					err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
 					if err != nil {
 						return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
 					}
 					data[key] = valueMap[key]
+					keyToComment["changesDictValue"] = make(map[string]interface{})
 				}
 				f.stringToDictValue(value, newAncestors, keyToComment)
 			}

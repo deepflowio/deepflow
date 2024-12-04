@@ -241,6 +241,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("create agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
 		return nil, err
@@ -323,6 +324,7 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("update agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
 		return nil, err
