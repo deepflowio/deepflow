@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Agent config change TODOs vol.3 [#8616](https://github.com/deepflowio/deepflow/pull/8616) by [rvql](https://github.com/rvql)
+* fix: Agent config change TODOs vol.2 [#8604](https://github.com/deepflowio/deepflow/pull/8604) by [rvql](https://github.com/rvql)
+* fix: bpf does not take effect in analyzer mode [#8603](https://github.com/deepflowio/deepflow/pull/8603) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: errors occurred when modifying some agent group configuration [#8602](https://github.com/deepflowio/deepflow/pull/8602) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix:  pcap,l4_packet, spantrace data exception [#8594](https://github.com/deepflowio/deepflow/pull/8594) by [lzf575](https://github.com/lzf575)
 * fix: TODOs in agent config [#8590](https://github.com/deepflowio/deepflow/pull/8590) by [rvql](https://github.com/rvql)
@@ -248,6 +251,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: supports creating 1h, 1d aggregate data source when using ByConity [#8614](https://github.com/deepflowio/deepflow/pull/8614) by [lzf575](https://github.com/lzf575)
 * feature: adds index to some tables [#8589](https://github.com/deepflowio/deepflow/pull/8589) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feature: adds system alarm of recorder cleaner [#8565](https://github.com/deepflowio/deepflow/pull/8565) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - eBPF Supplement the DPDK configuration description [#8543](https://github.com/deepflowio/deepflow/pull/8543) by [yinjiping](https://github.com/yinjiping)
