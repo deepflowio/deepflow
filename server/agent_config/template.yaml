@@ -993,7 +993,6 @@ inputs:
       #           script_command: ["cat", "/tmp/tag.yaml"]
       #     ```
       # upgrade_from: static_config.os-app-tag-exec
-      # TODO: 样例配置是否需要更新字段名？
       script_command: []
       # type: string
       # name:
@@ -1111,7 +1110,6 @@ inputs:
     # description:
     #   en: |-
     #     Default value `[]` match all languages.
-    # TODO: 6.6 新增
     # ---
     # match_languages: []
     # ---
@@ -1560,9 +1558,10 @@ inputs:
       #     when mirror-traffic-pcp is 8 calculate TAP value from outer vlan tag, when mirror-traffic-pcp is 9
       #     calculate TAP value from inner vlan tag.
       #   ch: |-
-      #     TODO
+      #     当 mirror-traffic-pcp 的值小于等于 7 时，仅当 VLAN PCP 与该值匹配时，从 VLAN tag 中计算 TAP。
+      #     当 mirror-traffic-pcp 的值为 8 时，从外层 VLAN tag 中计算 TAP，
+      #     当 mirror-traffic-pcp 的值为 9 时，从内层 VLAN tag 中计算 TAP。
       # upgrade_from: static_config.mirror-traffic-pcp
-      # TODO: 用途待明确，英文内容不是很理解。
       vlan_pcp_in_physical_mirror_traffic: 0
       # type: bool
       # name:
@@ -1728,8 +1727,7 @@ inputs:
         #   ch: |-
         #     目前支持两种采集 DPDK 流量的方式，包括：
         #     - pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
-        #     - eBPF: 使用 eBPF Uprobe的方式获取 DPDK 流量
-        # TODO: 待整理。
+        #     - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
         source: None
       # type: section
       # name: Libpcap
@@ -2011,7 +2009,6 @@ inputs:
       #     'vlan_pap_in_physical_mirror_traffic'的配置不一致时，deepflow-agent 使用本参数值
       #     标记数据的 TAP 值。
       # upgrade_from: static_config.default-tap-type
-      # TODO: 候选项特殊，需要改写
       default_capture_network_type: 3
       # type: bool
       # name:
@@ -2109,7 +2106,6 @@ inputs:
           #   ch: |-
           #     Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 0 时，Golang 程序的零侵扰追踪特性自动关闭。
           # upgrade_from: static_config.ebpf.go-tracing-timeout
-          # TODO: 类型从数字改为了 duration
           tracing_timeout: 120s
         # type: section
         # name: TLS
@@ -2146,7 +2142,6 @@ inputs:
           #     `cat /proc/<PID>/maps | grep "libssl.so"`
           #     ```
           # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
-          # TODO: 进程匹配要统一修改
           enabled: false
         # type: section
         # name: DPDK
@@ -2742,7 +2737,6 @@ inputs:
         #     - 1: 表示在采集 On-CPU 采样数据时获取 CPUID （On-CPU 剖析时，支持对单个 CPU 的分析）。
         #     - 0: 表示在采集 On-CPU 采样数据时不获取 CPUID （On-CPU 剖析时，不支持单个 CPU 的分析）。
         # upgrade_from: static_config.ebpf.on-cpu-profile.cpu
-        # TODO: 从数值改为了 bool
         aggregate_by_cpu: false
       # type: section
       # name: Off-CPU
@@ -2784,7 +2778,6 @@ inputs:
         #     - 1: 表示在采集 Off-CPU 数据时获取 CPUID （Off-CPU 剖析时，支持对单个 CPU 的分析）。
         #     - 0: 表示在采集 Off-CPU 数据时不获取 CPUID （Off-CPU 剖析时，不支持单个 CPU 的分析）。
         # upgrade_from: static_config.ebpf.off-cpu-profile.cpu
-        # TODO: 从数值改为了 bool
         aggregate_by_cpu: false
         # type: duration
         # name:
@@ -2902,7 +2895,6 @@ inputs:
       #     - 1-proc-event-to-sender
       #     - 1-profile-to-sender
       # upgrade_from: static_config.ebpf-collector-queue-size
-      # TODO: 是否每个 queue 自己的大小？单位是 Byte or block 数？单个 block 数多大？
       collector_queue_size: 65535
       # type: int
       # name:
@@ -2919,9 +2911,8 @@ inputs:
       #     in data processing in user-space. The actual maximal value is the number
       #     of CPU logical cores on the host.
       #   ch: |-
-      #     TODO
+      #     参与用户态数据处理的工作线程数量。实际最大值为主机 CPU 逻辑核心数。
       # upgrade_from: static_config.ebpf.thread-num
-      # TODO: 待明确英文释义。
       userspace_worker_threads: 1
       # type: int
       # name:
@@ -2939,10 +2930,9 @@ inputs:
       #     value is between `2^n` and `2^(n+1)`, it will be automatically adjusted
       #     by the ebpf configurator to the minimum value `2^n`.
       #   ch: |-
-      #     TODO
+      #     内核共享内存占用的页数。值为 `2^n (5 <= n <= 13)`。用于 perf 数据传输。
+      #     如果值在 `2^n` 和 `2^(n+1)` 之间，将自动调整到最小值 `2^n`。
       # upgrade_from: static_config.ebpf.perf-pages-count
-      # TODO: 准确含义是什么？名字不太清晰
-      # TODO: 待明确英文释义。
       perf_pages_count: 128
       # type: int
       # name:
@@ -2959,10 +2949,9 @@ inputs:
       #     If the value is between `2^n` and `2^(n+1)`, it will be automatically
       #     adjusted by the ebpf configurator to the minimum value `2^n`.
       #   ch: |-
-      #     TODO
+      #     内核环形队列的大小。值为 `2^n (13 <= n <= 17)`。
+      #     如果值在 `2^n` 和 `2^(n+1)` 之间，将自动调整到最小值 `2^n`。
       # upgrade_from: static_config.ebpf.ring-size
-      # TODO: 含义确认
-      # TODO: 待明确英文释义。
       kernel_ring_size: 65536
       # type: int
       # name:
@@ -2978,9 +2967,8 @@ inputs:
       #     Set the maximum value of hash table entries for socket tracking, depending
       #     on the number of concurrent requests in the actual scenario
       #   ch: |-
-      #     TODO
+      #     设置 socket tracking 哈希表的最大条目数，根据实际场景中的并发请求数量而定。
       # upgrade_from: static_config.ebpf.max-socket-entries
-      # TODO: 待明确英文释义。
       max_socket_entries: 131072
       # type: int
       # name:
@@ -2995,9 +2983,8 @@ inputs:
       #   en: |-
       #     The threshold for cleaning socket map table entries.
       #   ch: |-
-      #     TODO
+      #     Socket map 表条目清理阈值。
       # upgrade_from: static_config.ebpf.socket-map-max-reclaim
-      # TODO: 待明确英文释义。
       socket_map_reclaim_threshold: 120000
       # type: int
       # name:
@@ -3012,9 +2999,8 @@ inputs:
       #   en: |-
       #     Set the maximum value of hash table entries for thread/coroutine tracking sessions.
       #   ch: |-
-      #     TODO
+      #     线程和协程追踪的最大哈希表条目数。
       # upgrade_from: static_config.ebpf.max-trace-entries
-      # TODO: 待明确英文释义。
       max_trace_entries: 131072
   # type: section
   # name:
@@ -3038,7 +3024,6 @@ inputs:
     #   ch: |-
     #     deepflow-agent 主动向 deepflow-server 上报/同步资源信息的时间间隔。
     # upgrade_from: platform_sync_interval
-    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
     push_interval: 10s
     # type: section
     # name:
@@ -3058,13 +3043,24 @@ inputs:
       # description:
       #   en: |-
       #     When enabled, deepflow-agent will automatically synchronize virtual
-      #     machine and network information on the KVM (or Host) to deepflow-server.
+      #     machine and network information on KVM or Linux Host to deepflow-server.
+      #     Information collected includes:
+      #     - raw_all_vm_xml
+      #     - raw_vm_states
+      #     - raw_ovs_interfaces
+      #     - raw_ovs_ports
+      #     - raw_brctl_show
+      #     - raw_vlan_config
       #   ch: |-
-      #     开启开关后，deepflow-agent 将采集宿主机中的 VM 信息和网络信息，并上报/同步至 deepflow-server。
+      #     开启开关后，deepflow-agent 将采集 KVM 或 Linux 宿主机中的 VM 信息和网络信息，并上报/同步至 deepflow-server。
+      #     采集的信息包括：
+      #     - raw_all_vm_xml
+      #     - raw_vm_states
+      #     - raw_ovs_interfaces
+      #     - raw_ovs_ports
+      #     - raw_brctl_show
+      #     - raw_vlan_config
       # upgrade_from: platform_enabled
-      # TODO: 原来是 int，需要改为 bool
-      # TODO: 到底包含采集哪些信息？决定起什么名字
-      # TODO: 是否仅对 Trident 有效？【是的】
       hypervisor_resource_enabled: false
       # type: int
       # name:
@@ -3137,10 +3133,14 @@ inputs:
       #        - tap2d283dfe,11:22:33:44:55:66
       #        - tap2d283223,aa:bb:cc:dd:ee:ff
       #   ch: |-
-      #     TODO
+      #     复杂环境中，TAP 网卡的 MAC 地址映射关系可以通过编写脚本实现。使用脚本时需要满足以下条件：
+      #     1. if_mac_source = 2
+      #     2. tap_mode = 0
+      #     3. TAP 网卡的名称与虚拟机 XML 文件中的名称相同
+      #     4. 脚本输出格式如下：
+      #        - tap2d283dfe,11:22:33:44:55:66
+      #        - tap2d283223,aa:bb:cc:dd:ee:ff
       # upgrade_from: static_config.tap-mac-script
-      # TODO: 增加了最小、最大长度
-      # TODO: 英文释义待明确。
       vm_mac_mapping_script: ""
     # type: section
     # name:
@@ -3159,11 +3159,10 @@ inputs:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Used when deepflow-agent has only one k8s namespace query permission.
+      #     Specify the namespace for agent to query K8s resources.
       #   ch: |-
-      #     TODO
+      #     指定采集器获取 K8s 资源时的命名空间
       # upgrade_from: static_config.kubernetes-namespace
-      # TODO: 英文释义待明确。
       kubernetes_namespace:
       # type: dict
       # name:
@@ -3215,7 +3214,6 @@ inputs:
       #           - name: routes
       #     ```
       # upgrade_from: static_config.kubernetes-resources
-      # TODO: dict 类型的字段升级时要注意
       # ---
       # type: string
       # name:
@@ -3326,9 +3324,8 @@ inputs:
       #   en: |-
       #     Used when limit k8s api list entry size.
       #   ch: |-
-      #     TODO
+      #     用于指定 K8s 资源获取分页大小。
       # upgrade_from: static_config.kubernetes-api-list-limit
-      # TODO: 英文释义待明确。
       api_list_page_size: 1000
       # type: duration
       # name:
@@ -3343,10 +3340,8 @@ inputs:
       #   en: |-
       #     Interval of listing resource when watcher idles
       #   ch: |-
-      #     TODO
+      #     当 watcher 未收到更新时，获取 K8s 资源的间隔时间。
       # upgrade_from: static_config.kubernetes-api-list-interval
-      # TODO: 以前没有最大值限制，我加上了 30d
-      # TODO: 英文释义待明确。
       api_list_max_interval: 10m
       # type: string
       # name: Ingress Flavour
@@ -3431,7 +3426,6 @@ inputs:
       #   ch: |-
       #     TODO
       # upgrade_from: pod_cluster_internal_ip
-      # TODO: 改变了值的类型
       # TODO: 与上边参数是否重复？
       only_kubernetes_pod_ip_in_local_cluster: false
   # type: section
@@ -3455,7 +3449,6 @@ inputs:
     #     开关开启后，deepflow-agent 将开启外部数据的接收服务接口，以集成来自 Prometheus、
     #     Telegraf、OpenTelemetry 和 Skywalking 的数据。
     # upgrade_from: external_agent_http_proxy_enabled
-    # TODO: 原来是 int，需要改为 bool
     enabled: true
     # type: int
     # name:
@@ -3557,12 +3550,11 @@ inputs:
       #   ch: |-
       #     Prometheus 额外 label 的列表。
       # upgrade_from: static_config.prometheus-extra-config.labels
-      # TODO: 这里如何配置？原来的例子应该不对，只有 key 没有 value
       extra_labels: []
       # type: int
       # name:
-      #   en: Label Length Limit
-      #   ch: Label 键长度限制
+      #   en: Label Key Total Length Limit
+      #   ch: Label 键总长度限制
       # unit: byte
       # range: [1024, 1048576]
       # enum_options: []
@@ -3570,16 +3562,15 @@ inputs:
       # ee_feature: false
       # description:
       #   en: |-
-      #     The size limit of the parsed key.
+      #     The limit of the total length of parsed extra Prometheus label keys.
       #   ch: |-
-      #     deepflow-agent 对 Prometheus 额外 label 解析并采集时，key 字段的长度上限。
+      #     deepflow-agent 对 Prometheus 额外 label 解析并采集时，key 字段长度总和的上限。
       # upgrade_from: static_config.prometheus-extra-config.labels-limit
-      # TODO: 是 labels limit 还是 label-length limit?
       label_length: 1024
       # type: int
       # name:
-      #   en: Value Length Limit
-      #   ch: Label 值长度限制
+      #   en: Value Total Length Limit
+      #   ch: Label 值总长度限制
       # unit: byte
       # range: [4096, 4194304]
       # enum_options: []
@@ -3587,11 +3578,10 @@ inputs:
       # ee_feature: false
       # description:
       #   en: |-
-      #     The size limit of the parsed value.
+      #     The limit of the total length of parsed extra Prometheus label values.
       #   ch: |-
-      #     deepflow-agent 对 Prometheus 额外 label 解析并采集时，value 字段的长度上限。
+      #     deepflow-agent 对 Prometheus 额外 label 解析并采集时，value 字段长度总和的上限。
       # upgrade_from: static_config.prometheus-extra-config.values-limit
-      # TODO: 是 values limit 还是 value-length limit?
       value_length: 4096
     # type: section
     # name:
@@ -3712,7 +3702,7 @@ processors:
       #   ch: |-
       #     调大该参数，deepflow-agent 将消耗更多的内存。
       # upgrade_from: static_config.forward-capacity
-      # TODO: 需要确定最大值能配多少
+      # TODO: 需要解释字段含义
       forward_table_capacity: 16384
       # type: int
       # name:
@@ -3730,8 +3720,7 @@ processors:
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.first-path-level
-      # TODO: 这个名字不太清晰？
-      # TODO: 英文释义待明确。
+      # TODO: 需要解释字段含义
       max_first_path_level: 8
     # type: section
     # name:
@@ -3753,10 +3742,8 @@ processors:
       #     When generating TCP header data, each flow uses one block to compress and
       #     store multiple TCP headers, and the block size can be set here.
       #   ch: |-
-      #     TODO
+      #     压缩和保存多个 TCP 包头的缓冲区大小。
       # upgrade_from: static_config.packet-sequence-block-size
-      # TODO: 增加了最小、最大值
-      # TODO: block size 设多大合适呢？
       block_size: 256
       # type: int
       # name:
@@ -3774,8 +3761,6 @@ processors:
       #   ch: |-
       #     TCP 包时序数据的单个发送队列的大小。
       # upgrade_from: static_config.packet-sequence-queue-size
-      # TODO: 增加了最大值
-      # TODO: 该参数在什么样情况下需要调整呢？
       sender_queue_size: 65536
       # type: int
       # name:
@@ -3804,7 +3789,6 @@ processors:
       #     ```
       #     flag 设置为`0`表示全部关闭，设置为`255`表示全部
       # upgrade_from: static_config.packet-sequence-flag
-      # TODO: 英文中的的 bit 位是不是错位了？
       header_fields_flag: 0b0000_0000
     # type: section
     # name:
@@ -3828,7 +3812,6 @@ processors:
       #   ch: |-
       #     设置 deepflow-agent 的 1-mini-meta-packet-to-pcap 队列大小。
       # upgrade_from: static_config.pcap.queue-size
-      # TODO: 增加了最大值
       receiver_queue_size: 65536
       # type: int
       # name:
