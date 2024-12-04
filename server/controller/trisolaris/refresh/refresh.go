@@ -65,7 +65,7 @@ func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
 	if len(dataTypes) == 0 || (len(localControllerIPs) == 0 && len(remoteControllerIPs) == 0) {
 		return
 	}
-	log.Infof("refresh cache for trisolaris(%v %v)", localControllerIPs, remoteControllerIPs)
+	log.Infof("refresh cache for trisolaris(%v %v), orgID(%d), dataTypes(%v)", localControllerIPs, remoteControllerIPs, orgID, dataTypes)
 	params := url.Values{}
 	params.Add("org_id", strconv.Itoa(orgID))
 	for _, dataType := range dataTypes {

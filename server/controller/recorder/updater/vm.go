@@ -18,6 +18,7 @@ package updater
 
 import (
 	"encoding/json"
+	"time"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -27,6 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
 
 type VM struct {
@@ -112,8 +114,14 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {
 		dbItem.CreatedAt = cloudItem.CreatedAt
+		m.recordStatsd(cloudItem)
 	}
 	return dbItem, true
+}
+
+func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
+	syncDelay := time.Since(cloudItem.CreatedAt).Seconds()
+	m.statsd.GetMonitor(statsd.TagTypeVMSyncDelay).Fill(int(syncDelay))
 }
 
 func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.VMFieldsUpdate, map[string]interface{}, bool) {
