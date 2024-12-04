@@ -30,6 +30,7 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -52,6 +53,12 @@ func newSubDomains(ctx context.Context, cfg config.RecorderConfig, eventQueue *q
 		eventQueue: eventQueue,
 
 		refreshers: make(map[string]*subDomain),
+	}
+}
+
+func (s *subDomains) CloseStatsd() {
+	for _, refresher := range s.refreshers {
+		refresher.statsd.Close()
 	}
 }
 
@@ -109,6 +116,7 @@ func (s *subDomains) newRefresher(lcuuid string) (*subDomain, error) {
 
 type subDomain struct {
 	metadata *rcommon.Metadata
+	statsd   *statsd.SubDomainStatsd
 
 	domainToolDataSet *tool.DataSet
 	cache             *cache.Cache
@@ -118,6 +126,7 @@ type subDomain struct {
 func newSubDomain(eventQueue *queue.OverwriteQueue, md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
 	return &subDomain{
 		metadata: md,
+		statsd:   statsd.NewSubDomainStatsd(md),
 
 		domainToolDataSet: domainToolDataSet,
 		cache:             cache,
@@ -207,7 +216,7 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 		updater.NewPodReplicaSet(s.cache, cloudData.PodReplicaSets).RegisterListener(
 			listener.NewPodReplicaSet(s.cache)),
 		updater.NewPod(s.cache, cloudData.Pods).RegisterListener(
-			listener.NewPod(s.cache, s.eventQueue)),
+			listener.NewPod(s.cache, s.eventQueue)).BuildStatsd(s.statsd),
 		updater.NewNetwork(s.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(s.cache)),
 		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(
@@ -252,6 +261,8 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 	if syncAt.IsZero() {
 		return
 	}
+	log.Infof("update sub_domain synced_at: %s", syncAt.Format(common.GO_BIRTHDAY), s.metadata.LogPrefixes)
+
 	var subDomain mysqlmodel.SubDomain
 	err := s.metadata.DB.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
