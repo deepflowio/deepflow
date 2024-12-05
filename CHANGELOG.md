@@ -248,6 +248,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: register esxi vtap support cloudtower [#8599](https://github.com/deepflowio/deepflow/pull/8599) by [askyrie](https://github.com/askyrie)
+* feat: querier add version check [#8235](https://github.com/deepflowio/deepflow/pull/8235) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feature: adds index to some tables [#8589](https://github.com/deepflowio/deepflow/pull/8589) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feature: adds system alarm of recorder cleaner [#8565](https://github.com/deepflowio/deepflow/pull/8565) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - eBPF Supplement the DPDK configuration description [#8543](https://github.com/deepflowio/deepflow/pull/8543) by [yinjiping](https://github.com/yinjiping)
@@ -534,6 +536,7 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: add primary key for in_process table [#8623](https://github.com/deepflowio/deepflow/pull/8623) by [lzf575](https://github.com/lzf575)
 * perf: modify materialized view local table without group by [#8575](https://github.com/deepflowio/deepflow/pull/8575) by [lzf575](https://github.com/lzf575)
 * perf: improve the performance of json string escape [#8508](https://github.com/deepflowio/deepflow/pull/8508) by [lzf575](https://github.com/lzf575)
 * perf: use template instead of Interface{} in LockFreePool [#8372](https://github.com/deepflowio/deepflow/pull/8372) by [lzf575](https://github.com/lzf575)
