@@ -237,16 +237,14 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
-      #     When the load of the Linux system divided by the number of
+      #     When Linux system load divided by the number of
       #     CPU cores exceeds this value, the agent automatically enters
-      #     the disabled state. It will automatically recover if it remains
-      #     below 90% of this value for a continuous 5 minutes. Setting it
-      #     to 0 disables this feature.
+      #     the disabled state.
+      #     Setting it or `recovery_threshold` to 0 disables this feature.
       #   ch: |-
-      #     当`相对系统负载`高于此阈值时，deepflow-agent 自动停止运行；取值为 0 时，该特性不生效。
+      #     当`相对系统负载`（load 除以 CPU 核数）高于此阈值时，采集器自动停止运行。
+      #     设置该值或 `recovery_threshold` 为 0 时，该特性不生效。
       # upgrade_from: system_load_circuit_breaker_threshold
-      # TODO: 待核实————连续 5 分钟低于 90% 是否自动恢复（与 recovery_threshold 的英文解释冲突）？
-      # TODO: 待核实————trigger_threshold 与 recovery_threshold 任意为 0 均会关闭特性？
       trigger_threshold: 1.0
       # type: float
       # name:
@@ -259,16 +257,16 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
-      #     When the system load of the Linux system divided by the
-      #     number of CPU cores is continuously below this value for 5
+      #     After deepflow-agent enters disabled state and Linux system load
+      #     divided by the number of CPU cores is continuously below this value for 5
       #     minutes, the agent can recover from the circuit breaker
-      #     disabled state, and setting it to 0 means turning off the
-      #     circuit breaker feature.
+      #     disabled state.
+      #     Setting it or `trigger_threshold` to 0 disables this feature.
       #   ch: |-
-      #     当`相对系统负载`连续 5 分钟低于此阈值时，deepflow-agent 自动从
-      #     停止状态恢复运行。取值为 0 时，该特性不生效。
+      #     在采集器处于停止状态后，当`相对系统负载`（load 除以 CPU 核数）连续 5 分钟低于此阈值时，
+      #     采集器自动从停止状态恢复运行。
+      #     设置该值或 `trigger_threshold` 为 0 时，该特性不生效。
       # upgrade_from: system_load_circuit_breaker_recover
-      # TODO: 待核实————连续 5 分钟低于此值是否自动恢复（感觉与 trigger_threshold 的英文解释冲突）
       recovery_threshold: 0.9
       # type: string
       # name:
@@ -492,7 +490,6 @@ global:
     #     当 deepflow-agent 与 deepflow-server 之间的时间偏移大于‘min_drift’设置值时，对 agent 的
     #     时间戳进行纠正。
     # upgrade_from: static_config.ntp-min-interval
-    # TODO: 默认值 10s 代表 10s 内的时间偏差不做纠正吗？
     min_drift: 10s
   # type: section
   # name:
@@ -550,15 +547,15 @@ global:
     # description:
     #   en: |-
     #     When this value is set, deepflow-agent will use this IP to access the
-    #     control plane port of deepflow-server, which is usually used when
-    #     deepflow-server uses an external load balancer.
+    #     control plane port of deepflow-server, otherwise, the server will use
+    #     its own node IP as the control plane communication IP. This parameter is
+    #     usually used when the server uses a load balancer or a virtual IP to
+    #     provide services externally.
     #   ch: |-
-    #     用于设置 deepflow-server 向 deepflow-agent 下发的 server 端控制面通信 IP；如果不设置本
-    #     参数，server 下发自己的节点 IP 作为 server 端控制面通信IP。该参数通常用于 server 端使用负载
-    #     均衡或虚 IP 对外提供服务的场景。
+    #     用于设置 deepflow-agent 与 server 通信的控制面通信 IP；如果不设置本
+    #     参数，server 下发自己的节点 IP 作为 server 端控制面通信IP。
+    #     该参数通常用于 server 端使用负载均衡或虚 IP 对外提供服务的场景。
     # upgrade_from: proxy_controller_ip
-    # TODO: 字段名容易与 agent 的 yaml 文件中的 controller_ip 产生混淆。
-    # TODO: 中文描述与英文差异较大，待审核。
     proxy_controller_ip: "127.0.0.1"
     # type: int
     # name:
@@ -649,9 +646,11 @@ global:
     #     set an additional NAT IP for each deepflow-server address, and modify this
     #     value to true.
     #   ch: |-
-    #     TODO
+    #     当 deepflow-agent 使用外部 IP 地址访问 deepflow-server 时，设置本参数为 true。
+    #     例如，当 deepflow-server 位于 NAT 网关后，或 deepflow-server 所在的主机有多个
+    #     节点 IP 地址，不同的 deepflow-agent 需要访问不同的节点 IP 地址时，可以为每个
+    #     deepflow-server 地址设置一个额外的 NAT IP，并将本参数设置为 true。
     # upgrade_from: nat_ip_enabled
-    # TODO: 待明确与 controller_ip 的关系。
     request_via_nat_ip: false
   # type: section
   # name:
@@ -886,7 +885,6 @@ inputs:
     #     开启后 deepflow-agent 将获取操作系统的进程信息，并上报至 deepflow-server。该参数仅对
     #     CHOST_VM, CHOST_BM, K8S_VM, K8S_BM 等运行环境的 agent 有效。
     # upgrade_from: static_config.os-proc-sync-enabled
-    # TODO: 待确认——英文名是否需要修改。
     enabled: false
     # type: string
     # name:
@@ -1064,7 +1062,6 @@ inputs:
     #           match_type: tag
     #     ```
     # upgrade_from: static_config.os-proc-regex
-    # TODO: 注意 dict 的升级
     # ---
     # type: string
     # name:
@@ -1478,7 +1475,6 @@ inputs:
       #           - slave_interfaces: [eth2, eth3]
       #     ```
       # upgrade_from: static_config.tap-interface-bond-groups
-      # TODO: dict 中的配置注意升级问题
       # ---
       # type: string
       # name:
@@ -1495,7 +1491,6 @@ inputs:
       #   ch: |-
       #     Bond 网卡的从网卡列表。
       # upgrade_from: static_config.tap-interface-bond-groups.tap-interfaces
-      # TODO: 待理解场景。
       # ---
       # slave_interfaces: []
       bond_interfaces: []
@@ -1915,7 +1910,7 @@ inputs:
       #   ch: |-
       #     deepflow-agent 采集数据包的速率上限。
       # upgrade_from: max_collect_pps
-      # TODO: 默认值偏小了，默认设置为 0 表示不限速？
+      # TODO: 默认值偏小了
       max_capture_pps: 200000
     # type: section
     # name:
@@ -3403,7 +3398,6 @@ inputs:
       #     下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
       #     仅获取部分云平台的数据。
       # upgrade_from: domains
-      # TODO: 特殊字段，候选项需要通过自己的 API 获取。这个字段是 int 还是 string？默认值为空数组更合理？
       # TODO: local domain 如何配置？是否需要以云平台为单位，对 agent 配置 lcuuid？
       domain_filter: [0]
       # type: bool
@@ -3824,12 +3818,10 @@ processors:
       # ee_feature: true
       # description:
       #   en: |-
-      #     Buffer flushes when one of the flows reach this limit.
+      #     PCap buffer size per flow. Will flush the flow when reach this limit.
       #   ch: |-
-      #     TODO
+      #     按流的 PCap 缓冲区大小。到达该值时 flush 该条流的 PCap 数据。
       # upgrade_from: static_config.pcap.flow-buffer-size
-      # TODO: 增加了最小、最大值
-      # TODO: 含义待确定，调整场景待确定。
       buffer_size_per_flow: 65536
       # type: int
       # name:
@@ -3842,13 +3834,10 @@ processors:
       # ee_feature: true
       # description:
       #   en: |-
-      #     Buffer flushes when total data size reach this limit,
-      #     cannot exceed sender buffer size 128K.
+      #     Total PCap buffer size. Will flush all flows when reach this limit.
       #   ch: |-
-      #     TODO
+      #     PCap 总缓冲区大小。到达该值时 flush 所有流的 PCap 数据。
       # upgrade_from: static_config.pcap.buffer-size
-      # TODO: 增加了最小、最大值。注意这里最大值还要梳理一下，是否只能 128K
-      # TODO: 含义待确定，调整场景待确定。
       total_buffer_size: 88304
       # type: duration
       # name:
@@ -3861,12 +3850,10 @@ processors:
       # ee_feature: true
       # description:
       #   en: |-
-      #     Flushes a flow if its first packet were older then this interval.
+      #     Flushes the PCap buffer of a flow if it has not been flushed for this interval.
       #   ch: |-
-      #     TODO
+      #     如果一条流的 PCap buffer 超过这个时间没有进行过 flush，强制触发一次 flush。
       # upgrade_from: static_config.pcap.flush-interval
-      # TODO: 增加了最小、最大值。
-      # TODO: 含义待确定，调整场景待确定。
       flush_interval: 1m
     # type: section
     # name: TOA (TCP Option Address)
@@ -3883,12 +3870,12 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     TODO
+      #     The length of the following queues:
+      #     - 1-socket-sync-toa-info-queue
       #   ch: |-
-      #     TODO
+      #     以下队列的大小：
+      #     - 1-socket-sync-toa-info-queue
       # upgrade_from: static_config.toa-sender-queue-size
-      # TODO: 以前最小值写的 1，是笔误吗？另外加上了最大值限制。以及以前的描述信息不对，需要重写。
-      # TODO: 含义待明确。
       sender_queue_size: 65536
       # type: int
       # name:
@@ -3903,9 +3890,8 @@ processors:
       #   en: |-
       #     Size of tcp option address info cache size.
       #   ch: |-
-      #     含义待明确。
+      #     TCP Option Address 信息缓存大小。
       # upgrade_from: static_config.toa-lru-cache-size
-      # TODO: 增加了最大值限制
       cache_size: 65536
   # type: section
   # name:
@@ -3942,7 +3928,6 @@ processors:
       #     出该四元组承载的应用协议，agent 会将该四元组标记为 unknown 类型，并在本周期内暂停对后续数据的应用
       #     协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
       # upgrade_from: static_config.l7-protocol-inference-max-fail-count
-      # TODO: Function Data 也能用于识别协议类型吗？
       inference_max_retries: 5
       # type: duration
       # name:
@@ -4070,7 +4055,11 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Port-list example: `80,1000-2000`
+      #     Port-list example:
+      #     ```
+      #     HTTP: 80,1000-2000
+      #     HTTP2: 1-65535
+      #     ```
       #
       #     HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
       #     All data obtained through uprobe is not subject to port restrictions.
@@ -4081,14 +4070,21 @@ processors:
       #
       #     Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
-      #     配置样例: `80,1000-2000`
+      #     配置样例:
+      #     ```
+      #     HTTP: 80,1000-2000
+      #     HTTP2: 1-65535
+      #     ```
       #
       #     注意：
       #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
+      #
+      #     支持协议：https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+      #
       #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
-      # TODO: 格式改成和 l7-log-blacklist 一样，不用 dict 了，这样 key 更明确，且默认值的行为更明确。
-      # TODO: 注意这个配置项有下一级配置，但它不是 section 类型的
       port_number_prefilters:
         HTTP: 1-65535
         HTTP2: 1-65535
@@ -4182,7 +4178,6 @@ processors:
         #
         #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
         # upgrade_from: static_config.l7-log-blacklist.$protocol
-        # TODO: 注意升级
         # ---
         # type: string
         # name:
@@ -4229,9 +4224,8 @@ processors:
         #   en: |-
         #     Match field value.
         #   ch: |-
-        #     TODO
+        #     匹配字段。
         # upgrade_from: static_config.l7-log-blacklist.$protocol.value
-        # TODO: 待补充。
         # ---
         # field_value: ""
         HTTP: []
@@ -4477,7 +4471,6 @@ processors:
         #     - 提取 URL 最前的数段（段数由参数确定，默认值为 2）作为 endpoint。
         #     比如，URL 为 `/a/b/c?query=xxx`，deepflow-agent 默认提取 `/a/b` 作为 endpoint。
         # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules
-        # TODO: 注意 dict 字段的升级。
         # ---
         # type: string
         # name:
@@ -4492,9 +4485,8 @@ processors:
         #   en: |-
         #     HTTP URL prefix.
         #   ch: |-
-        #     TODO
+        #     HTTP URL 前缀。
         # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules.prefix
-        # TODO: 待补充
         # ---
         # url_prefix: ""
         # ---
@@ -4511,9 +4503,8 @@ processors:
         #   en: |-
         #     Keep how many segments.
         #   ch: |-
-        #     TODO
+        #     截取 URL 的段数。
         # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules.keep-segments
-        # TODO: 待补充
         # ---
         # keep_segments: 0
         match_rules:
@@ -4663,15 +4654,14 @@ processors:
       # description:
       #   en: |-
       #     The maximum data length used for application protocol identification,
-      #     note that the effective value is less than or equal to the value of
+      #     note that the effective value is less than the value of
       #     capture_packet_size.
       #
       #     NOTE: For eBPF data, the largest valid value is 16384.
       #   ch: |-
-      #     应用调用日志采集解析的最大 payload 长度。
+      #     应用调用日志采集解析的最大 payload 长度。注意实际的值小于 capture_packet_size。
       #     注意：eBPF 数据的 payload 可解析长度上限为 16384 Byte。
       # upgrade_from: l7_log_packet_size
-      # TODO: 此处的字节数指的是 payload 长度吗？capture_packet_size是指的含L2帧头部的长度吧？两者是否不匹配？
       payload_truncation: 1024
       # type: int
       # name:
@@ -4805,11 +4795,11 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Flush interval of the queue connected to the collector.
+      #     Flow generation delay time in FlowMap, used to increase the window size
+      #     in downstream processing units to avoid pushing the window too fast.
       #   ch: |-
-      #     TODO
+      #     FlowMap 中流产生延迟时间，用于在下游处理单元中增加窗口大小，避免窗口推动过快。
       # upgrade_from: static_config.flow.flush-interval
-      # TODO: 英文释义待理解，使用场景待分析。
       flow_flush_interval: 1s
       # type: section
       # name:
@@ -4913,7 +4903,6 @@ processors:
         #   ch: |-
         #     TCP 状态机的建连状态超时时长。
         # upgrade_from: static_config.flow.established-timeout
-        # TODO: 待确认。
         established: 300s
         # type: duration
         # name: Closing RST

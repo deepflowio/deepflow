@@ -2707,7 +2707,7 @@ impl From<&RuntimeConfig> for UserConfig {
                                 match_regex: regex,
                                 match_type: ProcessMatchType::from(o.match_type.as_str()),
                                 rewrite_name: o.rewrite_name.clone(),
-                                action: ProcessMatchAction::from(o.action.as_str()),
+                                ignore: o.action.as_str() == OS_PROC_REGEXP_MATCH_ACTION_DROP,
                                 enabled_features: vec!["proc.gprocess_info".to_string()],
                                 ..Default::default()
                             });
@@ -3011,7 +3011,6 @@ impl From<&RuntimeConfig> for UserConfig {
                     },
                     tunning: OutputsFlowLogTunning {
                         collector_queue_size: rc.yaml_config.flow_sender_queue_size,
-                        collector_queue_count: rc.yaml_config.flow_sender_queue_count,
                     },
                 },
                 flow_metrics: FlowMetrics {
@@ -3025,7 +3024,6 @@ impl From<&RuntimeConfig> for UserConfig {
                     },
                     tunning: FlowMetricsTunning {
                         sender_queue_size: rc.yaml_config.collector_sender_queue_size,
-                        sender_queue_count: rc.yaml_config.collector_sender_queue_count,
                     },
                 },
                 npb: Npb {
@@ -3053,7 +3051,6 @@ impl From<&RuntimeConfig> for UserConfig {
                     tcp_header: TcpHeader {
                         block_size: rc.yaml_config.packet_sequence_block_size,
                         sender_queue_size: rc.yaml_config.packet_sequence_queue_size,
-                        sender_queue_count: rc.yaml_config.packet_sequence_queue_count,
                         header_fields_flag: rc.yaml_config.packet_sequence_flag,
                     },
                     pcap_stream: PcapStream {
@@ -3118,8 +3115,8 @@ impl From<&RuntimeConfig> for UserConfig {
                     },
                     tag_extraction: RequestLogTagExtraction {
                         tracing_tag: TracingTag {
-                            http_real_client: rc.http_log_proxy_client.clone(),
-                            x_request_id: rc.http_log_x_request_id.clone(),
+                            http_real_client: rc.http_log_proxy_client.split(',').map(|s| s.to_string()).collect(),
+                            x_request_id: rc.http_log_x_request_id.split(',').map(|s| s.to_string()).collect(),
                             apm_trace_id: rc
                                 .http_log_trace_id
                                 .split(',')
@@ -3521,6 +3518,8 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_pro
 pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS: &'static str = "cmdline_with_args";
 
+pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
+pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
 // use for proc scan match and replace
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
