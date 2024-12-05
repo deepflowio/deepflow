@@ -67,9 +67,9 @@ func createPlugin(c *gin.Context) {
 		return
 	}
 	plugin := &mysqlmodel.Plugin{
-		Name: c.PostForm("NAME"),
-		Type: t,
-		User: u,
+		Name:     c.PostForm("NAME"),
+		Type:     t,
+		UserName: u,
 	}
 
 	// get file
