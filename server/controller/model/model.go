@@ -262,7 +262,7 @@ type DataSource struct {
 	State                     int    `json:"STATE"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID"`
 	BaseDataSourceDisplayName string `json:"BASE_DATA_SOURCE_NAME"`
-	Interval                  int    `json:"INTERVAL"`
+	IntervalTime              int    `json:"INTERVAL_TIME"`
 	RetentionTime             int    `json:"RETENTION_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR"`
 	UnSummableMetricsOperator string `json:"UNSUMMABLE_METRICS_OPERATOR"`
@@ -275,7 +275,7 @@ type DataSourceCreate struct {
 	DisplayName               string `json:"DISPLAY_NAME" binding:"required,min=1,max=10"`
 	DataTableCollection       string `json:"DATA_TABLE_COLLECTION" binding:"required,oneof=flow_metrics.network* flow_metrics.application*"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID" binding:"required"`
-	Interval                  int    `json:"INTERVAL" binding:"required"`
+	IntervalTime              int    `json:"INTERVAL_TIME" binding:"required"`
 	RetentionTime             int    `json:"RETENTION_TIME" binding:"required,min=1"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR" binding:"required,oneof=Sum Max Min"`
 	UnSummableMetricsOperator string `json:"UNSUMMABLE_METRICS_OPERATOR" binding:"required,oneof=Avg Max Min"`
@@ -664,7 +664,7 @@ type GenesisProcess struct {
 	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
-	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
+	UserName    string    `gorm:"column:user_name;type:varchar(256);default:null" json:"USER_NAME"`
 	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
 	NodeIP      string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	StartTime   time.Time `gorm:"column:start_time;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"START_TIME"`
@@ -721,7 +721,7 @@ type MailServerCreate struct {
 	Status       int    `json:"STATUS"`
 	Host         string `json:"HOST" binding:"required"`
 	Port         int    `json:"PORT" binding:"required"`
-	User         string `json:"USER" binding:"required"`
+	UserName     string `json:"USER_NAME" binding:"required"`
 	Password     string `json:"PASSWORD" binding:"required"`
 	NtlmEnabled  int    `json:"NTLM_ENABLED"`
 	NtlmName     string `json:"NTLM_NAME"`
@@ -733,7 +733,7 @@ type MailServerUpdate struct {
 	Status       int    `json:"STATUS"`
 	Host         string `json:"HOST"`
 	Port         int    `json:"PORT"`
-	User         string `json:"USER"`
+	UserName     string `json:"USER_NAME"`
 	Password     string `json:"PASSWORD"`
 	NtlmEnabled  int    `json:"NTLM_ENABLED"`
 	NtlmName     string `json:"NTLM_NAME"`
@@ -746,7 +746,7 @@ type MailServer struct {
 	Status       int    `json:"STATUS"`
 	Host         string `json:"HOST"`
 	Port         int    `json:"PORT"`
-	User         string `json:"USER"`
+	UserName     string `json:"USER_NAME"`
 	Password     string `json:"PASSWORD"`
 	Security     string `json:"SECURITY"`
 	NtlmEnabled  int    `json:"NTLM_ENABLED"`

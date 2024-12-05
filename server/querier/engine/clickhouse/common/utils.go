@@ -190,16 +190,16 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		return 1, errors.New(fmt.Sprintf("get datasource interval error, url: %s, code '%d'", url, response.StatusCode))
+		return 1, errors.New(fmt.Sprintf("get datasource interval_time error, url: %s, code '%d'", url, response.StatusCode))
 	}
 	body, err := ParseResponse(response)
 	if err != nil {
 		return 1, err
 	}
 	if body["DATA"] == nil || len(body["DATA"].([]interface{})) < 1 {
-		return 1, errors.New(fmt.Sprintf("get datasource interval error, url: %s, response: '%v'", url, body))
+		return 1, errors.New(fmt.Sprintf("get datasource interval_time error, url: %s, response: '%v'", url, body))
 	}
-	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
+	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL_TIME"].(float64)), nil
 }
 
 func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (values []interface{}) {
