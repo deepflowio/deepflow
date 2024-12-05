@@ -15,9 +15,11 @@
 * fix: trim-tunnel-type has not taken effect [#8578](https://github.com/deepflowio/deepflow/pull/8578) by [yuanchaoa](https://github.com/yuanchaoa)
 
 #### Performance
+* perf: add primary key for in_process table [#8624](https://github.com/deepflowio/deepflow/pull/8624) by [lzf575](https://github.com/lzf575)
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
-
 #### NEW FEATURE
+* feat: querier add version check [#8622](https://github.com/deepflowio/deepflow/pull/8622) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: register esxi vtap support cloudtower [#8613](https://github.com/deepflowio/deepflow/pull/8613) by [askyrie](https://github.com/askyrie)
 * feature: adds index to some tables [#8598](https://github.com/deepflowio/deepflow/pull/8598) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feature: adds system alarm of recorder cleaner [#8588](https://github.com/deepflowio/deepflow/pull/8588) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
