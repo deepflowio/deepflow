@@ -1819,15 +1819,15 @@ inputs:
       # ee_feature: false
       # description:
       #   en: |-
-      #     The configuration takes effect when capture_mode is 0 or 2,
+      #     The configuration takes effect when capture_mode is 0 or 1,
       #     dispatcher-queue is always true when capture_mode is 2.
       #
       #     Available for all recv_engines.
       #   ch: |-
-      #     TODO
+      #     当 capture_mode 为 0 或 1时该配置生效。
+      #
+      #     对所有流量采集方式都可用。
       # upgrade_from: static_config.dispatcher-queue
-      # TODO: 是不是 capture_mode 1 也支持了？@苑超
-      # TODO: 待确认英文内容后补充中文内容。
       dispatcher_queue_enabled: false
       # type: int
       # name:
@@ -3632,11 +3632,11 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
+      #     The size of the forwarding table, which is used to store MAC-IP information，
       #     When this value is larger, the more memory usage may be.
       #   ch: |-
-      #     调大该参数，deepflow-agent 将消耗更多的内存。
+      #     转发表大小，用来存储 MAC-IP 信息，调大该参数，deepflow-agent 将消耗更多的内存。
       # upgrade_from: static_config.forward-capacity
-      # TODO: 需要解释字段含义
       forward_table_capacity: 16384
       # type: int
       # name:
@@ -3649,12 +3649,15 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
+      #     DDBS algorithm level.
+      #
       #     When this value is larger, the memory overhead is smaller, but the
       #     performance of policy matching is worse.
       #   ch: |-
-      #     TODO
+      #     DDBS 算法等级。
+      #
+      #     该配置越大内存开销越小，但是性能会降低。
       # upgrade_from: static_config.first-path-level
-      # TODO: 需要解释字段含义
       max_first_path_level: 8
     # type: section
     # name:
@@ -4242,7 +4245,6 @@ processors:
       #     deepflow-agent 采集 TCP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
       #     该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 3600s。
       # upgrade_from: static_config.rrt-tcp-timeout
-      # TODO: will not calculate the sum and average——这个表述对吗？
       tcp_request_timeout: 1800s
       # type: duration
       # name:
@@ -4783,7 +4785,6 @@ processors:
         #     上、下行数据包中的 MAC 地址不一致（非对称），将导致会话的上、下行数据无法聚合为同一条流。开启此
         #     开关后，deepflow-agent 将在流聚合过程中不校验 MAC 地址。
         # upgrade_from: static_config.flow.ignore-tor-mac
-        # TODO: 命名对吗？所有流量都适用？
         cloud_traffic_ignore_mac: false
         # type: bool
         # name:
@@ -4801,9 +4802,9 @@ processors:
         #     force a double-sided MAC address match and only aggregate traffic with
         #     exactly equal MAC addresses.
         #   ch: |-
-        #     TODO
+        #     对于虚拟网络流量，流聚合仅匹配 l2end 为 true 的一端的 MAC 地址, 设置为 true
+        #     流聚合会使用全部MAC地址。
         # upgrade_from: static_config.flow.ignore-l2-end
-        # TODO: 待理解
         ignore_l2_end: false
         # type: bool
         # name:
@@ -4822,7 +4823,6 @@ processors:
         #   ch: |-
         #     TODO
         # upgrade_from: static_config.flow.ignore-idc-vlan
-        # TODO: 命名对吗？所有镜像流量都适用？
         idc_traffic_ignore_vlan: false
       # type: section
       # name:
@@ -5412,7 +5412,6 @@ outputs:
       #     做聚合处理，所有非活跃端口的数据聚合生成一条'server_port = 0'的指标，而不再生成每个
       #     server_port 单独的指标。
       # upgrade_from: inactive_server_port_enabled
-      # TODO: 非活跃端口的判别标准是仅接收数据，不发送数据吗？是不是不太对？server port本来就不发送数据吧？
       inactive_server_port_aggregation: false
       # type: bool
       # name:
@@ -5433,7 +5432,6 @@ outputs:
       #     开启功能后 deepflow-agent 将对非活跃 IP（仅接收数据，不发送数据）的指标数据采集做聚合
       #     处理，所有非活跃 IP 的数据聚合生成一条'ip = 0'的指标，而不再生成每个 IP 单独的指标。
       # upgrade_from: inactive_ip_enabled
-      # TODO: 非活跃 IP 的判别标准是仅接收数据，不发送数据吗？是不是不太对？很多 IP 仅做服务端的吧？
       inactive_ip_aggregation: false
       # type: bool
       # name:
@@ -5606,7 +5604,6 @@ outputs:
     #   ch: |-
     #     NPB 分发使用的目标端口号。
     # upgrade_from: static_config.npb-port
-    # TODO: VxLAN、ERSPAN、TCP 都使用这个目标端口号吗？
     target_port: 4789
     # type: int
     # name:
@@ -5626,10 +5623,10 @@ outputs:
     #     be used after |= 0b1000_0000. Therefore, this value cannot be directly
     #     configured as 0b1000_0000.
     #   ch: |-
-    #     TODO
+    #     使用 VXLAN 分发时设置 VXLAN 内的 Flags 为该值。采集器不会采集分发流量。
+    #
+    #     这个配置默认会或上0b1000_0000，所以不能配置为 0b1000_0000。
     # upgrade_from: static_config.vxlan-flags
-    # TODO: 这个值域要刨除 0x08，需要注意处理。
-    # TODO: 使用场景待了解。
     custom_vxlan_flags: 0b1111_1111
     # type: bool
     # name:

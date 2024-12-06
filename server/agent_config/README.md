@@ -2979,7 +2979,7 @@ inputs:
 
 **Description**:
 
-The configuration takes effect when capture_mode is 0 or 2,
+The configuration takes effect when capture_mode is 0 or 1,
 dispatcher-queue is always true when capture_mode is 2.
 
 Available for all recv_engines.
@@ -5629,6 +5629,7 @@ processors:
 
 **Description**:
 
+The size of the forwarding table, which is used to store MAC-IP information，
 When this value is larger, the more memory usage may be.
 
 #### Max First-path Level {#processors.packet.policy.max_first_path_level}
@@ -5659,6 +5660,7 @@ processors:
 
 **Description**:
 
+DDBS algorithm level.
 When this value is larger, the memory overhead is smaller, but the
 performance of policy matching is worse.
 
