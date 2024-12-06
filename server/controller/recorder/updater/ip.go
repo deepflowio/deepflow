@@ -21,6 +21,7 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
 
 type IP struct {
@@ -69,6 +70,8 @@ func (i *IP) GetChanged() bool {
 func (i *IP) GetResourceType() string {
 	return ctrlrcommon.RESOURCE_TYPE_IP_EN
 }
+
+func (i *IP) BuildStatsd(statsd statsd.Statsd) ResourceUpdater { return nil }
 
 func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []cloudmodel.IP) {
 	wanCloudData := []cloudmodel.IP{}
