@@ -1325,22 +1325,21 @@ inputs:
         # ee_feature: false
         # description:
         #   en: |-
-        #     When deepflow-agent finds that an unresolved function name appears in the function call
-        #     stack of a Java process, it will trigger the regeneration of the symbol file of the
-        #     process. Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain
-        #     more symbols for Java processes, the regeneration will be deferred for a period of time.
-        #
-        #     At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
-        #     period, symbol changes are typically frequent due to the dynamic compilation and optimization
-        #     processes. Therefore, deepflow-agent delay symbol collection for one minute after the Java program
-        #     starts, allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding
-        #     with the collection.
+        #     When the `deepflow-agent` detects unresolved function names in the Java process call stack, it
+        #     triggers the generation of the process function symbol table and updates the symbol cache. Currently,
+        #     the Java symbol file is continuously updated, and the `duration` is used to control the delay in
+        #     updating the symbol cache with the new symbol file. This delay is necessary because Java uses a JIT
+        #     (Just-In-Time) compilation mechanism, which requires a warm-up phase for symbol generation. To obtain
+        #     more complete Java symbols, the update of the Java symbol cache is deferred. This approach also helps
+        #     avoid frequent symbol cache refreshes due to missing symbols, which could otherwise result in significant
+        #     CPU resource consumption.
         #   ch: |-
-        #     当 deepflow-agent 在 Java 进程的函数调用栈中发现未能解析的函数名时，将触发进程函数符号表的再生成
-        #     过程，而由于 Java 使用了 JIT 编译机制，符号表的再生成过程将延迟一定的时间。
+        #     当 deepflow-agent 在 Java 进程的函数调用栈中发现未能解析的函数名时，将触发进程函数符号表的生成和符号缓存
+        #     的更新。当前 Java 符号文件是采用持续更新的方式，该 duration 用于控制推迟使用符号文件更新符号缓存的时间。
+        #     原因是由于 Java 使用了 JIT 编译机制，编译符号生成有个预热阶段，为了获取更充足的 Java 符号需要推迟一段时间
+        #     来更新 Java 符号的缓存，也可避免由于符号缺失而造成的频繁符号缓存刷新引起大量CPU资源消耗。
         #
         # upgrade_from: static_config.ebpf.java-symbol-file-refresh-defer-interval
-        # TODO: 待确认——该 duration 是否用于控制符号表再生成的延迟时间？
         refresh_defer_duration: 60s
         # type: int
         # name:
@@ -2358,14 +2357,15 @@ inputs:
           # description:
           #   en: |-
           #     TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
+          #     Use kprobe to collect data on ports that are not in the blacklist or whitelist.
           #
           #     Example: `ports: 80,1000-2000`
           #   ch: |-
           #     TCP 和 UDP 的端口白名单列表，白名单生效优先级低于 kprobe 黑名单。
+          #     未列入黑名单、白名单的端口用 kprobe 做采集。
           #
           #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
-          # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
           ports: ""
       # type: section
       # name:
