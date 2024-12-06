@@ -2914,7 +2914,9 @@ inputs:
 
 **详细描述**:
 
-TODO
+当 capture_mode 为 0 或 1 时该配置生效,
+当 capture_mode 为 2 是该配置为 true 。
+对所有流量采集方式都可用。
 
 #### 最大采集包长 {#inputs.cbpf.tunning.max_capture_packet_size}
 
@@ -5468,6 +5470,7 @@ processors:
 
 **详细描述**:
 
+转发表大小，用来存储 MAC-IP 信息，调大该参数，deepflow-agent 将消耗更多的内存。
 调大该参数，deepflow-agent 将消耗更多的内存。
 
 #### 最大 First-path 层级 {#processors.packet.policy.max_first_path_level}
@@ -5498,7 +5501,8 @@ processors:
 
 **详细描述**:
 
-TODO
+DDBS 算法等级。
+该配置越大内存开销越小，但是性能会降低。
 
 ### TCP 包头（时序图） {#processors.packet.tcp_header}
 
@@ -7122,7 +7126,8 @@ processors:
 
 **详细描述**:
 
-TODO
+对于虚拟网络流量，流聚合仅匹配 l2end 为 true 的一端的 MAC 地址，设置为 true
+流聚合会使用全部MAC地址。
 
 ##### IDC 流量忽略 VLAN {#processors.flow_log.conntrack.flow_generation.idc_traffic_ignore_vlan}
 
@@ -8428,7 +8433,9 @@ outputs:
 
 **详细描述**:
 
-TODO
+使用 VXLAN 分发时设置 VXLAN 内的 Flags 为该值。采集器不会采集分发流量。
+
+这个配置默认会或上0b1000_0000，所以不能配置为 0b1000_0000。
 
 ### Overlay VLAN 头剥离 {#outputs.npb.overlay_vlan_header_trimming}
 
