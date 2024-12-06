@@ -101,7 +101,6 @@ global:
   # description:
   #   en:
   #   ch:
-  # TODO: 待确认 alerts 与 limits的区别。
   alerts:
     # type: int
     # name:
@@ -626,7 +625,6 @@ global:
     #   ch: |-
     #     设置 deepflow-agent 的 gRPC socket 缓冲区大小。
     # upgrade_from: static_config.grpc-buffer-size
-    # TODO: 【待确认】拆分为两个 RPC，第一个获取 size
     grpc_buffer_size: 5
     # type: bool
     # name:
@@ -838,7 +836,6 @@ global:
     #     形式保存在本地磁盘中。目前支持 2 种数据：l4_flow_log 和 l7_flow_log，每种数据分开写入
     #     不同的数据文件，每种数据最多可产生 2 个数据文件。
     # upgrade_from: static_config.standalone-data-file-size
-    # TODO: 独立运行模式下，该参数配置在 server 端如何下发到采集器上呢？
     max_data_file_size: 200
     # type: string
     # name:
@@ -1909,8 +1906,7 @@ inputs:
       #   ch: |-
       #     deepflow-agent 采集数据包的速率上限。
       # upgrade_from: max_collect_pps
-      # TODO: 默认值偏小了
-      max_capture_pps: 200000
+      max_capture_pps: 1048576
     # type: section
     # name:
     #   en: Preprocess
@@ -3366,62 +3362,6 @@ inputs:
       #     - adaptive: deepflow-agent 优先使用 active 模式获取其他 POD 的 MAC 和 IP 信息。
       # upgrade_from: static_config.kubernetes-poller-type
       pod_mac_collection_method: adaptive
-    # type: section
-    # name:
-    #   en: Pull Resource From Controller
-    #   ch: 从控制器拉取资源
-    # description:
-    pull_resource_from_controller:
-      # type: int
-      # name:
-      #   en: Domain Filter
-      #   ch: 云平台过滤器
-      # unit:
-      # range: []
-      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
-      # modification: hot_update
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     Default value `0` means all domains, or can be set to a list of lcuuid of a
-      #     series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
-      #
-      #     Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
-      #     into data. This configuration can reduce the number and frequency of MAC and
-      #     IP addresses delivered by deepflow-server to deepflow-agent. When there is no
-      #     cross-domain service request, deepflow-server can be configured to only deliver
-      #     the information in the local domain to deepflow-agent.
-      #   ch: |-
-      #     在运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
-      #     向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
-      #     以减少下发的数据量。当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
-      #     下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
-      #     仅获取部分云平台的数据。
-      # upgrade_from: domains
-      # TODO: local domain 如何配置？是否需要以云平台为单位，对 agent 配置 lcuuid？
-      domain_filter: [0]
-      # type: bool
-      # name:
-      #   en: Only K8s Pod IP in Local Cluster
-      #   ch: 仅下发本集群中的 K8s Pod IP
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     The list of MAC and IP addresses is used by deepflow-agent to inject tags
-      #     into data. This configuration can reduce the number and frequency of MAC and IP
-      #     addresses delivered by deepflow-server to deepflow-agent. When the Pod IP is not
-      #     used for direct communication between the K8s cluster and the outside world,
-      #     deepflow-server can be configured to only deliver the information in the local
-      #     K8s cluster to deepflow-agent.
-      #   ch: |-
-      #     TODO
-      # upgrade_from: pod_cluster_internal_ip
-      # TODO: 与上边参数是否重复？
-      only_kubernetes_pod_ip_in_local_cluster: false
   # type: section
   # name:
   #   en: Integration
@@ -4145,7 +4085,6 @@ processors:
       #   ch: |-
       #     控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
       # upgrade_from: static_config.l7-log-blacklist
-      # TODO: gRPC 要和 HTTP2 合并吗？需要增加 Custom 协议。
       tag_filters:
         # type: dict
         # name:
@@ -4252,6 +4191,7 @@ processors:
         ZMTP: []
         DNS: []
         TLS: []
+        Custom: []
       # type: string
       # name:
       #   en: Unconcerned DNS NXDOMAIN
@@ -5566,7 +5506,6 @@ outputs:
       #     配置如下队列的大小:
       #     - 3-doc-to-collector-sender
       # upgrade_from: static_config.collector-sender-queue-size
-      # TODO: 队列的调优分散在许多不同地方，建议放到一起，便于理解和使用。
       sender_queue_size: 65536
   # type: section
   # name: NPB (Network Packet Broker)
@@ -5784,7 +5723,6 @@ dev:
   #   en: |-
   #     Unreleased deepflow-agent features can be turned on by setting this switch.
   #   ch: |-
-  #     TODO
+  #     未发布的采集器特性可以通过该选项开启。
   # upgrade_from: static_config.feature-flags
-  # TODO: 待理解。
   feature_flags: []

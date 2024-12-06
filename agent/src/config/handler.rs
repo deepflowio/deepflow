@@ -3336,22 +3336,6 @@ impl ConfigHandler {
             private_cloud.vm_xml_directory = new_private_cloud.vm_xml_directory.clone();
         }
 
-        let pull_resource = &mut resources.pull_resource_from_controller;
-        let new_pull_resource = &mut new_resources.pull_resource_from_controller;
-        if pull_resource.only_kubernetes_pod_ip_in_local_cluster
-            != new_pull_resource.only_kubernetes_pod_ip_in_local_cluster
-        {
-            info!("Update inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster from {:?} to {:?}.",
-                pull_resource.only_kubernetes_pod_ip_in_local_cluster, new_pull_resource.only_kubernetes_pod_ip_in_local_cluster);
-            pull_resource.only_kubernetes_pod_ip_in_local_cluster =
-                new_pull_resource.only_kubernetes_pod_ip_in_local_cluster;
-        }
-        if pull_resource.domain_filter != new_pull_resource.domain_filter {
-            info!("Update inputs.resources.pull_resource_from_controller.domain_filter from {:?} to {:?}.",
-                pull_resource.domain_filter, new_pull_resource.domain_filter);
-            pull_resource.domain_filter = new_pull_resource.domain_filter.clone();
-        }
-
         let proc = &mut config.inputs.proc;
         let new_proc = &mut new_config.user_config.inputs.proc;
         if proc.enabled != new_proc.enabled {
