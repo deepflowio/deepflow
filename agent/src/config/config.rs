@@ -820,7 +820,7 @@ impl Default for CbpfTunning {
             max_capture_packet_size: 65535,
             raw_packet_buffer_block_size: 65536,
             raw_packet_queue_size: 131072,
-            max_capture_pps: 200000,
+            max_capture_pps: 1048576,
         }
     }
 }
@@ -1278,28 +1278,11 @@ impl Default for Kubernetes {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct PullResourceFromController {
-    pub domain_filter: Vec<usize>,
-    pub only_kubernetes_pod_ip_in_local_cluster: bool,
-}
-
-impl Default for PullResourceFromController {
-    fn default() -> Self {
-        Self {
-            domain_filter: vec![0],
-            only_kubernetes_pod_ip_in_local_cluster: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
 pub struct Resources {
     #[serde(with = "humantime_serde")]
     pub push_interval: Duration,
     pub private_cloud: PrivateCloud,
     pub kubernetes: Kubernetes,
-    pub pull_resource_from_controller: PullResourceFromController,
 }
 
 impl Default for Resources {
@@ -1308,7 +1291,6 @@ impl Default for Resources {
             push_interval: Duration::from_secs(10),
             private_cloud: PrivateCloud::default(),
             kubernetes: Kubernetes::default(),
-            pull_resource_from_controller: PullResourceFromController::default(),
         }
     }
 }
