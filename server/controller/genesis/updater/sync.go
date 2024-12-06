@@ -536,7 +536,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(orgID int, vtapID uint32, messa
 			Name:        p.GetName(),
 			ProcessName: p.GetProcessName(),
 			CMDLine:     p.GetCmdline(),
-			User:        p.GetUser(),
+			UserName:    p.GetUser(),
 			ContainerID: p.GetContainerId(),
 			VtapID:      vtapID,
 			NodeIP:      v.nodeIP,
