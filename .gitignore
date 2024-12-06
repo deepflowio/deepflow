@@ -51,7 +51,11 @@ target/
 /agent/src/ebpf/samples/rust/socket-tracer/target
 /agent/src/ebpf/samples/rust/socket-tracer/src/ebpf.rs
 /agent/src/ebpf/.flamegraph.pl
-/agent/src/ebpf/kernel/*.tmp
-
-
-
+/agent/src/ebpf/user/extended/bpf/*.tmp
+/agent/src/ebpf/user/extended/bpf/*.ll
+/agent/src/ebpf/user/extended/bpf/*.objdump
+/agent/src/ebpf/user/extended/bpf/*.elf
+/agent/src/ebpf/user/extended/bpf/.ebpf-compile.ok
+/agent/src/ebpf/user/extended/bpf/cpu_balancer_bpf_bytecode.c
+/agent/src/ebpf/user/extended/*.o
+/agent/src/ebpf/user/extended/test/*.o

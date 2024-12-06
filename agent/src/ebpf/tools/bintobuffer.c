@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -42,7 +43,8 @@ static unsigned char *read_bin_file(char *name, int *len)
 	//Open file
 	file = fopen(name, "rb");
 	if (!file) {
-		fprintf(stderr, "Unable to open file %s", name);
+		fprintf(stderr, "Unable to open file %s, with %s(%d)",
+			name, strerror(errno), errno);
 		return NULL;
 	}
 	//Get file length

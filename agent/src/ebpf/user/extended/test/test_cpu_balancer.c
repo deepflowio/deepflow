@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,25 @@
  * limitations under the License.
  */
 
-#include "../user/utils.h"
-#include "../user/mem.h"
-#include "../user/log.h"
-#include "../user/types.h"
-#include "../user/vec.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <linux/limits.h>
+#include <linux/version.h>
+#include <string.h>
+#include "../../config.h"
+#include "../../tracer.h"
+#include "../../socket.h"
+#include "../../proc.h"
+#include "../../utils.h"
+#include "../../log.h"
+#include "../../load.h"
+#include "../cpu_balancer.h"
 
-__thread uword thread_index = 0;
-
-#include "bihash_8_8.h"
-#include "bihash_template.c"
-
-#include "bihash_8_16.h"
-#include "bihash_template.c"
-
-#include "bihash_24_8.h"
-#include "bihash_template.c"
-
-#include "bihash_32_8.h"
-#include "bihash_template.c"
+int main(void)
+{
+	bpf_tracer_init(NULL, true);
+	set_cpu_balancer_nics("p1p1", 4096, "1,2,3", "4,5,6,7");
+	cpu_balancer_start();
+	cpu_balancer_destroy();
+	return 0;
+}
