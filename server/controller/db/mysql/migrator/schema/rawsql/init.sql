@@ -1117,6 +1117,13 @@ CREATE TABLE IF NOT EXISTS group_acl (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE group_acl;
 
+CREATE TABLE IF NOT EXISTS alarm_label (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    alarm_id                INTEGER NOT NULL,
+    label_name              TEXT
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE alarm_label;
+
 CREATE TABLE IF NOT EXISTS alarm_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                 INTEGER DEFAULT 1,
