@@ -78,11 +78,11 @@ impl MirrorPlusModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, agent_type: AgentType) {
+    pub fn on_tap_interface_change(&self, links: &[Link], _: IfMacSource, agent_type: AgentType) {
         let mut old_agent_type = self.agent_type.write().unwrap();
         *old_agent_type = agent_type;
         self.base
-            .on_tap_interface_change(vec![], IfMacSource::IfMac);
+            .on_tap_interface_change(links.to_vec(), IfMacSource::IfMac);
     }
 
     pub fn on_vm_change_with_bridge_macs(
