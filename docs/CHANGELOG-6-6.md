@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: modify agent config example [#8649](https://github.com/deepflowio/deepflow/pull/8649) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: parse 1d aggr table failed [#8646](https://github.com/deepflowio/deepflow/pull/8646) by [lzf575](https://github.com/lzf575)
 * fix: errors occurred when modifying some agent group configuration [#8605](https://github.com/deepflowio/deepflow/pull/8605) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: TODOs in agent config [#8597](https://github.com/deepflowio/deepflow/pull/8597) by [rvql](https://github.com/rvql)
 * fix: pcap,l4_packet,spantrace data exception [#8595](https://github.com/deepflowio/deepflow/pull/8595) by [lzf575](https://github.com/lzf575)
@@ -19,6 +21,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support fanout in mirror mode and analyzer mode [#8643](https://github.com/deepflowio/deepflow/pull/8643) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: optimize memory [#8572](https://github.com/deepflowio/deepflow/pull/8572) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: querier add version check [#8622](https://github.com/deepflowio/deepflow/pull/8622) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: register esxi vtap support cloudtower [#8613](https://github.com/deepflowio/deepflow/pull/8613) by [askyrie](https://github.com/askyrie)
 * feature: adds index to some tables [#8598](https://github.com/deepflowio/deepflow/pull/8598) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
