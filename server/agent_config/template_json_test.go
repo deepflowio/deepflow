@@ -623,6 +623,7 @@ inputs:
 func TestDictValueToString(t *testing.T) {
 	type args struct {
 		yamlData []byte
+		mapData  map[string]interface{}
 	}
 	tests := []struct {
 		name    string
@@ -660,10 +661,37 @@ outputs:
 			},
 			wantErr: false,
 		},
+		{
+			name: "case02",
+			args: args{
+				mapData: map[string]interface{}{
+					"processors": map[string]interface{}{
+						"request_log": map[string]interface{}{
+							"filters": map[string]interface{}{
+								"port_number_prefilters": map[string]interface{}{
+									"HTTP":  "1-6",
+									"HTTP2": "9-10",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"processors": map[string]interface{}{
+					"request_log": map[string]interface{}{
+						"filters": map[string]interface{}{
+							"port_number_prefilters": "HTTP: 1-6\nHTTP2: 9-10",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
+	keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 			dataFmt := NewDataFommatter()
 			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
@@ -685,6 +713,7 @@ outputs:
 func TestStringToDictValue(t *testing.T) {
 	type args struct {
 		yamlData []byte
+		mapData  map[string]interface{}
 	}
 	tests := []struct {
 		name    string
@@ -725,13 +754,47 @@ outputs:
 			},
 			wantErr: false,
 		},
+		{
+			name: "case02",
+			args: args{
+				mapData: map[string]interface{}{
+					"processors": map[string]interface{}{
+						"request_log": map[string]interface{}{
+							"filters": map[string]interface{}{
+								"port_number_prefilters": "HTTP: 1-6\nHTTP2: 9-10",
+							},
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"processors": map[string]interface{}{
+					"request_log": map[string]interface{}{
+						"filters": map[string]interface{}{
+							"port_number_prefilters": map[string]interface{}{
+								"HTTP":  "1-6",
+								"HTTP2": "9-10",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
+	keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 	for _, tt := range tests {
+		// if tt.name != "case02" {
+		// 	continue
+		// }
 		t.Run(tt.name, func(t *testing.T) {
-			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 			dataFmt := NewDataFommatter()
-			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
-				t.Fatalf("Failed to init yaml data: %v", err)
+			if tt.args.yamlData != nil {
+				if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
+					t.Fatalf("Failed to init yaml data: %v", err)
+				}
+			} else {
+				dataFmt.mapData = tt.args.mapData
 			}
 			err := dataFmt.stringToDictValue(dataFmt.mapData, "", keyToComment)
 			if (err != nil) != tt.wantErr {
