@@ -369,6 +369,11 @@ impl BpfOptions {
     ) -> Vec<BpfSyntax> {
         let mut bpf_syntax = self.bpf_syntax.clone();
 
+        if tap_interfaces.is_empty() {
+            bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+            return bpf_syntax;
+        }
+
         bpf_syntax.push(BpfSyntax::LoadExtension(LoadExtension {
             num: Extension::ExtInterfaceIndex,
         }));
