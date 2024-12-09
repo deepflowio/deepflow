@@ -775,7 +775,7 @@ impl Default for CbpfTunning {
             max_capture_packet_size: 65535,
             raw_packet_buffer_block_size: 65536,
             raw_packet_queue_size: 131072,
-            max_capture_pps: 200000,
+            max_capture_pps: 1048576,
         }
     }
 }
@@ -1233,28 +1233,11 @@ impl Default for Kubernetes {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct PullResourceFromController {
-    pub domain_filter: Vec<usize>,
-    pub only_kubernetes_pod_ip_in_local_cluster: bool,
-}
-
-impl Default for PullResourceFromController {
-    fn default() -> Self {
-        Self {
-            domain_filter: vec![0],
-            only_kubernetes_pod_ip_in_local_cluster: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
 pub struct Resources {
     #[serde(with = "humantime_serde")]
     pub push_interval: Duration,
     pub private_cloud: PrivateCloud,
     pub kubernetes: Kubernetes,
-    pub pull_resource_from_controller: PullResourceFromController,
 }
 
 impl Default for Resources {
@@ -1263,7 +1246,6 @@ impl Default for Resources {
             push_interval: Duration::from_secs(10),
             private_cloud: PrivateCloud::default(),
             kubernetes: Kubernetes::default(),
-            pull_resource_from_controller: PullResourceFromController::default(),
         }
     }
 }
@@ -2288,6 +2270,7 @@ pub struct FlowMetricsFilters {
     pub inactive_server_port_aggregation: bool,
     pub inactive_ip_aggregation: bool,
     pub npm_metrics: bool,
+    pub npm_metrics_concurrent: bool,
     pub apm_metrics: bool,
     pub second_metrics: bool,
 }
@@ -2298,6 +2281,7 @@ impl Default for FlowMetricsFilters {
             inactive_server_port_aggregation: false,
             inactive_ip_aggregation: false,
             npm_metrics: true,
+            npm_metrics_concurrent: true,
             apm_metrics: true,
             second_metrics: true,
         }
@@ -2655,6 +2639,7 @@ impl UserConfig {
         self.inputs.cbpf.af_packet.interface_regex = "".to_string();
         self.outputs.flow_metrics.filters.apm_metrics = true;
         self.outputs.flow_metrics.filters.npm_metrics = true;
+        self.outputs.flow_metrics.filters.npm_metrics_concurrent = true;
         self.outputs.socket.data_socket_type = agent::SocketType::File;
         self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
         self.outputs.flow_log.filters.l7_capture_network_types = vec![3];

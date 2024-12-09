@@ -606,9 +606,17 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 		return nil
 	}
 
+	var domainType int
+	domain, err := dbmgr.DBMgr[models.Domain](db).GetFromLcuuid(host.Domain)
+	if err != nil {
+		log.Warning(l.Logf("host(%s) domain(%s) not found", host.Name, host.Domain))
+	} else {
+		domainType = domain.Type
+	}
+
 	var vTapName, launchServer, az, region, lcuuid string
 	var vTapType, launchServerID int
-	if host.HType == HOST_HTYPE_ESXI {
+	if host.HType == HOST_HTYPE_ESXI || domainType == CLOUD_TOWER {
 		vTapName = fmt.Sprintf("%s-H%d", host.Name, host.ID)
 		vTapType = VTAP_TYPE_ESXI
 		launchServer = host.IP

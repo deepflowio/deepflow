@@ -2220,16 +2220,14 @@ inputs:
 
 **Description**:
 
-When deepflow-agent finds that an unresolved function name appears in the function call
-stack of a Java process, it will trigger the regeneration of the symbol file of the
-process. Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain
-more symbols for Java processes, the regeneration will be deferred for a period of time.
-
-At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
-period, symbol changes are typically frequent due to the dynamic compilation and optimization
-processes. Therefore, deepflow-agent delay symbol collection for one minute after the Java program
-starts, allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding
-with the collection.
+When the `deepflow-agent` detects unresolved function names in the Java process call stack, it
+triggers the generation of the process function symbol table and updates the symbol cache. Currently,
+the Java symbol file is continuously updated, and the `duration` is used to control the delay in
+updating the symbol cache with the new symbol file. This delay is necessary because Java uses a JIT
+(Just-In-Time) compilation mechanism, which requires a warm-up phase for symbol generation. To obtain
+more complete Java symbols, the update of the Java symbol cache is deferred. This approach also helps
+avoid frequent symbol cache refreshes due to missing symbols, which could otherwise result in significant
+CPU resource consumption.
 
 ##### Maximum Symbol File Size {#inputs.proc.symbol_table.java.max_symbol_file_size}
 
@@ -3667,6 +3665,7 @@ inputs:
 **Description**:
 
 TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
+Use kprobe to collect data on ports that are not in the blacklist or whitelist.
 
 Example: `ports: 80,1000-2000`
 
@@ -8382,6 +8381,33 @@ outputs:
 **Description**:
 
 When closed, deepflow-agent only collects some basic throughput metrics.
+
+#### NPM Metrics {#outputs.flow_metrics.filters.npm_metrics_concurrent}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_metrics.filters.npm_metrics_concurrent`
+
+**Default value**:
+```yaml
+outputs:
+  flow_metrics:
+    filters:
+      npm_metrics_concurrent: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When closed, deepflow-agent does not calculate metrics concurrent.
 
 #### APM Metrics {#outputs.flow_metrics.filters.apm_metrics}
 

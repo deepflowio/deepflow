@@ -703,3 +703,5 @@ const (
 )
 
 const TRISOLARIS_NODE_TYPE_MASTER = "master"
+
+const CLICK_HOUSE_VERSION = "24"
