@@ -149,12 +149,12 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 		}
 		if name, ok := filter["name"]; ok {
 			interval := convertNameToInterval(name.(string))
-			if interval != 0 && interval != dataSource.Interval {
+			if interval != 0 && interval != dataSource.IntervalTime {
 				continue
 			}
 		}
 
-		name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
+		name, err := getName(dataSource.IntervalTime, dataSource.DataTableCollection)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -168,7 +168,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 			DataTableCollection:       dataSource.DataTableCollection,
 			State:                     dataSource.State,
 			BaseDataSourceID:          dataSource.BaseDataSourceID,
-			Interval:                  dataSource.Interval,
+			IntervalTime:              dataSource.IntervalTime,
 			RetentionTime:             dataSource.RetentionTime,
 			SummableMetricsOperator:   dataSource.SummableMetricsOperator,
 			UnSummableMetricsOperator: dataSource.UnSummableMetricsOperator,
@@ -187,13 +187,13 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 		if specCfg != nil {
 			if dataSource.DataTableCollection == "deepflow_tenant.*" ||
 				dataSource.DataTableCollection == "deepflow_admin.*" {
-				dataSourceResp.Interval = common.DATA_SOURCE_DEEPFLOW_SYSTEM_INTERVAL
+				dataSourceResp.IntervalTime = common.DATA_SOURCE_DEEPFLOW_SYSTEM_INTERVAL
 			}
 			if dataSource.DataTableCollection == "ext_metrics.*" {
-				dataSourceResp.Interval = specCfg.DataSourceExtMetricsInterval
+				dataSourceResp.IntervalTime = specCfg.DataSourceExtMetricsInterval
 			}
 			if dataSource.DataTableCollection == "prometheus.*" {
-				dataSourceResp.Interval = specCfg.DataSourcePrometheusInterval
+				dataSourceResp.IntervalTime = specCfg.DataSourcePrometheusInterval
 			}
 		}
 
@@ -220,13 +220,13 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	if ret := db.Where(
 		map[string]interface{}{
 			"data_table_collection": dataSourceCreate.DataTableCollection,
-			"interval":              dataSourceCreate.Interval,
+			"interval_time":         dataSourceCreate.IntervalTime,
 		},
 	).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
-			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval: %v) already exists",
-				dataSourceCreate.DataTableCollection, dataSourceCreate.Interval),
+			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval_time: %v) already exists",
+				dataSourceCreate.DataTableCollection, dataSourceCreate.IntervalTime),
 		)
 	}
 
@@ -254,16 +254,16 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		)
 	}
 
-	if baseDataSource.DataTableCollection != dataSourceCreate.DataTableCollection || baseDataSource.Interval == common.INTERVAL_1DAY {
+	if baseDataSource.DataTableCollection != dataSourceCreate.DataTableCollection || baseDataSource.IntervalTime == common.INTERVAL_1DAY {
 		return model.DataSource{}, NewError(
 			httpcommon.PARAMETER_ILLEGAL,
-			"base data_source tsdb_type should the same as tsdb and interval should ne 1 day",
+			"base data_source tsdb_type should the same as tsdb and interval_time should ne 1 day",
 		)
 	}
 
-	if baseDataSource.Interval >= dataSourceCreate.Interval {
+	if baseDataSource.IntervalTime >= dataSourceCreate.IntervalTime {
 		return model.DataSource{}, NewError(
-			httpcommon.PARAMETER_ILLEGAL, "interval should gt base data_source interval",
+			httpcommon.PARAMETER_ILLEGAL, "interval_time should gt base data_source interval_time",
 		)
 	}
 
@@ -288,7 +288,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	dataSource.DisplayName = dataSourceCreate.DisplayName
 	dataSource.DataTableCollection = dataSourceCreate.DataTableCollection
 	dataSource.BaseDataSourceID = dataSourceCreate.BaseDataSourceID
-	dataSource.Interval = dataSourceCreate.Interval
+	dataSource.IntervalTime = dataSourceCreate.IntervalTime
 	dataSource.RetentionTime = dataSourceCreate.RetentionTime
 	dataSource.SummableMetricsOperator = dataSourceCreate.SummableMetricsOperator
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
@@ -539,10 +539,10 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql.DataSource) error {
 	var name, baseName string
 	var err error
-	if name, err = getName(dataSource.Interval, dataSource.DataTableCollection); err != nil {
+	if name, err = getName(dataSource.IntervalTime, dataSource.DataTableCollection); err != nil {
 		return err
 	}
-	if baseName, err = getName(baseDataSource.Interval, baseDataSource.DataTableCollection); err != nil {
+	if baseName, err = getName(baseDataSource.IntervalTime, baseDataSource.DataTableCollection); err != nil {
 		return err
 	}
 	body := map[string]interface{}{
@@ -552,7 +552,7 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 		"base-rp":                   baseName,
 		"summable-metrics-op":       strings.ToLower(dataSource.SummableMetricsOperator),
 		"unsummable-metrics-op":     strings.ToLower(dataSource.UnSummableMetricsOperator),
-		"interval":                  dataSource.Interval / common.INTERVAL_1MINUTE,
+		"interval":                  dataSource.IntervalTime / common.INTERVAL_1MINUTE,
 		"retention-time":            dataSource.RetentionTime,
 	}
 	if len(d.ipToController) == 0 {
@@ -575,7 +575,7 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 }
 
 func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource) error {
-	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
+	name, err := getName(dataSource.IntervalTime, dataSource.DataTableCollection)
 	if err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql
 }
 
 func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource) error {
-	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
+	name, err := getName(dataSource.IntervalTime, dataSource.DataTableCollection)
 	if err != nil {
 		return err
 	}

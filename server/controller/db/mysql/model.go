@@ -257,7 +257,7 @@ type DataSource struct {
 	DataTableCollection       string    `gorm:"column:data_table_collection;type:char(64);default:''" json:"DATA_TABLE_COLLECTION"`
 	State                     int       `gorm:"column:state;type:int;default:1" json:"STATE"`
 	BaseDataSourceID          int       `gorm:"column:base_data_source_id;type:int" json:"BASE_DATA_SOURCE_ID"`
-	Interval                  int       `gorm:"column:interval;type:int" json:"INTERVAL"`
+	IntervalTime              int       `gorm:"column:interval_time;type:int" json:"INTERVAL_TIME"`
 	RetentionTime             int       `gorm:"column:retention_time;type:int" json:"RETENTION_TIME"` // unit: hour
 	SummableMetricsOperator   string    `gorm:"column:summable_metrics_operator;type:char(64)" json:"SUMMABLE_METRICS_OPERATOR"`
 	UnSummableMetricsOperator string    `gorm:"column:unsummable_metrics_operator;type:char(64)" json:"UNSUMMABLE_METRICS_OPERATOR"`
@@ -500,7 +500,7 @@ type MailServer struct {
 	Status       int    `gorm:"column:status;type:int;not null" json:"STATUS"`
 	Host         string `gorm:"column:host;type:text;not null" json:"HOST"`
 	Port         int    `gorm:"column:port;type:int;not null" json:"PORT"`
-	User         string `gorm:"column:user;type:text;not null" json:"USER"`
+	UserName     string `gorm:"column:user_name;type:text;not null" json:"USER_NAME"`
 	Password     string `gorm:"column:password;type:text;not null" json:"PASSWORD"`
 	Security     string `gorm:"column:security;type:text;not null" json:"SECURITY"`
 	NtlmEnabled  int    `gorm:"column:ntlm_enabled;type:int" json:"NTLM_ENABLED"`
