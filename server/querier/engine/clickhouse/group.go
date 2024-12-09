@@ -169,7 +169,10 @@ func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) 
 	return &view.Expr{Value: "(" + filter + ")"}, true
 }
 
-func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
+func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
+	asTagMap := e.AsTagMap
+	db := e.DB
+	table := e.Table
 	preAsTag, preASOK := asTagMap[name]
 	if preASOK {
 		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(preAsTag, "`tag.") {
@@ -198,15 +201,21 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 						filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					}
 					return &view.Expr{Value: "(" + filter + ")"}, true
-				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
+				} else if strings.HasPrefix(preAsTag, "tag.") {
 					if db == chCommon.DB_NAME_PROMETHEUS {
 						return &view.Expr{}, false
 					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+					filterName := strings.TrimPrefix(strings.Trim(preAsTag, "`"), "tag.")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "attribute.") {
+					tagItem, ok = tag.GetTag("attribute.", db, table, "default")
+					filterName := strings.TrimPrefix(strings.Trim(preAsTag, "`"), "attribute.")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
-					filter := fmt.Sprintf("%s is not null", name)
+					filter := fmt.Sprintf("%s is not null", preAsTag)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				}
 				return &view.Expr{}, false
@@ -229,12 +238,18 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				}
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(noBackQuoteName, "tag.") || strings.HasPrefix(noBackQuoteName, "attribute.") {
+			} else if strings.HasPrefix(noBackQuoteName, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
 					return &view.Expr{}, false
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
-				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				filterName := strings.TrimPrefix(strings.Trim(name, "`"), "tag.")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(noBackQuoteName, "attribute.") {
+				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
+				filterName := strings.TrimPrefix(strings.Trim(name, "`"), "attribute.")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if common.IsValueInSliceString(noBackQuoteName, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
 				filter := fmt.Sprintf("%s is not null", name)
