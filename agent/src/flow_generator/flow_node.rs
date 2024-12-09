@@ -388,6 +388,18 @@ impl FlowNode {
             }
         }
     }
+
+    pub fn contain_pcap_policy(&self) -> bool {
+        match (
+            self.policy_data_cache[0].as_ref(),
+            self.policy_data_cache[1].as_ref(),
+        ) {
+            (Some(i), Some(j)) => i.contain_pcap() || j.contain_pcap(),
+            (None, Some(j)) => j.contain_pcap(),
+            (Some(i), None) => i.contain_pcap(),
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
