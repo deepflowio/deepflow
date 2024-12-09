@@ -661,12 +661,21 @@ func (f *DataFomatter) stringToDictValue(data interface{}, ancestors string, key
 			newAncestors := f.appendAncestor(ancestors, key)
 			if !f.isKeyComment(key) {
 				if f.isDictValue(keyToComment[newAncestors]) {
-					var valueMap map[string]interface{}
-					err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
-					if err != nil {
-						return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+					if strings.HasPrefix(strings.TrimSpace(value.(string)), "-") {
+						var valueMap map[string]interface{}
+						err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
+						if err != nil {
+							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+						}
+						data[key] = valueMap[key]
+					} else {
+						var valueMap map[string]interface{}
+						err := yaml.Unmarshal([]byte(value.(string)), &valueMap)
+						if err != nil {
+							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+						}
+						data[key] = valueMap
 					}
-					data[key] = valueMap[key]
 					keyToComment["changesDictValue"] = make(map[string]interface{})
 				}
 				f.stringToDictValue(value, newAncestors, keyToComment)
