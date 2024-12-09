@@ -148,6 +148,14 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
 			}
+		} else {
+			// non-resource tags
+			engine := &CHEngine{DB: db, Table: table}
+			notNullExpr, ok := GetNotNullFilter(args[0], engine)
+			if !ok {
+				return
+			}
+			filter = notNullExpr.(*view.Expr).Value
 		}
 	}
 	return

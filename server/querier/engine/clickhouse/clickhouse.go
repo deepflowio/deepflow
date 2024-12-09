@@ -1235,7 +1235,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(groupTag, e.AsTagMap, e.DB, e.Table)
+		notNullExpr, ok := GetNotNullFilter(groupTag, e)
 		if !ok {
 			return nil
 		}
@@ -1340,7 +1340,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 			}
 		}
-		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, derivativeArgs, e)
 		if err != nil {
 			return err
 		}
@@ -1468,7 +1468,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", derivativeArgs, e)
 		if err != nil {
 			return nil, err
 		}
