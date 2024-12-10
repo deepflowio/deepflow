@@ -555,7 +555,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 			// "enabled_features": []string{"static_config.ebpf.on-cpu-profile.regex", "static_config.ebpf.off-cpu-profile.regex"}, // 无法降级
 		},
 
-		"inputs.cdpf.af_packet.bond_interfaces": {
+		"inputs.cbpf.af_packet.bond_interfaces": {
 			"slave_interfaces": "tap-interfaces",
 		},
 		"inputs.resources.kubernetes.api_resources": {
