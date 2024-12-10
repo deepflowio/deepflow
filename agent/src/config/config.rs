@@ -545,7 +545,7 @@ pub struct Proc {
     pub enabled: bool,
     pub proc_dir_path: String,
     #[serde(with = "humantime_serde")]
-    pub sync_interval: Duration,
+    pub socket_info_sync_interval: Duration,
     #[serde(with = "humantime_serde")]
     pub min_lifetime: Duration,
     pub tag_extraction: TagExtraction,
@@ -558,7 +558,7 @@ impl Default for Proc {
         Self {
             enabled: false,
             proc_dir_path: "/proc".to_string(),
-            sync_interval: Duration::from_secs(10),
+            socket_info_sync_interval: Duration::from_secs(0),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
             process_matcher: vec![ProcessMatcher {
