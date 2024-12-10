@@ -1,32 +1,5 @@
 # Global {#global}
 
-## Enabled {#global.enabled}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.enabled`
-
-Upgrade from old version: `enabled`
-
-**Default value**:
-```yaml
-global:
-  enabled: true
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-Disabled / Enabled the deepflow-agent.
-
 ## Limits {#global.limits}
 
 Resource limitations
@@ -61,31 +34,6 @@ global:
 
 deepflow-agent uses cgroups to limit CPU usage.
 1 millicpu = 1 millicore = 0.001 core.
-
-### CPU Limit (Cores) {#global.limits.max_cpus}
-
-**Tags**:
-
-<mark></mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.limits.max_cpus`
-
-Upgrade from old version: `max_cpus`
-
-**Default value**:
-```yaml
-global:
-  limits:
-    max_cpus: 1
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
 
 ### Memory Limit {#global.limits.max_memory}
 
@@ -334,12 +282,12 @@ global:
 
 **Description**:
 
-Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
-1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
+Setting sys_memory_limit to 0 indicates that the system free/available memory ratio is not checked.
+1. When the current system free/available memory ratio is below sys_memory_limit * 70%,
    the agent will automatically restart.
-2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
+2. When the current system free/available memory ratio is below sys_memory_limit but above 70%,
    the agent enters the disabled state.
-3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+3. When the current system free/available memory ratio remains above sys_memory_limit * 110%,
    the agent recovers from the disabled state.
 
 #### Metric {#global.circuit_breakers.sys_memory_percentage.metric}
@@ -362,6 +310,12 @@ global:
       metric: free
 ```
 
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| free | |
+| available | |
+
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
@@ -369,7 +323,7 @@ global:
 
 **Description**:
 
-deepflow-agent observes the percentage of this memory metric.
+deepflow-agent observes the percentage of this memory metric
 
 ### Relative System Load {#global.circuit_breakers.relative_sys_load}
 
@@ -403,11 +357,10 @@ global:
 
 **Description**:
 
-When the load of the Linux system divided by the number of
+When Linux system load divided by the number of
 CPU cores exceeds this value, the agent automatically enters
-the disabled state. It will automatically recover if it remains
-below 90% of this value for a continuous 5 minutes. Setting it
-to 0 disables this feature.
+the disabled state.
+Setting it or `recovery_threshold` to 0 disables this feature.
 
 #### Recovery Threshold {#global.circuit_breakers.relative_sys_load.recovery_threshold}
 
@@ -437,11 +390,11 @@ global:
 
 **Description**:
 
-When the system load of the Linux system divided by the
-number of CPU cores is continuously below this value for 5
+After deepflow-agent enters disabled state and Linux system load
+divided by the number of CPU cores is continuously below this value for 5
 minutes, the agent can recover from the circuit breaker
-disabled state, and setting it to 0 means turning off the
-circuit breaker feature.
+disabled state.
+Setting it or `trigger_threshold` to 0 disables this feature.
 
 #### Metric {#global.circuit_breakers.relative_sys_load.metric}
 
@@ -451,7 +404,7 @@ circuit breaker feature.
 
 **FQCN**:
 
-`global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric`
+`global.circuit_breakers.relative_sys_load.metric`
 
 Upgrade from old version: `system_load_circuit_breaker_metric`
 
@@ -515,11 +468,11 @@ global:
 When the outbound throughput of the NPB interface reaches or exceeds
 the threshold, the broker will be stopped, after that the broker will
 be resumed if the throughput is lower than
-`(trigger_threshold - outputs.npb.max_npb_throughput)*90%`
+`(trigger_threshold - outputs.npb.max_tx_throughput)*90%`
 within 5 consecutive monitoring intervals.
 
 Attention: When configuring this value, it must be greater than
-`outputs.npb.max_npb_throughput`. Set to 0 will disable this feature.
+`outputs.npb.max_tx_throughput`. Set to 0 will disable this feature.
 
 #### Throughput Monitoring Interval {#global.circuit_breakers.tx_throughput.throughput_monitoring_interval}
 
@@ -582,7 +535,7 @@ global:
 **Description**:
 
 CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-without being migrated to other processors. Example:
+without being migrated to other processors. Invalid ID will be ignored. Example:
 ```yaml
 global:
   tunning:
@@ -635,7 +588,7 @@ Upgrade from old version: `static_config.memory-trim-disabled`
 ```yaml
 global:
   tunning:
-    idle_memory_trimming: false
+    idle_memory_trimming: true
 ```
 
 **Schema**:
@@ -838,7 +791,7 @@ The maximum time that the agent is allowed to work normally when it
 cannot connect to the server. After the timeout, the agent automatically
 enters the disabled state.
 
-### Controller IP Address {#global.communication.controller_ip}
+### Controller IP Address {#global.communication.proxy_controller_ip}
 
 **Tags**:
 
@@ -846,7 +799,7 @@ enters the disabled state.
 
 **FQCN**:
 
-`global.communication.controller_ip`
+`global.communication.proxy_controller_ip`
 
 Upgrade from old version: `proxy_controller_ip`
 
@@ -854,7 +807,7 @@ Upgrade from old version: `proxy_controller_ip`
 ```yaml
 global:
   communication:
-    controller_ip: ''
+    proxy_controller_ip: 127.0.0.1
 ```
 
 **Schema**:
@@ -865,10 +818,12 @@ global:
 **Description**:
 
 When this value is set, deepflow-agent will use this IP to access the
-control plane port of deepflow-server, which is usually used when
-deepflow-server uses an external load balancer.
+control plane port of deepflow-server, otherwise, the server will use
+its own node IP as the control plane communication IP. This parameter is
+usually used when the server uses a load balancer or a virtual IP to
+provide services externally.
 
-### Controller Port {#global.communication.controller_port}
+### Controller Port {#global.communication.proxy_controller_port}
 
 **Tags**:
 
@@ -876,7 +831,7 @@ deepflow-server uses an external load balancer.
 
 **FQCN**:
 
-`global.communication.controller_port`
+`global.communication.proxy_controller_port`
 
 Upgrade from old version: `proxy_controller_port`
 
@@ -884,7 +839,7 @@ Upgrade from old version: `proxy_controller_port`
 ```yaml
 global:
   communication:
-    controller_port: 30035
+    proxy_controller_port: 30035
 ```
 
 **Schema**:
@@ -1081,7 +1036,7 @@ Upgrade from old version: `static_config.log-file`
 global:
   self_monitoring:
     log:
-      log_file: /var/log/deepflow_agent/deepflow_agent.log
+      log_file: /var/log/deepflow-agent/deepflow-agent.log
 ```
 
 **Schema**:
@@ -1213,7 +1168,7 @@ global:
 
 **Description**:
 
-Default value `0` means use a random client port number.
+Default value `0` means use a random listen port number.
 Only available for Trident (Golang version of Agent).
 
 #### Debug Metrics Enabled {#global.self_monitoring.debug.debug_metrics_enabled}
@@ -1246,7 +1201,7 @@ global:
 
 Only available for Trident (Golang version of Agent).
 
-### Hostname {#global.self_monitoring.hostname}
+### Interval {#global.self_monitoring.interval}
 
 **Tags**:
 
@@ -1254,25 +1209,26 @@ Only available for Trident (Golang version of Agent).
 
 **FQCN**:
 
-`global.self_monitoring.hostname`
+`global.self_monitoring.interval`
 
-Upgrade from old version: `host`
+Upgrade from old version: `stats_interval`
 
 **Default value**:
 ```yaml
 global:
   self_monitoring:
-    hostname: ''
+    interval: 10s
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | duration |
+| Range | ['1s', '3600s'] |
 
 **Description**:
 
-Override statsd host tag.
+statsd interval.
 
 ## Standalone Mode {#global.standalone_mode}
 
@@ -1327,7 +1283,7 @@ Upgrade from old version: `static_config.standalone-data-file-dir`
 ```yaml
 global:
   standalone_mode:
-    data_file_dir: /var/log/deepflow_agent/
+    data_file_dir: /var/log/deepflow-agent/
 ```
 
 **Schema**:
@@ -1338,224 +1294,6 @@ global:
 **Description**:
 
 Directory where data files are written to.
-
-## Tags {#global.tags}
-
-Tags related to deepflow-agent.
-
-### Region ID {#global.tags.region_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.region_id`
-
-Upgrade from old version: `region_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    region_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-Region ID of the deepflow-agent or Region ID of the data node.
-
-### Pod cluster ID {#global.tags.pod_cluster_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.pod_cluster_id`
-
-Upgrade from old version: `pod_cluster_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    pod_cluster_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-Cluster ID of the container where the deepflow-agent is located.
-
-### VPC ID {#global.tags.vpc_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.vpc_id`
-
-Upgrade from old version: `epc_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    vpc_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-The ID of the VPC where the deepflow-agent is located is meaningful only for Workload-V/P and pod-V/P types.
-
-### Agent ID {#global.tags.agent_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.agent_id`
-
-Upgrade from old version: `vtap_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    agent_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [0, 64000] |
-
-**Description**:
-
-Agent ID.
-
-### Agent Type {#global.tags.agent_type}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.agent_type`
-
-Upgrade from old version: `trident_type`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    agent_type: 0
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| 0 | TT_UNKNOWN |
-| 1 | TT_PROCESS, Agent in KVM |
-| 2 | TT_VM, Agent in a dedicated VM on ESXi |
-| 3 | TT_PUBLIC_CLOUD, Agent in Cloud host (VM) |
-| 5 | TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host |
-| 6 | TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic |
-| 7 | TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host) |
-| 8 | TT_VM_POD, Agent in K8s Node (Cloud VM) |
-| 9 | TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic |
-| 10 | TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node |
-| 11 | TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node |
-| 12 | TT_K8S_SIDECAR, Agent in K8s POD |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [0, 12] |
-
-**Description**:
-
-Agent Type.
-
-### Team ID {#global.tags.team_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.team_id`
-
-Upgrade from old version: `team_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    team_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-The ID of the team where the deepflow-agent is located.
-
-### Organize ID {#global.tags.organize_id}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.organize_id`
-
-Upgrade from old version: `organize_id`
-
-**Default value**:
-```yaml
-global:
-  tags:
-    organize_id: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-The ID of the organize where the deepflow-agent is located.
 
 # Inputs {#inputs}
 
@@ -1617,7 +1355,7 @@ inputs:
 
 The /proc fs mount path.
 
-### Synchronization Interval {#inputs.proc.sync_interval}
+### Socket Information Synchronization Interval {#inputs.proc.socket_info_sync_interval}
 
 **Tags**:
 
@@ -1625,7 +1363,7 @@ The /proc fs mount path.
 
 **FQCN**:
 
-`inputs.proc.sync_interval`
+`inputs.proc.socket_info_sync_interval`
 
 Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 
@@ -1633,18 +1371,19 @@ Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 ```yaml
 inputs:
   proc:
-    sync_interval: 10s
+    socket_info_sync_interval: 0
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '1h'] |
+| Range | [0, '1h'] |
 
 **Description**:
 
 The interval of socket info sync.
+0 means disabled, do not configure a value less than 1s except for 0.
 
 ### Minimal Lifetime {#inputs.proc.min_lifetime}
 
@@ -1673,7 +1412,7 @@ inputs:
 
 **Description**:
 
-Socket and Process uptime threshold
+Socket and Process will not be reported if their uptime is lower than this threshold.
 
 ### Tag Extraction {#inputs.proc.tag_extraction}
 
@@ -1773,7 +1512,8 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - ebpf.profile.off_cpu
-      match_regex: deepflow-*
+      - proc.gprocess_info
+      match_regex: deepflow-.*
       only_in_container: false
 ```
 
@@ -1866,7 +1606,7 @@ The regex of matcher.
 
 `inputs.proc.process_matcher.match_type`
 
-Upgrade from old version: `static_config.os-proc-regex.match-regex`
+Upgrade from old version: `static_config.os-proc-regex.match-type`
 
 **Default value**:
 ```yaml
@@ -1881,9 +1621,9 @@ inputs:
 | ----- | ---------------------------- |
 | process_name | |
 | cmdline | |
+| cmdline_with_args | |
 | parent_process_name | |
 | tag | |
-| cmdline_with_args | |
 
 **Schema**:
 | Key  | Value                        |
@@ -2094,19 +1834,14 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
+| proc.gprocess_info | |
+| proc.golang_symbol_table | |
 | proc.socket_list | |
-| proc.symbol_table | |
-| proc.proc_event | |
 | ebpf.socket.uprobe.golang | |
 | ebpf.socket.uprobe.tls | |
-| ebpf.socket.uprobe.rdma | |
-| ebpf.file.io_event | |
-| ebpf.file.management_event | |
 | ebpf.profile.on_cpu | |
 | ebpf.profile.off_cpu | |
 | ebpf.profile.memory | |
-| ebpf.profile.cuda | |
-| ebpf.profile.hbm | |
 
 **Schema**:
 | Key  | Value                        |
@@ -2145,7 +1880,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **Description**:
 
@@ -2718,8 +2453,8 @@ inputs:
 **Description**:
 
 The configuration takes effect when capture_mode is 0 and extra_netns_regex is null,
-PACKET_FANOUT is to enable load balancing and parallel processing, which can improve
-the performance and scalability of network applications. When the `local-dispatcher-count`
+PACKET_FANOUT is to enable load balancing and parallel processing, scaling dispatcher for
+better performance of handling network applications. When the `local-dispatcher-count`
 is greater than 1, multiple dispatcher threads will be launched, consuming more CPU and
 memory. Increasing the `local-dispatcher-count` helps to reduce the operating system's
 software interrupts on multi-core CPU servers.
@@ -2775,7 +2510,7 @@ kernel to specify the desired packet distribution algorithm. Refer to:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### Source {#inputs.cbpf.special_network.dpdk.source}
+##### source {#inputs.cbpf.special_network.dpdk.source}
 
 **Tags**:
 
@@ -2800,7 +2535,7 @@ inputs:
 | ----- | ---------------------------- |
 | None | |
 | eBPF | |
-| pDump | |
+| pdump | |
 
 **Schema**:
 | Key  | Value                        |
@@ -3044,6 +2779,9 @@ inputs:
 
 **Description**:
 
+In analyzer mode, raw packets will go through a queue before being processed.
+To avoid memory allocation for each packet, a memory block of size
+raw_packet_buffer_block_size is allocated for multiple packets.
 Larger value will reduce memory allocation for raw packet, but will also
 delay memory free.
 
@@ -3098,7 +2836,7 @@ Upgrade from old version: `max_collect_pps`
 inputs:
   cbpf:
     tunning:
-      max_capture_pps: 200000
+      max_capture_pps: 1048576
 ```
 
 **Schema**:
@@ -3190,6 +2928,37 @@ inputs:
 **Description**:
 
 Whether to remove the tunnel header in mirrored traffic.
+
+#### Packet Segmentation Reassembly {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.cbpf.preprocess.packet_segmentation_reassembly`
+
+Upgrade from old version: `static_config.packet-segmentation-reassembly`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    preprocess:
+      packet_segmentation_reassembly: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 65535] |
+
+**Description**:
+
+Consecutive TCP packets will be aggregated together for application log parsing.
 
 ### Physical Mirror Traffic {#inputs.cbpf.physical_mirror}
 
@@ -3339,7 +3108,7 @@ Whether to enable eBPF features.
 
 `inputs.ebpf.socket.uprobe.golang.enabled`
 
-Upgrade from old version: `static_config.ebpf.uprobe-process-name-regexs.golang`
+Upgrade from old version: `static_config.ebpf.uprobe-golang-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.golang`
 
 **Default value**:
 ```yaml
@@ -3407,7 +3176,7 @@ thread number.
 
 `inputs.ebpf.socket.uprobe.tls.enabled`
 
-Upgrade from old version: `static_config.ebpf.uprobe-process-name-regexs.openssl`
+Upgrade from old version: `static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl`
 
 **Default value**:
 ```yaml
@@ -3443,54 +3212,17 @@ In the logs, you will encounter a message similar to the following:
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
-###### Source {#inputs.ebpf.socket.uprobe.dpdk.source}
+###### DPDK Application Command Name {#inputs.ebpf.socket.uprobe.dpdk.command}
 
 **Tags**:
 
 <mark>agent_restart</mark>
-
-**FQCN**:
-
-`inputs.ebpf.socket.uprobe.dpdk.source`
-
-
-**Default value**:
-```yaml
-inputs:
-  ebpf:
-    socket:
-      uprobe:
-        dpdk:
-          source: None
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| None | |
-| eBPF | |
-| pDump | |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-The toggle for enabling DPDK packet capture feature.
-
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.command}
-
-**Tags**:
-
-<mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.command`
 
-
 **Default value**:
 ```yaml
 inputs:
@@ -3498,7 +3230,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          command: ""
+          command: ''
 ```
 
 **Schema**:
@@ -3510,18 +3242,19 @@ inputs:
 
 Set the command name of the DPDK application, eBPF will automatically
 locate and trace packets for data collection.
-Example: In the command line '/usr/bin/mydpdk', it can be set as "command: mydpdk"
 
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
+Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+
+###### DPDK Application RX Hooks Configuration {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.rx_hooks`
-
 
 **Default value**:
 ```yaml
@@ -3542,72 +3275,75 @@ inputs:
 
 Fill in the appropriate packet reception hook point according to the actual network card driver.
 You can use the command 'lspci -vmmk' to find the network card driver type. For example:
-
-     Slot:   04:00.0
-     Class:  Ethernet controller
-     Vendor: Intel Corporation
-     Device: Ethernet Controller XL710 for 40GbE QSFP+
-     SVendor:        Unknown vendor 1e18
-     SDevice:        Device 4712
-     Rev:    02
-     Driver: igb_uio
-     Module: i40e
-
+```
+Slot:   04:00.0
+Class:  Ethernet controller
+Vendor: Intel Corporation
+Device: Ethernet Controller XL710 for 40GbE QSFP+
+SVendor:        Unknown vendor 1e18
+SDevice:        Device 4712
+Rev:    02
+Driver: igb_uio
+Module: i40e
+```
 In the example above, "Driver: igb_uio" indicates a DPDK-managed device (other options include
 "vfio-pci" and "uio_pci_generic", which are also managed by DPDK). The actual driver is 'i40e'
 (derived from 'Module: i40e').
 
-You can use the sustainable profiling feature provided by DeepFlow to perform function profiling on the DPDK application and check the specific interface names. Alternatively, you can run the `perf` command on the node where the agent is located:
+You can use the sustainable profiling feature provided by DeepFlow to perform function profiling
+on the DPDK application and check the specific interface names. Alternatively, you can run the
+`perf` command on the node where the agent is located:
 `perf record -F97 -a -g -p <DPDK application PID> -- sleep 30`
 and then use
 `perf script | grep -E 'recv|xmit'`
 to confirm the driver interfaces.
 
-     Below are some common interface names for different drivers, for reference only:
-      1. Physical NIC Drivers:
-          - Intel Drivers:
-            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
-              - rx: ixgbe_recv_pkts, ixgbe_recv_pkts_vec
-              - tx: ixgbe_xmit_pkts, ixgbe_xmit_fixed_burst_vec, ixgbe_xmit_pkts_vec
-            - i40e:    Supports Intel X710, XL710 series NICs.
-              - rx: i40e_recv_pkts
-              - tx: i40e_xmit_pkts
-            - ice:     Supports Intel E810 series NICs.
-              - rx: ice_recv_pkts
-              - tx: ice_xmit_pkts
-          - Mellanox Drivers:
-            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
-              - rx: mlx4_rx_burst
-              - tx: mlx4_tx_burst
-            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
-              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
-              - tx: Pending confirmation
-          - Broadcom Drivers:
-            - bnxt:    Supports Broadcom NetXtreme series NICs.
-              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
-              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
-       2. Virtual NIC Drivers:
-          - Virtio Driver:
-            - virtio:  Supports Virtio-based virtual network interfaces.
-              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
-                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
-              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
-          - VMXNET3 Driver:
-            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
-              - rx: vmxnet3_recv_pkts
-              - tx: vmxnet3_xmit_pkts
-Example: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
+Below are some common interface names for different drivers, for reference only:
+ 1. Physical NIC Drivers:
+     - Intel Drivers:
+       - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+         - rx: ixgbe_recv_pkts, ixgbe_recv_pkts_vec
+         - tx: ixgbe_xmit_pkts, ixgbe_xmit_fixed_burst_vec, ixgbe_xmit_pkts_vec
+       - i40e:    Supports Intel X710, XL710 series NICs.
+         - rx: i40e_recv_pkts
+         - tx: i40e_xmit_pkts
+       - ice:     Supports Intel E810 series NICs.
+         - rx: ice_recv_pkts
+         - tx: ice_xmit_pkts
+     - Mellanox Drivers:
+       - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+         - rx: mlx4_rx_burst
+         - tx: mlx4_tx_burst
+       - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+         - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+         - tx: Pending confirmation
+     - Broadcom Drivers:
+       - bnxt:    Supports Broadcom NetXtreme series NICs.
+         - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+         - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+  2. Virtual NIC Drivers:
+     - Virtio Driver:
+       - virtio:  Supports Virtio-based virtual network interfaces.
+         - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+               virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+         - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
+     - VMXNET3 Driver:
+       - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+         - rx: vmxnet3_recv_pkts
+         - tx: vmxnet3_xmit_pkts
 
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
+Example: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
+
+###### DPDK Application TX Hooks Configuration {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.tx_hooks`
-
 
 **Default value**:
 ```yaml
@@ -3629,7 +3365,7 @@ inputs:
 Specify the appropriate packet transmission hook point according to the actual network card driver.
 To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
 
-Example: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
+Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
@@ -3665,13 +3401,12 @@ inputs:
 **Description**:
 
 TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
-Use kprobe to collect data on ports that are not in the blacklist or whitelist.
 
 Example: `ports: 80,1000-2000`
 
 ##### Whitelist {#inputs.ebpf.socket.kprobe.whitelist}
 
-###### Port Numbers {#inputs.ebpf.socket.kprobe.whitelist.port}
+###### Port Numbers {#inputs.ebpf.socket.kprobe.whitelist.ports}
 
 **Tags**:
 
@@ -3679,7 +3414,7 @@ Example: `ports: 80,1000-2000`
 
 **FQCN**:
 
-`inputs.ebpf.socket.kprobe.whitelist.port`
+`inputs.ebpf.socket.kprobe.whitelist.ports`
 
 Upgrade from old version: `static_config.ebpf.kprobe-whitelist.port-list`
 
@@ -3690,7 +3425,7 @@ inputs:
     socket:
       kprobe:
         whitelist:
-          port: ''
+          ports: ''
 ```
 
 **Schema**:
@@ -3701,6 +3436,7 @@ inputs:
 **Description**:
 
 TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
+Use kprobe to collect data on ports that are not in the blacklist or whitelist.
 
 Example: `ports: 80,1000-2000`
 
@@ -3777,6 +3513,8 @@ eBPF hook on the CPU consumption of the application process.
 **FQCN**:
 
 `inputs.ebpf.socket.tunning.map_prealloc_disabled`
+
+Upgrade from old version: `static_config.ebpf.map-prealloc-disabled`
 
 **Default value**:
 ```yaml
@@ -3866,7 +3604,7 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **Schema**:
 | Key  | Value                        |
@@ -3911,7 +3649,7 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **Schema**:
 | Key  | Value                        |
@@ -4008,6 +3746,145 @@ inputs:
 Only collect IO events with delay exceeding this threshold.
 
 ### Profile {#inputs.ebpf.profile}
+
+#### Unwinding {#inputs.ebpf.profile.unwinding}
+
+##### DWARF unwinding disabled {#inputs.ebpf.profile.unwinding.dwarf_disabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_disabled`
+
+Upgrade from old version: `static_config.ebpf.dwarf-disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_disabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+The default setting is "false", which enables DWARF based stack unwinding for
+all processes that do not contain frame pointers. Agent uses a heuristic algorithm
+to determine whether the process being analyzed contains frame pointers.
+Setting it to "true" will disable DWARF based stack unwinding, using frame pointer
+based unwinding for all processes. If a process does not contain frame pointers,
+the stack cannot be displayed correctly.
+
+##### DWARF unwinding process matching regular expression {#inputs.ebpf.profile.unwinding.dwarf_regex}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_regex`
+
+Upgrade from old version: `static_config.ebpf.dwarf-regex`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_regex: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+If set to empty, agennt will use a heuristic algorithm to determine whether the process
+being analyzed contains frame pointers, and will use DWARF based stack unwinding for
+processes that do not contain frame pointers.
+If set to a valid regular expression, agent will no longer infer whether a process contains
+frame pointers but will instead use the provided regular expression to match process names,
+applying DWARF based stack unwinding only to the matching processes.
+
+##### DWARF unwinding process map size {#inputs.ebpf.profile.unwinding.dwarf_process_map_size}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_process_map_size`
+
+Upgrade from old version: `static_config.ebpf.dwarf-process-map-size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_process_map_size: 1024
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 131072] |
+
+**Description**:
+
+Each process using DWARF unwind has an entry in this map, relating process id to DWARF unwind entries.
+The size of each one of these entries is arount 8K, the default setting will allocate around 8M kernel memory.
+This is a hash map, so size can be lower than max process id.
+The configuration is only effective if DWARF is enabled.
+
+##### DWARF unwinding shard map size {#inputs.ebpf.profile.unwinding.dwarf_shard_map_size}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_shard_map_size`
+
+Upgrade from old version: `static_config.ebpf.dwarf-shard-map-size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_shard_map_size: 128
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 4096] |
+
+**Description**:
+
+The number of unwind entry shards for DWARF unwinding.
+The size of each one of these entries is 1M, the default setting will allocate around 128M kernel memory.
+The configuration is only effective if DWARF is enabled.
 
 #### On-CPU {#inputs.ebpf.profile.on_cpu}
 
@@ -4222,7 +4099,7 @@ will not collect events with a blocking time exceeding 1 hour.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -4249,6 +4126,38 @@ inputs:
 
 eBPF memory profile switch.
 
+##### Memory profile report interval {#inputs.ebpf.profile.memory.report_interval}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.report_interval`
+
+Upgrade from old version: `static_config.ebpf.memory-profile.report-interval`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        report_interval: 10s
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1s', '60s'] |
+
+**Description**:
+
+The interval at which deepflow-agent aggregates and reports memory profile data.
+
 #### Preprocess {#inputs.ebpf.profile.preprocess}
 
 ##### Stack Compression {#inputs.ebpf.profile.preprocess.stack_compression}
@@ -4260,6 +4169,8 @@ eBPF memory profile switch.
 **FQCN**:
 
 `inputs.ebpf.profile.preprocess.stack_compression`
+
+Upgrade from old version: `static_config.ebpf.preprocess.stack-compression`
 
 **Default value**:
 ```yaml
@@ -4568,7 +4479,14 @@ inputs:
 **Description**:
 
 When enabled, deepflow-agent will automatically synchronize virtual
-machine and network information on the KVM (or Host) to deepflow-server.
+machine and network information on KVM or Linux Host to deepflow-server.
+Information collected includes:
+- raw_all_vm_xml
+- raw_vm_states
+- raw_ovs_interfaces
+- raw_ovs_ports
+- raw_brctl_show
+- raw_vlan_config
 
 #### VM MAC Source {#inputs.resources.private_cloud.vm_mac_source}
 
@@ -4682,36 +4600,6 @@ script:
 
 ### Collect K8s Resource {#inputs.resources.kubernetes}
 
-#### Enabled {#inputs.resources.kubernetes.enabled}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.kubernetes.enabled`
-
-Upgrade from old version: `kubernetes_api_enabled`
-
-**Default value**:
-```yaml
-inputs:
-  resources:
-    kubernetes:
-      enabled: false
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-When there are multiple deepflow-agents in the same K8s cluster,
-only one deepflow-agent will be enabled to collect K8s resources.
-
 #### K8s Namespace {#inputs.resources.kubernetes.kubernetes_namespace}
 
 **Tags**:
@@ -4739,7 +4627,7 @@ inputs:
 
 **Description**:
 
-TODO
+Specify the namespace for agent to query K8s resources.
 
 #### K8s API Resources {#inputs.resources.kubernetes.api_resources}
 
@@ -5107,84 +4995,6 @@ operation requires the SYS_ADMIN permission. In passive mode deepflow-agent
 calculates the MAC and IP addresses used by Pods by capturing ARP/ND traffic.
 When set to adaptive, active mode will be used first.
 
-### Pull Resource From Controller {#inputs.resources.pull_resource_from_controller}
-
-#### Domain Filter {#inputs.resources.pull_resource_from_controller.domain_filter}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.pull_resource_from_controller.domain_filter`
-
-Upgrade from old version: `domains`
-
-**Default value**:
-```yaml
-inputs:
-  resources:
-    pull_resource_from_controller:
-      domain_filter:
-      - 0
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**Description**:
-
-Default value `0` means all domains, or can be set to a list of lcuuid of a
-series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
-
-Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
-into data. This configuration can reduce the number and frequency of MAC and
-IP addresses delivered by deepflow-server to deepflow-agent. When there is no
-cross-domain service request, deepflow-server can be configured to only deliver
-the information in the local domain to deepflow-agent.
-
-#### Only K8s Pod IP in Local Cluster {#inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster`
-
-Upgrade from old version: `pod_cluster_internal_ip`
-
-**Default value**:
-```yaml
-inputs:
-  resources:
-    pull_resource_from_controller:
-      only_kubernetes_pod_ip_in_local_cluster: false
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-The list of MAC and IP addresses is used by deepflow-agent to inject tags
-into data. This configuration can reduce the number and frequency of MAC and IP
-addresses delivered by deepflow-server to deepflow-agent. When the Pod IP is not
-used for direct communication between the K8s cluster and the outside world,
-deepflow-server can be configured to only deliver the information in the local
-K8s cluster to deepflow-agent.
-
 ## Integration {#inputs.integration}
 
 ### Enabled {#inputs.integration.enabled}
@@ -5288,7 +5098,7 @@ of deepflow-agent.
 
 `inputs.integration.compression.profile`
 
-Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
+Upgrade from old version: `static_config.external-agent-http-proxy-profile-compressed`
 
 **Default value**:
 ```yaml
@@ -5308,7 +5118,6 @@ inputs:
 Whether to compress the integrated profile data received by deepflow-agent. The compression
 ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
 of deepflow-agent.
-
 
 ### Prometheus Extra Labels {#inputs.integration.prometheus_extra_labels}
 
@@ -5373,7 +5182,7 @@ inputs:
 Labels list. Labels in this list are sent. Label is a string
 matching the regular expression `[a-zA-Z_][a-zA-Z0-9_]*`
 
-#### Label Length Limit {#inputs.integration.prometheus_extra_labels.label_length}
+#### Label Key Total Length Limit {#inputs.integration.prometheus_extra_labels.label_length}
 
 **Tags**:
 
@@ -5402,9 +5211,9 @@ inputs:
 
 **Description**:
 
-The size limit of the parsed key.
+The limit of the total length of parsed extra Prometheus label keys.
 
-#### Value Length Limit {#inputs.integration.prometheus_extra_labels.value_length}
+#### Value Total Length Limit {#inputs.integration.prometheus_extra_labels.value_length}
 
 **Tags**:
 
@@ -5433,7 +5242,7 @@ inputs:
 
 **Description**:
 
-The size limit of the parsed value.
+The limit of the total length of parsed extra Prometheus label values.
 
 ### Feature Control {#inputs.integration.feature_control}
 
@@ -5567,11 +5376,13 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
+| Range | [0, 10000000] |
 
 **Description**:
 
 When set to 0, deepflow-agent will automatically adjust the map size
 according to max_memory.
+Note: In practice, it should not be set to less than 8000.
 
 #### Fast-path Disabled {#processors.packet.policy.fast_path_disabled}
 
@@ -5662,6 +5473,7 @@ processors:
 **Description**:
 
 DDBS algorithm level.
+
 When this value is larger, the memory overhead is smaller, but the
 performance of policy matching is worse.
 
@@ -5730,37 +5542,6 @@ processors:
 
 The length of the following queues (to UniformCollectSender):
 - 1-packet-sequence-block-to-uniform-collect-sender
-
-#### Sender Queue Count {#processors.packet.tcp_header.sender_queue_count}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`processors.packet.tcp_header.sender_queue_count`
-
-Upgrade from old version: `static_config.packet-sequence-queue-count`
-
-**Default value**:
-```yaml
-processors:
-  packet:
-    tcp_header:
-      sender_queue_count: 1
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**Description**:
-
-The number of replicas for each output queue of the PacketSequence.
 
 #### Header Fields Flag {#processors.packet.tcp_header.header_fields_flag}
 
@@ -5862,7 +5643,7 @@ processors:
 
 **Description**:
 
-Buffer flushes when one of the flows reach this limit.
+PCap buffer size per flow. Will flush the flow when reach this limit.
 
 #### Total Buffer Size {#processors.packet.pcap_stream.total_buffer_size}
 
@@ -5893,8 +5674,7 @@ processors:
 
 **Description**:
 
-Buffer flushes when total data size reach this limit,
-cannot exceed sender buffer size 128K.
+Total PCap buffer size. Will flush all flows when reach this limit.
 
 #### Flush Interval {#processors.packet.pcap_stream.flush_interval}
 
@@ -5925,7 +5705,7 @@ processors:
 
 **Description**:
 
-Flushes a flow if its first packet were older then this interval.
+Flushes the PCap buffer of a flow if it has not been flushed for this interval.
 
 ### TOA (TCP Option Address) {#processors.packet.toa}
 
@@ -5957,7 +5737,8 @@ processors:
 
 **Description**:
 
-TODO
+The length of the following queues:
+- 1-socket-sync-toa-info-queue
 
 #### Cache Size {#processors.packet.toa.cache_size}
 
@@ -6045,7 +5826,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-ttl`
 processors:
   request_log:
     application_protocol_inference:
-      inference_result_ttl: 60
+      inference_result_ttl: 60s
 ```
 
 **Schema**:
@@ -6081,31 +5862,17 @@ processors:
       enabled_protocols:
       - HTTP
       - HTTP2
-      - Dubbo
-      - SofaRPC
-      - FastCGI
-      - bRPC
       - MySQL
-      - PostgreSQL
-      - Oracle
       - Redis
-      - MongoDB
       - Kafka
-      - MQTT
-      - AMQP
-      - OpenWire
-      - NATS
-      - Pulsar
-      - ZMTP
       - DNS
       - TLS
-      - Custom
 ```
 
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **Schema**:
 | Key  | Value                        |
@@ -6247,6 +6014,7 @@ processors:
         HTTP2: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
+        Memcached: 11211
         MongoDB: 1-65535
         MySQL: 1-65535
         NATS: 1-65535
@@ -6256,7 +6024,9 @@ processors:
         Pulsar: 1-65535
         Redis: 1-65535
         SofaRPC: 1-65535
+        SomeIP: 1-65535
         TLS: 443,6443
+        Tars: 1-65535
         ZMTP: 1-65535
         bRPC: 1-65535
 ```
@@ -6273,7 +6043,11 @@ processors:
 
 **Description**:
 
-Port-list example: `80,1000-2000`
+Port-list example:
+```
+HTTP: 80,1000-2000
+HTTP2: 1-65535
+```
 
 HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
 All data obtained through uprobe is not subject to port restrictions.
@@ -6303,6 +6077,7 @@ processors:
     filters:
       tag_filters:
         AMQP: []
+        Custom: []
         DNS: []
         Dubbo: []
         FastCGI: []
@@ -6310,6 +6085,7 @@ processors:
         HTTP2: []
         Kafka: []
         MQTT: []
+        Memcached: []
         MongoDB: []
         MySQL: []
         NATS: []
@@ -6319,7 +6095,9 @@ processors:
         Pulsar: []
         Redis: []
         SOFARPC: []
+        SomeIP: []
         TLS: []
+        Tars: []
         ZMTP: []
         bRPC: []
         gRPC: []
@@ -6667,7 +6445,8 @@ processors:
   request_log:
     tag_extraction:
       tracing_tag:
-        http_real_client: X_Forwarded_For
+        http_real_client:
+        - X_Forwarded_For
 ```
 
 **Schema**:
@@ -6698,7 +6477,8 @@ processors:
   request_log:
     tag_extraction:
       tracing_tag:
-        x_request_id: X_Request_ID
+        x_request_id:
+        - X_Request_ID
 ```
 
 **Schema**:
@@ -7002,8 +6782,8 @@ processors:
     tag_extraction:
       custom_fields:
         HTTP:
-        - field-name: "user-agent"
-        - field-name: "cookie"
+        - field_name: "user-agent"
+        - field_name: "cookie"
 ```
 
 Attention: use `HTTP2` for `gRPC` Protocol.
@@ -7078,6 +6858,9 @@ processors:
 
 For the sake of data security, the data of the protocol that needs
 to be desensitized is configured here and is not processed by default.
+Obfuscated fields mainly include:
+- Authorization information
+- Value information in various statements
 
 ### Tunning {#processors.request_log.tunning}
 
@@ -7111,7 +6894,7 @@ processors:
 **Description**:
 
 The maximum data length used for application protocol identification,
-note that the effective value is less than or equal to the value of
+note that the effective value is less than the value of
 capture_packet_size.
 
 NOTE: For eBPF data, the largest valid value is 16384.
@@ -7227,7 +7010,10 @@ processors:
 
 **Description**:
 
-Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+The timestamp carried by the packet captured by AF_PACKET may be delayed
+from the current clock, especially in heavy traffic scenarios, which may be
+as high as nearly 10s.
+This also affects FlowMap aggregation window size.
 
 #### Extra Tolerable Flow Delay {#processors.flow_log.time_window.extra_tolerable_flow_delay}
 
@@ -7253,11 +7039,12 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '10s'] |
+| Range | ['0s', '10s'] |
 
 **Description**:
 
-Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+Extra tolerance for QuadrupleGenerator receiving flows.
+Affects 1s/1m QuadrupleGenerator aggregation window size.
 
 ### Conntrack (a.k.a. Flow Map) {#processors.flow_log.conntrack}
 
@@ -7289,7 +7076,8 @@ processors:
 
 **Description**:
 
-Flush interval of the queue connected to the collector.
+Flow generation delay time in FlowMap, used to increase the window size
+in downstream processing units to avoid pushing the window too fast.
 
 #### Flow Generation {#processors.flow_log.conntrack.flow_generation}
 
@@ -7817,42 +7605,6 @@ outputs:
 It can only be set to FILE in standalone mode, in which case
 l4_flow_log and l7_flow_log will be written to local files.
 
-### PCAP Socket Type {#outputs.socket.pcap_socket_type}
-
-**Tags**:
-
-`hot_update`
-
-**FQCN**:
-
-`outputs.socket.pcap_socket_type`
-
-Upgrade from old version: `compressor_socket_type`
-
-**Default value**:
-```yaml
-outputs:
-  socket:
-    pcap_socket_type: TCP
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| TCP | |
-| UDP | |
-| RAW_UDP | |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-RAW_UDP uses RawSocket to send UDP packets, which has the highest
-performance, but there may be compatibility issues in some environments.
-
 ### NPB Socket Type {#outputs.socket.npb_socket_type}
 
 **Tags**:
@@ -8009,7 +7761,8 @@ Upgrade from old version: `l7_log_store_tap_types`
 outputs:
   flow_log:
     filters:
-      l7_capture_network_types: []
+      l7_capture_network_types:
+      - 0
 ```
 
 **Enum options**:
@@ -8158,7 +7911,8 @@ outputs:
 **Description**:
 
 The maximum number of rows of l4_flow_log sent per second, when the actual
-number of rows exceeds this value, sampling is triggered.
+number of upstream rows exceeds this value, reservoir sampling is applied to
+limit the actual number of rows sent.
 
 #### L7 Throttle {#outputs.flow_log.throttles.l7_throttle}
 
@@ -8225,37 +7979,6 @@ outputs:
 The length of the following queues:
 - 3-flow-to-collector-sender
 - 3-protolog-to-collector-sender
-
-#### Collector Queue Count {#outputs.flow_log.tunning.collector_queue_count}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`outputs.flow_log.tunning.collector_queue_count`
-
-Upgrade from old version: `static_config.flow-sender-queue-count`
-
-**Default value**:
-```yaml
-outputs:
-  flow_log:
-    tunning:
-      collector_queue_count: 1
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**Description**:
-
-The number of replicas for each output queue of the
-FlowAggregator/SessionAggregator.
 
 ## Flow Metrics {#outputs.flow_metrics}
 
@@ -8385,7 +8108,7 @@ outputs:
 
 When closed, deepflow-agent only collects some basic throughput metrics.
 
-#### NPM Metrics {#outputs.flow_metrics.filters.npm_metrics_concurrent}
+#### NPM Concurrent Metrics {#outputs.flow_metrics.filters.npm_metrics_concurrent}
 
 **Tags**:
 
@@ -8501,37 +8224,7 @@ outputs:
 **Description**:
 
 The length of the following queues:
-- 2-doc-to-collector-sender
-
-#### Sender Queue Count {#outputs.flow_metrics.tunning.sender_queue_count}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`outputs.flow_metrics.tunning.sender_queue_count`
-
-Upgrade from old version: `static_config.collector-sender-queue-count`
-
-**Default value**:
-```yaml
-outputs:
-  flow_metrics:
-    tunning:
-      sender_queue_count: 1
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**Description**:
-
-The number of replicas for each output queue of the collector.
+- 3-doc-to-collector-sender
 
 ## NPB (Network Packet Broker) {#outputs.npb}
 
@@ -8564,7 +8257,7 @@ outputs:
 
 **Description**:
 
-Maximum MTU allowed when using UDP to transfer data.
+Maximum MTU allowed when using UDP for NPB.
 
 Attention: Public cloud service providers may modify the content of the
 tail of the UDP packet whose packet length is close to 1500 bytes. When
@@ -8797,7 +8490,7 @@ Maximum traffic rate allowed for npb sender.
 
 ## Compression {#outputs.compression}
 
-## ApplicationLog {#outputs.compression.application_log}
+### Application_Log {#outputs.compression.application_log}
 
 **Tags**:
 
