@@ -22,6 +22,7 @@
 #include <sys/prctl.h>
 #include <linux/version.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
 #include <bcc/libbpf.h>
@@ -1559,9 +1560,125 @@ static int boot_time_update(void)
 	return ETR_OK;
 }
 
+/* 
+ * Thread function to periodically trigger a kernel-related action.
+ *
+ * The kernel uses bundled bursts to send data to the user.  
+ * The following method triggers a timeout check on all CPUs  
+ * to push data residing in the eBPF buffer.
+ */
+static void *kick_kern_push_data(void *arg)
+{
+	int cpu_id = *((int *)arg);	// Extract CPU ID from the argument
+	char thread_name[NAME_LEN];
+
+	// Set a descriptive thread name
+	snprintf(thread_name, sizeof(thread_name), "kick-kern-%d", cpu_id);
+	prctl(PR_SET_NAME, thread_name);
+
+	int tfd = -1, epfd = -1;
+	// Set CPU affinity for the thread
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_id, &cpuset);
+
+	if (pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset) !=
+	    0) {
+		ebpf_warning("pthread_setaffinity_np() failed: %s(%d)\n",
+			     strerror(errno), errno);
+		goto error;
+	}
+	// Create a timerfd for periodic notifications
+	tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+	if (tfd == -1) {
+		ebpf_warning("timerfd_create failed: %s(%d)\n", strerror(errno),
+			     errno);
+		goto error;
+	}
+
+	struct itimerspec timer_spec = {
+		.it_interval = {.tv_sec = 0,.tv_nsec = KICK_KERN_PERIOD},
+		.it_value = {.tv_sec = 0,.tv_nsec = KICK_KERN_PERIOD}
+	};
+
+	if (timerfd_settime(tfd, 0, &timer_spec, NULL) == -1) {
+		ebpf_warning("timerfd_settime failed: %s(%d)\n",
+			     strerror(errno), errno);
+		goto error;
+	}
+	// Create epoll instance and add timerfd
+	epfd = epoll_create1(0);
+	if (epfd == -1) {
+		ebpf_warning("epoll_create1 failed: %s(%d)\n", strerror(errno),
+			     errno);
+		goto error;
+	}
+
+	struct epoll_event ev = {
+		.events = EPOLLIN,
+		.data.fd = tfd
+	};
+
+	if (epoll_ctl(epfd, EPOLL_CTL_ADD, tfd, &ev) == -1) {
+		ebpf_warning("epoll_ctl failed: %s(%d)\n", strerror(errno),
+			     errno);
+		goto error;
+	}
+
+	struct epoll_event events[1];
+	ssize_t ret;
+
+	for (;;) {
+		int nfds = epoll_wait(epfd, events, 1, -1);
+		if (nfds > 0 && events[0].data.fd == tfd) {
+			uint64_t expirations;
+			while (1) {
+				ret =
+				    read(tfd, &expirations,
+					 sizeof(expirations));
+				if (ret == -1) {
+					if (errno == EINTR || errno == EAGAIN
+					    || errno == EWOULDBLOCK) {
+						continue;
+					} else {
+						ebpf_warning
+						    ("read from timerfd failed: %s(%d)\n",
+						     strerror(errno), errno);
+						goto error;
+					}
+				}
+				break;
+			}
+
+			if (ret != sizeof(expirations)) {
+				ebpf_warning("Kick kernel timer read error.\n");
+				goto error;
+			}
+
+			syscall(__NR_getppid);	// Trigger a kernel-related action (sample action)
+		}
+	}
+
+error:
+	if (tfd > 0)
+		close(tfd);
+	if (epfd > 0)
+		close(epfd);
+	pthread_exit(NULL);
+}
+
 static void period_process_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "period-process");
+	pthread_t threads[sys_cpus_count];
+	int i;
+	for (i = 0; i < sys_cpus_count; i++) {
+		if (cpu_online[i])
+			if (pthread_create
+			    (&threads[i], NULL, kick_kern_push_data, &i) != 0) {
+				ebpf_warning("pthread_create failed");
+			}
+	}
 
 	// Only this unique identifier can be adapted to the kernel
 	adapt_kern_uid =

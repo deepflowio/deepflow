@@ -20,7 +20,6 @@
  */
 
 #include <arpa/inet.h>
-#include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
@@ -30,6 +29,7 @@
 
 #define NS_PER_US		1000ULL
 #define NS_PER_SEC		1000000000ULL
+#define PUSH_PERIOD_TIME        10000000ULL // Push period time, 10 milliseconds.
 
 #define PROTO_INFER_CACHE_SIZE  80
 
@@ -273,7 +273,7 @@ static bool __inline check_socket_valid(struct socket_info_s *socket_info_ptr, i
 	if (is_socket_info_valid(socket_info_ptr)) {
 		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
 		void *check_socket;
-    bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
+		bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
 				      socket_info_ptr->sk + sk_off);
 		if (unlikely(check_socket != socket_info_ptr->socket)) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
@@ -1030,7 +1030,7 @@ static __inline bool check_pid_validity(void)
 		return false;
 
 	// Only a preset uid can be adapted to the kernel
-	if (*adapt_uid != bpf_get_current_pid_tgid())
+	if ((*adapt_uid) >> 32 != bpf_get_current_pid_tgid() >> 32)
 		return false;
 
 	return true;
@@ -3317,12 +3317,8 @@ PROGTP(io_event) (void *ctx) {
 	return 0;
 }
 
-/*
- * Here, the perf event is used to periodically send the data residing in
- * the cache but not yet transmitted to the user-level receiving program
- * for processing.
- */
-PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
+static __inline int push_socket_data(struct syscall_comm_enter_ctx *ctx)
+{
 	__u32 k0 = 0;
 	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
 	if (tracer_ctx == NULL)
@@ -3333,25 +3329,12 @@ PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
 		return 0;
 
 	/*
-	 * For perf event's periodic events, we have set them to push data
-	 * from the kernel buffer every 10 milliseconds. This periodic event
-	 * is implemented based on the kernel's high-resolution timer (hrtimer),
-	 * which triggers a timer interrupt when the time expires. However, in
-	 * reality, the timer does not always trigger the interrupt exactly every
-	 * 10 milliseconds to execute the ebpf program. This is because the timer
-	 * interrupt may be masked off during certain operations, such as when
-	 * interrupts are disabled during locking operations. Consequently, the
-	 * timer may trigger the interrupt after the expected time, resulting in a
-	 * delay in the periodic event. We need to monitor and record the maximum
-	 * delay time, the total runtime, and the number of occurrences of the
-	 * periodic event.
+	 * Monitor the maximum and average delay time of periodic push events.
 	 */
 	tracer_ctx->last_period_timestamp = tracer_ctx->period_timestamp;
 	tracer_ctx->period_timestamp = bpf_ktime_get_ns();
 	__u64 diff = tracer_ctx->period_timestamp -
 	    tracer_ctx->last_period_timestamp;
-	if (diff > trace_stats->period_event_max_delay)
-		trace_stats->period_event_max_delay = diff;
 
 	__sync_fetch_and_add(&trace_stats->period_event_total_time, diff);
 	__sync_fetch_and_add(&trace_stats->period_event_count, 1);
@@ -3401,10 +3384,23 @@ PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
 
 			v_buff->events_num = 0;
 			v_buff->len = 0;
+			if (diff > trace_stats->period_event_max_delay)
+				trace_stats->period_event_max_delay = diff;
 		}
 	}
 
 	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
+// Here, the tracepoint is used to periodically send the data residing in the cache but not
+// yet transmitted to the user-level receiving program for processing.
+TP_SYSCALL_PROG(enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
+	// Only pre-specified Pid is allowed to trigger.
+	if (!check_pid_validity())
+		return 0;
+
+	return push_socket_data(ctx);
 }
 
 //Refer to the eBPF programs here
