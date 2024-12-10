@@ -567,14 +567,11 @@ func (f *DataFomatter) LoadMapData(data map[string]interface{}) error {
 }
 
 func (f *DataFomatter) mapToYAML() ([]byte, error) {
-	var buf strings.Builder
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	err := enc.Encode(f.mapData)
+	str, err := f.dictToString(f.mapData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("convert dict to string error: %v", err)
 	}
-	return []byte(buf.String()), nil
+	return []byte(str), nil
 }
 
 func (f *DataFomatter) LoadYAMLData(yamlData []byte) error {
@@ -697,8 +694,14 @@ func (f *DataFomatter) formatJson(data interface{}) ([]byte, error) {
 }
 
 func (f *DataFomatter) dictToString(data interface{}) (string, error) {
-	bytes, err := yaml.Marshal(data)
-	return string(bytes), err
+	var buf strings.Builder
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	err := enc.Encode(data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func (f *DataFomatter) isKeyComment(key string) bool {
