@@ -974,20 +974,22 @@ inputs:
     proc_dir_path: /proc
     # type: duration
     # name:
-    #   en: Synchronization Interval
-    #   ch: 同步间隔
+    #   en: Socket Information Synchronization Interval
+    #   ch: Socket 信息同步间隔
     # unit:
-    # range: [1s, 1h]
+    # range: [0, 1h]
     # enum_options: []
     # modification: agent_restart
     # ee_feature: false
     # description:
     #   en: |-
     #     The interval of socket info sync.
+    #     0 means disabled, do not configure a value less than 1s except for 0.
     #   ch: |-
-    #     进程和 Socket 信息同步的时间周期。
+    #     Socket 信息同步的周期。
+    #     0 表示不开启，除 0 外不要配置小于 1s 的值。
     # upgrade_from: static_config.os-proc-socket-sync-interval
-    sync_interval: 10s
+    socket_info_sync_interval: 0
     # type: duration
     # name:
     #   en: Minimal Lifetime
