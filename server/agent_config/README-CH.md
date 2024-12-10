@@ -1441,7 +1441,7 @@ inputs:
 
 进程信息同步所用的目录。
 
-### 同步间隔 {#inputs.proc.sync_interval}
+### Socket 信息同步间隔 {#inputs.proc.socket_info_sync_interval}
 
 **标签**:
 
@@ -1449,7 +1449,7 @@ inputs:
 
 **FQCN**:
 
-`inputs.proc.sync_interval`
+`inputs.proc.socket_info_sync_interval`
 
 Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 
@@ -1457,18 +1457,19 @@ Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 ```yaml
 inputs:
   proc:
-    sync_interval: 10s
+    socket_info_sync_interval: 0
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '1h'] |
+| Range | [0, '1h'] |
 
 **详细描述**:
 
-进程和 Socket 信息同步的时间周期。
+Socket 信息同步的周期。
+0 表示不开启，除 0 外不要配置小于 1s 的值。
 
 ### 最小活跃时间 {#inputs.proc.min_lifetime}
 

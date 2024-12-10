@@ -1831,7 +1831,11 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 os_proc_scan_conf: OsProcScanConfig {
                     os_proc_root: conf.inputs.proc.proc_dir_path.clone(),
-                    os_proc_socket_sync_interval: conf.inputs.proc.sync_interval.as_secs() as u32,
+                    os_proc_socket_sync_interval: conf
+                        .inputs
+                        .proc
+                        .socket_info_sync_interval
+                        .as_secs() as u32,
                     os_proc_socket_min_lifetime: conf.inputs.proc.min_lifetime.as_secs() as u32,
                     os_app_tag_exec_user: conf.inputs.proc.tag_extraction.exec_username.clone(),
                     os_app_tag_exec: conf.inputs.proc.tag_extraction.script_command.clone(),
@@ -3502,12 +3506,12 @@ impl ConfigHandler {
             proc.symbol_table = new_proc.symbol_table;
             restart_agent = !first_run;
         }
-        if proc.sync_interval != new_proc.sync_interval {
+        if proc.socket_info_sync_interval != new_proc.socket_info_sync_interval {
             info!(
-                "Update inputs.proc.sync_interval from {:?} to {:?}.",
-                proc.sync_interval, new_proc.sync_interval
+                "Update inputs.proc.socket_info_sync_interval from {:?} to {:?}.",
+                proc.socket_info_sync_interval, new_proc.socket_info_sync_interval
             );
-            proc.sync_interval = new_proc.sync_interval;
+            proc.socket_info_sync_interval = new_proc.socket_info_sync_interval;
             restart_agent = !first_run;
         }
 

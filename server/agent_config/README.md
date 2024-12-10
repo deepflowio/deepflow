@@ -1457,7 +1457,7 @@ inputs:
 
 The /proc fs mount path.
 
-### Synchronization Interval {#inputs.proc.sync_interval}
+### Socket Information Synchronization Interval {#inputs.proc.socket_info_sync_interval}
 
 **Tags**:
 
@@ -1465,7 +1465,7 @@ The /proc fs mount path.
 
 **FQCN**:
 
-`inputs.proc.sync_interval`
+`inputs.proc.socket_info_sync_interval`
 
 Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 
@@ -1473,18 +1473,19 @@ Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 ```yaml
 inputs:
   proc:
-    sync_interval: 10s
+    socket_info_sync_interval: 0
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '1h'] |
+| Range | [0, '1h'] |
 
 **Description**:
 
 The interval of socket info sync.
+0 means disabled, do not configure a value less than 1s except for 0.
 
 ### Minimal Lifetime {#inputs.proc.min_lifetime}
 
