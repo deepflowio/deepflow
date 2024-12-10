@@ -17,6 +17,8 @@
 package updater
 
 import (
+	"time"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -24,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
 
 type Pod struct {
@@ -150,8 +153,14 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysqlmodel.Pod, b
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {
 		dbItem.CreatedAt = cloudItem.CreatedAt
+		p.recordStatsd(cloudItem)
 	}
 	return dbItem, true
+}
+
+func (m *Pod) recordStatsd(cloudItem *cloudmodel.Pod) {
+	syncDelay := time.Since(cloudItem.CreatedAt).Seconds()
+	m.statsd.GetMonitor(statsd.TagTypePodSyncDelay).Fill(int(syncDelay))
 }
 
 func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.PodFieldsUpdate, map[string]interface{}, bool) {

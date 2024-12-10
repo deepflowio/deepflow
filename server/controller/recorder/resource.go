@@ -20,6 +20,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/deepflowio/deepflow/server/controller/recorder/cleaner"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
@@ -30,14 +31,14 @@ var (
 )
 
 type Resource struct {
-	Cleaners   *Cleaners
+	Cleaners   *cleaner.Cleaners
 	IDManagers *idmng.IDManagers
 }
 
 func GetResource() *Resource {
 	resourceOnce.Do(func() {
 		resource = &Resource{
-			Cleaners:   GetCleaners(),
+			Cleaners:   cleaner.GetCleaners(),
 			IDManagers: idmng.GetIDManagers(),
 		}
 	})
