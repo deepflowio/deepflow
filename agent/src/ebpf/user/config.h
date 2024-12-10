@@ -263,10 +263,9 @@ enum cfg_feature_idx {
 /*
  * The kernel uses bundled burst to send data to the user.
  * The implementation method is that all CPUs trigger timeout checks and send
- * the data resident in the eBPF buffer. This value is the periodic time, unit
- * is milliseconds.
+ * the data resident in the eBPF buffer. The frequency is 9997.
  */
-#define KICK_KERN_PERIOD 10
+#define SOCKET_DATA_PUSH_FREQ 9997
 
 /*
  * timer config

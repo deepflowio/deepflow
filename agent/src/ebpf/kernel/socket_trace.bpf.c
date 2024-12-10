@@ -30,6 +30,7 @@
 
 #define NS_PER_US		1000ULL
 #define NS_PER_SEC		1000000000ULL
+#define PUSH_PERIOD_TIME        10000000ULL // Push period time, 10 milliseconds.
 
 #define PROTO_INFER_CACHE_SIZE  80
 
@@ -273,7 +274,7 @@ static bool __inline check_socket_valid(struct socket_info_s *socket_info_ptr, i
 	if (is_socket_info_valid(socket_info_ptr)) {
 		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
 		void *check_socket;
-    bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
+		bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
 				      socket_info_ptr->sk + sk_off);
 		if (unlikely(check_socket != socket_info_ptr->socket)) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
@@ -3328,10 +3329,12 @@ PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
 	if (tracer_ctx == NULL)
 		return 0;
 
+	if ((bpf_ktime_get_ns() - tracer_ctx->period_timestamp) < PUSH_PERIOD_TIME)
+		return 0;
+
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
 		return 0;
-
 	/*
 	 * For perf event's periodic events, we have set them to push data
 	 * from the kernel buffer every 10 milliseconds. This periodic event
