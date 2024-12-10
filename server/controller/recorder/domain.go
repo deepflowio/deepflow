@@ -32,6 +32,7 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
+	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -45,6 +46,7 @@ const (
 
 type domain struct {
 	metadata *rcommon.Metadata
+	statsd   *statsd.DomainStatsd
 
 	eventQueue *queue.OverwriteQueue
 	cache      *cache.Cache
@@ -55,11 +57,17 @@ func newDomain(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue
 	cacheMng := cache.NewCacheManager(ctx, cfg, md)
 	return &domain{
 		metadata: md,
+		statsd:   statsd.NewDomainStatsd(md),
 
 		eventQueue: eventQueue,
 		cache:      cacheMng.DomainCache,
 		subDomains: newSubDomains(ctx, cfg, eventQueue, md, cacheMng),
 	}
+}
+
+func (d *domain) CloseStatsd() {
+	d.statsd.Close()
+	d.subDomains.CloseStatsd()
 }
 
 func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
@@ -157,7 +165,7 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 		updater.NewHost(d.cache, cloudData.Hosts).RegisterListener(
 			listener.NewHost(d.cache, d.eventQueue)),
 		updater.NewVM(d.cache, cloudData.VMs).RegisterListener(
-			listener.NewVM(d.cache, d.eventQueue)),
+			listener.NewVM(d.cache, d.eventQueue)).BuildStatsd(d.statsd),
 		updater.NewPodCluster(d.cache, cloudData.PodClusters).RegisterListener(
 			listener.NewPodCluster(d.cache)),
 		updater.NewPodNode(d.cache, cloudData.PodNodes).RegisterListener(
@@ -181,7 +189,7 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 		updater.NewPodReplicaSet(d.cache, cloudData.PodReplicaSets).RegisterListener(
 			listener.NewPodReplicaSet(d.cache)),
 		updater.NewPod(d.cache, cloudData.Pods).RegisterListener(
-			listener.NewPod(d.cache, d.eventQueue)),
+			listener.NewPod(d.cache, d.eventQueue)).BuildStatsd(d.statsd),
 		updater.NewNetwork(d.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(d.cache)),
 		updater.NewSubnet(d.cache, cloudData.Subnets).RegisterListener(
@@ -260,6 +268,10 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	if syncAt.IsZero() {
 		return
 	}
+
+	log.Infof("update domain synced_at: %s", syncAt.Format(common.GO_BIRTHDAY), d.metadata.LogPrefixes)
+	d.fillStatsd(syncAt)
+
 	var domain mysqlmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
@@ -269,6 +281,12 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	domain.SyncedAt = &syncAt
 	d.metadata.DB.Save(&domain)
 	log.Debugf("update domain (%+v)", domain, d.metadata.LogPrefixes)
+}
+
+func (d *domain) fillStatsd(syncAt time.Time) {
+	log.Infof("time now: %s", time.Now().Format(common.GO_BIRTHDAY), d.metadata.LogPrefixes)
+	cost := time.Since(syncAt).Seconds()
+	d.statsd.GetMonitor(statsd.TagTypeSyncCost).Fill(int(cost))
 }
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {

@@ -61,3 +61,11 @@ func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *que
 func (r *Recorder) Refresh(target string, cloudData cloudmodel.Resource) error {
 	return r.domainRefresher.Refresh(target, cloudData)
 }
+
+func (r *Recorder) Stop() {
+	r.CloseStatsd()
+}
+
+func (r *Recorder) CloseStatsd() {
+	r.domainRefresher.CloseStatsd()
+}
