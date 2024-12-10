@@ -1216,6 +1216,26 @@ func TestConvertJSONToYAMLAndValidate(t *testing.T) {
 `),
 			wantErr: false,
 		},
+		{
+			name: "case08",
+			args: args{
+				jsonData: map[string]interface{}{
+					"inputs": map[string]interface{}{
+						"cbpf": map[string]interface{}{
+							"af_packet": map[string]interface{}{
+								"bond_interfaces": "- slave_interfaces: [eth0, eth1]\r\n- slave_interfaces: [eth2, eth3]",
+							},
+						},
+					},
+				},
+			},
+			want: []byte(`inputs:
+  cbpf:
+    af_packet:
+      bond_interfaces: "- slave_interfaces:\n  - eth0\n  - eth1\n- slave_interfaces:\n  - eth2\n  - eth3\n"
+`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		// if tt.name != "case02" {

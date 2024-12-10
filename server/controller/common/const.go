@@ -705,3 +705,5 @@ const (
 const TRISOLARIS_NODE_TYPE_MASTER = "master"
 
 const CLICK_HOUSE_VERSION = "24"
+
+const TAP_TYPE_VALUE_CLOUD_NETWORK = 3
