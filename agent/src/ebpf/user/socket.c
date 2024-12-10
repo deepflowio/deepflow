@@ -2310,7 +2310,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps,
 			     thread_nr, NULL, NULL, (void *)handle, NULL,
-			     MS_IN_SEC / KICK_KERN_PERIOD);
+			     SOCKET_DATA_PUSH_FREQ);
 	if (tracer == NULL)
 		return -EINVAL;
 
@@ -2679,21 +2679,31 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.probes_count = t->probes_count;
 	stats.data_limit_max = socket_data_limit_max;
 
+	static int skip_count = 2;
+	static int curr_count = 0;
 	struct trace_stats stats_total;
+	memset(&stats_total, 0, sizeof(stats_total));
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		stats.kern_socket_map_used = stats_total.socket_map_count;
 		stats.kern_trace_map_used = stats_total.trace_map_count;
 		stats.period_push_conflict_count =
 		    stats_total.push_conflict_count;
-		if (stats_total.period_event_max_delay > 0)
+		if (stats_total.period_event_max_delay > 0) {
 			stats.period_push_max_delay =
 			    stats_total.period_event_max_delay / NS_IN_USEC;
+		}
 
 		if (stats_total.period_event_total_time > 0
 		    && stats_total.period_event_count > 0)
 			stats.period_push_avg_delay =
 			    (stats_total.period_event_total_time /
 			     stats_total.period_event_count) / NS_IN_USEC;
+
+		if (curr_count++ < skip_count) {
+			stats.period_push_max_delay = 0;
+			stats.period_push_avg_delay = 0;
+		}
+
 		if (!bpf_stats_map_update(t, -1, -1, 0, 0, 0, 0)) {
 			ebpf_warning("Update trace statistics failed.\n");
 		}
