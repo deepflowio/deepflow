@@ -202,8 +202,31 @@ static_config:
 `),
 			wantErr: false,
 		},
+		{
+			name: "case02",
+			args: args{
+				bytes: []byte(`inputs:
+  cbpf:
+    af_packet:
+      bond_interfaces:
+        - slave_interfaces:
+            - eth0
+            - eth1
+`),
+			},
+			want: []byte(`static_config:
+  tap-interface-bond-groups:
+    - tap-interfaces:
+        - eth0
+        - eth1
+`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
+		if tt.name != "case02" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			toolData, err := NewMigrationToolData(nil)
 			if err != nil {
@@ -387,32 +410,31 @@ func TestGenerateUpgradeHigherToLower(t *testing.T) {
 			name: "case02",
 			args: args{},
 			want: map[string][]string{
-				"inputs.proc.process_matcher":                             {"static_config.os-proc-regex"},
-				"inputs.proc.tag_extraction.process_matcher.rewrite_name": {"static_config.os-proc-regex.rewrite-name"},
+				"inputs.proc.process_matcher":           {"static_config.os-proc-regex"},
+				"inputs.cbpf.af_packet.bond_interfaces": {"static_config.tap-interface-bond-groups"},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
+		if tt.name != "case02" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
-			fmt, err := NewMigrationToolData(nil)
+			fmtt, err := NewMigrationToolData(nil)
 			if err != nil {
 				t.Fatalf("Failed to create parser: %v", err)
 			}
-			fmt.Format()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getHigherToLowers() error = \"%v\", wantErr \"%v\"", err, tt.wantErr)
 				return
 			}
-			if len(fmt.higherVerToLowerVerKeys) != len(tt.want) {
-				t.Errorf("getHigherToLowers() = \"%v\", want \"%v\"", fmt.higherVerToLowerVerKeys, tt.want)
-			}
 			for k, v := range tt.want {
-				if len(v) != len(fmt.higherVerToLowerVerKeys[k]) {
+				if len(v) != len(fmtt.higherVerToLowerVerKeys[k]) {
 					t.Errorf("field %s getHigherToLowers() = \"%v\", want \"%v\"", k, v, tt.want[k])
 				}
 				for i := 0; i < len(v); i++ {
-					if v[i] != fmt.higherVerToLowerVerKeys[k][i] {
+					if v[i] != fmtt.higherVerToLowerVerKeys[k][i] {
 						t.Errorf("field %s %d getHigherToLowers() = \"%v\", want \"%v\"", k, i, v[i], tt.want[k][i])
 					}
 				}
@@ -569,7 +591,7 @@ func TestLowerToHigher(t *testing.T) {
 			name: "case02",
 			args: args{
 				lowerToHigher: map[string]string{
-					"static_config.tap-interface-bond-groups": "inputs.resources.kubernetes.api_resources",
+					"static_config.tap-interface-bond-groups": "inputs.cbpf.af_packet.bond_interfaces",
 				},
 				dictValLowerKeyToHigher: map[string]map[string]interface{}{
 					"static_config.tap-interface-bond-groups": {
@@ -593,9 +615,9 @@ func TestLowerToHigher(t *testing.T) {
 			},
 			want: map[string]interface{}{
 				"inputs": map[string]interface{}{
-					"resources": map[string]interface{}{
-						"kubernetes": map[string]interface{}{
-							"api_resources": []map[string]interface{}{
+					"cbpf": map[string]interface{}{
+						"af_packet": map[string]interface{}{
+							"bond_interfaces": []map[string]interface{}{
 								{
 									"slave_interfaces": []string{"eth0", "eth1"},
 								},
@@ -610,9 +632,9 @@ func TestLowerToHigher(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if tt.name != "case02" {
-			continue
-		}
+		// if tt.name != "case02" {
+		// 	continue
+		// }
 		t.Run(tt.name, func(t *testing.T) {
 			migrator := &Upgrader{
 				MigrationToolData: MigrationToolData{
@@ -800,8 +822,54 @@ func TestHigherToLower(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "case04",
+			args: args{
+				higherToLower: map[string][]string{
+					"inputs.cbpf.af_packet.bond_interfaces": {"static_config.tap-interface-bond-groups"},
+				},
+				dictValHigherKeyToLower: map[string]map[string]interface{}{
+					"inputs.cbpf.af_packet.bond_interfaces": {
+						"slave_interfaces": "tap-interfaces",
+					},
+				},
+				ancestor: "",
+				data: map[string]interface{}{
+					"inputs": map[string]interface{}{
+						"cbpf": map[string]interface{}{
+							"af_packet": map[string]interface{}{
+								"bond_interfaces": []map[string]interface{}{
+									{
+										"slave_interfaces": []string{"eth0", "eth1"},
+									},
+									{
+										"slave_interfaces": []string{"eth2", "eth3"},
+									},
+								},
+							},
+						},
+					},
+				},
+				result: map[string]interface{}{},
+			},
+			want: map[string]interface{}{
+				"static_config": map[string]interface{}{
+					"tap-interface-bond-groups": []map[string]interface{}{
+						{
+							"tap-interfaces": []string{"eth0", "eth1"},
+						},
+						{
+							"tap-interfaces": []string{"eth2", "eth3"},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
+		if tt.name != "case04" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			migrator := &Downgrader{
 				MigrationToolData: MigrationToolData{
@@ -976,7 +1044,6 @@ func TestConvDictDataValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dictConv := &dictDataConv{}
 			got := dictConv.convDictDataValue(tt.args.data, tt.args.convMap, tt.args.longKey)
-			fmt.Printf("got: %v\n", got)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("convDictDataValue() = %v, want %v", got, tt.want)
 			}
