@@ -527,7 +527,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 		if configure.UserConfig != nil {
 			configure.UserConfig.Set("inputs.ebpf.disabled", true)
-			configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", []int{0})
+			configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", 0)
 		}
 	}
 
