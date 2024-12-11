@@ -937,10 +937,20 @@ fn parse_profile_query(query: &str, profile: &mut metric::Profile) {
         profile.sample_rate = sample_rate.parse::<u32>().unwrap_or_default();
     };
     if let Some(from) = query_hash.get("from") {
-        profile.from = from.parse::<u32>().unwrap_or_default();
+        let from = from.parse::<u64>().unwrap_or_default();
+        if from > u32::MAX as u64 {
+            profile.from = (from / 1_000_000_000) as u32;
+        } else {
+            profile.from = from as u32;
+        }
     };
     if let Some(until) = query_hash.get("until") {
-        profile.until = until.parse::<u32>().unwrap_or_default();
+        let until = until.parse::<u64>().unwrap_or_default();
+        if until > u32::MAX as u64 {
+            profile.until = (until / 1_000_000_000) as u32;
+        } else {
+            profile.until = until as u32;
+        }
     };
     if let Some(spy_name) = query_hash.get("spyName") {
         profile.spy_name = spy_name.to_string();
