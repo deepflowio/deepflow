@@ -523,7 +523,7 @@ func (c *Cache) Add(item CKItem) error {
 }
 
 func (c *Cache) Write() error {
-	if c.batchSize == 0 {
+	if c.batchSize == 0 || IsNil(c.batch) {
 		return nil
 	}
 	conn := c.queueContext.conns[c.writeCounter%c.queueContext.connCount]
