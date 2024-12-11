@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: update sub domain team_id [#8674](https://github.com/deepflowio/deepflow/pull/8674) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: nil pointer may cause panic [#8672](https://github.com/deepflowio/deepflow/pull/8672) by [lzf575](https://github.com/lzf575)
 * fix: invalid bpf syntax [#8648](https://github.com/deepflowio/deepflow/pull/8648) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: pcap,l4_packet,spantrace data exception [#8596](https://github.com/deepflowio/deepflow/pull/8596) by [lzf575](https://github.com/lzf575)
 * fix: the policy does not check memory in analyzer mode [#8551](https://github.com/deepflowio/deepflow/pull/8551) by [yuanchaoa](https://github.com/yuanchaoa)

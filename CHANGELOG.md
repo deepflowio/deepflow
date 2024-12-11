@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: nil pointer may cause panic [#8670](https://github.com/deepflowio/deepflow/pull/8670) by [lzf575](https://github.com/lzf575)
+* fix: agent config file.io_event.collect_mode [#8668](https://github.com/deepflowio/deepflow/pull/8668) by [askyrie](https://github.com/askyrie)
+* fix: adapt pprof u64 params [#8666](https://github.com/deepflowio/deepflow/pull/8666) by [taloric](https://github.com/taloric)
+* fix: failed to update old version agent group config when creating new version [#8662](https://github.com/deepflowio/deepflow/pull/8662) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: change proc socket sync interval config name and default value [#8658](https://github.com/deepflowio/deepflow/pull/8658) by [rvql](https://github.com/rvql)
 * fix: agent group configuration api response unexcepted value [#8647](https://github.com/deepflowio/deepflow/pull/8647) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: add alarm_label table [#8642](https://github.com/deepflowio/deepflow/pull/8642) by [SongZhen0704](https://github.com/SongZhen0704)
@@ -253,6 +257,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: querier supports show enum tags by language [#8512](https://github.com/deepflowio/deepflow/pull/8512) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: sender add compress flag [#8639](https://github.com/deepflowio/deepflow/pull/8639) by [taloric](https://github.com/taloric)
 * feat: adds resource synchronization delay alarms [#8612](https://github.com/deepflowio/deepflow/pull/8612) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: add resource association abnormal alarm [#8585](https://github.com/deepflowio/deepflow/pull/8585) by [xiaochaoren1](https://github.com/xiaochaoren1)
