@@ -192,7 +192,7 @@ enum {
  * the data resident in the eBPF buffer. This value is the periodic time, unit
  * is milliseconds.
  */
-#define KICK_KERN_PERIOD 10
+#define KICK_KERN_PERIOD 40000000  // Set default interval to 30 milliseconds
 
 /*
  * timer config
