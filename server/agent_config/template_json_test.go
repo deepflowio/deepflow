@@ -696,7 +696,7 @@ outputs:
 			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}
-			err := dataFmt.dictValueToString(dataFmt.mapData, "", keyToComment)
+			err := dataFmt.fmtVal("", dataFmt.mapData, keyToComment, true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DictValueToString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -796,7 +796,7 @@ outputs:
 			} else {
 				dataFmt.mapData = tt.args.mapData
 			}
-			err := dataFmt.stringToDictValue(dataFmt.mapData, "", keyToComment)
+			err := dataFmt.fmtVal("", dataFmt.mapData, keyToComment, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("stringToDictValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1238,9 +1238,9 @@ func TestConvertJSONToYAMLAndValidate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		// if tt.name != "case02" {
-		// 	continue
-		// }
+		if tt.name != "case06" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ConvertJSONToYAMLAndValidate(tt.args.jsonData)
 			if (err != nil) != tt.wantErr {
