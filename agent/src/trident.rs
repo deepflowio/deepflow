@@ -878,8 +878,6 @@ impl Trident {
                         &synchronizer,
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
-                        #[cfg(target_os = "linux")]
-                        false,
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -981,7 +979,6 @@ fn component_on_config_change(
     tap_types: Vec<trident::TapType>,
     synchronizer: &Arc<Synchronizer>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-    #[cfg(target_os = "linux")] fanout_enabled: bool,
 ) {
     let conf = &config_handler.candidate_config.dispatcher;
     match conf.tap_mode {
@@ -1100,7 +1097,7 @@ fn component_on_config_change(
                     #[cfg(target_os = "linux")]
                     libvirt_xml_extractor.clone(),
                     #[cfg(target_os = "linux")]
-                    fanout_enabled,
+                    false,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -3031,8 +3028,15 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(if cfg!(target_os = "linux") && !fanout_enabled {
-            src_link.name.clone()
+        .src_interface(if candidate_config.tap_mode != TapMode::Local {
+            #[cfg(target_os = "linux")]
+            if !fanout_enabled {
+                src_link.name.clone()
+            } else {
+                "".into()
+            }
+            #[cfg(target_os = "windows")]
+            "".into()
         } else {
             "".into()
         })
