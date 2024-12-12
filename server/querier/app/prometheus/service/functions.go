@@ -285,11 +285,9 @@ func offloadRate(fun string) QueryFunc {
 		 SO:
 		 assume metrics are `COUNTER` (only COUNTER with `rate`/`increase` is meaningful)
 		 we use MIN/MAX instead of first/last
-		 why not min(): min() will do `fill 0` in the time window, so we use Percentile(0) instead of it
-		 why not max(time): MAX(time) is not supported
 		*/
-		*query = append(*query, fmt.Sprintf("Percentile(toUnixTimestamp(time),1) as %s", PROMETHEUS_WINDOW_LAST_TIME))  // last time
-		*query = append(*query, fmt.Sprintf("Percentile(toUnixTimestamp(time),0) as %s", PROMETHEUS_WINDOW_FIRST_TIME)) // first time
+		*query = append(*query, fmt.Sprintf("Max(time) as %s", PROMETHEUS_WINDOW_LAST_TIME))  // last time
+		*query = append(*query, fmt.Sprintf("Min(time) as %s", PROMETHEUS_WINDOW_FIRST_TIME)) // first time
 
 		*query = append(*query, fmt.Sprintf("Percentile(%s, 0) as %s", metric, PROMETHEUS_WINDOW_FIRST_VALUE)) // first
 		*query = append(*query, fmt.Sprintf("Max(%s)", metric))
