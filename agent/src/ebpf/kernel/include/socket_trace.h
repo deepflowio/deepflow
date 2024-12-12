@@ -34,6 +34,8 @@
 #define INFER_CONTINUE	1
 #define INFER_TERMINATE	2
 
+#define MAX_PUSH_DELAY_TIME_NS 100000000ULL // 100ms
+
 typedef long unsigned int __kernel_size_t;
 
 enum {

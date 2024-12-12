@@ -266,7 +266,12 @@ enum cfg_feature_idx {
  * the data resident in the eBPF buffer. This value is the periodic time, unit
  * is milliseconds.
  */
-#define KICK_KERN_PERIOD 40000000  // Set default interval to 30 milliseconds
+#define KICK_KERN_PERIOD 40000000  // Set default interval to 40 milliseconds
+/*
+ * A special value should be assigned to indicate the case where no data has
+ * been pushed after exceeding 100 milliseconds.
+ */
+#define PUSH_DELAY_EXCEEDED_MARKER 199000 // 199 ms
 
 /*
  * timer config
