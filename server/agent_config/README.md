@@ -2279,7 +2279,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [0, 8] |
+| Range | [0, 9] |
 
 **Description**:
 
