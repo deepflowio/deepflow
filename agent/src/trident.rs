@@ -859,8 +859,6 @@ impl Trident {
                         &synchronizer,
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
-                        #[cfg(target_os = "linux")]
-                        false,
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -962,7 +960,6 @@ fn component_on_config_change(
     tap_types: Vec<trident::TapType>,
     synchronizer: &Arc<Synchronizer>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-    #[cfg(target_os = "linux")] fanout_enabled: bool,
 ) {
     let conf = &config_handler.candidate_config.dispatcher;
     match conf.tap_mode {
@@ -1063,7 +1060,7 @@ fn component_on_config_change(
                     #[cfg(target_os = "linux")]
                     libvirt_xml_extractor.clone(),
                     #[cfg(target_os = "linux")]
-                    fanout_enabled,
+                    false,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1821,9 +1818,7 @@ impl AgentComponents {
             }
         }
         #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode != TapMode::Local
-            && candidate_config.dispatcher.dpdk_enabled
-        {
+        if candidate_config.tap_mode != TapMode::Local && candidate_config.dispatcher.dpdk_enabled {
             packet_fanout_count = 1;
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
@@ -2995,6 +2990,8 @@ fn build_dispatchers(
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
+            #[cfg(target_os = "linux")]
+            fanout_enabled,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
@@ -3017,8 +3014,15 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(if cfg!(target_os = "linux") && !fanout_enabled {
-            src_link.name.clone()
+        .src_interface(if candidate_config.tap_mode != TapMode::Local {
+            #[cfg(target_os = "linux")]
+            if !fanout_enabled {
+                src_link.name.clone()
+            } else {
+                "".into()
+            }
+            #[cfg(target_os = "windows")]
+            "".into()
         } else {
             "".into()
         })
@@ -3026,6 +3030,8 @@ fn build_dispatchers(
         .queue_debugger(queue_debugger.clone())
         .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
         .pcap_interfaces(pcap_interfaces.clone())
+        .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
+        .bond_group(dispatcher_config.bond_group.clone())
         .analyzer_raw_packet_block_size(yaml_config.analyzer_raw_packet_block_size as usize);
     #[cfg(target_os = "linux")]
     let dispatcher_builder = dispatcher_builder
