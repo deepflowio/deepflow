@@ -3455,11 +3455,20 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(if cfg!(target_os = "linux") && !fanout_enabled {
-            src_link.name.clone()
-        } else {
-            "".into()
-        })
+        .src_interface(
+            if candidate_config.capture_mode != PacketCaptureType::Local {
+                #[cfg(target_os = "linux")]
+                if !fanout_enabled {
+                    src_link.name.clone()
+                } else {
+                    "".into()
+                }
+                #[cfg(target_os = "windows")]
+                "".into()
+            } else {
+                "".into()
+            },
+        )
         .agent_type(dispatcher_config.agent_type)
         .queue_debugger(queue_debugger.clone())
         .analyzer_queue_size(user_config.inputs.cbpf.tunning.raw_packet_queue_size)
