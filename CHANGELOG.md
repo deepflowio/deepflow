@@ -8,6 +8,11 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: modify log level [#8690](https://github.com/deepflowio/deepflow/pull/8690) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: query percentile to min/max time [#8685](https://github.com/deepflowio/deepflow/pull/8685) by [taloric](https://github.com/taloric)
+* fix: agent group api responses invalid int value [#8681](https://github.com/deepflowio/deepflow/pull/8681) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: invalid src_interface [#8680](https://github.com/deepflowio/deepflow/pull/8680) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Modify the range of the pcp value [#8678](https://github.com/deepflowio/deepflow/pull/8678) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: nil pointer may cause panic [#8670](https://github.com/deepflowio/deepflow/pull/8670) by [lzf575](https://github.com/lzf575)
 * fix: agent config file.io_event.collect_mode [#8668](https://github.com/deepflowio/deepflow/pull/8668) by [askyrie](https://github.com/askyrie)
 * fix: adapt pprof u64 params [#8666](https://github.com/deepflowio/deepflow/pull/8666) by [taloric](https://github.com/taloric)
@@ -257,6 +262,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: querier optimization group [#8688](https://github.com/deepflowio/deepflow/pull/8688) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: agent - eBPF Optimize data push logic (#8653) [#8684](https://github.com/deepflowio/deepflow/pull/8684) by [yinjiping](https://github.com/yinjiping)
 * feat: querier supports show enum tags by language [#8512](https://github.com/deepflowio/deepflow/pull/8512) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: sender add compress flag [#8639](https://github.com/deepflowio/deepflow/pull/8639) by [taloric](https://github.com/taloric)
 * feat: adds resource synchronization delay alarms [#8612](https://github.com/deepflowio/deepflow/pull/8612) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
