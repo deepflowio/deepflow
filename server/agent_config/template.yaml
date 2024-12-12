@@ -1539,7 +1539,7 @@ inputs:
       #   en: VLAN PCP in Physical Mirror Traffic
       #   ch: 物理网络镜像流量中的 VLAN PCP
       # unit:
-      # range: [0, 8]
+      # range: [0, 9]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: true
