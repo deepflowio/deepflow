@@ -1422,10 +1422,6 @@ func formatEnumTag(tagName string) (string, bool) {
 	enumFile := strings.TrimSuffix(tagName, "_0")
 	enumFile = strings.TrimSuffix(enumFile, "_1")
 	_, exists := tagdescription.TAG_ENUMS[enumFile]
-	if !exists {
-		enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
-		_, exists = tagdescription.TAG_ENUMS[enumFile]
-	}
 	if exists {
 		return fmt.Sprintf("Enum(%s)", tagName), exists
 	}

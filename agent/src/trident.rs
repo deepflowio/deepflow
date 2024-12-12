@@ -17,6 +17,7 @@
 use std::env;
 use std::fmt;
 use std::fs;
+use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -32,12 +33,18 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
+use flate2::{
+    write::{GzEncoder, ZlibEncoder},
+    Compression,
+};
 use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
 use log::{debug, info, warn};
+use num_enum::{FromPrimitive, IntoPrimitive};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
+use zstd::Encoder as ZstdEncoder;
 
 use crate::{
     collector::{
@@ -121,10 +128,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::{
-        agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
-        trident,
-    },
+    proto::agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -236,17 +240,46 @@ impl From<&AgentId> for agent::AgentId {
     }
 }
 
-// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
-impl From<&AgentId> for trident::AgentId {
-    fn from(id: &AgentId) -> Self {
-        Self {
-            ip: Some(id.ip.to_string()),
-            mac: Some(id.mac.to_string()),
-            team_id: Some(id.team_id.clone()),
-        }
-    }
+#[derive(Clone, Copy, PartialEq, Eq, Debug, FromPrimitive, IntoPrimitive, num_enum::Default)]
+#[repr(u8)]
+pub enum SenderEncoder {
+    #[num_enum(default)]
+    Raw = 0,
+
+    Zlib = 1,
+    Gzip = 2,
+    Zstd = 3,
 }
 
+impl SenderEncoder {
+    pub fn encode(&self, encode_buffer: &[u8]) -> std::io::Result<Option<Vec<u8>>> {
+        let result = match self {
+            Self::Raw => None,
+            Self::Zlib => {
+                let mut encoder = ZlibEncoder::new(
+                    Vec::with_capacity(encode_buffer.len()),
+                    Compression::default(),
+                );
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+            Self::Gzip => {
+                let mut encoder = GzEncoder::new(
+                    Vec::with_capacity(encode_buffer.len()),
+                    Compression::default(),
+                );
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+            Self::Zstd => {
+                let mut encoder = ZstdEncoder::new(Vec::with_capacity(encode_buffer.len()), 0)?;
+                encoder.write_all(&encode_buffer)?;
+                Some(encoder.finish()?)
+            }
+        };
+        Ok(result)
+    }
+}
 pub struct Trident {
     state: AgentState,
     handle: Option<JoinHandle<()>>,
@@ -326,6 +359,7 @@ impl Trident {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(log_stats_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
         stats_sender.start();
 
@@ -515,7 +549,6 @@ impl Trident {
             config_handler.static_config.controller_ips.clone(),
             exception_handler.clone(),
             &stats_collector,
-            config_handler.static_config.new_rpc,
         ));
 
         let runtime = Arc::new(
@@ -565,7 +598,6 @@ impl Trident {
             config_path,
             agent_id_tx.clone(),
             ntp_diff,
-            config_handler.static_config.new_rpc,
         ));
         stats_collector.register_countable(
             &stats::NoTagModule("ntp"),
@@ -1103,6 +1135,8 @@ fn component_on_config_change(
                     libvirt_xml_extractor.clone(),
                     #[cfg(target_os = "linux")]
                     None,
+                    #[cfg(target_os = "linux")]
+                    false,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1118,8 +1152,13 @@ fn component_on_config_change(
         }
         PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
             for d in components.dispatcher_components.iter() {
+                let links = get_listener_links(
+                    conf,
+                    #[cfg(target_os = "linux")]
+                    &netns::NsFile::Root,
+                );
                 d.dispatcher_listener.on_tap_interface_change(
-                    &vec![],
+                    &links,
                     conf.if_mac_source,
                     conf.agent_type,
                     &blacklist,
@@ -1213,6 +1252,8 @@ fn component_on_config_change(
                     libvirt_xml_extractor.clone(),
                     #[cfg(target_os = "linux")]
                     None,
+                    #[cfg(target_os = "linux")]
+                    false,
                 ) {
                     Ok(mut d) => {
                         d.start();
@@ -1936,9 +1977,7 @@ impl AgentComponents {
         }
 
         #[cfg(target_os = "linux")]
-        let local_dispatcher_count = if candidate_config.capture_mode == PacketCaptureType::Local
-            && candidate_config.dispatcher.extra_netns_regex == ""
-        {
+        let mut packet_fanout_count = if candidate_config.dispatcher.extra_netns_regex == "" {
             user_config
                 .inputs
                 .cbpf
@@ -1949,7 +1988,7 @@ impl AgentComponents {
             1
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
-        let local_dispatcher_count = 1;
+        let packet_fanout_count = 1;
 
         let links = get_listener_links(
             &candidate_config.dispatcher,
@@ -1957,24 +1996,25 @@ impl AgentComponents {
             &netns::NsFile::Root,
         );
         if interfaces_and_ns.is_empty() && !links.is_empty() {
-            if candidate_config.capture_mode != PacketCaptureType::Local {
+            if packet_fanout_count > 1 || candidate_config.capture_mode == PacketCaptureType::Local
+            {
+                for _ in 0..packet_fanout_count {
+                    #[cfg(target_os = "linux")]
+                    interfaces_and_ns.push((links.clone(), netns::NsFile::Root));
+                    #[cfg(any(target_os = "windows", target_os = "android"))]
+                    interfaces_and_ns.push(links.clone());
+                }
+            } else {
                 for l in links {
                     #[cfg(target_os = "linux")]
                     interfaces_and_ns.push((vec![l], netns::NsFile::Root));
                     #[cfg(any(target_os = "windows", target_os = "android"))]
                     interfaces_and_ns.push(vec![l]);
                 }
-            } else {
-                for _ in 0..local_dispatcher_count {
-                    #[cfg(target_os = "linux")]
-                    interfaces_and_ns.push((links.clone(), netns::NsFile::Root));
-                    #[cfg(any(target_os = "windows", target_os = "android"))]
-                    interfaces_and_ns.push(links.clone());
-                }
             }
         }
         #[cfg(target_os = "linux")]
-        if candidate_config.capture_mode == PacketCaptureType::Mirror
+        if candidate_config.capture_mode != PacketCaptureType::Local
             && (!user_config
                 .inputs
                 .cbpf
@@ -1984,6 +2024,7 @@ impl AgentComponents {
                 .is_empty()
                 || candidate_config.dispatcher.dpdk_source != DpdkSource::None)
         {
+            packet_fanout_count = 1;
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
 
@@ -2169,6 +2210,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let metrics_queue_name = "3-doc-to-collector-sender";
@@ -2191,6 +2233,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
@@ -2213,6 +2256,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let analyzer_ip = if candidate_config
@@ -2280,6 +2324,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(pcap_packet_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -2305,6 +2350,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(pcap_packet_shared_connection),
+            SenderEncoder::Raw,
         );
 
         let bpf_builder = bpf::Builder {
@@ -2386,6 +2432,10 @@ impl AgentComponents {
                 libvirt_xml_extractor.clone(),
                 #[cfg(target_os = "linux")]
                 dpdk_ebpf_receiver.take(),
+                #[cfg(target_os = "linux")]
+                {
+                    packet_fanout_count > 1
+                },
             )?;
             dispatcher_components.push(dispatcher_component);
         }
@@ -2411,6 +2461,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let profile_queue_name = "1-profile-to-sender";
@@ -2433,6 +2484,9 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            // profiler compress is a special one, it requires compressed and directly write into db
+            // so we compress profile data inside and not compress secondly
+            SenderEncoder::Raw,
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
@@ -2458,6 +2512,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.application_log_compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let skywalking_queue_name = "1-skywalking-to-sender";
@@ -2484,6 +2543,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let datadog_queue_name = "1-datadog-to-sender";
@@ -2510,6 +2574,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
@@ -2634,6 +2703,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            if candidate_config.metric_server.compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
@@ -2692,6 +2766,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection.clone()),
+            SenderEncoder::Raw,
         );
 
         let telegraf_queue_name = "1-telegraf-to-sender";
@@ -2718,6 +2793,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection),
+            SenderEncoder::Raw,
         );
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
@@ -2744,6 +2820,7 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
+            SenderEncoder::Raw,
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(
@@ -3174,6 +3251,7 @@ fn build_dispatchers(
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     #[cfg(target_os = "linux")] dpdk_ebpf_receiver: Option<Receiver<Box<packet::Packet<'static>>>>,
+    #[cfg(target_os = "linux")] fanout_enabled: bool,
 ) -> Result<DispatcherComponent> {
     let candidate_config = &config_handler.candidate_config;
     let user_config = &candidate_config.user_config;
@@ -3290,7 +3368,7 @@ fn build_dispatchers(
         )),
     ]));
 
-    let pcap_interfaces = if candidate_config.capture_mode == PacketCaptureType::Mirror
+    let pcap_interfaces = if candidate_config.capture_mode != PacketCaptureType::Local
         && candidate_config
             .user_config
             .inputs
@@ -3343,6 +3421,8 @@ fn build_dispatchers(
             cpu_set: dispatcher_config.cpu_set,
             #[cfg(target_os = "linux")]
             dpdk_ebpf_receiver,
+            #[cfg(target_os = "linux")]
+            fanout_enabled,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
@@ -3375,13 +3455,11 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(
-            if candidate_config.capture_mode != PacketCaptureType::Local {
-                src_link.name.clone()
-            } else {
-                "".into()
-            },
-        )
+        .src_interface(if cfg!(target_os = "linux") && !fanout_enabled {
+            src_link.name.clone()
+        } else {
+            "".into()
+        })
         .agent_type(dispatcher_config.agent_type)
         .queue_debugger(queue_debugger.clone())
         .analyzer_queue_size(user_config.inputs.cbpf.tunning.raw_packet_queue_size)

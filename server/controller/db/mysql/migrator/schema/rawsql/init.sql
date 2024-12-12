@@ -1117,6 +1117,13 @@ CREATE TABLE IF NOT EXISTS group_acl (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE group_acl;
 
+CREATE TABLE IF NOT EXISTS alarm_label (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    alarm_id                INTEGER NOT NULL,
+    label_name              TEXT
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE alarm_label;
+
 CREATE TABLE IF NOT EXISTS alarm_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                 INTEGER DEFAULT 1,
@@ -1396,6 +1403,41 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
     "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_collect_sender\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 collect_sender.metrics.dropped\",\"unit\":\"\"}]",
      "采集器数据丢失 (collect_sender.metrics.dropped)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"collect_sender.metrics.dropped\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: tag.type = device_ip_connection', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.count\",\"METRIC_NAME\":\"metrics.count\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Sum\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Sum(metrics.count)\",\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.count)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[{\"key\":\"tag.type\",\"op\":\"=\",\"val\":[\"device_ip_connection\"]}],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_relation_exception\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.count`) AS `Sum(metrics.count)`\",\"WHERE\":\"`tag.type`=\'device_ip_connection\'\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"Sum(`metrics.count`) AS `Sum(metrics.count)`\"]}]}',
+    '云资源关联关系异常 (实例与IP)',  0, 1, 1, 1, '{\"displayName\":\"Sum(metrics.count)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":1}', @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: tag.type = chost_pod_node_connection', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.count\",\"METRIC_NAME\":\"metrics.count\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Sum\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Sum(metrics.count)\",\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.count)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_relation_exception\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[{\"key\":\"tag.type\",\"op\":\"=\",\"val\":[\"chost_pod_node_connection\"]}],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_relation_exception\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.count`) AS `Sum(metrics.count)`\",\"WHERE\":\"`tag.type`=\'chost_pod_node_connection\'\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"Sum(`metrics.count`) AS `Sum(metrics.count)`\"]}]}',
+    '云资源关联关系异常 (云服务器与容器节点)',  0, 1, 1, 1, '{\"displayName\":\"Sum(metrics.count)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":1}', @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: N/A', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_sync_delay\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.max_delay\",\"METRIC_NAME\":\"metrics.max_delay\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Max\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Max(metrics.max_delay)\",\"ORIGIN_METRIC_LABEL\":\"Max(metrics.max_delay)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_sync_delay\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_sync_delay\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`\"]}]}',
+    '云资源同步滞后 (云服务器)',  0, 1, 1, 1, '{\"displayName\":\"Max(metrics.max_delay)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":150}', @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: N/A', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_resource_sync_delay\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.max_delay\",\"METRIC_NAME\":\"metrics.max_delay\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"Max\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"Max(metrics.max_delay)\",\"ORIGIN_METRIC_LABEL\":\"Max(metrics.max_delay)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_resource_sync_delay\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.domain\",\"tag.sub_domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\",\"tag.sub_domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_resource_sync_delay\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.domain`, `tag.sub_domain`\",\"METRICS\":[\"Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`\"]}]}',
+    '云资源同步滞后 (POD)',  0, 1, 1, 1, '{\"displayName\":\"Max(metrics.max_delay)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":120}', @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
+    app_type, contrast_type, target_field, threshold_warning, lcuuid)
+    values(1, '过滤项: N/A', '[{\"type\":\"deepflow\",\"tableName\":\"deepflow_server_controller_cloud_task_cost\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.cost\",\"METRIC_NAME\":\"metrics.cost\",\"isTimeUnit\":false,\"type\":1,\"unit\":[\"data\",\"short\"],\"checked\":true,\"operatorLv2\":[],\"_key\":\"77b0ee61-e213-4d10-9342-bb172f861f39\",\"perOperator\":\"\",\"operatorLv1\":\"AAvg\",\"percentile\":null,\"markLine\":null,\"diffMarkLine\":null,\"METRIC_LABEL\":\"AAvg(metrics.cost)\",\"ORIGIN_METRIC_LABEL\":\"AAvg(metrics.cost)\"}],\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_server_controller_cloud_task_cost\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.domain\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.domain\"]},\"inputMode\":\"free\"}]},\"dataSource\":\"\"}]',
+    '/v1/stats/querier/UniversalHistory', '{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_server_controller_cloud_task_cost\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"AAvg(`metrics.cost`) AS `AAvg(metrics.cost)`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.domain`\",\"METRICS\":[\"AAvg(`metrics.cost`) AS `AAvg(metrics.cost)`\"]}]}',
+    '云资源同步滞后 (API 调用)',  0, 1, 1, 1, '{\"displayName\":\"AAvg(metrics.cost)\",\"unit\":\"\"}', '{\"OP\":\">=\",\"VALUE\":300}', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS report_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2163,12 +2205,13 @@ CREATE TABLE IF NOT EXISTS mail_server (
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE mail_server;
 
-
 CREATE TABLE IF NOT EXISTS ch_string_enum (
     tag_name                VARCHAR(256) NOT NULL ,
     value                   VARCHAR(256) NOT NULL,
-    name                    VARCHAR(256) ,
-    description             VARCHAR(256) ,
+    name_zh                 VARCHAR(256) ,
+    name_en                 VARCHAR(256) ,
+    description_zh          VARCHAR(256) ,
+    description_en          VARCHAR(256) ,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY  (tag_name,value)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
@@ -2177,8 +2220,10 @@ TRUNCATE TABLE ch_string_enum;
 CREATE TABLE IF NOT EXISTS ch_int_enum (
     tag_name                VARCHAR(256) NOT NULL,
     value                   INTEGER DEFAULT 0,
-    name                    VARCHAR(256) ,
-    description             VARCHAR(256) ,
+    name_zh                 VARCHAR(256) ,
+    name_en                 VARCHAR(256) ,
+    description_zh          VARCHAR(256) ,
+    description_en          VARCHAR(256) ,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY  (tag_name,value)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;

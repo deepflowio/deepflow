@@ -155,6 +155,7 @@ func (t *Task) startSubDomainRefreshMonitor() {
 }
 
 func (t *Task) Stop() {
+	t.Recorder.Stop()
 	t.Cloud.Stop()
 	if t.tCancel != nil {
 		t.tCancel()

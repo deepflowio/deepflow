@@ -26,7 +26,7 @@ use super::enums::{EthernetType, IpProtocol};
 use crate::utils::bytes;
 use serde::Serialize;
 
-use public::proto::trident::DecapType;
+use public::proto::agent::DecapType;
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u8)]

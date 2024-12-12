@@ -356,7 +356,7 @@ func (u *UniversalTagsManager) Reload(orgId uint16) error {
 
 	u.universalTagMaps[orgId] = u.GetUniversalTagMaps(response)
 
-	log.Infof("eporter update rpc universalTagNames version %d -> %d", u.versionUniversalTagMaps, newVersion, logger.NewORGPrefix(int(orgId)))
+	log.Infof("eporter update rpc universalTagNames version %d -> %d", u.versionUniversalTagMaps[orgId], newVersion, logger.NewORGPrefix(int(orgId)))
 	u.versionUniversalTagMaps[orgId] = newVersion
 
 	return nil

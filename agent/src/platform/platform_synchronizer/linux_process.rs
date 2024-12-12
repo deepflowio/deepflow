@@ -31,7 +31,6 @@ use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
 use public::proto::agent::{ProcessInfo, Tag};
-use public::proto::trident;
 use public::pwd::PasswordInfo;
 use ring::digest;
 use serde::Deserialize;
@@ -197,32 +196,6 @@ impl From<&ProcessData> for ProcessInfo {
                 let mut tags = vec![];
                 for t in p.os_app_tags.iter() {
                     tags.push(Tag {
-                        key: Some(t.key.clone()),
-                        value: Some(t.value.clone()),
-                    })
-                }
-                tags
-            },
-            netns_id: Some(p.netns_id),
-            container_id: Some(p.container_id.clone()),
-        }
-    }
-}
-
-// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
-impl From<&ProcessData> for trident::ProcessInfo {
-    fn from(p: &ProcessData) -> Self {
-        Self {
-            name: Some(p.name.clone()),
-            pid: Some(p.pid),
-            process_name: Some(p.process_name.clone()),
-            cmdline: Some(p.cmd_with_args.join(" ")),
-            user: Some(p.user.clone()),
-            start_time: Some(u32::try_from(p.start_time.as_secs()).unwrap_or_default()),
-            os_app_tags: {
-                let mut tags = vec![];
-                for t in p.os_app_tags.iter() {
-                    tags.push(trident::Tag {
                         key: Some(t.key.clone()),
                         value: Some(t.value.clone()),
                     })

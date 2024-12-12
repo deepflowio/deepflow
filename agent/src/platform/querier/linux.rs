@@ -39,7 +39,6 @@ use crate::{
 use public::{
     netns::{self, InterfaceInfo, NsFile},
     proto::agent as pb,
-    proto::trident,
 };
 
 pub struct Querier {
@@ -192,82 +191,7 @@ impl Querier {
         self.digest()
     }
 
-    // FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
-    pub fn generate_message(&self, config: &PlatformConfig) -> trident::GenesisSyncRequest {
-        let mut interfaces: Vec<_> = self
-            .kubernetes_poller
-            .as_ref()
-            .map(|poller| {
-                fn info_to_pb(info: &InterfaceInfo) -> trident::InterfaceInfo {
-                    trident::InterfaceInfo {
-                        mac: Some(info.mac.into()),
-                        name: Some(info.name.to_string()),
-                        device_id: Some(info.device_id.to_string()),
-                        tap_index: Some(info.tap_idx),
-                        ip: info.ips.iter().map(ToString::to_string).collect(),
-                        netns: Some(info.tap_ns.to_string()),
-                        netns_id: Some(info.ns_inode as u32),
-                        if_type: info.if_type.clone(),
-                        ..Default::default()
-                    }
-                }
-
-                if matches!(poller.as_ref(), &GenericPoller::ActivePoller(_)) {
-                    self.kubeif_store
-                        .iter()
-                        .map(|info| info_to_pb(info))
-                        .collect()
-                } else {
-                    self.kubernetes_interfaces
-                        .iter()
-                        .map(|info| info_to_pb(info))
-                        .collect()
-                }
-            })
-            .unwrap_or_default();
-        interfaces.extend(
-            self.xml_interfaces
-                .iter()
-                .map(|info| trident::InterfaceInfo {
-                    name: Some(info.name.clone()),
-                    mac: Some(info.mac.into()),
-                    device_id: Some(info.domain_uuid.clone()),
-                    device_name: Some(info.domain_name.clone()),
-                    ..Default::default()
-                }),
-        );
-
-        let mut platform_data = trident::GenesisPlatformData {
-            platform_enabled: Some(config.enabled),
-            raw_hostname: self.raw_hostname.clone(),
-            raw_ip_netns: self.raw_ip_netns.clone(),
-            raw_ip_addrs: self.raw_ip_addrs.clone(),
-            interfaces,
-            ..Default::default()
-        };
-        if config.enabled {
-            platform_data.raw_all_vm_xml = self.raw_all_vm_xml.clone();
-            platform_data.raw_vm_states = self.raw_vm_states.clone();
-            platform_data.raw_ovs_interfaces = self.raw_ovs_interfaces.clone();
-            platform_data.raw_ovs_ports = self.raw_ovs_ports.clone();
-            platform_data.raw_brctl_show = self.raw_brctl_show.clone();
-            platform_data.raw_vlan_config = self.raw_vlan_config.clone();
-        }
-
-        trident::GenesisSyncRequest {
-            platform_data: Some(platform_data),
-            process_data: Some(trident::GenesisProcessData {
-                process_entries: self
-                    .process_data
-                    .iter()
-                    .map(|data| trident::ProcessInfo::from(data))
-                    .collect(),
-            }),
-            ..Default::default()
-        }
-    }
-
-    pub fn generate_agent_message(&self, config: &PlatformConfig) -> pb::GenesisSyncRequest {
+    pub fn generate_message(&self, config: &PlatformConfig) -> pb::GenesisSyncRequest {
         let mut interfaces: Vec<_> = self
             .kubernetes_poller
             .as_ref()

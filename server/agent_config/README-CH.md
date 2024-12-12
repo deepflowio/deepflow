@@ -1,32 +1,5 @@
 # 全局配置 {#global}
 
-## Enabled {#global.enabled}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.enabled`
-
-Upgrade from old version: `enabled`
-
-**默认值**:
-```yaml
-global:
-  enabled: true
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-禁用 / 启用 deepflow-agent。
-
 ## 资源限制 {#global.limits}
 
 控制 deepflow-agent 资源用量
@@ -61,31 +34,6 @@ global:
 
 deepflow-agent 使用 cgroups 来限制自身的 CPU 用量，
 1 millicpu = 1 millicore = 0.001 core。
-
-### CPU 限制 (Cores) {#global.limits.max_cpus}
-
-**标签**:
-
-<mark></mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.limits.max_cpus`
-
-Upgrade from old version: `max_cpus`
-
-**默认值**:
-```yaml
-global:
-  limits:
-    max_cpus: 1
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
 
 ### 内存限制 {#global.limits.max_memory}
 
@@ -358,6 +306,12 @@ global:
       metric: free
 ```
 
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| free | |
+| available | |
+
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
@@ -399,7 +353,8 @@ global:
 
 **详细描述**:
 
-当`相对系统负载`高于此阈值时，deepflow-agent 自动停止运行；取值为 0 时，该特性不生效。
+当`相对系统负载`（load 除以 CPU 核数）高于此阈值时，采集器自动停止运行。
+设置该值或 `recovery_threshold` 为 0 时，该特性不生效。
 
 #### 恢复阈值 {#global.circuit_breakers.relative_sys_load.recovery_threshold}
 
@@ -429,10 +384,11 @@ global:
 
 **详细描述**:
 
-当`相对系统负载`连续 5 分钟低于此阈值时，deepflow-agent 自动从
-停止状态恢复运行。取值为 0 时，该特性不生效。
+在采集器处于停止状态后，当`相对系统负载`（load 除以 CPU 核数）连续 5 分钟低于此阈值时，
+采集器自动从停止状态恢复运行。
+设置该值或 `trigger_threshold` 为 0 时，该特性不生效。
 
-#### 观测指标 {#global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric}
+#### 观测指标 {#global.circuit_breakers.relative_sys_load.metric}
 
 **标签**:
 
@@ -440,7 +396,7 @@ global:
 
 **FQCN**:
 
-`global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric`
+`global.circuit_breakers.relative_sys_load.metric`
 
 Upgrade from old version: `system_load_circuit_breaker_metric`
 
@@ -449,7 +405,7 @@ Upgrade from old version: `system_load_circuit_breaker_metric`
 global:
   circuit_breakers:
     relative_sys_load:
-      system_load_circuit_breaker_metric: load15
+      metric: load15
 ```
 
 **枚举可选值**:
@@ -502,11 +458,11 @@ global:
 
 如果流量分发所用网络接口的出方向吞吐量达到或超出此阈值，deepflow-agent 停止流量
 分发；如果该网络接口的出方向吞吐量连续 5 个监控周期低于`(trigger_threshold -
-outputs.npb.max_npb_throughput)*90%`，deepflow-agent 恢复流量分发。
+outputs.npb.max_tx_throughput)*90%`，deepflow-agent 恢复流量分发。
 
 注意：
 1. 取值为 0 时，该特性不生效；
-2. 若取非 0 值，必须大于 `max_npb_throughput`。
+2. 若取非 0 值，必须大于 `max_tx_throughput`。
 
 #### 吞吐监控间隔 {#global.circuit_breakers.tx_throughput.throughput_monitoring_interval}
 
@@ -570,7 +526,7 @@ global:
 
 **详细描述**:
 
-操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。举例：
+操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。举例：
 ```yaml
 global:
   tunning:
@@ -622,7 +578,7 @@ Upgrade from old version: `static_config.memory-trim-disabled`
 ```yaml
 global:
   tunning:
-    idle_memory_trimming: false
+    idle_memory_trimming: true
 ```
 
 **模式**:
@@ -822,7 +778,7 @@ global:
 `最大逃逸时长`是指 deepflow-agent 与 deepflow-server 失联后，自主运行的最长
 时间；超过该时长后，仍未与 server 恢复联系，agent 自动进入 disabled 状态。
 
-### Controller IP 地址 {#global.communication.controller_ip}
+### Controller IP 地址 {#global.communication.proxy_controller_ip}
 
 **标签**:
 
@@ -830,7 +786,7 @@ global:
 
 **FQCN**:
 
-`global.communication.controller_ip`
+`global.communication.proxy_controller_ip`
 
 Upgrade from old version: `proxy_controller_ip`
 
@@ -838,7 +794,7 @@ Upgrade from old version: `proxy_controller_ip`
 ```yaml
 global:
   communication:
-    controller_ip: ''
+    proxy_controller_ip: 127.0.0.1
 ```
 
 **模式**:
@@ -848,11 +804,11 @@ global:
 
 **详细描述**:
 
-用于设置 deepflow-server 向 deepflow-agent 下发的 server 端控制面通信 IP；如果不设置本
-参数，server 下发自己的节点 IP 作为 server 端控制面通信IP。该参数通常用于 server 端使用负载
-均衡或虚 IP 对外提供服务的场景。
+用于设置 deepflow-agent 与 server 通信的控制面通信 IP；如果不设置本
+参数，server 下发自己的节点 IP 作为 server 端控制面通信IP。
+该参数通常用于 server 端使用负载均衡或虚 IP 对外提供服务的场景。
 
-### Controller 端口号 {#global.communication.controller_port}
+### Controller 端口号 {#global.communication.proxy_controller_port}
 
 **标签**:
 
@@ -860,7 +816,7 @@ global:
 
 **FQCN**:
 
-`global.communication.controller_port`
+`global.communication.proxy_controller_port`
 
 Upgrade from old version: `proxy_controller_port`
 
@@ -868,7 +824,7 @@ Upgrade from old version: `proxy_controller_port`
 ```yaml
 global:
   communication:
-    controller_port: 30035
+    proxy_controller_port: 30035
 ```
 
 **模式**:
@@ -994,7 +950,10 @@ global:
 
 **详细描述**:
 
-TODO
+当 deepflow-agent 使用外部 IP 地址访问 deepflow-server 时，设置本参数为 true。
+例如，当 deepflow-server 位于 NAT 网关后，或 deepflow-server 所在的主机有多个
+节点 IP 地址，不同的 deepflow-agent 需要访问不同的节点 IP 地址时，可以为每个
+deepflow-server 地址设置一个额外的 NAT IP，并将本参数设置为 true。
 
 ## 自监控 {#global.self_monitoring}
 
@@ -1058,7 +1017,7 @@ Upgrade from old version: `static_config.log-file`
 global:
   self_monitoring:
     log:
-      log_file: /var/log/deepflow_agent/deepflow_agent.log
+      log_file: /var/log/deepflow-agent/deepflow-agent.log
 ```
 
 **模式**:
@@ -1228,7 +1187,7 @@ global:
 
 该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
 
-### Hostname {#global.self_monitoring.hostname}
+### Interval {#global.self_monitoring.interval}
 
 **标签**:
 
@@ -1236,25 +1195,26 @@ global:
 
 **FQCN**:
 
-`global.self_monitoring.hostname`
+`global.self_monitoring.interval`
 
-Upgrade from old version: `host`
+Upgrade from old version: `stats_interval`
 
 **默认值**:
 ```yaml
 global:
   self_monitoring:
-    hostname: ''
+    interval: 10s
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | duration |
+| Range | ['1s', '3600s'] |
 
 **详细描述**:
 
-覆盖 statsd 主机标签。
+statsd 时间间隔。
 
 ## 独立运行模式 {#global.standalone_mode}
 
@@ -1309,7 +1269,7 @@ Upgrade from old version: `static_config.standalone-data-file-dir`
 ```yaml
 global:
   standalone_mode:
-    data_file_dir: /var/log/deepflow_agent/
+    data_file_dir: /var/log/deepflow-agent/
 ```
 
 **模式**:
@@ -1320,224 +1280,6 @@ global:
 **详细描述**:
 
 数据文件的写入位置。
-
-## 标签 {#global.tags}
-
-deepflow-agent 关联标签。
-
-### Region ID {#global.tags.region_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.region_id`
-
-Upgrade from old version: `region_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    region_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-采集器所在区域 ID 或数据节点所在区域 ID。
-
-### 容器集群 ID {#global.tags.pod_cluster_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.pod_cluster_id`
-
-Upgrade from old version: `pod_cluster_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    pod_cluster_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-采集器所在容器集群 ID。
-
-### VPC ID {#global.tags.vpc_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.vpc_id`
-
-Upgrade from old version: `epc_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    vpc_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-采集器所在的 vpc 的 ID, 仅对 Workload-V/P, 容器-V/P 类型有意义。
-
-### Agent ID {#global.tags.agent_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.agent_id`
-
-Upgrade from old version: `vtap_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    agent_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [0, 64000] |
-
-**详细描述**:
-
-采集器 ID。
-
-### 采集器类型 {#global.tags.agent_type}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.agent_type`
-
-Upgrade from old version: `trident_type`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    agent_type: 0
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| 0 | TT_UNKNOWN |
-| 1 | TT_PROCESS, Agent in KVM |
-| 2 | TT_VM, Agent in a dedicated VM on ESXi |
-| 3 | TT_PUBLIC_CLOUD, Agent in Cloud host (VM) |
-| 5 | TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host |
-| 6 | TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic |
-| 7 | TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host) |
-| 8 | TT_VM_POD, Agent in K8s Node (Cloud VM) |
-| 9 | TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic |
-| 10 | TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node |
-| 11 | TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node |
-| 12 | TT_K8S_SIDECAR, Agent in K8s POD |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [0, 12] |
-
-**详细描述**:
-
-采集器类型。
-
-### 团队 ID {#global.tags.team_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.team_id`
-
-Upgrade from old version: `team_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    team_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-采集器所在的团队的 ID。
-
-### 组织 ID {#global.tags.organize_id}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`global.tags.organize_id`
-
-Upgrade from old version: `organize_id`
-
-**默认值**:
-```yaml
-global:
-  tags:
-    organize_id: 0
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-采集器所在的组织的 ID。
 
 # 输入 {#inputs}
 
@@ -1656,7 +1398,7 @@ inputs:
 
 **详细描述**:
 
-如果进程的活跃时间低于该参数值，deepflow-agent 将不上报该进程的信息。
+如果接口或进程的活跃时间低于该参数值，deepflow-agent 将不上报该接口或进程的信息。
 
 ### Tag 提取 {#inputs.proc.tag_extraction}
 
@@ -1756,7 +1498,8 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - ebpf.profile.off_cpu
-      match_regex: deepflow-*
+      - proc.gprocess_info
+      match_regex: deepflow-.*
       only_in_container: false
 ```
 
@@ -1849,7 +1592,7 @@ The regex of matcher.
 
 `inputs.proc.process_matcher.match_type`
 
-Upgrade from old version: `static_config.os-proc-regex.match-regex`
+Upgrade from old version: `static_config.os-proc-regex.match-type`
 
 **默认值**:
 ```yaml
@@ -1864,9 +1607,9 @@ inputs:
 | ----- | ---------------------------- |
 | process_name | |
 | cmdline | |
+| cmdline_with_args | |
 | parent_process_name | |
 | tag | |
-| cmdline_with_args | |
 
 **模式**:
 | Key  | Value                        |
@@ -2077,19 +1820,14 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
+| proc.gprocess_info | |
+| proc.golang_symbol_table | |
 | proc.socket_list | |
-| proc.symbol_table | |
-| proc.proc_event | |
 | ebpf.socket.uprobe.golang | |
 | ebpf.socket.uprobe.tls | |
-| ebpf.socket.uprobe.rdma | |
-| ebpf.file.io_event | |
-| ebpf.file.management_event | |
 | ebpf.profile.on_cpu | |
 | ebpf.profile.off_cpu | |
 | ebpf.profile.memory | |
-| ebpf.profile.cuda | |
-| ebpf.profile.hbm | |
 
 **模式**:
 | Key  | Value                        |
@@ -2128,7 +1866,7 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **详细描述**:
 
@@ -2376,7 +2114,7 @@ inputs:
 
 **详细描述**:
 
-TODO
+Bond 网卡的从网卡列表。
 
 #### 需要采集的额外网络 Namespace {#inputs.cbpf.af_packet.extra_netns_regex}
 
@@ -2495,7 +2233,9 @@ inputs:
 
 **详细描述**:
 
-TODO
+当 mirror-traffic-pcp 的值小于等于 7 时，仅当 VLAN PCP 与该值匹配时，从 VLAN tag 中计算 TAP。
+当 mirror-traffic-pcp 的值为 8 时，从外层 VLAN tag 中计算 TAP，
+当 mirror-traffic-pcp 的值为 9 时，从内层 VLAN tag 中计算 TAP。
 
 #### 禁用 BPF 过滤 {#inputs.cbpf.af_packet.bpf_filter_disabled}
 
@@ -2659,8 +2399,8 @@ inputs:
 **详细描述**:
 
 数据包 Fanout 的路数大于 1 时，deepflow-agent 将开启多个 dispatcher 线程，并把数据包分散到多个处理
-线程并行处理，以优化应用的的性能和弹性。增加`packet_fanout_count`可以降低多核服务器的操作系统软中断数
-量，但会消耗更多的 CPU 和内存。
+线程并行处理，弹性扩展 dispatcher 以优化网络应用的处理性能。增加`packet_fanout_count`可以降低
+多核服务器的操作系统软中断数量，但会消耗更多的 CPU 和内存。
 
 注意：参数仅在`capture_mode`为 0，且`extra_netns_regex`为空时有效。
 
@@ -2712,7 +2452,7 @@ inputs:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### Source {#inputs.cbpf.special_network.dpdk.source}
+##### source {#inputs.cbpf.special_network.dpdk.source}
 
 **标签**:
 
@@ -2737,7 +2477,7 @@ inputs:
 | ----- | ---------------------------- |
 | None | |
 | eBPF | |
-| pDump | |
+| pdump | |
 
 **模式**:
 | Key  | Value                        |
@@ -2914,7 +2654,9 @@ inputs:
 
 **详细描述**:
 
-TODO
+当 capture_mode 为 0 或 1时该配置生效。
+
+对所有流量采集方式都可用。
 
 #### 最大采集包长 {#inputs.cbpf.tunning.max_capture_packet_size}
 
@@ -2976,7 +2718,9 @@ inputs:
 
 **详细描述**:
 
-TODO
+Analyzer 模式下采集到的包进入队列前需要分配内存暂存。为避免每个包进行内存申请，每次开辟
+raw_packet_buffer_block_size 大小的内存块给数个包使用。
+更大的配置可以减少内存分配，但会延迟内存释放。
 
 #### 裸包队列大小 {#inputs.cbpf.tunning.raw_packet_queue_size}
 
@@ -3007,7 +2751,10 @@ inputs:
 
 **详细描述**:
 
-TODO
+以下队列的长度（仅在 capture_mode = 2 时有效）：
+- 0.1-bytes-to-parse
+- 0.2-packet-to-flowgenerator
+- 0.3-packet-to-pipeline
 
 #### 最大采集 PPS {#inputs.cbpf.tunning.max_capture_pps}
 
@@ -3026,7 +2773,7 @@ Upgrade from old version: `max_collect_pps`
 inputs:
   cbpf:
     tunning:
-      max_capture_pps: 200000
+      max_capture_pps: 1048576
 ```
 
 **模式**:
@@ -3115,7 +2862,38 @@ inputs:
 
 **详细描述**:
 
-流量镜像模式下，deepflow-agent 需要剥离的隧道头协议类型。
+流量镜像（虚拟或物理）模式下，deepflow-agent 需要剥离的隧道头协议类型。
+
+#### TCP分段重组开关 {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.cbpf.preprocess.packet_segmentation_reassembly`
+
+Upgrade from old version: `static_config.packet-segmentation-reassembly`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    preprocess:
+      packet_segmentation_reassembly: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 65535] |
+
+**详细描述**:
+
+开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
 
 ### 物理网络流量镜像 {#inputs.cbpf.physical_mirror}
 
@@ -3264,7 +3042,7 @@ eBPF 特性的总开关。
 
 `inputs.ebpf.socket.uprobe.golang.enabled`
 
-Upgrade from old version: `static_config.ebpf.uprobe-process-name-regexs.golang`
+Upgrade from old version: `static_config.ebpf.uprobe-golang-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.golang`
 
 **默认值**:
 ```yaml
@@ -3279,7 +3057,7 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **详细描述**:
 
@@ -3329,7 +3107,7 @@ Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 0 �
 
 `inputs.ebpf.socket.uprobe.tls.enabled`
 
-Upgrade from old version: `static_config.ebpf.uprobe-process-name-regexs.openssl`
+Upgrade from old version: `static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl`
 
 **默认值**:
 ```yaml
@@ -3344,7 +3122,7 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **详细描述**:
 
@@ -3357,54 +3135,17 @@ inputs:
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
-###### Source {#inputs.ebpf.socket.uprobe.dpdk.source}
+###### DPDK 应用命令名称 {#inputs.ebpf.socket.uprobe.dpdk.command}
 
 **标签**:
 
 <mark>agent_restart</mark>
-
-**FQCN**:
-
-`inputs.ebpf.socket.uprobe.dpdk.source`
-
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    socket:
-      uprobe:
-        dpdk:
-          source: None
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| None | |
-| eBPF | |
-| pDump | |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**详细描述**:
-
-DPDK数据包采集特性的开启开关
-
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.command}
-
-**标签**:
-
-<mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.command`
 
-
 **默认值**:
 ```yaml
 inputs:
@@ -3412,7 +3153,7 @@ inputs:
     socket:
       uprobe:
         dpdk:
-          command: ""
+          command: ''
 ```
 
 **模式**:
@@ -3422,20 +3163,20 @@ inputs:
 
 **详细描述**:
 
-设置DPDK应用的命令名称, eBPF会自动寻找并进行追踪采集数据包
+设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
 
-配置样例: 如果命令行是'/usr/bin/mydpdk', 可以配置成 "command: mydpdk"
+配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
 
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
+###### DPDK 应用数据包接收 hook 点设置 {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.rx_hooks`
-
 
 **默认值**:
 ```yaml
@@ -3454,68 +3195,71 @@ inputs:
 
 **详细描述**:
 
-根据实际的网卡驱动填写合适的数据包接收hook点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
+根据实际的网卡驱动填写合适的数据包接收 hook 点，可以利用命令 'lspci -vmmk' 寻找网卡驱动类型例如：
+```
+Slot:   04:00.0
+Class:  Ethernet controller
+Vendor: Intel Corporation
+Device: Ethernet Controller XL710 for 40GbE QSFP+
+SVendor:        Unknown vendor 1e18
+SDevice:        Device 4712
+Rev:    02
+Driver: igb_uio
+Module: i40e
+```
+上面的 "Driver: igb_uio" 说明是 DPDP 纳管的设备 (除此之外还有 "vfio-pci", "uio_pci_generic"
+也被 DPDK 纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
 
-     Slot:   04:00.0
-     Class:  Ethernet controller
-     Vendor: Intel Corporation
-     Device: Ethernet Controller XL710 for 40GbE QSFP+
-     SVendor:        Unknown vendor 1e18
-     SDevice:        Device 4712
-     Rev:    02
-     Driver: igb_uio
-     Module: i40e
+可以使用 deepflow 提供的可持续剖析功能对 DPDK 应用做函数剖析查看具体接口名字，也可以使用 perf 命令
+在agent所在节点上运行 `perf record -F97 -a -g -p <dpdk应用进程号> -- sleep 30`，`perf script | grep -E 'recv|xmit'`
+来确认驱动接口。
 
-上面的 "Driver: igb_uio" 说明是DPDP纳管的设备 (除此之外还有"vfio-pci", "uio_pci_generic"
-也被DPDK纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
+下面列出了不同驱动对应的接口名称，仅供参考:
+ 1. Physical NIC Drivers:
+     - Intel Drivers:
+       - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
+         - rx: ixgbe_recv_pkts, ixgbe_recv_pkts_vec
+         - tx: ixgbe_xmit_pkts, ixgbe_xmit_fixed_burst_vec, ixgbe_xmit_pkts_vec
+       - i40e:    Supports Intel X710, XL710 series NICs.
+         - rx: i40e_recv_pkts
+         - tx: i40e_xmit_pkts
+       - ice:     Supports Intel E810 series NICs.
+         - rx: ice_recv_pkts
+         - tx: ice_xmit_pkts
+     - Mellanox Drivers:
+       - mlx4:    Supports Mellanox ConnectX-3 series NICs.
+         - rx: mlx4_rx_burst
+         - tx: mlx4_tx_burst
+       - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
+         - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
+         - tx: Pending confirmation
+     - Broadcom Drivers:
+       - bnxt:    Supports Broadcom NetXtreme series NICs.
+         - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
+         - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
+  2. Virtual NIC Drivers:
+     - Virtio Driver:
+       - virtio:  Supports Virtio-based virtual network interfaces.
+         - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
+               virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
+         - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts,
+     - VMXNET3 Driver:
+       - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
+         - rx: vmxnet3_recv_pkts
+         - tx: vmxnet3_xmit_pkts
 
-可以使用 deepflow 提供的可持续剖析功能对 DPDK 应用做函数剖析查看具体接口名字，也可以使用 perf 命令在agent所在节点上运行 `perf record -F97 -a -g -p <dpdk应用进程号> -- sleep 30`，`perf script | grep -E 'recv|xmit'` 来确认驱动接口。
+配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
 
-     下面列出了不同驱动对应的接口名称，仅供参考:
-      1. Physical NIC Drivers:
-          - Intel Drivers:
-            - ixgbe:   Supports Intel 82598/82599/X520/X540/X550 series NICs.
-              - rx: ixgbe_recv_pkts, ixgbe_recv_pkts_vec
-              - tx: ixgbe_xmit_pkts, ixgbe_xmit_fixed_burst_vec, ixgbe_xmit_pkts_vec
-            - i40e:    Supports Intel X710, XL710 series NICs.
-              - rx: i40e_recv_pkts
-              - tx: i40e_xmit_pkts
-            - ice:     Supports Intel E810 series NICs.
-              - rx: ice_recv_pkts
-              - tx: ice_xmit_pkts
-          - Mellanox Drivers:
-            - mlx4:    Supports Mellanox ConnectX-3 series NICs.
-              - rx: mlx4_rx_burst
-              - tx: mlx4_tx_burst
-            - mlx5:    Supports Mellanox ConnectX-4, ConnectX-5, ConnectX-6 series NICs.
-              - rx: mlx5_rx_burst, mlx5_rx_burst_vec, mlx5_rx_burst_mprq
-              - tx: Pending confirmation
-          - Broadcom Drivers:
-            - bnxt:    Supports Broadcom NetXtreme series NICs.
-              - rx: bnxt_recv_pkts, bnxt_recv_pkts_vec (x86, Vector mode receive)
-              - tx: bnxt_xmit_pkts, bnxt_xmit_pkts_vec (x86, Vector mode transmit)
-       2. Virtual NIC Drivers:
-          - Virtio Driver:
-            - virtio:  Supports Virtio-based virtual network interfaces.
-              - rx: virtio_recv_pkts, virtio_recv_mergeable_pkts_packed, virtio_recv_pkts_packed,
-                    virtio_recv_pkts_vec, virtio_recv_pkts_inorder, virtio_recv_mergeable_pkts
-              - tx: virtio_xmit_pkts_packed, virtio_xmit_pkts
-          - VMXNET3 Driver:
-            - vmxnet3: Supports VMware's VMXNET3 virtual NICs.
-              - rx: vmxnet3_recv_pkts
-              - tx: vmxnet3_xmit_pkts
-配置样例: "rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]"
-
-###### Command {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
+###### DPDK 应用数据包发送 hook 点设置 {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>ee_feature</mark>
 
 **FQCN**:
 
 `inputs.ebpf.socket.uprobe.dpdk.tx_hooks`
-
 
 **默认值**:
 ```yaml
@@ -3534,9 +3278,9 @@ inputs:
 
 **详细描述**:
 
-根据实际的网卡驱动填写合适的数据包发送hook点, 获取驱动方法和发送hook点设置参考'rx_hooks'的说明.
+根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置参考 'rx_hooks' 的说明.
 
-配置样例: "tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]"
+配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
@@ -3578,7 +3322,7 @@ TCP 和 UDP 的端口黑名单列表。端口号列入黑名单的 socket 将被
 
 ##### 白名单 {#inputs.ebpf.socket.kprobe.whitelist}
 
-###### 白名单 {#inputs.ebpf.socket.kprobe.whitelist.port}
+###### 白名单 {#inputs.ebpf.socket.kprobe.whitelist.ports}
 
 **标签**:
 
@@ -3586,7 +3330,7 @@ TCP 和 UDP 的端口黑名单列表。端口号列入黑名单的 socket 将被
 
 **FQCN**:
 
-`inputs.ebpf.socket.kprobe.whitelist.port`
+`inputs.ebpf.socket.kprobe.whitelist.ports`
 
 Upgrade from old version: `static_config.ebpf.kprobe-whitelist.port-list`
 
@@ -3597,7 +3341,7 @@ inputs:
     socket:
       kprobe:
         whitelist:
-          port: ''
+          ports: ''
 ```
 
 **模式**:
@@ -3685,6 +3429,8 @@ eBPF hook 进程的 CPU 消耗。
 
 `inputs.ebpf.socket.tunning.map_prealloc_disabled`
 
+Upgrade from old version: `static_config.ebpf.map-prealloc-disabled`
+
 **默认值**:
 ```yaml
 inputs:
@@ -3702,7 +3448,7 @@ inputs:
 **详细描述**:
 
 当完整的map预分配过于昂贵时，将 `map_prealloc_disabled` 设置为 true 可以防止在定义map时进行
-内存预分配，但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 ebpf map。
+内存预分配，但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
 #### 预处理 {#inputs.ebpf.socket.preprocess}
@@ -3768,7 +3514,7 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **模式**:
 | Key  | Value                        |
@@ -3805,7 +3551,7 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **模式**:
 | Key  | Value                        |
@@ -3895,6 +3641,137 @@ deepflow-agent 所采集的文件 IO 事件的时延下限阈值，操作系统�
 的文件 IO 事件将被忽略。
 
 ### Profile {#inputs.ebpf.profile}
+
+#### 栈回溯 {#inputs.ebpf.profile.unwinding}
+
+##### 禁用 DWARF 栈回溯 {#inputs.ebpf.profile.unwinding.dwarf_disabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_disabled`
+
+Upgrade from old version: `static_config.ebpf.dwarf-disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_disabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+默认设置为“true”，将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
+设置为“true”将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
+
+##### DWARF 回溯进程匹配正则表达式 {#inputs.ebpf.profile.unwinding.dwarf_regex}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_regex`
+
+Upgrade from old version: `static_config.ebpf.dwarf-regex`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_regex: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+如设置为空，采集器将使用启发式算法判断待剖析进程是否包含帧指针，并对不包含帧指针的进程使用 DWARF 栈回溯。
+如设置为合法正则表达式，采集器将不再自行推断进程是否包含帧指针，改用该正则表达式对进程名进行匹配，仅对匹配的进程使用 DWARF 帧回溯。
+
+##### DWARF 回溯进程表容量 {#inputs.ebpf.profile.unwinding.dwarf_process_map_size}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_process_map_size`
+
+Upgrade from old version: `static_config.ebpf.dwarf-process-map-size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_process_map_size: 1024
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 131072] |
+
+**详细描述**:
+
+每个需要进行 DWARF 回溯的进程在该表中有一条记录，用于关联进程和回溯记录分片。
+每条记录大约占 8K 内存，默认配置大约需要分配 8M 内核内存。
+由于是哈希表，配置可以比最大进程号低。
+该配置只在 DWARF 功能开启时生效。
+
+##### DWARF 回溯分片表容量 {#inputs.ebpf.profile.unwinding.dwarf_shard_map_size}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.profile.unwinding.dwarf_shard_map_size`
+
+Upgrade from old version: `static_config.ebpf.dwarf-shard-map-size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      unwinding:
+        dwarf_shard_map_size: 128
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 4096] |
+
+**详细描述**:
+
+DWARF 回溯记录分片数量。
+每条记录大约占 1M 内存，默认配置大约需要分配 128M 内核内存。
+该配置只在 DWARF 功能开启时生效。
 
 #### On-CPU {#inputs.ebpf.profile.on_cpu}
 
@@ -4098,7 +3975,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -4125,6 +4002,38 @@ inputs:
 
 eBPF memory profile 数据的采集开关。
 
+##### 内存剖析上报间隔 {#inputs.ebpf.profile.memory.report_interval}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.report_interval`
+
+Upgrade from old version: `static_config.ebpf.memory-profile.report-interval`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        report_interval: 10s
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1s', '60s'] |
+
+**详细描述**:
+
+deepflow-agent 聚合和上报内存剖析数据的间隔。
+
 #### 预处理 {#inputs.ebpf.profile.preprocess}
 
 ##### 函数栈压缩 {#inputs.ebpf.profile.preprocess.stack_compression}
@@ -4136,6 +4045,8 @@ eBPF memory profile 数据的采集开关。
 **FQCN**:
 
 `inputs.ebpf.profile.preprocess.stack_compression`
+
+Upgrade from old version: `static_config.ebpf.preprocess.stack-compression`
 
 **默认值**:
 ```yaml
@@ -4220,7 +4131,7 @@ inputs:
 
 **详细描述**:
 
-TODO
+参与用户态数据处理的工作线程数量。实际最大值为主机 CPU 逻辑核心数。
 
 #### Perf Page 数量 {#inputs.ebpf.tunning.perf_pages_count}
 
@@ -4250,7 +4161,8 @@ inputs:
 
 **详细描述**:
 
-TODO
+内核共享内存占用的页数。值为 `2^n (5 <= n <= 13)`。用于 perf 数据传输。
+如果值在 `2^n` 和 `2^(n+1)` 之间，将自动调整到最小值 `2^n`。
 
 #### 内核环形队列大小 {#inputs.ebpf.tunning.kernel_ring_size}
 
@@ -4280,7 +4192,8 @@ inputs:
 
 **详细描述**:
 
-TODO
+内核环形队列的大小。值为 `2^n (13 <= n <= 17)`。
+如果值在 `2^n` 和 `2^(n+1)` 之间，将自动调整到最小值 `2^n`。
 
 #### 最大 Socket 条目数 {#inputs.ebpf.tunning.max_socket_entries}
 
@@ -4306,11 +4219,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **详细描述**:
 
-TODO
+设置 socket tracking 哈希表的最大条目数，根据实际场景中的并发请求数量而定。
 
 #### Socket Map 回收阈值 {#inputs.ebpf.tunning.socket_map_reclaim_threshold}
 
@@ -4336,11 +4249,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [8000, 2000000] |
 
 **详细描述**:
 
-TODO
+Socket map 表条目清理阈值。
 
 #### 最大 Trace 条目数 {#inputs.ebpf.tunning.max_trace_entries}
 
@@ -4366,11 +4279,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **详细描述**:
 
-TODO
+线程和协程追踪的最大哈希表条目数。
 
 ## 资源 {#inputs.resources}
 
@@ -4432,7 +4345,14 @@ inputs:
 
 **详细描述**:
 
-开启开关后，deepflow-agent 将采集宿主机中的 VM 信息和网络信息，并上报/同步至 deepflow-server。
+开启开关后，deepflow-agent 将采集 KVM 或 Linux 宿主机中的 VM 信息和网络信息，并上报/同步至 deepflow-server。
+采集的信息包括：
+- raw_all_vm_xml
+- raw_vm_states
+- raw_ovs_interfaces
+- raw_ovs_ports
+- raw_brctl_show
+- raw_vlan_config
 
 #### 虚拟机 MAC 源 {#inputs.resources.private_cloud.vm_mac_source}
 
@@ -4531,38 +4451,15 @@ inputs:
 
 **详细描述**:
 
-TODO
+复杂环境中，TAP 网卡的 MAC 地址映射关系可以通过编写脚本实现。使用脚本时需要满足以下条件：
+1. if_mac_source = 2
+2. tap_mode = 0
+3. TAP 网卡的名称与虚拟机 XML 文件中的名称相同
+4. 脚本输出格式如下：
+   - tap2d283dfe,11:22:33:44:55:66
+   - tap2d283223,aa:bb:cc:dd:ee:ff
 
 ### 采集 K8s 资源 {#inputs.resources.kubernetes}
-
-#### Enabled {#inputs.resources.kubernetes.enabled}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.kubernetes.enabled`
-
-Upgrade from old version: `kubernetes_api_enabled`
-
-**默认值**:
-```yaml
-inputs:
-  resources:
-    kubernetes:
-      enabled: false
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-当同个 K8s 集群中有多个 deepflow-agent 时，只有一个 deepflow-agent 会被启用采集 K8s 资源。
 
 #### K8s 命名空间 {#inputs.resources.kubernetes.kubernetes_namespace}
 
@@ -4591,7 +4488,7 @@ inputs:
 
 **详细描述**:
 
-TODO
+指定采集器获取 K8s 资源时的命名空间
 
 #### K8s API 资源 {#inputs.resources.kubernetes.api_resources}
 
@@ -4861,7 +4758,7 @@ inputs:
 
 **详细描述**:
 
-TODO
+用于指定 K8s 资源获取分页大小。
 
 #### K8s API List 最大间隔 {#inputs.resources.kubernetes.api_list_max_interval}
 
@@ -4891,7 +4788,7 @@ inputs:
 
 **详细描述**:
 
-TODO
+当 watcher 未收到更新时，获取 K8s 资源的间隔时间。
 
 #### Ingress Flavour {#inputs.resources.kubernetes.ingress_flavour}
 
@@ -4957,76 +4854,6 @@ inputs:
 - active: deepflow-agent 通过 setns 进入其他 POD 的 netns 查询 MAC 和 IP 信息（部署
   时需要 SYS_ADMIN 权限）。
 - adaptive: deepflow-agent 优先使用 active 模式获取其他 POD 的 MAC 和 IP 信息。
-
-### 从控制器拉取资源 {#inputs.resources.pull_resource_from_controller}
-
-#### 云平台过滤器 {#inputs.resources.pull_resource_from_controller.domain_filter}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.pull_resource_from_controller.domain_filter`
-
-Upgrade from old version: `domains`
-
-**默认值**:
-```yaml
-inputs:
-  resources:
-    pull_resource_from_controller:
-      domain_filter:
-      - 0
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-
-**详细描述**:
-
-在运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
-向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
-以减少下发的数据量。当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
-下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
-仅获取部分云平台的数据。
-
-#### 仅下发本集群中的 K8s Pod IP {#inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster`
-
-Upgrade from old version: `pod_cluster_internal_ip`
-
-**默认值**:
-```yaml
-inputs:
-  resources:
-    pull_resource_from_controller:
-      only_kubernetes_pod_ip_in_local_cluster: false
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-TODO
 
 ## 集成 {#inputs.integration}
 
@@ -5130,7 +4957,7 @@ inputs:
 
 `inputs.integration.compression.profile`
 
-Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
+Upgrade from old version: `static_config.external-agent-http-proxy-profile-compressed`
 
 **默认值**:
 ```yaml
@@ -5212,7 +5039,7 @@ inputs:
 
 Prometheus 额外 label 的列表。
 
-#### Label 键长度限制 {#inputs.integration.prometheus_extra_labels.label_length}
+#### Label 键总长度限制 {#inputs.integration.prometheus_extra_labels.label_length}
 
 **标签**:
 
@@ -5241,9 +5068,9 @@ inputs:
 
 **详细描述**:
 
-deepflow-agent 对 Prometheus 额外 label 解析并采集时，key 字段的长度上限。
+deepflow-agent 对 Prometheus 额外 label 解析并采集时，key 字段长度总和的上限。
 
-#### Label 值长度限制 {#inputs.integration.prometheus_extra_labels.value_length}
+#### Label 值总长度限制 {#inputs.integration.prometheus_extra_labels.value_length}
 
 **标签**:
 
@@ -5272,7 +5099,7 @@ inputs:
 
 **详细描述**:
 
-deepflow-agent 对 Prometheus 额外 label 解析并采集时，value 字段的长度上限。
+deepflow-agent 对 Prometheus 额外 label 解析并采集时，value 字段长度总和的上限。
 
 ### 特性开关 {#inputs.integration.feature_control}
 
@@ -5406,10 +5233,12 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
+| Range | [0, 10000000] |
 
 **详细描述**:
 
 设置为`0`时，deepflow-agent 根据 `max_memory` 参数自动调整 Fast-path 字典大小。
+注意：实践中不应配置小于 8000 的值。
 
 #### 禁用 Fast-path {#processors.packet.policy.fast_path_disabled}
 
@@ -5468,7 +5297,7 @@ processors:
 
 **详细描述**:
 
-调大该参数，deepflow-agent 将消耗更多的内存。
+转发表大小，用来存储 MAC-IP 信息，调大该参数，deepflow-agent 将消耗更多的内存。
 
 #### 最大 First-path 层级 {#processors.packet.policy.max_first_path_level}
 
@@ -5498,7 +5327,9 @@ processors:
 
 **详细描述**:
 
-TODO
+DDBS 算法等级。
+
+该配置越大内存开销越小，但是性能会降低。
 
 ### TCP 包头（时序图） {#processors.packet.tcp_header}
 
@@ -5531,7 +5362,7 @@ processors:
 
 **详细描述**:
 
-TODO
+压缩和保存多个 TCP 包头的缓冲区大小。
 
 #### Sender 队列大小 {#processors.packet.tcp_header.sender_queue_size}
 
@@ -5563,37 +5394,6 @@ processors:
 **详细描述**:
 
 TCP 包时序数据的单个发送队列的大小。
-
-#### Sender 队列数量 {#processors.packet.tcp_header.sender_queue_count}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`processors.packet.tcp_header.sender_queue_count`
-
-Upgrade from old version: `static_config.packet-sequence-queue-count`
-
-**默认值**:
-```yaml
-processors:
-  packet:
-    tcp_header:
-      sender_queue_count: 1
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**详细描述**:
-
-TCP 包时序数据发送队列的数量。
 
 #### 包头字段 Flag {#processors.packet.tcp_header.header_fields_flag}
 
@@ -5694,7 +5494,7 @@ processors:
 
 **详细描述**:
 
-TODO
+按流的 PCap 缓冲区大小。到达该值时 flush 该条流的 PCap 数据。
 
 #### 总体缓冲区大小 {#processors.packet.pcap_stream.total_buffer_size}
 
@@ -5725,7 +5525,7 @@ processors:
 
 **详细描述**:
 
-TODO
+PCap 总缓冲区大小。到达该值时 flush 所有流的 PCap 数据。
 
 #### Flush 间隔 {#processors.packet.pcap_stream.flush_interval}
 
@@ -5756,7 +5556,7 @@ processors:
 
 **详细描述**:
 
-TODO
+如果一条流的 PCap buffer 超过这个时间没有进行过 flush，强制触发一次 flush。
 
 ### TOA (TCP Option Address) {#processors.packet.toa}
 
@@ -5788,7 +5588,8 @@ processors:
 
 **详细描述**:
 
-TODO
+以下队列的大小：
+- 1-socket-sync-toa-info-queue
 
 #### Cache 大小 {#processors.packet.toa.cache_size}
 
@@ -5818,7 +5619,7 @@ processors:
 
 **详细描述**:
 
-含义待明确。
+TCP Option Address 信息缓存大小。
 
 ## 调用日志 {#processors.request_log}
 
@@ -5874,7 +5675,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-ttl`
 processors:
   request_log:
     application_protocol_inference:
-      inference_result_ttl: 60
+      inference_result_ttl: 60s
 ```
 
 **模式**:
@@ -5909,31 +5710,17 @@ processors:
       enabled_protocols:
       - HTTP
       - HTTP2
-      - Dubbo
-      - SofaRPC
-      - FastCGI
-      - bRPC
       - MySQL
-      - PostgreSQL
-      - Oracle
       - Redis
-      - MongoDB
       - Kafka
-      - MQTT
-      - AMQP
-      - OpenWire
-      - NATS
-      - Pulsar
-      - ZMTP
       - DNS
       - TLS
-      - Custom
 ```
 
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+| _DYNAMIC_OPTIONS_ | |
 
 **模式**:
 | Key  | Value                        |
@@ -6072,6 +5859,7 @@ processors:
         HTTP2: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
+        Memcached: 11211
         MongoDB: 1-65535
         MySQL: 1-65535
         NATS: 1-65535
@@ -6081,7 +5869,9 @@ processors:
         Pulsar: 1-65535
         Redis: 1-65535
         SofaRPC: 1-65535
+        SomeIP: 1-65535
         TLS: 443,6443
+        Tars: 1-65535
         ZMTP: 1-65535
         bRPC: 1-65535
 ```
@@ -6098,10 +5888,19 @@ processors:
 
 **详细描述**:
 
-配置样例: `80,1000-2000`
+配置样例:
+```
+HTTP: 80,1000-2000
+HTTP2: 1-65535
+```
 
 注意：
 1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
+
+支持协议：https://www.deepflow.io/docs/features/l7-protocols/overview/
+
+<mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+
 2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
 
 #### Tag 过滤器 {#processors.request_log.filters.tag_filters}
@@ -6123,6 +5922,7 @@ processors:
     filters:
       tag_filters:
         AMQP: []
+        Custom: []
         DNS: []
         Dubbo: []
         FastCGI: []
@@ -6130,6 +5930,7 @@ processors:
         HTTP2: []
         Kafka: []
         MQTT: []
+        Memcached: []
         MongoDB: []
         MySQL: []
         NATS: []
@@ -6139,7 +5940,9 @@ processors:
         Pulsar: []
         Redis: []
         SOFARPC: []
+        SomeIP: []
         TLS: []
+        Tars: []
         ZMTP: []
         bRPC: []
         gRPC: []
@@ -6157,7 +5960,7 @@ processors:
 
 **详细描述**:
 
-控制不同应用协议数据采集时的 Tag。
+控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
 
 ##### $HTTP Tag 过滤器 {#processors.request_log.filters.tag_filters.HTTP}
 
@@ -6312,7 +6115,7 @@ processors:
 
 **详细描述**:
 
-TODO
+匹配字段。
 
 #### 不关心的 DNS NXDOMAIN 错误 {#processors.request_log.filters.unconcerned_dns_nxdomain_response_suffixes}
 
@@ -6463,7 +6266,8 @@ processors:
   request_log:
     tag_extraction:
       tracing_tag:
-        http_real_client: X_Forwarded_For
+        http_real_client:
+        - X_Forwarded_For
 ```
 
 **模式**:
@@ -6494,7 +6298,8 @@ processors:
   request_log:
     tag_extraction:
       tracing_tag:
-        x_request_id: X_Request_ID
+        x_request_id:
+        - X_Request_ID
 ```
 
 **模式**:
@@ -6671,7 +6476,7 @@ processors:
 
 **详细描述**:
 
-TODO
+HTTP URL 前缀。
 
 ###### 截取 Segment 数 {#processors.request_log.tag_extraction.http_endpoint.match_rules.keep_segments}
 
@@ -6702,7 +6507,7 @@ processors:
 
 **详细描述**:
 
-TODO
+截取 URL 的段数。
 
 #### 自定义字段 {#processors.request_log.tag_extraction.custom_fields}
 
@@ -6739,7 +6544,20 @@ processors:
 
 **详细描述**:
 
-配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
+配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。
+
+示例:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_fields:
+        HTTP:
+        - field-name: "user-agent"
+        - field-name: "cookie"
+```
+
+注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
 
 ##### $HTTP 自定义字段 {#processors.request_log.tag_extraction.custom_fields.HTTP}
 
@@ -6769,7 +6587,20 @@ processors:
 
 **详细描述**:
 
-TODO
+配置 HTTP、HTTP2、gRPC 等协议的额外提取字段。
+
+示例:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_fields:
+        HTTP:
+        - field_name: "user-agent"
+        - field_name: "cookie"
+```
+
+注意：如需配置`gRPC`协议，使用`HTTP2`。
 
 ###### 字段名 {#processors.request_log.tag_extraction.custom_fields.HTTP.field_name}
 
@@ -6800,7 +6631,7 @@ processors:
 
 **详细描述**:
 
-TODO
+字段名
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -6840,6 +6671,9 @@ processors:
 **详细描述**:
 
 配置该参数后，deepflow-agent 将在采集时对特定应用协议的关键数据做脱敏处理。
+脱敏字段主要包括：
+- 授权信息
+- 各类语句中的 value 信息
 
 ### 调优 {#processors.request_log.tunning}
 
@@ -6872,7 +6706,7 @@ processors:
 
 **详细描述**:
 
-应用调用日志采集解析的最大 payload 长度。
+应用调用日志采集解析的最大 payload 长度。注意实际的值小于 capture_packet_size。
 注意：eBPF 数据的 payload 可解析长度上限为 16384 Byte。
 
 #### 会话聚合桶容量 {#processors.request_log.tunning.session_aggregate_slot_capacity}
@@ -6903,7 +6737,18 @@ processors:
 
 **详细描述**:
 
-TODO
+默认情况下，2 分钟缓存窗口中的单向 l7_flow_log 将被聚合成双向的 request_log（会话）。
+聚合时的槽位大小为 5 秒。该配置用于指定每个时间槽中最多可以缓存多少个单向的 l7_flow_log 条目。
+
+如果某个时间槽中的 l7_flow_log 条目数量超过该配置，则该时间槽中 10% 的 l7_flow_log 条目将被
+LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目不会被丢弃，而是作为单向的 request_log
+发送给 deepflow-server。
+
+以下指标可以作为调整该配置的参考数据：
+- Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+  用于记录当前时刻所有时间槽中缓存的 request_resource 字段占用的总内存，单位为字节。
+- Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+  用于记录达到 LRU 容量限制并触发淘汰的次数。
 
 #### 应用指标时间一致性开关 {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
 
@@ -6964,7 +6809,8 @@ processors:
 
 **详细描述**:
 
-Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+捕获的包携带的时间戳可能比当前时间晚，尤其是在流量高峰期可能延迟高达 10s。
+该配置也会影响 FlowMap 聚合窗口的大小。
 
 #### 额外可容忍的 Flow 延迟 {#processors.flow_log.time_window.extra_tolerable_flow_delay}
 
@@ -6990,11 +6836,12 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '10s'] |
+| Range | ['0s', '10s'] |
 
 **详细描述**:
 
-TODO
+QuadrupleGenerator 接收 flow 的额外时间延迟。
+该配置会影响秒级和分钟级 QuadrupleGenerator 聚合窗口的大小。
 
 ### Conntrack（即 Flow Map） {#processors.flow_log.conntrack}
 
@@ -7026,7 +6873,7 @@ processors:
 
 **详细描述**:
 
-TODO
+FlowMap 中流产生延迟时间，用于在下游处理单元中增加窗口大小，避免窗口推动过快。
 
 #### Flow 生成逻辑 {#processors.flow_log.conntrack.flow_generation}
 
@@ -7122,7 +6969,8 @@ processors:
 
 **详细描述**:
 
-TODO
+对于虚拟网络流量，流聚合仅匹配 l2end 为 true 的一端的 MAC 地址, 设置为 true
+流聚合会使用全部MAC地址。
 
 ##### IDC 流量忽略 VLAN {#processors.flow_log.conntrack.flow_generation.idc_traffic_ignore_vlan}
 
@@ -7217,7 +7065,7 @@ processors:
 
 **详细描述**:
 
-TODO
+Closing Reset 类型的 TCP 状态机超时。
 
 ##### Opening RST {#processors.flow_log.conntrack.timeouts.opening_rst}
 
@@ -7248,7 +7096,7 @@ processors:
 
 **详细描述**:
 
-TODO
+Opening Reset 类型的 TCP 状态机超时。
 
 ##### Others {#processors.flow_log.conntrack.timeouts.others}
 
@@ -7279,7 +7127,7 @@ processors:
 
 **详细描述**:
 
-TODO
+其他类型的 TCP 状态机超时。
 
 ### 调优 {#processors.flow_log.tunning}
 
@@ -7311,7 +7159,8 @@ processors:
 
 **详细描述**:
 
-TODO
+由于 FlowAggregator 是所有处理流程的第一步，该值也被广泛用于其他哈希表，如
+QuadrupleGenerator、Collector 等。
 
 #### 并发 Flow 数量限制 {#processors.flow_log.tunning.concurrent_flow_limit}
 
@@ -7341,7 +7190,9 @@ processors:
 
 **详细描述**:
 
-TODO
+FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
+例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
+将无法计算 L7 的 RRT。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
 
@@ -7401,7 +7252,11 @@ processors:
 
 **详细描述**:
 
-待理解
+目前只影响 TaggedFlow 批量分配。
+为避免大量的 malloc 调用，生命周期短且数量多的结构体用批量分配进行优化。
+一次分配的总内存大小不会超过这个限制。
+由于默认的 MMAP_THRESHOLD 是 128K，分配的内存块超过 128K 会导致
+mmap 调用和页错误增加，反而降低性能，所以不推荐将该配置设置大于 128K。
 
 #### FlowAggregator 队列大小 {#processors.flow_log.tunning.flow_aggregator_queue_size}
 
@@ -7431,7 +7286,8 @@ processors:
 
 **详细描述**:
 
-2-second-flow-to-minute-aggrer 的队列大小。
+以下队列的大小：
+- 2-second-flow-to-minute-aggrer
 
 #### FlowGenerator 队列大小 {#processors.flow_log.tunning.flow_generator_queue_size}
 
@@ -7461,7 +7317,10 @@ processors:
 
 **详细描述**:
 
-TODO
+以下队列的大小：
+- 1-tagged-flow-to-quadruple-generator
+- 1-tagged-flow-to-app-protocol-logs
+- 0-{flow_type}-{port}-packet-to-tagged-flow (flow_type: sflow, netflow)
 
 #### QuadrupleGenerator 队列大小 {#processors.flow_log.tunning.quadruple_generator_queue_size}
 
@@ -7491,7 +7350,9 @@ processors:
 
 **详细描述**:
 
-TODO
+以下队列的大小：
+- 2-flow-with-meter-to-second-collector
+- 2-flow-with-meter-to-minute-collector
 
 # 输出 {#outputs}
 
@@ -7532,43 +7393,6 @@ outputs:
 
 配置 deepflow-agent 向 deepflow-server 回传数据所用的 Socket 类型。在独立部署
 模式下，需配置为 FILE 类型，agent 将 l4_flow_log 和 l7_flow_log 写入本地文件。
-
-### PCAP Socket 类型 {#outputs.socket.pcap_socket_type}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`outputs.socket.pcap_socket_type`
-
-Upgrade from old version: `compressor_socket_type`
-
-**默认值**:
-```yaml
-outputs:
-  socket:
-    pcap_socket_type: TCP
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| TCP | |
-| UDP | |
-| RAW_UDP | |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**详细描述**:
-
-配置 deepflow-agent 向 deepflow-server 回传 PCAP 数据所用的 Socket 类型。
-RAW_UDP 使用 RawSocket 发送 UDP 报文，可以带来更高的性能，但在一些环境中存在兼
-容性问题。
 
 ### NPB Socket 类型 {#outputs.socket.npb_socket_type}
 
@@ -7705,7 +7529,7 @@ outputs:
 
 **详细描述**:
 
-TODO
+将被存储的流日志采集网络类型列表。
 
 #### 调用日志采集网络类型 {#outputs.flow_log.filters.l7_capture_network_types}
 
@@ -7724,7 +7548,8 @@ Upgrade from old version: `l7_log_store_tap_types`
 outputs:
   flow_log:
     filters:
-      l7_capture_network_types: []
+      l7_capture_network_types:
+      - 0
 ```
 
 **枚举可选值**:
@@ -7741,7 +7566,7 @@ outputs:
 
 **详细描述**:
 
-TODO
+将被存储的调用日志采集网络类型列表。
 
 #### 流日志忽略的观测点 {#outputs.flow_log.filters.l4_ignored_observation_points}
 
@@ -7869,7 +7694,8 @@ outputs:
 
 **详细描述**:
 
-deepflow-agent 每秒发送的 l4_flow_log 数量上限，实际发送数量超出参数值后，将开启采样。
+deepflow-agent 每秒发送的 l4_flow_log 数量上限，实际产生的日志数量超过阈值时，将
+使用水库采样限制实际发送数量不超过阈值。
 
 #### 调用日志限速器 {#outputs.flow_log.throttles.l7_throttle}
 
@@ -7933,38 +7759,6 @@ outputs:
 **详细描述**:
 
 设置如下队列的长度:
-- 3-flow-to-collector-sender
-- 3-protolog-to-collector-sender
-
-#### Collector 队列数量 {#outputs.flow_log.tunning.collector_queue_count}
-
-**标签**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`outputs.flow_log.tunning.collector_queue_count`
-
-Upgrade from old version: `static_config.flow-sender-queue-count`
-
-**默认值**:
-```yaml
-outputs:
-  flow_log:
-    tunning:
-      collector_queue_count: 1
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**详细描述**:
-
-设置如下队列的数量：
 - 3-flow-to-collector-sender
 - 3-protolog-to-collector-sender
 
@@ -8091,6 +7885,33 @@ outputs:
 
 网络指标的采集开关。关闭后 deepflow-agent 停止采集除基本的吞吐类指标外的其他网络指标。
 
+#### NPM 活跃连接指标 {#outputs.flow_metrics.filters.npm_metrics_concurrent}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_metrics.filters.npm_metrics_concurrent`
+
+**默认值**:
+```yaml
+outputs:
+  flow_metrics:
+    filters:
+      npm_metrics_concurrent: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当关闭时，deepflow-agent 不计算活跃连接指标。
+
 #### APM 指标 {#outputs.flow_metrics.filters.apm_metrics}
 
 **标签**:
@@ -8180,37 +8001,7 @@ outputs:
 **详细描述**:
 
 配置如下队列的大小:
-- 2-doc-to-collector-sender
-
-#### Sender 队列数量 {#outputs.flow_metrics.tunning.sender_queue_count}
-
-**标签**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`outputs.flow_metrics.tunning.sender_queue_count`
-
-Upgrade from old version: `static_config.collector-sender-queue-count`
-
-**默认值**:
-```yaml
-outputs:
-  flow_metrics:
-    tunning:
-      sender_queue_count: 1
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 64] |
-
-**详细描述**:
-
-配置如下队列的数量：TODO
+- 3-doc-to-collector-sender
 
 ## NPB (Network Packet Broker) {#outputs.npb}
 
@@ -8401,7 +8192,9 @@ outputs:
 
 **详细描述**:
 
-TODO
+使用 VXLAN 分发时设置 VXLAN 内的 Flags 为该值。采集器不会采集分发流量。
+
+这个配置默认会或上0b1000_0000，所以不能配置为 0b1000_0000。
 
 ### Overlay VLAN 头剥离 {#outputs.npb.overlay_vlan_header_trimming}
 
@@ -8462,6 +8255,35 @@ outputs:
 **详细描述**:
 
 设置 deepflow-agent 做 NPB 分发的最大吞吐率。
+
+## 压缩 {#outputs.compression}
+
+### Application_Log {#outputs.compression.application_log}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.application_log`
+
+**默认值**:
+```yaml
+outputs:
+  compression:
+    application_log: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
 # 插件 {#plugins}
 
@@ -8556,5 +8378,5 @@ dev:
 
 **详细描述**:
 
-TODO
+未发布的采集器特性可以通过该选项开启。
 

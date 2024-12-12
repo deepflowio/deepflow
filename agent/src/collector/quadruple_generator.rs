@@ -292,7 +292,7 @@ struct SubQuadGen {
     stashs: VecDeque<QuadrupleStash>, // flow_generator 不会有超过2分钟的延时
     batch_buffer: Vec<Box<FlowMeterWithFlow>>,
 
-    connections: VecDeque<ConcurrentConnection>,
+    connections: Option<VecDeque<ConcurrentConnection>>,
     ntp_diff: Arc<AtomicI64>,
     // TODO: 策略统计处理
     // traffic_setter: TrafficSetter,
@@ -337,7 +337,11 @@ impl RefCountable for QgCounter {
 
 impl SubQuadGen {
     // return false if flow out of window
-    fn move_window(&mut self, time_in_second: Duration, possible_host: &mut PossibleHost) -> bool {
+    fn move_window(
+        &mut self,
+        time_in_second: Duration,
+        possible_host: &mut Option<PossibleHost>,
+    ) -> bool {
         if time_in_second < self.window_start {
             self.counter
                 .drop_before_window
@@ -357,23 +361,41 @@ impl SubQuadGen {
                     / self.slot_interval
                     + 1;
             if slots_to_shift >= self.number_of_slots {
-                for i in 0..self.stashs.len() {
-                    // 计算并发连接数，发送该秒/分钟的flow后, 将该秒/分钟的连接数，需并入下一秒/分钟中计算
-                    let mut front = self.connections.pop_front().unwrap();
-                    self.flush_flow(i, &mut front, possible_host);
-                    self.connections[0].merge(time_in_second, &front);
-                    front.clear();
-                    self.connections.push_back(front);
+                if let Some(mut current) = self.connections.take() {
+                    for i in 0..self.stashs.len() {
+                        // 计算并发连接数，发送该秒/分钟的flow后, 将该秒/分钟的连接数，需并入下一秒/分钟中计算
+                        let mut front = current.pop_front();
+                        self.flush_flow(i, &mut front, possible_host);
+                        let mut front = front.unwrap();
+                        current[0].merge(time_in_second, &front);
+                        front.clear();
+                        current.push_back(front);
+                    }
+                    self.connections = Some(current);
+                } else {
+                    for i in 0..self.stashs.len() {
+                        self.flush_flow(i, &mut None, possible_host);
+                    }
                 }
             } else {
                 let slots_to_shift = slots_to_shift as usize;
-                for i in 0..slots_to_shift {
-                    let mut front = self.connections.pop_front().unwrap();
-                    self.flush_flow(i, &mut front, possible_host);
-                    self.connections[0].merge(time_in_second, &front);
-                    front.clear();
-                    self.connections.push_back(front);
+                if let Some(mut current) = self.connections.take() {
+                    for i in 0..slots_to_shift {
+                        // 计算并发连接数，发送该秒/分钟的flow后, 将该秒/分钟的连接数，需并入下一秒/分钟中计算
+                        let mut front = current.pop_front();
+                        self.flush_flow(i, &mut front, possible_host);
+                        let mut front = front.unwrap();
+                        current[0].merge(time_in_second, &front);
+                        front.clear();
+                        current.push_back(front);
+                    }
+                    self.connections = Some(current);
+                } else {
+                    for i in 0..slots_to_shift {
+                        self.flush_flow(i, &mut None, possible_host);
+                    }
                 }
+
                 self.stashs.rotate_left(slots_to_shift);
             }
             self.window_start += Duration::from_secs(self.slot_interval * slots_to_shift as u64);
@@ -393,8 +415,8 @@ impl SubQuadGen {
 
     fn set_connection(
         flows: &mut Vec<Box<FlowMeterWithFlow>>,
-        connection: &mut ConcurrentConnection,
-        possible_host: &mut PossibleHost,
+        connection: &mut Option<ConcurrentConnection>,
+        possible_host: &mut Option<PossibleHost>,
     ) {
         if flows.len() == 0 || flows[0].flow.signal_source == SignalSource::EBPF {
             // eBPF data has no L4 info
@@ -418,8 +440,11 @@ impl SubQuadGen {
             if acc_flow.flow.flow_key.proto == IpProtocol::TCP
                 || acc_flow.flow.flow_key.proto == IpProtocol::UDP
             {
-                acc_flow.flow_meter.flow_load.load =
-                    connection.get_concurrent(acc_flow.time_in_second.into(), &mut acc_flow.key);
+                if let Some(current) = connection {
+                    acc_flow.flow_meter.flow_load.load =
+                        current.get_concurrent(acc_flow.time_in_second.into(), &mut acc_flow.key);
+                }
+
                 acc_flow.flow_meter.flow_load.flow_count = if acc_flow.flow_meter.flow_load.load
                     > acc_flow.flow_meter.traffic.closed_flow
                 {
@@ -434,8 +459,8 @@ impl SubQuadGen {
     fn flush_flow(
         &mut self,
         stash_index: usize,
-        connection: &mut ConcurrentConnection,
-        possible_host: &mut PossibleHost,
+        connection: &mut Option<ConcurrentConnection>,
+        possible_host: &mut Option<PossibleHost>,
     ) {
         self.stashs.push_back(QuadrupleStash::new());
         let stash = self.stashs.swap_remove_back(stash_index).unwrap();
@@ -484,11 +509,18 @@ impl SubQuadGen {
         }
     }
 
-    fn flush_all_flow(&mut self, possible_host: &mut PossibleHost) {
-        let mut tmp = ConcurrentConnection::with_capacity(1 << 13);
-        for i in 0..self.stashs.len() {
-            tmp.merge(Duration::ZERO, &self.connections[i]);
-            self.flush_flow(i, &mut tmp, possible_host);
+    fn flush_all_flow(&mut self, possible_host: &mut Option<PossibleHost>) {
+        if let Some(connections) = self.connections.take() {
+            let mut tmp = Some(ConcurrentConnection::with_capacity(1 << 13));
+            for i in 0..self.stashs.len() {
+                tmp.as_mut().unwrap().merge(Duration::ZERO, &connections[i]);
+                self.flush_flow(i, &mut tmp, possible_host);
+            }
+            self.connections = Some(connections);
+        } else {
+            for i in 0..self.stashs.len() {
+                self.flush_flow(i, &mut None, possible_host);
+            }
         }
     }
 
@@ -520,19 +552,24 @@ impl SubQuadGen {
     ) {
         let slot = ((time_in_second - self.window_start).as_secs() / self.slot_interval) as usize;
         let stash = &mut self.stashs[slot];
-        let connection = &mut self.connections[slot];
 
         // Only count the number of concurrent connections between TCP and UDP with the signal_source of packet
         if (tagged_flow.flow.flow_key.proto == IpProtocol::TCP
             || tagged_flow.flow.flow_key.proto == IpProtocol::UDP)
             && tagged_flow.flow.signal_source == SignalSource::Packet
         {
-            if tagged_flow.flow.is_new_flow
-                && tagged_flow.flow.close_type == CloseType::ForcedReport
-            {
-                connection.add_connection(time_in_second, key);
-            } else if tagged_flow.flow.close_type != CloseType::ForcedReport {
-                connection.delete_connection(time_in_second, key, tagged_flow.flow.is_new_flow);
+            if let Some(current) = self.connections.as_mut() {
+                if tagged_flow.flow.is_new_flow
+                    && tagged_flow.flow.close_type == CloseType::ForcedReport
+                {
+                    current[slot].add_connection(time_in_second, key);
+                } else if tagged_flow.flow.close_type != CloseType::ForcedReport {
+                    current[slot].delete_connection(
+                        time_in_second,
+                        key,
+                        tagged_flow.flow.is_new_flow,
+                    );
+                }
             }
         }
 
@@ -696,7 +733,7 @@ pub struct QuadrupleGenerator {
 
     second_quad_gen: Option<SubQuadGen>,
     minute_quad_gen: Option<SubQuadGen>,
-    possible_host: PossibleHost,
+    possible_host: Option<PossibleHost>,
 
     key: QgKey,
     id_maps: [HashMap<u16, u16>; 2],
@@ -760,7 +797,11 @@ impl QuadrupleGenerator {
                 delay_seconds: second_delay_seconds,
                 stashs: VecDeque::with_capacity(second_slots),
                 batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
-                connections: VecDeque::with_capacity(second_slots),
+                connections: if conf.npm_metrics_concurrent {
+                    Some(VecDeque::with_capacity(second_slots))
+                } else {
+                    None
+                },
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
@@ -772,11 +813,10 @@ impl QuadrupleGenerator {
                     .unwrap()
                     .stashs
                     .push_back(QuadrupleStash::new());
-                second_quad_gen
-                    .as_mut()
-                    .unwrap()
-                    .connections
-                    .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
+                if let Some(connections) = second_quad_gen.as_mut().unwrap().connections.as_mut() {
+                    connections
+                        .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
+                }
             }
             stats.register_countable(
                 &QgStats { id, kind: "second" },
@@ -796,7 +836,11 @@ impl QuadrupleGenerator {
                 delay_seconds: minute_delay_seconds,
                 stashs: VecDeque::with_capacity(minute_slots),
                 batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
-                connections: VecDeque::with_capacity(minute_slots),
+                connections: if conf.npm_metrics_concurrent {
+                    Some(VecDeque::with_capacity(minute_slots))
+                } else {
+                    None
+                },
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
@@ -808,11 +852,10 @@ impl QuadrupleGenerator {
                     .unwrap()
                     .stashs
                     .push_back(QuadrupleStash::new());
-                minute_quad_gen
-                    .as_mut()
-                    .unwrap()
-                    .connections
-                    .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
+                if let Some(connections) = minute_quad_gen.as_mut().unwrap().connections.as_mut() {
+                    connections
+                        .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
+                }
             }
             stats.register_countable(
                 &QgStats { id, kind: "minute" },
@@ -828,8 +871,11 @@ impl QuadrupleGenerator {
 
             second_quad_gen,
             minute_quad_gen,
-            possible_host: PossibleHost::new(possible_host_size),
-
+            possible_host: if !conf.inactive_ip_aggregation {
+                Some(PossibleHost::new(possible_host_size))
+            } else {
+                None
+            },
             key: QgKey::V6([0; IPV6_LRU_KEY_SIZE]),
             id_maps: [HashMap::new(), HashMap::new()],
             output_flow: flow_output,
@@ -1251,7 +1297,7 @@ mod test {
             delay_seconds: slots,
             stashs: VecDeque::with_capacity(slots as usize),
             batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
-            connections: VecDeque::with_capacity(slots as usize),
+            connections: Some(VecDeque::with_capacity(slots as usize)),
             counter: Arc::new(QgCounter::default()),
             ntp_diff,
         };
@@ -1259,6 +1305,8 @@ mod test {
             quad_gen.stashs.push_back(QuadrupleStash::new());
             quad_gen
                 .connections
+                .as_mut()
+                .unwrap()
                 .push_back(ConcurrentConnection::with_capacity((slots as usize) << 8));
         }
 
@@ -1296,7 +1344,7 @@ mod test {
             quad_gen.stashs[10].v4_flows.get(&k).unwrap().flow_meter,
             new_acc_flow(tagged_flow).flow_meter
         );
-        let mut poss_host = PossibleHost::new(100);
+        let mut poss_host = Some(PossibleHost::new(100));
         quad_gen.flush_all_flow(&mut poss_host);
         if let Ok(ret) = r.recv(None) {
             assert_eq!(ret.flow_meter.flow_load.load, 1);

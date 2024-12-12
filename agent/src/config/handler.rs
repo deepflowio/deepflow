@@ -50,11 +50,9 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, TagFilterOperator, UserConfig,
-        YamlConfig,
     },
     ConfigError, KubernetesPollerType,
 };
-use crate::dispatcher::recv_engine;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
@@ -142,6 +140,7 @@ pub struct CollectorConfig {
     pub agent_id: u16,
     pub cloud_gateway_traffic: bool,
     pub packet_delay: Duration,
+    pub npm_metrics_concurrent: bool,
 }
 
 impl fmt::Debug for CollectorConfig {
@@ -187,6 +186,7 @@ impl fmt::Debug for CollectorConfig {
             .field("agent_id", &self.agent_id)
             .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
             .field("packet_delay", &self.packet_delay)
+            .field("npm_metrics_concurrent", &self.npm_metrics_concurrent)
             .finish()
     }
 }
@@ -395,7 +395,7 @@ impl PluginConfig {
         rt.block_on(async {
             for (name, ptype) in self.names.iter() {
                 log::trace!("get {:?} plugin {}", ptype, name);
-                match session.get_plugin(name, *ptype, agent_id).await {
+                match session.grpc_get_plugin(name, *ptype, agent_id).await {
                     Ok(prog) => match ptype {
                         agent::PluginType::Wasm => self.wasm_plugins.push((name.clone(), prog)),
                         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1488,6 +1488,7 @@ pub struct MetricServerConfig {
     pub port: u16,
     pub compressed: bool,
     pub profile_compressed: bool,
+    pub application_log_compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1737,6 +1738,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .flow_log
                     .time_window
                     .max_tolerable_packet_delay,
+                npm_metrics_concurrent: conf.outputs.flow_metrics.filters.npm_metrics_concurrent,
             },
             handler: HandlerConfig {
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
@@ -2051,6 +2053,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 port: conf.inputs.integration.listen_port,
                 compressed: conf.inputs.integration.compression.trace,
                 profile_compressed: conf.inputs.integration.compression.profile,
+                application_log_compressed: conf.outputs.compression.application_log,
             },
             agent_type: conf.global.common.agent_type,
             port_config: PortConfig {
@@ -4015,6 +4018,7 @@ impl ConfigHandler {
                 filters.inactive_ip_aggregation, new_filters.inactive_ip_aggregation
             );
             filters.inactive_ip_aggregation = new_filters.inactive_ip_aggregation;
+            restart_dispatcher = true;
         }
         if filters.inactive_server_port_aggregation != new_filters.inactive_server_port_aggregation
         {
@@ -4028,6 +4032,14 @@ impl ConfigHandler {
                 filters.npm_metrics, new_filters.npm_metrics
             );
             filters.npm_metrics = new_filters.npm_metrics;
+        }
+        if filters.npm_metrics_concurrent != new_filters.npm_metrics_concurrent {
+            info!(
+                "Update outputs.flow_metrics.filters.npm_metrics_concurrent from {:?} to {:?}.",
+                filters.npm_metrics_concurrent, new_filters.npm_metrics_concurrent
+            );
+            filters.npm_metrics_concurrent = new_filters.npm_metrics_concurrent;
+            restart_dispatcher = true;
         }
         if filters.second_metrics != new_filters.second_metrics {
             info!(
@@ -4111,6 +4123,14 @@ impl ConfigHandler {
                 npb.target_port, new_npb.target_port
             );
             npb.target_port = new_npb.target_port;
+            restart_agent = !first_run;
+        }
+        if outputs.compression != new_outputs.compression {
+            info!(
+                "Update outputs.compression from {:?} to {:?}.",
+                outputs.compression, new_outputs.compression
+            );
+            outputs.compression = new_outputs.compression.clone();
             restart_agent = !first_run;
         }
 
@@ -4874,24 +4894,6 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
-    }
-}
-
-impl YamlConfig {
-    pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
-        if self.fast_path_map_size > 0 {
-            return self.fast_path_map_size;
-        }
-
-        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
-    }
-
-    fn get_af_packet_blocks(&self, capture_mode: agent::PacketCaptureType, mem_size: u64) -> usize {
-        if capture_mode == PacketCaptureType::Analyzer || self.af_packet_blocks_enabled {
-            self.af_packet_blocks.max(8)
-        } else {
-            (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
-        }
     }
 }
 

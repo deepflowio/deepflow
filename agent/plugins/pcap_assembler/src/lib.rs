@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use public::counter::{Counter, RefCountable};
 use public::packet::MiniPacket;
-use public::proto::trident::PcapBatch;
+use public::proto::agent::PcapBatch;
 use public::queue::{DebugSender, Receiver};
 use public::sender::{SendMessageType, Sendable};
 
