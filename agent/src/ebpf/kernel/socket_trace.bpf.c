@@ -2732,16 +2732,9 @@ static __inline int finalize_data_output(void *ctx,
 	v_buff->events_num = 0;
 	v_buff->len = 0;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS) {
-		__u32 k0 = 0;
-		struct trace_stats *stats;
 		tracer_ctx->last_period_timestamp =
 		    tracer_ctx->period_timestamp;
 		tracer_ctx->period_timestamp = curr_time;
-		stats = trace_stats_map__lookup(&k0);
-		if (stats == NULL)
-			return -1;
-		if (diff > stats->period_event_max_delay)
-			stats->period_event_max_delay = diff;
 	}
 
 	return 0;
@@ -3354,8 +3347,11 @@ static __inline int push_socket_data(struct syscall_comm_enter_ctx *ctx)
 
 			v_buff->events_num = 0;
 			v_buff->len = 0;
-			if (diff > trace_stats->period_event_max_delay)
-				trace_stats->period_event_max_delay = diff;
+			if (diff > MAX_PUSH_DELAY_TIME_NS) {
+				// Indicates that a delay occurred in this data push.
+				__sync_fetch_and_add(&trace_stats->period_event_max_delay, 1);
+			}
+
 		}
 	}
 

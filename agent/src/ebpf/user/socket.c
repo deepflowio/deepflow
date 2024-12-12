@@ -2614,8 +2614,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 			     stats_total.period_event_count) / NS_IN_USEC;
 
 		if (stats_total.period_event_max_delay > 0) {
-			stats.period_push_max_delay =
-			    stats_total.period_event_max_delay / NS_IN_USEC;
+			stats.period_push_max_delay = PUSH_DELAY_EXCEEDED_MARKER;
 		} else {
 			stats.period_push_max_delay = stats.period_push_avg_delay;
 		}
