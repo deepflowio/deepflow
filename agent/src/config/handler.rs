@@ -1746,7 +1746,13 @@ impl ConfigHandler {
             info!("tap_mode set to {:?}", new_config.tap_mode);
             candidate_config.tap_mode = new_config.tap_mode;
             if let Some(c) = components.as_mut() {
-                c.clear_dispatcher_components();
+                if yaml_config.local_dispatcher_count > 1 {
+                    info!("tap_mode changes and fanout is enabled, deepflow-agent restart...");
+                    crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                    return vec![];
+                } else {
+                    c.clear_dispatcher_components();
+                }
             }
         }
 
