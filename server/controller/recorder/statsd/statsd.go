@@ -74,7 +74,7 @@ func (r *DomainStatsd) GetMetadata() *common.Metadata {
 }
 
 func (r *DomainStatsd) Start() {
-	log.Infof("start statsd", r.md.Domain.Lcuuid, r.md.LogPrefixes)
+	log.Info("start statsd", r.md.LogPrefixes)
 	err := stats.RegisterCountableWithModulePrefix(
 		counterModulePrefix,
 		counterModuleTypeCloudTaskCost,
@@ -159,7 +159,7 @@ func (r *SubDomainStatsd) GetMetadata() *common.Metadata {
 }
 
 func (r *SubDomainStatsd) Start() {
-	log.Infof("start statsd", r.md.LogPrefixes)
+	log.Info("start statsd", r.md.LogPrefixes)
 	err := stats.RegisterCountableWithModulePrefix(
 		counterModulePrefix,
 		counterModuleTypeResourceSyncDelay,
