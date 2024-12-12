@@ -554,7 +554,7 @@ func (f *DataFomatter) LoadMapData(data map[string]interface{}) error {
 		return fmt.Errorf("unmarshal yaml to node error: %v", err)
 	}
 
-	err = f.stringToDictValue(f.mapData, "", f.keyToComment)
+	err = f.fmtVal("", f.mapData, f.keyToComment, false)
 	if err != nil {
 		return fmt.Errorf("convert dict value to string error: %v", err)
 	}
@@ -603,17 +603,12 @@ func (f *DataFomatter) mapToJSON(keyToComment KeyToComment) ([]byte, error) {
 }
 
 func (f *DataFomatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
-	var err error
-	if dictValToStr {
-		err = f.dictValueToString(f.mapData, "", keyToComment)
-	} else {
-		err = f.stringToDictValue(f.mapData, "", keyToComment)
-	}
+	err := f.fmtVal("", f.mapData, keyToComment, dictValToStr)
 	if err != nil {
 		return fmt.Errorf("convert dict value to string error: %v", err)
 	}
 	// refresh yamlNode if changes dict value
-	if _, ok := keyToComment["changesDictValue"]; ok {
+	if _, ok := keyToComment["valueChanged"]; ok {
 		yamlBytes, err := yaml.Marshal(f.mapData)
 		if err != nil {
 			return fmt.Errorf("marshal map to yaml error: %v", err)
@@ -628,54 +623,47 @@ func (f *DataFomatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToS
 	return nil
 }
 
-func (f *DataFomatter) dictValueToString(data interface{}, ancestors string, keyToComment KeyToComment) error {
+func (f *DataFomatter) fmtVal(ancestors string, data interface{}, keyToComment KeyToComment, dictValToStr bool) error {
 	switch data := data.(type) {
 	case map[string]interface{}:
 		for key, value := range data {
 			newAncestors := f.appendAncestor(ancestors, key)
 			if !f.isKeyComment(key) {
 				if f.isDictValue(keyToComment[newAncestors]) {
-					valueStr, err := f.dictToString(value)
-					if err != nil {
-						return fmt.Errorf("convert dict value to string error: %v, key: %s", err, newAncestors)
-					}
-					data[key] = valueStr
-					keyToComment["changesDictValue"] = make(map[string]interface{})
-				}
-				f.dictValueToString(value, newAncestors, keyToComment)
-			}
-		}
-	default:
-		return nil
-	}
-	return nil
-}
-
-func (f *DataFomatter) stringToDictValue(data interface{}, ancestors string, keyToComment KeyToComment) error {
-	switch data := data.(type) {
-	case map[string]interface{}:
-		for key, value := range data {
-			newAncestors := f.appendAncestor(ancestors, key)
-			if !f.isKeyComment(key) {
-				if f.isDictValue(keyToComment[newAncestors]) {
-					if strings.HasPrefix(strings.TrimSpace(value.(string)), "-") {
-						var valueMap map[string]interface{}
-						err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
+					if dictValToStr {
+						valueStr, err := f.dictToString(value)
 						if err != nil {
-							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+							return fmt.Errorf("convert dict value to string error: %v, key: %s", err, newAncestors)
 						}
-						data[key] = valueMap[key]
+						data[key] = valueStr
 					} else {
-						var valueMap map[string]interface{}
-						err := yaml.Unmarshal([]byte(value.(string)), &valueMap)
-						if err != nil {
-							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+						if strings.HasPrefix(strings.TrimSpace(value.(string)), "-") {
+							var valueMap map[string]interface{}
+							err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
+							if err != nil {
+								return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+							}
+							data[key] = valueMap[key]
+						} else {
+							var valueMap map[string]interface{}
+							err := yaml.Unmarshal([]byte(value.(string)), &valueMap)
+							if err != nil {
+								return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+							}
+							data[key] = valueMap
 						}
-						data[key] = valueMap
 					}
-					keyToComment["changesDictValue"] = make(map[string]interface{})
+					keyToComment["valueChanged"] = make(map[string]interface{})
+				} else if f.isIntValue(keyToComment[newAncestors]) {
+					switch value := value.(type) {
+					case int:
+						data[key] = value
+					case float64:
+						data[key] = int(value)
+						keyToComment["valueChanged"] = make(map[string]interface{})
+					}
 				}
-				f.stringToDictValue(value, newAncestors, keyToComment)
+				f.fmtVal(newAncestors, value, keyToComment, dictValToStr)
 			}
 		}
 	default:
@@ -719,6 +707,13 @@ func (f *DataFomatter) appendAncestor(ancestor, key string) string {
 func (f *DataFomatter) isDictValue(comment map[string]interface{}) bool {
 	if _, ok := comment["type"]; ok {
 		return comment["type"] == "dict"
+	}
+	return false
+}
+
+func (f *DataFomatter) isIntValue(comment map[string]interface{}) bool {
+	if _, ok := comment["type"]; ok {
+		return comment["type"] == "int"
 	}
 	return false
 }
