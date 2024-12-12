@@ -535,7 +535,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(toUnixTimestamp(time),1) as _last_timestamp,Percentile(toUnixTimestamp(time),0) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Max(time) as _last_timestamp,Min(time) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
 			err:    nil,
 		},
 
@@ -727,7 +727,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(toUnixTimestamp(time),1) as _last_timestamp,Percentile(toUnixTimestamp(time),0) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Max(time) as _last_timestamp,Min(time) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
 			err:    nil,
 		},
 
