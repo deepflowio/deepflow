@@ -61,13 +61,13 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 		return nil, err
 	}
 	var tapTypes []model.TapType
-	if err := dbInfo.Select("id", "name").Find(&tapTypes).Error; err != nil {
+	if err := dbInfo.Where("value != ?", common.TAP_TYPE_VALUE_CLOUD_NETWORK).Select("value", "name").Find(&tapTypes).Error; err != nil {
 		return nil, err
 	}
 	tapTypInfos := make([]map[string]interface{}, len(tapTypes))
 	for i, tapType := range tapTypes {
 		tapTypInfos[i] = map[string]interface{}{
-			strconv.Itoa(tapType.ID): map[string]interface{}{
+			strconv.Itoa(tapType.Value): map[string]interface{}{
 				"ch": tapType.Name,
 				"en": tapType.Name,
 			},
@@ -144,7 +144,7 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 	// TODO get from ck
 	l7Protocols := []string{
 		"HTTP", "HTTP2", "Dubbo", "gRPC", "SOFARPC", "FastCGI", "bRPC", "Tars", "Some/IP", "MySQL", "PostgreSQL",
-		"Oracle", "Redis", "MongoDB", "Kafka", "MQTT", "AMQP", "OpenWire", "NATS", "Pulsar", "ZMTP", "DNS", "TLS", "Custom"}
+		"Oracle", "Redis", "MongoDB", "Memcached", "Kafka", "MQTT", "AMQP", "OpenWire", "NATS", "Pulsar", "ZMTP", "DNS", "TLS", "Custom"}
 	l7ProtocolsYamlBytes, err := yaml.Marshal(l7Protocols)
 	if err != nil {
 		return nil, err
@@ -241,7 +241,11 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("create agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
+	if dataType == DataTypeJSON {
+		log.Infof("create agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
+	} else {
+		log.Infof("create agent group config, group lcuuid: %s, data: %s, data type: %d", groupLcuuid, data.(string), dataType, dbInfo.LogPrefixORGID)
+	}
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
 		return nil, err
@@ -263,8 +267,6 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 			if err := dbInfo.Create(newConfig).Error; err != nil {
 				return nil, err
 			}
-
-			return a.GetAgentGroupConfig(groupLcuuid, dataType)
 		}
 		return nil, err
 	}
@@ -306,6 +308,8 @@ func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *mysql.DB, groupLcuui
 			if err := dbInfo.Create(vtapGroupConfig).Error; err != nil {
 				log.Errorf("failed to create agent group lcuuid %s old version yaml: %v", groupLcuuid, err)
 			}
+		} else {
+			log.Errorf("failed to get agent group config (lcuuid %s): %v", groupLcuuid, err)
 		}
 		return
 	}

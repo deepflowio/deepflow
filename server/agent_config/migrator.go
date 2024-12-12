@@ -87,7 +87,7 @@ func (m *Upgrader) lowerToHigher(lowerVerData interface{}, ancestor string, high
 				lowers := m.higherVerToLowerVerKeys[higher]
 				if len(lowers) > 1 {
 					for _, lower := range lowers {
-						log.Warnf("%s has been upgraded to %s", lower, higher) // TODO return?
+						log.Warnf("%s has been upgraded to %s, please configure it manually", lower, higher) // TODO return?
 					}
 				} else {
 					m.setNestedValue(higherVerData, higher, m.fmtLowerVersionValue(newAncestor, value))
@@ -199,6 +199,13 @@ func (m *Upgrader) fmtLowerVersionValue(longKey string, value interface{}) inter
 			return value
 		}
 	}
+	//  TODO
+	// 升级 static_config.ebpf.uprobe-process-name-regexs.golang-symbol 时，需要：
+	//  1. 将 inputs.proc.symbol_table.golang_specific.enabled 设置为 true
+	//  2. 新增一条 inputs.proc.process_matcher
+	// 升级 static_config.os-proc-sync-tagged-only 时，需要：
+	//  1. 将 inputs.proc.process_matcher 里所有的 only_with_tag 设置为 static_config.os-proc-sync-tagged-only
+
 	return m.convDictData(longKey, value)
 }
 
@@ -552,10 +559,10 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 			// "only_with_tag":    "static_config.os-proc-sync-tagged-only", // TODO
 			"ignore":       "action",
 			"rewrite_name": "rewrite-name",
-			// "enabled_features": []string{"static_config.ebpf.on-cpu-profile.regex", "static_config.ebpf.off-cpu-profile.regex"}, // 无法降级
+			// "enabled_features": []string{"static_config.ebpf.on-cpu-profile.regex", "static_config.ebpf.off-cpu-profile.regex"}, // 无法升降级
 		},
 
-		"inputs.cdpf.af_packet.bond_interfaces": {
+		"inputs.cbpf.af_packet.bond_interfaces": {
 			"slave_interfaces": "tap-interfaces",
 		},
 		"inputs.resources.kubernetes.api_resources": {
