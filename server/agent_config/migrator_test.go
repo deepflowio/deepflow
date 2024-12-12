@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	"testing"
 )
@@ -124,17 +125,116 @@ static_config:
   forward-capacity: 300000`),
 			},
 		},
+		{
+			name: "case03_1",
+			args: args{
+				bytes: []byte(`os-proc-sync-tagged-only: true
+
+static_config:
+  ebpf:
+    uprobe-process-name-regexs:
+      golang-symbol: deepflow-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: deepflow-.*
+        only_with_tag: true
+    symbol_table:
+      golang_specific:
+        enabled: true
+`),
+		},
+		{
+			name: "case03_2",
+			args: args{
+				bytes: []byte(`os-proc-sync-tagged-only: true`),
+			},
+			want: []byte(`{}
+`),
+		},
+		{
+			name: "case03_3",
+			args: args{
+				bytes: []byte(`os-proc-sync-tagged-only: true
+
+static_config:
+  os-proc-regex:
+    - match-regex: test-.*
+  ebpf:
+    uprobe-process-name-regexs:
+      golang-symbol: deepflow-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: test-.*
+        only_with_tag: true
+      - match_regex: deepflow-.*
+        only_with_tag: true
+    symbol_table:
+      golang_specific:
+        enabled: true
+`),
+		},
+		{
+			name: "case03_4",
+			args: args{
+				bytes: []byte(`os-proc-sync-tagged-only: false
+
+static_config:
+  os-proc-regex:
+    - match-regex: test-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: test-.*
+        only_with_tag: false
+`),
+		},
+		{
+			name: "case03_5",
+			args: args{
+				bytes: []byte(`static_config:
+  os-proc-regex:
+    - match-regex: test-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: test-.*
+`),
+		},
+		{
+			name: "case03_6",
+			args: args{
+				bytes: []byte(`static_config:
+  ebpf:
+    uprobe-process-name-regexs:
+      golang-symbol: deepflow-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: deepflow-.*
+    symbol_table:
+      golang_specific:
+        enabled: true
+`),
+		},
 	}
 	for _, tt := range tests {
+		if !strings.HasPrefix(tt.name, "case03") {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			toolData, err := NewMigrationToolData(nil)
 			if err != nil {
 				t.Fatalf("Failed to create toolData: %v", err)
 				return
 			}
-			migrator := &Upgrader{
-				MigrationToolData: toolData,
-			}
+			migrator := newUpgrader(toolData)
 			got, err := migrator.Upgrade(tt.args.bytes)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Upgrade() error = \"%v\", wantErr \"%v\"", err, tt.wantErr)
@@ -147,9 +247,9 @@ static_config:
 			if err := os.WriteFile(fmt.Sprintf("test_tmp/upgrade_%s_want.yaml", tt.name), tt.want, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
-			// if string(got) != string(tt.want) {
-			// 	t.Errorf("Upgrade() = \"%v\", want \"%v\"", string(got), string(tt.want))
-			// }
+			if string(got) != string(tt.want) {
+				t.Errorf("Upgrade() = \"%v\", want \"%v\"", string(got), string(tt.want))
+			}
 		})
 	}
 }

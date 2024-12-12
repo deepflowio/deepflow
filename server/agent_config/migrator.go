@@ -40,9 +40,7 @@ func Upgrade(lowerVersionDBData *AgentGroupConfigModel, domainData *DomainData) 
 	if err != nil {
 		return []byte{}, err
 	}
-	upgrader := &Upgrader{
-		MigrationToolData: toolData,
-	}
+	upgrader := newUpgrader(toolData)
 	return upgrader.Upgrade(lowerVersionYAMLBytes)
 }
 
@@ -65,6 +63,15 @@ type Upgrader struct {
 	dictDataConv
 
 	MigrationToolData
+
+	spacialLowerVersionKeyToValue map[string]interface{}
+}
+
+func newUpgrader(toolData MigrationToolData) *Upgrader {
+	return &Upgrader{
+		MigrationToolData:             toolData,
+		spacialLowerVersionKeyToValue: make(map[string]interface{}),
+	}
 }
 
 func (m *Upgrader) Upgrade(bytes []byte) ([]byte, error) {
@@ -75,7 +82,55 @@ func (m *Upgrader) Upgrade(bytes []byte) ([]byte, error) {
 	}
 	result := make(map[string]interface{})
 	m.lowerToHigher(lowerVerData, "", result)
+	m.appendSpecialLowerVersionKeyToValue(result)
 	return mapToYaml(result)
+}
+
+func (m *Upgrader) appendSpecialLowerVersionKeyToValue(result map[string]interface{}) {
+	hasProcessMatcher := false
+	if inputs, ok := result["inputs"]; ok {
+		if proc, ok := inputs.(map[string]interface{})["proc"]; ok {
+			if _, ok := proc.(map[string]interface{})["process_matcher"]; ok {
+				hasProcessMatcher = true
+				if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.uprobe-process-name-regexs.golang-symbol"]; ok {
+					switch value := proc.(map[string]interface{})["process_matcher"].(type) {
+					case []interface{}:
+						value = append(value, interface{}(map[string]interface{}{"match_regex": lowerVal}))
+						proc.(map[string]interface{})["process_matcher"] = value
+					case []map[string]interface{}:
+						value = append(value, map[string]interface{}{"match_regex": lowerVal})
+						proc.(map[string]interface{})["process_matcher"] = value
+					default:
+					}
+				}
+				if lowerVal, ok := m.spacialLowerVersionKeyToValue["os-proc-sync-tagged-only"]; ok {
+					switch value := proc.(map[string]interface{})["process_matcher"].(type) {
+					case []interface{}:
+						for i := range value {
+							value[i].(map[string]interface{})["only_with_tag"] = lowerVal
+						}
+					case []map[string]interface{}:
+						for i := range value {
+							value[i]["only_with_tag"] = lowerVal
+						}
+					default:
+					}
+				}
+			}
+		}
+	}
+	if !hasProcessMatcher {
+		value := make(map[string]interface{})
+		if lowerVal1, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.uprobe-process-name-regexs.golang-symbol"]; ok {
+			value["match_regex"] = lowerVal1
+			if lowerVal2, ok := m.spacialLowerVersionKeyToValue["os-proc-sync-tagged-only"]; ok {
+				value["only_with_tag"] = lowerVal2
+			}
+		}
+		if len(value) > 0 {
+			m.setNestedValue(result, "inputs.proc.process_matcher", []interface{}{value})
+		}
+	}
 }
 
 func (m *Upgrader) lowerToHigher(lowerVerData interface{}, ancestor string, higherVerData map[string]interface{}) {
@@ -87,11 +142,15 @@ func (m *Upgrader) lowerToHigher(lowerVerData interface{}, ancestor string, high
 				lowers := m.higherVerToLowerVerKeys[higher]
 				if len(lowers) > 1 {
 					for _, lower := range lowers {
-						log.Warnf("%s has been upgraded to %s, please configure it manually", lower, higher) // TODO return?
+						log.Warnf("%s has been upgraded to %s, please configure it manually", lower, higher)
 					}
 				} else {
 					m.setNestedValue(higherVerData, higher, m.fmtLowerVersionValue(newAncestor, value))
 				}
+			} else if newAncestor == "os-proc-sync-tagged-only" {
+				// 升级 static_config.os-proc-sync-tagged-only 时，需要：
+				//  1. 将 inputs.proc.process_matcher 里所有的 only_with_tag 设置为 static_config.os-proc-sync-tagged-only
+				m.setSpecialLowerVersionKeyToValue(newAncestor, value)
 			}
 			m.lowerToHigher(value, newAncestor, higherVerData)
 		}
@@ -198,15 +257,27 @@ func (m *Upgrader) fmtLowerVersionValue(longKey string, value interface{}) inter
 		default:
 			return value
 		}
+	} else if longKey == "static_config.ebpf.uprobe-process-name-regexs.golang-symbol" {
+		// 升级 static_config.ebpf.uprobe-process-name-regexs.golang-symbol 时，需要：
+		//  1. 将 inputs.proc.symbol_table.golang_specific.enabled 设置为 true
+		//  2. 新增一条 inputs.proc.process_matcher
+		switch value := value.(type) {
+		case string:
+			if value == "" {
+				return false
+			}
+			m.setSpecialLowerVersionKeyToValue(longKey, value)
+			return true
+		default:
+			return false
+		}
 	}
-	//  TODO
-	// 升级 static_config.ebpf.uprobe-process-name-regexs.golang-symbol 时，需要：
-	//  1. 将 inputs.proc.symbol_table.golang_specific.enabled 设置为 true
-	//  2. 新增一条 inputs.proc.process_matcher
-	// 升级 static_config.os-proc-sync-tagged-only 时，需要：
-	//  1. 将 inputs.proc.process_matcher 里所有的 only_with_tag 设置为 static_config.os-proc-sync-tagged-only
 
 	return m.convDictData(longKey, value)
+}
+
+func (m *Upgrader) setSpecialLowerVersionKeyToValue(key string, value interface{}) {
+	m.spacialLowerVersionKeyToValue[key] = value
 }
 
 func (m *Upgrader) convDictData(longKey string, value interface{}) interface{} {
