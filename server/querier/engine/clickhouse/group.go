@@ -87,7 +87,9 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 				}
 			}
 		} else {
-			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			if !strings.Contains(name, "node_type") && !strings.Contains(name, "icon_id") {
+				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			}
 		}
 	}
 	return stmts, nil
@@ -324,12 +326,6 @@ func (g *GroupTag) Format(m *view.Model) {
 				}
 				m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
 			}
-		}
-	}
-	for _, tag := range []string{"client_node_type", "server_node_type", "node_type"} {
-		if g.Value == tag {
-			iconTag := strings.ReplaceAll(tag, "node_type", "icon_id")
-			m.AddGroup(&view.Group{Value: iconTag})
 		}
 	}
 }
