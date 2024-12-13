@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: agent - eBPF Correct the maximum data push delay [#8704](https://github.com/deepflowio/deepflow/pull/8704) by [yinjiping](https://github.com/yinjiping)
 * fix: update sub domain team_id [#8674](https://github.com/deepflowio/deepflow/pull/8674) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: nil pointer may cause panic [#8672](https://github.com/deepflowio/deepflow/pull/8672) by [lzf575](https://github.com/lzf575)
 * fix: invalid bpf syntax [#8648](https://github.com/deepflowio/deepflow/pull/8648) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -168,6 +170,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: gets by page when refreshing recorder cache [#8712](https://github.com/deepflowio/deepflow/pull/8712) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - eBPF Optimize data push logic (#8653) [#8683](https://github.com/deepflowio/deepflow/pull/8683) by [yinjiping](https://github.com/yinjiping)
 * feat: register esxi vtap support cloudtower [#8611](https://github.com/deepflowio/deepflow/pull/8611) by [askyrie](https://github.com/askyrie)
 * feat: the role field adds the values local and rest [#8465](https://github.com/deepflowio/deepflow/pull/8465) by [lzf575](https://github.com/lzf575)

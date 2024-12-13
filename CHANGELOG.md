@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Configuration text [#8701](https://github.com/deepflowio/deepflow/pull/8701) by [rvql](https://github.com/rvql)
+* fix: recorder fails to clean 10w data at one time [#8699](https://github.com/deepflowio/deepflow/pull/8699) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: agent - eBPF Correct the maximum data push delay [#8694](https://github.com/deepflowio/deepflow/pull/8694) by [yinjiping](https://github.com/yinjiping)
+* fix: fix ip filter error [#8693](https://github.com/deepflowio/deepflow/pull/8693) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: modify log level [#8690](https://github.com/deepflowio/deepflow/pull/8690) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: query percentile to min/max time [#8685](https://github.com/deepflowio/deepflow/pull/8685) by [taloric](https://github.com/taloric)
 * fix: agent group api responses invalid int value [#8681](https://github.com/deepflowio/deepflow/pull/8681) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
