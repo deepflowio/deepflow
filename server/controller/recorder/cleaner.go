@@ -176,7 +176,7 @@ func (c *Cleaners) NewCleanerIfNotExists(orgID int) (*Cleaner, error) {
 		return cl, nil
 	}
 
-	cl, err := newCleaner(orgID)
+	cl, err := newCleaner(c.cfg, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,15 +214,16 @@ func (c *Cleaners) set(orgID int, cl *Cleaner) {
 type Cleaner struct {
 	org      *common.ORG
 	toolData *toolData
+	cfg      config.RecorderConfig
 }
 
-func newCleaner(orgID int) (*Cleaner, error) {
+func newCleaner(cfg config.RecorderConfig, orgID int) (*Cleaner, error) {
 	org, err := common.NewORG(orgID)
 	if err != nil {
 		log.Errorf("failed to create org object: %s", err.Error())
 		return nil, err
 	}
-	c := &Cleaner{org: org, toolData: newToolData()}
+	c := &Cleaner{cfg: cfg, org: org, toolData: newToolData()}
 	return c, nil
 }
 
@@ -234,30 +235,30 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
 	log.Info(c.org.Logf("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY)))
-	deleteAndPublish[mysql.Region](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REGION_EN, c.toolData)
-	deleteAndPublish[mysql.AZ](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_AZ_EN, c.toolData)
-	deleteAndPublish[mysql.Host](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_HOST_EN, c.toolData)
-	deleteAndPublish[mysql.VM](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VM_EN, c.toolData)
-	deleteAndPublish[mysql.VPC](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VPC_EN, c.toolData)
-	deleteAndPublish[mysql.Network](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, c.toolData)
-	deleteAndPublish[mysql.VRouter](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, c.toolData)
-	deleteAndPublish[mysql.DHCPPort](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, c.toolData)
-	deleteAndPublish[mysql.NATGateway](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, c.toolData)
-	deleteAndPublish[mysql.LB](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_EN, c.toolData)
-	deleteAndPublish[mysql.LBListener](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, c.toolData)
-	deleteAndPublish[mysql.CEN](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_CEN_EN, c.toolData)
-	deleteAndPublish[mysql.PeerConnection](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, c.toolData)
-	deleteAndPublish[mysql.RDSInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, c.toolData)
-	deleteAndPublish[mysql.RedisInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, c.toolData)
-	deleteAndPublish[mysql.PodCluster](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, c.toolData)
-	deleteAndPublish[mysql.PodNode](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData)
-	deleteAndPublish[mysql.PodNamespace](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData)
-	deleteAndPublish[mysql.PodIngress](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
-	deleteAndPublish[mysql.PodService](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
-	deleteAndPublish[mysql.PodGroup](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
-	deleteAndPublish[mysql.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
-	deleteAndPublish[mysql.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
-	deleteAndPublish[mysql.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData)
+	pageDeleteExpiredAndPublish[mysql.Region](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REGION_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.AZ](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_AZ_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.Host](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_HOST_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.VM](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VM_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.VPC](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VPC_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.Network](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.VRouter](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.DHCPPort](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.NATGateway](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.LB](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.LBListener](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.CEN](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_CEN_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PeerConnection](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.RDSInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.RedisInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodCluster](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodNode](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodNamespace](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodIngress](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodService](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodGroup](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[mysql.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData, c.cfg.MySQLBatchSize)
 	// deleteAndPublish[mysql.PrometheusTarget](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, c.toolData)
 	log.Info(c.org.Logf("clean soft deleted resources completed"))
 }
@@ -473,10 +474,33 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB) (ids []int) {
 	return
 }
 
-func deleteAndPublish[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
-	dbItems := deleteExpired[MT](db, expiredAt)
-	publishTagrecorder(db, dbItems, resourceType, toolData)
-	log.Info(db.Logf("clean %s completed: %d", resourceType, len(dbItems)))
+func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
+	db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
+	var items []*MT
+	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
+	if err != nil {
+		log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error())
+		return
+	}
+	if len(items) == 0 {
+		return
+	}
+
+	log.Infof("clean %s started: %d", resourceType, len(items))
+	total := len(items)
+	for i := 0; i < total; i += size {
+		end := i + size
+		if end > total {
+			end = total
+		}
+		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
+			log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error())
+		} else {
+			publishTagrecorder(db, items, resourceType, toolData)
+		}
+	}
+
+	log.Infof("clean %s completed: %d", resourceType, len(items))
 }
 
 func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
