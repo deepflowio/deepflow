@@ -25,6 +25,7 @@ type RecorderConfig struct {
 	DirtyResourceCleanInterval   uint16 `default:"99" yaml:"dirty_resource_clean_interval"`
 	ResourceMaxID0               int    `default:"64000" yaml:"resource_max_id_0"`
 	ResourceMaxID1               int    `default:"499999" yaml:"resource_max_id_1"`
+	MySQLBatchSize               int    `default:"2500" yaml:"mysql_batch_size"`
 
 	LogDebug LogDebugConfig `yaml:"log_debug"`
 }
