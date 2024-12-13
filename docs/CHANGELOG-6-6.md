@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* fix: recorder fails to clean 10w data at one time [#8706](https://github.com/deepflowio/deepflow/pull/8706) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: agent - eBPF Correct the maximum data push delay [#8703](https://github.com/deepflowio/deepflow/pull/8703) by [yinjiping](https://github.com/yinjiping)
+* fix: Configuration text [#8702](https://github.com/deepflowio/deepflow/pull/8702) by [rvql](https://github.com/rvql)
 * fix: fix ip filter error [#8692](https://github.com/deepflowio/deepflow/pull/8692) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: modify log level [#8689](https://github.com/deepflowio/deepflow/pull/8689) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: invalid value when migrating agent group config [#8687](https://github.com/deepflowio/deepflow/pull/8687) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -33,6 +36,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: gets by page when refreshing recorder cache [#8711](https://github.com/deepflowio/deepflow/pull/8711) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* Revert "Revert "feat: querier optimization group"" [#8708](https://github.com/deepflowio/deepflow/pull/8708) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * Revert "feat: querier optimization group" [#8695](https://github.com/deepflowio/deepflow/pull/8695) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: querier optimization group [#8691](https://github.com/deepflowio/deepflow/pull/8691) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Optimize data push logic [#8653](https://github.com/deepflowio/deepflow/pull/8653) by [yinjiping](https://github.com/yinjiping)
