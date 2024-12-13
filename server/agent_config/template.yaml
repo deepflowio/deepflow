@@ -2599,15 +2599,18 @@ inputs:
         # ee_feature: false
         # description:
         #   en: |-
-        #     The default setting is "false", which enables DWARF based stack unwinding for
-        #     all processes that do not contain frame pointers. Agent uses a heuristic algorithm
-        #     to determine whether the process being analyzed contains frame pointers.
-        #     Setting it to "true" will disable DWARF based stack unwinding, using frame pointer
-        #     based unwinding for all processes. If a process does not contain frame pointers,
-        #     the stack cannot be displayed correctly.
+        #     The default setting is "true", agent will use frame pointer based unwinding for
+        #     all processes. If a process does not contain frame pointers, the stack cannot be
+        #     displayed correctly.
+        #     Setting it to "false" will enable DWARF based stack unwinding for all processes that
+        #     do not contain frame pointers. Agent uses a heuristic algorithm to determine whether
+        #     the process being analyzed contains frame pointers.
+        #     Additionally, setting `dwarf_regex` to force DWARF based stack unwinding for certain
+        #     processes.
         #   ch: |-
         #     默认设置为“true”，将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
-        #     设置为“true”将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
+        #     设置为“false”将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
+        #     设置 `dwarf_regex` 后，将强制对匹配的进程使用 DWARF 回溯。
         # upgrade_from: static_config.ebpf.dwarf-disabled
         dwarf_disabled: true
         # type: string
