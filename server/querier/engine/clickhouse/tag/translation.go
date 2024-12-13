@@ -432,7 +432,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				fmt.Sprintf("if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s))", ip4Suffix, ip6Suffix),
 				"",
-				fmt.Sprintf("if(is_ipv4=1, %s %%s toIPv4(%%s), %s %%s toIPv6(%%s))", ip4Suffix, ip6Suffix),
+				fmt.Sprintf("if(is_ipv4=1, %s %%s toIPv4OrNull(%%s), %s %%s toIPv6OrNull(%%s))", ip4Suffix, ip6Suffix),
 				"",
 			), "mask": NewTag(
 				"if(is_ipv4, IPv4NumToString(bitAnd("+ip4Suffix+", %v)), IPv6NumToString(bitAnd("+ip6Suffix+", toFixedString(unhex('%s'), 16))))",
@@ -894,7 +894,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				NatRealIP4Suffix,
 				"",
-				fmt.Sprintf("%s %%s toIPv4(%%s)", NatRealIP4Suffix),
+				fmt.Sprintf("%s %%s toIPv4OrNull(%%s)", NatRealIP4Suffix),
 				"",
 			)}
 	}
@@ -903,42 +903,42 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"",
 			"",
-			"(if(tunnel_is_ipv4=1, tunnel_tx_ip4_0 %s toIPv4(%s), tunnel_tx_ip6_0 %s toIPv6(%s)) OR if(tunnel_is_ipv4=1, tunnel_tx_ip4_1 %s toIPv4(%s), tunnel_tx_ip6_1 %s toIPv6(%s)))",
+			"(if(tunnel_is_ipv4=1, tunnel_tx_ip4_0 %s toIPv4OrNull(%s), tunnel_tx_ip6_0 %s toIPv6OrNull(%s)) OR if(tunnel_is_ipv4=1, tunnel_tx_ip4_1 %s toIPv4OrNull(%s), tunnel_tx_ip6_1 %s toIPv6OrNull(%s)))",
 			"",
 		)}
 	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0))",
 			"",
-			"if(tunnel_is_ipv4=1, tunnel_tx_ip4_0 %s toIPv4(%s), tunnel_tx_ip6_0 %s toIPv6(%s))",
+			"if(tunnel_is_ipv4=1, tunnel_tx_ip4_0 %s toIPv4OrNull(%s), tunnel_tx_ip6_0 %s toIPv6OrNull(%s))",
 			"",
 		)}
 	tagResourceMap["tunnel_tx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1))",
 			"",
-			"if(tunnel_is_ipv4=1, tunnel_tx_ip4_1 %s toIPv4(%s), tunnel_tx_ip6_1 %s toIPv6(%s))",
+			"if(tunnel_is_ipv4=1, tunnel_tx_ip4_1 %s toIPv4OrNull(%s), tunnel_tx_ip6_1 %s toIPv6OrNull(%s))",
 			"",
 		)}
 	tagResourceMap["tunnel_rx_ip"] = map[string]*Tag{
 		"default": NewTag(
 			"",
 			"",
-			"(if(tunnel_is_ipv4=1, tunnel_rx_ip4_0 %s toIPv4(%s), tunnel_rx_ip6_0 %s toIPv6(%s)) OR if(tunnel_is_ipv4=1, tunnel_rx_ip4_1 %s toIPv4(%s), tunnel_rx_ip6_1 %s toIPv6(%s)))",
+			"(if(tunnel_is_ipv4=1, tunnel_rx_ip4_0 %s toIPv4OrNull(%s), tunnel_rx_ip6_0 %s toIPv6OrNull(%s)) OR if(tunnel_is_ipv4=1, tunnel_rx_ip4_1 %s toIPv4OrNull(%s), tunnel_rx_ip6_1 %s toIPv6OrNull(%s)))",
 			"",
 		)}
 	tagResourceMap["tunnel_rx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0))",
 			"",
-			"if(tunnel_is_ipv4=1, tunnel_rx_ip4_0 %s toIPv4(%s), tunnel_rx_ip6_0 %s toIPv6(%s))",
+			"if(tunnel_is_ipv4=1, tunnel_rx_ip4_0 %s toIPv4OrNull(%s), tunnel_rx_ip6_0 %s toIPv6OrNull(%s))",
 			"",
 		)}
 	tagResourceMap["tunnel_rx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1))",
 			"",
-			"if(tunnel_is_ipv4=1, tunnel_rx_ip4_1 %s toIPv4(%s), tunnel_rx_ip6_1 %s toIPv6(%s))",
+			"if(tunnel_is_ipv4=1, tunnel_rx_ip4_1 %s toIPv4OrNull(%s), tunnel_rx_ip6_1 %s toIPv6OrNull(%s))",
 			"",
 		)}
 	// 开始时间
