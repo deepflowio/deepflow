@@ -38,7 +38,7 @@ type Recorder struct {
 
 func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, orgID int, domainLcuuid string) *Recorder {
 	log.Infof("domain lcuuid: %s, new recorder", domainLcuuid, logger.NewORGPrefix(orgID))
-	md, err := common.NewMetadata(orgID)
+	md, err := common.NewMetadata(cfg, orgID)
 	if err != nil {
 		log.Errorf("domain lcuuid: %s, failed to create metadata object: %s", domainLcuuid, err.Error(), logger.NewORGPrefix(orgID))
 		return nil
