@@ -43,23 +43,6 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time) []*MT {
-	var dbItems []*MT
-	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&dbItems).Error
-	if err != nil {
-		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORGID)
-		return nil
-	}
-	if len(dbItems) == 0 {
-		return nil
-	}
-	if err := db.Unscoped().Delete(&dbItems).Error; err != nil {
-		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORGID)
-		return nil
-	}
-	return dbItems
-}
-
 func getIDs[MT constraint.MySQLModel](db *mysql.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
@@ -69,10 +52,33 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB, domainLcuuid string) (ids []
 	return
 }
 
-func deleteAndPublish[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
-	dbItems := deleteExpired[MT](db, expiredAt)
-	publishTagrecorder(db, dbItems, resourceType, toolData)
-	log.Infof("clean %s completed: %d", resourceType, len(dbItems), db.LogPrefixORGID)
+func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
+	db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
+	var items []*MT
+	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
+	if err != nil {
+		log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+		return
+	}
+	if len(items) == 0 {
+		return
+	}
+
+	log.Infof("clean %s started: %d", resourceType, len(items), db.LogPrefixORGID)
+	total := len(items)
+	for i := 0; i < total; i += size {
+		end := i + size
+		if end > total {
+			end = total
+		}
+		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
+			log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+		} else {
+			publishTagrecorder(db, items, resourceType, toolData)
+		}
+	}
+
+	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
 }
 
 func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
