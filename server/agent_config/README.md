@@ -3776,12 +3776,14 @@ inputs:
 
 **Description**:
 
-The default setting is "false", which enables DWARF based stack unwinding for
-all processes that do not contain frame pointers. Agent uses a heuristic algorithm
-to determine whether the process being analyzed contains frame pointers.
-Setting it to "true" will disable DWARF based stack unwinding, using frame pointer
-based unwinding for all processes. If a process does not contain frame pointers,
-the stack cannot be displayed correctly.
+The default setting is "true", agent will use frame pointer based unwinding for
+all processes. If a process does not contain frame pointers, the stack cannot be
+displayed correctly.
+Setting it to "false" will enable DWARF based stack unwinding for all processes that
+do not contain frame pointers. Agent uses a heuristic algorithm to determine whether
+the process being analyzed contains frame pointers.
+Additionally, setting `dwarf_regex` to force DWARF based stack unwinding for certain
+processes.
 
 ##### DWARF unwinding process matching regular expression {#inputs.ebpf.profile.unwinding.dwarf_regex}
 
