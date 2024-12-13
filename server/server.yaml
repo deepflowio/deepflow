@@ -244,6 +244,7 @@ controller:
           resource_type:
           #  - all
           #  - vpc
+        mysql_batch_size: 2500
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
