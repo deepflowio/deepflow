@@ -60,7 +60,7 @@ type AppServiceTagWriter struct {
 
 func NewAppServiceTagWriter(
 	decoderIndex int,
-	db string,
+	db, msgType string,
 	ttl int,
 	partition ckdb.TimeFuncType,
 	config *config.Config) (*AppServiceTagWriter, error) {
@@ -76,7 +76,7 @@ func NewAppServiceTagWriter(
 	tableName := fmt.Sprintf("%s_app_service", db)
 	w.ckwriter, err = ckwriter.NewCKWriter(
 		*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		fmt.Sprintf("tag-%s-%d", tableName, decoderIndex),
+		fmt.Sprintf("tag-%s-%s-%d", tableName, msgType, decoderIndex),
 		config.CKDB.TimeZone,
 		GenAppServiceTagCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, config.CKDB.Type, ttl, partition),
 		WRITER_QUEUE_COUNT, WRITER_QUEUE_SIZE, WRITER_BATCH_SIZE, WRITER_FLUSH_TIMEOUT, config.CKDB.Watcher)
@@ -85,7 +85,7 @@ func NewAppServiceTagWriter(
 	}
 	w.ckwriter.Run()
 
-	common.RegisterCountableForIngester("app_service_tag_writer", w, stats.OptionStatTags{"type": tableName, "decoder_index": strconv.Itoa(decoderIndex)})
+	common.RegisterCountableForIngester("app_service_tag_writer", w, stats.OptionStatTags{"type": msgType, "decoder_index": strconv.Itoa(decoderIndex)})
 	return w, nil
 }
 

@@ -80,7 +80,7 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 		if err != nil {
 			return nil, err
 		}
-		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, ckdb.METRICS_DB, cfg.FlowMetricsTTL.VtapApp1M, ckdb.TimeFuncTwelveHour, cfg.Base)
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, ckdb.METRICS_DB, datatype.MESSAGE_TYPE_METRICS.String(), cfg.FlowMetricsTTL.VtapApp1M, ckdb.TimeFuncTwelveHour, cfg.Base)
 		if err != nil {
 			return nil, err
 		}

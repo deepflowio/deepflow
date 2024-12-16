@@ -206,7 +206,7 @@ func NewExtMetricsWriter(
 	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
 	ckwriter, err := ckwriter.NewCKWriter(
 		*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
+		fmt.Sprintf("%s-%s-%d", w.msgType, flowTagTablePrefix, w.decoderIndex), w.ckdbTimeZone,
 		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
 	if err != nil {
 		return nil, err
