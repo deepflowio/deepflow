@@ -7402,7 +7402,8 @@ processors:
 
 Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
 the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
-is not enough, it will be unable to calculate the rrt of l7.
+is not enough, it will be unable to calculate the rrt of l7. When capture_mode is 2 and
+concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
 
 #### Memory Pool Size {#processors.flow_log.tunning.memory_pool_size}
 

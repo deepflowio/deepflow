@@ -7194,7 +7194,8 @@ processors:
 
 FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
 例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-将无法计算 L7 的 RRT。
+将无法计算 L7 的 RRT。当 capture_mode 为 2 并且 concurrent_flow_limit 小于等于 65535 时，
+将会被强制设置为 u32::MAX。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
 
