@@ -126,7 +126,7 @@ func NewFlowTagWriter(
 		w.ckwriters[tagType].Run()
 	}
 
-	common.RegisterCountableForIngester("flow_tag_writer", w, stats.OptionStatTags{"type": name, "decoder_index": strconv.Itoa(decoderIndex)})
+	common.RegisterCountableForIngester("flow_tag_writer", w, stats.OptionStatTags{"type": srcDB + "_" + name, "decoder_index": strconv.Itoa(decoderIndex)})
 	return w, nil
 }
 

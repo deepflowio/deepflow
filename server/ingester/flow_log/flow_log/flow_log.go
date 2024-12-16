@@ -163,7 +163,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 		if err != nil {
 			return nil, err
 		}
-		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base)
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, common.FLOW_LOG_DB, msgType.String(), config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +286,7 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 			if err != nil {
 				return nil, err
 			}
-			appServiceTagWriter, err = flow_tag.NewAppServiceTagWriter(i, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base)
+			appServiceTagWriter, err = flow_tag.NewAppServiceTagWriter(i, common.FLOW_LOG_DB, msgType.String(), config.FlowLogTTL.L7FlowLog, ckdb.TimeFuncTwelveHour, config.Base)
 			if err != nil {
 				return nil, err
 			}
