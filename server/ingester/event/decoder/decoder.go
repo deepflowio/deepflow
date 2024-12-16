@@ -89,6 +89,7 @@ func NewDecoder(
 		}
 	}
 	return &Decoder{
+		index:        index,
 		eventType:    eventType,
 		platformData: platformData,
 		inQueue:      inQueue,
@@ -109,7 +110,7 @@ func (d *Decoder) GetCounter() interface{} {
 func (d *Decoder) Run() {
 	log.Infof("event (%s) decoder run", d.eventType)
 	ingestercommon.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
-		"event_type": d.eventType.String()})
+		"index": strconv.Itoa(d.index), "event_type": d.eventType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	for {
