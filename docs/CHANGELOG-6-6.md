@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: Add a description of the configuration [#8717](https://github.com/deepflowio/deepflow/pull/8717) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: recorder fails to clean 10w data at one time [#8706](https://github.com/deepflowio/deepflow/pull/8706) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: agent - eBPF Correct the maximum data push delay [#8703](https://github.com/deepflowio/deepflow/pull/8703) by [yinjiping](https://github.com/yinjiping)
 * fix: Configuration text [#8702](https://github.com/deepflowio/deepflow/pull/8702) by [rvql](https://github.com/rvql)
