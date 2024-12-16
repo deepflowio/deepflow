@@ -767,6 +767,27 @@ impl Synchronizer {
         return (segments, macs, gateway_vmacs);
     }
 
+    fn update_agent_state(
+        state: &mut trident::State,
+        ex_handler: &ExceptionHandler,
+        changed_config: ChangedConfig,
+        dynamic_config: DynamicConfig,
+    ) {
+        // Never update state when agent is terminating
+        if matches!(*state, trident::State::Terminated) {
+            return;
+        }
+        let user_config = &changed_config.user_config;
+        if !user_config.global.common.enabled
+            || ex_handler.has(Exception::SystemLoadCircuitBreaker)
+            || ex_handler.has(Exception::FreeMemExceeded)
+        {
+            *state = trident::State::Disabled(Some((changed_config.user_config, dynamic_config)));
+        } else {
+            *state = trident::State::ConfigChanged(changed_config);
+        }
+    }
+
     // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
     // and 'flow_acl_listener' are used need to be careful to avoid deadlocks
     async fn on_response(
@@ -878,21 +899,18 @@ impl Synchronizer {
         drop(status_guard);
 
         let (agent_state, cvar) = &**agent_state;
-        if !user_config.global.common.enabled
-            || exception_handler.has(Exception::SystemLoadCircuitBreaker)
-            || exception_handler.has(Exception::FreeMemExceeded)
-        {
-            *agent_state.lock().unwrap() =
-                trident::State::Disabled(Some((user_config, resp.dynamic_config.unwrap())));
-        } else {
-            *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
+        Self::update_agent_state(
+            &mut agent_state.lock().unwrap(),
+            &exception_handler,
+            ChangedConfig {
                 user_config,
                 blacklist,
                 vm_mac_addrs: macs,
                 gateway_vmac_addrs,
                 tap_types: resp.capture_network_types,
-            });
-        }
+            },
+            resp.dynamic_config.unwrap(),
+        );
         cvar.notify_one();
     }
 
@@ -1032,7 +1050,11 @@ impl Synchronizer {
                     Ok(None) => return,
                     Err(_) => {
                         let (ts, cvar) = &*agent_state;
-                        *ts.lock().unwrap() = trident::State::Disabled(None);
+                        let mut g = ts.lock().unwrap();
+                        if !matches!(*g, trident::State::Terminated) {
+                            *g = trident::State::Disabled(None);
+                        }
+                        drop(g);
                         cvar.notify_one();
                         warn!("as max escape time expired, deepflow-agent restart...");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
@@ -1399,6 +1421,7 @@ impl Synchronizer {
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
+        let exception_handler = self.exception_handler.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let mut user_config =
@@ -1438,15 +1461,15 @@ impl Synchronizer {
                 max_memory.store(user_config.global.limits.max_memory, Ordering::Relaxed);
                 let new_sync_interval = user_config.global.communication.proactive_request_interval;
                 let (agent_state, cvar) = &*agent_state;
-                if !user_config.global.common.enabled {
-                    *agent_state.lock().unwrap() =
-                        trident::State::Disabled(Some((user_config, dynamic_config)));
-                } else {
-                    *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
+                Self::update_agent_state(
+                    &mut agent_state.lock().unwrap(),
+                    &exception_handler,
+                    ChangedConfig {
                         user_config,
                         ..Default::default()
-                    });
-                }
+                    },
+                    dynamic_config,
+                );
                 cvar.notify_one();
 
                 if sync_interval != new_sync_interval {
