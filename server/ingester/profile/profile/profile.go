@@ -76,7 +76,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 			}
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROFILE, platformDatas[i])
 		}
-		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, dbwriter.PROFILE_DB, config.ProfileTTL, ckdb.TimeFuncTwelveHour, config.Base)
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, dbwriter.PROFILE_DB, msgType.String(), config.ProfileTTL, ckdb.TimeFuncTwelveHour, config.Base)
 		if err != nil {
 			return nil, err
 		}
