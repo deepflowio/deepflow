@@ -48,7 +48,7 @@ func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err 
 			Status:       mail.Status,
 			Host:         mail.Host,
 			Port:         mail.Port,
-			User:         mail.User,
+			UserName:     mail.UserName,
 			Password:     mail.Password,
 			Security:     mail.Security,
 			NtlmEnabled:  mail.NtlmEnabled,
@@ -67,7 +67,7 @@ func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, erro
 	mailServer.Status = mailCreate.Status
 	mailServer.Host = mailCreate.Host
 	mailServer.Port = mailCreate.Port
-	mailServer.User = mailCreate.User
+	mailServer.UserName = mailCreate.UserName
 	mailServer.Password = mailCreate.Password
 	mailServer.Security = mailCreate.Security
 	mailServer.NtlmEnabled = mailCreate.NtlmEnabled
@@ -92,9 +92,9 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 		return model.MailServer{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify lcuuid")
 	}
 
-	log.Infof("update mailServer(%s) config %v", mailServer.User, mailServerUpdate)
+	log.Infof("update mailServer(%s) config %v", mailServer.UserName, mailServerUpdate)
 
-	for _, key := range []string{"STATUS", "HOST", "PORT", "USER", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
+	for _, key := range []string{"STATUS", "HOST", "PORT", "USER_NAME", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
 		if _, ok := mailServerUpdate[key]; ok {
 			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
 		}
@@ -113,7 +113,7 @@ func DeleteMailServer(lcuuid string) (map[string]string, error) {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))
 	}
 
-	log.Infof("delete mail server (%s)", mailServer.User)
+	log.Infof("delete mail server (%s)", mailServer.UserName)
 
 	mysql.Db.Delete(&mailServer)
 	return map[string]string{"LCUUID": lcuuid}, nil
