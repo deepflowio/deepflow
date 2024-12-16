@@ -4927,11 +4927,13 @@ processors:
       #   en: |-
       #     Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
       #     the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
-      #     is not enough, it will be unable to calculate the rrt of l7.
+      #     is not enough, it will be unable to calculate the rrt of l7. When capture_mode is 2 and
+      #     concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
       #   ch: |-
       #     FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
       #     例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-      #     将无法计算 L7 的 RRT。
+      #     将无法计算 L7 的 RRT。当 capture_mode 为 2 并且 concurrent_flow_limit 小于等于 65535 时，
+      #     将会被强制设置为 u32::MAX。
       # upgrade_from: static_config.flow.flow-count-limit
       concurrent_flow_limit: 65535
       # type: int
