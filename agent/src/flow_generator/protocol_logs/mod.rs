@@ -24,7 +24,6 @@ pub mod pb_adapter;
 pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
-pub(crate) mod tls;
 pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
 
@@ -37,13 +36,22 @@ use num_enum::TryFromPrimitive;
 pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
-    SofaRpcLog, SomeIpInfo, SomeIpLog, TarsInfo, TarsLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
+    SofaRpcLog, TarsInfo, TarsLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
-    MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo,
-    OracleLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
+    MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, PostgreInfo,
+    PostgresqlLog, RedisInfo, RedisLog,
 };
-pub use tls::{TlsInfo, TlsLog};
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+        pub(crate) mod tls;
+
+        pub use sql::{OracleInfo, OracleLog};
+        pub use rpc::{SomeIpInfo, SomeIpLog};
+        pub use tls::{TlsInfo, TlsLog};
+    }
+}
 
 #[cfg(test)]
 pub use self::plugin::wasm::{get_wasm_parser, WasmLog};

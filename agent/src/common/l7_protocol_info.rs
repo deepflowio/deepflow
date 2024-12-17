@@ -27,8 +27,8 @@ use crate::{
         protocol_logs::{
             fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
             DubboInfo, HttpInfo, KafkaInfo, MemcachedInfo, MongoDBInfo, MqttInfo, MysqlInfo,
-            NatsInfo, OpenWireInfo, OracleInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo,
-            SomeIpInfo, TarsInfo, TlsInfo, ZmtpInfo,
+            NatsInfo, OpenWireInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo, TarsInfo,
+            ZmtpInfo,
         },
         AppProtoHead, LogMessageType, Result,
     },
@@ -38,7 +38,7 @@ use crate::{
 use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
 
 macro_rules! all_protocol_info {
-    ($($name:ident($info_struct:ident)),+$(,)?) => {
+    ($($name:ident($info_struct:ty)),+$(,)?) => {
 
         #[derive(Serialize, Debug, Clone)]
         #[enum_dispatch]
@@ -61,32 +61,60 @@ macro_rules! all_protocol_info {
     };
 }
 
-all_protocol_info!(
-    DnsInfo(DnsInfo),
-    HttpInfo(HttpInfo),
-    MysqlInfo(MysqlInfo),
-    RedisInfo(RedisInfo),
-    MongoDBInfo(MongoDBInfo),
-    MemcachedInfo(MemcachedInfo),
-    DubboInfo(DubboInfo),
-    FastCGIInfo(FastCGIInfo),
-    BrpcInfo(BrpcInfo),
-    TarsInfo(TarsInfo),
-    KafkaInfo(KafkaInfo),
-    MqttInfo(MqttInfo),
-    AmqpInfo(AmqpInfo),
-    NatsInfo(NatsInfo),
-    PulsarInfo(PulsarInfo),
-    ZmtpInfo(ZmtpInfo),
-    PostgreInfo(PostgreInfo),
-    OpenWireInfo(OpenWireInfo),
-    OracleInfo(OracleInfo),
-    SofaRpcInfo(SofaRpcInfo),
-    TlsInfo(TlsInfo),
-    SomeIpInfo(SomeIpInfo),
-    CustomInfo(CustomInfo),
-    // add new protocol info below
-);
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "enterprise"))] {
+        all_protocol_info!(
+            DnsInfo(DnsInfo),
+            HttpInfo(HttpInfo),
+            MysqlInfo(MysqlInfo),
+            RedisInfo(RedisInfo),
+            MongoDBInfo(MongoDBInfo),
+            MemcachedInfo(MemcachedInfo),
+            DubboInfo(DubboInfo),
+            FastCGIInfo(FastCGIInfo),
+            BrpcInfo(BrpcInfo),
+            TarsInfo(TarsInfo),
+            KafkaInfo(KafkaInfo),
+            MqttInfo(MqttInfo),
+            AmqpInfo(AmqpInfo),
+            NatsInfo(NatsInfo),
+            PulsarInfo(PulsarInfo),
+            ZmtpInfo(ZmtpInfo),
+            PostgreInfo(PostgreInfo),
+            OpenWireInfo(OpenWireInfo),
+            SofaRpcInfo(SofaRpcInfo),
+            CustomInfo(CustomInfo),
+            // add new protocol info below
+        );
+    } else {
+        all_protocol_info!(
+            DnsInfo(DnsInfo),
+            HttpInfo(HttpInfo),
+            MysqlInfo(MysqlInfo),
+            RedisInfo(RedisInfo),
+            MongoDBInfo(MongoDBInfo),
+            MemcachedInfo(MemcachedInfo),
+            DubboInfo(DubboInfo),
+            FastCGIInfo(FastCGIInfo),
+            BrpcInfo(BrpcInfo),
+            TarsInfo(TarsInfo),
+            KafkaInfo(KafkaInfo),
+            MqttInfo(MqttInfo),
+            AmqpInfo(AmqpInfo),
+            NatsInfo(NatsInfo),
+            PulsarInfo(PulsarInfo),
+            ZmtpInfo(ZmtpInfo),
+            PostgreInfo(PostgreInfo),
+            OpenWireInfo(OpenWireInfo),
+            OracleInfo(crate::flow_generator::protocol_logs::sql::OracleInfo),
+            SofaRpcInfo(SofaRpcInfo),
+            TlsInfo(crate::flow_generator::protocol_logs::tls::TlsInfo),
+            SomeIpInfo(crate::flow_generator::protocol_logs::rpc::SomeIpInfo),
+            CustomInfo(CustomInfo),
+            // add new protocol info below
+        );
+    }
+}
 
 #[enum_dispatch(L7ProtocolInfo)]
 pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {

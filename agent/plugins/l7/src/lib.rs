@@ -14,6 +14,5 @@
  * limitations under the License.
  */
 
-pub mod oracle;
 pub mod some_ip;
 pub mod tls;
