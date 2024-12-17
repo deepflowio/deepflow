@@ -17,7 +17,7 @@
 package common
 
 const (
-	SYNC_TYPE_FORMAT = "%v-%v-%v-%v" // region-orgID-type-vtapID
+	SYNC_TYPE_FORMAT = "%v-%v-%v" // orgID-type-vtapID
 )
 
 const (
