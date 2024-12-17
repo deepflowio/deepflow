@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/utsname.h>
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include "elf.h"
 #include <bcc/linux/bpf.h>
