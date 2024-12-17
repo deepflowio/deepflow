@@ -1172,7 +1172,7 @@ fn component_on_config_change(
             }
 
             #[cfg(target_os = "linux")]
-            if conf.capture_mode == PacketCaptureType::Mirror
+            if conf.capture_mode != PacketCaptureType::Local
                 && (!config_handler
                     .candidate_config
                     .user_config
@@ -1935,7 +1935,9 @@ impl AgentComponents {
             .process_threshold;
         let feature_flags = FeatureFlags::from(&user_config.dev.feature_flags);
 
-        if !user_config.inputs.cbpf.af_packet.src_interfaces.is_empty() {
+        if !user_config.inputs.cbpf.af_packet.src_interfaces.is_empty()
+            && user_config.inputs.cbpf.special_network.dpdk.source == DpdkSource::None
+        {
             warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
@@ -2033,19 +2035,29 @@ impl AgentComponents {
             PacketCaptureType::Analyzer => {
                 info!("Start check kernel...");
                 kernel_check();
-                info!("Start check tap interface...");
-                #[cfg(target_os = "linux")]
-                let tap_interfaces: Vec<_> = interfaces_and_ns
-                    .iter()
-                    .filter_map(|i| i.0.get(0).map(|l| l.name.clone()))
-                    .collect();
-                #[cfg(any(target_os = "windows", target_os = "android"))]
-                let tap_interfaces: Vec<_> = interfaces_and_ns
-                    .iter()
-                    .filter_map(|i| i.get(0).map(|l| l.name.clone()))
-                    .collect();
+                if candidate_config
+                    .user_config
+                    .inputs
+                    .cbpf
+                    .special_network
+                    .dpdk
+                    .source
+                    == DpdkSource::None
+                {
+                    info!("Start check tap interface...");
+                    #[cfg(target_os = "linux")]
+                    let tap_interfaces: Vec<_> = interfaces_and_ns
+                        .iter()
+                        .filter_map(|i| i.0.get(0).map(|l| l.name.clone()))
+                        .collect();
+                    #[cfg(any(target_os = "windows", target_os = "android"))]
+                    let tap_interfaces: Vec<_> = interfaces_and_ns
+                        .iter()
+                        .filter_map(|i| i.get(0).map(|l| l.name.clone()))
+                        .collect();
 
-                tap_interface_check(&tap_interfaces);
+                    tap_interface_check(&tap_interfaces);
+                }
             }
             _ => {
                 // NPF服务检查
@@ -2587,7 +2599,15 @@ impl AgentComponents {
         let mut ebpf_dispatcher_component = None;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
-            && candidate_config.capture_mode != PacketCaptureType::Analyzer
+            && (candidate_config.capture_mode != PacketCaptureType::Analyzer
+                || candidate_config
+                    .user_config
+                    .inputs
+                    .cbpf
+                    .special_network
+                    .dpdk
+                    .source
+                    == DpdkSource::Ebpf)
         {
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
                 user_config
