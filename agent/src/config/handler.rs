@@ -32,7 +32,7 @@ use flexi_logger::{
     Naming,
 };
 use http2::get_expected_headers;
-use log::{debug, info, warn, Level};
+use log::{debug, error, info, warn, Level};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
     sched::{sched_setaffinity, CpuSet},
@@ -4579,7 +4579,7 @@ impl ConfigHandler {
                 "dispatcher config change from {:#?} to {:#?}",
                 candidate_config.dispatcher, new_config.dispatcher
             );
-            candidate_config.dispatcher = new_config.dispatcher;
+            candidate_config.dispatcher = new_config.dispatcher.clone();
         }
 
         if candidate_config.stats != new_config.stats {
@@ -4587,7 +4587,7 @@ impl ConfigHandler {
                 "stats config change from {:#?} to {:#?}",
                 candidate_config.stats, new_config.stats
             );
-            candidate_config.stats = new_config.stats;
+            candidate_config.stats = new_config.stats.clone();
             callbacks.push(Self::set_stats);
         }
 
@@ -4596,7 +4596,7 @@ impl ConfigHandler {
                 "debug config change from {:#?} to {:#?}",
                 candidate_config.debug, new_config.debug
             );
-            candidate_config.debug = new_config.debug;
+            candidate_config.debug = new_config.debug.clone();
             callbacks.push(Self::set_debug);
         }
 
@@ -4606,7 +4606,7 @@ impl ConfigHandler {
                 "diagnose config change from {:#?} to {:#?}",
                 candidate_config.diagnose, new_config.diagnose
             );
-            candidate_config.diagnose = new_config.diagnose;
+            candidate_config.diagnose = new_config.diagnose.clone();
         }
 
         if candidate_config.environment.max_memory != new_config.environment.max_memory {
@@ -4685,7 +4685,7 @@ impl ConfigHandler {
                     .plugins
                     .fill_plugin_prog_from_server(runtime, session, agent_id);
             }
-            candidate_config.flow = new_config.flow;
+            candidate_config.flow = new_config.flow.clone();
         }
 
         if candidate_config.collector != new_config.collector {
@@ -4696,7 +4696,7 @@ impl ConfigHandler {
             restart_dispatcher = candidate_config.collector.agent_id
                 != new_config.collector.agent_id
                 && new_config.collector.enabled;
-            candidate_config.collector = new_config.collector;
+            candidate_config.collector = new_config.collector.clone();
         }
 
         if candidate_config.platform != new_config.platform {
@@ -4723,7 +4723,7 @@ impl ConfigHandler {
                 "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform
             );
-            candidate_config.platform = new_config.platform;
+            candidate_config.platform = new_config.platform.clone();
 
             #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
@@ -4756,7 +4756,7 @@ impl ConfigHandler {
                 "sender config change from {:#?} to {:#?}",
                 candidate_config.sender, new_config.sender
             );
-            candidate_config.sender = new_config.sender;
+            candidate_config.sender = new_config.sender.clone();
         }
 
         if candidate_config.handler != new_config.handler {
@@ -4769,7 +4769,7 @@ impl ConfigHandler {
                 "handler config change from {:#?} to {:#?}",
                 candidate_config.handler, new_config.handler
             );
-            candidate_config.handler = new_config.handler;
+            candidate_config.handler = new_config.handler.clone();
         }
 
         if candidate_config.log_parser != new_config.log_parser {
@@ -4777,7 +4777,7 @@ impl ConfigHandler {
                 "log_parser config change from {:#?} to {:#?}",
                 candidate_config.log_parser, new_config.log_parser
             );
-            candidate_config.log_parser = new_config.log_parser;
+            candidate_config.log_parser = new_config.log_parser.clone();
         }
 
         if candidate_config.synchronizer != new_config.synchronizer {
@@ -4785,7 +4785,7 @@ impl ConfigHandler {
                 "synchronizer config change from {:#?} to {:#?}",
                 candidate_config.synchronizer, new_config.synchronizer
             );
-            candidate_config.synchronizer = new_config.synchronizer;
+            candidate_config.synchronizer = new_config.synchronizer.clone();
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -4797,7 +4797,7 @@ impl ConfigHandler {
                 );
                 callbacks.push(Self::set_ebpf);
             }
-            candidate_config.ebpf = new_config.ebpf;
+            candidate_config.ebpf = new_config.ebpf.clone();
         }
 
         if candidate_config.agent_type != new_config.agent_type {
@@ -4823,7 +4823,7 @@ impl ConfigHandler {
                 "integration collector config change from {:#?} to {:#?}",
                 candidate_config.metric_server, new_config.metric_server
             );
-            candidate_config.metric_server = new_config.metric_server;
+            candidate_config.metric_server = new_config.metric_server.clone();
             callbacks.push(Self::set_metric_server);
         }
 
@@ -4832,12 +4832,28 @@ impl ConfigHandler {
                 "npb config change from {:#?} to {:#?}",
                 candidate_config.npb, new_config.npb
             );
-            candidate_config.npb = new_config.npb;
+            candidate_config.npb = new_config.npb.clone();
             restart_dispatcher = true;
             if components.is_some() {
                 callbacks.push(Self::set_npb);
             }
         }
+
+        candidate_config.environment = new_config.environment.clone();
+        candidate_config.log = new_config.log.clone();
+        candidate_config.port_config = new_config.port_config.clone();
+        candidate_config.pcap = new_config.pcap.clone();
+
+        if new_config != *candidate_config {
+            error!("Some configurations have not been updated, please check the code.");
+            error!(
+                "Configurations from {:#?} to {:#?}",
+                candidate_config, new_config
+            );
+            crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+            return vec![];
+        }
+
         // avoid first config changed to restart dispatcher
         let restart_dispatcher =
             components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled;
@@ -4860,12 +4876,8 @@ impl ConfigHandler {
             return vec![];
         }
 
-        candidate_config.environment = new_config.environment;
-        candidate_config.log = new_config.log;
-        candidate_config.port_config = new_config.port_config;
-        candidate_config.pcap = new_config.pcap;
-
         if restart_dispatcher {
+            warn!("Change configuration and restart dispatcher...");
             callbacks.push(Self::set_restart_dispatcher);
         }
 
