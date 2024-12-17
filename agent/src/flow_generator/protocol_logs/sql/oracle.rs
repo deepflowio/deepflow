@@ -37,7 +37,10 @@ use crate::{
     },
 };
 
-use l7::oracle::{CallId, DataFlags, DataId, OracleParseConfig, OracleParser, TnsPacketType};
+use enterprise_utils::l7::sql::oracle::{
+    Body, CallId, DataFlags, DataId, OracleParseConfig, OracleParser, Request, Response,
+    TnsPacketType,
+};
 use public::l7_protocol::L7Protocol;
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq)]
@@ -225,7 +228,6 @@ impl L7ProtocolParserInterface for OracleLog {
                 is_be: param.oracle_parse_conf.is_be,
                 int_compress: param.oracle_parse_conf.int_compressed,
                 resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
-                buf_size: param.buf_size,
             },
         )
     }
@@ -238,7 +240,6 @@ impl L7ProtocolParserInterface for OracleLog {
                 is_be: param.oracle_parse_conf.is_be,
                 int_compress: param.oracle_parse_conf.int_compressed,
                 resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
-                buf_size: param.buf_size,
             },
         ) {
             return Err(Error::L7ProtocolUnknown);
@@ -248,55 +249,68 @@ impl L7ProtocolParserInterface for OracleLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        let mut log_info = OracleInfo {
-            msg_type: param.direction.into(),
-            is_tls: false,
-            packet_type: self.parser.packet_type,
-            sql: self.parser.sql.clone(),
-            req_data_flags: self.parser.req_data_flags,
-            req_data_id: self.parser.req_data_id.clone(),
-            req_call_id: self.parser.req_call_id.clone(),
-            ret_code: self.parser.ret_code,
-            affected_rows: self.parser.affected_rows,
-            error_message: self.parser.error_message.clone(),
-            status: match self.parser.ret_code {
-                0 => L7ResponseStatus::Ok,
-                // TODO: Error code needs to be referenced: https://docs.oracle.com/cd/E11882_01/server.112/e17766/e29250.htm. Currently, simple processing is considered to be a client error
-                _ => L7ResponseStatus::ClientError,
-            },
-            resp_data_flags: self.parser.resp_data_flags,
-            resp_data_id: self.parser.resp_data_id.clone(),
-            rrt: 0,
-            captured_request_byte: 0,
-            captured_response_byte: 0,
-            is_on_blacklist: false,
-        };
-        set_captured_byte!(log_info, param);
-
-        if let Some(config) = param.parse_config {
-            log_info.set_is_on_blacklist(config);
-        }
-        if !log_info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => self.perf_stats.as_mut().map(|p| p.inc_req()),
-                PacketDirection::ServerToClient => self.perf_stats.as_mut().map(|p| p.inc_resp()),
+        let mut info = vec![];
+        for frame in self.parser.frames.drain(..) {
+            let mut log_info = match frame.body {
+                Body::Request(req) => OracleInfo {
+                    msg_type: param.direction.into(),
+                    packet_type: frame.packet_type,
+                    sql: req.sql,
+                    req_data_flags: req.req_data_flags,
+                    req_data_id: req.req_data_id,
+                    req_call_id: req.req_call_id,
+                    captured_request_byte: frame.length as u32,
+                    ..Default::default()
+                },
+                Body::Response(resp) => OracleInfo {
+                    msg_type: param.direction.into(),
+                    packet_type: frame.packet_type,
+                    ret_code: resp.ret_code,
+                    affected_rows: resp.affected_rows,
+                    error_message: resp.error_message,
+                    status: match resp.ret_code {
+                        0 => L7ResponseStatus::Ok,
+                        // TODO: Error code needs to be referenced: https://docs.oracle.com/cd/E11882_01/server.112/e17766/e29250.htm. Currently, simple processing is considered to be a client error
+                        _ => L7ResponseStatus::ClientError,
+                    },
+                    resp_data_flags: resp.resp_data_flags,
+                    resp_data_id: resp.resp_data_id,
+                    captured_response_byte: frame.length as u32,
+                    ..Default::default()
+                },
             };
-            match log_info.status {
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                _ => {}
+
+            if let Some(config) = param.parse_config {
+                log_info.set_is_on_blacklist(config);
             }
-            log_info.cal_rrt(param).map(|rrt| {
-                log_info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(log_info.rrt));
-            });
+            if !log_info.is_on_blacklist && !self.last_is_on_blacklist {
+                match param.direction {
+                    PacketDirection::ClientToServer => {
+                        self.perf_stats.as_mut().map(|p| p.inc_req())
+                    }
+                    PacketDirection::ServerToClient => {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp())
+                    }
+                };
+                match log_info.status {
+                    L7ResponseStatus::ServerError => {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                    }
+                    L7ResponseStatus::ClientError => {
+                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                    }
+                    _ => {}
+                }
+                log_info.cal_rrt(param).map(|rrt| {
+                    log_info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(log_info.rrt));
+                });
+            }
+            self.last_is_on_blacklist = log_info.is_on_blacklist;
+
+            info.push(L7ProtocolInfo::OracleInfo(log_info));
         }
-        self.last_is_on_blacklist = log_info.is_on_blacklist;
-        Ok(L7ParseResult::Single(L7ProtocolInfo::OracleInfo(log_info)))
+        Ok(L7ParseResult::Multi(info))
     }
 
     fn protocol(&self) -> L7Protocol {

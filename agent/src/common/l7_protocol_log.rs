@@ -39,8 +39,8 @@ use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
     AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MemcachedLog, MongoDBLog, MqttLog,
-    MysqlLog, NatsLog, OpenWireLog, OracleLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog,
-    SomeIpLog, TarsLog, TlsLog, ZmtpLog,
+    MysqlLog, NatsLog, OpenWireLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog, TarsLog,
+    ZmtpLog,
 };
 
 use crate::flow_generator::{LogMessageType, Result};
@@ -160,32 +160,62 @@ macro_rules! impl_protocol_parser {
 // enum name will be used to parse strings so case matters
 // large structs (>128B) should be boxed to reduce memory consumption
 //
-impl_protocol_parser! {
-    pub enum L7ProtocolParser {
-        // http have two version but one parser, can not place in macro param.
-        // custom must in first so can not place in macro
-        DNS(DnsLog),
-        SofaRPC(SofaRpcLog),
-        MySQL(MysqlLog),
-        Kafka(KafkaLog),
-        Redis(RedisLog),
-        MongoDB(MongoDBLog),
-        Memcached(MemcachedLog),
-        PostgreSQL(PostgresqlLog),
-        Dubbo(DubboLog),
-        FastCGI(FastCGILog),
-        Brpc(BrpcLog),
-        Tars(TarsLog),
-        Oracle(OracleLog),
-        MQTT(MqttLog),
-        AMQP(AmqpLog),
-        NATS(NatsLog),
-        Pulsar(PulsarLog),
-        ZMTP(ZmtpLog),
-        OpenWire(OpenWireLog),
-        TLS(TlsLog),
-        SomeIp(SomeIpLog),
-        // add protocol below
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "enterprise"))] {
+        impl_protocol_parser! {
+            pub enum L7ProtocolParser {
+                // http have two version but one parser, can not place in macro param.
+                // custom must in first so can not place in macro
+                DNS(DnsLog),
+                SofaRPC(SofaRpcLog),
+                MySQL(MysqlLog),
+                Kafka(KafkaLog),
+                Redis(RedisLog),
+                MongoDB(MongoDBLog),
+                Memcached(MemcachedLog),
+                PostgreSQL(PostgresqlLog),
+                Dubbo(DubboLog),
+                FastCGI(FastCGILog),
+                Brpc(BrpcLog),
+                Tars(TarsLog),
+                MQTT(MqttLog),
+                AMQP(AmqpLog),
+                NATS(NatsLog),
+                Pulsar(PulsarLog),
+                ZMTP(ZmtpLog),
+                OpenWire(OpenWireLog),
+                // add protocol below
+            }
+        }
+    } else {
+        impl_protocol_parser! {
+            pub enum L7ProtocolParser {
+                // http have two version but one parser, can not place in macro param.
+                // custom must in first so can not place in macro
+                DNS(DnsLog),
+                SofaRPC(SofaRpcLog),
+                MySQL(MysqlLog),
+                Kafka(KafkaLog),
+                Redis(RedisLog),
+                MongoDB(MongoDBLog),
+                Memcached(MemcachedLog),
+                PostgreSQL(PostgresqlLog),
+                Dubbo(DubboLog),
+                FastCGI(FastCGILog),
+                Brpc(BrpcLog),
+                Tars(TarsLog),
+                Oracle(crate::flow_generator::protocol_logs::sql::OracleLog),
+                MQTT(MqttLog),
+                AMQP(AmqpLog),
+                NATS(NatsLog),
+                Pulsar(PulsarLog),
+                ZMTP(ZmtpLog),
+                OpenWire(OpenWireLog),
+                TLS(crate::flow_generator::protocol_logs::tls::TlsLog),
+                SomeIp(crate::flow_generator::protocol_logs::rpc::SomeIpLog),
+                // add protocol below
+            }
+        }
     }
 }
 

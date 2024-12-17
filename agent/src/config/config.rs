@@ -39,7 +39,7 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
-use crate::flow_generator::{DnsLog, MemcachedLog, OracleLog, TlsLog};
+use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::platform::{get_container_id, OsAppTag, ProcessData};
 use crate::{
@@ -2466,30 +2466,38 @@ impl UserConfig {
         {
             new.insert(dns_str.to_string(), Self::DEFAULT_DNS_PORTS.to_string());
         }
-        let tls_str = L7ProtocolParser::TLS(TlsLog::default()).as_str();
-        // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
-        if !self
-            .processors
-            .request_log
-            .filters
-            .port_number_prefilters
-            .contains_key(tls_str)
+        #[cfg(feature = "enterprise")]
         {
-            new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
-        }
-        let oracle_str = L7ProtocolParser::Oracle(OracleLog::default()).as_str();
-        // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
-        if !self
-            .processors
-            .request_log
-            .filters
-            .port_number_prefilters
-            .contains_key(oracle_str)
-        {
-            new.insert(
-                oracle_str.to_string(),
-                Self::DEFAULT_ORACLE_PORTS.to_string(),
-            );
+            let tls_str =
+                L7ProtocolParser::TLS(crate::flow_generator::protocol_logs::tls::TlsLog::default())
+                    .as_str();
+            // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+            if !self
+                .processors
+                .request_log
+                .filters
+                .port_number_prefilters
+                .contains_key(tls_str)
+            {
+                new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
+            }
+            let oracle_str = L7ProtocolParser::Oracle(
+                crate::flow_generator::protocol_logs::sql::OracleLog::default(),
+            )
+            .as_str();
+            // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
+            if !self
+                .processors
+                .request_log
+                .filters
+                .port_number_prefilters
+                .contains_key(oracle_str)
+            {
+                new.insert(
+                    oracle_str.to_string(),
+                    Self::DEFAULT_ORACLE_PORTS.to_string(),
+                );
+            }
         }
         let memcached_str = L7ProtocolParser::Memcached(MemcachedLog::default()).as_str();
         // memcached default only parse 11211 port. when l7_protocol_ports config without MEMCACHED, need to reserve the memcached default config.
