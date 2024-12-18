@@ -345,8 +345,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 								"",
 								"",
 								"",
+								"",
 							),
 							"node_type": NewTag(
+								"",
 								"",
 								"",
 								"",
@@ -357,10 +359,12 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 								"",
 								"",
 								"",
+								"",
 							),
 						}
 						AlarmEventResourceMap[tagNameSuffix] = map[string]*Tag{
 							"default": NewTag(
+								"",
 								"",
 								"",
 								"",

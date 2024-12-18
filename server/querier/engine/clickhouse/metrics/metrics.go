@@ -62,6 +62,7 @@ type Metrics struct {
 	DescriptionZH string // 描述
 	DescriptionEN string // 描述
 	TagType       string // Tag type of metric's tag type
+	GroupField    string // field when group
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -81,7 +82,7 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 
 func NewMetrics(
 	index int, dbField string, displayname string, displaynameZH string, displaynameEN string, unit string, unitZH string, unitEN string, metricType int, category string,
-	permissions []bool, condition string, table string, description string, descriptionZH string, descriptionEN string, tagType string,
+	permissions []bool, condition string, table string, description string, descriptionZH string, descriptionEN string, tagType string, groupField string,
 ) *Metrics {
 	return &Metrics{
 		Index:         index,
@@ -101,6 +102,7 @@ func NewMetrics(
 		DescriptionZH: descriptionZH,
 		DescriptionEN: descriptionEN,
 		TagType:       tagType,
+		GroupField:    groupField,
 	}
 }
 
@@ -157,15 +159,15 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 			}
 		}
 
-		nameDBField, err := GetTagDBField(name, db, table, orgID)
+		nameDBField, nameGroupField, err := GetTagDBField(name, db, table, orgID)
 		if err != nil {
 			return err
 		}
-		clientNameDBField, err := GetTagDBField(clientName, db, table, orgID)
+		clientNameDBField, clientNameGroupField, err := GetTagDBField(clientName, db, table, orgID)
 		if err != nil {
 			return err
 		}
-		serverNameDBField, err := GetTagDBField(serverName, db, table, orgID)
+		serverNameDBField, serverNameGroupField, err := GetTagDBField(serverName, db, table, orgID)
 		if err != nil {
 			return err
 		}
@@ -173,7 +175,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 			if serverName == clientName {
 				clientNameMetric := NewMetrics(
 					0, clientNameDBField, displayName, displayNameZH, displayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", "", "", tagType,
+					"Tag", permissions, "", table, "", "", "", tagType, clientNameGroupField,
 				)
 				newAllMetrics[clientName] = clientNameMetric
 			} else {
@@ -201,11 +203,11 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 				}
 				serverNameMetric := NewMetrics(
 					0, serverNameDBField, serverDisplayName, serverDisplayNameZH, serverDisplayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", "", "", tagType,
+					"Tag", permissions, "", table, "", "", "", tagType, serverNameGroupField,
 				)
 				clientNameMetric := NewMetrics(
 					0, clientNameDBField, clientDisplayName, clientDisplayNameZH, clientDisplayNameEN, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", permissions, "", table, "", "", "", tagType,
+					"Tag", permissions, "", table, "", "", "", tagType, clientNameGroupField,
 				)
 				newAllMetrics[serverName] = serverNameMetric
 				newAllMetrics[clientName] = clientNameMetric
@@ -213,7 +215,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 		} else {
 			nameMetric := NewMetrics(
 				0, nameDBField, displayName, displayName, displayName, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-				"Tag", permissions, "", table, "", "", "", tagType,
+				"Tag", permissions, "", table, "", "", "", tagType, nameGroupField,
 			)
 			newAllMetrics[name] = nameMetric
 		}
@@ -233,7 +235,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	if field == "time" {
 		metric := NewMetrics(
 			0, "time", field, "时间", field, "", "", "", METRICS_TYPE_NAME_MAP["delay"],
-			"Tag", []bool{true, true, true}, "", table, "", "", "", "time",
+			"Tag", []bool{true, true, true}, "", table, "", "", "", "time", "time",
 		)
 		return metric, true
 	}
@@ -246,7 +248,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, field, field, "", "", "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table, "", "", "", "",
+					"metrics", []bool{true, true, true}, "", table, "", "", "", "", "",
 				)
 				newAllMetrics[field] = metric
 			} else if fieldSplit[0] == "tag" {
@@ -254,7 +256,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(tag_names, '%s')=0,null,tag_values[indexOf(tag_names, '%s')])", fieldName, fieldName),
 					field, field, field, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-					"Tag", []bool{true, true, true}, "", table, "", "", "", "",
+					"Tag", []bool{true, true, true}, "", table, "", "", "", "", "",
 				)
 				newAllMetrics[field] = metric
 			}
@@ -285,7 +287,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			if ok {
 				idMetric := noIDMetric
 				idMetric.DisplayName = field
-				idMetric.DBField, err = GetTagDBField(field, db, table, orgID)
+				idMetric.DBField, idMetric.GroupField, err = GetTagDBField(field, db, table, orgID)
 				if err != nil {
 					log.Error("Failed to get tag db field")
 					return nil, false
@@ -374,7 +376,7 @@ func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, u
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
+				"metrics", []bool{true, true, true}, "", table, "", "", "", "", "",
 			)
 			return metrics, err
 		}
@@ -391,7 +393,7 @@ func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, u
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
+				"metrics", []bool{true, true, true}, "", table, "", "", "", "", "",
 			)
 			return metrics, err
 		}
@@ -547,9 +549,10 @@ func GetPrometheusAllTagTranslator(table, orgID string) (string, error) {
 	return tagTranslatorStr, nil
 }
 
-func GetTagDBField(name, db, table, orgID string) (string, error) {
+func GetTagDBField(name, db, table, orgID string) (string, string, error) {
 	selectTag := name
 	tagTranslatorStr := name
+	groupTranslator := ""
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
@@ -566,7 +569,7 @@ func GetTagDBField(name, db, table, orgID string) (string, error) {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
 					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table, orgID)
-					return tagTranslatorStr, err
+					return tagTranslatorStr, groupTranslator, err
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
@@ -586,17 +589,20 @@ func GetTagDBField(name, db, table, orgID string) (string, error) {
 		} else if name == "tag" && db == ckcommon.DB_NAME_PROMETHEUS {
 			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table, orgID)
 			if err != nil {
-				return tagTranslatorStr, err
+				return tagTranslatorStr, groupTranslator, err
 			}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				tagTranslatorStr = tagItem.TagTranslator
 			}
+			if tagItem.GroupTranslator != "" {
+				groupTranslator = tagItem.GroupTranslator
+			}
 		} else {
 			tagTranslatorStr = selectTag
 		}
 	}
-	return tagTranslatorStr, nil
+	return tagTranslatorStr, groupTranslator, nil
 }
 
 func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics, err error) {
@@ -638,7 +644,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				descriptionEN := metricsLanguageEN[3].(string)
 				lm := NewMetrics(
 					i, metrics[1].(string), displayName, displayNameZH, displayNameEN, unit, unitZH, unitEN, metricType,
-					metrics[3].(string), permissions, "", table, description, descriptionZH, descriptionEN, "",
+					metrics[3].(string), permissions, "", table, description, descriptionZH, descriptionEN, "", "",
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}

@@ -112,7 +112,6 @@ func GetFunc(name string) Function {
 	default:
 		return &DefaultFunction{Name: name}
 	}
-	return nil
 }
 
 type Function interface {
