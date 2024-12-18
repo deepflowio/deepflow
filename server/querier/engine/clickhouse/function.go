@@ -141,10 +141,68 @@ func GetAggFunc(name string, args []string, alias string, derivativeArgs []strin
 	}, levelFlag, unit, nil
 }
 
+func TransMultiTag(isMulti bool, field string, dbFields []string, withs []view.Node) (bool, []string, []view.Node) {
+	// name to id
+	for _, suffix := range []string{"", "_0", "_1"} {
+		ip4Suffix := "ip4" + suffix
+		ip6Suffix := "ip6" + suffix
+		deviceTypeSuffix := "l3_device_type" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		// auto
+		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
+			if field == resourceName+suffix {
+				isMulti = true
+				resourceTypeSuffix := "auto_service_type" + suffix
+				resourceIDSuffix := "auto_service_id" + suffix
+				ip4Alias := "auto_service_ip4" + suffix
+				ip6Alias := "auto_service_ip6" + suffix
+				if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
+					resourceTypeSuffix = "auto_instance_type" + suffix
+					resourceIDSuffix = "auto_instance_id" + suffix
+					ip4Alias = "auto_instance_ip4" + suffix
+					ip6Alias = "auto_instance_ip6" + suffix
+				}
+				ip4WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 1, %s, NULL), NULL)", resourceTypeSuffix, ip4Suffix)
+				ip6WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 1, %s, NULL), NULL)", resourceTypeSuffix, ip6Suffix)
+				dbFields = append(dbFields, []string{"is_ipv4", ip4Alias, ip6Alias, resourceTypeSuffix, resourceIDSuffix}...)
+				withs = append(withs, []view.Node{&view.With{Value: ip4WithValue, Alias: ip4Alias}, &view.With{Value: ip6WithValue, Alias: ip6Alias}}...)
+			}
+		}
+		// ip
+		if field == "ip"+suffix {
+			isMulti = true
+			dbFields = append(dbFields, []string{"is_ipv4", ip4Suffix, ip6Suffix}...)
+		}
+		// device
+		for resourceStr, deviceTypeValue := range tag.DEVICE_MAP {
+			if resourceStr == "pod_service" {
+				continue
+			} else if field == resourceStr+suffix {
+				isMulti = true
+				deviceAlias := "device_type_" + field
+				deviceWithValue := fmt.Sprintf("if(%s = %d, %s, 0)", deviceTypeSuffix, deviceTypeValue, deviceTypeSuffix)
+				dbFields = append(dbFields, []string{deviceIDSuffix, deviceAlias}...)
+				withs = append(withs, &view.With{Value: deviceWithValue, Alias: deviceAlias})
+			}
+		}
+		for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+			if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && field == resource+suffix {
+				isMulti = true
+				deviceAlias := "device_type_" + field
+				deviceWithValue := fmt.Sprintf("if(%s = %d, %s, 0)", deviceTypeSuffix, tag.VIF_DEVICE_TYPE_VM, deviceTypeSuffix)
+				dbFields = append(dbFields, []string{deviceIDSuffix, deviceAlias}...)
+				withs = append(withs, &view.With{Value: deviceWithValue, Alias: deviceAlias})
+			}
+		}
+	}
+	return isMulti, dbFields, withs
+}
+
 func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statement, int, string, error) {
 	db := e.DB
 	table := e.Table
 	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
+	withs := []view.Node{}
 	if !ok {
 		return nil, 0, "", nil
 	}
@@ -170,16 +228,16 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	fieldsLen := len(fields)
 	dbFields := make([]string, fieldsLen)
 	conditions := make([]string, 0, fieldsLen)
-
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
-
 		field = strings.Trim(field, "`")
 		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
 		dbFields[i] = metricStruct.DBField
+		// get withs
+		_, _, withs = TransMultiTag(false, field, dbFields, withs)
 		condition := metricStruct.Condition
 
 		// enum tag
@@ -253,6 +311,7 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 		Name:    name,
 		Args:    args,
 		Alias:   alias,
+		Withs:   withs,
 	}, levelFlag, unit, nil
 }
 
@@ -266,18 +325,25 @@ func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	}
 
 	levelFlag := view.MODEL_METRICS_LEVEL_FLAG_UNLAY
-	fieldsLen := len(fields)
-	dbFields := make([]string, fieldsLen)
-
+	dbFields := []string{}
+	withs := []view.Node{}
 	var metricStruct *metrics.Metrics
-	for i, field := range fields {
+	for _, field := range fields {
 		field = strings.Trim(field, "`")
 		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
-		dbFields[i] = metricStruct.DBField
 
+		isMulti := false
+		isMulti, dbFields, withs = TransMultiTag(isMulti, field, dbFields, withs)
+		if !isMulti {
+			if metricStruct.GroupField != "" {
+				dbFields = append(dbFields, metricStruct.GroupField)
+			} else {
+				dbFields = append(dbFields, metricStruct.DBField)
+			}
+		}
 		// judge whether the operator supports single layer
 		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
 			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
@@ -289,7 +355,7 @@ func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statem
 
 	metricStructCopy := *metricStruct
 	metricStructCopy.DBField = strings.Join(dbFields, ", ")
-	if fieldsLen > 1 {
+	if len(dbFields) > 1 {
 		metricStructCopy.DBField = "(" + metricStructCopy.DBField + ")"
 	}
 
@@ -300,6 +366,7 @@ func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statem
 		Name:    name,
 		Args:    args,
 		Alias:   alias,
+		Withs:   withs,
 	}, levelFlag, unit, nil
 }
 
@@ -390,6 +457,7 @@ type AggFunction struct {
 	IsDerivative      bool
 	DerivativeArgs    []string
 	DerivativeGroupBy []string
+	Withs             []view.Node
 }
 
 func (f *AggFunction) SetAlias(alias string) {
@@ -613,6 +681,11 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	outFunc.SetFlag(view.METRICS_FLAG_OUTER)
 	outFunc.SetTime(m.Time)
 	outFunc.Init()
+	// uniq function has withs
+	defaultFunc, ok := outFunc.(*view.DefaultFunction)
+	if ok {
+		defaultFunc.Withs = f.Withs
+	}
 	return outFunc
 }
 
@@ -1038,10 +1111,17 @@ func (f *TagFunction) Format(m *view.Model) {
 	if f.Name == TAG_FUNCTION_ICON_ID {
 		for resourceStr := range tag.DEVICE_MAP {
 			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+			// device group add icon_id
 			for _, suffix := range []string{"", "_0", "_1"} {
 				resourceNameSuffix := resourceStr + suffix
 				if f.Args[0] == resourceNameSuffix {
 					m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+				} else {
+					for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+						if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && f.Args[0] == resource+suffix {
+							m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+						}
+					}
 				}
 			}
 		}
