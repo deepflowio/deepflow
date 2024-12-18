@@ -83,7 +83,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	isMasterController := IsMasterController(cfg)
 	if isMasterController {
-		router.SetInitStageForHealthChecker("MySQL migration")
+		router.SetInitStageForHealthChecker(router.StageMySQLMigration)
 		migrateMySQL(cfg)
 	}
 
