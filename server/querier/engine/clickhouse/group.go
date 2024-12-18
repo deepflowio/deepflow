@@ -30,6 +30,71 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
+func GetMultiGroup(stmts []Statement, name string, asTagMap map[string]string) []Statement {
+	isMulti := false
+	for _, suffix := range []string{"", "_0", "_1"} {
+		ip4Suffix := "ip4" + suffix
+		ip6Suffix := "ip6" + suffix
+		deviceTypeSuffix := "l3_device_type" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		// auto
+		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
+			if name == resourceName+suffix {
+				isMulti = true
+				resourceTypeSuffix := "auto_service_type" + suffix
+				resourceIDSuffix := "auto_service_id" + suffix
+				ip4Alias := "auto_service_ip4" + suffix
+				ip6Alias := "auto_service_ip6" + suffix
+				if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
+					resourceTypeSuffix = "auto_instance_type" + suffix
+					resourceIDSuffix = "auto_instance_id" + suffix
+					ip4Alias = "auto_instance_ip4" + suffix
+					ip6Alias = "auto_instance_ip6" + suffix
+				}
+				ip4WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 1, %s, NULL), NULL)", resourceTypeSuffix, ip4Suffix)
+				ip6WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 1, %s, NULL), NULL)", resourceTypeSuffix, ip6Suffix)
+				stmts = append(stmts, &GroupTag{Value: "is_ipv4"})
+				stmts = append(stmts, &GroupTag{Value: ip4Alias, Withs: []view.Node{&view.With{Value: ip4WithValue, Alias: ip4Alias}}})
+				stmts = append(stmts, &GroupTag{Value: ip6Alias, Withs: []view.Node{&view.With{Value: ip6WithValue, Alias: ip6Alias}}})
+				stmts = append(stmts, &GroupTag{Value: resourceTypeSuffix})
+				stmts = append(stmts, &GroupTag{Value: resourceIDSuffix})
+			}
+		}
+		// ip
+		if name == "ip"+suffix {
+			isMulti = true
+			stmts = append(stmts, &GroupTag{Value: "is_ipv4"})
+			stmts = append(stmts, &GroupTag{Value: ip4Suffix})
+			stmts = append(stmts, &GroupTag{Value: ip6Suffix})
+		}
+		// device
+		for resourceStr, deviceTypeValue := range tag.DEVICE_MAP {
+			if resourceStr == "pod_service" {
+				continue
+			} else if name == resourceStr+suffix {
+				isMulti = true
+				deviceAlias := "device_type_" + name
+				deviceWithValue := fmt.Sprintf("if(%s = %d, %s, 0)", deviceTypeSuffix, deviceTypeValue, deviceTypeSuffix)
+				stmts = append(stmts, &GroupTag{Value: deviceIDSuffix})
+				stmts = append(stmts, &GroupTag{Value: deviceAlias, Withs: []view.Node{&view.With{Value: deviceWithValue, Alias: deviceAlias}}})
+			}
+		}
+		for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+			if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && name == resource+suffix {
+				isMulti = true
+				deviceAlias := "device_type_" + name
+				deviceWithValue := fmt.Sprintf("if(%s = %d, %s, 0)", deviceTypeSuffix, tag.VIF_DEVICE_TYPE_VM, deviceTypeSuffix)
+				stmts = append(stmts, &GroupTag{Value: deviceIDSuffix})
+				stmts = append(stmts, &GroupTag{Value: deviceAlias, Withs: []view.Node{&view.With{Value: deviceWithValue, Alias: deviceAlias}}})
+			}
+		}
+	}
+	if !isMulti {
+		stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+	}
+	return stmts
+}
+
 func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 	asTagMap := e.AsTagMap
 	db := e.DB
@@ -52,18 +117,17 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 			}
 		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, strings.Trim(name, "`")) {
 			autoTagMap := tagItem.TagTranslatorMap
-			autoTagSlice := []string{}
 			for autoTagKey, _ := range autoTagMap {
-				autoTagSlice = append(autoTagSlice, autoTagKey)
+				stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`"})
 			}
-			sort.Strings(autoTagSlice)
-			for _, autoTagKey := range autoTagSlice {
-				stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
-			}
-		} else if tagItem.TagTranslator != "" {
-			stmts = append(stmts, &GroupTag{Value: tagItem.TagTranslator, Alias: name, AsTagMap: asTagMap})
+		} else if tagItem.GroupTranslator != "" {
+			stmts = append(stmts, &GroupTag{Value: tagItem.GroupTranslator, AsTagMap: asTagMap})
 		} else {
-			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			if table == "alert_event" {
+				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			} else {
+				stmts = GetMultiGroup(stmts, name, asTagMap)
+			}
 		}
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS && strings.Contains(name, "tag.") {
@@ -88,6 +152,8 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 			}
 		} else {
 			if !strings.Contains(name, "node_type") && !strings.Contains(name, "icon_id") {
+				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			} else if db == chCommon.DB_NAME_FLOW_TAG {
 				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 			}
 		}
@@ -299,33 +365,5 @@ func (g *GroupTag) Format(m *view.Model) {
 		m.AddGroup(&view.Group{Value: g.Value, Alias: g.Alias})
 	} else {
 		m.AddGroup(&view.Group{Value: g.Value, Withs: g.Withs})
-	}
-	preAsTag, preAsOK := g.AsTagMap[g.Value]
-	for _, suffix := range []string{"", "_0", "_1"} {
-		table := m.From.ToString()
-		if table == "event.`alert_event`" {
-			break
-		}
-		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
-			resourceTypeSuffix := "auto_service_type" + suffix
-			oldResourceTypeSuffix := resourceName + "_type" + suffix
-			if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
-				resourceTypeSuffix = "auto_instance_type" + suffix
-			}
-			preAsTag, preAsOK = g.AsTagMap[g.Value]
-			if preAsOK {
-				if preAsTag == resourceName+suffix {
-					m.AddTag(&view.Tag{Value: resourceTypeSuffix, Alias: oldResourceTypeSuffix})
-					m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
-				}
-			} else if g.Alias == resourceName+suffix {
-				if resourceTypeSuffix != oldResourceTypeSuffix {
-					m.AddTag(&view.Tag{Value: resourceTypeSuffix, Alias: oldResourceTypeSuffix})
-				} else {
-					m.AddTag(&view.Tag{Value: resourceTypeSuffix})
-				}
-				m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
-			}
-		}
 	}
 }
