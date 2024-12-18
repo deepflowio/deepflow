@@ -390,6 +390,7 @@ type AggFunction struct {
 	IsDerivative      bool
 	DerivativeArgs    []string
 	DerivativeGroupBy []string
+	Withs             []view.Node
 }
 
 func (f *AggFunction) SetAlias(alias string) {
@@ -1038,10 +1039,17 @@ func (f *TagFunction) Format(m *view.Model) {
 	if f.Name == TAG_FUNCTION_ICON_ID {
 		for resourceStr := range tag.DEVICE_MAP {
 			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+			// device group add icon_id
 			for _, suffix := range []string{"", "_0", "_1"} {
 				resourceNameSuffix := resourceStr + suffix
 				if f.Args[0] == resourceNameSuffix {
 					m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+				} else {
+					for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+						if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && f.Args[0] == resource+suffix {
+							m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+						}
+					}
 				}
 			}
 		}
