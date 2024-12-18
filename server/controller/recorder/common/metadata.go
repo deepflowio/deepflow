@@ -19,10 +19,12 @@ package common
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type Metadata struct {
+	Config      config.RecorderConfig
 	ORGID       int       // org id
 	DB          *mysql.DB // org database connection
 	Domain      *DomainInfo
@@ -30,9 +32,10 @@ type Metadata struct {
 	LogPrefixes []logger.Prefix
 }
 
-func NewMetadata(orgID int) (*Metadata, error) {
+func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
 	db, err := mysql.GetDB(orgID)
 	return &Metadata{
+		Config:      cfg,
 		ORGID:       orgID,
 		DB:          db,
 		Domain:      new(DomainInfo),
@@ -43,6 +46,7 @@ func NewMetadata(orgID int) (*Metadata, error) {
 
 func (m *Metadata) Copy() *Metadata {
 	return &Metadata{
+		Config:      m.Config,
 		ORGID:       m.ORGID,
 		DB:          m.DB,
 		Domain:      m.Domain,
