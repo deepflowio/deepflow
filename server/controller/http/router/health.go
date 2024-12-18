@@ -30,7 +30,11 @@ import (
 
 var log = logger.MustGetLogger("router")
 
-const OK = "ok"
+const (
+	OK = "ok"
+
+	StageMySQLMigration = "MySQL migration"
+)
 
 var curStage string
 var curStageStartedAt time.Time
@@ -46,8 +50,12 @@ func (s *Health) RegisterTo(e *gin.Engine) {
 		if curStage == OK {
 			JsonResponse(c, make(map[string]string), nil)
 		} else {
-			msg := fmt.Sprintf("server is in stage: %s now, time cost: %v", curStage, time.Since(curStageStartedAt))
+			curStageCost := time.Since(curStageStartedAt)
+			msg := fmt.Sprintf("server is in stage: %s now, time cost: %v", curStage, curStageCost)
 			log.Errorf(msg)
+			if curStage == StageMySQLMigration && curStageCost > 30*time.Second {
+				log.Warningf("MySQL migration is taking too long, please add initialDelaySeconds of server to wait for migration to complete")
+			}
 			JsonResponse(
 				c, make(map[string]string),
 				servicecommon.NewError(httpcommon.SERVICE_UNAVAILABLE, msg),

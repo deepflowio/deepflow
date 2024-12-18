@@ -57,6 +57,10 @@ func UpgradeVTapAgentConfig(db *gorm.DB) error {
 	}
 	newConfigs := make([]agentconf.MySQLAgentGroupConfiguration, 0)
 	for _, config := range configs {
+		if config.VTapGroupLcuuid == nil || *config.VTapGroupLcuuid == "" {
+			log.Infof("agent_group_configuration (lcuuid: %s) has no vtap_group_lcuuid", *config.Lcuuid)
+			continue
+		}
 		if _, ok := existedNewConfigInfo[*config.VTapGroupLcuuid]; ok {
 			log.Infof("agent_group_configuration (agent_group_lcuuid: %s) already exists", *config.VTapGroupLcuuid)
 			continue
