@@ -148,18 +148,13 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			continue
 		}
 
-		vMac := vItem.Mac
-		if vItem.IFType == "ipvlan" {
-			vMac = common.VIF_DEFAULT_MAC
-		}
-
 		vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, podLcuuid+vItem.Mac)
 		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 			vinterfaceLcuuids.Add(vinterfaceLcuuid)
 			vinterface := model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_LAN,
-				Mac:           vMac,
+				Mac:           vItem.Mac,
 				TapMac:        vItem.TapMac,
 				NetnsID:       vItem.NetnsID,
 				VTapID:        vItem.VtapID,
