@@ -170,6 +170,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+*  feat: support fanout in mirror mode and analyzer mode [#8730](https://github.com/deepflowio/deepflow/pull/8730) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: deprecated ipvlan [#8724](https://github.com/deepflowio/deepflow/pull/8724) by [askyrie](https://github.com/askyrie)
 * feat: gets by page when refreshing recorder cache [#8712](https://github.com/deepflowio/deepflow/pull/8712) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - eBPF Optimize data push logic (#8653) [#8683](https://github.com/deepflowio/deepflow/pull/8683) by [yinjiping](https://github.com/yinjiping)
 * feat: register esxi vtap support cloudtower [#8611](https://github.com/deepflowio/deepflow/pull/8611) by [askyrie](https://github.com/askyrie)
