@@ -244,7 +244,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 	if dataType == DataTypeJSON {
 		log.Infof("create agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
 	} else {
-		log.Infof("create agent group config, group lcuuid: %s, data: %s, data type: %d", groupLcuuid, data.(string), dataType, dbInfo.LogPrefixORGID)
+		log.Infof("create agent group config, group lcuuid: %s, data: %s, data type: %d", groupLcuuid, string(data.([]byte)), dataType, dbInfo.LogPrefixORGID)
 	}
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
@@ -328,7 +328,11 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("update agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
+	if dataType == DataTypeJSON {
+		log.Infof("update agent group config, group lcuuid: %s, data: %#v, data type: %d", groupLcuuid, data, dataType, dbInfo.LogPrefixORGID)
+	} else {
+		log.Infof("update agent group config, group lcuuid: %s, data: %s, data type: %d", groupLcuuid, string(data.([]byte)), dataType, dbInfo.LogPrefixORGID)
+	}
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
 		return nil, err
