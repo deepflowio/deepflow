@@ -89,27 +89,10 @@ func (m *ExtMetrics) VirtualTableName() string {
 	return m.VTableName
 }
 
-// Note: The order of Write() must be consistent with the order of append() in Columns.
-func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(m.Timestamp)
-	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS && m.MsgType != datatype.MESSAGE_TYPE_SERVER_DFSTATS {
-		m.UniversalTag.WriteBlock(block)
-	}
-	block.Write(
-		m.VTableName,
-		m.TeamID,
-		m.TagNames,
-		m.TagValues,
-		m.MetricsFloatNames,
-		m.MetricsFloatValues,
-	)
-}
-
 func (m *ExtMetrics) OrgID() uint16 {
 	return m.OrgId
 }
 
-// Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *ExtMetrics) Columns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 

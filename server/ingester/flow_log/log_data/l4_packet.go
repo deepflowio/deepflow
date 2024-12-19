@@ -53,17 +53,6 @@ func L4PacketColumns() []*ckdb.Column {
 	}
 }
 
-func (s *L4Packet) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(uint32(s.EndTime / US_TO_S_DEVISOR))
-	block.Write(s.StartTime)
-	block.Write(s.EndTime)
-	block.Write(s.FlowID)
-	block.Write(s.VtapID)
-	block.Write(s.TeamID)
-	block.Write(s.PacketCount)
-	block.Write(s.PacketBatch)
-}
-
 func (s *L4Packet) OrgID() uint16 {
 	return s.OrgId
 }

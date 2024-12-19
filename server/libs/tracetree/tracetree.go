@@ -97,16 +97,6 @@ func (t *TraceTree) OrgID() uint16 {
 	return t.OrgId
 }
 
-func (t *TraceTree) WriteBlock(block *ckdb.Block) {
-	t.Encode()
-	block.WriteDateTime(t.Time)
-	block.Write(
-		t.SearchIndex,
-		t.TraceId,
-		utils.String(t.encodedTreeNodes),
-	)
-}
-
 func TraceTreeColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),

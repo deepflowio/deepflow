@@ -63,7 +63,7 @@ type PrometheusCKWriter struct {
 
 // all 'PrometheusWriters' share 'prometheusCKWriters' to write to ClickHouse, preventing each PrometheusWriter from creating CKWriter and causing excessive resource consumption
 type PrometheusCKWriters struct {
-	writers [MAX_APP_LABEL_COLUMN_INDEX + 1]PrometheusCKWriter
+	writers [ckdb.MAX_APP_LABEL_COLUMN_INDEX + 1]PrometheusCKWriter
 	sync.Mutex
 }
 
@@ -173,8 +173,8 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 		return nil, fmt.Errorf("AppLabelValueIDs is empty")
 	}
 	appLabelCount := s.AppLabelLen() - 1
-	if appLabelCount > MAX_APP_LABEL_COLUMN_INDEX {
-		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), MAX_APP_LABEL_COLUMN_INDEX)
+	if appLabelCount > ckdb.MAX_APP_LABEL_COLUMN_INDEX {
+		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), ckdb.MAX_APP_LABEL_COLUMN_INDEX)
 	}
 	writer := getPrometheusCKWriter(appLabelCount)
 	if writer.ckwriter != nil && !writer.updateAppLabelColumn {

@@ -16,10 +16,6 @@
 
 package flow_metrics
 
-import (
-	"github.com/deepflowio/deepflow/server/libs/ckdb"
-)
-
 type Tagger interface {
 	SetID(string)
 	GetCode() uint64
@@ -44,5 +40,4 @@ type Meter interface {
 	Release()
 	Reverse()
 	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) // 写入clickhouse的block
 }

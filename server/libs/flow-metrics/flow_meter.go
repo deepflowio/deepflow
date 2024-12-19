@@ -154,11 +154,3 @@ func FlowMeterColumns() []*ckdb.Column {
 	columns = append(columns, FlowLoadColumns()...)
 	return columns
 }
-
-func (m *FlowMeter) WriteBlock(block *ckdb.Block) {
-	m.Traffic.WriteBlock(block)
-	m.Latency.WriteBlock(block)
-	m.Performance.WriteBlock(block)
-	m.Anomaly.WriteBlock(block)
-	m.FlowLoad.WriteBlock(block)
-}

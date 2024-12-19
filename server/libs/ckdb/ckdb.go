@@ -20,64 +20,50 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"unsafe"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/ClickHouse/ch-go/proto"
 	logging "github.com/op/go-logging"
-
-	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ckdb")
 
 const DEFAULT_COLUMN_COUNT = 256
 
-type Block struct {
-	batch driver.Batch
-	items []interface{}
+type CKColumnBlock interface {
+	ToInput(input proto.Input) proto.Input
+	Reset()
 }
 
-func NewBlock(batch driver.Batch) *Block {
-	return &Block{
-		batch: batch,
-		items: make([]interface{}, 0, DEFAULT_COLUMN_COUNT),
+func AppendColNullable[T any](col *proto.ColNullable[T], v *T) {
+	if v == nil {
+		col.Append(proto.Null[T]())
+	} else {
+		col.Append(proto.NewNullable[T](*v))
 	}
 }
 
-func (b *Block) SetBatch(batch driver.Batch) {
-	b.batch = batch
-}
-
-func (b *Block) WriteAll() error {
-	err := b.batch.Append(b.items...)
-	b.items = b.items[:0]
-	return err
-}
-
-func (b *Block) Send() error {
-	return b.batch.Send()
-}
-
-func (b *Block) Write(v ...interface{}) {
-	b.items = append(b.items, v...)
-}
-
-func (b *Block) WriteBool(v bool) {
-	b.items = append(b.items, utils.Bool2UInt8(v))
-}
-
-func (b *Block) WriteDateTime(v uint32) {
-	b.items = append(b.items, v)
-}
-
-func (b *Block) WriteIPv4(v uint32) {
-	b.items = append(b.items, utils.IpFromUint32(v))
-}
-
-func (b *Block) WriteIPv6(v net.IP) {
-	if len(v) == 0 {
-		v = net.IPv6zero
+func AppendIPv6(col *proto.ColIPv6, ipv6 net.IP) {
+	if len(ipv6) == 0 {
+		col.Append(proto.IPv6{})
+	} else if len(ipv6) == net.IPv6len {
+		col.Append(*(*[16]byte)(unsafe.Pointer(&ipv6[0])))
+	} else {
+		var protoIPv6 [16]byte
+		copy(protoIPv6[:], ipv6)
+		col.Append(protoIPv6)
 	}
-	b.items = append(b.items, v)
+}
+
+func AppendColDateTime(col *proto.ColDateTime, t uint32) {
+	col.AppendRaw(proto.DateTime(t))
+}
+
+func AppendColDateTime64Micro(col *proto.ColDateTime64, t int64) {
+	if !col.PrecisionSet {
+		col.WithPrecision(proto.PrecisionMicro)
+	}
+	col.AppendRaw(proto.DateTime64(t))
 }
 
 type ColumnType uint8

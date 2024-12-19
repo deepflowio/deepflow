@@ -18,7 +18,6 @@ package stats
 
 import (
 	"errors"
-	"unsafe"
 
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
@@ -103,21 +102,6 @@ func Decode(decoder *codec.SimpleDecoder) (*DFStats, error) {
 		s.Fields = append(s.Fields, Field{decoder.ReadString255(), ValueType(decoder.ReadU8()), int64(decoder.ReadVarintU64())})
 	}
 	return s, nil
-}
-
-func (s *DFStats) WriteBlock(block *ckdb.Block) error {
-	block.Write(s.Time)
-	for _, tag := range s.Tags {
-		block.Write(tag.Value)
-	}
-	for _, field := range s.Fields {
-		if field.Type == TypeFloat64 {
-			block.Write(*((*float64)(unsafe.Pointer(&field.Value))))
-		} else {
-			block.Write(field.Value)
-		}
-	}
-	return nil
 }
 
 func (s *DFStats) OrgID() uint16 {

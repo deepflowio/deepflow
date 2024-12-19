@@ -35,17 +35,6 @@ const (
 
 type SpanWithTraceID logdata.L7FlowLog
 
-func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
-	t.Encode()
-	block.WriteDateTime(t.Time)
-	block.Write(
-		t.TraceId,
-		t.TraceIdIndex,
-		// need to copy it first when writing, otherwise if the memory is released after writing to the CK Block before it is sent to clickhouse, it will cause problems.
-		string(t.EncodedSpan),
-	)
-}
-
 func SpanWithTraceIDColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),

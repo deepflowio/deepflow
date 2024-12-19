@@ -205,57 +205,6 @@ func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType strin
 	}
 }
 
-func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(p.Time)
-	block.Write(p._id)
-	block.WriteIPv4(p.IP4)
-	block.WriteIPv6(p.IP6)
-	block.WriteBool(p.IsIPv4)
-
-	block.Write(
-		p.AppService,
-		p.ProfileLocationStr,
-		p.ProfileValue,
-		p.ProfileValueUnit,
-		p.ProfileEventType,
-		p.ProfileCreateTimestamp,
-		p.ProfileInTimestamp,
-		p.ProfileLanguageType,
-		p.ProfileID,
-		p.TraceID,
-		p.SpanName,
-		p.AppInstance,
-		p.TagNames,
-		p.TagValues,
-		p.CompressionAlgo,
-		p.ProcessID,
-		p.ProcessStartTime,
-		p.GPID,
-
-		p.VtapID,
-		p.RegionID,
-		p.AZID,
-		p.SubnetID,
-		p.L3EpcID,
-		p.HostID,
-		p.PodID,
-		p.PodNodeID,
-		p.PodNSID,
-		p.PodClusterID,
-		p.PodGroupID,
-
-		p.AutoInstanceID,
-		p.AutoInstanceType,
-		p.AutoServiceID,
-		p.AutoServiceType,
-
-		p.L3DeviceType,
-		p.L3DeviceID,
-		p.ServiceID,
-		p.TeamID,
-	)
-}
-
 func (p *InProcessProfile) OrgID() uint16 {
 	return p.OrgId
 }
