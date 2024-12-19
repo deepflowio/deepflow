@@ -235,21 +235,43 @@ impl fmt::Display for GroupVersion {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) enum SelectedGv {
+    None,
+    Specified(GroupVersion),
+    Inferred(GroupVersion),
+}
+
+impl SelectedGv {
+    pub fn is_none(&self) -> bool {
+        matches!(self, SelectedGv::None)
+    }
+
+    pub fn unwrap(&self) -> &GroupVersion {
+        match self {
+            SelectedGv::None => unreachable!(),
+            SelectedGv::Specified(gv) => gv,
+            SelectedGv::Inferred(gv) => gv,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Resource {
     pub name: &'static str,
     pub pb_name: &'static str,
     // supported group versions ordered by priority
     pub group_versions: Vec<GroupVersion>,
     // group version to use
-    pub selected_gv: Option<GroupVersion>,
+    pub selected_gv: SelectedGv,
     pub field_selector: String,
 }
 
 impl fmt::Display for Resource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.selected_gv {
-            Some(gv) => write!(f, "{}/{}", gv, self.name),
-            None => write!(f, "{}: {:?}", self.name, self.group_versions),
+            SelectedGv::None => write!(f, "{}: {:?}", self.name, self.group_versions),
+            SelectedGv::Specified(gv) => write!(f, "{}/{}", gv, self.name),
+            SelectedGv::Inferred(gv) => write!(f, "{}/{}", gv, self.name),
         }
     }
 }
@@ -263,7 +285,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -273,7 +295,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -283,7 +305,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -293,7 +315,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -303,7 +325,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -313,7 +335,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -323,7 +345,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -333,7 +355,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -343,7 +365,7 @@ pub fn default_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -363,7 +385,7 @@ pub fn default_resources() -> Vec<Resource> {
                     version: "v1beta1",
                 },
             ],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
     ]
@@ -378,7 +400,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -388,7 +410,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -398,7 +420,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -408,7 +430,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -418,7 +440,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "core",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -428,7 +450,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -438,7 +460,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -448,7 +470,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "apps",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -468,7 +490,7 @@ pub fn supported_resources() -> Vec<Resource> {
                     version: "v1alpha1",
                 },
             ],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -488,7 +510,7 @@ pub fn supported_resources() -> Vec<Resource> {
                     version: "v1beta1",
                 },
             ],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -498,7 +520,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "route.openshift.io",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -508,7 +530,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "crd.pingan.org",
                 version: "v1alpha1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -518,7 +540,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "apps.kruise.io",
                 version: "v1alpha1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -528,7 +550,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "crd.projectcalico.org",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
         Resource {
@@ -538,7 +560,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 group: "opengauss.cmbc.com.cn",
                 version: "v1",
             }],
-            selected_gv: None,
+            selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
     ]
@@ -1443,7 +1465,7 @@ impl ResourceWatcherFactory {
                 namespace,
                 config,
             )),
-            "statefulsets" => match resource.selected_gv.as_ref().unwrap() {
+            "statefulsets" => match resource.selected_gv.unwrap() {
                 GroupVersion {
                     group: "apps.kruise.io",
                     version: "v1beta1",
@@ -1475,7 +1497,7 @@ impl ResourceWatcherFactory {
                     warn!(
                         "unsupported resource {} group version {}",
                         resource.name,
-                        resource.selected_gv.as_ref().unwrap()
+                        resource.selected_gv.unwrap()
                     );
                     return None;
                 }
@@ -1495,7 +1517,7 @@ impl ResourceWatcherFactory {
                 namespace,
                 config,
             )),
-            "ingresses" => match resource.selected_gv.as_ref().unwrap() {
+            "ingresses" => match resource.selected_gv.unwrap() {
                 GroupVersion {
                     group: "networking.k8s.io",
                     version: "v1",
@@ -1527,7 +1549,7 @@ impl ResourceWatcherFactory {
                     warn!(
                         "unsupported resource {} group version {}",
                         resource.name,
-                        resource.selected_gv.as_ref().unwrap()
+                        resource.selected_gv.unwrap()
                     );
                     return None;
                 }

@@ -38,13 +38,12 @@ use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{
     default_resources, supported_resources, GenericResourceWatcher, GroupVersion, Resource,
-    Watcher, WatcherConfig,
+    ResourceWatcherFactory, SelectedGv, Watcher, WatcherConfig,
 };
 use crate::{
     config::{handler::PlatformAccess, ApiResources},
     error::{Error, Result},
     exception::ExceptionHandler,
-    platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     rpc::Session,
     trident::AgentId,
     utils::{
@@ -338,7 +337,7 @@ impl ApiWatcher {
                 continue;
             };
             resources.push(Resource {
-                selected_gv: Some(sr.group_versions[index]),
+                selected_gv: SelectedGv::Specified(sr.group_versions[index]),
                 field_selector: r.field_selector.clone(),
                 ..sr.clone()
             });
@@ -372,7 +371,7 @@ impl ApiWatcher {
                 "found {} api in group core/{}",
                 api_resource.name, core_version
             );
-            resources[index].selected_gv = Some(GroupVersion {
+            resources[index].selected_gv = SelectedGv::Inferred(GroupVersion {
                 group: "core",
                 version: core_version,
             });
@@ -457,23 +456,25 @@ impl ApiWatcher {
                                 "found {} api in group {}",
                                 resource_name, version.group_version
                             );
-                            if resource.selected_gv.is_none() {
-                                resource.selected_gv = Some(*gv);
-                            } else {
-                                let selected = &resource.selected_gv.as_ref().unwrap();
-                                if &gv != selected {
+                            match &resource.selected_gv {
+                                SelectedGv::None => {
+                                    resource.selected_gv = SelectedGv::Inferred(*gv)
+                                }
+                                SelectedGv::Inferred(selected) if gv != selected => {
                                     // must exist
                                     let prev_index = resource
                                         .group_versions
                                         .iter()
-                                        .position(|g| &g == selected)
+                                        .position(|g| g == selected)
                                         .unwrap();
                                     // prior
                                     if gv_index < prev_index {
                                         debug!("use more suitable {} api in {}", resource_name, gv);
-                                        resource.selected_gv = Some(*gv);
+                                        resource.selected_gv = SelectedGv::Inferred(*gv);
                                     }
                                 }
+                                // do nothing if a group version is specified in agent config
+                                _ => (),
                             }
                         }
                     }
@@ -491,7 +492,7 @@ impl ApiWatcher {
         for r in resources.iter_mut() {
             if r.selected_gv.is_none() {
                 warn!("resource {} not found, use defaults", r.name);
-                r.selected_gv = Some(r.group_versions[0]);
+                r.selected_gv = SelectedGv::Inferred(r.group_versions[0]);
             }
         }
 
@@ -554,7 +555,7 @@ impl ApiWatcher {
         for r in resources {
             let key = WatcherKey {
                 name: r.name,
-                group: r.selected_gv.as_ref().unwrap().group,
+                group: r.selected_gv.unwrap().group,
             };
             if let Some(watcher) =
                 watcher_factory.new_watcher(r, namespace, stats_collector, watcher_config)
