@@ -26,14 +26,16 @@ type Tag struct {
 	WhereTranslator       string            // 资源过滤转换
 	WhereRegexpTranslator string            // 资源过滤正则转换
 	TagTranslatorMap      map[string]string // 自定义分组tag翻译
+	GroupTranslator       string            // translate or convert groups
 }
 
-func NewTag(tagTranslator, notNullFilter, whereTranslator, whereRegexpTranslator string) *Tag {
+func NewTag(tagTranslator, notNullFilter, whereTranslator, whereRegexpTranslator, groupTranslator string) *Tag {
 	return &Tag{
 		TagTranslator:         tagTranslator,
 		NotNullFilter:         notNullFilter,
 		WhereTranslator:       whereTranslator,
 		WhereRegexpTranslator: whereRegexpTranslator,
+		GroupTranslator:       groupTranslator,
 	}
 }
 
