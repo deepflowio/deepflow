@@ -143,6 +143,8 @@ impl Synchronizer {
     }
 
     pub fn stop(&self) {
+        debug!("PlatformSynchronizer stopping");
+
         let mut running_lock = self.running.lock().unwrap();
         if !*running_lock {
             let config_guard = self.config.load();
@@ -331,15 +333,11 @@ impl Synchronizer {
         }
     }
 
-    fn wait_timeout(running: &Arc<Mutex<bool>>, timer: &Arc<Condvar>, interval: Duration) -> bool {
+    fn wait_timeout(running: &Mutex<bool>, timer: &Condvar, interval: Duration) -> bool {
         let guard = running.lock().unwrap();
         if !*guard {
             return true;
         }
-        let (guard, _) = timer.wait_timeout(guard, interval).unwrap();
-        if !*guard {
-            return true;
-        }
-        false
+        !*timer.wait_timeout(guard, interval).unwrap().0
     }
 }
