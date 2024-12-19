@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/config"
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/dbwriter"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
@@ -49,7 +50,7 @@ const (
 	PROMETHEUS_POD = "pod"
 )
 
-var appLableValueIDsMaxBuffer []uint32 = make([]uint32, dbwriter.MAX_APP_LABEL_COLUMN_INDEX+1)
+var appLableValueIDsMaxBuffer []uint32 = make([]uint32, ckdb.MAX_APP_LABEL_COLUMN_INDEX+1)
 
 type Counter struct {
 	InCount        int64 `statsd:"in-count"`

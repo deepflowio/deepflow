@@ -54,6 +54,9 @@ type Document interface {
 	DataSource() uint32
 	GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{}
 	TimestampUs() int64
+
+	NewColumnBlock() ckdb.CKColumnBlock
+	AppendToColumnBlock(ckdb.CKColumnBlock)
 }
 
 type DocumentBase struct {

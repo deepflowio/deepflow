@@ -30,8 +30,7 @@ import (
 )
 
 const (
-	DefaultPartition           = ckdb.TimeFuncTwoHour
-	MAX_APP_LABEL_COLUMN_INDEX = 256
+	DefaultPartition = ckdb.TimeFuncTwoHour
 )
 
 type PrometheusSampleInterface interface {
@@ -46,6 +45,9 @@ type PrometheusSampleInterface interface {
 	VpcId() int32
 	PodNsId() uint16
 	Release()
+
+	NewColumnBlock() ckdb.CKColumnBlock
+	AppendToColumnBlock(ckdb.CKColumnBlock)
 }
 
 type PrometheusSample struct {

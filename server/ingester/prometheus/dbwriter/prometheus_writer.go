@@ -56,7 +56,7 @@ type Counter struct {
 }
 
 // all 'PrometheusWriters' share 'prometheusCKWriters' to write to ClickHouse, preventing each PrometheusWriter from creating CKWriter and causing excessive resource consumption
-var prometheusCKWriters [MAX_APP_LABEL_COLUMN_INDEX + 1]*ckwriter.CKWriter
+var prometheusCKWriters [ckdb.MAX_APP_LABEL_COLUMN_INDEX + 1]*ckwriter.CKWriter
 var prometheusCKWritersMutex sync.Mutex
 
 func getPrometheusCKWriters(columnCount int) *ckwriter.CKWriter {
@@ -119,8 +119,8 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 		return nil, fmt.Errorf("AppLabelValueIDs is empty")
 	}
 	appLabelCount := s.AppLabelLen() - 1
-	if appLabelCount > MAX_APP_LABEL_COLUMN_INDEX {
-		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), MAX_APP_LABEL_COLUMN_INDEX)
+	if appLabelCount > ckdb.MAX_APP_LABEL_COLUMN_INDEX {
+		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), ckdb.MAX_APP_LABEL_COLUMN_INDEX)
 	}
 	if writer := getPrometheusCKWriters(appLabelCount); writer != nil {
 		return writer, nil
@@ -177,7 +177,6 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 			log.Warningf("other node failed when add app_value_id columns which index from %d to %d: %s", startIndex, endIndex, err)
 		}
 	}
-
 	ckwriter.Run()
 	setPrometheusCKWriters(appLabelCount, ckwriter)
 	log.Infof("finish create new ckwriter for prometheus, app label count: %d, cost time: %s", appLabelCount, time.Since(startTime))

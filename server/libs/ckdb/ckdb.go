@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
+	"unsafe"
 
+	"github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	logging "github.com/op/go-logging"
 
@@ -30,6 +33,42 @@ import (
 var log = logging.MustGetLogger("ckdb")
 
 const DEFAULT_COLUMN_COUNT = 256
+
+type CKColumnBlock interface {
+	ToInput(input proto.Input) proto.Input
+	Reset()
+}
+
+func AppendColNullable[T any](col *proto.ColNullable[T], v *T) {
+	if v == nil {
+		col.Append(proto.Null[T]())
+	} else {
+		col.Append(proto.NewNullable[T](*v))
+	}
+}
+
+func AppendIPv6(col *proto.ColIPv6, ipv6 net.IP) {
+	if len(ipv6) == 0 {
+		col.Append(proto.IPv6{})
+	} else if len(ipv6) == net.IPv6len {
+		col.Append(*(*[16]byte)(unsafe.Pointer(&ipv6[0])))
+	} else {
+		var protoIPv6 [16]byte
+		copy(protoIPv6[:], ipv6)
+		col.Append(protoIPv6)
+	}
+}
+
+func AppendColDateTime(col *proto.ColDateTime, t uint32) {
+	col.Append(time.Unix(int64(t), 0))
+}
+
+func AppendColDateTime64Micro(col *proto.ColDateTime64, t int64) {
+	if !col.PrecisionSet {
+		col.WithPrecision(proto.PrecisionMicro)
+	}
+	col.Append(time.UnixMicro(t))
+}
 
 type Block struct {
 	batch driver.Batch
