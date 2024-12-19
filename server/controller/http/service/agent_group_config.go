@@ -172,10 +172,12 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 func (a *AgentGroupConfig) GetAgentGroupConfig(groupLcuuid string, dataType int) ([]byte, error) {
 	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
+		log.Infof("failed to get db info: %v", err)
 		return nil, err
 	}
 	var data agentconf.MySQLAgentGroupConfiguration
 	if err := dbInfo.Where("agent_group_lcuuid = ?", groupLcuuid).First(&data).Error; err != nil {
+		log.Infof("failed to get agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
 		return nil, err
 	}
 
@@ -253,6 +255,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 
 	strYaml, err := a.getStringYaml(data, dataType)
 	if err != nil {
+		log.Infof("failed to convert data to yaml: %v", err)
 		return nil, err
 	}
 
@@ -265,22 +268,26 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 				Yaml:             strYaml,
 			}
 			if err := dbInfo.Create(newConfig).Error; err != nil {
+				log.Infof("failed to insert agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
 				return nil, err
 			}
+		} else {
+			log.Infof("failed to get agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
+			return nil, err
 		}
-		return nil, err
-	}
-
-	// TODO(weiqiang): duplicate and verify
-	agentGroupConfig.Yaml = strYaml
-	if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
-		return nil, err
+	} else {
+		// TODO(weiqiang): duplicate and verify
+		agentGroupConfig.Yaml = strYaml
+		if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
+			log.Infof("failed to update agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
+			return nil, err
+		}
 	}
 
 	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
 
 	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
-	return a.GetAgentGroupConfig(groupLcuuid, dataType)
+	return a.strToBytes(agentGroupConfig.Yaml, dataType)
 }
 
 func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *mysql.DB, groupLcuuid string, newVersionYaml string) {
@@ -335,21 +342,26 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 	}
 	var agentGroup model.VTapGroup
 	if err := dbInfo.Where("lcuuid = ?", groupLcuuid).First(&agentGroup).Error; err != nil {
+		log.Infof("failed to get vtap_group (lcuuid %s): %v", groupLcuuid, err)
 		return nil, err
 	}
 
 	strYaml, err := a.getStringYaml(data, dataType)
 	if err != nil {
+		log.Infof("failed to convert data to yaml: %v", err)
 		return nil, err
 	}
 
 	var agentGroupConfig agentconf.MySQLAgentGroupConfiguration
 	if err := dbInfo.Where("agent_group_lcuuid = ?", groupLcuuid).First(&agentGroupConfig).Error; err != nil {
+		log.Infof("failed to get agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
 		return nil, err
-	}
-	agentGroupConfig.Yaml = strYaml
-	if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
-		return nil, err
+	} else {
+		agentGroupConfig.Yaml = strYaml
+		if err := dbInfo.Save(&agentGroupConfig).Error; err != nil {
+			log.Infof("failed to update agent_group_configuration (agent group lcuuid %s): %v", groupLcuuid, err)
+			return nil, err
+		}
 	}
 
 	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
