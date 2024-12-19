@@ -4528,9 +4528,30 @@ inputs:
 
 **详细描述**:
 
-Specify kubernetes resources to watch.
+指定采集器采集的 K8s 资源。
 
-To disable a resource, add an entry to the list with `disabled: true`:
+列表中的条目格式如下：
+{
+    name: string
+    group: string
+    version: string
+    disabled: bool
+    field_selector: string
+}
+
+默认采集的资源如下：
+- namespaces
+- nodes
+- pods
+- replicationcontrollers
+- services
+- daemonsets
+- deployments
+- replicasets
+- statefulsets
+- ingresses
+
+禁用某个资源，在列表中添加 `disabled: true` 的条目：
 ```yaml
 inputs:
   resources:
@@ -4540,10 +4561,8 @@ inputs:
         disabled: true
 ```
 
-To enable a resource, add an entry of this resource to the list. Be advised that
-this setting overrides the default of the same resource. For example, to enable
-`statefulsets` in both group `apps` (the default) and `apps.kruise.io` will require
-two entries:
+启用某个资源，在列表中添加该资源的条目。注意该设置会覆盖默认的资源采集。
+例如，要启用在 group `apps` 和 `apps.kruise.io` 中的 `statefulsets`，需要添加两个条目：
 ```yaml
 inputs:
   resources:
@@ -4556,7 +4575,7 @@ inputs:
         version: v1beta1
 ```
 
-To watching `routes` in openshift you can use the following settings:
+要采集 openshift 中的 `routes`，可以使用以下设置：
 ```yaml
 inputs:
   resources:
@@ -4601,6 +4620,11 @@ inputs:
 | replicasets | |
 | statefulsets | |
 | ingresses | |
+| routes | |
+| servicerules | |
+| clonesets | |
+| ippools | |
+| opengaussclusters | |
 
 **模式**:
 | Key  | Value                        |

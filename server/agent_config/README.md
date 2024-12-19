@@ -4669,6 +4669,27 @@ inputs:
 
 Specify kubernetes resources to watch.
 
+The schematics of entries in list is:
+{
+    name: string
+    group: string
+    version: string
+    disabled: bool
+    field_selector: string
+}
+
+Agent will watch the following resources by default:
+- namespaces
+- nodes
+- pods
+- replicationcontrollers
+- services
+- daemonsets
+- deployments
+- replicasets
+- statefulsets
+- ingresses
+
 To disable a resource, add an entry to the list with `disabled: true`:
 ```yaml
 inputs:
@@ -4740,6 +4761,11 @@ inputs:
 | replicasets | |
 | statefulsets | |
 | ingresses | |
+| routes | |
+| servicerules | |
+| clonesets | |
+| ippools | |
+| opengaussclusters | |
 
 **Schema**:
 | Key  | Value                        |
