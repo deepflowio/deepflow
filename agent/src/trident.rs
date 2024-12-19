@@ -2978,7 +2978,7 @@ impl AgentComponents {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
-        info!("Staring agent components.");
+        info!("Starting agent components.");
         self.stats_collector.start();
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
