@@ -53,7 +53,6 @@ type UniversalTag struct {
 	//SignalSource uint16
 }
 
-// Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 // Currently all fields are sorted lexicographically by name.
 func GenUniversalTagColumns(columns []*ckdb.Column) []*ckdb.Column {
 	columns = append(columns, ckdb.NewColumnWithGroupBy("az_id", ckdb.UInt16).SetComment("可用区ID"))
@@ -81,36 +80,4 @@ func GenUniversalTagColumns(columns []*ckdb.Column) []*ckdb.Column {
 	columns = append(columns, ckdb.NewColumnWithGroupBy("agent_id", ckdb.UInt16).SetComment("采集器的ID"))
 
 	return columns
-}
-
-// Note: The order of Write() must be consistent with the order of append() in GenUniversalTagColumns.
-// Currently all fields are sorted lexicographically by name.
-func (t *UniversalTag) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		t.AZID,
-		t.GPID,
-		t.HostID,
-	)
-	block.WriteIPv4(t.IP)
-	block.WriteIPv6(t.IP6)
-	block.Write(
-		1-t.IsIPv6,
-		t.L3DeviceID,
-		uint8(t.L3DeviceType),
-		t.L3EpcID,
-		t.PodClusterID,
-		t.PodGroupID,
-		t.PodID,
-		t.PodNodeID,
-		t.PodNSID,
-		t.RegionID,
-		t.AutoInstanceID,
-		t.AutoInstanceType,
-		t.AutoServiceID,
-		t.AutoServiceType,
-		//t.SignalSource,
-		t.ServiceID,
-		t.SubnetID,
-		t.VTAPID,
-	)
 }

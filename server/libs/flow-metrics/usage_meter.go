@@ -53,17 +53,6 @@ func (m *UsageMeter) VTAPName() string {
 	return MeterVTAPNames[m.ID()]
 }
 
-func (m *UsageMeter) WriteToPB(p *pb.UsageMeter) {
-	p.PacketTx = m.PacketTx
-	p.PacketRx = m.PacketRx
-	p.ByteTx = m.ByteTx
-	p.ByteRx = m.ByteRx
-	p.L3ByteTx = m.L3ByteTx
-	p.L3ByteRx = m.L3ByteRx
-	p.L4ByteTx = m.L4ByteTx
-	p.L4ByteRx = m.L4ByteRx
-}
-
 func (m *UsageMeter) ReadFromPB(p *pb.UsageMeter) {
 	m.PacketTx = p.PacketTx
 	m.PacketRx = p.PacketRx
@@ -128,7 +117,6 @@ const (
 	USAGE_L4_BYTE_RX
 )
 
-// Columns列和WriteBlock的列需要一一对应
 func UsageMeterColumns() []*ckdb.Column {
 	return ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -146,24 +134,6 @@ func UsageMeterColumns() []*ckdb.Column {
 			USAGE_L4_BYTE_RX: {"l4_byte_rx", "累计接收应用层负载总字节数"},
 		},
 		ckdb.UInt64)
-}
-
-// WriteBlock需要和Colums的列一一对应
-func (m *UsageMeter) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		m.PacketTx,
-		m.PacketRx,
-		m.PacketTx+m.PacketRx,
-
-		m.ByteTx,
-		m.ByteRx,
-		m.ByteTx+m.ByteRx,
-
-		m.L3ByteTx,
-		m.L3ByteRx,
-		m.L4ByteTx,
-		m.L4ByteRx,
-	)
 }
 
 func (m *UsageMeter) Merge(other *UsageMeter) {

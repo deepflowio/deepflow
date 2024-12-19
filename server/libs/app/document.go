@@ -45,7 +45,6 @@ type Document interface {
 	Flag() DocumentFlag
 	Meter() flow_metrics.Meter
 	Release()
-	WriteBlock(block *ckdb.Block)
 	OrgID() uint16
 	TableID() (uint8, error)
 	String() string
@@ -54,6 +53,9 @@ type Document interface {
 	DataSource() uint32
 	GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{}
 	TimestampUs() int64
+
+	NewColumnBlock() ckdb.CKColumnBlock
+	AppendToColumnBlock(ckdb.CKColumnBlock)
 }
 
 type DocumentBase struct {
@@ -135,11 +137,6 @@ func (d *DocumentFlow) Release() {
 	ReleaseDocumentFlow(d)
 }
 
-func (d *DocumentFlow) WriteBlock(block *ckdb.Block) {
-	d.Tag.WriteBlock(block, d.Timestamp)
-	d.FlowMeter.WriteBlock(block)
-}
-
 func (d *DocumentFlow) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
 	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
@@ -180,11 +177,6 @@ func (d *DocumentApp) Release() {
 	ReleaseDocumentApp(d)
 }
 
-func (d *DocumentApp) WriteBlock(block *ckdb.Block) {
-	d.Tag.WriteBlock(block, d.Timestamp)
-	d.AppMeter.WriteBlock(block)
-}
-
 func (d *DocumentApp) Meter() flow_metrics.Meter {
 	return &d.AppMeter
 }
@@ -219,11 +211,6 @@ func ReleaseDocumentUsage(doc *DocumentUsage) {
 
 func (d *DocumentUsage) Release() {
 	ReleaseDocumentUsage(d)
-}
-
-func (d *DocumentUsage) WriteBlock(block *ckdb.Block) {
-	d.Tag.WriteBlock(block, d.Timestamp)
-	d.UsageMeter.WriteBlock(block)
 }
 
 func (d *DocumentUsage) Meter() flow_metrics.Meter {

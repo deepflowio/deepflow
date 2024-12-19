@@ -30,14 +30,12 @@ import (
 )
 
 const (
-	DefaultPartition           = ckdb.TimeFuncTwoHour
-	MAX_APP_LABEL_COLUMN_INDEX = 256
+	DefaultPartition = ckdb.TimeFuncTwoHour
 )
 
 type PrometheusSampleInterface interface {
 	DatabaseName() string
 	TableName() string
-	WriteBlock(*ckdb.Block)
 	OrgID() uint16
 	Columns(int) []*ckdb.Column
 	AppLabelLen() int
@@ -46,6 +44,9 @@ type PrometheusSampleInterface interface {
 	VpcId() int32
 	PodNsId() uint16
 	Release()
+
+	NewColumnBlock() ckdb.CKColumnBlock
+	AppendToColumnBlock(ckdb.CKColumnBlock)
 }
 
 type PrometheusSample struct {
@@ -88,25 +89,10 @@ func (m *PrometheusSampleMini) PodNsId() uint16 {
 	return 0
 }
 
-// Note: The order of Write() must be consistent with the order of append() in Columns.
-func (m *PrometheusSampleMini) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(m.Timestamp)
-	block.Write(
-		m.MetricID,
-		m.TargetID,
-		m.TeamID,
-	)
-	for _, v := range m.AppLabelValueIDs[1:] {
-		block.Write(v)
-	}
-	block.Write(m.Value)
-}
-
 func (m *PrometheusSampleMini) OrgID() uint16 {
 	return m.OrgId
 }
 
-// Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *PrometheusSampleMini) Columns(appLabelColumnCount int) []*ckdb.Column {
 	columns := []*ckdb.Column{}
 
@@ -240,17 +226,10 @@ func (m *PrometheusSample) TableName() string {
 	return m.PrometheusSampleMini.DatabaseName()
 }
 
-// Note: The order of Write() must be consistent with the order of append() in Columns.
-func (m *PrometheusSample) WriteBlock(block *ckdb.Block) {
-	m.PrometheusSampleMini.WriteBlock(block)
-	m.UniversalTag.WriteBlock(block)
-}
-
 func (m *PrometheusSample) OrgID() uint16 {
 	return m.OrgId
 }
 
-// Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *PrometheusSample) Columns(appLabelColumnCount int) []*ckdb.Column {
 	columns := m.PrometheusSampleMini.Columns(appLabelColumnCount)
 	columns = flow_metrics.GenUniversalTagColumns(columns)

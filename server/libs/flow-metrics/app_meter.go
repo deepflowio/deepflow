@@ -128,12 +128,6 @@ func AppMeterColumns() []*ckdb.Column {
 	return columns
 }
 
-func (m *AppMeter) WriteBlock(block *ckdb.Block) {
-	m.AppTraffic.WriteBlock(block)
-	m.AppLatency.WriteBlock(block)
-	m.AppAnomaly.WriteBlock(block)
-}
-
 type AppTraffic struct {
 	Request        uint32 `json:"request" category:"$metrics" sub:"throughput"`
 	Response       uint32 `json:"response" category:"$metrics" sub:"throughput"`
@@ -180,18 +174,12 @@ const (
 	AppTRIFFIC_RRT_COUNT
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func AppTrafficColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumn("request", ckdb.UInt32).SetComment("累计请求次数"))
 	columns = append(columns, ckdb.NewColumn("response", ckdb.UInt32).SetComment("累计响应次数"))
 	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetComment("for correcting direction").SetIndex(ckdb.IndexMinmax))
 	return columns
-}
-
-// WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (t *AppTraffic) WriteBlock(block *ckdb.Block) {
-	block.Write(t.Request, t.Response, t.DirectionScore)
 }
 
 type AppLatency struct {
@@ -240,18 +228,12 @@ const (
 	APPLATENCY_RRT_COUNT
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func AppLatencyColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumn("rrt_max", ckdb.UInt32).SetComment("所有请求响应时延最大值(us)"))
 	columns = append(columns, ckdb.NewColumn("rrt_sum", ckdb.Float64).SetComment("累计所有请求响应时延(us)"))
 	columns = append(columns, ckdb.NewColumn("rrt_count", ckdb.UInt64).SetComment("请求响应时延计算次数"))
 	return columns
-}
-
-// WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (l *AppLatency) WriteBlock(block *ckdb.Block) {
-	block.Write(l.RRTMax, float64(l.RRTSum), uint64(l.RRTCount))
 }
 
 type AppAnomaly struct {
@@ -303,7 +285,6 @@ const (
 	APPANOMALY_ERROR
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func AppAnomalyColumns() []*ckdb.Column {
 	columns := ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -313,11 +294,6 @@ func AppAnomalyColumns() []*ckdb.Column {
 			APPANOMALY_ERROR:        {"error", "异常次数"},
 		}, ckdb.UInt64)
 	return columns
-}
-
-// WriteBlock的列和AnomalyColumns需要按顺序一一对应
-func (a *AppAnomaly) WriteBlock(block *ckdb.Block) {
-	block.Write(uint64(a.ClientError), uint64(a.ServerError), uint64(a.Timeout), uint64(a.ClientError+a.ServerError))
 }
 
 func EncodeAppMeterToMetrics(meter *AppMeter) map[string]float64 {

@@ -58,21 +58,6 @@ func PcapStoreColumns() []*ckdb.Column {
 	}
 }
 
-func (s *PcapStore) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(s.Time)
-	block.Write(
-		s.StartTime,
-		s.EndTime,
-		s.FlowID,
-		s.VtapID,
-		s.PacketCount,
-		// need to copy it first when writing, otherwise if the memory is released after writing to the CK Block before it is sent to clickhouse, it will cause problems.
-		string(s.PacketBatch),
-		s.AclGids,
-		s.TeamID,
-	)
-}
-
 func (s *PcapStore) OrgID() uint16 {
 	return s.OrgId
 }

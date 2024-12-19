@@ -114,53 +114,6 @@ type ApplicationLogStore struct {
 	MetricsValues []float64 `json:"metrics_values" category:"$metrics" data_type:"[]float64"`
 }
 
-func (l *ApplicationLogStore) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(l.Time)
-	block.Write(
-		l.Timestamp,
-		l._id,
-		l.Type,
-		l.TraceID,
-		l.SpanID,
-		l.TraceFlags,
-		l.SeverityNumber,
-		l.Body,
-		l.AppService,
-
-		l.GProcessID,
-		l.AgentID,
-		l.RegionID,
-		l.AZID,
-		l.L3EpcID,
-		l.HostID,
-		l.PodID,
-		l.PodNodeID,
-		l.PodNSID,
-		l.PodClusterID,
-		l.PodGroupID,
-		l.L3DeviceType,
-		l.L3DeviceID,
-		l.ServiceID,
-		l.SubnetID)
-	block.WriteBool(l.IsIPv4)
-	block.WriteIPv4(l.IP4)
-	block.WriteIPv6(l.IP6)
-
-	block.Write(
-		l.TeamID,
-		l.UserID,
-		l.AutoInstanceID,
-		l.AutoInstanceType,
-		l.AutoServiceID,
-		l.AutoServiceType,
-
-		l.AttributeNames,
-		l.AttributeValues,
-		l.MetricsNames,
-		l.MetricsValues,
-	)
-}
-
 func (l *ApplicationLogStore) OrgID() uint16 {
 	return l.OrgId
 }

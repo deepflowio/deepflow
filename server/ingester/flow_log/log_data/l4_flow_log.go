@@ -68,14 +68,6 @@ var DataLinkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("vlan", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 }
 
-func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		f.MAC0,
-		f.MAC1,
-		f.EthType,
-		f.VLAN)
-}
-
 func DF_IPv4String(ip4 uint32) string {
 	ip := make(net.IP, 4)
 	ip[0] = byte(ip4 >> 24)
@@ -137,38 +129,6 @@ var NetworkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("tunnel_rx_mac_1", ckdb.UInt32),
 }
 
-func (n *NetworkLayer) WriteBlock(block *ckdb.Block) {
-	block.WriteIPv4(n.IP40)
-	block.WriteIPv4(n.IP41)
-	block.WriteIPv6(n.IP60)
-	block.WriteIPv6(n.IP61)
-	block.WriteBool(n.IsIPv4)
-
-	block.Write(
-		n.Protocol,
-		n.TunnelTier,
-		n.TunnelType,
-		n.TunnelTxID,
-		n.TunnelRxID)
-
-	block.WriteIPv4(n.TunnelTxIP40)
-	block.WriteIPv4(n.TunnelTxIP41)
-	block.WriteIPv4(n.TunnelRxIP40)
-	block.WriteIPv4(n.TunnelRxIP41)
-
-	block.WriteIPv6(n.TunnelTxIP60)
-	block.WriteIPv6(n.TunnelTxIP61)
-	block.WriteIPv6(n.TunnelRxIP60)
-	block.WriteIPv6(n.TunnelRxIP61)
-	block.WriteBool(n.TunnelIsIPv4)
-
-	block.Write(
-		n.TunnelTxMac0,
-		n.TunnelTxMac1,
-		n.TunnelRxMac0,
-		n.TunnelRxMac1)
-}
-
 type TransportLayer struct {
 	ClientPort       uint16 `json:"client_port" category:"$tag" sub:"transport_layer"`
 	ServerPort       uint16 `json:"server_port" category:"$tag" sub:"transport_layer"`
@@ -192,18 +152,6 @@ var TransportLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("last_keepalive_ack", ckdb.UInt32),
 }
 
-func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		t.ClientPort,
-		t.ServerPort,
-		t.TCPFlagsBit0,
-		t.TCPFlagsBit1,
-		t.SynSeq,
-		t.SynAckSeq,
-		t.LastKeepaliveSeq,
-		t.LastKeepaliveAck)
-}
-
 type ApplicationLayer struct {
 	L7Protocol uint8 `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"` // HTTP, DNS, others
 }
@@ -211,10 +159,6 @@ type ApplicationLayer struct {
 var ApplicationLayerColumns = []*ckdb.Column{
 	// 应用层
 	ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
-}
-
-func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) {
-	block.Write(a.L7Protocol)
 }
 
 type Internet struct {
@@ -226,10 +170,6 @@ var InternetColumns = []*ckdb.Column{
 	// 广域网
 	ckdb.NewColumn("province_0", ckdb.LowCardinalityString),
 	ckdb.NewColumn("province_1", ckdb.LowCardinalityString),
-}
-
-func (i *Internet) WriteBlock(block *ckdb.Block) {
-	block.Write(i.Province0, i.Province1)
 }
 
 type KnowledgeGraph struct {
@@ -330,53 +270,6 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("team_id", ckdb.UInt16),
 }
 
-func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		k.RegionID0,
-		k.RegionID1,
-		k.AZID0,
-		k.AZID1,
-		k.HostID0,
-		k.HostID1,
-		k.L3DeviceType0,
-		k.L3DeviceType1,
-		k.L3DeviceID0,
-		k.L3DeviceID1,
-		k.PodNodeID0,
-		k.PodNodeID1,
-		k.PodNSID0,
-		k.PodNSID1,
-		k.PodGroupID0,
-		k.PodGroupID1,
-		k.PodID0,
-		k.PodID1,
-		k.PodClusterID0,
-		k.PodClusterID1,
-		k.L3EpcID0,
-		k.L3EpcID1,
-		k.EpcID0,
-		k.EpcID1,
-		k.SubnetID0,
-		k.SubnetID1,
-		k.ServiceID0,
-		k.ServiceID1,
-
-		k.AutoInstanceID0,
-		k.AutoInstanceType0,
-		k.AutoServiceID0,
-		k.AutoServiceType0,
-
-		k.AutoInstanceID1,
-		k.AutoInstanceType1,
-		k.AutoServiceID1,
-		k.AutoServiceType1,
-
-		k.TagSource0,
-		k.TagSource1,
-		k.TeamID,
-	)
-}
-
 type FlowInfo struct {
 	Time         uint32 `json:"time" category:"$tag" sub:"flow_info"` // s
 	CloseType    uint16 `json:"close_type" category:"$tag" sub:"flow_info" enumfile:"close_type"`
@@ -440,37 +333,6 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 	ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
-}
-
-func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(f.Time)
-	block.Write(
-		f.CloseType,
-		f.SignalSource,
-		f.FlowID,
-		f.TapType,
-		f.NatSource,
-		f.TapPortType,
-		f.TapPort,
-		f.TapSide,
-		f.VtapID,
-		f.L2End0,
-		f.L2End1,
-		f.L3End0,
-		f.L3End1,
-		f.StartTime,
-		f.EndTime,
-
-		f.Duration,
-		f.IsNewFlow,
-		f.Status,
-		f.AclGids,
-		f.GPID0,
-		f.GPID1)
-
-	block.WriteIPv4(f.NatRealIP0)
-	block.WriteIPv4(f.NatRealIP1)
-	block.Write(f.NatRealPort0, f.NatRealPort1, f.DirectionScore, f.RequestDomain)
 }
 
 type Metrics struct {
@@ -574,58 +436,6 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_server_error", ckdb.UInt32),
 	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32),
 	ckdb.NewColumn("l7_error", ckdb.UInt32),
-}
-
-func (m *Metrics) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		m.PacketTx,
-		m.PacketRx,
-		m.ByteTx,
-		m.ByteRx,
-		m.L3ByteTx,
-		m.L3ByteRx,
-		m.L4ByteTx,
-		m.L4ByteRx,
-		m.TotalPacketTx,
-		m.TotalPacketRx,
-		m.TotalByteTx,
-		m.TotalByteRx,
-		m.L7Request,
-		m.L7Response,
-		m.L7ParseFailed,
-
-		float64(m.RTT),
-		float64(m.RTTClient),
-		float64(m.RTTServer),
-		float64(m.TLSRTT),
-
-		float64(m.SRTSum),
-		float64(m.ARTSum),
-		float64(m.RRTSum),
-		float64(m.CITSum),
-
-		uint64(m.SRTCount),
-		uint64(m.ARTCount),
-		uint64(m.RRTCount),
-		uint64(m.CITCount),
-
-		m.SRTMax,
-		m.ARTMax,
-		m.RRTMax,
-		m.CITMax,
-
-		m.RetransTx,
-		m.RetransRx,
-		m.ZeroWinTx,
-		m.ZeroWinRx,
-		m.SynCount,
-		m.SynackCount,
-		m.RetransSyn,
-		m.RetransSynack,
-		m.L7ClientError,
-		m.L7ServerError,
-		m.L7ServerTimeout,
-		m.L7Error)
 }
 
 func parseUint32EpcID(v uint32) int32 {
@@ -1034,18 +844,6 @@ func L4FlowLogColumns() []*ckdb.Column {
 	columns = append(columns, FlowInfoColumns...)
 	columns = append(columns, MetricsColumns...)
 	return columns
-}
-
-func (f *L4FlowLog) WriteBlock(block *ckdb.Block) {
-	block.Write(f._id)
-	f.DataLinkLayer.WriteBlock(block)
-	f.KnowledgeGraph.WriteBlock(block)
-	f.NetworkLayer.WriteBlock(block)
-	f.TransportLayer.WriteBlock(block)
-	f.ApplicationLayer.WriteBlock(block)
-	f.Internet.WriteBlock(block)
-	f.FlowInfo.WriteBlock(block)
-	f.Metrics.WriteBlock(block)
 }
 
 func (f *L4FlowLog) OrgID() uint16 {

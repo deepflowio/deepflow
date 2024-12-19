@@ -117,29 +117,6 @@ type FlowTag struct {
 	FlowTagInfo
 }
 
-func (t *FlowTag) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(t.Timestamp)
-	fieldValueType := t.FieldValueType
-	if fieldValueType == FieldValueTypeAuto {
-		fieldValueType = FieldValueTypeString
-		if len(t.FieldValue) == 0 && t.FieldType != FieldTag {
-			fieldValueType = FieldValueTypeFloat
-		}
-	}
-	block.Write(
-		t.Table,
-		t.VpcId,
-		t.PodNsId,
-		t.FieldType.String(),
-		t.FieldName,
-		fieldValueType.String(),
-		t.TeamID,
-	)
-	if t.TagType == TagFieldValue {
-		block.Write(t.FieldValue, uint64(1)) // count is 1
-	}
-}
-
 func (t *FlowTag) OrgID() uint16 {
 	return t.OrgId
 }

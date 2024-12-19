@@ -31,16 +31,6 @@ type AppServiceTag struct {
 	OrgId       uint16
 }
 
-func (t *AppServiceTag) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(t.Time)
-	block.Write(
-		t.Table,
-		t.AppService,
-		t.AppInstance,
-		t.TeamID,
-	)
-}
-
 func (t *AppServiceTag) OrgID() uint16 {
 	return t.OrgId
 }

@@ -162,7 +162,6 @@ const (
 	TRAFFIC_SYNACK_COUNT
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func TrafficColumns() []*ckdb.Column {
 	columns := ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -191,33 +190,6 @@ func TrafficColumns() []*ckdb.Column {
 		ckdb.UInt64)
 	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax))
 	return columns
-}
-
-// WriteBlock的列需和Columns 按顺序一一对应
-func (t *Traffic) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		t.PacketTx,
-		t.PacketRx,
-		t.PacketTx+t.PacketRx,
-
-		t.ByteTx,
-		t.ByteRx,
-		t.ByteTx+t.ByteRx,
-
-		t.L3ByteTx,
-		t.L3ByteRx,
-		t.L4ByteTx,
-		t.L4ByteRx,
-
-		t.NewFlow,
-		t.ClosedFlow,
-		uint64(t.L7Request),
-		uint64(t.L7Response),
-
-		uint64(t.SynCount),
-		uint64(t.SynackCount),
-		t.DirectionScore,
-	)
 }
 
 type Latency struct {
@@ -368,7 +340,6 @@ const (
 	LATENCY_CIT
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func LatencyColumns() []*ckdb.Column {
 	sumColumns := ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -410,36 +381,6 @@ func LatencyColumns() []*ckdb.Column {
 	columns = append(columns, counterColumns...)
 	columns = append(columns, maxColumns...)
 	return columns
-}
-
-// WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (l *Latency) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		float64(l.RTTSum),
-		float64(l.RTTClientSum),
-		float64(l.RTTServerSum),
-		float64(l.SRTSum),
-		float64(l.ARTSum),
-		float64(l.RRTSum),
-		float64(l.CITSum),
-
-		uint64(l.RTTCount),
-		uint64(l.RTTClientCount),
-		uint64(l.RTTServerCount),
-		uint64(l.SRTCount),
-		uint64(l.ARTCount),
-		uint64(l.RRTCount),
-		uint64(l.CITCount),
-
-		l.RTTMax,
-		l.RTTClientMax,
-		l.RTTServerMax,
-		l.SRTMax,
-		l.ARTMax,
-		l.RRTMax,
-		l.CITMax,
-	)
-
 }
 
 type Performance struct {
@@ -509,7 +450,6 @@ const (
 	PERF_RETRANS_SYNACK
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func PerformanceColumns() []*ckdb.Column {
 	return ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -525,15 +465,6 @@ func PerformanceColumns() []*ckdb.Column {
 			PERF_RETRANS_SYNACK: {"retrans_synack", "Total server retransmit SYNACK times"},
 		},
 		ckdb.UInt64)
-}
-
-// WriteBlock的列和PerformanceColumns需要按顺序一一对应
-func (a *Performance) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		a.RetransTx, a.RetransRx, a.RetransTx+a.RetransRx,
-		a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx+a.ZeroWinRx,
-		uint64(a.RetransSyn), uint64(a.RetransSynack),
-	)
 }
 
 type Anomaly struct {
@@ -697,7 +628,6 @@ const (
 	ANOMALY_L7_ERROR
 )
 
-// Columns列和WriteBlock的列需要按顺序一一对应
 func AnomalyColumns() []*ckdb.Column {
 	anomalColumns := ckdb.NewColumnsWithComment(
 		[][2]string{
@@ -738,40 +668,6 @@ func AnomalyColumns() []*ckdb.Column {
 	return append(anomalColumns, l7AnomalColumns...)
 }
 
-// WriteBlock的列和AnomalyColumns需要按顺序一一对应
-func (a *Anomaly) WriteBlock(block *ckdb.Block) {
-	block.Write(
-		a.ClientRstFlow,
-		a.ServerRstFlow,
-
-		a.ServerSynMiss,
-		a.ClientAckMiss,
-
-		a.ClientHalfCloseFlow,
-		a.ServerHalfCloseFlow,
-
-		a.ClientSourcePortReuse,
-		a.ServerReset,
-		a.ServerQueueLack,
-
-		a.ClientEstablishReset,
-		a.ServerEstablishReset,
-
-		a.TCPTimeout,
-
-		a.ClientEstablishFail,
-		a.ServerEstablishFail,
-		a.TCPEstablishFail,
-		a.TCPTransferFail,
-		a.TCPRstFail,
-
-		a.L7ClientError,
-		a.L7ServerError,
-		a.L7Timeout,
-		a.L7ClientError+a.L7ServerError,
-	)
-}
-
 type FlowLoad struct {
 	Load uint64 `json:"flow_load" category:"$metrics" sub:"l4_throughput"`
 }
@@ -808,10 +704,6 @@ const (
 
 func FlowLoadColumns() []*ckdb.Column {
 	return ckdb.NewColumnsWithComment([][2]string{FLOW_LOAD: {"flow_load", "累计活跃连接数"}}, ckdb.UInt64)
-}
-
-func (l *FlowLoad) WriteBlock(block *ckdb.Block) {
-	block.Write(l.Load)
 }
 
 func marshalKeyValues(b []byte, fields []string, values []uint64) int {

@@ -146,51 +146,6 @@ func L7BaseColumns() []*ckdb.Column {
 	return columns
 }
 
-func (f *L7Base) WriteBlock(block *ckdb.Block) {
-	f.KnowledgeGraph.WriteBlock(block)
-
-	block.WriteDateTime(f.Time)
-	block.WriteIPv4(f.IP40)
-	block.WriteIPv4(f.IP41)
-	block.WriteIPv6(f.IP60)
-	block.WriteIPv6(f.IP61)
-	block.WriteBool(f.IsIPv4)
-
-	block.Write(
-		f.Protocol,
-		f.ClientPort,
-		f.ServerPort,
-		f.FlowID,
-		f.TapType,
-		f.NatSource,
-		f.TapPortType,
-		f.SignalSource,
-		f.TunnelType,
-		f.TapPort,
-		f.TapSide,
-		f.VtapID,
-		f.ReqTcpSeq,
-		f.RespTcpSeq,
-		f.StartTime,
-		f.EndTime,
-		f.GPID0,
-		f.GPID1,
-		f.BizType,
-
-		int32(f.ProcessID0),
-		int32(f.ProcessID1),
-		f.ProcessKName0,
-		f.ProcessKName1,
-		f.SyscallTraceIDRequest,
-		f.SyscallTraceIDResponse,
-		f.SyscallThread0,
-		f.SyscallThread1,
-		f.SyscallCoroutine0,
-		f.SyscallCoroutine1,
-		f.SyscallCapSeq0,
-		f.SyscallCapSeq1)
-}
-
 type L7FlowLog struct {
 	pool.ReferenceCount
 	_id uint64 `json:"_id" category:"$tag" sub:"flow_info"`
@@ -300,54 +255,6 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("events", ckdb.String).SetComment("OTel events"),
 	)
 	return l7Columns
-}
-
-func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
-	block.Write(h._id)
-	h.L7Base.WriteBlock(block)
-
-	block.Write(
-		h.L7Protocol,
-		h.L7ProtocolStr,
-		h.Version,
-		h.Type,
-		h.IsTLS,
-
-		h.RequestType,
-		h.RequestDomain,
-		h.RequestResource,
-		h.Endpoint,
-		h.RequestId,
-
-		h.ResponseStatus,
-		h.ResponseCode,
-		h.ResponseException,
-		h.ResponseResult,
-
-		h.HttpProxyClient,
-		h.XRequestId0,
-		h.XRequestId1,
-		h.TraceId,
-		h.TraceIdIndex,
-		h.SpanId,
-		h.ParentSpanId,
-		h.spanKind,
-		h.AppService,
-		h.AppInstance,
-		h.ResponseDuration,
-		h.RequestLength,
-		h.ResponseLength,
-		h.SqlAffectedRows,
-		h.DirectionScore,
-		h.CapturedRequestByte,
-		h.CapturedResponseByte,
-
-		h.AttributeNames,
-		h.AttributeValues,
-		h.MetricsNames,
-		h.MetricsValues,
-		h.Events,
-	)
 }
 
 func (h *L7FlowLog) OrgID() uint16 {

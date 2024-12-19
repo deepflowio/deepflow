@@ -51,7 +51,7 @@ type AlertEventStore struct {
 
 	PolicyId     uint32
 	PolicyType   uint8
-	AlertPlicy   string
+	AlertPolicy  string
 	MetricValue  float64
 	EventLevel   uint8
 	TargetTags   string
@@ -97,29 +97,6 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("team_id", ckdb.UInt16),
 		ckdb.NewColumn("user_id", ckdb.UInt32),
 	}
-}
-
-func (e *AlertEventStore) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(e.Time)
-	block.Write(
-		e._id,
-		e.PolicyId,
-		e.PolicyType,
-		e.AlertPlicy,
-		e.MetricValue,
-		e.EventLevel,
-		e.TargetTags,
-
-		e.TagStrKeys,
-		e.TagStrValues,
-		e.TagIntKeys,
-		e.TagIntValues,
-		e.XTargetUid,
-		e.XQueryRegion,
-
-		e.TeamID,
-		e.UserId,
-	)
 }
 
 func (e *AlertEventStore) Release() {

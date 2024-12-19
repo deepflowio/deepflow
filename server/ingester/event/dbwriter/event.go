@@ -106,60 +106,6 @@ type EventStore struct {
 	Duration   uint64 `json:"duration" category:"$metrics" sub:"delay"`
 }
 
-func (e *EventStore) WriteBlock(block *ckdb.Block) {
-	block.WriteDateTime(e.Time)
-	block.Write(
-		e._id,
-		e.StartTime,
-		e.EndTime,
-
-		e.Tagged,
-
-		e.SignalSource,
-		e.EventType,
-		e.EventDescription,
-		e.ProcessKName,
-
-		e.GProcessID,
-
-		e.RegionID,
-		e.AZID,
-		e.L3EpcID,
-		e.HostID,
-		e.PodID,
-		e.PodNodeID,
-		e.PodNSID,
-		e.PodClusterID,
-		e.PodGroupID,
-		e.L3DeviceType,
-		e.L3DeviceID,
-		e.ServiceID,
-		e.VTAPID,
-		e.SubnetID)
-	block.WriteBool(e.IsIPv4)
-	block.WriteIPv4(e.IP4)
-	block.WriteIPv6(e.IP6)
-
-	block.Write(
-		e.TeamID,
-		e.AutoInstanceID,
-		e.AutoInstanceType,
-		e.AutoServiceID,
-		e.AutoServiceType,
-		e.AppInstance,
-
-		e.AttributeNames,
-		e.AttributeValues,
-	)
-
-	if e.HasMetrics {
-		block.Write(
-			e.Bytes,
-			e.Duration,
-		)
-	}
-}
-
 func (e *EventStore) OrgID() uint16 {
 	return e.OrgId
 }
