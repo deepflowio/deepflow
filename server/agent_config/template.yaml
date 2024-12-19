@@ -3171,6 +3171,27 @@ inputs:
       #   en: |-
       #     Specify kubernetes resources to watch.
       #
+      #     The schematics of entries in list is:
+      #     {
+      #         name: string
+      #         group: string
+      #         version: string
+      #         disabled: bool
+      #         field_selector: string
+      #     }
+      #
+      #     Agent will watch the following resources by default:
+      #     - namespaces
+      #     - nodes
+      #     - pods
+      #     - replicationcontrollers
+      #     - services
+      #     - daemonsets
+      #     - deployments
+      #     - replicasets
+      #     - statefulsets
+      #     - ingresses
+      #
       #     To disable a resource, add an entry to the list with `disabled: true`:
       #     ```yaml
       #     inputs:
@@ -3207,6 +3228,64 @@ inputs:
       #             disabled: true
       #           - name: routes
       #     ```
+      #   ch: |-
+      #     指定采集器采集的 K8s 资源。
+      #
+      #     列表中的条目格式如下：
+      #     {
+      #         name: string
+      #         group: string
+      #         version: string
+      #         disabled: bool
+      #         field_selector: string
+      #     }
+      #
+      #     默认采集的资源如下：
+      #     - namespaces
+      #     - nodes
+      #     - pods
+      #     - replicationcontrollers
+      #     - services
+      #     - daemonsets
+      #     - deployments
+      #     - replicasets
+      #     - statefulsets
+      #     - ingresses
+      #
+      #     禁用某个资源，在列表中添加 `disabled: true` 的条目：
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: services
+      #             disabled: true
+      #     ```
+      #
+      #     启用某个资源，在列表中添加该资源的条目。注意该设置会覆盖默认的资源采集。
+      #     例如，要启用在 group `apps` 和 `apps.kruise.io` 中的 `statefulsets`，需要添加两个条目：
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: statefulsets
+      #             group: apps
+      #           - name: statefulsets
+      #             group: apps.kruise.io
+      #             version: v1beta1
+      #     ```
+      #
+      #     要采集 openshift 中的 `routes`，可以使用以下设置：
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: ingresses
+      #             disabled: true
+      #           - name: routes
+      #     ```
       # upgrade_from: static_config.kubernetes-resources
       # ---
       # type: string
@@ -3226,6 +3305,11 @@ inputs:
       #   - replicasets
       #   - statefulsets
       #   - ingresses
+      #   - routes
+      #   - servicerules
+      #   - clonesets
+      #   - ippools
+      #   - opengaussclusters
       # modification: agent_restart
       # ee_feature: false
       # description:
