@@ -71,7 +71,7 @@ func GetPlugin(db *mysql.DB, filter map[string]interface{}) ([]model.Plugin, err
 			Name:      plugin.Name,
 			Type:      plugin.Type,
 			UpdatedAt: plugin.UpdatedAt.Format(common.GO_BIRTHDAY),
-			User:      plugin.User,
+			UserName:  plugin.UserName,
 		}
 		resp = append(resp, temp)
 	}

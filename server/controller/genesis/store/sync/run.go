@@ -387,7 +387,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 				ProcessName: p.GetProcessName(),
 				CMDLine:     p.GetCmdLine(),
 				ContainerID: p.GetContainerId(),
-				User:        p.GetUser(),
+				UserName:    p.GetUser(),
 				OSAPPTags:   p.GetOsAppTags(),
 				NodeIP:      p.GetNodeIp(),
 				StartTime:   pStartTime,
