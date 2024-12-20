@@ -497,7 +497,7 @@ func TestConvertTemplateYAMLToJSON(t *testing.T) {
 				t.Errorf("ParseYAMLToJson() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if err = os.WriteFile(fmt.Sprintf("test_tmp/json_tmpl_%s.json", tt.name), got, os.ModePerm); err != nil {
+			if err = os.WriteFile(fmt.Sprintf("test_tmp/conv_tmpl_%s.json", tt.name), got, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})
