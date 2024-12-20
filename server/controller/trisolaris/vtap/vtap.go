@@ -1057,7 +1057,20 @@ func (v *VTapInfo) updateCacheToDB() {
 	vTapmgr := dbmgr.DBMgr[models.VTap](v.db)
 	if len(updateVTaps) > 0 {
 		log.Infof("update vtap count(%d)", len(updateVTaps))
-		err = vTapmgr.UpdateBulk(updateVTaps)
+		err = vTapmgr.UpdateSelects(updateVTaps,
+			"id",
+			"az",
+			"name",
+			"enable",
+			"region",
+			"analyzer_ip",
+			"license_type",
+			"controller_ip",
+			"launch_server",
+			"launch_server_id",
+			"vtap_group_lcuuid",
+			"expected_revision",
+			"license_functions")
 		if err != nil {
 			log.Error(err)
 		}

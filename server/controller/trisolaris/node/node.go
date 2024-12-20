@@ -188,7 +188,11 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 
 	if len(updateTSDB) > 0 {
 		mgr := dbmgr.DBMgr[models.Analyzer](n.db)
-		err := mgr.UpdateBulk(updateTSDB)
+		err := mgr.UpdateSelects(updateTSDB,
+			"id",
+			"state",
+			"nat_ip",
+			"vtap_max")
 		if err != nil {
 			log.Error(err)
 		}
