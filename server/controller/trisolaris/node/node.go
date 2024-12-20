@@ -186,9 +186,9 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 		cacheTSDB.unsetSyncFlag()
 	}
 
-	if len(updateTSDB) > 0 {
-		mgr := dbmgr.DBMgr[models.Analyzer](n.db)
-		err := mgr.UpdateBulk(updateTSDB)
+	mgr := dbmgr.DBMgr[models.Analyzer](n.db)
+	for _, dbTSDB := range updateTSDB {
+		err := mgr.UpdateSelects(&models.Analyzer{ID: dbTSDB.ID}, dbTSDB)
 		if err != nil {
 			log.Error(err)
 		}

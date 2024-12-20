@@ -216,10 +216,8 @@ func (obj *_DBMgr[M]) InsertBulk(data []*M) (err error) {
 	return
 }
 
-func (obj *_DBMgr[M]) UpdateBulk(data []*M) (err error) {
-	for _, d := range data {
-		err = obj.DB.WithContext(obj.ctx).Save(&d).Error
-	}
+func (obj *_DBMgr[M]) UpdateSelects(data, values *M, ignoreFields ...string) (err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(&data).Select("*").Omit(ignoreFields...).Updates(values).Error
 	return
 }
 
