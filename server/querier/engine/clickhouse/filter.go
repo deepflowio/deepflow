@@ -587,7 +587,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
 					if strings.HasSuffix(t.Tag, "_id") {
-
 						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP {
 							tagItem, ok := tag.GetTag("value", db, table, "default")
 							if ok {
