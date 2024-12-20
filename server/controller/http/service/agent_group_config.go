@@ -90,14 +90,14 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 	for _, plugin := range plugins {
 		if plugin.Type == 1 {
 			wasmPluginInfos = append(wasmPluginInfos, map[string]interface{}{
-				strconv.Itoa(plugin.ID): map[string]interface{}{
+				plugin.Name: map[string]interface{}{
 					"ch": plugin.Name,
 					"en": plugin.Name,
 				},
 			})
 		} else if plugin.Type == 2 {
 			soPluginInfos = append(soPluginInfos, map[string]interface{}{
-				strconv.Itoa(plugin.ID): map[string]interface{}{
+				plugin.Name: map[string]interface{}{
 					"ch": plugin.Name,
 					"en": plugin.Name,
 				},

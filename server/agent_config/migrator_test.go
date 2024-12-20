@@ -223,6 +223,46 @@ static_config:
         enabled: true
 `),
 		},
+		{
+			name: "case03_7",
+			args: args{
+				bytes: []byte(`static_config:
+  ebpf:
+    on-cpu-profile:
+      regex: on-cpu-profile-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - enabled_features:
+          - ebpf.profile.on_cpu
+        match_regex: on-cpu-profile-.*
+`),
+		},
+		{
+			name: "case03_8",
+			args: args{
+				bytes: []byte(`os-proc-sync-tagged-only: true
+static_config:
+  ebpf:
+    on-cpu-profile:
+      regex: on-cpu-profile-.*
+    off-cpu-profile:
+      regex: off-cpu-profile-.*`),
+			},
+			want: []byte(`inputs:
+  proc:
+    process_matcher:
+      - enabled_features:
+          - ebpf.profile.on_cpu
+        match_regex: on-cpu-profile-.*      
+        only_with_tag: true
+      - enabled_features:
+          - ebpf.profile.off_cpu
+        match_regex: off-cpu-profile-.*
+        only_with_tag: true
+`),
+		},
 	}
 	for _, tt := range tests {
 		if !strings.HasPrefix(tt.name, "case03") {
@@ -472,6 +512,15 @@ func TestFmtLowerVersionValue(t *testing.T) {
 				},
 			},
 			want: []int{1, 2},
+		},
+		{
+			name: "case04",
+			args: args{
+				longKey:    "max_collect_pps",
+				value:      10,
+				domainData: &DomainData{},
+			},
+			want: 10 * 1000,
 		},
 	}
 	for _, tt := range tests {
