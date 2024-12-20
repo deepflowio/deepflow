@@ -338,6 +338,7 @@ func (f *TemplateFormatter) GenerateKeyToComment() (KeyToComment, error) {
 
 	keyToComment := make(KeyToComment)
 	f.generateKeyComment(f.mapData, "", keyToComment)
+	fmt.Printf("keyToComment: %#v\n", keyToComment)
 	return keyToComment, nil
 }
 
@@ -678,6 +679,8 @@ func (f *DataFomatter) formatJson(data interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("marshal json error: %v", err)
 	}
 	jsonStr := strings.ReplaceAll(string(indenttedJson), ": null", ": []")
+	// replace "null" value to empty string
+	jsonStr = strings.ReplaceAll(jsonStr, ": \"null\"", ": \"\"")
 	return []byte(jsonStr), nil
 }
 

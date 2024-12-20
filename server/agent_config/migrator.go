@@ -103,6 +103,30 @@ func (m *Upgrader) appendSpecialLowerVersionKeyToValue(result map[string]interfa
 					default:
 					}
 				}
+
+				if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.on-cpu-profile.regex"]; ok {
+					switch value := proc.(map[string]interface{})["process_matcher"].(type) {
+					case []interface{}:
+						value = append(value, interface{}(map[string]interface{}{"match_regex": lowerVal}))
+						proc.(map[string]interface{})["process_matcher"] = value
+					case []map[string]interface{}:
+						value = append(value, map[string]interface{}{"match_regex": lowerVal})
+						proc.(map[string]interface{})["process_matcher"] = value
+					default:
+					}
+				}
+				if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.off-cpu-profile.regex"]; ok {
+					switch value := proc.(map[string]interface{})["process_matcher"].(type) {
+					case []interface{}:
+						value = append(value, interface{}(map[string]interface{}{"match_regex": lowerVal}))
+						proc.(map[string]interface{})["process_matcher"] = value
+					case []map[string]interface{}:
+						value = append(value, map[string]interface{}{"match_regex": lowerVal})
+						proc.(map[string]interface{})["process_matcher"] = value
+					default:
+					}
+				}
+
 				if lowerVal, ok := m.spacialLowerVersionKeyToValue["os-proc-sync-tagged-only"]; ok {
 					switch value := proc.(map[string]interface{})["process_matcher"].(type) {
 					case []interface{}:
@@ -120,15 +144,37 @@ func (m *Upgrader) appendSpecialLowerVersionKeyToValue(result map[string]interfa
 		}
 	}
 	if !hasProcessMatcher {
-		value := make(map[string]interface{})
-		if lowerVal1, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.uprobe-process-name-regexs.golang-symbol"]; ok {
-			value["match_regex"] = lowerVal1
-			if lowerVal2, ok := m.spacialLowerVersionKeyToValue["os-proc-sync-tagged-only"]; ok {
-				value["only_with_tag"] = lowerVal2
+		onlyWithTag, onlyWithTagOK := m.spacialLowerVersionKeyToValue["os-proc-sync-tagged-only"]
+		var processMatchers []interface{}
+		if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.uprobe-process-name-regexs.golang-symbol"]; ok {
+			value := make(map[string]interface{})
+			value["match_regex"] = lowerVal
+			if onlyWithTagOK {
+				value["only_with_tag"] = onlyWithTag
 			}
+			processMatchers = append(processMatchers, value)
 		}
-		if len(value) > 0 {
-			m.setNestedValue(result, "inputs.proc.process_matcher", []interface{}{value})
+		if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.on-cpu-profile.regex"]; ok {
+			value := make(map[string]interface{})
+			value["match_regex"] = lowerVal
+			if onlyWithTagOK {
+				value["only_with_tag"] = onlyWithTag
+			}
+			value["enabled_features"] = []string{"ebpf.profile.on_cpu"}
+			processMatchers = append(processMatchers, value)
+		}
+		if lowerVal, ok := m.spacialLowerVersionKeyToValue["static_config.ebpf.off-cpu-profile.regex"]; ok {
+			value := make(map[string]interface{})
+			value["match_regex"] = lowerVal
+			if onlyWithTagOK {
+				value["only_with_tag"] = onlyWithTag
+			}
+			value["enabled_features"] = []string{"ebpf.profile.off_cpu"}
+			processMatchers = append(processMatchers, value)
+		}
+
+		if len(processMatchers) > 0 {
+			m.setNestedValue(result, "inputs.proc.process_matcher", processMatchers)
 		}
 	}
 }
@@ -147,9 +193,7 @@ func (m *Upgrader) lowerToHigher(lowerVerData interface{}, ancestor string, high
 				} else {
 					m.setNestedValue(higherVerData, higher, m.fmtLowerVersionValue(newAncestor, value))
 				}
-			} else if newAncestor == "os-proc-sync-tagged-only" {
-				// 升级 static_config.os-proc-sync-tagged-only 时，需要：
-				//  1. 将 inputs.proc.process_matcher 里所有的 only_with_tag 设置为 static_config.os-proc-sync-tagged-only
+			} else if slices.Contains(m.lowerVersionKeysNeedHandleManually, newAncestor) {
 				m.setSpecialLowerVersionKeyToValue(newAncestor, value)
 			}
 			m.lowerToHigher(value, newAncestor, higherVerData)
@@ -160,7 +204,14 @@ func (m *Upgrader) lowerToHigher(lowerVerData interface{}, ancestor string, high
 }
 
 func (m *Upgrader) fmtLowerVersionValue(longKey string, value interface{}) interface{} {
-	if longKey == "static_config.cpu-affinity" {
+	if longKey == "max_collect_pps" {
+		switch value := value.(type) {
+		case int:
+			return value * 1000
+		default:
+			return 1048576
+		}
+	} else if longKey == "static_config.cpu-affinity" {
 		switch value := value.(type) {
 		case string:
 			list, err := convertStrToIntList(value)
@@ -207,17 +258,6 @@ func (m *Upgrader) fmtLowerVersionValue(longKey string, value interface{}) inter
 		default:
 		}
 		return []int{}
-	} else if longKey == "external_agent_http_proxy_enabled" {
-		switch value := value.(type) {
-		case int:
-			if value == 1 {
-				return true
-			} else {
-				return false
-			}
-		default:
-			return false
-		}
 	} else if slices.Contains(m.lowerVersionIntToBoolKeys, longKey) {
 		switch value := value.(type) {
 		case int:
@@ -322,7 +362,14 @@ func (m *Downgrader) higherToLower(higherVerData interface{}, ancestor string, l
 }
 
 func (m *Downgrader) fmtHigherVersionValue(longKey string, value interface{}) interface{} {
-	if longKey == "global.tunning.cpu_affinity" {
+	if longKey == "inputs.cbpf.tunning.max_capture_pps" {
+		switch value := value.(type) {
+		case int:
+			return value / 1000
+		default:
+			return 1048576 / 1000
+		}
+	} else if longKey == "global.tunning.cpu_affinity" {
 		switch value := value.(type) {
 		case []interface{}:
 			if len(value) == 0 {
@@ -553,6 +600,8 @@ type MigrationToolData struct {
 	lowerVersionReverseKeys      []string
 	higherVersionReverseKeys     []string
 
+	lowerVersionKeysNeedHandleManually []string
+
 	domainData *DomainData
 
 	DataFomatter
@@ -734,6 +783,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"static_config.os-proc-socket-sync-interval",
 		"static_config.os-proc-socket-min-lifetime",
 		"static_config.ebpf.go-tracing-timeout",
+		"static_config.l7-protocol-inference-ttl",
 	}
 	p.higherVersionSecondToIntKeys = []string{
 		"global.circuit_breakers.tx_throughput.throughput_monitoring_interval",
@@ -743,6 +793,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"inputs.proc.sync_interval",
 		"inputs.proc.min_lifetime",
 		"inputs.epbf.socket.uprobe.golang.tracing_timeout",
+		"processors.request_log.application_protocol_inference.inference_result_ttl",
 	}
 	p.lowerVersionIntToDayKeys = []string{
 		"log_retention",
@@ -763,6 +814,22 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 	}
 	p.higherVersionReverseKeys = []string{
 		"global.tunning.idle_memory_trimming",
+	}
+
+	p.lowerVersionKeysNeedHandleManually = []string{
+		// 升级 static_config.os-proc-sync-tagged-only 时，需要：
+		//  1. 将 inputs.proc.process_matcher 里所有的 only_with_tag 设置为 static_config.os-proc-sync-tagged-only
+		"os-proc-sync-tagged-only",
+		// 升级 static_config.ebpf.uprobe-process-name-regexs.golang-symbol 时，需要：
+		//  1. 将 inputs.proc.symbol_table.golang_specific.enabled 设置为 true
+		//  2. 新增一条 inputs.proc.process_matcher
+		"static_config.ebpf.uprobe-process-name-regexs.golang-symbol",
+		// 升级 static_config.ebpf.on-cpu-profile.regex 时，需要：
+		//  1. 新增一条 inputs.proc.process_matcher
+		"static_config.ebpf.on-cpu-profile.regex",
+		// 升级 static_config.ebpf.off-cpu-profile.regex 时，需要：
+		//  1. 新增一条 inputs.proc.process_matcher
+		"static_config.ebpf.off-cpu-profile.regex",
 	}
 }
 
