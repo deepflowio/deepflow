@@ -489,7 +489,7 @@ pub struct Synchronizer {
     pub agent_id: Arc<RwLock<AgentId>>,
     pub status: Arc<RwLock<Status>>,
 
-    agent_state: AgentState,
+    agent_state: Arc<AgentState>,
 
     session: Arc<Session>,
     // 策略模块和NPB带宽检测会用到
@@ -515,7 +515,7 @@ impl Synchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         session: Arc<Session>,
-        agent_state: AgentState,
+        agent_state: Arc<AgentState>,
         version_info: &'static VersionInfo,
         agent_id: AgentId,
         controller_ip: String,
@@ -877,23 +877,13 @@ impl Synchronizer {
         status_guard.first = false;
         drop(status_guard);
 
-        let (agent_state, cvar) = &**agent_state;
-        if !user_config.global.common.enabled
-            || exception_handler.has(Exception::SystemLoadCircuitBreaker)
-            || exception_handler.has(Exception::FreeMemExceeded)
-        {
-            *agent_state.lock().unwrap() =
-                trident::State::Disabled(Some((user_config, resp.dynamic_config.unwrap())));
-        } else {
-            *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
-                user_config,
-                blacklist,
-                vm_mac_addrs: macs,
-                gateway_vmac_addrs,
-                tap_types: resp.capture_network_types,
-            });
-        }
-        cvar.notify_one();
+        agent_state.update_config(ChangedConfig {
+            user_config,
+            blacklist,
+            vm_mac_addrs: macs,
+            gateway_vmac_addrs,
+            tap_types: resp.capture_network_types,
+        });
     }
 
     fn grpc_failed_log(grpc_failed_count: &mut usize, detail: String) {
@@ -1031,9 +1021,7 @@ impl Synchronizer {
                     // channel closed
                     Ok(None) => return,
                     Err(_) => {
-                        let (ts, cvar) = &*agent_state;
-                        *ts.lock().unwrap() = trident::State::Disabled(None);
-                        cvar.notify_one();
+                        agent_state.disable();
                         warn!("as max escape time expired, deepflow-agent restart...");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
@@ -1437,17 +1425,10 @@ impl Synchronizer {
 
                 max_memory.store(user_config.global.limits.max_memory, Ordering::Relaxed);
                 let new_sync_interval = user_config.global.communication.proactive_request_interval;
-                let (agent_state, cvar) = &*agent_state;
-                if !user_config.global.common.enabled {
-                    *agent_state.lock().unwrap() =
-                        trident::State::Disabled(Some((user_config, dynamic_config)));
-                } else {
-                    *agent_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
-                        user_config,
-                        ..Default::default()
-                    });
-                }
-                cvar.notify_one();
+                agent_state.update_config(ChangedConfig {
+                    user_config,
+                    ..Default::default()
+                });
 
                 if sync_interval != new_sync_interval {
                     sync_interval = new_sync_interval;
@@ -1569,9 +1550,7 @@ impl Synchronizer {
                     } else {
                         match Self::upgrade(&running, &session, &revision, &id).await {
                             Ok(_) => {
-                                let (ts, cvar) = &*agent_state;
-                                *ts.lock().unwrap() = trident::State::Terminated;
-                                cvar.notify_one();
+                                agent_state.terminate();
                                 warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
                                 crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                                 return;
