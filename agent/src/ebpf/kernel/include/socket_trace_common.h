@@ -292,16 +292,16 @@ struct ebpf_proc_info {
 
 enum {
 	/*
-	 * 0 ~ 16 for L7 socket event (struct socket_data_buffer),
+	 * 0 ~ 256 for L7 socket event (struct socket_data_buffer),
 	 * indicates the number of socket data in socket_data_buffer.
 	 */
 
 	/*
 	 * For event registrion
 	 */
-	EVENT_TYPE_MIN = 1 << 5,
-	EVENT_TYPE_PROC_EXEC = 1 << 5,
-	EVENT_TYPE_PROC_EXIT = 1 << 6
+	EVENT_TYPE_MIN = 1 << 9,
+	EVENT_TYPE_PROC_EXEC = 1 << 9,
+	EVENT_TYPE_PROC_EXIT = 1 << 10
 	    // Add new event type here.
 };
 
