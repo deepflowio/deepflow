@@ -9,6 +9,10 @@
 #### New Feature
 
 #### Bug Fix
+* fix: tracemap error [#8755](https://github.com/deepflowio/deepflow/pull/8755) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: agent - eBPF Fix process event type size [#8753](https://github.com/deepflowio/deepflow/pull/8753) by [yinjiping](https://github.com/yinjiping)
+* fix: querier group by icon_id error [#8749](https://github.com/deepflowio/deepflow/pull/8749) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: agent - eBPF Fix Event Type Value [#8744](https://github.com/deepflowio/deepflow/pull/8744) by [yinjiping](https://github.com/yinjiping)
 * fix: failed to create agent group config using yaml [#8732](https://github.com/deepflowio/deepflow/pull/8732) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: the analyzer mode supports ebpf dpdk [#8729](https://github.com/deepflowio/deepflow/pull/8729) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: recorder fails to clean 10w data at one time [#8706](https://github.com/deepflowio/deepflow/pull/8706) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -38,6 +42,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
+* feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
 * feat: deprecated ipvlan [#8725](https://github.com/deepflowio/deepflow/pull/8725) by [askyrie](https://github.com/askyrie)
 * feat: gets by page when refreshing recorder cache [#8711](https://github.com/deepflowio/deepflow/pull/8711) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * Revert "Revert "feat: querier optimization group"" [#8708](https://github.com/deepflowio/deepflow/pull/8708) by [xiaochaoren1](https://github.com/xiaochaoren1)
