@@ -1042,6 +1042,12 @@ func (f *TagFunction) Format(m *view.Model) {
 				resourceNameSuffix := resourceStr + suffix
 				if f.Args[0] == resourceNameSuffix {
 					m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+				} else {
+					for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+						if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && f.Args[0] == resource+suffix {
+							m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
+						}
+					}
 				}
 			}
 		}
