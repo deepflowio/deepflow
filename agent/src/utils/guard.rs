@@ -43,6 +43,7 @@ use crate::common::{
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
+use crate::trident::AgentState;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
 use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
@@ -131,6 +132,7 @@ impl SystemLoadGuard {
 
 pub struct Guard {
     config: EnvironmentAccess,
+    state: Arc<AgentState>,
     log_dir: String,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
@@ -146,6 +148,7 @@ pub struct Guard {
 impl Guard {
     pub fn new(
         config: EnvironmentAccess,
+        state: Arc<AgentState>,
         log_dir: String,
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
@@ -158,6 +161,7 @@ impl Guard {
         };
         Ok(Self {
             config,
+            state,
             log_dir,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
@@ -322,16 +326,17 @@ impl Guard {
 
     pub fn start(&self) {
         {
-            let (started, _) = &*self.running;
-            let mut started = started.lock().unwrap();
-            if *started {
+            let (running, _) = &*self.running;
+            let mut running = running.lock().unwrap();
+            if *running {
                 return;
             }
-            *started = true;
+            *running = true;
         }
 
         let config = self.config.clone();
-        let running = self.running.clone();
+        let running_state = self.running.clone();
+        let state = self.state.clone();
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
         let mut over_memory_limit = false; // Higher than the limit does not meet expectations
@@ -486,13 +491,19 @@ impl Guard {
                     }
                 }
 
-                let (running, timer) = &*running;
-                let mut running = running.lock().unwrap();
-                if !*running {
+                if exception_handler.has(Exception::SystemLoadCircuitBreaker) || exception_handler.has(Exception::FreeMemExceeded) {
+                    state.melt_down();
+                } else {
+                    state.recover();
+                }
+
+                let (running, notifier) = &*running_state;
+                let mut rg = running.lock().unwrap();
+                if !*rg {
                     break;
                 }
-                running = timer.wait_timeout(running, config.guard_interval).unwrap().0;
-                if !*running {
+                rg = notifier.wait_timeout(rg, config.guard_interval).unwrap().0;
+                if !*rg {
                     break;
                 }
             }
@@ -504,15 +515,15 @@ impl Guard {
     }
 
     pub fn stop(&self) {
-        let (stopped, timer) = &*self.running;
+        let (running, notifier) = &*self.running;
         {
-            let mut stopped = stopped.lock().unwrap();
-            if !*stopped {
+            let mut running = running.lock().unwrap();
+            if !*running {
                 return;
             }
-            *stopped = false;
+            *running = false;
         }
-        timer.notify_one();
+        notifier.notify_one();
 
         if let Some(thread) = self.thread.lock().unwrap().take() {
             let _ = thread.join();
