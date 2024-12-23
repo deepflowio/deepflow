@@ -22,8 +22,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -31,9 +31,9 @@ import (
 
 func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err error) {
 	var response []model.MailServer
-	var mails []mysqlmodel.MailServer
+	var mails []metadbmodel.MailServer
 
-	Db := mysql.DefaultDB.DB
+	Db := metadb.DefaultDB.DB
 	for _, param := range []string{"lcuuid"} {
 		if _, ok := filter[param]; ok {
 			Db = Db.Where(fmt.Sprintf("%s = ?", param), filter[param])
@@ -64,7 +64,7 @@ func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err 
 }
 
 func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, error) {
-	mailServer := mysqlmodel.MailServer{}
+	mailServer := metadbmodel.MailServer{}
 	mailServer.Status = mailCreate.Status
 	mailServer.Host = mailCreate.Host
 	mailServer.Port = mailCreate.Port
@@ -75,18 +75,18 @@ func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, erro
 	mailServer.NtlmName = mailCreate.NtlmName
 	mailServer.NtlmPassword = mailCreate.NtlmPassword
 	mailServer.Lcuuid = uuid.New().String()
-	mysql.DefaultDB.Create(&mailServer)
+	metadb.DefaultDB.Create(&mailServer)
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
 	return response[0], err
 }
 
 func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (model.MailServer, error) {
-	var mailServer mysqlmodel.MailServer
+	var mailServer metadbmodel.MailServer
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
-		if ret := mysql.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
+		if ret := metadb.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
 			return model.MailServer{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mailServer (%s) not found", lcuuid))
 		}
 	} else {
@@ -103,22 +103,22 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 	if _, ok := mailServerUpdate["USER"]; ok {
 		dbUpdateMap["user_name"] = mailServerUpdate["USER"]
 	}
-	mysql.DefaultDB.Model(&mailServer).Updates(dbUpdateMap)
+	metadb.DefaultDB.Model(&mailServer).Updates(dbUpdateMap)
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
 	return response[0], err
 }
 
 func DeleteMailServer(lcuuid string) (map[string]string, error) {
-	var mailServer mysqlmodel.MailServer
+	var mailServer metadbmodel.MailServer
 
-	if ret := mysql.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
+	if ret := metadb.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete mail server (%s)", mailServer.UserName)
 
-	mysql.DefaultDB.Delete(&mailServer)
+	metadb.DefaultDB.Delete(&mailServer)
 	return map[string]string{"LCUUID": lcuuid}, nil
 
 }

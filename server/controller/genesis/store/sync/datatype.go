@@ -23,7 +23,7 @@ import (
 	"time"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -131,14 +131,14 @@ func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Dur
 	defer g.mutex.Unlock()
 
 	var items []T
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error("get org ids failed")
 		return
 	}
 	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			continue
@@ -174,7 +174,7 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 
 	nIP := os.Getenv(ccommon.NODE_IP_KEY)
 	for orgID, dataMaps := range g.dataStore {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			continue

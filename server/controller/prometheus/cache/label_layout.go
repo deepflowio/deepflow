@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -81,8 +81,8 @@ func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (mml *metricAndAPPLabelLayout) load() ([]*mysqlmodel.PrometheusMetricAPPLabelLayout, error) {
-	var metricAPPLabelLayouts []*mysqlmodel.PrometheusMetricAPPLabelLayout
+func (mml *metricAndAPPLabelLayout) load() ([]*metadbmodel.PrometheusMetricAPPLabelLayout, error) {
+	var metricAPPLabelLayouts []*metadbmodel.PrometheusMetricAPPLabelLayout
 	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }

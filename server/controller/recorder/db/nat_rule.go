@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type NATRule struct {
-	OperatorBase[*mysqlmodel.NATRule, mysqlmodel.NATRule]
+	OperatorBase[*metadbmodel.NATRule, metadbmodel.NATRule]
 }
 
 func NewNATRule() *NATRule {
 	return &NATRule{
-		newOperatorBase[*mysqlmodel.NATRule](
+		newOperatorBase[*metadbmodel.NATRule](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			false,
 			false,

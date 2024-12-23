@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChVTap struct {
-	UpdaterBase[mysqlmodel.ChVTap, IDKey]
+	UpdaterBase[metadbmodel.ChVTap, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater := &ChVTap{
-		UpdaterBase[mysqlmodel.ChVTap, IDKey]{
+		UpdaterBase[metadbmodel.ChVTap, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VTAP,
 		},
 		resourceTypeToIconID,
@@ -37,17 +37,17 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 
-func (v *ChVTap) generateNewData() (map[IDKey]mysqlmodel.ChVTap, bool) {
-	var vTaps []mysqlmodel.VTap
-	err := mysql.DefaultDB.Unscoped().Find(&vTaps).Error
+func (v *ChVTap) generateNewData() (map[IDKey]metadbmodel.ChVTap, bool) {
+	var vTaps []metadbmodel.VTap
+	err := metadb.DefaultDB.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChVTap)
+	keyToItem := make(map[IDKey]metadbmodel.ChVTap)
 	for _, vTap := range vTaps {
-		keyToItem[IDKey{ID: vTap.ID}] = mysqlmodel.ChVTap{
+		keyToItem[IDKey{ID: vTap.ID}] = metadbmodel.ChVTap{
 			ID:   vTap.ID,
 			Name: vTap.Name,
 			Type: vTap.Type,
@@ -56,11 +56,11 @@ func (v *ChVTap) generateNewData() (map[IDKey]mysqlmodel.ChVTap, bool) {
 	return keyToItem, true
 }
 
-func (v *ChVTap) generateKey(dbItem mysqlmodel.ChVTap) IDKey {
+func (v *ChVTap) generateKey(dbItem metadbmodel.ChVTap) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTap) (map[string]interface{}, bool) {
+func (v *ChVTap) generateUpdateInfo(oldItem, newItem metadbmodel.ChVTap) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

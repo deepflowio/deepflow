@@ -17,23 +17,23 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type Metadata struct {
 	Config      config.RecorderConfig
-	ORGID       int       // org id
-	DB          *mysql.DB // org database connection
+	ORGID       int        // org id
+	DB          *metadb.DB // org database connection
 	Domain      *DomainInfo
 	SubDomain   *SubDomainInfo
 	LogPrefixes []logger.Prefix
 }
 
 func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	return &Metadata{
 		Config:      cfg,
 		ORGID:       orgID,
@@ -67,13 +67,13 @@ func (m *Metadata) GetTeamID() int {
 	}
 }
 
-func (m *Metadata) SetDomain(domain mysqlmodel.Domain) {
+func (m *Metadata) SetDomain(domain metadbmodel.Domain) {
 	m.Domain = &DomainInfo{domain}
 	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
 	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
 }
 
-func (m *Metadata) SetSubDomain(subDomain mysqlmodel.SubDomain) {
+func (m *Metadata) SetSubDomain(subDomain metadbmodel.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
 	if subDomain.TeamID != 0 {
 		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
@@ -82,9 +82,9 @@ func (m *Metadata) SetSubDomain(subDomain mysqlmodel.SubDomain) {
 }
 
 type DomainInfo struct {
-	mysqlmodel.Domain
+	metadbmodel.Domain
 }
 
 type SubDomainInfo struct {
-	mysqlmodel.SubDomain
+	metadbmodel.SubDomain
 }

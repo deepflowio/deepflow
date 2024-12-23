@@ -24,8 +24,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -45,7 +45,7 @@ func (p *Plugin) RegisterTo(e *gin.Engine) {
 }
 
 func getPlugin(c *gin.Context) {
-	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
 		JsonResponse(c, nil, err)
 		return
@@ -66,7 +66,7 @@ func createPlugin(c *gin.Context) {
 		JsonResponse(c, nil, err)
 		return
 	}
-	plugin := &mysqlmodel.Plugin{
+	plugin := &metadbmodel.Plugin{
 		Name:     c.PostForm("NAME"),
 		Type:     t,
 		UserName: u,
@@ -87,7 +87,7 @@ func createPlugin(c *gin.Context) {
 	}
 	plugin.Image = buf.Bytes()
 
-	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
 		JsonResponse(c, nil, err)
 		return
@@ -100,7 +100,7 @@ func createPlugin(c *gin.Context) {
 }
 
 func deletePlugin(c *gin.Context) {
-	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
 		JsonResponse(c, nil, err)
 		return

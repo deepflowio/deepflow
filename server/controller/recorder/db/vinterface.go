@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type VInterface struct {
-	OperatorBase[*mysqlmodel.VInterface, mysqlmodel.VInterface]
+	OperatorBase[*metadbmodel.VInterface, metadbmodel.VInterface]
 }
 
 func NewVInterface() *VInterface {
 	o := &VInterface{
-		newOperatorBase[*mysqlmodel.VInterface](
+		newOperatorBase[*metadbmodel.VInterface](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			false,
 			false,

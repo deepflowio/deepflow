@@ -40,7 +40,7 @@ func (t *SuiteTest) TestHandleAddVIPSuccess() {
 	updater := NewVIP(c, []cloudmodel.VIP{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var result *mysqlmodel.VIP
+	var result *metadbmodel.VIP
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), cloudItem.IP, result.IP)
@@ -58,7 +58,7 @@ func (t *SuiteTest) TestHandleUpdateVIPSuccess() {
 	updater.cloudData = []cloudmodel.VIP{cloudItem}
 	updater.HandleAddAndUpdate()
 
-	var result *mysqlmodel.VIP
+	var result *metadbmodel.VIP
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), wantIP, result.IP)
@@ -73,7 +73,7 @@ func (t *SuiteTest) TestHandleDeleteVIPSuccess() {
 	updater.cache.SetSequence(updater.cache.GetSequence() + 1)
 	updater.HandleDelete()
 
-	var result *mysqlmodel.VIP
+	var result *metadbmodel.VIP
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(0))
 	if updater.cache.DiffBaseDataSet.VIP[cloudItem.Lcuuid] != nil {

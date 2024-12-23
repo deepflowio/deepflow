@@ -20,18 +20,18 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChChost struct {
-	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChChost, IDKey]
+	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChChost, IDKey]
 }
 
 func NewChChost() *ChChost {
 	mng := &ChChost{
-		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChChost, IDKey](
+		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChChost, IDKey](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST,
 		),
 	}
@@ -40,14 +40,14 @@ func NewChChost() *ChChost {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKey, targets []mysqlmodel.ChChost) {
+func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKey, targets []metadbmodel.ChChost) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysqlmodel.ChChost{
+	targets = append(targets, metadbmodel.ChChost{
 		ID:       source.ID,
 		Name:     sourceName,
 		L3EPCID:  source.VPCID,
@@ -61,7 +61,7 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
+func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -80,14 +80,14 @@ func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFields
 	}
 
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChChost
+		var chItem metadbmodel.ChChost
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChost) softDeletedTargetsUpdated(targets []mysqlmodel.ChChost, db *mysql.DB) {
+func (c *ChChost) softDeletedTargetsUpdated(targets []metadbmodel.ChChost, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

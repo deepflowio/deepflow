@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodServicePort struct {
 	UpdaterBase[
 		cloudmodel.PodServicePort,
 		*diffbase.PodServicePort,
-		*mysqlmodel.PodServicePort,
-		mysqlmodel.PodServicePort,
+		*metadbmodel.PodServicePort,
+		metadbmodel.PodServicePort,
 		*message.PodServicePortAdd,
 		message.PodServicePortAdd,
 		*message.PodServicePortUpdate,
@@ -47,8 +47,8 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		newUpdaterBase[
 			cloudmodel.PodServicePort,
 			*diffbase.PodServicePort,
-			*mysqlmodel.PodServicePort,
-			mysqlmodel.PodServicePort,
+			*metadbmodel.PodServicePort,
+			metadbmodel.PodServicePort,
 			*message.PodServicePortAdd,
 			message.PodServicePortAdd,
 			*message.PodServicePortUpdate,
@@ -73,7 +73,7 @@ func (s *PodServicePort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodService
 	return
 }
 
-func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePort) (*mysqlmodel.PodServicePort, bool) {
+func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePort) (*metadbmodel.PodServicePort, bool) {
 	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.PodServicePort{
+	dbItem := &metadbmodel.PodServicePort{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
 		Port:         cloudItem.Port,

@@ -20,7 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -31,8 +31,8 @@ type Process struct {
 	UpdaterBase[
 		cloudmodel.Process,
 		*diffbase.Process,
-		*mysqlmodel.Process,
-		mysqlmodel.Process,
+		*metadbmodel.Process,
+		metadbmodel.Process,
 		*message.ProcessAdd,
 		message.ProcessAdd,
 		*message.ProcessUpdate,
@@ -48,8 +48,8 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		newUpdaterBase[
 			cloudmodel.Process,
 			*diffbase.Process,
-			*mysqlmodel.Process,
-			mysqlmodel.Process,
+			*metadbmodel.Process,
+			metadbmodel.Process,
 			*message.ProcessAdd,
 			message.ProcessAdd,
 			*message.ProcessUpdate,
@@ -74,7 +74,7 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 	return
 }
 
-func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmodel.Process, bool) {
+func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmodel.Process, bool) {
 	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
 	// add pod node id
 	var podNodeID int
@@ -111,7 +111,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 		vpcID = vmInfo.VPCID
 	}
 
-	dbItem := &mysqlmodel.Process{
+	dbItem := &metadbmodel.Process{
 		Name:        cloudItem.Name,
 		VTapID:      cloudItem.VTapID,
 		PID:         cloudItem.PID,

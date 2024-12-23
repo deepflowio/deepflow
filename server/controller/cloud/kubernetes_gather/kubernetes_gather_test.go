@@ -30,22 +30,22 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 )
 
 func TestKubernetes(t *testing.T) {
 	Convey("TestKubernetes", t, func() {
-		k8sConfig := mysqlmodel.SubDomain{
+		k8sConfig := metadbmodel.SubDomain{
 			Name:        "test_k8s",
 			DisplayName: "test_k8s",
 			ClusterID:   "d-01LMvvfQPZ",
 			Config:      fmt.Sprintf(`{"node_port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
-		k8s := NewKubernetesGather(mysql.DefaultDB, nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
+		k8s := NewKubernetesGather(metadb.DefaultDB, nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
 		type KResource struct {
 			Pod        []string `json:"*v1.Pod"`
 			Info       []string `json:"*version.Info"`

@@ -22,7 +22,7 @@ import (
 	"github.com/cornelk/hashmap"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -73,8 +73,8 @@ func (ln *labelName) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (ln *labelName) load() ([]*mysqlmodel.PrometheusLabelName, error) {
-	var labelNames []*mysqlmodel.PrometheusLabelName
+func (ln *labelName) load() ([]*metadbmodel.PrometheusLabelName, error) {
+	var labelNames []*metadbmodel.PrometheusLabelName
 	err := ln.org.DB.Find(&labelNames).Error
 	return labelNames, err
 }

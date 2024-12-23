@@ -23,8 +23,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -34,13 +34,13 @@ const (
 	IMAGE_MAX_COUNT = 20
 )
 
-func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.VtapRepo, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+func CreateVtapRepo(orgID int, vtapRepoCreate *metadbmodel.VTapRepo) (*model.VtapRepo, error) {
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
-	var vtapRepoFirst mysqlmodel.VTapRepo
+	var vtapRepoFirst metadbmodel.VTapRepo
 	if err := db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewError(httpcommon.SERVER_ERROR,
@@ -48,7 +48,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.Vtap
 		}
 
 		var count int64
-		db.Model(&mysqlmodel.VTapRepo{}).Count(&count)
+		db.Model(&metadbmodel.VTapRepo{}).Count(&count)
 		if count >= IMAGE_MAX_COUNT {
 			return nil, fmt.Errorf("the number of image can not exceed %d", IMAGE_MAX_COUNT)
 		}
@@ -60,7 +60,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.Vtap
 	}
 
 	// update by name
-	if err := db.Model(&mysqlmodel.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
+	if err := db.Model(&metadbmodel.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
 		Updates(vtapRepoCreate).Error; err != nil {
 		return nil, err
 	}
@@ -69,8 +69,8 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.Vtap
 }
 
 func GetVtapRepo(orgID int, filter map[string]interface{}) ([]model.VtapRepo, error) {
-	var vtapRepoes []mysqlmodel.VTapRepo
-	dbInfo, err := mysql.GetDB(orgID)
+	var vtapRepoes []metadbmodel.VTapRepo
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,17 +99,17 @@ func GetVtapRepo(orgID int, filter map[string]interface{}) ([]model.VtapRepo, er
 }
 
 func DeleteVtapRepo(orgID int, name string) error {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return err
 	}
 	db := dbInfo.DB
-	var vtapRepo mysqlmodel.VTapRepo
+	var vtapRepo metadbmodel.VTapRepo
 	if err := db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
 	}
 
-	if err := db.Where("name = ?", name).Delete(&mysqlmodel.VTapRepo{}).Error; err != nil {
+	if err := db.Where("name = ?", name).Delete(&metadbmodel.VTapRepo{}).Error; err != nil {
 		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete vtap_repo (name: %s) failed", name))
 	}
 	return nil

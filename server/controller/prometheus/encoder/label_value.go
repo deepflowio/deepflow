@@ -22,7 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -41,7 +41,7 @@ func newLabelValue(org *common.ORG) *labelValue {
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
-	var items []*mysqlmodel.PrometheusLabelValue
+	var items []*metadbmodel.PrometheusLabelValue
 	err := lv.org.DB.Unscoped().Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
@@ -58,14 +58,14 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 	defer lv.lock.Unlock()
 
 	resp := make([]*controller.PrometheusLabelValue, 0)
-	dbToAdd := make([]*mysqlmodel.PrometheusLabelValue, 0)
+	dbToAdd := make([]*metadbmodel.PrometheusLabelValue, 0)
 	for i := range strs {
 		str := strs[i]
 		if id, ok := lv.getID(str); ok {
 			resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
-		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusLabelValue{Value: str})
+		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusLabelValue{Value: str})
 	}
 	if len(dbToAdd) == 0 {
 		return resp, nil
@@ -90,6 +90,6 @@ func (lv *labelValue) getID(str string) (int, bool) {
 	return 0, false
 }
 
-func (lv *labelValue) store(item *mysqlmodel.PrometheusLabelValue) {
+func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
 	lv.strToID.Store(item.Value, item.ID)
 }

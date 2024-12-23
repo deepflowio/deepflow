@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -31,8 +31,8 @@ type FloatingIP struct {
 	UpdaterBase[
 		cloudmodel.FloatingIP,
 		*diffbase.FloatingIP,
-		*mysqlmodel.FloatingIP,
-		mysqlmodel.FloatingIP,
+		*metadbmodel.FloatingIP,
+		metadbmodel.FloatingIP,
 		*message.FloatingIPAdd,
 		message.FloatingIPAdd,
 		*message.FloatingIPUpdate,
@@ -48,8 +48,8 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		newUpdaterBase[
 			cloudmodel.FloatingIP,
 			*diffbase.FloatingIP,
-			*mysqlmodel.FloatingIP,
-			mysqlmodel.FloatingIP,
+			*metadbmodel.FloatingIP,
+			metadbmodel.FloatingIP,
 			*message.FloatingIPAdd,
 			message.FloatingIPAdd,
 			*message.FloatingIPUpdate,
@@ -74,7 +74,7 @@ func (f *FloatingIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.FloatingIP) (d
 	return
 }
 
-func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mysqlmodel.FloatingIP, bool) {
+func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*metadbmodel.FloatingIP, bool) {
 	networkID, exists := f.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -106,7 +106,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 		), f.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.FloatingIP{
+	dbItem := &metadbmodel.FloatingIP{
 		Domain:    f.metadata.Domain.Lcuuid,
 		Region:    cloudItem.RegionLcuuid,
 		IP:        ip,

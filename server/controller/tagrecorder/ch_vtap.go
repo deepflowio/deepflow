@@ -18,21 +18,21 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type ChVTap struct {
-	UpdaterComponent[mysqlmodel.ChVTap, IDKey]
+	UpdaterComponent[metadbmodel.ChVTap, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater := &ChVTap{
-		newUpdaterComponent[mysqlmodel.ChVTap, IDKey](
+		newUpdaterComponent[metadbmodel.ChVTap, IDKey](
 			RESOURCE_TYPE_CH_VTAP,
 		),
 		resourceTypeToIconID,
@@ -41,8 +41,8 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 
-func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, bool) {
-	var vTaps []mysqlmodel.VTap
+func (v *ChVTap) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChVTap, bool) {
+	var vTaps []metadbmodel.VTap
 	err := db.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
@@ -70,9 +70,9 @@ func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, boo
 		vTapIDToResourceName[vTapID] = resourceName
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChVTap)
+	keyToItem := make(map[IDKey]metadbmodel.ChVTap)
 	for _, vTap := range vTaps {
-		keyToItem[IDKey{ID: vTap.ID}] = mysqlmodel.ChVTap{
+		keyToItem[IDKey{ID: vTap.ID}] = metadbmodel.ChVTap{
 			ID:          vTap.ID,
 			Name:        vTap.Name,
 			Type:        vTap.Type,
@@ -88,11 +88,11 @@ func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, boo
 	return keyToItem, true
 }
 
-func (v *ChVTap) generateKey(dbItem mysqlmodel.ChVTap) IDKey {
+func (v *ChVTap) generateKey(dbItem metadbmodel.ChVTap) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTap) (map[string]interface{}, bool) {
+func (v *ChVTap) generateUpdateInfo(oldItem, newItem metadbmodel.ChVTap) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

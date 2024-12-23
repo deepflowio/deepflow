@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 )
@@ -39,7 +39,7 @@ func GenerateUUID(str string) string {
 }
 
 func GenerateUUIDByOrgID(orgID int, s string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		s = strconv.Itoa(orgID) + "_" + s
 	}
 	return GenerateUUID(s)
@@ -70,21 +70,21 @@ func GetUUID(str string, namespace uuid.UUID) string {
 }
 
 func GetUUIDByOrgID(orgID int, s string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		s = strconv.Itoa(orgID) + "_" + s
 	}
 	return GetUUID(s, uuid.Nil)
 }
 
 func GetUUIDByOrgIDAndNamespaceDNS(orgID int, s string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		s = strconv.Itoa(orgID) + "_" + s
 	}
 	return GetUUID(s, uuid.NamespaceDNS)
 }
 
 func IDGenerateUUID(orgID int, s string) string {
-	if orgID == mysqlcommon.DEFAULT_ORG_ID || len(s) == 0 {
+	if orgID == metadbcommon.DEFAULT_ORG_ID || len(s) == 0 {
 		return s
 	}
 	return GetUUID(strconv.Itoa(orgID)+"_"+s, uuid.Nil)

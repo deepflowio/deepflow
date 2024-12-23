@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type PodGroup struct {
-	OperatorBase[*mysqlmodel.PodGroup, mysqlmodel.PodGroup]
+	OperatorBase[*metadbmodel.PodGroup, metadbmodel.PodGroup]
 }
 
 func NewPodGroup() *PodGroup {
 	operater := &PodGroup{
-		newOperatorBase[*mysqlmodel.PodGroup](
+		newOperatorBase[*metadbmodel.PodGroup](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			true,
 			true,

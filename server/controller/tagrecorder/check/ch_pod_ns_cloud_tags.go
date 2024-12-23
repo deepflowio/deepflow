@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"encoding/json"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNSCloudTags struct {
-	UpdaterBase[mysqlmodel.ChPodNSCloudTags, CloudTagsKey]
+	UpdaterBase[metadbmodel.ChPodNSCloudTags, CloudTagsKey]
 }
 
 func NewChPodNSCloudTags() *ChPodNSCloudTags {
 	updater := &ChPodNSCloudTags{
-		UpdaterBase[mysqlmodel.ChPodNSCloudTags, CloudTagsKey]{
+		UpdaterBase[metadbmodel.ChPodNSCloudTags, CloudTagsKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
 		},
 	}
@@ -37,15 +37,15 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 	return updater
 }
 
-func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysqlmodel.ChPodNSCloudTags, bool) {
-	var podNamespaces []mysqlmodel.PodNamespace
+func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]metadbmodel.ChPodNSCloudTags, bool) {
+	var podNamespaces []metadbmodel.PodNamespace
 	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagsKey]mysqlmodel.ChPodNSCloudTags)
+	keyToItem := make(map[CloudTagsKey]metadbmodel.ChPodNSCloudTags)
 	for _, podNamespace := range podNamespaces {
 		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
 		if err != nil {
@@ -65,7 +65,7 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysqlmodel.ChPodN
 			key := CloudTagsKey{
 				ID: podNamespace.ID,
 			}
-			keyToItem[key] = mysqlmodel.ChPodNSCloudTags{
+			keyToItem[key] = metadbmodel.ChPodNSCloudTags{
 				ID:          podNamespace.ID,
 				CloudTags:   string(cloudTagsStr),
 				TeamID:      teamID,
@@ -77,11 +77,11 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysqlmodel.ChPodN
 	return keyToItem, true
 }
 
-func (p *ChPodNSCloudTags) generateKey(dbItem mysqlmodel.ChPodNSCloudTags) CloudTagsKey {
+func (p *ChPodNSCloudTags) generateKey(dbItem metadbmodel.ChPodNSCloudTags) CloudTagsKey {
 	return CloudTagsKey{ID: dbItem.ID}
 }
 
-func (p *ChPodNSCloudTags) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodNSCloudTags) (map[string]interface{}, bool) {
+func (p *ChPodNSCloudTags) generateUpdateInfo(oldItem, newItem metadbmodel.ChPodNSCloudTags) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.CloudTags != newItem.CloudTags {
 		updateInfo["cloud_tags"] = newItem.CloudTags

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type VMPodNodeConnection struct {
-	OperatorBase[*mysqlmodel.VMPodNodeConnection, mysqlmodel.VMPodNodeConnection]
+	OperatorBase[*metadbmodel.VMPodNodeConnection, metadbmodel.VMPodNodeConnection]
 }
 
 func NewVMPodNodeConnection() *VMPodNodeConnection {
 	return &VMPodNodeConnection{
-		newOperatorBase[*mysqlmodel.VMPodNodeConnection](
+		newOperatorBase[*metadbmodel.VMPodNodeConnection](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			false,
 			false,

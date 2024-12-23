@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type Host struct {
 	UpdaterBase[
 		cloudmodel.Host,
 		*diffbase.Host,
-		*mysqlmodel.Host,
-		mysqlmodel.Host,
+		*metadbmodel.Host,
+		metadbmodel.Host,
 		*message.HostAdd,
 		message.HostAdd,
 		*message.HostUpdate,
@@ -47,8 +47,8 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		newUpdaterBase[
 			cloudmodel.Host,
 			*diffbase.Host,
-			*mysqlmodel.Host,
-			mysqlmodel.Host,
+			*metadbmodel.Host,
+			metadbmodel.Host,
 			*message.HostAdd,
 			message.HostAdd,
 			*message.HostUpdate,
@@ -73,8 +73,8 @@ func (h *Host) getDiffBaseByCloudItem(cloudItem *cloudmodel.Host) (diffBase *dif
 	return
 }
 
-func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysqlmodel.Host, bool) {
-	dbItem := &mysqlmodel.Host{
+func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*metadbmodel.Host, bool) {
+	dbItem := &metadbmodel.Host{
 		Name:       cloudItem.Name,
 		IP:         cloudItem.IP,
 		Hostname:   cloudItem.Hostname,

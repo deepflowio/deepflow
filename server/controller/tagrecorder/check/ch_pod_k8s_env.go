@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodK8sEnv struct {
-	UpdaterBase[mysqlmodel.ChPodK8sEnv, K8sEnvKey]
+	UpdaterBase[metadbmodel.ChPodK8sEnv, K8sEnvKey]
 }
 
 func NewChPodK8sEnv() *ChPodK8sEnv {
 	updater := &ChPodK8sEnv{
-		UpdaterBase[mysqlmodel.ChPodK8sEnv, K8sEnvKey]{
+		UpdaterBase[metadbmodel.ChPodK8sEnv, K8sEnvKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_ENV,
 		},
 	}
@@ -37,8 +37,8 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 	return updater
 }
 
-func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysqlmodel.ChPodK8sEnv, bool) {
-	var pods []mysqlmodel.Pod
+func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]metadbmodel.ChPodK8sEnv, bool) {
+	var pods []metadbmodel.Pod
 
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
@@ -46,7 +46,7 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysqlmodel.ChPodK8sEnv, b
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sEnvKey]mysqlmodel.ChPodK8sEnv)
+	keyToItem := make(map[K8sEnvKey]metadbmodel.ChPodK8sEnv)
 	for _, pod := range pods {
 		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
 		if err != nil {
@@ -61,7 +61,7 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysqlmodel.ChPodK8sEnv, b
 					ID:  pod.ID,
 					Key: envInfo[0],
 				}
-				keyToItem[key] = mysqlmodel.ChPodK8sEnv{
+				keyToItem[key] = metadbmodel.ChPodK8sEnv{
 					ID:          pod.ID,
 					Key:         envInfo[0],
 					Value:       envInfo[1],
@@ -77,11 +77,11 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysqlmodel.ChPodK8sEnv, b
 	return keyToItem, true
 }
 
-func (k *ChPodK8sEnv) generateKey(dbItem mysqlmodel.ChPodK8sEnv) K8sEnvKey {
+func (k *ChPodK8sEnv) generateKey(dbItem metadbmodel.ChPodK8sEnv) K8sEnvKey {
 	return K8sEnvKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (k *ChPodK8sEnv) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodK8sEnv) (map[string]interface{}, bool) {
+func (k *ChPodK8sEnv) generateUpdateInfo(oldItem, newItem metadbmodel.ChPodK8sEnv) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

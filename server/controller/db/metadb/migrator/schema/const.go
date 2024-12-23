@@ -16,4 +16,4 @@
 
 package schema
 
-const FILE_DIR = "/etc/mysql/schema/rawsql"
+const FILE_DIR = "/etc/metadb/schema/rawsql"

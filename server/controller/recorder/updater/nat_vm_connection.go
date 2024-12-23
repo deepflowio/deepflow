@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
 		*diffbase.NATVMConnection,
-		*mysqlmodel.NATVMConnection,
-		mysqlmodel.NATVMConnection,
+		*metadbmodel.NATVMConnection,
+		metadbmodel.NATVMConnection,
 		*message.NATVMConnectionAdd,
 		message.NATVMConnectionAdd,
 		*message.NATVMConnectionUpdate,
@@ -47,8 +47,8 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		newUpdaterBase[
 			cloudmodel.NATVMConnection,
 			*diffbase.NATVMConnection,
-			*mysqlmodel.NATVMConnection,
-			mysqlmodel.NATVMConnection,
+			*metadbmodel.NATVMConnection,
+			metadbmodel.NATVMConnection,
 			*message.NATVMConnectionAdd,
 			message.NATVMConnectionAdd,
 			*message.NATVMConnectionUpdate,
@@ -73,7 +73,7 @@ func (c *NATVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATVMConn
 	return
 }
 
-func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*mysqlmodel.NATVMConnection, bool) {
+func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*metadbmodel.NATVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -91,7 +91,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.NATVMConnection{
+	dbItem := &metadbmodel.NATVMConnection{
 		Domain:       c.metadata.Domain.Lcuuid,
 		VMID:         vmID,
 		NATGatewayID: natID,

@@ -31,7 +31,7 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -68,7 +68,7 @@ type awsGressRule struct {
 	rule      types.IpPermission
 }
 
-func NewAws(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
+func NewAws(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

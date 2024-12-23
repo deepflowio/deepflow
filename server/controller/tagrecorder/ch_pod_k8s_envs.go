@@ -18,18 +18,18 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodK8sEnvs struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sEnvs, K8sEnvsKey]
+	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sEnvs, K8sEnvsKey]
 }
 
 func NewChPodK8sEnvs() *ChPodK8sEnvs {
 	mng := &ChPodK8sEnvs{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sEnvs, K8sEnvsKey](
+		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sEnvs, K8sEnvsKey](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ENVS,
 		),
 	}
@@ -38,7 +38,7 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
@@ -46,12 +46,12 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 		updateInfo["envs"] = envs
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChPodK8sEnvs
+		var chItem metadbmodel.ChPodK8sEnvs
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sEnvsKey{{ID: sourceID}},
-				[]mysqlmodel.ChPodK8sEnvs{{ID: sourceID, Envs: updateInfo["envs"].(string)}},
+				[]metadbmodel.ChPodK8sEnvs{{ID: sourceID, Envs: updateInfo["envs"].(string)}},
 				db,
 			)
 		} else {
@@ -61,12 +61,12 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *mysqlmodel.Pod) (keys []K8sEnvsKey, targets []mysqlmodel.ChPodK8sEnvs) {
+func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *metadbmodel.Pod) (keys []K8sEnvsKey, targets []metadbmodel.ChPodK8sEnvs) {
 	if item.ENV == "" {
 		return
 	}
 	envs, _ := common.StrToJsonAndMap(item.ENV)
-	return []K8sEnvsKey{{ID: item.ID}}, []mysqlmodel.ChPodK8sEnvs{{
+	return []K8sEnvsKey{{ID: item.ID}}, []metadbmodel.ChPodK8sEnvs{{
 		ID:          item.ID,
 		Envs:        envs,
 		TeamID:      md.TeamID,
@@ -76,6 +76,6 @@ func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *mysqlmodel.Pod
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sEnvs, db *mysql.DB) {
+func (c *ChPodK8sEnvs) softDeletedTargetsUpdated(targets []metadbmodel.ChPodK8sEnvs, db *metadb.DB) {
 
 }

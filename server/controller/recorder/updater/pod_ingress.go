@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodIngress struct {
 	UpdaterBase[
 		cloudmodel.PodIngress,
 		*diffbase.PodIngress,
-		*mysqlmodel.PodIngress,
-		mysqlmodel.PodIngress,
+		*metadbmodel.PodIngress,
+		metadbmodel.PodIngress,
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
 		*message.PodIngressUpdate,
@@ -47,8 +47,8 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 		newUpdaterBase[
 			cloudmodel.PodIngress,
 			*diffbase.PodIngress,
-			*mysqlmodel.PodIngress,
-			mysqlmodel.PodIngress,
+			*metadbmodel.PodIngress,
+			metadbmodel.PodIngress,
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
 			*message.PodIngressUpdate,
@@ -73,7 +73,7 @@ func (i *PodIngress) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress) (d
 	return
 }
 
-func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mysqlmodel.PodIngress, bool) {
+func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*metadbmodel.PodIngress, bool) {
 	podNamespaceID, exists := i.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -90,7 +90,7 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mys
 		), i.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.PodIngress{
+	dbItem := &metadbmodel.PodIngress{
 		Name:           cloudItem.Name,
 		PodNamespaceID: podNamespaceID,
 		PodClusterID:   podClusterID,

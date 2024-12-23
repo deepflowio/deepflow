@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -65,7 +65,7 @@ func (v *VTapLicenseAllocation) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
 					v.allocLicense(db)
 					return nil
 				}); err != nil {
@@ -87,12 +87,12 @@ func (v *VTapLicenseAllocation) Stop() {
 	log.Info("vtap license allocation and check stopped")
 }
 
-func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
+func (v *VTapLicenseAllocation) allocLicense(orgDB *metadb.DB) {
 	log.Info("alloc license starting", orgDB.LogPrefixORGID)
 
 	whereSQL := "license_type IS NULL OR license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
-	orgDB.Model(&mysqlmodel.VTap{}).Where(whereSQL, licenseFunctions).Updates(
+	orgDB.Model(&metadbmodel.VTap{}).Where(whereSQL, licenseFunctions).Updates(
 		map[string]interface{}{
 			"license_type":      VTAP_LICENSE_TYPE_DEFAULT,
 			"license_functions": licenseFunctions,

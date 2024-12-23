@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodGroupPort struct {
 	UpdaterBase[
 		cloudmodel.PodGroupPort,
 		*diffbase.PodGroupPort,
-		*mysqlmodel.PodGroupPort,
-		mysqlmodel.PodGroupPort,
+		*metadbmodel.PodGroupPort,
+		metadbmodel.PodGroupPort,
 		*message.PodGroupPortAdd,
 		message.PodGroupPortAdd,
 		*message.PodGroupPortUpdate,
@@ -47,8 +47,8 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		newUpdaterBase[
 			cloudmodel.PodGroupPort,
 			*diffbase.PodGroupPort,
-			*mysqlmodel.PodGroupPort,
-			mysqlmodel.PodGroupPort,
+			*metadbmodel.PodGroupPort,
+			metadbmodel.PodGroupPort,
 			*message.PodGroupPortAdd,
 			message.PodGroupPortAdd,
 			*message.PodGroupPortUpdate,
@@ -73,7 +73,7 @@ func (p *PodGroupPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroupPort
 	return
 }
 
-func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (*mysqlmodel.PodGroupPort, bool) {
+func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (*metadbmodel.PodGroupPort, bool) {
 	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -91,7 +91,7 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.PodGroupPort{
+	dbItem := &metadbmodel.PodGroupPort{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
 		Port:         cloudItem.Port,

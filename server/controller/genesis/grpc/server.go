@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
 	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
@@ -136,8 +136,8 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 	var orgID, teamID int
 	teamShortLcuuid := request.GetTeamId()
 	if teamShortLcuuid == "" {
-		orgID = mysqlcommon.DEFAULT_ORG_ID
-		teamID = mysqlcommon.DEFAULT_TEAM_ID
+		orgID = metadbcommon.DEFAULT_ORG_ID
+		teamID = metadbcommon.DEFAULT_TEAM_ID
 	} else {
 		t, ok := g.teamShortLcuuidToInfo.Load(teamShortLcuuid)
 		if ok {
@@ -269,8 +269,8 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	var orgID, teamID int
 	teamShortLcuuid := request.GetTeamId()
 	if teamShortLcuuid == "" {
-		orgID = mysqlcommon.DEFAULT_ORG_ID
-		teamID = mysqlcommon.DEFAULT_TEAM_ID
+		orgID = metadbcommon.DEFAULT_ORG_ID
+		teamID = metadbcommon.DEFAULT_TEAM_ID
 	} else {
 		t, ok := g.teamShortLcuuidToInfo.Load(teamShortLcuuid)
 		if ok {

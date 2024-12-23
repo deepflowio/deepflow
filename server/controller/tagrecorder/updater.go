@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -124,7 +124,7 @@ type Updater interface {
 
 type updaterDataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 	// 根据db中的基础资源数据，构建最新的ch资源数据
-	generateNewData(*mysql.DB) (map[KT]MT, bool)
+	generateNewData(*metadb.DB) (map[KT]MT, bool)
 	// 构建ch资源的结构体key
 	generateKey(MT) KT
 	// 根据新旧数据对比，构建需要更新的ch资源数据
@@ -159,14 +159,14 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 
 	// 遍历组织ID, 在每个组织的数据库中更新资源
 	// Traverse the orgIDs, updating resources in each org's database
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)
 		return false
 	}
 
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get org dbinfo fail", logger.NewORGPrefix(orgID))
 			continue
@@ -220,7 +220,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 	return false
 }
 
-func (b *UpdaterComponent[MT, KT]) generateOldData(db *mysql.DB) (map[KT]MT, bool) {
+func (b *UpdaterComponent[MT, KT]) generateOldData(db *metadb.DB) (map[KT]MT, bool) {
 	var items []MT
 	var err error
 	if b.resourceTypeName == RESOURCE_TYPE_CH_GPROCESS {
@@ -239,7 +239,7 @@ func (b *UpdaterComponent[MT, KT]) generateOldData(db *mysql.DB) (map[KT]MT, boo
 	return idToItem, true
 }
 
-func (b *UpdaterComponent[MT, KT]) generateOneData(db *mysql.DB) (map[KT]MT, bool) {
+func (b *UpdaterComponent[MT, KT]) generateOneData(db *metadb.DB) (map[KT]MT, bool) {
 	var items []MT
 	err := db.Unscoped().First(&items).Error
 	if err != nil {
@@ -254,7 +254,7 @@ func (b *UpdaterComponent[MT, KT]) generateOneData(db *mysql.DB) (map[KT]MT, boo
 }
 
 // Update updated_at when resource is deleted
-func (b *UpdaterComponent[MT, KT]) ResourceUpdateAtInfoUpdated(db *mysql.DB) {
+func (b *UpdaterComponent[MT, KT]) ResourceUpdateAtInfoUpdated(db *metadb.DB) {
 	var updateItems []MT
 	err := db.Unscoped().First(&updateItems).Error
 	if err == nil {

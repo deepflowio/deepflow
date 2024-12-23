@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -49,7 +49,7 @@ func NewSubDomain(domainLcuuid, subDomainLcuuid string, toolDS *tool.DataSet, eq
 // After all updaters are processed, fill the information of resource events stored in the db and put them to the queue.
 // If the population fails, incomplete resource events are also written to the queue.
 func (r *SubDomain) ProduceFromMySQL() {
-	var dbItems []mysqlmodel.ResourceEvent
+	var dbItems []metadbmodel.ResourceEvent
 	err := r.metadata.DB.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query resource_event failed: %s", err.Error(), r.metadata.LogPrefixes)

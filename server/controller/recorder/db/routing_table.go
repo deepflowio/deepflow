@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type RoutingTable struct {
-	OperatorBase[*mysqlmodel.RoutingTable, mysqlmodel.RoutingTable]
+	OperatorBase[*metadbmodel.RoutingTable, metadbmodel.RoutingTable]
 }
 
 func NewRoutingTable() *RoutingTable {
 	return &RoutingTable{
-		newOperatorBase[*mysqlmodel.RoutingTable](
+		newOperatorBase[*metadbmodel.RoutingTable](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			false,
 			false,

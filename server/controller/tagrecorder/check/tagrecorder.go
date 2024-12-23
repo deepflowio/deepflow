@@ -30,7 +30,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -64,7 +64,7 @@ type TagRecorder struct {
 
 func (c *TagRecorder) Check() {
 	go func() {
-		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+		if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
 			t := time.Now()
 			log.Infof("database=%s tagrecorder health check data run", db.Name, db.LogPrefixORGID)
 			tagrecorder.GetTeamInfo(db)
@@ -79,7 +79,7 @@ func (c *TagRecorder) Check() {
 	}()
 }
 
-func (c *TagRecorder) check(db *mysql.DB) error {
+func (c *TagRecorder) check(db *metadb.DB) error {
 	// 调用API获取资源对应的icon_id
 	domainToIconID, resourceToIconID, err := c.UpdateIconInfo(db)
 	if err != nil {
@@ -101,7 +101,7 @@ func (t *TagRecorder) Stop() {
 	log.Info("tagrecorder stopped")
 }
 
-func (c *TagRecorder) getUpdaters(db *mysql.DB, domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
+func (c *TagRecorder) getUpdaters(db *metadb.DB, domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []ChResourceUpdater{
 		// NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
@@ -182,7 +182,7 @@ func (b *UpdaterBase[MT, KT]) Check() error {
 	return compareAndCheck(b.db, oldItems, newItems)
 }
 
-func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) error {
+func compareAndCheck[CT MySQLChModel](db *metadb.DB, oldItems, newItems []CT) error {
 	if len(newItems) == 0 && len(oldItems) == 0 {
 		return nil
 	}

@@ -27,7 +27,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -272,7 +272,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	log.Infof("update domain synced_at: %s", syncAt.Format(common.GO_BIRTHDAY), d.metadata.LogPrefixes)
 	d.fillStatsd(syncAt)
 
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -290,7 +290,7 @@ func (d *domain) fillStatsd(syncAt time.Time) {
 }
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -301,7 +301,7 @@ func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	log.Debugf("update domain (%+v)", domain, d.metadata.LogPrefixes)
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
-		var subDomain mysqlmodel.SubDomain
+		var subDomain metadbmodel.SubDomain
 		err := d.metadata.DB.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err, d.metadata.LogPrefixes)

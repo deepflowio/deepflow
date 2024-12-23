@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -56,7 +56,7 @@ func (v *VTapCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
 					// check launch_server resource if exist
 					v.launchServerCheck(db)
 					// check vtap type
@@ -83,8 +83,8 @@ func (v *VTapCheck) Stop() {
 	log.Info("vtap check stopped")
 }
 
-func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
-	var vtaps []mysqlmodel.VTap
+func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
+	var vtaps []metadbmodel.VTap
 	var reg = regexp.MustCompile(` |:`)
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
@@ -93,7 +93,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
-			var vm mysqlmodel.VM
+			var vm metadbmodel.VM
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -126,7 +126,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
-			var host mysqlmodel.Host
+			var host metadbmodel.Host
 			if ret := db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -158,7 +158,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
-			var podNode mysqlmodel.PodNode
+			var podNode metadbmodel.PodNode
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -195,7 +195,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
-			var pod mysqlmodel.Pod
+			var pod metadbmodel.Pod
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -231,15 +231,15 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	log.Debugf("vtap launch_server check end", db.LogPrefixORGID)
 }
 
-func (v *VTapCheck) typeCheck(db *mysql.DB) {
-	var vtaps []mysqlmodel.VTap
-	var podNodes []mysqlmodel.PodNode
-	var conns []mysqlmodel.VMPodNodeConnection
+func (v *VTapCheck) typeCheck(db *metadb.DB) {
+	var vtaps []metadbmodel.VTap
+	var podNodes []metadbmodel.PodNode
+	var conns []metadbmodel.VMPodNodeConnection
 
 	log.Debugf("vtap type check start", db.LogPrefixORGID)
 
 	db.Find(&podNodes)
-	idToPodNode := make(map[int]*mysqlmodel.PodNode)
+	idToPodNode := make(map[int]*metadbmodel.PodNode)
 	for i, podNode := range podNodes {
 		idToPodNode[podNode.ID] = &podNodes[i]
 	}
@@ -252,7 +252,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vms []mysqlmodel.VM
+	var vms []metadbmodel.VM
 	if err := db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
@@ -267,7 +267,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 	).Find(&vtaps)
 	for _, vtap := range vtaps {
 		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
-			var vm mysqlmodel.VM
+			var vm metadbmodel.VM
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				continue
 			}
@@ -291,7 +291,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 				continue
 			}
 		} else {
-			var podNode mysqlmodel.PodNode
+			var podNode metadbmodel.PodNode
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				continue
 			}
@@ -314,8 +314,8 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 	log.Debugf("vtap type check end", db.LogPrefixORGID)
 }
 
-func (v *VTapCheck) deleteLostVTap(db *mysql.DB) {
-	var vtaps []*mysqlmodel.VTap
+func (v *VTapCheck) deleteLostVTap(db *metadb.DB) {
+	var vtaps []*metadbmodel.VTap
 	db.Where("state = ? and type not in (?)",
 		common.VTAP_STATE_NOT_CONNECTED,
 		[]int{common.VTAP_TYPE_DEDICATED, common.VTAP_TYPE_TUNNEL_DECAPSULATION},

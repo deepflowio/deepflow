@@ -18,7 +18,7 @@ package event
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -40,7 +40,7 @@ func NewRDSInstance(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *RDSInstance
 	}
 }
 
-func (r *RDSInstance) ProduceByAdd(items []*mysqlmodel.RDSInstance) {
+func (r *RDSInstance) ProduceByAdd(items []*metadbmodel.RDSInstance) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
 		info, err := r.ToolDataSet.GetRDSInstanceInfoByID(item.ID)

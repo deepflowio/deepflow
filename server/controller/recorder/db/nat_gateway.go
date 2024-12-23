@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type NATGateway struct {
-	OperatorBase[*mysqlmodel.NATGateway, mysqlmodel.NATGateway]
+	OperatorBase[*metadbmodel.NATGateway, metadbmodel.NATGateway]
 }
 
 func NewNATGateway() *NATGateway {
 	operater := &NATGateway{
-		newOperatorBase[*mysqlmodel.NATGateway](
+		newOperatorBase[*metadbmodel.NATGateway](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			true,
 			true,

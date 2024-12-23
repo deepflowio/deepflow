@@ -30,8 +30,8 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
@@ -61,17 +61,17 @@ const (
 
 func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	var response []model.Vtap
-	var allVTaps []mysqlmodel.VTap
-	var vtapGroups []mysqlmodel.VTapGroup
-	var regions []mysqlmodel.Region
-	var azs []mysqlmodel.AZ
-	var podClusters []mysqlmodel.PodCluster
-	var podNodes []mysqlmodel.PodNode
-	var pods []mysqlmodel.Pod
-	var vtapRepos []mysqlmodel.VTapRepo
+	var allVTaps []metadbmodel.VTap
+	var vtapGroups []metadbmodel.VTapGroup
+	var regions []metadbmodel.Region
+	var azs []metadbmodel.AZ
+	var podClusters []metadbmodel.PodCluster
+	var podNodes []metadbmodel.PodNode
+	var pods []metadbmodel.Pod
+	var vtapRepos []metadbmodel.VTapRepo
 
 	userInfo := a.resourceAccess.UserInfo
-	dbInfo, err := mysql.GetDB(userInfo.ORGID)
+	dbInfo, err := metadb.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -307,13 +307,13 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	if err := a.resourceAccess.CanAddResource(vtapCreate.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
 	db := dbInfo.DB
 
-	var vtap mysqlmodel.VTap
+	var vtap metadbmodel.VTap
 	if ret := db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
@@ -333,7 +333,7 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	strings.Replace(vtapName, ":", "-", -1)
 	strings.Replace(vtapName, " ", "-", -1)
 
-	vtap = mysqlmodel.VTap{}
+	vtap = metadbmodel.VTap{}
 	lcuuid := uuid.New().String()
 	vtap.Lcuuid = lcuuid
 	vtap.Name = vtapName
@@ -360,13 +360,13 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 
 func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
 	orgID := a.resourceAccess.UserInfo.ORGID
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
 	db := dbInfo.DB
 
-	var vtap mysqlmodel.VTap
+	var vtap metadbmodel.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
@@ -399,7 +399,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		}
 		if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
 			key := vtap.CtrlIP + "-" + vtap.CtrlMac
-			if err := tx.Delete(&mysqlmodel.KubernetesCluster{}, "value = ?", key).Error; err != nil {
+			if err := tx.Delete(&metadbmodel.KubernetesCluster{}, "value = ?", key).Error; err != nil {
 				log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 			}
 		}
@@ -451,7 +451,7 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (map[string][]st
 	}
 }
 
-func (a *Agent) checkLicenseType(vtap mysqlmodel.VTap, licenseType int) (err error) {
+func (a *Agent) checkLicenseType(vtap metadbmodel.VTap, licenseType int) (err error) {
 	// check current vtap if support wanted licenseType
 	supportedLicenseTypes := license.GetSupportedLicenseType(vtap.Type)
 	if len(supportedLicenseTypes) > 0 {
@@ -467,13 +467,13 @@ func (a *Agent) checkLicenseType(vtap mysqlmodel.VTap, licenseType int) (err err
 }
 
 func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
 	db := dbInfo.DB
 
-	var vtap mysqlmodel.VTap
+	var vtap metadbmodel.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -512,7 +512,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 }
 
 func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
 			var _err error
-			var vtap mysqlmodel.VTap
+			var vtap metadbmodel.VTap
 			var dbUpdateMap = make(map[string]interface{})
 
 			if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -573,13 +573,13 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 }
 
 func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
 
-	var vtap mysqlmodel.VTap
+	var vtap metadbmodel.VTap
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
@@ -623,7 +623,7 @@ func (a *Agent) BatchDelete(deleteMap []map[string]string) (resp map[string][]st
 }
 
 func execAZRebalance(
-	db *mysql.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysqlmodel.VTap,
+	db *metadb.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*metadbmodel.VTap,
 	hostIPToAvailableVTapNum map[string]int, hostIPToUsedVTapNum map[string]int,
 	hostIPToState map[string]int, ifCheck bool,
 ) model.AZVTapRebalanceResult {
@@ -731,17 +731,17 @@ func execAZRebalance(
 	return response
 }
 
-func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var controllers []mysqlmodel.Controller
-	var azControllerConns []mysqlmodel.AZControllerConnection
-	var vtaps []mysqlmodel.VTap
+func vtapControllerRebalance(db *metadb.DB, azs []metadbmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	var controllers []metadbmodel.Controller
+	var azControllerConns []metadbmodel.AZControllerConnection
+	var vtaps []metadbmodel.VTap
 	response := &model.VTapRebalanceResult{}
 
 	db.Find(&controllers)
 	db.Find(&azControllerConns)
 	db.Where("controller_ip != ''").Find(&vtaps)
 
-	azToVTaps := make(map[string][]*mysqlmodel.VTap)
+	azToVTaps := make(map[string][]*metadbmodel.VTap)
 	for i, vtap := range vtaps {
 		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
 	}
@@ -752,7 +752,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*
 	}
 
 	normalControllerNum := 0
-	ipToController := make(map[string]*mysqlmodel.Controller)
+	ipToController := make(map[string]*metadbmodel.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
 		if controller.State == common.HOST_STATE_COMPLETE && controller.VTapMax > 0 {
@@ -765,7 +765,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*
 	}
 
 	// 获取各可用区中的控制列表
-	azToControllers := make(map[string][]*mysqlmodel.Controller)
+	azToControllers := make(map[string][]*metadbmodel.Controller)
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
 			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {
@@ -796,7 +796,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*
 		}
 
 		// 获取控制器当前已分配的采集器信息
-		controllerIPToVTaps := make(map[string][]*mysqlmodel.VTap)
+		controllerIPToVTaps := make(map[string][]*metadbmodel.VTap)
 		for _, vtap := range azVTaps {
 			controllerIPToVTaps[vtap.ControllerIP] = append(
 				controllerIPToVTaps[vtap.ControllerIP], vtap,
@@ -828,17 +828,17 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*
 	return response, nil
 }
 
-func vtapAnalyzerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var analyzers []mysqlmodel.Analyzer
-	var azAnalyzerConns []mysqlmodel.AZAnalyzerConnection
-	var vtaps []mysqlmodel.VTap
+func vtapAnalyzerRebalance(db *metadb.DB, azs []metadbmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	var analyzers []metadbmodel.Analyzer
+	var azAnalyzerConns []metadbmodel.AZAnalyzerConnection
+	var vtaps []metadbmodel.VTap
 	response := &model.VTapRebalanceResult{}
 
 	db.Find(&analyzers)
 	db.Find(&azAnalyzerConns)
 	db.Where("analyzer_ip != ''").Find(&vtaps)
 
-	azToVTaps := make(map[string][]*mysqlmodel.VTap)
+	azToVTaps := make(map[string][]*metadbmodel.VTap)
 	for i, vtap := range vtaps {
 		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
 	}
@@ -849,7 +849,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*mo
 	}
 
 	normalAnalyzerNum := 0
-	ipToAnalyzer := make(map[string]*mysqlmodel.Analyzer)
+	ipToAnalyzer := make(map[string]*metadbmodel.Analyzer)
 	for i, analyzer := range analyzers {
 		ipToAnalyzer[analyzer.IP] = &analyzers[i]
 		if analyzer.State == common.HOST_STATE_COMPLETE && analyzer.VTapMax > 0 {
@@ -874,7 +874,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*mo
 			continue
 		}
 		// 获取数据节点当前已分配的采集器信息
-		analyzerIPToVTaps := make(map[string][]*mysqlmodel.VTap)
+		analyzerIPToVTaps := make(map[string][]*metadbmodel.VTap)
 		for _, vtap := range azVTaps {
 			analyzerIPToVTaps[vtap.AnalyzerIP] = append(
 				analyzerIPToVTaps[vtap.AnalyzerIP], vtap,
@@ -906,8 +906,8 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*mo
 	return response, nil
 }
 
-func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (interface{}, error) {
-	var azs []mysqlmodel.AZ
+func VTapRebalance(db *metadb.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (interface{}, error) {
+	var azs []metadbmodel.AZ
 
 	hostType := "controller"
 	if argsType, ok := args["type"]; ok {
@@ -955,8 +955,8 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 // GetVTapPortsCount gets the number of virtual network cards covered by the deployed vtap,
 // and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
 func GetVTapPortsCount() (int, error) {
-	var vtaps []mysqlmodel.VTap
-	if err := mysql.DefaultDB.Find(&vtaps).Error; err != nil {
+	var vtaps []metadbmodel.VTap
+	if err := metadb.DefaultDB.Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
 	vtapHostIPs, vtapNodeIPs := mapset.NewSet(), mapset.NewSet()
@@ -973,8 +973,8 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var vms []mysqlmodel.VM
-	if err := mysql.DefaultDB.Find(&vms).Error; err != nil {
+	var vms []metadbmodel.VM
+	if err := metadb.DefaultDB.Find(&vms).Error; err != nil {
 		return 0, err
 	}
 	vtapVMIDs := mapset.NewSet()
@@ -984,8 +984,8 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var podNodes []mysqlmodel.PodNode
-	if err := mysql.DefaultDB.Find(&podNodes).Error; err != nil {
+	var podNodes []metadbmodel.PodNode
+	if err := metadb.DefaultDB.Find(&podNodes).Error; err != nil {
 		return 0, err
 	}
 	podNodeIDs := mapset.NewSet()
@@ -995,8 +995,8 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var pods []mysqlmodel.Pod
-	if err := mysql.DefaultDB.Find(&pods).Error; err != nil {
+	var pods []metadbmodel.Pod
+	if err := metadb.DefaultDB.Find(&pods).Error; err != nil {
 		return 0, err
 	}
 	vtapPodIDs := mapset.NewSet()
@@ -1006,8 +1006,8 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var lanIPs []mysqlmodel.LANIP
-	if err := mysql.DefaultDB.Find(&lanIPs).Error; err != nil {
+	var lanIPs []metadbmodel.LANIP
+	if err := metadb.DefaultDB.Find(&lanIPs).Error; err != nil {
 		return 0, err
 	}
 	pubVTapVIFs := mapset.NewSet()
@@ -1018,8 +1018,8 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	vtapVifCount := 0
-	var vinterfaces []mysqlmodel.VInterface
-	if err := mysql.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
+	var vinterfaces []metadbmodel.VInterface
+	if err := metadb.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
 		Find(&vinterfaces).Error; err != nil {
 		return 0, err
 	}

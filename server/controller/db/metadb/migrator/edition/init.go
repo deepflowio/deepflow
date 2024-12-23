@@ -19,10 +19,10 @@ package edition
 import (
 	"github.com/op/go-logging"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
 )
 
-var log = logging.MustGetLogger("db.mysql.migrator.edition")
+var log = logging.MustGetLogger("db.metadb.migrator.edition")
 
 func DropDatabaseIfInitTablesFailed(dc *common.DBConfig) error {
 	log.Infof(common.LogDBName(dc.Config.Database, "drop database if init CE tables failed"))

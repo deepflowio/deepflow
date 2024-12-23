@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/test"
 )
 
@@ -40,12 +40,12 @@ func TestSuite(t *testing.T) {
 	if _, err := os.Stat(TEST_DB_FILE); err == nil {
 		os.Remove(TEST_DB_FILE)
 	}
-	mysql.DefaultDB = GetDB(TEST_DB_FILE)
+	metadb.DefaultDB = GetDB(TEST_DB_FILE)
 	suite.Run(t, new(SuiteTest))
 }
 
 func (t *SuiteTest) SetupSuite() {
-	t.db = mysql.DefaultDB
+	t.db = metadb.DefaultDB
 
 	for _, val := range GetModels() {
 		t.db.AutoMigrate(val)

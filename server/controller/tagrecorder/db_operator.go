@@ -20,14 +20,14 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 )
 
 type operator[MT MySQLChModel, KT ChModelKey] interface {
-	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB), db *mysql.DB)
-	add(keys []KT, dbItems []MT, db *mysql.DB)
-	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB)
-	delete(keys []KT, dbItems []MT, db *mysql.DB)
+	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *metadb.DB), db *metadb.DB)
+	add(keys []KT, dbItems []MT, db *metadb.DB)
+	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *metadb.DB)
+	delete(keys []KT, dbItems []MT, db *metadb.DB)
 	setConfig(config.ControllerConfig)
 }
 
@@ -46,7 +46,7 @@ func (b *operatorComponent[MT, KT]) setConfig(cfg config.ControllerConfig) {
 	b.cfg = cfg
 }
 
-func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB), db *mysql.DB) {
+func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *metadb.DB), db *metadb.DB) {
 	count := len(items)
 	offset := b.cfg.TagRecorderCfg.MySQLBatchSize
 	var pages int
@@ -65,7 +65,7 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 	}
 }
 
-func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
+func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *metadb.DB) {
 	err := db.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(&dbItems).Error
@@ -76,7 +76,7 @@ func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
 	log.Infof("add %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems, db.LogPrefixORGID)
 }
 
-func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) {
+func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *metadb.DB) {
 	err := db.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error(), db.LogPrefixORGID)
@@ -85,7 +85,7 @@ func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]i
 	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo, db.LogPrefixORGID)
 }
 
-func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *mysql.DB) {
+func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *metadb.DB) {
 	err := db.Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error(), db.LogPrefixORGID)

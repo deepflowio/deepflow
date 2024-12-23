@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewNATGateway(c *cache.Cache, eq *queue.OverwriteQueue) *NATGateway {
 	return listener
 }
 
-func (g *NATGateway) OnUpdaterAdded(addedDBItems []*mysqlmodel.NATGateway) {
+func (g *NATGateway) OnUpdaterAdded(addedDBItems []*metadbmodel.NATGateway) {
 	g.eventProducer.ProduceByAdd(addedDBItems)
 	g.cache.AddNATGateways(addedDBItems)
 }

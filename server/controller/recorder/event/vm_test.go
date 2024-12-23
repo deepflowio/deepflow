@@ -22,7 +22,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -32,7 +32,7 @@ import (
 
 func TestVM_ProduceByAdd(t *testing.T) {
 	type args struct {
-		items []*mysqlmodel.VM
+		items []*metadbmodel.VM
 	}
 	tests := []struct {
 		name      string
@@ -47,26 +47,26 @@ func TestVM_ProduceByAdd(t *testing.T) {
 		{
 			name: "add success",
 			args: args{
-				items: []*mysqlmodel.VM{
+				items: []*metadbmodel.VM{
 					{
-						Base:  mysqlmodel.Base{ID: 1},
+						Base:  metadbmodel.Base{ID: 1},
 						Name:  "vm_name",
 						VPCID: 3,
 					},
 				},
 			},
 			prepare: func(cache *cache.Cache) {
-				cache.AddRegion(&mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
-				cache.AddAZ(&mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
-				cache.AddVPCs([]*mysqlmodel.VPC{{Base: mysqlmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
-				cache.AddHost(&mysqlmodel.Host{
-					Base:   mysqlmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
+				cache.AddRegion(&metadbmodel.Region{Base: metadbmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&metadbmodel.AZ{Base: metadbmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*metadbmodel.VPC{{Base: metadbmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&metadbmodel.Host{
+					Base:   metadbmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
 					IP:     "10.233.101.79",
 					Region: "region_lcuuid",
 					AZ:     "az_lcuuid",
 				})
-				cache.AddVM(&mysqlmodel.VM{
-					Base: mysqlmodel.Base{
+				cache.AddVM(&metadbmodel.VM{
+					Base: metadbmodel.Base{
 						ID:     1,
 						Lcuuid: "vm_lcuuid",
 					},
@@ -124,17 +124,17 @@ func TestVM_ProduceByDelete(t *testing.T) {
 				lcuuids: []string{"vm_lcuuid"},
 			},
 			prepare: func(cache *cache.Cache) {
-				cache.AddRegion(&mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
-				cache.AddAZ(&mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
-				cache.AddVPCs([]*mysqlmodel.VPC{{Base: mysqlmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
-				cache.AddHost(&mysqlmodel.Host{
-					Base:   mysqlmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
+				cache.AddRegion(&metadbmodel.Region{Base: metadbmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&metadbmodel.AZ{Base: metadbmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*metadbmodel.VPC{{Base: metadbmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&metadbmodel.Host{
+					Base:   metadbmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
 					IP:     "10.233.101.79",
 					Region: "region_lcuuid",
 					AZ:     "az_lcuuid",
 				})
-				cache.AddVM(&mysqlmodel.VM{
-					Base: mysqlmodel.Base{
+				cache.AddVM(&metadbmodel.VM{
+					Base: metadbmodel.Base{
 						ID:     1,
 						Lcuuid: "vm_lcuuid",
 					},
@@ -187,17 +187,17 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 				},
 			},
 			prepare: func(cache *cache.Cache) {
-				cache.AddRegion(&mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
-				cache.AddAZ(&mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
-				cache.AddVPCs([]*mysqlmodel.VPC{{Base: mysqlmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
-				cache.AddHost(&mysqlmodel.Host{
-					Base:   mysqlmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
+				cache.AddRegion(&metadbmodel.Region{Base: metadbmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&metadbmodel.AZ{Base: metadbmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*metadbmodel.VPC{{Base: metadbmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&metadbmodel.Host{
+					Base:   metadbmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
 					IP:     "10.233.101.79",
 					Region: "region_lcuuid",
 					AZ:     "az_lcuuid",
 				})
-				cache.AddVM(&mysqlmodel.VM{
-					Base: mysqlmodel.Base{
+				cache.AddVM(&metadbmodel.VM{
+					Base: metadbmodel.Base{
 						ID:     1,
 						Lcuuid: "vm_lcuuid",
 					},
@@ -226,17 +226,17 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 				},
 			},
 			prepare: func(cache *cache.Cache) {
-				cache.AddRegion(&mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
-				cache.AddAZ(&mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
-				cache.AddVPCs([]*mysqlmodel.VPC{{Base: mysqlmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
-				cache.AddHost(&mysqlmodel.Host{
-					Base:   mysqlmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
+				cache.AddRegion(&metadbmodel.Region{Base: metadbmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&metadbmodel.AZ{Base: metadbmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*metadbmodel.VPC{{Base: metadbmodel.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&metadbmodel.Host{
+					Base:   metadbmodel.Base{ID: 4, Lcuuid: "host_lcuuid"},
 					IP:     "10.233.101.79",
 					Region: "region_lcuuid",
 					AZ:     "az_lcuuid",
 				})
-				cache.AddVM(&mysqlmodel.VM{
-					Base: mysqlmodel.Base{
+				cache.AddVM(&metadbmodel.VM{
+					Base: metadbmodel.Base{
 						ID:     1,
 						Lcuuid: "vm_lcuuid",
 					},

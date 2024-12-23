@@ -25,8 +25,8 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -48,7 +48,7 @@ type Trisolaris struct {
 	nodeInfo       *node.NodeInfo
 	kubernetesInfo *kubernetes.KubernetesInfo
 	startTime      int64
-	mDB            *mysql.DB
+	mDB            *metadb.DB
 	ctx            context.Context
 	cancel         context.CancelFunc
 }
@@ -319,7 +319,7 @@ func (t *Trisolaris) GetNodeInfo() *node.NodeInfo {
 	return t.nodeInfo
 }
 
-func NewTrisolaris(cfg *config.Config, mDB *mysql.DB, pctx context.Context, startTime int64) *Trisolaris {
+func NewTrisolaris(cfg *config.Config, mDB *metadb.DB, pctx context.Context, startTime int64) *Trisolaris {
 	ctx, cancel := context.WithCancel(pctx)
 	metaData := metadata.NewMetaData(mDB.DB, cfg, mDB.ORGID, ctx)
 	trisolaris := &Trisolaris{
@@ -361,13 +361,13 @@ func NewTrisolarisManager(cfg *config.Config, db *gorm.DB) *TrisolarisManager {
 func (m *TrisolarisManager) Start() error {
 	go m.refreshOP.TimedRefreshIPs()
 	m.startTime = getStartTime()
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error(err)
 		return err
 	}
 	log.Infof("get orgIDs : %v", orgIDs)
-	trisolaris := NewTrisolaris(m.config, mysql.DefaultDB, m.ctx, m.startTime)
+	trisolaris := NewTrisolaris(m.config, metadb.DefaultDB, m.ctx, m.startTime)
 	m.orgToTrisolaris[DEFAULT_ORG_ID] = trisolaris
 	go trisolaris.Start()
 	orgIDsUint32 := make([]uint32, len(orgIDs), len(orgIDs))
@@ -376,7 +376,7 @@ func (m *TrisolarisManager) Start() error {
 		if utils.CheckOrgID(orgID) == false || orgID == DEFAULT_ORG_ID {
 			continue
 		}
-		orgDB, err := mysql.GetDB(orgID)
+		orgDB, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error(err)
 			continue
@@ -403,12 +403,12 @@ func (m *TrisolarisManager) getTeamData(orgIDs []int) {
 	teamIDToOrgID := make(map[string]int)
 	teamIDStrToInt := make(map[string]int)
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error(err)
 			continue
 		}
-		teams, err := dbmgr.DBMgr[mysqlmodel.Team](db.DB).Gets()
+		teams, err := dbmgr.DBMgr[metadbmodel.Team](db.DB).Gets()
 		if err != nil {
 			log.Errorf("get org(id=%d) team failed, err(%s)", orgID, err)
 			continue
@@ -476,7 +476,7 @@ func (m *TrisolarisManager) GetVTapCache(orgID int, key string) *vtap.VTapCache 
 }
 
 func (m *TrisolarisManager) checkORG() {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error(err)
 		return
@@ -501,7 +501,7 @@ func (m *TrisolarisManager) checkORG() {
 			}
 		} else {
 			if trisolaris == nil {
-				orgDB, err := mysql.GetDB(orgID)
+				orgDB, err := metadb.GetDB(orgID)
 				if err != nil {
 					log.Error(err)
 					continue

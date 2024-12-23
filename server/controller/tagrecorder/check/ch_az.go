@@ -17,19 +17,19 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChAZ struct {
-	UpdaterBase[mysqlmodel.ChAZ, IDKey]
+	UpdaterBase[metadbmodel.ChAZ, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	updater := &ChAZ{
-		UpdaterBase[mysqlmodel.ChAZ, IDKey]{
+		UpdaterBase[metadbmodel.ChAZ, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_AZ,
 		},
 		domainLcuuidToIconID,
@@ -39,16 +39,16 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 	return updater
 }
 
-func (a *ChAZ) generateNewData() (map[IDKey]mysqlmodel.ChAZ, bool) {
+func (a *ChAZ) generateNewData() (map[IDKey]metadbmodel.ChAZ, bool) {
 	log.Infof("generate data for %s", a.resourceTypeName, a.db.LogPrefixORGID)
-	var azs []mysqlmodel.AZ
+	var azs []metadbmodel.AZ
 	err := a.db.Unscoped().Find(&azs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(a.resourceTypeName, err), a.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChAZ)
+	keyToItem := make(map[IDKey]metadbmodel.ChAZ)
 
 	for _, az := range azs {
 		iconID := a.domainLcuuidToIconID[az.Domain]
@@ -59,7 +59,7 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysqlmodel.ChAZ, bool) {
 			iconID = a.resourceTypeToIconID[key]
 		}
 		if az.DeletedAt.Valid {
-			keyToItem[IDKey{ID: az.ID}] = mysqlmodel.ChAZ{
+			keyToItem[IDKey{ID: az.ID}] = metadbmodel.ChAZ{
 				ID:       az.ID,
 				Name:     az.Name + " (deleted)",
 				IconID:   iconID,
@@ -67,7 +67,7 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysqlmodel.ChAZ, bool) {
 				DomainID: tagrecorder.DomainToDomainID[az.Domain],
 			}
 		} else {
-			keyToItem[IDKey{ID: az.ID}] = mysqlmodel.ChAZ{
+			keyToItem[IDKey{ID: az.ID}] = metadbmodel.ChAZ{
 				ID:       az.ID,
 				Name:     az.Name,
 				IconID:   iconID,
@@ -80,11 +80,11 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysqlmodel.ChAZ, bool) {
 	return keyToItem, true
 }
 
-func (a *ChAZ) generateKey(dbItem mysqlmodel.ChAZ) IDKey {
+func (a *ChAZ) generateKey(dbItem metadbmodel.ChAZ) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (a *ChAZ) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAZ) (map[string]interface{}, bool) {
+func (a *ChAZ) generateUpdateInfo(oldItem, newItem metadbmodel.ChAZ) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

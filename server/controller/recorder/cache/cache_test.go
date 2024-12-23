@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 )
 
 const (
@@ -30,7 +30,7 @@ const (
 )
 
 func TestAddRegion(t *testing.T) {
-	mysqlItem := &mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.Region{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.Regions), 0)
 	cache.AddRegion(mysqlItem)
@@ -39,7 +39,7 @@ func TestAddRegion(t *testing.T) {
 }
 
 func TestAddAZ(t *testing.T) {
-	mysqlItem := &mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.AZ{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.AZs), 0)
 	cache.AddAZ(mysqlItem)
@@ -47,7 +47,7 @@ func TestAddAZ(t *testing.T) {
 }
 
 func TestAddSubDomain(t *testing.T) {
-	mysqlItem := &mysqlmodel.SubDomain{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.SubDomain{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.SubDomains), 0)
 	cache.AddSubDomain(mysqlItem)
@@ -55,7 +55,7 @@ func TestAddSubDomain(t *testing.T) {
 }
 
 func TestAddHost(t *testing.T) {
-	mysqlItem := &mysqlmodel.Host{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.Host{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.Hosts), 0)
 	cache.AddHost(mysqlItem)
@@ -64,7 +64,7 @@ func TestAddHost(t *testing.T) {
 }
 
 func TestAddVM(t *testing.T) {
-	mysqlItem := &mysqlmodel.VM{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.VM{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.VMs), 0)
 	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
@@ -74,7 +74,7 @@ func TestAddVM(t *testing.T) {
 }
 
 func TestAddNetwork(t *testing.T) {
-	mysqlItem := &mysqlmodel.Network{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.Network{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	assert.Equal(t, len(cache.Networks), 0)
@@ -84,15 +84,15 @@ func TestAddNetwork(t *testing.T) {
 }
 
 func TestAddSubnets(t *testing.T) {
-	mysqlItem := &mysqlmodel.Subnet{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}, NetworkID: 9}
+	mysqlItem := &metadbmodel.Subnet{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}, NetworkID: 9}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.Subnets), 0)
-	cache.AddSubnets([]*mysqlmodel.Subnet{mysqlItem})
+	cache.AddSubnets([]*metadbmodel.Subnet{mysqlItem})
 	assert.Equal(t, len(cache.Subnets), 1)
 }
 
 func TestAddVRouter(t *testing.T) {
-	mysqlItem := &mysqlmodel.VRouter{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.VRouter{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	assert.Equal(t, len(cache.VRouters), 0)
@@ -102,59 +102,59 @@ func TestAddVRouter(t *testing.T) {
 }
 
 func TestAddRoutingTables(t *testing.T) {
-	mysqlItem := &mysqlmodel.RoutingTable{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.RoutingTable{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.RoutingTables), 0)
-	cache.AddRoutingTables([]*mysqlmodel.RoutingTable{mysqlItem})
+	cache.AddRoutingTables([]*metadbmodel.RoutingTable{mysqlItem})
 	assert.Equal(t, len(cache.RoutingTables), 1)
 }
 
 func TestAddDHCPPorts(t *testing.T) {
-	mysqlItem := &mysqlmodel.DHCPPort{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.DHCPPort{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.DHCPPorts), 0)
-	cache.AddDHCPPorts([]*mysqlmodel.DHCPPort{mysqlItem})
+	cache.AddDHCPPorts([]*metadbmodel.DHCPPort{mysqlItem})
 	assert.Equal(t, len(cache.DHCPPorts), 1)
 	assert.Equal(t, cache.dhcpPortLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddVInterfaces(t *testing.T) {
-	mysqlItem := &mysqlmodel.VInterface{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}, NetworkID: 9}
+	mysqlItem := &metadbmodel.VInterface{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}, NetworkID: 9}
 	networkLcuuid := uuid.New().String()
 	cache := NewCache(DOMAIN_LCUUID)
 	cache.networkIDToLcuuid[mysqlItem.NetworkID] = networkLcuuid
 	assert.Equal(t, len(cache.VInterfaces), 0)
-	cache.AddVInterfaces([]*mysqlmodel.VInterface{mysqlItem})
+	cache.AddVInterfaces([]*metadbmodel.VInterface{mysqlItem})
 	assert.Equal(t, len(cache.VInterfaces), 1)
 	assert.Equal(t, cache.vinterfaceLcuuidToNetworkID[mysqlItem.Lcuuid], 9)
 }
 
 func TestAddWANIPs(t *testing.T) {
-	mysqlItem := &mysqlmodel.WANIP{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.WANIP{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.WANIPs), 0)
-	cache.AddWANIPs([]*mysqlmodel.WANIP{mysqlItem})
+	cache.AddWANIPs([]*metadbmodel.WANIP{mysqlItem})
 	assert.Equal(t, len(cache.WANIPs), 1)
 }
 
 func TestAddLANIPs(t *testing.T) {
-	mysqlItem := &mysqlmodel.LANIP{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.LANIP{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.LANIPs), 0)
-	cache.AddLANIPs([]*mysqlmodel.LANIP{mysqlItem})
+	cache.AddLANIPs([]*metadbmodel.LANIP{mysqlItem})
 	assert.Equal(t, len(cache.LANIPs), 1)
 }
 
 func TestAddFloatingIPs(t *testing.T) {
-	mysqlItem := &mysqlmodel.FloatingIP{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.FloatingIP{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.FloatingIPs), 0)
-	cache.AddFloatingIPs([]*mysqlmodel.FloatingIP{mysqlItem})
+	cache.AddFloatingIPs([]*metadbmodel.FloatingIP{mysqlItem})
 	assert.Equal(t, len(cache.FloatingIPs), 1)
 }
 
 func TestAddSecurityGroup(t *testing.T) {
-	mysqlItem := &mysql.SecurityGroup{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadb.SecurityGroup{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.SecurityGroups), 0)
 	cache.AddSecurityGroup(mysqlItem)
@@ -163,143 +163,143 @@ func TestAddSecurityGroup(t *testing.T) {
 }
 
 func TestAddSecurityGroupRules(t *testing.T) {
-	mysqlItem := &mysql.SecurityGroupRule{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadb.SecurityGroupRule{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.SecurityGroupRules), 0)
-	cache.AddSecurityGroupRules([]*mysql.SecurityGroupRule{mysqlItem})
+	cache.AddSecurityGroupRules([]*metadb.SecurityGroupRule{mysqlItem})
 	assert.Equal(t, len(cache.SecurityGroupRules), 1)
 }
 
 func TestAddVMSecurityGroups(t *testing.T) {
-	mysqlItem := &mysql.VMSecurityGroup{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadb.VMSecurityGroup{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.VMSecurityGroups), 0)
-	cache.AddVMSecurityGroups([]*mysql.VMSecurityGroup{mysqlItem})
+	cache.AddVMSecurityGroups([]*metadb.VMSecurityGroup{mysqlItem})
 	assert.Equal(t, len(cache.VMSecurityGroups), 1)
 }
 
 func TestAddNATGateways(t *testing.T) {
-	mysqlItem := &mysqlmodel.NATGateway{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.NATGateway{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.NATGateways), 0)
-	cache.AddNATGateways([]*mysqlmodel.NATGateway{mysqlItem})
+	cache.AddNATGateways([]*metadbmodel.NATGateway{mysqlItem})
 	assert.Equal(t, len(cache.NATGateways), 1)
 	assert.Equal(t, cache.natGatewayLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddNATRules(t *testing.T) {
-	mysqlItem := &mysqlmodel.NATRule{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.NATRule{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.NATRules), 0)
-	cache.AddNATRules([]*mysqlmodel.NATRule{mysqlItem})
+	cache.AddNATRules([]*metadbmodel.NATRule{mysqlItem})
 	assert.Equal(t, len(cache.NATRules), 1)
 }
 
 func TestAddNATVMConnections(t *testing.T) {
-	mysqlItem := &mysqlmodel.NATVMConnection{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.NATVMConnection{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.NATVMConnections), 0)
-	cache.AddNATVMConnections([]*mysqlmodel.NATVMConnection{mysqlItem})
+	cache.AddNATVMConnections([]*metadbmodel.NATVMConnection{mysqlItem})
 	assert.Equal(t, len(cache.NATVMConnections), 1)
 }
 
 func TestAddLBs(t *testing.T) {
-	mysqlItem := &mysqlmodel.LB{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.LB{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.LBs), 0)
-	cache.AddLBs([]*mysqlmodel.LB{mysqlItem})
+	cache.AddLBs([]*metadbmodel.LB{mysqlItem})
 	assert.Equal(t, len(cache.LBs), 1)
 	assert.Equal(t, cache.lbLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddLBListeners(t *testing.T) {
-	mysqlItem := &mysqlmodel.LBListener{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.LBListener{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.LBListeners), 0)
-	cache.AddLBListeners([]*mysqlmodel.LBListener{mysqlItem})
+	cache.AddLBListeners([]*metadbmodel.LBListener{mysqlItem})
 	assert.Equal(t, len(cache.LBListeners), 1)
 }
 
 func TestAddLBTargetServers(t *testing.T) {
-	mysqlItem := &mysqlmodel.LBTargetServer{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.LBTargetServer{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.LBTargetServers), 0)
-	cache.AddLBTargetServers([]*mysqlmodel.LBTargetServer{mysqlItem})
+	cache.AddLBTargetServers([]*metadbmodel.LBTargetServer{mysqlItem})
 	assert.Equal(t, len(cache.LBTargetServers), 1)
 }
 
 func TestAddLBVMConnections(t *testing.T) {
-	mysqlItem := &mysqlmodel.LBVMConnection{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.LBVMConnection{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.LBVMConnections), 0)
-	cache.AddLBVMConnections([]*mysqlmodel.LBVMConnection{mysqlItem})
+	cache.AddLBVMConnections([]*metadbmodel.LBVMConnection{mysqlItem})
 	assert.Equal(t, len(cache.LBVMConnections), 1)
 }
 
 func TestAddPeerConnections(t *testing.T) {
-	mysqlItem := &mysqlmodel.PeerConnection{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PeerConnection{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	cache.regionIDToLcuuid[mysqlItem.RemoteRegionID] = uuid.New().String()
 	cache.regionIDToLcuuid[mysqlItem.LocalRegionID] = uuid.New().String()
 	assert.Equal(t, len(cache.PeerConnections), 0)
-	cache.AddPeerConnections([]*mysqlmodel.PeerConnection{mysqlItem})
+	cache.AddPeerConnections([]*metadbmodel.PeerConnection{mysqlItem})
 	assert.Equal(t, len(cache.PeerConnections), 1)
 }
 
 func TestAddCENs(t *testing.T) {
-	mysqlItem := &mysqlmodel.CEN{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.CEN{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.CENs), 0)
-	cache.AddCENs([]*mysqlmodel.CEN{mysqlItem})
+	cache.AddCENs([]*metadbmodel.CEN{mysqlItem})
 	assert.Equal(t, len(cache.CENs), 1)
 }
 
 func TestAddRDSInstances(t *testing.T) {
-	mysqlItem := &mysqlmodel.RDSInstance{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.RDSInstance{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.RDSInstances), 0)
-	cache.AddRDSInstances([]*mysqlmodel.RDSInstance{mysqlItem})
+	cache.AddRDSInstances([]*metadbmodel.RDSInstance{mysqlItem})
 	assert.Equal(t, len(cache.RDSInstances), 1)
 	assert.Equal(t, cache.rdsInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddRedisInstances(t *testing.T) {
-	mysqlItem := &mysqlmodel.RedisInstance{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.RedisInstance{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.RedisInstances), 0)
-	cache.AddRedisInstances([]*mysqlmodel.RedisInstance{mysqlItem})
+	cache.AddRedisInstances([]*metadbmodel.RedisInstance{mysqlItem})
 	assert.Equal(t, len(cache.RedisInstances), 1)
 	assert.Equal(t, cache.redisInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodClusters(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodCluster{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodCluster{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodClusters), 0)
-	cache.AddPodClusters([]*mysqlmodel.PodCluster{mysqlItem})
+	cache.AddPodClusters([]*metadbmodel.PodCluster{mysqlItem})
 	assert.Equal(t, len(cache.PodClusters), 1)
 	assert.Equal(t, cache.podClusterLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodNodes(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodNode{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodNode{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodNodes), 0)
-	cache.AddPodNodes([]*mysqlmodel.PodNode{mysqlItem})
+	cache.AddPodNodes([]*metadbmodel.PodNode{mysqlItem})
 	assert.Equal(t, len(cache.PodNodes), 1)
 	assert.Equal(t, cache.podNodeIDToLcuuid[mysqlItem.ID], mysqlItem.Lcuuid)
 }
 
 func TestAddPodNamespaces(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodNamespace{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodNamespace{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodNamespaces), 0)
-	cache.AddPodNamespaces([]*mysqlmodel.PodNamespace{mysqlItem})
+	cache.AddPodNamespaces([]*metadbmodel.PodNamespace{mysqlItem})
 	assert.Equal(t, len(cache.PodNamespaces), 1)
 }
 
 func TestAddPodIngress(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodIngress{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodIngress{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodIngresses), 0)
 	cache.AddPodIngress(mysqlItem)
@@ -307,24 +307,24 @@ func TestAddPodIngress(t *testing.T) {
 }
 
 func TestAddPodIngressRules(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodIngressRule{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodIngressRule{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodIngressRules), 0)
-	cache.AddPodIngressRules([]*mysqlmodel.PodIngressRule{mysqlItem})
+	cache.AddPodIngressRules([]*metadbmodel.PodIngressRule{mysqlItem})
 	assert.Equal(t, len(cache.PodIngressRules), 1)
 	assert.Equal(t, cache.podIngressRuleLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodIngressRuleBackends(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodIngressRuleBackend{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodIngressRuleBackend{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodIngressRuleBackends), 0)
-	cache.AddPodIngressRuleBackends([]*mysqlmodel.PodIngressRuleBackend{mysqlItem})
+	cache.AddPodIngressRuleBackends([]*metadbmodel.PodIngressRuleBackend{mysqlItem})
 	assert.Equal(t, len(cache.PodIngressRuleBackends), 1)
 }
 
 func TestAddPodService(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodService{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodService{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodServices), 0)
 	cache.AddPodService(mysqlItem)
@@ -332,53 +332,53 @@ func TestAddPodService(t *testing.T) {
 }
 
 func TestAddPodServicePorts(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodServicePort{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodServicePort{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodServicePorts), 0)
-	cache.AddPodServicePorts([]*mysqlmodel.PodServicePort{mysqlItem})
+	cache.AddPodServicePorts([]*metadbmodel.PodServicePort{mysqlItem})
 	assert.Equal(t, len(cache.PodServicePorts), 1)
 }
 
 func TestAddPodGroups(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodGroup{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodGroup{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodGroups), 0)
-	cache.AddPodGroups([]*mysqlmodel.PodGroup{mysqlItem})
+	cache.AddPodGroups([]*metadbmodel.PodGroup{mysqlItem})
 	assert.Equal(t, len(cache.PodGroups), 1)
 }
 
 func TestAddPodGroupPorts(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodGroupPort{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodGroupPort{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodGroupPorts), 0)
-	cache.AddPodGroupPorts([]*mysqlmodel.PodGroupPort{mysqlItem})
+	cache.AddPodGroupPorts([]*metadbmodel.PodGroupPort{mysqlItem})
 	assert.Equal(t, len(cache.PodGroupPorts), 1)
 }
 
 func TestAddPodReplicaSets(t *testing.T) {
-	mysqlItem := &mysqlmodel.PodReplicaSet{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.PodReplicaSet{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.PodReplicaSets), 0)
-	cache.AddPodReplicaSets([]*mysqlmodel.PodReplicaSet{mysqlItem})
+	cache.AddPodReplicaSets([]*metadbmodel.PodReplicaSet{mysqlItem})
 	assert.Equal(t, len(cache.PodReplicaSets), 1)
 }
 
 func TestAddPods(t *testing.T) {
-	mysqlItem := &mysqlmodel.Pod{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.Pod{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	cache.podNodeIDToLcuuid[mysqlItem.PodNodeID] = uuid.New().String()
 	cache.podReplicaSetIDToLcuuid[mysqlItem.PodReplicaSetID] = uuid.New().String()
 	assert.Equal(t, len(cache.Pods), 0)
-	cache.AddPods([]*mysqlmodel.Pod{mysqlItem})
+	cache.AddPods([]*metadbmodel.Pod{mysqlItem})
 	assert.Equal(t, len(cache.Pods), 1)
 }
 
 func TestAddVMPodNodeConnections(t *testing.T) {
-	mysqlItem := &mysqlmodel.VMPodNodeConnection{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
+	mysqlItem := &metadbmodel.VMPodNodeConnection{Base: metadbmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.VMPodNodeConnections), 0)
-	cache.AddVMPodNodeConnections([]*mysqlmodel.VMPodNodeConnection{mysqlItem})
+	cache.AddVMPodNodeConnections([]*metadbmodel.VMPodNodeConnection{mysqlItem})
 	assert.Equal(t, len(cache.VMPodNodeConnections), 1)
 }
 

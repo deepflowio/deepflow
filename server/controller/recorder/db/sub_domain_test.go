@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBSubDomain() *mysqlmodel.SubDomain {
-	return &mysqlmodel.SubDomain{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBSubDomain() *metadbmodel.SubDomain {
+	return &metadbmodel.SubDomain{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddSubDomainBatchSuccess() {
 	operator := NewSubDomain()
 	itemToAdd := newDBSubDomain()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.SubDomain{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.SubDomain{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.SubDomain
+	var addedItem *metadbmodel.SubDomain
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.SubDomain{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.SubDomain{})
 }
 
 func (t *SuiteTest) TestUpdateSubDomainSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateSubDomainSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.SubDomain
+	var updatedItem *metadbmodel.SubDomain
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.SubDomain{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.SubDomain{})
 }
 
 func (t *SuiteTest) TestDeleteSubDomainSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeleteSubDomainSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.SubDomain
+	var deletedItem *metadbmodel.SubDomain
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -17,12 +17,12 @@
 package resource
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func GetVPCs(orgID int, filter map[string]interface{}) ([]*mysqlmodel.VPC, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+func GetVPCs(orgID int, filter map[string]interface{}) ([]*metadbmodel.VPC, error) {
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func GetVPCs(orgID int, filter map[string]interface{}) ([]*mysqlmodel.VPC, error
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
-	var vpcs []*mysqlmodel.VPC
+	var vpcs []*metadbmodel.VPC
 	if err := db.Where("deleted_at IS NULL").Order("created_at DESC").Find(&vpcs).Error; err != nil {
 		return nil, err
 	}

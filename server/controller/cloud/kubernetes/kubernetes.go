@@ -23,7 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -41,7 +41,7 @@ type Kubernetes struct {
 	portNameRegex         string
 }
 
-func NewKubernetes(orgID int, domain mysqlmodel.Domain) (*Kubernetes, error) {
+func NewKubernetes(orgID int, domain metadbmodel.Domain) (*Kubernetes, error) {
 	configJson, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

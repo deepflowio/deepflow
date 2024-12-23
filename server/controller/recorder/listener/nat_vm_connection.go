@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewNATVMConnection(c *cache.Cache) *NATVMConnection {
 	return listener
 }
 
-func (c *NATVMConnection) OnUpdaterAdded(addedDBItems []*mysqlmodel.NATVMConnection) {
+func (c *NATVMConnection) OnUpdaterAdded(addedDBItems []*metadbmodel.NATVMConnection) {
 	c.cache.AddNATVMConnections(addedDBItems)
 }
 

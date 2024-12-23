@@ -19,11 +19,11 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddDHCPPort(dbItem *mysqlmodel.DHCPPort, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddDHCPPort(dbItem *metadbmodel.DHCPPort, seq int, toolDataSet *tool.DataSet) {
 	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
 	b.DHCPPorts[dbItem.Lcuuid] = &DHCPPort{
 		DiffBase: DiffBase{

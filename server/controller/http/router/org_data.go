@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	metadbcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -31,7 +31,7 @@ import (
 )
 
 type ORGData struct {
-	mysqlCfg mysqlcfg.MySqlConfig
+	mysqlCfg metadbcfg.MySqlConfig
 	cfg      *config.ControllerConfig
 }
 

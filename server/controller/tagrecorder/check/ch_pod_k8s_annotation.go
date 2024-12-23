@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodK8sAnnotation struct {
-	UpdaterBase[mysqlmodel.ChPodK8sAnnotation, K8sAnnotationKey]
+	UpdaterBase[metadbmodel.ChPodK8sAnnotation, K8sAnnotationKey]
 }
 
 func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 	updater := &ChPodK8sAnnotation{
-		UpdaterBase[mysqlmodel.ChPodK8sAnnotation, K8sAnnotationKey]{
+		UpdaterBase[metadbmodel.ChPodK8sAnnotation, K8sAnnotationKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_ANNOTATION,
 		},
 	}
@@ -37,8 +37,8 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 	return updater
 }
 
-func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysqlmodel.ChPodK8sAnnotation, bool) {
-	var pods []mysqlmodel.Pod
+func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]metadbmodel.ChPodK8sAnnotation, bool) {
+	var pods []metadbmodel.Pod
 
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
@@ -46,7 +46,7 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysqlmodel.
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sAnnotationKey]mysqlmodel.ChPodK8sAnnotation)
+	keyToItem := make(map[K8sAnnotationKey]metadbmodel.ChPodK8sAnnotation)
 	for _, pod := range pods {
 		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
 		if err != nil {
@@ -61,7 +61,7 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysqlmodel.
 					ID:  pod.ID,
 					Key: annotationInfo[0],
 				}
-				keyToItem[key] = mysqlmodel.ChPodK8sAnnotation{
+				keyToItem[key] = metadbmodel.ChPodK8sAnnotation{
 					ID:          pod.ID,
 					Key:         annotationInfo[0],
 					Value:       annotationInfo[1],
@@ -77,11 +77,11 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysqlmodel.
 	return keyToItem, true
 }
 
-func (k *ChPodK8sAnnotation) generateKey(dbItem mysqlmodel.ChPodK8sAnnotation) K8sAnnotationKey {
+func (k *ChPodK8sAnnotation) generateKey(dbItem metadbmodel.ChPodK8sAnnotation) K8sAnnotationKey {
 	return K8sAnnotationKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (k *ChPodK8sAnnotation) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodK8sAnnotation) (map[string]interface{}, bool) {
+func (k *ChPodK8sAnnotation) generateUpdateInfo(oldItem, newItem metadbmodel.ChPodK8sAnnotation) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

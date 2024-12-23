@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPod struct {
-	UpdaterBase[mysqlmodel.ChPod, IDKey]
+	UpdaterBase[metadbmodel.ChPod, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 	updater := &ChPod{
-		UpdaterBase[mysqlmodel.ChPod, IDKey]{
+		UpdaterBase[metadbmodel.ChPod, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD,
 		},
 		resourceTypeToIconID,
@@ -37,10 +37,10 @@ func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 	return updater
 }
 
-func (p *ChPod) generateNewData() (map[IDKey]mysqlmodel.ChPod, bool) {
+func (p *ChPod) generateNewData() (map[IDKey]metadbmodel.ChPod, bool) {
 	var (
-		pods          []mysqlmodel.Pod
-		podGroupPorts []mysqlmodel.PodGroupPort
+		pods          []metadbmodel.Pod
+		podGroupPorts []metadbmodel.PodGroupPort
 	)
 	err := p.db.Unscoped().Find(&pods).Error
 	if err != nil {
@@ -59,7 +59,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysqlmodel.ChPod, bool) {
 		groupToService[podGroupPort.PodGroupID] = podGroupPort.PodServiceID
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChPod)
+	keyToItem := make(map[IDKey]metadbmodel.ChPod)
 	for _, pod := range pods {
 		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
 		if err != nil {
@@ -68,7 +68,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysqlmodel.ChPod, bool) {
 
 		podServiceID := groupToService[pod.PodGroupID]
 		if pod.DeletedAt.Valid {
-			keyToItem[IDKey{ID: pod.ID}] = mysqlmodel.ChPod{
+			keyToItem[IDKey{ID: pod.ID}] = metadbmodel.ChPod{
 				ID:           pod.ID,
 				Name:         pod.Name + " (deleted)",
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
@@ -82,7 +82,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysqlmodel.ChPod, bool) {
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: pod.ID}] = mysqlmodel.ChPod{
+			keyToItem[IDKey{ID: pod.ID}] = metadbmodel.ChPod{
 				ID:           pod.ID,
 				Name:         pod.Name,
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
@@ -100,11 +100,11 @@ func (p *ChPod) generateNewData() (map[IDKey]mysqlmodel.ChPod, bool) {
 	return keyToItem, true
 }
 
-func (p *ChPod) generateKey(dbItem mysqlmodel.ChPod) IDKey {
+func (p *ChPod) generateKey(dbItem metadbmodel.ChPod) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPod) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPod) (map[string]interface{}, bool) {
+func (p *ChPod) generateUpdateInfo(oldItem, newItem metadbmodel.ChPod) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

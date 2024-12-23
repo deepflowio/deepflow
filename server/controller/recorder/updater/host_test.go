@@ -24,7 +24,7 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -45,7 +45,7 @@ func (t *SuiteTest) getHostMock(mockDB bool) (*cache.Cache, cloudmodel.Host) {
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.Host{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.Host{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.Hosts[cloudItem.Lcuuid] = &diffbase.Host{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -61,12 +61,12 @@ func (t *SuiteTest) TestHandleAddHostSucess() {
 	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.Host
+	var addedItem *metadbmodel.Host
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Hosts), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Host{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Host{})
 }
 
 func (t *SuiteTest) TestHandleUpdateHostSucess() {
@@ -78,7 +78,7 @@ func (t *SuiteTest) TestHandleUpdateHostSucess() {
 	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var updatedItem *mysqlmodel.Host
+	var updatedItem *metadbmodel.Host
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Hosts), 1)
@@ -86,7 +86,7 @@ func (t *SuiteTest) TestHandleUpdateHostSucess() {
 	assert.Equal(t.T(), updatedItem.VCPUNum, cloudItem.VCPUNum)
 	assert.Equal(t.T(), updatedItem.AZ, cloudItem.AZLcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Host{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Host{})
 }
 
 func (t *SuiteTest) TestHandleDeleteHostSucess() {
@@ -96,7 +96,7 @@ func (t *SuiteTest) TestHandleDeleteHostSucess() {
 	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.Host
+	var addedItem *metadbmodel.Host
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Hosts), 0)

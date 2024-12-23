@@ -26,8 +26,8 @@ import (
 	"time"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -106,18 +106,18 @@ func (k *KubernetesStorage) fetch() {
 func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
 	var controllerIP, domainLcuuid, subDomainLcuuid string
 
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return err
 	}
 
-	var subDomains []mysqlmodel.SubDomain
+	var subDomains []metadbmodel.SubDomain
 	err = db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
 	if err != nil {
 		return err
 	}
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	switch len(subDomains) {
 	case 0:
 		err = db.Where("cluster_id = ? AND type = ?", clusterID, ccommon.KUBERNETES).First(&domain).Error
@@ -139,7 +139,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in mysql table sub_domain", clusterID))
 	}
 
-	var controller mysqlmodel.Controller
+	var controller metadbmodel.Controller
 	err = db.Where("ip = ? AND state <> ?", controllerIP, ccommon.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
 	if err != nil {
 		return err

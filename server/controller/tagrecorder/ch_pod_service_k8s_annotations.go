@@ -18,18 +18,18 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodServiceK8sAnnotations struct {
-	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey]
+	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, metadbmodel.PodService, metadbmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey]
 }
 
 func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 	mng := &ChPodServiceK8sAnnotations{
-		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey](
+		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, metadbmodel.PodService, metadbmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
 		),
 	}
@@ -38,9 +38,9 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
-	var chItem mysqlmodel.ChPodServiceK8sAnnotations
+	var chItem metadbmodel.ChPodServiceK8sAnnotations
 
 	if fieldsUpdate.Annotation.IsDifferent() {
 		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
@@ -53,7 +53,7 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sAnnotationsKey{{ID: sourceID}},
-				[]mysqlmodel.ChPodServiceK8sAnnotations{{
+				[]metadbmodel.ChPodServiceK8sAnnotations{{
 					ID:          sourceID,
 					Annotations: updateInfo["annotations"].(string),
 				}},
@@ -70,12 +70,12 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysqlmodel.PodService) (keys []K8sAnnotationsKey, targets []mysqlmodel.ChPodServiceK8sAnnotations) {
+func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *metadbmodel.PodService) (keys []K8sAnnotationsKey, targets []metadbmodel.ChPodServiceK8sAnnotations) {
 	if item.Annotation == "" {
 		return
 	}
 	annotations, _ := common.StrToJsonAndMap(item.Annotation)
-	return []K8sAnnotationsKey{{ID: item.ID}}, []mysqlmodel.ChPodServiceK8sAnnotations{{
+	return []K8sAnnotationsKey{{ID: item.ID}}, []metadbmodel.ChPodServiceK8sAnnotations{{
 		ID:          item.ID,
 		Annotations: annotations,
 		TeamID:      md.TeamID,
@@ -85,6 +85,6 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodServiceK8sAnnotations, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []metadbmodel.ChPodServiceK8sAnnotations, db *metadb.DB) {
 
 }

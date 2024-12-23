@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewVIP(c *cache.Cache) *VIP {
 	return listener
 }
 
-func (p *VIP) OnUpdaterAdded(addedDBItems []*mysqlmodel.VIP) {
+func (p *VIP) OnUpdaterAdded(addedDBItems []*metadbmodel.VIP) {
 	p.cache.AddVIPs(addedDBItems)
 }
 

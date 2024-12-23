@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -53,7 +53,7 @@ type Task struct {
 	subDomainRefreshSignals cmap.ConcurrentMap[string, *queue.OverwriteQueue] // key: subDomainLcuuid
 }
 
-func NewTask(orgID int, domain mysqlmodel.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
+func NewTask(orgID int, domain metadbmodel.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 	tCtx, tCancel := context.WithCancel(ctx)
 	t := &Task{
 		tCtx:           tCtx,

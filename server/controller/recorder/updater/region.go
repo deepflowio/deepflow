@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type Region struct {
 	UpdaterBase[
 		cloudmodel.Region,
 		*diffbase.Region,
-		*mysqlmodel.Region,
-		mysqlmodel.Region,
+		*metadbmodel.Region,
+		metadbmodel.Region,
 		*message.RegionAdd,
 		message.RegionAdd,
 		*message.RegionUpdate,
@@ -47,8 +47,8 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 		newUpdaterBase[
 			cloudmodel.Region,
 			*diffbase.Region,
-			*mysqlmodel.Region,
-			mysqlmodel.Region,
+			*metadbmodel.Region,
+			metadbmodel.Region,
 			*message.RegionAdd,
 			message.RegionAdd,
 			*message.RegionUpdate,
@@ -73,8 +73,8 @@ func (r *Region) getDiffBaseByCloudItem(cloudItem *cloudmodel.Region) (diffBase 
 	return
 }
 
-func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*mysqlmodel.Region, bool) {
-	dbItem := &mysqlmodel.Region{
+func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*metadbmodel.Region, bool) {
+	dbItem := &metadbmodel.Region{
 		Name:  cloudItem.Name,
 		Label: cloudItem.Label,
 	}

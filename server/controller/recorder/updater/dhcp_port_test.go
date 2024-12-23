@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -45,7 +45,7 @@ func (t *SuiteTest) getDHCPPortMock(mockDB bool) (*cache.Cache, cloudmodel.DHCPP
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.DHCPPort{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.DHCPPort{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.DHCPPorts[cloudItem.Lcuuid] = &diffbase.DHCPPort{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -66,12 +66,12 @@ func (t *SuiteTest) TestHandleAddDHCPPortSucess() {
 	updater := NewDHCPPort(cache_, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.DHCPPort
+	var addedItem *metadbmodel.DHCPPort
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.DHCPPorts), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DHCPPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.DHCPPort{})
 }
 
 func (t *SuiteTest) TestHandleUpdateDHCPPortSucess() {
@@ -81,13 +81,13 @@ func (t *SuiteTest) TestHandleUpdateDHCPPortSucess() {
 	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.DHCPPort
+	var addedItem *metadbmodel.DHCPPort
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.DHCPPorts), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DHCPPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.DHCPPort{})
 }
 
 func (t *SuiteTest) TestHandleDeleteDHCPPortSucess() {
@@ -96,10 +96,10 @@ func (t *SuiteTest) TestHandleDeleteDHCPPortSucess() {
 	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.DHCPPort
+	var addedItem *metadbmodel.DHCPPort
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.DHCPPorts), 0)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DHCPPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.DHCPPort{})
 }

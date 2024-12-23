@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -47,7 +47,7 @@ type HuaWei struct {
 	debugger        *cloudcommon.Debugger
 }
 
-func NewHuaWei(orgID int, domain mysqlmodel.Domain, globalCloudCfg config.CloudConfig) (*HuaWei, error) {
+func NewHuaWei(orgID int, domain metadbmodel.Domain, globalCloudCfg config.CloudConfig) (*HuaWei, error) {
 	conf := &Config{}
 	err := conf.LoadFromString(orgID, domain.Config)
 	if err != nil {

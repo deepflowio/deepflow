@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type DHCPPort struct {
 	UpdaterBase[
 		cloudmodel.DHCPPort,
 		*diffbase.DHCPPort,
-		*mysqlmodel.DHCPPort,
-		mysqlmodel.DHCPPort,
+		*metadbmodel.DHCPPort,
+		metadbmodel.DHCPPort,
 		*message.DHCPPortAdd,
 		message.DHCPPortAdd,
 		*message.DHCPPortUpdate,
@@ -47,8 +47,8 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		newUpdaterBase[
 			cloudmodel.DHCPPort,
 			*diffbase.DHCPPort,
-			*mysqlmodel.DHCPPort,
-			mysqlmodel.DHCPPort,
+			*metadbmodel.DHCPPort,
+			metadbmodel.DHCPPort,
 			*message.DHCPPortAdd,
 			message.DHCPPortAdd,
 			*message.DHCPPortUpdate,
@@ -73,7 +73,7 @@ func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffB
 	return
 }
 
-func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysqlmodel.DHCPPort, bool) {
+func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbmodel.DHCPPort, bool) {
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysqlmo
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.DHCPPort{
+	dbItem := &metadbmodel.DHCPPort{
 		Name:   cloudItem.Name,
 		Domain: p.metadata.Domain.Lcuuid,
 		Region: cloudItem.RegionLcuuid,

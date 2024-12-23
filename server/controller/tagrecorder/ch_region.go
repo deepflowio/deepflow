@@ -18,19 +18,19 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChRegion struct {
-	UpdaterComponent[mysqlmodel.ChRegion, IDKey]
+	UpdaterComponent[metadbmodel.ChRegion, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChRegion {
 	updater := &ChRegion{
-		newUpdaterComponent[mysqlmodel.ChRegion, IDKey](
+		newUpdaterComponent[metadbmodel.ChRegion, IDKey](
 			RESOURCE_TYPE_CH_REGION,
 		),
 		domainLcuuidToIconID,
@@ -40,11 +40,11 @@ func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[I
 	return updater
 }
 
-func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChRegion, bool) {
+func (r *ChRegion) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChRegion, bool) {
 	log.Infof("generate data for %s", r.resourceTypeName, db.LogPrefixORGID)
-	var regions []mysqlmodel.Region
-	var azs []mysqlmodel.AZ
-	var vpcs []mysqlmodel.VPC
+	var regions []metadbmodel.Region
+	var azs []metadbmodel.AZ
+	var vpcs []metadbmodel.VPC
 	err := db.Unscoped().Find(&regions).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), db.LogPrefixORGID)
@@ -80,7 +80,7 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChRegion,
 			regionLcuuidToDomainLcuuids[vpc.Region][vpc.Domain] = true
 		}
 	}
-	keyToItem := make(map[IDKey]mysqlmodel.ChRegion)
+	keyToItem := make(map[IDKey]metadbmodel.ChRegion)
 	for _, region := range regions {
 		domainLcuuids, _ := regionLcuuidToDomainLcuuids[region.Lcuuid]
 		domainIconIDs := []int{}
@@ -100,13 +100,13 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChRegion,
 		}
 
 		if region.DeletedAt.Valid {
-			keyToItem[IDKey{ID: region.ID}] = mysqlmodel.ChRegion{
+			keyToItem[IDKey{ID: region.ID}] = metadbmodel.ChRegion{
 				ID:     region.ID,
 				Name:   region.Name + " (deleted)",
 				IconID: iconID,
 			}
 		} else {
-			keyToItem[IDKey{ID: region.ID}] = mysqlmodel.ChRegion{
+			keyToItem[IDKey{ID: region.ID}] = metadbmodel.ChRegion{
 				ID:     region.ID,
 				Name:   region.Name,
 				IconID: iconID,
@@ -116,11 +116,11 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChRegion,
 	return keyToItem, true
 }
 
-func (r *ChRegion) generateKey(dbItem mysqlmodel.ChRegion) IDKey {
+func (r *ChRegion) generateKey(dbItem metadbmodel.ChRegion) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (r *ChRegion) generateUpdateInfo(oldItem, newItem mysqlmodel.ChRegion) (map[string]interface{}, bool) {
+func (r *ChRegion) generateUpdateInfo(oldItem, newItem metadbmodel.ChRegion) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

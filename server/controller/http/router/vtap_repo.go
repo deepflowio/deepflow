@@ -21,7 +21,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -47,7 +47,7 @@ func getVtapRepo(c *gin.Context) {
 }
 
 func createVtapRepo(c *gin.Context) {
-	vtapRepo := &mysqlmodel.VTapRepo{
+	vtapRepo := &metadbmodel.VTapRepo{
 		Name:     c.PostForm("NAME"),
 		Arch:     c.PostForm("ARCH"),
 		Branch:   c.PostForm("BRANCH"),

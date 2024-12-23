@@ -22,9 +22,9 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -49,38 +49,38 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 	}
 	mng := &IDManager{org: org}
 	mng.resourceTypeToIDPool = map[string]IDPoolUpdater{
-		ctrlrcommon.RESOURCE_TYPE_REGION_EN:        newIDPool[mysqlmodel.Region](mng.org, ctrlrcommon.RESOURCE_TYPE_REGION_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_AZ_EN:            newIDPool[mysqlmodel.AZ](mng.org, ctrlrcommon.RESOURCE_TYPE_AZ_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_HOST_EN:          newIDPool[mysqlmodel.Host](mng.org, ctrlrcommon.RESOURCE_TYPE_HOST_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_VPC_EN:           newIDPool[mysqlmodel.VPC](mng.org, ctrlrcommon.RESOURCE_TYPE_VPC_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_NETWORK_EN:       newIDPool[mysqlmodel.Network](mng.org, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN:   newIDPool[mysqlmodel.PodCluster](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cfg.ResourceMaxID0),
-		ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN: newIDPool[mysqlmodel.PodNamespace](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_REGION_EN:        newIDPool[metadbmodel.Region](mng.org, ctrlrcommon.RESOURCE_TYPE_REGION_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_AZ_EN:            newIDPool[metadbmodel.AZ](mng.org, ctrlrcommon.RESOURCE_TYPE_AZ_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_HOST_EN:          newIDPool[metadbmodel.Host](mng.org, ctrlrcommon.RESOURCE_TYPE_HOST_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_VPC_EN:           newIDPool[metadbmodel.VPC](mng.org, ctrlrcommon.RESOURCE_TYPE_VPC_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_NETWORK_EN:       newIDPool[metadbmodel.Network](mng.org, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN:   newIDPool[metadbmodel.PodCluster](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN: newIDPool[metadbmodel.PodNamespace](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cfg.ResourceMaxID0),
 
-		ctrlrcommon.RESOURCE_TYPE_VM_EN:              newIDPool[mysqlmodel.VM](mng.org, ctrlrcommon.RESOURCE_TYPE_VM_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_VROUTER_EN:         newIDPool[mysqlmodel.VRouter](mng.org, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN:       newIDPool[mysqlmodel.DHCPPort](mng.org, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN:    newIDPool[mysqlmodel.RDSInstance](mng.org, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN:  newIDPool[mysqlmodel.RedisInstance](mng.org, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN:     newIDPool[mysqlmodel.NATGateway](mng.org, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_LB_EN:              newIDPool[mysqlmodel.LB](mng.org, ctrlrcommon.RESOURCE_TYPE_LB_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN:        newIDPool[mysqlmodel.PodNode](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN:     newIDPool[mysqlmodel.PodService](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_EN:             newIDPool[mysqlmodel.Pod](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN:     newIDPool[mysqlmodel.PodIngress](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       newIDPool[mysqlmodel.PodGroup](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[mysqlmodel.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysqlmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysqlmodel.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
+		ctrlrcommon.RESOURCE_TYPE_VM_EN:              newIDPool[metadbmodel.VM](mng.org, ctrlrcommon.RESOURCE_TYPE_VM_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_VROUTER_EN:         newIDPool[metadbmodel.VRouter](mng.org, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN:       newIDPool[metadbmodel.DHCPPort](mng.org, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN:    newIDPool[metadbmodel.RDSInstance](mng.org, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN:  newIDPool[metadbmodel.RedisInstance](mng.org, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN:     newIDPool[metadbmodel.NATGateway](mng.org, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_LB_EN:              newIDPool[metadbmodel.LB](mng.org, ctrlrcommon.RESOURCE_TYPE_LB_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN:        newIDPool[metadbmodel.PodNode](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN:     newIDPool[metadbmodel.PodService](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_EN:             newIDPool[metadbmodel.Pod](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN:     newIDPool[metadbmodel.PodIngress](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       newIDPool[metadbmodel.PodGroup](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[metadbmodel.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[metadbmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[metadbmodel.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
 
-	orgTableExists, err := mysql.CheckIfORGTableExists()
+	orgTableExists, err := metadb.CheckIfORGTableExists()
 	if err != nil {
 		log.Errorf("failed to check if org table exists: %s", err.Error())
 		return nil, err
 	}
 	if orgTableExists && orgID == ctrlrcommon.DEFAULT_ORG_ID {
-		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[mysqlmodel.ORG](
+		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[metadbmodel.ORG](
 			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
 		)
 	}
