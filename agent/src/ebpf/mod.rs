@@ -189,9 +189,9 @@ pub const MSG_COMMON: u8 = 7;
 
 //Register event types
 #[allow(dead_code)]
-pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 5;
+pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 9;
 #[allow(dead_code)]
-pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
+pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 10;
 
 // Profiler types
 #[allow(dead_code)]
