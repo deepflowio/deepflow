@@ -55,7 +55,7 @@
 struct process_event {
 	struct list_head list;	// list add to proc_events_head
 	struct bpf_tracer *tracer;	// link to struct bpf_tracer
-	uint8_t type;		// EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
+	uint32_t type;		// EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
 	char *path;		// Full path "/proc/<pid>/root/..."
 	int pid;		// Process ID
 	uint64_t stime;		// The start time of the process
@@ -993,7 +993,7 @@ static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 }
 
 static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
-				     uint8_t type)
+				     uint32_t type)
 {
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL) {
@@ -1086,7 +1086,7 @@ void go_process_events_handle(void)
 			char *path = strdup(pe->path);
 			int pid = pe->pid;
 			struct bpf_tracer *tracer = pe->tracer;
-			uint8_t type = pe->type;
+			uint32_t type = pe->type;
 			list_head_del(&pe->list);
 			free(pe->path);
 			free(pe);
