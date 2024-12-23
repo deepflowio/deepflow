@@ -18,6 +18,7 @@ package view
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -260,6 +261,23 @@ func (v *View) trans() {
 			groupsLevelInner = append(groupsLevelInner, group)
 		}
 	}
+	// The inner tag should be in the outer group
+	groupList := []string{}
+	for _, group := range groupsLevelMetrics {
+		groupList = append(groupList, group.(*Group).Value)
+	}
+	for _, node := range v.Model.Tags.tags {
+		switch tag := node.(type) {
+		case *Tag:
+			if tag.Flag == NODE_FLAG_METRICS {
+				// outer group
+				if tag.Alias != "" && !slices.Contains(groupList, tag.Alias) {
+					groupsLevelMetrics = append(groupsLevelMetrics, &Group{Value: tag.Alias})
+				}
+			}
+		}
+	}
+
 	if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		// 计算层不拆层
 		// 里层tag+外层metric
