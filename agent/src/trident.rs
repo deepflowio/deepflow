@@ -128,7 +128,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
+    proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -156,20 +156,121 @@ pub enum RunningMode {
     Standalone,
 }
 
-#[derive(Debug)]
-pub enum State {
-    Running,
-    ConfigChanged(ChangedConfig),
-    Terminated,
-    Disabled(Option<(UserConfig, DynamicConfig)>), // Requires user config and dynamic config to update platform config
+#[derive(Copy, Clone, Debug)]
+struct InnerState {
+    enabled: bool,
+    melted_down: bool,
 }
 
-impl State {
-    fn unwrap_config(self) -> ChangedConfig {
-        match self {
-            Self::ConfigChanged(c) => c,
-            _ => panic!("{:?} not config type", &self),
+impl Default for InnerState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            melted_down: true,
         }
+    }
+}
+
+impl From<InnerState> for State {
+    fn from(state: InnerState) -> Self {
+        if state.enabled && !state.melted_down {
+            State::Running
+        } else {
+            State::Disabled
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum State {
+    Running,
+    Terminated,
+    Disabled,
+}
+
+#[derive(Default)]
+pub struct AgentState {
+    // terminated is outside of Mutex because during termination, state will be locked in main thread,
+    // and the main thread will try to stop other threads, in which may lock and update agent state,
+    // causing a deadlock. Checking terminated state before locking inner state will avoid this deadlock.
+    terminated: AtomicBool,
+    state: Mutex<(InnerState, Option<ChangedConfig>)>,
+    notifier: Condvar,
+}
+
+impl AgentState {
+    pub fn enable(&self) {
+        if self.terminated.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
+        sg.0.enabled = true;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+            self.notifier.notify_one();
+        }
+    }
+
+    pub fn disable(&self) {
+        if self.terminated.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
+        sg.0.enabled = false;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+            self.notifier.notify_one();
+        }
+    }
+
+    pub fn melt_down(&self) {
+        if self.terminated.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
+        sg.0.melted_down = true;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+            self.notifier.notify_one();
+        }
+    }
+
+    pub fn recover(&self) {
+        if self.terminated.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
+        sg.0.melted_down = false;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+            self.notifier.notify_one();
+        }
+    }
+
+    pub fn terminate(&self) {
+        if !self.terminated.swap(true, Ordering::Relaxed) {
+            // log only the first time
+            info!("Agent state changed to {:?}", State::Terminated);
+        }
+        self.notifier.notify_one();
+    }
+
+    pub fn update_config(&self, config: ChangedConfig) {
+        if self.terminated.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        sg.0.enabled = config.user_config.global.common.enabled;
+        sg.1.replace(config);
+        self.notifier.notify_one();
     }
 }
 
@@ -182,6 +283,21 @@ pub struct VersionInfo {
     pub compile_time: &'static str,
 
     pub revision: &'static str,
+}
+
+impl VersionInfo {
+    pub fn brief_tag(&self) -> String {
+        format!(
+            "{}|{}|{}",
+            match self.name {
+                "deepflow-agent-ce" => "CE",
+                "deepflow-agent-ee" => "EE",
+                _ => panic!("{:?} unknown deepflow-agent edition", &self.name),
+            },
+            self.branch,
+            self.commit_id
+        )
+    }
 }
 
 impl fmt::Display for VersionInfo {
@@ -210,8 +326,6 @@ CompileTime: {}",
         )
     }
 }
-
-pub type AgentState = Arc<(Mutex<State>, Condvar)>;
 
 #[derive(Clone, Debug)]
 pub struct AgentId {
@@ -282,7 +396,7 @@ impl SenderEncoder {
 }
 
 pub struct Trident {
-    state: AgentState,
+    state: Arc<AgentState>,
     handle: Option<JoinHandle<()>>,
     #[cfg(target_os = "linux")]
     pid_file: Option<crate::utils::pid_file::PidFile>,
@@ -442,7 +556,7 @@ impl Trident {
         );
 
         info!("static_config {:#?}", config);
-        let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
+        let state = Arc::new(AgentState::default());
         let state_thread = state.clone();
         let config_path = match agent_mode {
             RunningMode::Managed => None,
@@ -479,7 +593,7 @@ impl Trident {
     }
 
     fn run(
-        state: AgentState,
+        state: Arc<AgentState>,
         ctrl_ip: IpAddr,
         ctrl_mac: MacAddr,
         mut config_handler: ConfigHandler,
@@ -492,6 +606,7 @@ impl Trident {
         ntp_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
+        info!("Brief tag: {}", version_info.brief_tag());
         info!("Environment variables: {:?}", get_env());
 
         if running_in_container() {
@@ -661,6 +776,7 @@ impl Trident {
         let log_dir = log_dir.parent().unwrap().to_str().unwrap();
         let guard = match Guard::new(
             config_handler.environment(),
+            state.clone(),
             log_dir.to_string(),
             exception_handler.clone(),
             cgroup_mount_path,
@@ -679,7 +795,6 @@ impl Trident {
                 return Err(anyhow!(e));
             }
         };
-        guard.start();
 
         let monitor = Monitor::new(
             stats_collector.clone(),
@@ -740,15 +855,36 @@ impl Trident {
             platform_synchronizer.start();
         }
 
-        let (state, cond) = &*state;
-        let mut state_guard = state.lock().unwrap();
+        let mut state_guard = state.state.lock().unwrap();
         let mut components: Option<Components> = None;
         let mut first_run = true;
+        let mut config_initialized = false;
 
         loop {
-            match &mut *state_guard {
-                State::Running => {
-                    state_guard = cond.wait(state_guard).unwrap();
+            if state.terminated.load(Ordering::Relaxed) {
+                if let Some(mut c) = components {
+                    c.stop();
+                    guard.stop();
+                    monitor.stop();
+                    domain_name_listener.stop();
+                    platform_synchronizer.stop();
+                    #[cfg(target_os = "linux")]
+                    {
+                        api_watcher.stop();
+                        libvirt_xml_extractor.stop();
+                    }
+                    if let Some(cg_controller) = cgroups_controller {
+                        if let Err(e) = cg_controller.stop() {
+                            info!("stop cgroups controller failed, {:?}", e);
+                        }
+                    }
+                }
+                return Ok(());
+            }
+
+            match State::from(state_guard.0) {
+                State::Running if state_guard.1.is_none() => {
+                    state_guard = state.notifier.wait(state_guard).unwrap();
                     #[cfg(target_os = "linux")]
                     if config_handler
                         .candidate_config
@@ -759,36 +895,19 @@ impl Trident {
                     } else {
                         api_watcher.stop();
                     }
+                    if let Some(ref mut c) = components {
+                        c.start();
+                    }
                     continue;
                 }
-                State::Terminated => {
-                    if let Some(mut c) = components {
-                        c.stop();
-                        guard.stop();
-                        monitor.stop();
-                        domain_name_listener.stop();
-                        platform_synchronizer.stop();
-                        #[cfg(target_os = "linux")]
-                        {
-                            api_watcher.stop();
-                            libvirt_xml_extractor.stop();
-                        }
-                        if let Some(cg_controller) = cgroups_controller {
-                            if let Err(e) = cg_controller.stop() {
-                                info!("stop cgroups controller failed, {:?}", e);
-                            }
-                        }
-                    }
-                    return Ok(());
-                }
-                State::Disabled(config) => {
+                State::Disabled => {
                     if let Some(ref mut c) = components {
                         c.stop();
                     }
-                    if let Some(c) = config.take() {
+                    if let Some(cfg) = state_guard.1.take() {
                         let agent_id = synchronizer.agent_id.read().clone();
                         let callbacks = config_handler.on_config(
-                            c.0,
+                            cfg.user_config,
                             &exception_handler,
                             None,
                             #[cfg(target_os = "linux")]
@@ -826,15 +945,19 @@ impl Trident {
                             stats_collector
                                 .set_min_interval(config_handler.candidate_config.stats.interval);
                         }
+
+                        if !config_initialized {
+                            // start guard on receiving first config to ensure
+                            // the meltdown thresholds are set by the config
+                            guard.start();
+                            config_initialized = true;
+                        }
                     }
-                    state_guard = cond.wait(state_guard).unwrap();
+                    state_guard = state.notifier.wait(state_guard).unwrap();
                     continue;
                 }
                 _ => (),
             }
-            let mut new_state = State::Running;
-            mem::swap(&mut new_state, &mut *state_guard);
-            mem::drop(state_guard);
 
             let ChangedConfig {
                 user_config,
@@ -842,7 +965,8 @@ impl Trident {
                 vm_mac_addrs,
                 gateway_vmac_addrs,
                 tap_types,
-            } = new_state.unwrap_config();
+            } = state_guard.1.take().unwrap();
+            mem::drop(state_guard);
 
             // TODO At present, all changes in user_config will not cause the agent to restart,
             // hot update needs to be implemented and this judgment should be removed
@@ -998,18 +1122,21 @@ impl Trident {
                     }
                 }
             }
-            state_guard = state.lock().unwrap();
+
+            if !config_initialized {
+                // start guard on receiving first config to ensure
+                // the meltdown thresholds are set by the config
+                guard.start();
+                config_initialized = true;
+            }
+
+            state_guard = state.state.lock().unwrap();
         }
     }
 
     pub fn stop(&mut self) {
         info!("Gracefully stopping");
-        let (state, cond) = &*self.state;
-
-        let mut state_guard = state.lock().unwrap();
-        *state_guard = State::Terminated;
-        cond.notify_one();
-        mem::drop(state_guard);
+        self.state.terminate();
         self.handle.take().unwrap().join().unwrap();
         info!("Gracefully stopped");
     }
