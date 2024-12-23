@@ -138,6 +138,15 @@ func getIDs[MT constraint.MySQLModel]() (ids []int) {
 	return
 }
 
+func getIDsByDomainLcuuid[MT constraint.MySQLModel](domainLcuuid string) (ids []int) {
+	var dbItems []*MT
+	mysql.Db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
+	for _, item := range dbItems {
+		ids = append(ids, (*item).GetID())
+	}
+	return
+}
+
 func (c *Cleaner) timedCleanDirtyData(sContext context.Context) {
 	c.cleanDirtyData()
 	go func() {
@@ -159,12 +168,21 @@ func (c *Cleaner) timedCleanDirtyData(sContext context.Context) {
 
 func (c *Cleaner) cleanDirtyData() {
 	log.Info("clean dirty data started")
+	var domains []mysql.Domain
+	if err := mysql.Db.Find(&domains).Error; err != nil {
+		log.Errorf("failed to get domains: %v", err)
+		return
+	}
+	for _, domain := range domains {
+		c.cleanPodNodeDirty(domain.Lcuuid)
+		c.cleanVMDirty(domain.Lcuuid)
+	}
+
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
 	c.cleanSecurityGroupDirty()
 	c.cleanPodIngressDirty()
 	c.cleanPodServiceDirty()
-	c.cleanPodNodeDirty()
 	c.cleanPodDirty()
 	c.cleanVInterfaceDirty()
 	log.Info("clean dirty data completed")
@@ -257,28 +275,47 @@ func (c *Cleaner) cleanPodServiceDirty() {
 	}
 }
 
-func (c *Cleaner) cleanPodNodeDirty() {
-	podNodeIDs := getIDs[mysql.PodNode]()
+func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
+	podNodeIDs := getIDsByDomainLcuuid[mysql.PodNode](domainLcuuid)
 	if len(podNodeIDs) != 0 {
 		var vifs []mysql.VInterface
-		mysql.Db.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
+		mysql.Db.Where("domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			mysql.Db.Delete(&vifs)
 			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs)
 		}
 
 		var vmPodNodeConns []mysql.VMPodNodeConnection
-		mysql.Db.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&vmPodNodeConns)
+		mysql.Db.Where("domain = ? AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs).Find(&vmPodNodeConns)
 		if len(vmPodNodeConns) != 0 {
 			mysql.Db.Delete(&vmPodNodeConns)
 			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)
 		}
 
 		var pods []mysql.Pod
-		mysql.Db.Where("pod_node_id != 0 AND pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
+		mysql.Db.Where("domain = ? AND pod_node_id != 0 AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs).Find(&pods)
 		if len(pods) != 0 {
 			mysql.Db.Delete(&pods)
 			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)
+		}
+	}
+}
+
+func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
+	vmIDs := getIDsByDomainLcuuid[mysql.VM](domainLcuuid)
+	if len(vmIDs) != 0 {
+		var vifs []mysql.VInterface
+		mysql.Db.Where("domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs).Find(&vifs)
+		if len(vifs) != 0 {
+			mysql.Db.Delete(&vifs)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, vifs)
+		}
+
+		var vmPodNodeConns []mysql.VMPodNodeConnection
+		mysql.Db.Where("domain = ? AND vm_id NOT IN ?", domainLcuuid, vmIDs).Find(&vmPodNodeConns)
+		if len(vmPodNodeConns) != 0 {
+			mysql.Db.Delete(&vmPodNodeConns)
+			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, vmPodNodeConns)
 		}
 	}
 }
