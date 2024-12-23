@@ -89,6 +89,8 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 		} else {
 			if !strings.Contains(name, "node_type") && !strings.Contains(name, "icon_id") {
 				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
+			} else if db == chCommon.DB_NAME_FLOW_TAG {
+				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 			}
 		}
 	}
