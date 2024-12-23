@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 )
 
 type ChResourceUpdater interface {
@@ -30,7 +30,7 @@ type ChResourceUpdater interface {
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	// Refresh() bool
 	SetConfig(cfg config.ControllerConfig)
-	SetDB(db *mysql.DB)
+	SetDB(db *metadb.DB)
 	Check() error
 }
 
@@ -47,14 +47,14 @@ type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
 	cfg              config.ControllerConfig
 	resourceTypeName string
 	dataGenerator    DataGenerator[MT, KT]
-	db               *mysql.DB // db for multi org
+	db               *metadb.DB // db for multi org
 }
 
 func (b *UpdaterBase[MT, KT]) SetConfig(cfg config.ControllerConfig) {
 	b.cfg = cfg
 }
 
-func (b *UpdaterBase[MT, KT]) SetDB(db *mysql.DB) {
+func (b *UpdaterBase[MT, KT]) SetDB(db *metadb.DB) {
 	b.db = db
 }
 
@@ -76,7 +76,7 @@ func (b *UpdaterBase[MT, KT]) generateOldData() ([]MT, bool) {
 
 func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	var items []MT
-	err := mysql.DefaultDB.Unscoped().First(&items).Error
+	err := metadb.DefaultDB.Unscoped().First(&items).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), b.db.LogPrefixORGID)
 		return nil, false
@@ -108,7 +108,7 @@ func (b *UpdaterBase[MT, KT]) operateBatch(keys []KT, items []MT, operateFunc fu
 }
 
 func (b *UpdaterBase[MT, KT]) add(keys []KT, dbItems []MT) {
-	err := mysql.DefaultDB.Create(&dbItems).Error
+	err := metadb.DefaultDB.Create(&dbItems).Error
 	if err != nil {
 		log.Errorf("add %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error())
 		return
@@ -117,7 +117,7 @@ func (b *UpdaterBase[MT, KT]) add(keys []KT, dbItems []MT) {
 }
 
 func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
-	err := mysql.DefaultDB.Model(&oldDBItem).Updates(updateInfo).Error
+	err := metadb.DefaultDB.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error())
 		return
@@ -126,7 +126,7 @@ func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interfa
 }
 
 func (b *UpdaterBase[MT, KT]) delete(keys []KT, dbItems []MT) {
-	err := mysql.DefaultDB.Delete(&dbItems).Error
+	err := metadb.DefaultDB.Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error())
 		return

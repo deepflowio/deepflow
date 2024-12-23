@@ -25,8 +25,8 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -82,7 +82,7 @@ func (c *AnalyzerCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
 					// 数据节点健康检查
 					c.healthCheck(db)
 					// 检查没有分配数据节点的采集器，并进行分配
@@ -130,22 +130,22 @@ func (c *AnalyzerCheck) Stop() {
 
 var checkExceptionAnalyzers = make(map[string]*dfHostCheck)
 
-func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
-	var controllers []mysqlmodel.Controller
-	var analyzers []mysqlmodel.Analyzer
+func (c *AnalyzerCheck) healthCheck(orgDB *metadb.DB) {
+	var controllers []metadbmodel.Controller
+	var analyzers []metadbmodel.Analyzer
 	var exceptionIPs []string
 
 	log.Info("analyzer health check start")
 
-	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+	if err := metadb.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
-	ipToController := make(map[string]*mysqlmodel.Controller)
+	ipToController := make(map[string]*metadbmodel.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
 	}
 
-	if err := mysql.DefaultDB.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
+	if err := metadb.DefaultDB.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
 		log.Errorf("get analyzer from db error: %v", err)
 		return
 	}
@@ -175,7 +175,7 @@ func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					if c.exceptionAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionAnalyzerDict, analyzer.IP)
-						if err := mysql.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
+						if err := metadb.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
 							log.Errorf("update analyzer(name: %s, ip: %s) state error: %v", analyzer.Name, analyzer.IP, err)
 						}
 						exceptionIPs = append(exceptionIPs, analyzer.IP)
@@ -198,7 +198,7 @@ func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {
 					if c.normalAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalAnalyzerDict, analyzer.IP)
-						if err := mysql.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
+						if err := metadb.DefaultDB.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
 							log.Errorf("update analyzer(name: %s, ip: %s) state error: %v", analyzer.Name, analyzer.IP, err)
 						}
 						log.Infof("set analyzer (%s) state to normal", analyzer.IP)
@@ -219,10 +219,10 @@ func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 	}
 	for ip, dfhostCheck := range checkExceptionAnalyzers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			if err := orgDB.Delete(mysqlmodel.AZAnalyzerConnection{}, "analyzer_ip = ?", ip).Error; err != nil {
+			if err := orgDB.Delete(metadbmodel.AZAnalyzerConnection{}, "analyzer_ip = ?", ip).Error; err != nil {
 				log.Errorf("delete az_analyzer_connection(ip: %s) error: %s", ip, err.Error(), orgDB.LogPrefixORGID)
 			}
-			err := mysql.DefaultDB.Delete(mysqlmodel.Analyzer{}, "ip = ?", ip).Error
+			err := metadb.DefaultDB.Delete(metadbmodel.Analyzer{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete analyzer(%s) failed, err:%s", ip, err)
 			} else {
@@ -234,12 +234,12 @@ func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 	log.Info("analyzer health check end")
 }
 
-func (c *AnalyzerCheck) TriggerReallocAnalyzer(orgDB *mysql.DB, analyzerIP string) {
+func (c *AnalyzerCheck) TriggerReallocAnalyzer(orgDB *metadb.DB, analyzerIP string) {
 	c.ch <- dbAndIP{db: orgDB, ip: analyzerIP}
 }
 
-func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
-	var vtaps []mysqlmodel.VTap
+func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *metadb.DB) {
+	var vtaps []metadbmodel.VTap
 	var noAnalyzerVtapCount int64
 
 	log.Info("vtap analyzer check start", orgDB.LogPrefixORGID)
@@ -258,7 +258,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
 			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name, orgDB.LogPrefixORGID)
 			vtap.AnalyzerIP = ""
-			if err := orgDB.Model(&mysqlmodel.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "").Error; err != nil {
+			if err := orgDB.Model(&metadbmodel.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "").Error; err != nil {
 				log.Errorf("update vtap(lcuuid: %s, name: %s) analyzer ip to empty error: %v", vtap.Lcuuid, vtap.Name, err, orgDB.LogPrefixORGID)
 			}
 		}
@@ -278,11 +278,11 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 	log.Info("vtap analyzer check end", orgDB.LogPrefixORGID)
 }
 
-func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
-	var vtaps []mysqlmodel.VTap
-	var analyzers []mysqlmodel.Analyzer
-	var azs []mysqlmodel.AZ
-	var azAnalyzerConns []mysqlmodel.AZAnalyzerConnection
+func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *metadb.DB, excludeIP string) {
+	var vtaps []metadbmodel.VTap
+	var analyzers []metadbmodel.Analyzer
+	var azs []metadbmodel.AZ
+	var azAnalyzerConns []metadbmodel.AZAnalyzerConnection
 
 	log.Info("vtap analyzer alloc start", orgDB.LogPrefixORGID)
 
@@ -297,7 +297,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取数据节点当前已分配的采集器个数
-	azToNoAnalyzerVTaps := make(map[string][]*mysqlmodel.VTap)
+	azToNoAnalyzerVTaps := make(map[string][]*metadbmodel.VTap)
 	analyzerIPToUsedVTapNum := make(map[string]int)
 	azLcuuids := mapset.NewSet()
 	for i, vtap := range vtaps {
@@ -396,11 +396,11 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 	log.Info("vtap analyzer alloc end")
 }
 
-func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
-	var azs []mysqlmodel.AZ
-	var azAnalyzerConns []mysqlmodel.AZAnalyzerConnection
-	var analyzers []mysqlmodel.Analyzer
-	var regions []mysqlmodel.Region
+func (c *AnalyzerCheck) azConnectionCheck(orgDB *metadb.DB) {
+	var azs []metadbmodel.AZ
+	var azAnalyzerConns []metadbmodel.AZAnalyzerConnection
+	var analyzers []metadbmodel.Analyzer
+	var regions []metadbmodel.Region
 
 	log.Info("az connection check start", orgDB.LogPrefixORGID)
 
@@ -413,7 +413,7 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
-	analyzerIPToConn := make(map[string]mysqlmodel.AZAnalyzerConnection)
+	analyzerIPToConn := make(map[string]metadbmodel.AZAnalyzerConnection)
 	if err := orgDB.Find(&azAnalyzerConns).Error; err != nil {
 		log.Error(err, orgDB.LogPrefixORGID)
 	}
@@ -435,7 +435,7 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 		log.Error(err, orgDB.LogPrefixORGID)
 	}
 	if len(regions) == 1 {
-		var deleteAnalyzers []mysqlmodel.Analyzer
+		var deleteAnalyzers []metadbmodel.Analyzer
 		if err := orgDB.Find(&analyzers).Error; err != nil {
 			log.Error(err, orgDB.LogPrefixORGID)
 		}
@@ -458,11 +458,11 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 var SyncAnalyzerExcludeField = []string{"nat_ip", "agg", "state"}
 
 func (c *AnalyzerCheck) SyncDefaultOrgData() {
-	var analyzers []mysqlmodel.Analyzer
-	if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
+	var analyzers []metadbmodel.Analyzer
+	if err := metadb.DefaultDB.Find(&analyzers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(analyzers, SyncAnalyzerExcludeField); err != nil {
+	if err := metadb.SyncDefaultOrgData(analyzers, SyncAnalyzerExcludeField); err != nil {
 		log.Error(err)
 	}
 }

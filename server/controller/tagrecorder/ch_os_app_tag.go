@@ -18,18 +18,18 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTag struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTag, OSAPPTagKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTag, OSAPPTagKey]
 }
 
 func NewChOSAppTag() *ChOSAppTag {
 	mng := &ChOSAppTag{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTag, OSAPPTagKey](
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTag, OSAPPTagKey](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
 	}
@@ -38,12 +38,12 @@ func NewChOSAppTag() *ChOSAppTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
 	keysToAdd := make([]OSAPPTagKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChOSAppTag, 0)
+	targetsToAdd := make([]metadbmodel.ChOSAppTag, 0)
 	keysToDelete := make([]OSAPPTagKey, 0)
-	targetsToDelete := make([]mysqlmodel.ChOSAppTag, 0)
-	var chItem mysqlmodel.ChOSAppTag
+	targetsToDelete := make([]metadbmodel.ChOSAppTag, 0)
+	var chItem metadbmodel.ChOSAppTag
 	var updateKey OSAPPTagKey
 	updateInfo := make(map[string]interface{})
 
@@ -55,7 +55,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
+				targetsToAdd = append(targetsToAdd, metadbmodel.ChOSAppTag{
 					PID:   sourceID,
 					Key:   k,
 					Value: v,
@@ -67,7 +67,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.PID == 0 {
 						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
+						targetsToAdd = append(targetsToAdd, metadbmodel.ChOSAppTag{
 							PID:   sourceID,
 							Key:   k,
 							Value: v,
@@ -81,7 +81,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, OSAPPTagKey{PID: sourceID, Key: k})
-				targetsToDelete = append(targetsToDelete, mysqlmodel.ChOSAppTag{
+				targetsToDelete = append(targetsToDelete, metadbmodel.ChOSAppTag{
 					PID: sourceID,
 					Key: k,
 				})
@@ -97,12 +97,12 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Process) (keys []OSAPPTagKey, targets []mysqlmodel.ChOSAppTag) {
+func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []OSAPPTagKey, targets []metadbmodel.ChOSAppTag) {
 	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
-		targets = append(targets, mysqlmodel.ChOSAppTag{
+		targets = append(targets, metadbmodel.ChOSAppTag{
 			PID:         source.ID,
 			Key:         k,
 			Value:       v,
@@ -115,6 +115,6 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysqlmodel.ChOSAppTag, db *mysql.DB) {
+func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []metadbmodel.ChOSAppTag, db *metadb.DB) {
 
 }

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -31,8 +31,8 @@ type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
 		*diffbase.CEN,
-		*mysqlmodel.CEN,
-		mysqlmodel.CEN,
+		*metadbmodel.CEN,
+		metadbmodel.CEN,
 		*message.CENAdd,
 		message.CENAdd,
 		*message.CENUpdate,
@@ -48,8 +48,8 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		newUpdaterBase[
 			cloudmodel.CEN,
 			*diffbase.CEN,
-			*mysqlmodel.CEN,
-			mysqlmodel.CEN,
+			*metadbmodel.CEN,
+			metadbmodel.CEN,
 			*message.CENAdd,
 			message.CENAdd,
 			*message.CENUpdate,
@@ -74,7 +74,7 @@ func (c *CEN) getDiffBaseByCloudItem(cloudItem *cloudmodel.CEN) (diffBase *diffb
 	return
 }
 
-func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysqlmodel.CEN, bool) {
+func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, bool) {
 	vpcIDs := []int{}
 	for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
@@ -87,7 +87,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysqlmodel.CEN, b
 		}
 		vpcIDs = append(vpcIDs, vpcID)
 	}
-	dbItem := &mysqlmodel.CEN{
+	dbItem := &metadbmodel.CEN{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Domain: c.metadata.Domain.Lcuuid,

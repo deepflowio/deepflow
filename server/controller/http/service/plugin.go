@@ -21,16 +21,16 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"gorm.io/gorm"
 )
 
-func CreatePlugin(db *mysql.DB, pluginCreate *mysqlmodel.Plugin) (*model.Plugin, error) {
-	var pluginFirst mysqlmodel.Plugin
+func CreatePlugin(db *metadb.DB, pluginCreate *metadbmodel.Plugin) (*model.Plugin, error) {
+	var pluginFirst metadbmodel.Plugin
 	if err := db.Where("name = ?", pluginCreate.Name).First(&pluginFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewError(httpcommon.SERVER_ERROR,
@@ -45,7 +45,7 @@ func CreatePlugin(db *mysql.DB, pluginCreate *mysqlmodel.Plugin) (*model.Plugin,
 	}
 
 	// update by name and type
-	if err := db.Model(&mysqlmodel.Plugin{}).Where("name = ?", pluginCreate.Name).
+	if err := db.Model(&metadbmodel.Plugin{}).Where("name = ?", pluginCreate.Name).
 		Updates(pluginCreate).Error; err != nil {
 		return nil, err
 	}
@@ -54,8 +54,8 @@ func CreatePlugin(db *mysql.DB, pluginCreate *mysqlmodel.Plugin) (*model.Plugin,
 	return &plugins[0], nil
 }
 
-func GetPlugin(db *mysql.DB, filter map[string]interface{}) ([]model.Plugin, error) {
-	var plugins []mysqlmodel.Plugin
+func GetPlugin(db *metadb.DB, filter map[string]interface{}) ([]model.Plugin, error) {
+	var plugins []metadbmodel.Plugin
 	queryDB := db.DB
 	if _, ok := filter["name"]; ok {
 		queryDB = queryDB.Where("name = ?", filter["name"])
@@ -79,13 +79,13 @@ func GetPlugin(db *mysql.DB, filter map[string]interface{}) ([]model.Plugin, err
 
 }
 
-func DeletePlugin(db *mysql.DB, name string) error {
+func DeletePlugin(db *metadb.DB, name string) error {
 	var plugin model.Plugin
 	if err := db.Where("name = ?", name).First(&plugin).Error; err != nil {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("plugin (name: %s) not found", name))
 	}
 
-	if err := db.Where("name = ?", name).Delete(&mysqlmodel.Plugin{}).Error; err != nil {
+	if err := db.Where("name = ?", name).Delete(&metadbmodel.Plugin{}).Error; err != nil {
 		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete plugin (name: %s) failed, err: %v", name, err))
 	}
 	return nil

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
@@ -152,7 +152,7 @@ type RegionUpdate struct {
 	Fields[RegionFieldsUpdate]
 	CloudItem[cloudmodel.Region]
 	DiffBase[*diffbase.Region]
-	MySQLData[mysqlmodel.Region]
+	MySQLData[metadbmodel.Region]
 }
 
 type AZFieldsUpdate struct {
@@ -166,7 +166,7 @@ type AZUpdate struct {
 	Fields[AZFieldsUpdate]
 	CloudItem[cloudmodel.AZ]
 	DiffBase[*diffbase.AZ]
-	MySQLData[mysqlmodel.AZ]
+	MySQLData[metadbmodel.AZ]
 }
 
 type SubDomainFieldsUpdate struct {
@@ -177,7 +177,7 @@ type SubDomainUpdate struct {
 	Fields[SubDomainFieldsUpdate]
 	CloudItem[cloudmodel.SubDomain] // TODO tmp, delete later
 	DiffBase[*diffbase.SubDomain]
-	MySQLData[mysqlmodel.SubDomain]
+	MySQLData[metadbmodel.SubDomain]
 }
 
 type HostFieldsUpdate struct {
@@ -198,7 +198,7 @@ type HostUpdate struct {
 	Fields[HostFieldsUpdate]
 	CloudItem[cloudmodel.Host]
 	DiffBase[*diffbase.Host]
-	MySQLData[mysqlmodel.Host]
+	MySQLData[metadbmodel.Host]
 }
 
 type VMFieldsUpdate struct {
@@ -223,7 +223,7 @@ type VMUpdate struct {
 	Fields[VMFieldsUpdate]
 	CloudItem[cloudmodel.VM]
 	DiffBase[*diffbase.VM]
-	MySQLData[mysqlmodel.VM]
+	MySQLData[metadbmodel.VM]
 }
 
 type VMPodNodeConnectionFieldsUpdate struct {
@@ -234,7 +234,7 @@ type VMPodNodeConnectionUpdate struct {
 	Fields[VMPodNodeConnectionFieldsUpdate]
 	CloudItem[cloudmodel.VMPodNodeConnection]
 	DiffBase[*diffbase.VMPodNodeConnection]
-	MySQLData[mysqlmodel.VMPodNodeConnection]
+	MySQLData[metadbmodel.VMPodNodeConnection]
 }
 
 type VPCFieldsUpdate struct {
@@ -251,7 +251,7 @@ type VPCUpdate struct {
 	Fields[VPCFieldsUpdate]
 	CloudItem[cloudmodel.VPC]
 	DiffBase[*diffbase.VPC]
-	MySQLData[mysqlmodel.VPC]
+	MySQLData[metadbmodel.VPC]
 }
 
 type NetworkFieldsUpdate struct {
@@ -271,7 +271,7 @@ type NetworkUpdate struct {
 	Fields[NetworkFieldsUpdate]
 	CloudItem[cloudmodel.Network]
 	DiffBase[*diffbase.Network]
-	MySQLData[mysqlmodel.Network]
+	MySQLData[metadbmodel.Network]
 }
 
 type SubnetFieldsUpdate struct {
@@ -284,7 +284,7 @@ type SubnetUpdate struct {
 	Fields[SubnetFieldsUpdate]
 	CloudItem[cloudmodel.Subnet]
 	DiffBase[*diffbase.Subnet]
-	MySQLData[mysqlmodel.Subnet]
+	MySQLData[metadbmodel.Subnet]
 }
 
 type VRouterFieldsUpdate struct {
@@ -300,7 +300,7 @@ type VRouterUpdate struct {
 	Fields[VRouterFieldsUpdate]
 	CloudItem[cloudmodel.VRouter]
 	DiffBase[*diffbase.VRouter]
-	MySQLData[mysqlmodel.VRouter]
+	MySQLData[metadbmodel.VRouter]
 }
 
 type RoutingTableFieldsUpdate struct {
@@ -314,7 +314,7 @@ type RoutingTableUpdate struct {
 	Fields[RoutingTableFieldsUpdate]
 	CloudItem[cloudmodel.RoutingTable]
 	DiffBase[*diffbase.RoutingTable]
-	MySQLData[mysqlmodel.RoutingTable]
+	MySQLData[metadbmodel.RoutingTable]
 }
 
 type DHCPPortFieldsUpdate struct {
@@ -330,7 +330,7 @@ type DHCPPortUpdate struct {
 	Fields[DHCPPortFieldsUpdate]
 	CloudItem[cloudmodel.DHCPPort]
 	DiffBase[*diffbase.DHCPPort]
-	MySQLData[mysqlmodel.DHCPPort]
+	MySQLData[metadbmodel.DHCPPort]
 }
 
 type VInterfaceFieldsUpdate struct {
@@ -349,7 +349,7 @@ type VInterfaceUpdate struct {
 	Fields[VInterfaceFieldsUpdate]
 	CloudItem[cloudmodel.VInterface]
 	DiffBase[*diffbase.VInterface]
-	MySQLData[mysqlmodel.VInterface]
+	MySQLData[metadbmodel.VInterface]
 }
 
 type FloatingIPFieldsUpdate struct {
@@ -363,7 +363,7 @@ type FloatingIPUpdate struct {
 	Fields[FloatingIPFieldsUpdate]
 	CloudItem[cloudmodel.FloatingIP]
 	DiffBase[*diffbase.FloatingIP]
-	MySQLData[mysqlmodel.FloatingIP]
+	MySQLData[metadbmodel.FloatingIP]
 }
 
 type LANIPFieldsUpdate struct {
@@ -375,7 +375,7 @@ type LANIPUpdate struct {
 	Fields[LANIPFieldsUpdate]
 	CloudItem[cloudmodel.IP]
 	DiffBase[*diffbase.LANIP]
-	MySQLData[mysqlmodel.LANIP]
+	MySQLData[metadbmodel.LANIP]
 }
 type WANIPFieldsUpdate struct {
 	Key
@@ -387,7 +387,7 @@ type WANIPUpdate struct {
 	Fields[WANIPFieldsUpdate]
 	CloudItem[cloudmodel.IP]
 	DiffBase[*diffbase.WANIP]
-	MySQLData[mysqlmodel.WANIP]
+	MySQLData[metadbmodel.WANIP]
 }
 type VIPFieldsUpdate struct {
 	Key
@@ -398,7 +398,7 @@ type VIPUpdate struct {
 	Fields[VIPFieldsUpdate]
 	CloudItem[cloudmodel.IP]
 	DiffBase[*diffbase.VIP]
-	MySQLData[mysqlmodel.VIP]
+	MySQLData[metadbmodel.VIP]
 }
 
 type NATGatewayFieldsUpdate struct {
@@ -412,7 +412,7 @@ type NATGatewayUpdate struct {
 	Fields[NATGatewayFieldsUpdate]
 	CloudItem[cloudmodel.NATGateway]
 	DiffBase[*diffbase.NATGateway]
-	MySQLData[mysqlmodel.NATGateway]
+	MySQLData[metadbmodel.NATGateway]
 }
 
 type NATRuleFieldsUpdate struct {
@@ -422,7 +422,7 @@ type NATRuleUpdate struct {
 	Fields[NATRuleFieldsUpdate]
 	CloudItem[cloudmodel.NATRule]
 	DiffBase[*diffbase.NATRule]
-	MySQLData[mysqlmodel.NATRule]
+	MySQLData[metadbmodel.NATRule]
 }
 
 type NATVMConnectionFieldsUpdate struct {
@@ -432,7 +432,7 @@ type NATVMConnectionUpdate struct {
 	Fields[NATVMConnectionFieldsUpdate]
 	CloudItem[cloudmodel.NATVMConnection]
 	DiffBase[*diffbase.NATVMConnection]
-	MySQLData[mysqlmodel.NATVMConnection]
+	MySQLData[metadbmodel.NATVMConnection]
 }
 
 type LBFieldsUpdate struct {
@@ -447,7 +447,7 @@ type LBUpdate struct {
 	Fields[LBFieldsUpdate]
 	CloudItem[cloudmodel.LB]
 	DiffBase[*diffbase.LB]
-	MySQLData[mysqlmodel.LB]
+	MySQLData[metadbmodel.LB]
 }
 
 type LBListenerFieldsUpdate struct {
@@ -462,7 +462,7 @@ type LBListenerUpdate struct {
 	Fields[LBListenerFieldsUpdate]
 	CloudItem[cloudmodel.LBListener]
 	DiffBase[*diffbase.LBListener]
-	MySQLData[mysqlmodel.LBListener]
+	MySQLData[metadbmodel.LBListener]
 }
 
 type LBTargetServerFieldsUpdate struct {
@@ -475,7 +475,7 @@ type LBTargetServerUpdate struct {
 	Fields[LBTargetServerFieldsUpdate]
 	CloudItem[cloudmodel.LBTargetServer]
 	DiffBase[*diffbase.LBTargetServer]
-	MySQLData[mysqlmodel.LBTargetServer]
+	MySQLData[metadbmodel.LBTargetServer]
 }
 
 type LBVMConnectionFieldsUpdate struct {
@@ -485,7 +485,7 @@ type LBVMConnectionUpdate struct {
 	Fields[LBVMConnectionFieldsUpdate]
 	CloudItem[cloudmodel.LBVMConnection]
 	DiffBase[*diffbase.LBVMConnection]
-	MySQLData[mysqlmodel.LBVMConnection]
+	MySQLData[metadbmodel.LBVMConnection]
 }
 
 type PeerConnectionFieldsUpdate struct {
@@ -500,7 +500,7 @@ type PeerConnectionUpdate struct {
 	Fields[PeerConnectionFieldsUpdate]
 	CloudItem[cloudmodel.PeerConnection]
 	DiffBase[*diffbase.PeerConnection]
-	MySQLData[mysqlmodel.PeerConnection]
+	MySQLData[metadbmodel.PeerConnection]
 }
 
 type CENFieldsUpdate struct {
@@ -513,7 +513,7 @@ type CENUpdate struct {
 	Fields[CENFieldsUpdate]
 	CloudItem[cloudmodel.CEN]
 	DiffBase[*diffbase.CEN]
-	MySQLData[mysqlmodel.CEN]
+	MySQLData[metadbmodel.CEN]
 }
 
 type RDSInstanceFieldsUpdate struct {
@@ -530,7 +530,7 @@ type RDSInstanceUpdate struct {
 	Fields[RDSInstanceFieldsUpdate]
 	CloudItem[cloudmodel.RDSInstance]
 	DiffBase[*diffbase.RDSInstance]
-	MySQLData[mysqlmodel.RDSInstance]
+	MySQLData[metadbmodel.RDSInstance]
 }
 
 type RedisInstanceFieldsUpdate struct {
@@ -546,7 +546,7 @@ type RedisInstanceUpdate struct {
 	Fields[RedisInstanceFieldsUpdate]
 	CloudItem[cloudmodel.RedisInstance]
 	DiffBase[*diffbase.RedisInstance]
-	MySQLData[mysqlmodel.RedisInstance]
+	MySQLData[metadbmodel.RedisInstance]
 }
 
 type PodClusterFieldsUpdate struct {
@@ -560,7 +560,7 @@ type PodClusterUpdate struct {
 	Fields[PodClusterFieldsUpdate]
 	CloudItem[cloudmodel.PodCluster]
 	DiffBase[*diffbase.PodCluster]
-	MySQLData[mysqlmodel.PodCluster]
+	MySQLData[metadbmodel.PodCluster]
 }
 
 type PodNamespaceFieldsUpdate struct {
@@ -575,7 +575,7 @@ type PodNamespaceUpdate struct {
 	Fields[PodNamespaceFieldsUpdate]
 	CloudItem[cloudmodel.PodNamespace]
 	DiffBase[*diffbase.PodNamespace]
-	MySQLData[mysqlmodel.PodNamespace]
+	MySQLData[metadbmodel.PodNamespace]
 }
 
 type PodNodeFieldsUpdate struct {
@@ -594,7 +594,7 @@ type PodNodeUpdate struct {
 	Fields[PodNodeFieldsUpdate]
 	CloudItem[cloudmodel.PodNode]
 	DiffBase[*diffbase.PodNode]
-	MySQLData[mysqlmodel.PodNode]
+	MySQLData[metadbmodel.PodNode]
 }
 
 type PodIngressFieldsUpdate struct {
@@ -607,7 +607,7 @@ type PodIngressUpdate struct {
 	Fields[PodIngressFieldsUpdate]
 	CloudItem[cloudmodel.PodIngress]
 	DiffBase[*diffbase.PodIngress]
-	MySQLData[mysqlmodel.PodIngress]
+	MySQLData[metadbmodel.PodIngress]
 }
 
 type PodIngressRuleFieldsUpdate struct {
@@ -617,7 +617,7 @@ type PodIngressRuleUpdate struct {
 	Fields[PodIngressRuleFieldsUpdate]
 	CloudItem[cloudmodel.PodIngressRule]
 	DiffBase[*diffbase.PodIngressRule]
-	MySQLData[mysqlmodel.PodIngressRule]
+	MySQLData[metadbmodel.PodIngressRule]
 }
 
 type PodIngressRuleBackendFieldsUpdate struct {
@@ -627,7 +627,7 @@ type PodIngressRuleBackendUpdate struct {
 	Fields[PodIngressRuleBackendFieldsUpdate]
 	CloudItem[cloudmodel.PodIngressRuleBackend]
 	DiffBase[*diffbase.PodIngressRuleBackend]
-	MySQLData[mysqlmodel.PodIngressRuleBackend]
+	MySQLData[metadbmodel.PodIngressRuleBackend]
 }
 
 type PodServiceFieldsUpdate struct {
@@ -650,7 +650,7 @@ type PodServiceUpdate struct {
 	Fields[PodServiceFieldsUpdate]
 	CloudItem[cloudmodel.PodService]
 	DiffBase[*diffbase.PodService]
-	MySQLData[mysqlmodel.PodService]
+	MySQLData[metadbmodel.PodService]
 }
 
 type PodServicePortFieldsUpdate struct {
@@ -661,7 +661,7 @@ type PodServicePortUpdate struct {
 	Fields[PodServicePortFieldsUpdate]
 	CloudItem[cloudmodel.PodServicePort]
 	DiffBase[*diffbase.PodServicePort]
-	MySQLData[mysqlmodel.PodServicePort]
+	MySQLData[metadbmodel.PodServicePort]
 }
 
 type PodGroupFieldsUpdate struct {
@@ -679,7 +679,7 @@ type PodGroupUpdate struct {
 	Fields[PodGroupFieldsUpdate]
 	CloudItem[cloudmodel.PodGroup]
 	DiffBase[*diffbase.PodGroup]
-	MySQLData[mysqlmodel.PodGroup]
+	MySQLData[metadbmodel.PodGroup]
 }
 
 type PodGroupPortFieldsUpdate struct {
@@ -690,7 +690,7 @@ type PodGroupPortUpdate struct {
 	Fields[PodGroupPortFieldsUpdate]
 	CloudItem[cloudmodel.PodGroupPort]
 	DiffBase[*diffbase.PodGroupPort]
-	MySQLData[mysqlmodel.PodGroupPort]
+	MySQLData[metadbmodel.PodGroupPort]
 }
 
 type PodReplicaSetFieldsUpdate struct {
@@ -705,7 +705,7 @@ type PodReplicaSetUpdate struct {
 	Fields[PodReplicaSetFieldsUpdate]
 	CloudItem[cloudmodel.PodReplicaSet]
 	DiffBase[*diffbase.PodReplicaSet]
-	MySQLData[mysqlmodel.PodReplicaSet]
+	MySQLData[metadbmodel.PodReplicaSet]
 }
 
 type PodFieldsUpdate struct {
@@ -736,7 +736,7 @@ type PodUpdate struct {
 	Fields[PodFieldsUpdate]
 	CloudItem[cloudmodel.Pod]
 	DiffBase[*diffbase.Pod]
-	MySQLData[mysqlmodel.Pod]
+	MySQLData[metadbmodel.Pod]
 }
 
 type ProcessFieldsUpdate struct {
@@ -751,5 +751,5 @@ type ProcessUpdate struct {
 	Fields[ProcessFieldsUpdate]
 	CloudItem[cloudmodel.Process]
 	DiffBase[*diffbase.Process]
-	MySQLData[mysqlmodel.Process]
+	MySQLData[metadbmodel.Process]
 }

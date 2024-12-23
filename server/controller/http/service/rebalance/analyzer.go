@@ -18,8 +18,8 @@ package rebalance
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 // //go:generate mockgen -source=analyzer.go -destination=./mocks/mock_analyzer.go -package=mocks DB
@@ -28,15 +28,15 @@ type DB interface {
 }
 
 type DBInfo struct {
-	Regions         []mysqlmodel.Region
-	AZs             []mysqlmodel.AZ
-	Analyzers       []mysqlmodel.Analyzer
-	AZAnalyzerConns []mysqlmodel.AZAnalyzerConnection
-	VTaps           []mysqlmodel.VTap
+	Regions         []metadbmodel.Region
+	AZs             []metadbmodel.AZ
+	Analyzers       []metadbmodel.Analyzer
+	AZAnalyzerConns []metadbmodel.AZAnalyzerConnection
+	VTaps           []metadbmodel.VTap
 
 	// get query data
-	Controllers       []mysqlmodel.Controller
-	AZControllerConns []mysqlmodel.AZControllerConnection
+	Controllers       []metadbmodel.Controller
+	AZControllerConns []metadbmodel.AZControllerConnection
 }
 
 type AnalyzerInfo struct {
@@ -50,11 +50,11 @@ type AnalyzerInfo struct {
 }
 
 type RebalanceData struct {
-	RegionToVTapNameToTraffic map[string]map[string]int64       `json:"RegionToVTapNameToTraffic"`
-	RegionToAZLcuuids         map[string][]string               `json:"RegionToAZLcuuids"`
-	AZToRegion                map[string]string                 `json:"AZToRegion"`
-	AZToVTaps                 map[string][]*mysqlmodel.VTap     `json:"AZToVTaps"`
-	AZToAnalyzers             map[string][]*mysqlmodel.Analyzer `json:"AZToAnalyzers"`
+	RegionToVTapNameToTraffic map[string]map[string]int64        `json:"RegionToVTapNameToTraffic"`
+	RegionToAZLcuuids         map[string][]string                `json:"RegionToAZLcuuids"`
+	AZToRegion                map[string]string                  `json:"AZToRegion"`
+	AZToVTaps                 map[string][]*metadbmodel.VTap     `json:"AZToVTaps"`
+	AZToAnalyzers             map[string][]*metadbmodel.Analyzer `json:"AZToAnalyzers"`
 }
 
 func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
@@ -67,7 +67,7 @@ func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
 	}
 }
 
-func (r *DBInfo) Get(db *mysql.DB) error {
+func (r *DBInfo) Get(db *metadb.DB) error {
 	if err := db.Find(&r.Regions).Error; err != nil {
 		return err
 	}
@@ -93,10 +93,10 @@ func (r *DBInfo) Get(db *mysql.DB) error {
 	return nil
 }
 
-func GetAZToAnalyzers(azAnalyzerConns []mysqlmodel.AZAnalyzerConnection, regionToAZLcuuids map[string][]string,
-	ipToAnalyzer map[string]*mysqlmodel.Analyzer) map[string][]*mysqlmodel.Analyzer {
+func GetAZToAnalyzers(azAnalyzerConns []metadbmodel.AZAnalyzerConnection, regionToAZLcuuids map[string][]string,
+	ipToAnalyzer map[string]*metadbmodel.Analyzer) map[string][]*metadbmodel.Analyzer {
 
-	azToAnalyzers := make(map[string][]*mysqlmodel.Analyzer)
+	azToAnalyzers := make(map[string][]*metadbmodel.Analyzer)
 	for _, conn := range azAnalyzerConns {
 		if conn.AZ == "ALL" {
 			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {

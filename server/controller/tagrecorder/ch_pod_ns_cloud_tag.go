@@ -18,18 +18,18 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodNSCloudTag struct {
-	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, CloudTagKey]
+	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, metadbmodel.PodNamespace, metadbmodel.ChPodNSCloudTag, CloudTagKey]
 }
 
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	mng := &ChPodNSCloudTag{
-		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, CloudTagKey](
+		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, metadbmodel.PodNamespace, metadbmodel.ChPodNSCloudTag, CloudTagKey](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
 		),
 	}
@@ -38,12 +38,12 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *metadb.DB) {
 	keysToAdd := make([]CloudTagKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChPodNSCloudTag, 0)
+	targetsToAdd := make([]metadbmodel.ChPodNSCloudTag, 0)
 	keysToDelete := make([]CloudTagKey, 0)
-	targetsToDelete := make([]mysqlmodel.ChPodNSCloudTag, 0)
-	var chItem mysqlmodel.ChPodNSCloudTag
+	targetsToDelete := make([]metadbmodel.ChPodNSCloudTag, 0)
+	var chItem metadbmodel.ChPodNSCloudTag
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.CloudTags.IsDifferent() {
@@ -53,7 +53,7 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, CloudTagKey{ID: sourceID, Key: k})
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
+				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodNSCloudTag{
 					ID:    sourceID,
 					Key:   k,
 					Value: v,
@@ -65,7 +65,7 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, key)
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
+						targetsToAdd = append(targetsToAdd, metadbmodel.ChPodNSCloudTag{
 							ID:    sourceID,
 							Key:   k,
 							Value: v,
@@ -79,7 +79,7 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, CloudTagKey{ID: sourceID, Key: k})
-				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodNSCloudTag{
+				targetsToDelete = append(targetsToDelete, metadbmodel.ChPodNSCloudTag{
 					ID:  sourceID,
 					Key: k,
 				})
@@ -95,10 +95,10 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodNamespace) (keys []CloudTagKey, targets []mysqlmodel.ChPodNSCloudTag) {
+func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.PodNamespace) (keys []CloudTagKey, targets []metadbmodel.ChPodNSCloudTag) {
 	for k, v := range source.CloudTags {
 		keys = append(keys, CloudTagKey{ID: source.ID, Key: k})
-		targets = append(targets, mysqlmodel.ChPodNSCloudTag{
+		targets = append(targets, metadbmodel.ChPodNSCloudTag{
 			ID:          source.ID,
 			Key:         k,
 			Value:       v,
@@ -111,6 +111,6 @@ func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmode
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodNSCloudTag, db *mysql.DB) {
+func (c *ChPodNSCloudTag) softDeletedTargetsUpdated(targets []metadbmodel.ChPodNSCloudTag, db *metadb.DB) {
 
 }

@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPodNode() *mysqlmodel.PodNode {
-	return &mysqlmodel.PodNode{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Region: uuid.New().String()}
+func newDBPodNode() *metadbmodel.PodNode {
+	return &metadbmodel.PodNode{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Region: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodNodeBatchSuccess() {
 	operator := NewPodNode()
 	itemToAdd := newDBPodNode()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PodNode{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PodNode{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PodNode
+	var addedItem *metadbmodel.PodNode
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodNode{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodNode{})
 }
 
 func (t *SuiteTest) TestUpdatePodNodeSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodNodeSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.PodNode
+	var updatedItem *metadbmodel.PodNode
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Region, updateInfo["region"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodNode{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodNode{})
 }
 
 func (t *SuiteTest) TestDeletePodNodeBatchSuccess() {
@@ -66,27 +66,27 @@ func (t *SuiteTest) TestDeletePodNodeBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PodNode
+	var deletedItem *metadbmodel.PodNode
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestPodNodeCreateAndFind() {
 	lcuuid := uuid.New().String()
-	pd := &mysqlmodel.PodNode{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	pd := &metadbmodel.PodNode{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(pd)
-	var resultPodNode *mysqlmodel.PodNode
+	var resultPodNode *metadbmodel.PodNode
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and ip='' and region='' and sub_domain='' and az=''", lcuuid).First(&resultPodNode).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), pd.Base.Lcuuid, resultPodNode.Base.Lcuuid)
 
-	resultPodNode = new(mysqlmodel.PodNode)
+	resultPodNode = new(metadbmodel.PodNode)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodNode)
 	assert.Equal(t.T(), pd.Base.Lcuuid, resultPodNode.Base.Lcuuid)
 
-	resultPodNode = new(mysqlmodel.PodNode)
+	resultPodNode = new(metadbmodel.PodNode)
 	result := t.db.Where("lcuuid = ? and alias = null", lcuuid).Find(&resultPodNode)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

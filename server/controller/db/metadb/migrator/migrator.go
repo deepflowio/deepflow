@@ -19,14 +19,14 @@ package migrator
 import (
 	"github.com/op/go-logging"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition"
 )
 
-var log = logging.MustGetLogger("db.mysql.migrator")
+var log = logging.MustGetLogger("db.metadb.migrator")
 
 // if configured database does not exist, it is considered a new deployment, will create database and init tables;
 // if configured database exists, but db_version table does not exist, it is also considered a new deployment,
@@ -40,7 +40,7 @@ func Migrate(cfg config.MySqlConfig) error {
 	if err := migrateDefaultDatabase(cfg); err != nil {
 		return err
 	}
-	orgIDs, err := mysql.GetNonDefaultORGIDs()
+	orgIDs, err := metadb.GetNonDefaultORGIDs()
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func migrateDefaultDatabase(cfg config.MySqlConfig) error {
 		return err
 	}
 
-	if err := mysql.InitDefaultDB(cfg); err != nil {
+	if err := metadb.InitDefaultDB(cfg); err != nil {
 		return err
 	}
 
@@ -67,7 +67,7 @@ func migrateDefaultDatabase(cfg config.MySqlConfig) error {
 }
 
 func migrateNonDefaultDatabase(cfg config.MySqlConfig, orgID int) error {
-	copiedCfg := mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)
+	copiedCfg := metadbcommon.ReplaceConfigDatabaseName(cfg, orgID)
 	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
 		return err

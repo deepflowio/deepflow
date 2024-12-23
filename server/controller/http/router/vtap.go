@@ -32,7 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -256,7 +256,7 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		dbInfo, err := mysql.GetDB(orgID.(int))
+		dbInfo, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			JsonResponse(c, nil, err)
 			return

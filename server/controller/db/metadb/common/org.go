@@ -20,22 +20,19 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-var log = logging.MustGetLogger("db.mysql.migrator.common")
+var log = logging.MustGetLogger("db.metadb.common")
 
-func CreateDatabase(dc *DBConfig) error {
-	log.Infof(LogDBName(dc.Config.Database, "create database"))
-	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
+// ORGIDToDatabaseName convert organization id to database name, format: 0002_deepflow
+func ORGIDToDatabaseName(id int) string {
+	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + NON_DEFAULT_ORG_DATABASE_SUFFIX
 }
 
-func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
-	var databaseName string
-	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
-	if databaseName == dc.Config.Database {
-		return true, nil
-	} else {
-		err := CreateDatabase(dc)
-		return false, err
-	}
+func ReplaceConfigDatabaseName(cfg config.MySqlConfig, orgID int) config.MySqlConfig {
+	copiedCfg := cfg
+	copiedCfg.Database = ORGIDToDatabaseName(orgID)
+	return copiedCfg
 }

@@ -19,7 +19,7 @@ package event
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -43,7 +43,7 @@ func NewNATGateway(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *NATGateway {
 	return mng
 }
 
-func (n *NATGateway) ProduceByAdd(items []*mysqlmodel.NATGateway) {
+func (n *NATGateway) ProduceByAdd(items []*metadbmodel.NATGateway) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
 		info, err := n.ToolDataSet.GetNATGatewayInfoByID(item.ID)

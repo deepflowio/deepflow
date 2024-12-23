@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
 		*diffbase.PodReplicaSet,
-		*mysqlmodel.PodReplicaSet,
-		mysqlmodel.PodReplicaSet,
+		*metadbmodel.PodReplicaSet,
+		metadbmodel.PodReplicaSet,
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
 		*message.PodReplicaSetUpdate,
@@ -47,8 +47,8 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 		newUpdaterBase[
 			cloudmodel.PodReplicaSet,
 			*diffbase.PodReplicaSet,
-			*mysqlmodel.PodReplicaSet,
-			mysqlmodel.PodReplicaSet,
+			*metadbmodel.PodReplicaSet,
+			metadbmodel.PodReplicaSet,
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
 			*message.PodReplicaSetUpdate,
@@ -73,7 +73,7 @@ func (r *PodReplicaSet) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodReplicaS
 	return
 }
 
-func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*mysqlmodel.PodReplicaSet, bool) {
+func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*metadbmodel.PodReplicaSet, bool) {
 	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -98,7 +98,7 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.PodReplicaSet{
+	dbItem := &metadbmodel.PodReplicaSet{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		PodClusterID:   podClusterID,

@@ -21,20 +21,20 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	json "github.com/goccy/go-json"
 )
 
 type ChIPResource struct {
-	UpdaterComponent[mysqlmodel.ChIPResource, IPResourceKey]
+	UpdaterComponent[metadbmodel.ChIPResource, IPResourceKey]
 	ctx context.Context
 }
 
 func NewChIPResource(ctx context.Context) *ChIPResource {
 	updater := &ChIPResource{
-		newUpdaterComponent[mysqlmodel.ChIPResource, IPResourceKey](
+		newUpdaterComponent[metadbmodel.ChIPResource, IPResourceKey](
 			RESOURCE_TYPE_CH_IP_RESOURCE,
 		),
 		ctx,
@@ -43,9 +43,9 @@ func NewChIPResource(ctx context.Context) *ChIPResource {
 	return updater
 }
 
-func getVMIdToUidMap(db *mysql.DB) map[int]string {
+func getVMIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var vms []mysqlmodel.VM
+	var vms []metadbmodel.VM
 	err := db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), db.LogPrefixORGID)
@@ -57,9 +57,9 @@ func getVMIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func getRDSIdToUidMap(db *mysql.DB) map[int]string {
+func getRDSIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var rdsInstances []mysqlmodel.RDSInstance
+	var rdsInstances []metadbmodel.RDSInstance
 	err := db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err), db.LogPrefixORGID)
@@ -71,9 +71,9 @@ func getRDSIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func getRedisIdToUidMap(db *mysql.DB) map[int]string {
+func getRedisIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var redisInstances []mysqlmodel.RedisInstance
+	var redisInstances []metadbmodel.RedisInstance
 	err := db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err), db.LogPrefixORGID)
@@ -85,9 +85,9 @@ func getRedisIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func getLBIdToUidMap(db *mysql.DB) map[int]string {
+func getLBIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var lbs []mysqlmodel.LB
+	var lbs []metadbmodel.LB
 	err := db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), db.LogPrefixORGID)
@@ -99,9 +99,9 @@ func getLBIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
+func getNatgwIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var natGateways []mysqlmodel.NATGateway
+	var natGateways []metadbmodel.NATGateway
 	err := db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), db.LogPrefixORGID)
@@ -113,9 +113,9 @@ func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func getVPCIdToUidMap(db *mysql.DB) map[int]string {
+func getVPCIdToUidMap(db *metadb.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var vpcs []mysqlmodel.VPC
+	var vpcs []metadbmodel.VPC
 
 	err := db.Unscoped().Find(&vpcs).Error
 	if err != nil {
@@ -128,8 +128,8 @@ func getVPCIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func (i *ChIPResource) generateNewData(db *mysql.DB) (map[IPResourceKey]mysqlmodel.ChIPResource, bool) {
-	keyToItem := make(map[IPResourceKey]mysqlmodel.ChIPResource)
+func (i *ChIPResource) generateNewData(db *metadb.DB) (map[IPResourceKey]metadbmodel.ChIPResource, bool) {
+	keyToItem := make(map[IPResourceKey]metadbmodel.ChIPResource)
 	vmIdToUidMap := getVMIdToUidMap(db)
 	rdsIdToUidMap := getRDSIdToUidMap(db)
 	redisIdToUidMap := getRedisIdToUidMap(db)
@@ -213,7 +213,7 @@ func (i *ChIPResource) generateNewData(db *mysql.DB) (map[IPResourceKey]mysqlmod
 			log.Error(err, db.LogPrefixORGID)
 			return nil, false
 		}
-		itemStruct := mysqlmodel.ChIPResource{}
+		itemStruct := metadbmodel.ChIPResource{}
 		err = json.Unmarshal(itemStr, &itemStruct)
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
@@ -224,11 +224,11 @@ func (i *ChIPResource) generateNewData(db *mysql.DB) (map[IPResourceKey]mysqlmod
 	return keyToItem, true
 }
 
-func (i *ChIPResource) generateKey(dbItem mysqlmodel.ChIPResource) IPResourceKey {
+func (i *ChIPResource) generateKey(dbItem metadbmodel.ChIPResource) IPResourceKey {
 	return IPResourceKey{IP: dbItem.IP, SubnetID: dbItem.SubnetID}
 }
 
-func (i *ChIPResource) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIPResource) (map[string]interface{}, bool) {
+func (i *ChIPResource) generateUpdateInfo(oldItem, newItem metadbmodel.ChIPResource) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	oldItemMap := make(map[string]interface{})
 	newItemMap := make(map[string]interface{})

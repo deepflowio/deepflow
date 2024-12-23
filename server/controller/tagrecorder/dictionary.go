@@ -36,8 +36,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -232,7 +232,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		CH_DICTIONARY_ALARM_POLICY,
 	)
 	// 根据不同的组织进行更新
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)
 	}

@@ -25,15 +25,15 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 type dbAndIP struct {
-	db *mysql.DB
+	db *metadb.DB
 	ip string
 }
 
@@ -87,7 +87,7 @@ func (c *ControllerCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
 					// 控制器健康检查
 					c.healthCheck(db)
 					// 检查没有分配控制器的采集器，并进行分配
@@ -126,13 +126,13 @@ func (c *ControllerCheck) Stop() {
 
 var checkExceptionControllers = make(map[string]*dfHostCheck)
 
-func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
-	var controllers []mysqlmodel.Controller
+func (c *ControllerCheck) healthCheck(orgDB *metadb.DB) {
+	var controllers []metadbmodel.Controller
 	var exceptionIPs []string
 
 	log.Info("controller health check start")
 
-	if err := mysql.DefaultDB.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers).Error; err != nil {
+	if err := metadb.DefaultDB.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers).Error; err != nil {
 		log.Errorf("get controller from db error: %v", err)
 		return
 	}
@@ -180,7 +180,7 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					if c.exceptionControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionControllerDict, controller.IP)
-						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
+						if err := metadb.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
 							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
 						}
 						exceptionIPs = append(exceptionIPs, controller.IP)
@@ -203,7 +203,7 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
 					if c.normalControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalControllerDict, controller.IP)
-						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
+						if err := metadb.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
 							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
 						}
 						log.Infof("set controller (%s) state to normal", controller.IP)
@@ -226,10 +226,10 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			if err := orgDB.Delete(mysqlmodel.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
+			if err := orgDB.Delete(metadbmodel.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
 				log.Errorf("delete az_controller_connection(ip: %s) error: %s", ip, err.Error(), orgDB.LogPrefixORGID)
 			}
-			err := mysql.DefaultDB.Delete(mysqlmodel.Controller{}, "ip = ?", ip).Error
+			err := metadb.DefaultDB.Delete(metadbmodel.Controller{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
 			} else {
@@ -243,12 +243,12 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 	log.Info("controller health check end")
 }
 
-func (c *ControllerCheck) TriggerReallocController(orgDB *mysql.DB, controllerIP string) {
+func (c *ControllerCheck) TriggerReallocController(orgDB *metadb.DB, controllerIP string) {
 	c.ch <- dbAndIP{db: orgDB, ip: controllerIP}
 }
 
-func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
-	var vtaps []mysqlmodel.VTap
+func (c *ControllerCheck) vtapControllerCheck(orgDB *metadb.DB) {
+	var vtaps []metadbmodel.VTap
 	var noControllerVtapCount int64
 
 	log.Info("vtap controller check start", orgDB.LogPrefixORGID)
@@ -267,7 +267,7 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
 			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name, orgDB.LogPrefixORGID)
 			vtap.ControllerIP = ""
-			if err := orgDB.Model(&mysqlmodel.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
+			if err := orgDB.Model(&metadbmodel.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
 				log.Errorf("update vtap(lcuuid: %s, name: %s) controller ip to empty error: %v", vtap.Lcuuid, vtap.Name, err, orgDB.LogPrefixORGID)
 			}
 		}
@@ -287,11 +287,11 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 	log.Info("vtap controller check end", orgDB.LogPrefixORGID)
 }
 
-func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string) {
-	var vtaps []mysqlmodel.VTap
-	var controllers []mysqlmodel.Controller
-	var azs []mysqlmodel.AZ
-	var azControllerConns []mysqlmodel.AZControllerConnection
+func (c *ControllerCheck) vtapControllerAlloc(orgDB *metadb.DB, excludeIP string) {
+	var vtaps []metadbmodel.VTap
+	var controllers []metadbmodel.Controller
+	var azs []metadbmodel.AZ
+	var azControllerConns []metadbmodel.AZControllerConnection
 
 	log.Info("vtap controller alloc start")
 
@@ -306,7 +306,7 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取控制器当前已分配的采集器个数
-	azToNoControllerVTaps := make(map[string][]*mysqlmodel.VTap)
+	azToNoControllerVTaps := make(map[string][]*metadbmodel.VTap)
 	controllerIPToUsedVTapNum := make(map[string]int)
 	azLcuuids := mapset.NewSet()
 	for i, vtap := range vtaps {
@@ -407,9 +407,9 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 	log.Info("vtap controller alloc end", orgDB.LogPrefixORGID)
 }
 
-func (c *ControllerCheck) azConnectionCheck(orgDB *mysql.DB) {
-	var azs []mysqlmodel.AZ
-	var azControllerConns []mysqlmodel.AZControllerConnection
+func (c *ControllerCheck) azConnectionCheck(orgDB *metadb.DB) {
+	var azs []metadbmodel.AZ
+	var azControllerConns []metadbmodel.AZControllerConnection
 
 	log.Info("az connection check start", orgDB.LogPrefixORGID)
 
@@ -442,7 +442,7 @@ func (c *ControllerCheck) azConnectionCheck(orgDB *mysql.DB) {
 	log.Info("az connection check end", orgDB.LogPrefixORGID)
 }
 
-func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controllerIPs []string) {
+func (c *ControllerCheck) cleanExceptionControllerData(orgDB *metadb.DB, controllerIPs []string) {
 	if len(controllerIPs) == 0 {
 		return
 	}
@@ -459,11 +459,11 @@ func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controll
 var SyncControllerExcludeField = []string{"nat_ip", "state"}
 
 func (c *ControllerCheck) SyncDefaultOrgData() {
-	var controllers []mysqlmodel.Controller
-	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+	var controllers []metadbmodel.Controller
+	if err := metadb.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(controllers, SyncControllerExcludeField); err != nil {
+	if err := metadb.SyncDefaultOrgData(controllers, SyncControllerExcludeField); err != nil {
 		log.Error(err)
 	}
 }

@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -99,7 +99,7 @@ func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
 }
 
 func (r *RefreshOP) generateRefreshIPs() {
-	dbControllers, err := dbmgr.DBMgr[mysqlmodel.Controller](r.db).Gets()
+	dbControllers, err := dbmgr.DBMgr[metadbmodel.Controller](r.db).Gets()
 	if err != nil {
 		log.Error(err)
 		return
@@ -110,7 +110,7 @@ func (r *RefreshOP) generateRefreshIPs() {
 
 	controllerIPToRegion := make(map[string]string)
 	var localRegion string
-	azCons, _ := dbmgr.DBMgr[mysqlmodel.AZControllerConnection](r.db).Gets()
+	azCons, _ := dbmgr.DBMgr[metadbmodel.AZControllerConnection](r.db).Gets()
 	for _, azCon := range azCons {
 		if azCon.ControllerIP == r.nodeIP {
 			localRegion = azCon.Region

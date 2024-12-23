@@ -20,19 +20,19 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodCluster struct {
-	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysqlmodel.PodCluster, mysqlmodel.ChPodCluster, IDKey]
+	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChPodCluster, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	mng := &ChPodCluster{
-		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysqlmodel.PodCluster, mysqlmodel.ChPodCluster, IDKey](
+		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChPodCluster, IDKey](
 			common.RESOURCE_TYPE_POD_CLUSTER_EN, RESOURCE_TYPE_CH_POD_CLUSTER,
 		),
 		resourceTypeToIconID,
@@ -42,7 +42,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodCluster) (keys []IDKey, targets []mysqlmodel.ChPodCluster) {
+func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *metadbmodel.PodCluster) (keys []IDKey, targets []metadbmodel.ChPodCluster) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_CLUSTER,
 	}]
@@ -52,7 +52,7 @@ func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysqlmodel.ChPodCluster{
+	targets = append(targets, metadbmodel.ChPodCluster{
 		ID:          source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
@@ -64,21 +64,21 @@ func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodCluster) onResourceUpdated(sourceID int, fieldsUpdate *message.PodClusterFieldsUpdate, db *mysql.DB) {
+func (c *ChPodCluster) onResourceUpdated(sourceID int, fieldsUpdate *message.PodClusterFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChPodCluster
+		var chItem metadbmodel.ChPodCluster
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodCluster) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodCluster, db *mysql.DB) {
+func (c *ChPodCluster) softDeletedTargetsUpdated(targets []metadbmodel.ChPodCluster, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

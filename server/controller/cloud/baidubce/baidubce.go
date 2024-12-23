@@ -34,7 +34,7 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -60,7 +60,7 @@ type BaiduBce struct {
 	debugger    *cloudcommon.Debugger
 }
 
-func NewBaiduBce(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
+func NewBaiduBce(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

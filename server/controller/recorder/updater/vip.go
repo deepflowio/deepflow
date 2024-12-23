@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type VIP struct {
 	UpdaterBase[
 		cloudmodel.VIP,
 		*diffbase.VIP,
-		*mysqlmodel.VIP,
-		mysqlmodel.VIP,
+		*metadbmodel.VIP,
+		metadbmodel.VIP,
 		*message.VIPAdd,
 		message.VIPAdd,
 		*message.VIPUpdate,
@@ -47,8 +47,8 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		newUpdaterBase[
 			cloudmodel.VIP,
 			*diffbase.VIP,
-			*mysqlmodel.VIP,
-			mysqlmodel.VIP,
+			*metadbmodel.VIP,
+			metadbmodel.VIP,
 			*message.VIPAdd,
 			message.VIPAdd,
 			*message.VIPUpdate,
@@ -73,8 +73,8 @@ func (p *VIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.VIP) (diffBase *diffb
 	return
 }
 
-func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysqlmodel.VIP, bool) {
-	dbItem := &mysqlmodel.VIP{
+func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*metadbmodel.VIP, bool) {
+	dbItem := &metadbmodel.VIP{
 		IP:     cloudItem.IP,
 		VTapID: cloudItem.VTapID,
 		Domain: p.metadata.Domain.Lcuuid,

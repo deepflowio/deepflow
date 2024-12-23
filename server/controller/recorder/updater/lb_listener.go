@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type LBListener struct {
 	UpdaterBase[
 		cloudmodel.LBListener,
 		*diffbase.LBListener,
-		*mysqlmodel.LBListener,
-		mysqlmodel.LBListener,
+		*metadbmodel.LBListener,
+		metadbmodel.LBListener,
 		*message.LBListenerAdd,
 		message.LBListenerAdd,
 		*message.LBListenerUpdate,
@@ -47,8 +47,8 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		newUpdaterBase[
 			cloudmodel.LBListener,
 			*diffbase.LBListener,
-			*mysqlmodel.LBListener,
-			mysqlmodel.LBListener,
+			*metadbmodel.LBListener,
+			metadbmodel.LBListener,
 			*message.LBListenerAdd,
 			message.LBListenerAdd,
 			*message.LBListenerUpdate,
@@ -73,7 +73,7 @@ func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (d
 	return
 }
 
-func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mysqlmodel.LBListener, bool) {
+func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*metadbmodel.LBListener, bool) {
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.LBListener{
+	dbItem := &metadbmodel.LBListener{
 		Name:     cloudItem.Name,
 		LBID:     lbID,
 		IPs:      cloudItem.IPs,

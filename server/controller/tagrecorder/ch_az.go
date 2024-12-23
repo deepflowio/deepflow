@@ -20,20 +20,20 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChAZ struct {
-	SubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysqlmodel.AZ, mysqlmodel.ChAZ, IDKey]
+	SubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, metadbmodel.AZ, metadbmodel.ChAZ, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	mng := &ChAZ{
-		newSubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysqlmodel.AZ, mysqlmodel.ChAZ, IDKey](
+		newSubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, metadbmodel.AZ, metadbmodel.ChAZ, IDKey](
 			common.RESOURCE_TYPE_AZ_EN, RESOURCE_TYPE_CH_AZ,
 		),
 		domainLcuuidToIconID,
@@ -44,20 +44,20 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *mysql.DB) {
+func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChAZ
+		var chItem metadbmodel.ChAZ
 		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
 		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysqlmodel.AZ) (keys []IDKey, targets []mysqlmodel.ChAZ) {
+func (a *ChAZ) sourceToTarget(md *message.Metadata, az *metadbmodel.AZ) (keys []IDKey, targets []metadbmodel.ChAZ) {
 	iconID := a.domainLcuuidToIconID[az.Domain]
 	var err error
 	if iconID == 0 {
@@ -77,7 +77,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysqlmodel.AZ) (keys []I
 	if az.DeletedAt.Valid {
 		name += " (deleted)"
 	}
-	targets = append(targets, mysqlmodel.ChAZ{
+	targets = append(targets, metadbmodel.ChAZ{
 		ID:       az.ID,
 		Name:     name,
 		IconID:   iconID,
@@ -88,7 +88,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysqlmodel.AZ) (keys []I
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (a *ChAZ) softDeletedTargetsUpdated(targets []mysqlmodel.ChAZ, db *mysql.DB) {
+func (a *ChAZ) softDeletedTargetsUpdated(targets []metadbmodel.ChAZ, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

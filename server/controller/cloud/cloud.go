@@ -35,8 +35,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/platform"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -48,7 +48,7 @@ var log = logger.MustGetLogger("cloud")
 type Cloud struct {
 	orgID                   int
 	synchronizing           bool
-	db                      *mysql.DB
+	db                      *metadb.DB
 	cfg                     config.CloudConfig
 	cCtx                    context.Context
 	cCancel                 context.CancelFunc
@@ -64,8 +64,8 @@ type Cloud struct {
 }
 
 // TODO 添加参数
-func NewCloud(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
-	mysqlDB, err := mysql.GetDB(orgID)
+func NewCloud(orgID int, domain metadbmodel.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
+	mysqlDB, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil
@@ -277,7 +277,7 @@ func (c *Cloud) getCloudGatherInterval() int {
 		log.Infof("qing and qing private daily trigger time is (%s), sync timer is default (%d)s", c.cfg.QingCloudConfig.DailyTriggerTime, cloudcommon.CLOUD_SYNC_TIMER_DEFAULT, logger.NewORGPrefix(c.orgID))
 		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
 	}
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Warningf("get cloud gather interval failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
@@ -423,7 +423,7 @@ func (c *Cloud) startKubernetesGatherTask() {
 }
 
 func (c *Cloud) runKubernetesGatherTask() {
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(c.orgID))
@@ -448,7 +448,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 
 	} else {
 		// 附属容器集群的处理
-		var subDomains []mysqlmodel.SubDomain
+		var subDomains []metadbmodel.SubDomain
 		var oldSubDomains = mapset.NewSet()
 		var newSubDomains = mapset.NewSet()
 		var delSubDomains = mapset.NewSet()
@@ -460,7 +460,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		}
 
 		c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subDomains)
-		lcuuidToSubDomain := make(map[string]*mysqlmodel.SubDomain)
+		lcuuidToSubDomain := make(map[string]*metadbmodel.SubDomain)
 		for index, subDomain := range subDomains {
 			lcuuidToSubDomain[subDomain.Lcuuid] = &subDomains[index]
 			newSubDomains.Add(subDomain.Lcuuid)
@@ -570,8 +570,8 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // otherwise get the field compressed_content.
 // old content field: content
 // new centent field: compressed_content
-func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*mysqlmodel.DomainAdditionalResource, error) {
-	var dbItem mysqlmodel.DomainAdditionalResource
+func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*metadbmodel.DomainAdditionalResource, error) {
+	var dbItem metadbmodel.DomainAdditionalResource
 	result := db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		result = db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)

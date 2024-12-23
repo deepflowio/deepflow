@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewProcess(c *cache.Cache, eq *queue.OverwriteQueue) *Process {
 	return listener
 }
 
-func (p *Process) OnUpdaterAdded(addedDBItems []*mysqlmodel.Process) {
+func (p *Process) OnUpdaterAdded(addedDBItems []*metadbmodel.Process) {
 	p.eventProducer.ProduceByAdd(addedDBItems)
 	p.cache.AddProcesses(addedDBItems)
 }

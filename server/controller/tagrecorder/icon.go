@@ -23,8 +23,8 @@ import (
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type IconData struct {
@@ -74,8 +74,8 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 			domainTypeToDefaultIconID[domainType] = icon.ID
 		}
 	}
-	var domains []mysqlmodel.Domain
-	err := mysql.DefaultDB.Unscoped().Find(&domains).Error
+	var domains []metadbmodel.Domain
+	err := metadb.DefaultDB.Unscoped().Find(&domains).Error
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err
@@ -121,8 +121,8 @@ func GetIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, 
 	if cfg.TrisolarisCfg.NodeType == TrisolarisNodeTypeMaster {
 		return UpdateIconInfo(cfg)
 	}
-	var controller mysqlmodel.Controller
-	err := mysql.DefaultDB.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
+	var controller metadbmodel.Controller
+	err := metadb.DefaultDB.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err

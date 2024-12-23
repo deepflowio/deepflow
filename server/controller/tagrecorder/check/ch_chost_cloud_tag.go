@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTag struct {
-	UpdaterBase[mysqlmodel.ChChostCloudTag, CloudTagKey]
+	UpdaterBase[metadbmodel.ChChostCloudTag, CloudTagKey]
 }
 
 func NewChChostCloudTag() *ChChostCloudTag {
 	updater := &ChChostCloudTag{
-		UpdaterBase[mysqlmodel.ChChostCloudTag, CloudTagKey]{
+		UpdaterBase[metadbmodel.ChChostCloudTag, CloudTagKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VM_CLOUD_TAG,
 		},
 	}
@@ -35,22 +35,22 @@ func NewChChostCloudTag() *ChChostCloudTag {
 	return updater
 }
 
-func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysqlmodel.ChChostCloudTag, bool) {
-	var vms []mysqlmodel.VM
+func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]metadbmodel.ChChostCloudTag, bool) {
+	var vms []metadbmodel.VM
 	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), c.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagKey]mysqlmodel.ChChostCloudTag)
+	keyToItem := make(map[CloudTagKey]metadbmodel.ChChostCloudTag)
 	for _, vm := range vms {
 		for k, v := range vm.CloudTags {
 			key := CloudTagKey{
 				ID:  vm.ID,
 				Key: k,
 			}
-			keyToItem[key] = mysqlmodel.ChChostCloudTag{
+			keyToItem[key] = metadbmodel.ChChostCloudTag{
 				ID:       vm.ID,
 				Key:      k,
 				Value:    v,
@@ -62,11 +62,11 @@ func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysqlmodel.ChChostC
 	return keyToItem, true
 }
 
-func (c *ChChostCloudTag) generateKey(dbItem mysqlmodel.ChChostCloudTag) CloudTagKey {
+func (c *ChChostCloudTag) generateKey(dbItem metadbmodel.ChChostCloudTag) CloudTagKey {
 	return CloudTagKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (c *ChChostCloudTag) generateUpdateInfo(oldItem, newItem mysqlmodel.ChChostCloudTag) (map[string]interface{}, bool) {
+func (c *ChChostCloudTag) generateUpdateInfo(oldItem, newItem metadbmodel.ChChostCloudTag) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

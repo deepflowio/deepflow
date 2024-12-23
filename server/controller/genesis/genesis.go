@@ -22,8 +22,8 @@ import (
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/grpc"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
@@ -66,15 +66,15 @@ func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
 }
 
 func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 
 	var serverIPs []string
-	var controllers []mysqlmodel.Controller
-	var azControllerConns []mysqlmodel.AZControllerConnection
+	var controllers []metadbmodel.Controller
+	var azControllerConns []metadbmodel.AZControllerConnection
 	var currentRegion string
 
 	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)

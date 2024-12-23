@@ -30,8 +30,8 @@ import (
 	api "github.com/deepflowio/deepflow/message/controller"
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/updater"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -93,7 +93,7 @@ func (g *GenesisSync) GetGenesisSyncData(orgID int) common.GenesisSyncDataRespon
 func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataResponse, error) {
 	retGenesisSyncData := common.GenesisSyncDataResponse{}
 
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return retGenesisSyncData, err

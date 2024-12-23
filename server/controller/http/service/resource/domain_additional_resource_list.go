@@ -26,12 +26,12 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func ListDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (map[string]interface{}, error) {
+func ListDomainAdditionalResource(resourceType, resourceName string, orgDB *metadb.DB) (map[string]interface{}, error) {
 	resource, err := GetDomainAdditionalResource(resourceType, resourceName, orgDB)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func ListDomainAdditionalResource(resourceType, resourceName string, orgDB *mysq
 	return data, nil
 }
 
-func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (*model.AdditionalResource, error) {
+func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *metadb.DB) (*model.AdditionalResource, error) {
 	domainToResource, err := getResourceFromDB(orgDB)
 	if err != nil {
 		return nil, err
@@ -274,8 +274,8 @@ func convertToUpperMap(data map[string]interface{}, v reflect.Value) {
 	}
 }
 
-func getResourceFromDB(orgDB *mysql.DB) (map[string]*cloudmodel.AdditionalResource, error) {
-	var items []mysqlmodel.DomainAdditionalResource
+func getResourceFromDB(orgDB *metadb.DB) (map[string]*cloudmodel.AdditionalResource, error) {
+	var items []metadbmodel.DomainAdditionalResource
 	orgDB.Select("domain", "content").Where("content!=''").Find(&items)
 	if len(items) == 0 {
 		orgDB.Select("domain", "compressed_content").Find(&items)
@@ -324,19 +324,19 @@ func getVinterfaces(deviceUUID string, vifs []cloudmodel.VInterface, ips []cloud
 	return resp
 }
 
-func getClouTags(orgDB *mysql.DB, resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
+func getClouTags(orgDB *metadb.DB, resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
 	chostUUIDToName := make(map[string]string)
 	podNSUUIDToName := make(map[string]string)
 	podNSUUIDToSubdomain := make(map[string]string)
 
-	var vms []mysqlmodel.VM
+	var vms []metadbmodel.VM
 	if err := orgDB.Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	for _, vm := range vms {
 		chostUUIDToName[vm.Lcuuid] = vm.Name
 	}
-	var podNamespaces []mysqlmodel.PodNamespace
+	var podNamespaces []metadbmodel.PodNamespace
 	if err := orgDB.Find(&podNamespaces).Error; err != nil {
 		return nil, err
 	}

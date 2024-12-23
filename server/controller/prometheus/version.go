@@ -23,8 +23,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 var (
@@ -50,16 +50,16 @@ func GetVersion() *Version {
 
 func (v *Version) Refresh() error {
 	versions := "versions"
-	if orgIDs, err := mysql.GetORGIDs(); err != nil {
+	if orgIDs, err := metadb.GetORGIDs(); err != nil {
 		log.Errorf("failed to get org ids: %v", err)
 	} else {
 		for _, orgID := range orgIDs {
-			db, err := mysql.GetDB(orgID)
+			db, err := metadb.GetDB(orgID)
 			if err != nil {
 				log.Errorf("failed to get db: %v for org: %d", err, orgID)
 				continue
 			}
-			var resourceVersion mysqlmodel.ResourceVersion
+			var resourceVersion metadbmodel.ResourceVersion
 			err = db.Where("name = ?", versionName).First(&resourceVersion).Error
 			if err != nil {
 				log.Errorf("failed to get version: %v", err, db.LogPrefixORGID)

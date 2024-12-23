@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBVInterface() *mysqlmodel.VInterface {
-	return &mysqlmodel.VInterface{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Region: uuid.New().String()}
+func newDBVInterface() *metadbmodel.VInterface {
+	return &metadbmodel.VInterface{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Region: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddVInterfaceBatchSuccess() {
 	operator := NewVInterface()
 	itemToAdd := newDBVInterface()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.VInterface{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.VInterface{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.VInterface
+	var addedItem *metadbmodel.VInterface
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VInterface{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VInterface{})
 }
 
 func (t *SuiteTest) TestUpdateVInterfaceSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateVInterfaceSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.VInterface
+	var updatedItem *metadbmodel.VInterface
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Region, updateInfo["region"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VInterface{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VInterface{})
 }
 
 func (t *SuiteTest) TestDeleteVInterfaceBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeleteVInterfaceBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.VInterface
+	var deletedItem *metadbmodel.VInterface
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestVInterfaceCreateAndFind() {
 	lcuuid := uuid.New().String()
-	vInterface := &mysqlmodel.VInterface{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	vInterface := &metadbmodel.VInterface{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(vInterface)
-	var resultVInterface *mysqlmodel.VInterface
+	var resultVInterface *metadbmodel.VInterface
 	err := t.db.Where("lcuuid = ? and name='' and mac='' and tap_mac='' and "+
 		"sub_domain='' and region=''", lcuuid).First(&resultVInterface).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
 
-	resultVInterface = new(mysqlmodel.VInterface)
+	resultVInterface = new(metadbmodel.VInterface)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultVInterface)
 	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
 
-	resultVInterface = new(mysqlmodel.VInterface)
+	resultVInterface = new(metadbmodel.VInterface)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVInterface)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

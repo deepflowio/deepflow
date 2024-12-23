@@ -25,7 +25,7 @@ import (
 	"github.com/bitly/go-simplejson"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 // associate sql issu 6.4.1.1

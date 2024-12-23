@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package metadb
 
 import (
 	"fmt"
@@ -22,9 +22,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 

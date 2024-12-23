@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (b *DataSet) AddRedisInstance(dbItem *mysqlmodel.RedisInstance, seq int) {
+func (b *DataSet) AddRedisInstance(dbItem *metadbmodel.RedisInstance, seq int) {
 	b.RedisInstances[dbItem.Lcuuid] = &RedisInstance{
 		DiffBase: DiffBase{
 			Sequence: seq,

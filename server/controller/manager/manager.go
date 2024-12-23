@@ -29,8 +29,8 @@ import (
 	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	recordercfg "github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -173,20 +173,20 @@ func (m *Manager) GetRecorder(domainLcuuid string) (recorder.Recorder, error) {
 }
 
 func (m *Manager) run(ctx context.Context) {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error("get org ids failed")
 		return
 	}
 
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 		// 获取所在控制器的IP
-		var controller mysqlmodel.Controller
+		var controller metadbmodel.Controller
 		hostName := common.GetNodeName()
 		if len(hostName) == 0 {
 			log.Error("hostname is null")
@@ -197,7 +197,7 @@ func (m *Manager) run(ctx context.Context) {
 			return
 		}
 
-		var domains []mysqlmodel.Domain
+		var domains []metadbmodel.Domain
 		var oldDomainLcuuids = mapset.NewSet()
 		var newDomainLcuuids = mapset.NewSet()
 		var delDomainLcuuids = mapset.NewSet()
@@ -219,7 +219,7 @@ func (m *Manager) run(ctx context.Context) {
 		db.Where(
 			"enabled = ? AND controller_ip = ?", common.DOMAIN_ENABLED_TRUE, controller.IP,
 		).Find(&domains)
-		lcuuidToDomain := make(map[string]mysqlmodel.Domain)
+		lcuuidToDomain := make(map[string]metadbmodel.Domain)
 		for _, domain := range domains {
 			lcuuidToDomain[domain.Lcuuid] = domain
 			newDomainLcuuids.Add(domain.Lcuuid)

@@ -25,9 +25,9 @@ import (
 	"gorm.io/gorm/clause"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -124,7 +124,7 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, data common.GenesisSyncDa
 		// push immediately after update
 		s.fetch()
 
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			return
@@ -228,19 +228,19 @@ func (s *SyncStorage) refreshDatabase() {
 
 	for range ticker.C {
 		// clean genesis storage invalid data
-		orgIDs, err := mysql.GetORGIDs()
+		orgIDs, err := metadb.GetORGIDs()
 		if err != nil {
 			log.Error("get org ids failed")
 			return
 		}
 		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 		for _, orgID := range orgIDs {
-			db, err := mysql.GetDB(orgID)
+			db, err := metadb.GetDB(orgID)
 			if err != nil {
 				log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 				continue
 			}
-			vTaps := []mysqlmodel.VTap{}
+			vTaps := []metadbmodel.VTap{}
 			vTapIDs := map[int]bool{}
 			storages := []model.GenesisStorage{}
 			invalidStorages := []model.GenesisStorage{}

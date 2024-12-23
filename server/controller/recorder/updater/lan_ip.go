@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -32,8 +32,8 @@ type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
 		*diffbase.LANIP,
-		*mysqlmodel.LANIP,
-		mysqlmodel.LANIP,
+		*metadbmodel.LANIP,
+		metadbmodel.LANIP,
 		*message.LANIPAdd,
 		message.LANIPAdd,
 		*message.LANIPUpdate,
@@ -49,8 +49,8 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 		newUpdaterBase[
 			cloudmodel.IP,
 			*diffbase.LANIP,
-			*mysqlmodel.LANIP,
-			mysqlmodel.LANIP,
+			*metadbmodel.LANIP,
+			metadbmodel.LANIP,
 			*message.LANIPAdd,
 			message.LANIPAdd,
 			*message.LANIPUpdate,
@@ -80,7 +80,7 @@ func (i *LANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *diff
 	return
 }
 
-func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.LANIP, bool) {
+func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANIP, bool) {
 	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -129,7 +129,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.LANIP
 		))
 		return nil, false
 	}
-	dbItem := &mysqlmodel.LANIP{
+	dbItem := &metadbmodel.LANIP{
 		IP:           ip,
 		Domain:       i.metadata.Domain.Lcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,

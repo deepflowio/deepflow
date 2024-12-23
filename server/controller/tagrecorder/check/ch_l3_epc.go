@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChVPC struct {
-	UpdaterBase[mysqlmodel.ChVPC, IDKey]
+	UpdaterBase[metadbmodel.ChVPC, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	updater := &ChVPC{
-		UpdaterBase[mysqlmodel.ChVPC, IDKey]{
+		UpdaterBase[metadbmodel.ChVPC, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VPC,
 		},
 		resourceTypeToIconID,
@@ -37,18 +37,18 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	return updater
 }
 
-func (v *ChVPC) generateNewData() (map[IDKey]mysqlmodel.ChVPC, bool) {
-	var vpcs []mysqlmodel.VPC
+func (v *ChVPC) generateNewData() (map[IDKey]metadbmodel.ChVPC, bool) {
+	var vpcs []metadbmodel.VPC
 	err := v.db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChVPC)
+	keyToItem := make(map[IDKey]metadbmodel.ChVPC)
 	for _, vpc := range vpcs {
 		if vpc.DeletedAt.Valid {
-			keyToItem[IDKey{ID: vpc.ID}] = mysqlmodel.ChVPC{
+			keyToItem[IDKey{ID: vpc.ID}] = metadbmodel.ChVPC{
 				ID:       vpc.ID,
 				Name:     vpc.Name + " (deleted)",
 				UID:      vpc.UID,
@@ -57,7 +57,7 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysqlmodel.ChVPC, bool) {
 				DomainID: tagrecorder.DomainToDomainID[vpc.Domain],
 			}
 		} else {
-			keyToItem[IDKey{ID: vpc.ID}] = mysqlmodel.ChVPC{
+			keyToItem[IDKey{ID: vpc.ID}] = metadbmodel.ChVPC{
 				ID:       vpc.ID,
 				Name:     vpc.Name,
 				UID:      vpc.UID,
@@ -70,11 +70,11 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysqlmodel.ChVPC, bool) {
 	return keyToItem, true
 }
 
-func (v *ChVPC) generateKey(dbItem mysqlmodel.ChVPC) IDKey {
+func (v *ChVPC) generateKey(dbItem metadbmodel.ChVPC) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVPC) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVPC) (map[string]interface{}, bool) {
+func (v *ChVPC) generateUpdateInfo(oldItem, newItem metadbmodel.ChVPC) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

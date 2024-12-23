@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -148,13 +148,13 @@ type Subscriber interface {
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
-	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB)
+	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
-	onResourceUpdated(int, MUPT, *mysql.DB)
-	softDeletedTargetsUpdated([]CT, *mysql.DB)
+	onResourceUpdated(int, MUPT, *metadb.DB)
+	softDeletedTargetsUpdated([]CT, *metadb.DB)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
@@ -214,7 +214,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -225,7 +225,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *me
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -235,7 +235,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	items := msg.([]*MT)
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -252,7 +252,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 // Delete resource by domain
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -265,7 +265,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 // Delete resource by sub domain
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -278,7 +278,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 // Update team_id of resource by sub domain
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
@@ -288,7 +288,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md
 }
 
 // Update updated_at when resource is deleted
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB) {
 	var updateItems []MT
 	err := db.Unscoped().First(&updateItems).Error
 	if err == nil {

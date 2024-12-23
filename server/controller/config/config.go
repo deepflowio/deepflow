@@ -27,7 +27,7 @@ import (
 	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	http "github.com/deepflowio/deepflow/server/controller/http/config"

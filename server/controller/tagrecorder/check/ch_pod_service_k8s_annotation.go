@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sAnnotation struct {
-	UpdaterBase[mysqlmodel.ChPodServiceK8sAnnotation, K8sAnnotationKey]
+	UpdaterBase[metadbmodel.ChPodServiceK8sAnnotation, K8sAnnotationKey]
 }
 
 func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 	updater := &ChPodServiceK8sAnnotation{
-		UpdaterBase[mysqlmodel.ChPodServiceK8sAnnotation, K8sAnnotationKey]{
+		UpdaterBase[metadbmodel.ChPodServiceK8sAnnotation, K8sAnnotationKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_ANNOTATION,
 		},
 	}
@@ -37,8 +37,8 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 	return updater
 }
 
-func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysqlmodel.ChPodServiceK8sAnnotation, bool) {
-	var podServices []mysqlmodel.PodService
+func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]metadbmodel.ChPodServiceK8sAnnotation, bool) {
+	var podServices []metadbmodel.PodService
 
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
@@ -46,7 +46,7 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sAnnotationKey]mysqlmodel.ChPodServiceK8sAnnotation)
+	keyToItem := make(map[K8sAnnotationKey]metadbmodel.ChPodServiceK8sAnnotation)
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
@@ -61,7 +61,7 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 					ID:  podService.ID,
 					Key: annotationInfo[0],
 				}
-				keyToItem[key] = mysqlmodel.ChPodServiceK8sAnnotation{
+				keyToItem[key] = metadbmodel.ChPodServiceK8sAnnotation{
 					ID:          podService.ID,
 					Key:         annotationInfo[0],
 					Value:       annotationInfo[1],
@@ -77,11 +77,11 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 	return keyToItem, true
 }
 
-func (k *ChPodServiceK8sAnnotation) generateKey(dbItem mysqlmodel.ChPodServiceK8sAnnotation) K8sAnnotationKey {
+func (k *ChPodServiceK8sAnnotation) generateKey(dbItem metadbmodel.ChPodServiceK8sAnnotation) K8sAnnotationKey {
 	return K8sAnnotationKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (k *ChPodServiceK8sAnnotation) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodServiceK8sAnnotation) (map[string]interface{}, bool) {
+func (k *ChPodServiceK8sAnnotation) generateUpdateInfo(oldItem, newItem metadbmodel.ChPodServiceK8sAnnotation) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

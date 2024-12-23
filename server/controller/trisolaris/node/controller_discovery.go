@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -48,7 +48,7 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 	}
 }
 
-func (c *ControllerDiscovery) GetControllerData() *mysqlmodel.Controller {
+func (c *ControllerDiscovery) GetControllerData() *metadbmodel.Controller {
 	if c.ctrlIP == "" {
 		log.Errorf(c.Logf("get env(%s) data failed", NODE_IP_KEY))
 		return nil
@@ -76,7 +76,7 @@ func (c *ControllerDiscovery) GetControllerData() *mysqlmodel.Controller {
 	}
 
 	log.Infof(c.Logf("controller name (%s), node_name (%s)", name, nodeName))
-	return &mysqlmodel.Controller{
+	return &metadbmodel.Controller{
 		Name:               name,
 		CPUNum:             int(envData.CpuNum),
 		MemorySize:         int64(envData.MemorySize),

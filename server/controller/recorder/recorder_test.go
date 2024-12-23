@@ -27,8 +27,8 @@ import (
 	"github.com/google/uuid"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -70,27 +70,27 @@ func BenchmarkAdd(b *testing.B) {
 
 func TestMain(m *testing.M) {
 	clearDBFile()
-	mysql.DefaultDB = test.GetDB(TEST_DB_FILE)
+	metadb.DefaultDB = test.GetDB(TEST_DB_FILE)
 	for _, val := range test.GetModels() {
-		mysql.DefaultDB.AutoMigrate(val)
+		metadb.DefaultDB.AutoMigrate(val)
 	}
 
 	for i := 0; i < 1; i++ {
-		domain := new(mysqlmodel.Domain)
+		domain := new(metadbmodel.Domain)
 		domain.Lcuuid = uuid.NewString()
 		domain.Name = fmt.Sprintf("第 %d 次性能测试", i)
-		mysql.DefaultDB.Create(&domain)
+		metadb.DefaultDB.Create(&domain)
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
 		domainNames = append(domainNames, domain.Name)
 		cloudData = append(cloudData, test.NewCloudResource(1))
 	}
-	publicNetwork := new(mysqlmodel.Network)
+	publicNetwork := new(metadbmodel.Network)
 	publicNetwork.Lcuuid = rcommon.PUBLIC_NETWORK_LCUUID
-	mysql.DefaultDB.Create(&publicNetwork)
+	metadb.DefaultDB.Create(&publicNetwork)
 
 	exitCode := m.Run()
 
-	sqlDB, _ := mysql.DefaultDB.DB()
+	sqlDB, _ := metadb.DefaultDB.DB()
 	defer sqlDB.Close()
 	clearDBFile()
 	os.Exit(exitCode)

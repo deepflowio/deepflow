@@ -18,18 +18,18 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTags struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTags, OSAPPTagsKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTags, OSAPPTagsKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
 	mng := &ChOSAppTags{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTags, OSAPPTagsKey](
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTags, OSAPPTagsKey](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
@@ -38,7 +38,7 @@ func NewChOSAppTags() *ChOSAppTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.OSAPPTags.IsDifferent() {
@@ -48,12 +48,12 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 		}
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChOSAppTags
+		var chItem metadbmodel.ChOSAppTags
 		db.Where("pid = ?", sourceID).First(&chItem)
 		if chItem.PID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]OSAPPTagsKey{{PID: sourceID}},
-				[]mysqlmodel.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
+				[]metadbmodel.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
 				db,
 			)
 		} else {
@@ -63,12 +63,12 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, item *mysqlmodel.Process) (keys []OSAPPTagsKey, targets []mysqlmodel.ChOSAppTags) {
+func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, item *metadbmodel.Process) (keys []OSAPPTagsKey, targets []metadbmodel.ChOSAppTags) {
 	if item.OSAPPTags == "" {
 		return
 	}
 	osAppTags, _ := common.StrToJsonAndMap(item.OSAPPTags)
-	return []OSAPPTagsKey{{PID: item.ID}}, []mysqlmodel.ChOSAppTags{{
+	return []OSAPPTagsKey{{PID: item.ID}}, []metadbmodel.ChOSAppTags{{
 		PID:         item.ID,
 		OSAPPTags:   osAppTags,
 		TeamID:      md.TeamID,
@@ -78,6 +78,6 @@ func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, item *mysqlmodel.Proc
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []mysqlmodel.ChOSAppTags, db *mysql.DB) {
+func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []metadbmodel.ChOSAppTags, db *metadb.DB) {
 
 }

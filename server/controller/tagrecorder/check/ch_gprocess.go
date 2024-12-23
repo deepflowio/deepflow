@@ -17,19 +17,19 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChGProcess struct {
-	UpdaterBase[mysqlmodel.ChGProcess, IDKey]
+	UpdaterBase[metadbmodel.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	updater := &ChGProcess{
-		UpdaterBase[mysqlmodel.ChGProcess, IDKey]{
+		UpdaterBase[metadbmodel.ChGProcess, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_GPROCESS,
 		},
 		resourceTypeToIconID,
@@ -38,14 +38,14 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	return updater
 }
 
-func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
-	processes, err := query.FindInBatches[mysqlmodel.Process](p.db.Unscoped())
+func (p *ChGProcess) generateNewData() (map[IDKey]metadbmodel.ChGProcess, bool) {
+	processes, err := query.FindInBatches[metadbmodel.Process](p.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChGProcess)
+	keyToItem := make(map[IDKey]metadbmodel.ChGProcess)
 	for _, process := range processes {
 		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
 		if err != nil {
@@ -53,7 +53,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
 		}
 
 		if process.DeletedAt.Valid {
-			keyToItem[IDKey{ID: process.ID}] = mysqlmodel.ChGProcess{
+			keyToItem[IDKey{ID: process.ID}] = metadbmodel.ChGProcess{
 				ID:          process.ID,
 				Name:        process.Name + " (deleted)",
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
@@ -64,7 +64,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: process.ID}] = mysqlmodel.ChGProcess{
+			keyToItem[IDKey{ID: process.ID}] = metadbmodel.ChGProcess{
 				ID:          process.ID,
 				Name:        process.Name,
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
@@ -79,11 +79,11 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
 	return keyToItem, true
 }
 
-func (p *ChGProcess) generateKey(dbItem mysqlmodel.ChGProcess) IDKey {
+func (p *ChGProcess) generateKey(dbItem metadbmodel.ChGProcess) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChGProcess) generateUpdateInfo(oldItem, newItem mysqlmodel.ChGProcess) (map[string]interface{}, bool) {
+func (p *ChGProcess) generateUpdateInfo(oldItem, newItem metadbmodel.ChGProcess) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

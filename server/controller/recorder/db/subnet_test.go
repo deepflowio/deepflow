@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBSubnet() *mysqlmodel.Subnet {
-	return &mysqlmodel.Subnet{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBSubnet() *metadbmodel.Subnet {
+	return &metadbmodel.Subnet{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddSubnetBatchSuccess() {
 	operator := NewSubnet()
 	itemToAdd := newDBSubnet()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.Subnet{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.Subnet{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.Subnet
+	var addedItem *metadbmodel.Subnet
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Subnet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Subnet{})
 }
 
 func (t *SuiteTest) TestUpdateSubnetSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateSubnetSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.Subnet
+	var updatedItem *metadbmodel.Subnet
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Subnet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Subnet{})
 }
 
 func (t *SuiteTest) TestDeleteSubnetBatchSuccess() {
@@ -66,27 +66,27 @@ func (t *SuiteTest) TestDeleteSubnetBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.Subnet
+	var deletedItem *metadbmodel.Subnet
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestSubnetCreateAndFind() {
 	lcuuid := uuid.New().String()
-	subnet := &mysqlmodel.Subnet{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	subnet := &metadbmodel.Subnet{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(subnet)
-	var resultSubnet *mysqlmodel.Subnet
+	var resultSubnet *metadbmodel.Subnet
 	err := t.db.Where("lcuuid = ? and name='' and label='' and prefix='' and netmask=''", lcuuid).First(&resultSubnet).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), subnet.Base.Lcuuid, resultSubnet.Base.Lcuuid)
 
-	resultSubnet = new(mysqlmodel.Subnet)
+	resultSubnet = new(metadbmodel.Subnet)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultSubnet)
 	assert.Equal(t.T(), subnet.Base.Lcuuid, resultSubnet.Base.Lcuuid)
 
-	resultSubnet = new(mysqlmodel.Subnet)
+	resultSubnet = new(metadbmodel.Subnet)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultSubnet)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

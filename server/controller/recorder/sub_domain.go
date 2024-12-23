@@ -24,7 +24,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -104,7 +104,7 @@ func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResourc
 }
 
 func (s *subDomains) newRefresher(lcuuid string) (*subDomain, error) {
-	var sd mysqlmodel.SubDomain
+	var sd metadbmodel.SubDomain
 	if err := s.metadata.DB.Where("lcuuid = ?", lcuuid).First(&sd).Error; err != nil {
 		log.Errorf("failed to get sub_domain from db: %s", err.Error(), s.metadata.LogPrefixes)
 		return nil, err
@@ -263,7 +263,7 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 	}
 	log.Infof("update sub_domain synced_at: %s", syncAt.Format(common.GO_BIRTHDAY), s.metadata.LogPrefixes)
 
-	var subDomain mysqlmodel.SubDomain
+	var subDomain metadbmodel.SubDomain
 	err := s.metadata.DB.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)
@@ -276,7 +276,7 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
 func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
-	var subDomain mysqlmodel.SubDomain
+	var subDomain metadbmodel.SubDomain
 	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.SubDomain.Lcuuid).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)

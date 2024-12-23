@@ -14,8 +14,15 @@
  * limitations under the License.
  */
 
-package script
+package edition
 
-import "github.com/op/go-logging"
+import (
+	"gorm.io/gorm"
 
-var log = logging.MustGetLogger("db.mysql.migration.script")
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
+)
+
+func CheckDBVersion(db *gorm.DB, cfg config.MySqlConfig) error {
+	return common.CheckCEDBVersion(common.NewDBConfig(db, cfg))
+}

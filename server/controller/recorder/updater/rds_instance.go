@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
 		*diffbase.RDSInstance,
-		*mysqlmodel.RDSInstance,
-		mysqlmodel.RDSInstance,
+		*metadbmodel.RDSInstance,
+		metadbmodel.RDSInstance,
 		*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
 		*message.RDSInstanceUpdate,
@@ -47,8 +47,8 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		newUpdaterBase[
 			cloudmodel.RDSInstance,
 			*diffbase.RDSInstance,
-			*mysqlmodel.RDSInstance,
-			mysqlmodel.RDSInstance,
+			*metadbmodel.RDSInstance,
+			metadbmodel.RDSInstance,
 			*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
 			*message.RDSInstanceUpdate,
@@ -73,7 +73,7 @@ func (r *RDSInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RDSInstance) 
 	return
 }
 
-func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*mysqlmodel.RDSInstance, bool) {
+func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*metadbmodel.RDSInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.RDSInstance{
+	dbItem := &metadbmodel.RDSInstance{
 		Name:    cloudItem.Name,
 		Label:   cloudItem.Label,
 		UID:     cloudItem.Label,

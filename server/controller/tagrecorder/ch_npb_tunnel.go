@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChNpbTunnel struct {
-	UpdaterComponent[mysqlmodel.ChNpbTunnel, IDKey]
+	UpdaterComponent[metadbmodel.ChNpbTunnel, IDKey]
 }
 
 func NewChNpbTunnel() *ChNpbTunnel {
 	updater := &ChNpbTunnel{
-		newUpdaterComponent[mysqlmodel.ChNpbTunnel, IDKey](
+		newUpdaterComponent[metadbmodel.ChNpbTunnel, IDKey](
 			RESOURCE_TYPE_CH_NPB_TUNNEL,
 		),
 	}
@@ -35,17 +35,17 @@ func NewChNpbTunnel() *ChNpbTunnel {
 	return updater
 }
 
-func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChNpbTunnel, bool) {
-	var npbTunnels []mysqlmodel.NpbTunnel
+func (p *ChNpbTunnel) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChNpbTunnel, bool) {
+	var npbTunnels []metadbmodel.NpbTunnel
 	err := db.Unscoped().Select("id", "name", "team_id").Find(&npbTunnels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChNpbTunnel)
+	keyToItem := make(map[IDKey]metadbmodel.ChNpbTunnel)
 	for _, npbTunnel := range npbTunnels {
-		keyToItem[IDKey{ID: npbTunnel.ID}] = mysqlmodel.ChNpbTunnel{
+		keyToItem[IDKey{ID: npbTunnel.ID}] = metadbmodel.ChNpbTunnel{
 			ID:     npbTunnel.ID,
 			Name:   npbTunnel.Name,
 			TeamID: npbTunnel.TeamID,
@@ -54,11 +54,11 @@ func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChNpbT
 	return keyToItem, true
 }
 
-func (p *ChNpbTunnel) generateKey(dbItem mysqlmodel.ChNpbTunnel) IDKey {
+func (p *ChNpbTunnel) generateKey(dbItem metadbmodel.ChNpbTunnel) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChNpbTunnel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChNpbTunnel) (map[string]interface{}, bool) {
+func (p *ChNpbTunnel) generateUpdateInfo(oldItem, newItem metadbmodel.ChNpbTunnel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

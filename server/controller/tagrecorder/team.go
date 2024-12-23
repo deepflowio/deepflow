@@ -19,8 +19,8 @@ package tagrecorder
 import (
 	"fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 var DomainToTeamID map[string]int
@@ -29,10 +29,10 @@ var DomainToDomainID map[string]int
 var SubDomainToSubDomainID map[string]int
 var VTapIDToTeamID map[int]int
 
-func GetTeamInfo(db *mysql.DB) {
-	var domains []mysqlmodel.Domain
-	var subDomains []mysqlmodel.SubDomain
-	var vTaps []mysqlmodel.VTap
+func GetTeamInfo(db *metadb.DB) {
+	var domains []metadbmodel.Domain
+	var subDomains []metadbmodel.SubDomain
+	var vTaps []metadbmodel.VTap
 	err := db.Unscoped().Find(&domains).Error
 	if err != nil {
 		log.Error(err, db.LogPrefixORGID)

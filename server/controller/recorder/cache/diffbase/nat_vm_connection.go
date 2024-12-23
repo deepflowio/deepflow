@@ -18,10 +18,10 @@ package diffbase
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (b *DataSet) AddNATVMConnection(dbItem *mysqlmodel.NATVMConnection, seq int) {
+func (b *DataSet) AddNATVMConnection(dbItem *metadbmodel.NATVMConnection, seq int) {
 	b.NATVMConnections[dbItem.Lcuuid] = &NATVMConnection{
 		DiffBase: DiffBase{
 			Sequence: seq,

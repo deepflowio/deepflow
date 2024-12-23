@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBNetwork() *mysqlmodel.Network {
-	return &mysqlmodel.Network{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBNetwork() *metadbmodel.Network {
+	return &metadbmodel.Network{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddNetworkBatchSuccess() {
 	operator := NewNetwork()
 	itemToAdd := newDBNetwork()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.Network{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.Network{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.Network
+	var addedItem *metadbmodel.Network
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Network{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Network{})
 }
 
 func (t *SuiteTest) TestUpdateNetworkSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateNetworkSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.Network
+	var updatedItem *metadbmodel.Network
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Network{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Network{})
 }
 
 func (t *SuiteTest) TestDeleteNetworkBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeleteNetworkBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.Network
+	var deletedItem *metadbmodel.Network
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestNetworkCreateAndFind() {
 	lcuuid := uuid.New().String()
-	network := &mysqlmodel.Network{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	network := &metadbmodel.Network{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(network)
-	var resultNetwork *mysqlmodel.Network
+	var resultNetwork *metadbmodel.Network
 	err := t.db.Where("lcuuid = ? and name='' and label='' and alias='' and description='' "+
 		"and sub_domain='' and region='' and az=''", lcuuid).First(&resultNetwork).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
 
-	resultNetwork = new(mysqlmodel.Network)
+	resultNetwork = new(metadbmodel.Network)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultNetwork)
 	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
 
-	resultNetwork = new(mysqlmodel.Network)
+	resultNetwork = new(metadbmodel.Network)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNetwork)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

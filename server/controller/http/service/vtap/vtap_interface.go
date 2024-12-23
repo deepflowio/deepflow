@@ -25,8 +25,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -34,7 +34,7 @@ import (
 type VTapInterface struct {
 	userInfo *httpcommon.UserInfo
 	cfg      common.FPermit
-	db       *mysql.DB
+	db       *metadb.DB
 }
 
 func NewVTapInterface(cfg common.FPermit, userInfo *httpcommon.UserInfo) *VTapInterface {
@@ -58,7 +58,7 @@ func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*sim
 		return nil, nil
 	}
 
-	v.db, err = mysql.GetDB(v.userInfo.ORGID)
+	v.db, err = metadb.GetDB(v.userInfo.ORGID)
 	if err != nil {
 		log.Errorf("failed to get db for org: %d", v.userInfo.ORGID)
 		return nil, err
@@ -68,12 +68,12 @@ func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*sim
 		return nil, err
 	}
 	controllerIPToRegionLcuuid := make(map[string]string)
-	var azCConns []*mysqlmodel.AZControllerConnection
+	var azCConns []*metadbmodel.AZControllerConnection
 	v.db.Unscoped().Find(&azCConns)
 	for _, c := range azCConns {
 		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
 	}
-	var controllers []*mysqlmodel.Controller
+	var controllers []*metadbmodel.Controller
 	v.db.Unscoped().Find(&controllers)
 	slaveRegionLcuuidToHealthyControllerIPs := make(map[string][]string)
 	for _, c := range controllers {
@@ -204,7 +204,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 
 			macVIFs := toolDS.macToVIFs[vtapVIF.MAC]
 			if len(macVIFs) > 0 {
-				var macVIF *mysqlmodel.VInterface
+				var macVIF *metadbmodel.VInterface
 				if len(macVIFs) == 1 {
 					macVIF = macVIFs[0]
 				} else {
@@ -234,7 +234,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					}
 					if macVIF == nil {
 						// Agent-owned resource
-						macVIF = &mysqlmodel.VInterface{DeviceType: deviceType, DeviceID: vtapVIF.VTapLaunchServerID}
+						macVIF = &metadbmodel.VInterface{DeviceType: deviceType, DeviceID: vtapVIF.VTapLaunchServerID}
 					}
 				}
 				vtapVIF.DeviceType = macVIF.DeviceType
@@ -389,8 +389,8 @@ func (v *VTapInterface) formatVTapResource(vifs *simplejson.Json, filter map[str
 }
 
 type vpToolDataSet struct {
-	idToVTap              map[int]*mysqlmodel.VTap
-	macToVIFs             map[string][]*mysqlmodel.VInterface
+	idToVTap              map[int]*metadbmodel.VTap
+	macToVIFs             map[string][]*metadbmodel.VInterface
 	hostIDToName          map[int]string
 	hostIPToID            map[string]int
 	vmIDToName            map[int]string
@@ -409,10 +409,10 @@ type vpToolDataSet struct {
 	podIDToPodNodeID      map[int]int
 }
 
-func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
+func newToolDataSet(db *metadb.DB) (toolDS *vpToolDataSet, err error) {
 	toolDS = &vpToolDataSet{
-		idToVTap:              make(map[int]*mysqlmodel.VTap),
-		macToVIFs:             make(map[string][]*mysqlmodel.VInterface),
+		idToVTap:              make(map[int]*metadbmodel.VTap),
+		macToVIFs:             make(map[string][]*metadbmodel.VInterface),
 		hostIDToName:          make(map[int]string),
 		hostIPToID:            make(map[string]int),
 		vmIDToName:            make(map[int]string),
@@ -430,7 +430,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		podIDToName:           make(map[int]string),
 		podIDToPodNodeID:      make(map[int]int),
 	}
-	var vtaps []*mysqlmodel.VTap
+	var vtaps []*metadbmodel.VTap
 	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vtap", err), db.LogPrefixORGID)
 		return
@@ -439,7 +439,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.idToVTap[vtap.ID] = vtap
 	}
 
-	var vifs []*mysqlmodel.VInterface
+	var vifs []*metadbmodel.VInterface
 	if err = db.Select("mac", "deviceid", "devicetype").Unscoped().Find(&vifs).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vinterface", err), db.LogPrefixORGID)
 		return
@@ -448,7 +448,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.macToVIFs[vif.Mac] = append(toolDS.macToVIFs[vif.Mac], vif)
 	}
 
-	var hosts []*mysqlmodel.Host
+	var hosts []*metadbmodel.Host
 	if err = db.Select("id", "name").Unscoped().Find(&hosts).Error; err != nil {
 		log.Error(dbQueryResourceFailed("host_device", err), db.LogPrefixORGID)
 		return
@@ -457,7 +457,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.hostIDToName[host.ID] = host.Name
 	}
 
-	var vms []*mysqlmodel.VM
+	var vms []*metadbmodel.VM
 	if err = db.Select("id", "name", "launch_server").Unscoped().Find(&vms).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vm", err), db.LogPrefixORGID)
 		return
@@ -467,7 +467,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.vmIDToLaunchServer[vm.ID] = vm.LaunchServer
 	}
 
-	var podNodes []*mysqlmodel.PodNode
+	var podNodes []*metadbmodel.PodNode
 	if err = db.Select("id", "name").Unscoped().Find(&podNodes).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod_node", err), db.LogPrefixORGID)
 		return
@@ -476,7 +476,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.podNodeIDToName[podNode.ID] = podNode.Name
 	}
 
-	var vmPodNodeConns []*mysqlmodel.VMPodNodeConnection
+	var vmPodNodeConns []*metadbmodel.VMPodNodeConnection
 	if err = db.Unscoped().Find(&vmPodNodeConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vm_pod_node_connection", err), db.LogPrefixORGID)
 		return
@@ -486,7 +486,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vrouters []*mysqlmodel.VRouter
+	var vrouters []*metadbmodel.VRouter
 	if err = db.Select("id", "name").Unscoped().Find(&vrouters).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vrouter", err), db.LogPrefixORGID)
 		return
@@ -495,7 +495,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.vrouterIDToName[v.ID] = v.Name
 	}
 
-	var dhcpPorts []*mysqlmodel.DHCPPort
+	var dhcpPorts []*metadbmodel.DHCPPort
 	if err = db.Select("id", "name").Unscoped().Find(&dhcpPorts).Error; err != nil {
 		log.Error(dbQueryResourceFailed("dhcp_port", err), db.LogPrefixORGID)
 		return
@@ -504,7 +504,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.dhcpPortIDToName[d.ID] = d.Name
 	}
 
-	var ngws []*mysqlmodel.NATGateway
+	var ngws []*metadbmodel.NATGateway
 	if err = db.Select("id", "name").Unscoped().Find(&ngws).Error; err != nil {
 		log.Error(dbQueryResourceFailed("nat_gateway", err), db.LogPrefixORGID)
 		return
@@ -513,7 +513,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.natGatewayIDToName[n.ID] = n.Name
 	}
 
-	var lbs []*mysqlmodel.LB
+	var lbs []*metadbmodel.LB
 	if err = db.Select("id", "name").Unscoped().Find(&lbs).Error; err != nil {
 		log.Error(dbQueryResourceFailed("lb", err), db.LogPrefixORGID)
 		return
@@ -522,7 +522,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.lbIDToName[lb.ID] = lb.Name
 	}
 
-	var rdsInstances []*mysqlmodel.RDSInstance
+	var rdsInstances []*metadbmodel.RDSInstance
 	if err = db.Select("id", "name").Unscoped().Find(&rdsInstances).Error; err != nil {
 		log.Error(dbQueryResourceFailed("rds_instance", err), db.LogPrefixORGID)
 		return
@@ -531,7 +531,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.rdsInstanceIDToName[r.ID] = r.Name
 	}
 
-	var redisInstances []*mysqlmodel.RedisInstance
+	var redisInstances []*metadbmodel.RedisInstance
 	if err = db.Select("id", "name").Unscoped().Find(&redisInstances).Error; err != nil {
 		log.Error(dbQueryResourceFailed("redis_instance", err), db.LogPrefixORGID)
 		return
@@ -540,7 +540,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.redisInstanceIDToName[r.ID] = r.Name
 	}
 
-	var podServices []*mysqlmodel.PodService
+	var podServices []*metadbmodel.PodService
 	if err = db.Select("id", "name").Unscoped().Find(&podServices).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod_service", err), db.LogPrefixORGID)
 		return
@@ -549,7 +549,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		toolDS.podServiceIDToName[p.ID] = p.Name
 	}
 
-	var pods []*mysqlmodel.Pod
+	var pods []*metadbmodel.Pod
 	if err = db.Select("id", "name", "pod_node_id").Unscoped().Find(&pods).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod", err), db.LogPrefixORGID)
 		return

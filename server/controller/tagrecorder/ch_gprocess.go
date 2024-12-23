@@ -20,19 +20,19 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChGProcess struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChGProcess, IDKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	mng := &ChGProcess{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChGProcess, IDKey](
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChGProcess, IDKey](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_GPROCESS,
 		),
 		resourceTypeToIconID,
@@ -42,7 +42,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Process) (keys []IDKey, targets []mysqlmodel.ChGProcess) {
+func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []IDKey, targets []metadbmodel.ChGProcess) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_GPROCESS,
 	}]
@@ -52,7 +52,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysqlmodel.ChGProcess{
+	targets = append(targets, metadbmodel.ChGProcess{
 		ID:          source.ID,
 		Name:        sourceName,
 		CHostID:     source.VMID,
@@ -66,7 +66,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -79,14 +79,14 @@ func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChGProcess
+		var chItem metadbmodel.ChGProcess
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysqlmodel.ChGProcess, db *mysql.DB) {
+func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

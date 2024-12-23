@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -64,14 +64,14 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	defer mn.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricName, 0)
-	dbToAdd := make([]*mysqlmodel.PrometheusMetricName, 0)
+	dbToAdd := make([]*metadbmodel.PrometheusMetricName, 0)
 	for i := range strs {
 		str := strs[i]
 		if id, ok := mn.strToID.Get(str); ok {
 			resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
-		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusMetricName{Name: str})
+		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusMetricName{Name: str})
 	}
 	if len(dbToAdd) == 0 {
 		return resp, nil
@@ -98,7 +98,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 }
 
 func (mn *metricName) load() (ids mapset.Set[int], err error) {
-	var items []*mysqlmodel.PrometheusMetricName
+	var items []*metadbmodel.PrometheusMetricName
 	err = mn.org.DB.Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)
@@ -113,7 +113,7 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 }
 
 func (mn *metricName) check(ids []int) (inUseIDs []int, err error) {
-	var dbItems []*mysqlmodel.PrometheusMetricName
+	var dbItems []*metadbmodel.PrometheusMetricName
 	err = mn.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)

@@ -17,22 +17,22 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 )
 
-func FindPtr[T any](db *mysql.DB) ([]*T, error) {
+func FindPtr[T any](db *metadb.DB) ([]*T, error) {
 	var result []*T
 	err := db.Find(&result).Error
 	return result, err
 }
 
-func WhereFind[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]T, error) {
+func WhereFind[T any](db *metadb.DB, query interface{}, args ...interface{}) ([]T, error) {
 	var result []T
 	err := db.Where(query, args...).Find(&result).Error
 	return result, err
 }
 
-func WhereFindPtr[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]*T, error) {
+func WhereFindPtr[T any](db *metadb.DB, query interface{}, args ...interface{}) ([]*T, error) {
 	var result []*T
 	err := db.Where(query, args...).Find(&result).Error
 	return result, err

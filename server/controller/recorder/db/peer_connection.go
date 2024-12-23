@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type PeerConnection struct {
-	OperatorBase[*mysqlmodel.PeerConnection, mysqlmodel.PeerConnection]
+	OperatorBase[*metadbmodel.PeerConnection, metadbmodel.PeerConnection]
 }
 
 func NewPeerConnection() *PeerConnection {
 	operater := &PeerConnection{
-		newOperatorBase[*mysqlmodel.PeerConnection](
+		newOperatorBase[*metadbmodel.PeerConnection](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			true,
 			false,

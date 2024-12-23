@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/gin-gonic/gin"

@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -301,77 +301,77 @@ func (i *IPTool) getL3DeviceOptionsByPodNodeID(id int) (opts []eventapi.TagField
 func (i *IPTool) getDeviceNameFromAllByID(deviceType, deviceID int) string {
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_HOST:
-		device := findFromAllByID[mysqlmodel.Host](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.Host](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
-		device := findFromAllByID[mysqlmodel.VM](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.VM](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
-		device := findFromAllByID[mysqlmodel.VRouter](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.VRouter](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		device := findFromAllByID[mysqlmodel.DHCPPort](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.DHCPPort](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
-		device := findFromAllByID[mysqlmodel.NATGateway](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.NATGateway](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
-		device := findFromAllByID[mysqlmodel.LB](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.LB](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
-		device := findFromAllByID[mysqlmodel.RDSInstance](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.RDSInstance](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-		device := findFromAllByID[mysqlmodel.RedisInstance](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.RedisInstance](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
-		device := findFromAllByID[mysqlmodel.PodNode](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.PodNode](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
-		device := findFromAllByID[mysqlmodel.PodService](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.PodService](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
 			return device.Name
 		}
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
-		device := findFromAllByID[mysqlmodel.Pod](i.metadata.DB, deviceID)
+		device := findFromAllByID[metadbmodel.Pod](i.metadata.DB, deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, deviceID), i.metadata.LogPrefixes)
 		} else {
@@ -384,7 +384,7 @@ func (i *IPTool) getDeviceNameFromAllByID(deviceType, deviceID int) string {
 	return ""
 }
 
-func findFromAllByID[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, id int) *MT {
+func findFromAllByID[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, id int) *MT {
 	var item *MT
 	res := db.Unscoped().Where("id = ?", id).Find(&item)
 	if res.Error != nil {

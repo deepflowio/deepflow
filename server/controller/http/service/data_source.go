@@ -27,8 +27,8 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -40,7 +40,7 @@ type DataSource struct {
 	cfg *config.ControllerConfig
 
 	resourceAccess *ResourceAccess
-	ipToController map[string]*mysqlmodel.Controller
+	ipToController map[string]*metadbmodel.Controller
 }
 
 func NewDataSource(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *DataSource {
@@ -67,15 +67,15 @@ func NewDataSourceWithIngesterAPIConfig(userInfo *httpcommon.UserInfo, cfg commo
 }
 
 func (d *DataSource) generateIPToController() error {
-	db, err := mysql.GetDB(d.resourceAccess.UserInfo.ORGID)
+	db, err := metadb.GetDB(d.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return err
 	}
-	var controllers []mysqlmodel.Controller
+	var controllers []metadbmodel.Controller
 	if err = db.Find(&controllers).Error; err != nil {
 		return err
 	}
-	ipToController := make(map[string]*mysqlmodel.Controller)
+	ipToController := make(map[string]*metadbmodel.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
 	}
@@ -103,12 +103,12 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 }
 
 func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
-	var baseDataSources []mysqlmodel.DataSource
+	var baseDataSources []metadbmodel.DataSource
 	if err := db.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
@@ -210,13 +210,13 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		return model.DataSource{}, err
 	}
 
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return model.DataSource{}, err
 	}
 	db := dbInfo.DB
-	var dataSource mysqlmodel.DataSource
-	var baseDataSource mysqlmodel.DataSource
+	var dataSource metadbmodel.DataSource
+	var baseDataSource metadbmodel.DataSource
 	var dataSourceCount int64
 
 	if ret := db.Where(
@@ -284,7 +284,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		)
 	}
 
-	dataSource = mysqlmodel.DataSource{}
+	dataSource = metadbmodel.DataSource{}
 
 	dataSource.Lcuuid = lcuuid
 	dataSource.DisplayName = dataSourceCreate.DisplayName
@@ -299,7 +299,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	}
 
 	// 调用ingester API配置clickhouse
-	var analyzers []mysqlmodel.Analyzer
+	var analyzers []metadbmodel.Analyzer
 	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
@@ -338,12 +338,12 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 }
 
 func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourceUpdate) (model.DataSource, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return model.DataSource{}, err
 	}
 	db := dbInfo.DB
-	var dataSource mysqlmodel.DataSource
+	var dataSource metadbmodel.DataSource
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
@@ -397,7 +397,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 
 	// 调用roze API配置clickhouse
-	var analyzers []mysqlmodel.Analyzer
+	var analyzers []metadbmodel.Analyzer
 	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
@@ -459,13 +459,13 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 }
 
 func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
-	var dataSource mysqlmodel.DataSource
-	var baseDataSource mysqlmodel.DataSource
+	var dataSource metadbmodel.DataSource
+	var baseDataSource metadbmodel.DataSource
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return map[string]string{}, NewError(
@@ -498,7 +498,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	log.Infof("delete data_source (%s)", dataSource.DisplayName, dbInfo.LogPrefixORGID)
 
 	// 调用ingester API配置clickhouse
-	var analyzers []mysqlmodel.Analyzer
+	var analyzers []metadbmodel.Analyzer
 	if err := db.Find(&analyzers).Error; err != nil {
 		return nil, err
 	}
@@ -538,7 +538,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysqlmodel.DataSource) error {
+func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource metadbmodel.DataSource) error {
 	var name, baseName string
 	var err error
 	if name, err = getName(dataSource.IntervalTime, dataSource.DataTableCollection); err != nil {
@@ -576,7 +576,7 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 	return err
 }
 
-func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysqlmodel.DataSource) error {
+func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource metadbmodel.DataSource) error {
 	name, err := getName(dataSource.IntervalTime, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -606,7 +606,7 @@ func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql
 	return err
 }
 
-func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysqlmodel.DataSource) error {
+func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource metadbmodel.DataSource) error {
 	name, err := getName(dataSource.IntervalTime, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -682,10 +682,10 @@ func getTableName(collection string) string {
 }
 
 func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
-	var dataSources []mysqlmodel.DataSource
+	var dataSources []metadbmodel.DataSource
 	var err error
 
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return err
 	}
@@ -693,7 +693,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 	if err := db.Find(&dataSources).Error; err != nil {
 		return err
 	}
-	idToDataSource := make(map[int]mysqlmodel.DataSource)
+	idToDataSource := make(map[int]metadbmodel.DataSource)
 	for _, dataSource := range dataSources {
 		idToDataSource[dataSource.ID] = dataSource
 	}

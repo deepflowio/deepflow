@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func RandID() int {
@@ -34,88 +34,88 @@ func RandID() int {
 	return rand.Intn(999)
 }
 
-func newDBWANIP(vifID int) mysqlmodel.WANIP {
-	var wanip mysqlmodel.WANIP
+func newDBWANIP(vifID int) metadbmodel.WANIP {
+	var wanip metadbmodel.WANIP
 	wanip.Lcuuid = uuid.NewString()
 	wanip.VInterfaceID = vifID
 	wanip.IP = faker.IPv4()
 	return wanip
 }
 
-func newDBLANIP(vifID int) mysqlmodel.LANIP {
-	var lanip mysqlmodel.LANIP
+func newDBLANIP(vifID int) metadbmodel.LANIP {
+	var lanip metadbmodel.LANIP
 	lanip.Lcuuid = uuid.NewString()
 	lanip.VInterfaceID = vifID
 	lanip.IP = faker.IPv4()
 	return lanip
 }
 
-func newDBVInterface(deviceType, deviceID int) mysqlmodel.VInterface {
-	var vif mysqlmodel.VInterface
+func newDBVInterface(deviceType, deviceID int) metadbmodel.VInterface {
+	var vif metadbmodel.VInterface
 	vif.Lcuuid = uuid.NewString()
 	vif.DeviceType = deviceType
 	vif.DeviceID = deviceID
 	return vif
 }
 
-func newDBVM() mysqlmodel.VM {
-	var vm mysqlmodel.VM
+func newDBVM() metadbmodel.VM {
+	var vm metadbmodel.VM
 	vm.Lcuuid = uuid.NewString()
 	vm.Name = vm.Lcuuid[:6]
 	vm.VPCID = RandID()
 	return vm
 }
 
-func newDBNATGateway() mysqlmodel.NATGateway {
-	var nat mysqlmodel.NATGateway
+func newDBNATGateway() metadbmodel.NATGateway {
+	var nat metadbmodel.NATGateway
 	nat.Lcuuid = uuid.NewString()
 	nat.Name = nat.Lcuuid[:6]
 	nat.VPCID = RandID()
 	return nat
 }
 
-func newDBNATVMConnection(natID, vmID int) mysqlmodel.NATVMConnection {
-	var connection mysqlmodel.NATVMConnection
+func newDBNATVMConnection(natID, vmID int) metadbmodel.NATVMConnection {
+	var connection metadbmodel.NATVMConnection
 	connection.Lcuuid = uuid.NewString()
 	connection.NATGatewayID = natID
 	connection.VMID = vmID
 	return connection
 }
 
-func newDBNATRule(natID int) mysqlmodel.NATRule {
-	var rule mysqlmodel.NATRule
+func newDBNATRule(natID int) metadbmodel.NATRule {
+	var rule metadbmodel.NATRule
 	rule.Lcuuid = uuid.NewString()
 	rule.NATGatewayID = natID
 	rule.FixedIP = faker.IPv4()
 	return rule
 }
 
-func newDBLB() mysqlmodel.LB {
-	var lb mysqlmodel.LB
+func newDBLB() metadbmodel.LB {
+	var lb metadbmodel.LB
 	lb.Lcuuid = uuid.NewString()
 	lb.Name = lb.Lcuuid[:6]
 	lb.VPCID = RandID()
 	return lb
 }
 
-func newLBVMConnection(lbID, vmID int) mysqlmodel.LBVMConnection {
-	var connection mysqlmodel.LBVMConnection
+func newLBVMConnection(lbID, vmID int) metadbmodel.LBVMConnection {
+	var connection metadbmodel.LBVMConnection
 	connection.Lcuuid = uuid.NewString()
 	connection.LBID = lbID
 	connection.VMID = vmID
 	return connection
 }
 
-func newDBLBListener(lbID int) mysqlmodel.LBListener {
-	var listener mysqlmodel.LBListener
+func newDBLBListener(lbID int) metadbmodel.LBListener {
+	var listener metadbmodel.LBListener
 	listener.Lcuuid = uuid.NewString()
 	listener.LBID = lbID
 	listener.IPs = faker.IPv4()
 	return listener
 }
 
-func newDBLBTargetServer(lbID, lbListenerID int) mysqlmodel.LBTargetServer {
-	var server mysqlmodel.LBTargetServer
+func newDBLBTargetServer(lbID, lbListenerID int) metadbmodel.LBTargetServer {
+	var server metadbmodel.LBTargetServer
 	server.Lcuuid = uuid.NewString()
 	server.LBID = lbID
 	server.LBListenerID = lbListenerID
@@ -123,15 +123,15 @@ func newDBLBTargetServer(lbID, lbListenerID int) mysqlmodel.LBTargetServer {
 	return server
 }
 
-func newDBPodIngress() mysqlmodel.PodIngress {
-	var ingress mysqlmodel.PodIngress
+func newDBPodIngress() metadbmodel.PodIngress {
+	var ingress metadbmodel.PodIngress
 	ingress.Lcuuid = uuid.NewString()
 	ingress.Name = ingress.Lcuuid[:6]
 	return ingress
 }
 
-func newDBPodService(podIngressID int) mysqlmodel.PodService {
-	var service mysqlmodel.PodService
+func newDBPodService(podIngressID int) metadbmodel.PodService {
+	var service metadbmodel.PodService
 	service.Lcuuid = uuid.NewString()
 	service.Name = service.Lcuuid[:6]
 	service.PodIngressID = podIngressID
@@ -139,23 +139,23 @@ func newDBPodService(podIngressID int) mysqlmodel.PodService {
 	return service
 }
 
-func newDBPodGroup() mysqlmodel.PodGroup {
-	var group mysqlmodel.PodGroup
+func newDBPodGroup() metadbmodel.PodGroup {
+	var group metadbmodel.PodGroup
 	group.Lcuuid = uuid.NewString()
 	group.Name = group.Lcuuid[:6]
 	return group
 }
 
-func newDBPodGroupPort(podServiceID, podGroupID int) mysqlmodel.PodGroupPort {
-	var port mysqlmodel.PodGroupPort
+func newDBPodGroupPort(podServiceID, podGroupID int) metadbmodel.PodGroupPort {
+	var port metadbmodel.PodGroupPort
 	port.Lcuuid = uuid.NewString()
 	port.PodGroupID = podGroupID
 	port.PodServiceID = podServiceID
 	return port
 }
 
-func newDBPod(podGroupID int) mysqlmodel.Pod {
-	var pod mysqlmodel.Pod
+func newDBPod(podGroupID int) metadbmodel.Pod {
+	var pod metadbmodel.Pod
 	pod.Lcuuid = uuid.NewString()
 	pod.Name = pod.Lcuuid[:6]
 	pod.PodGroupID = podGroupID
@@ -163,22 +163,22 @@ func newDBPod(podGroupID int) mysqlmodel.Pod {
 }
 
 func clearIPRelationDB(db *gorm.DB) {
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.WANIP{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LANIP{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VInterface{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATVMConnection{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATRule{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATGateway{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBVMConnection{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBListener{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBTargetServer{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LB{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodService{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodIngress{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroupPort{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroup{})
-	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Pod{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.WANIP{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LANIP{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VInterface{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VM{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.NATVMConnection{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.NATRule{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.NATGateway{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LBVMConnection{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LBListener{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LBTargetServer{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LB{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodService{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodIngress{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodGroupPort{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodGroup{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Pod{})
 }
 
 func (t *SuiteTest) TestNewToolDataSet() {
@@ -271,7 +271,7 @@ func (t *SuiteTest) TestGenerateFromNATGateway() {
 
 	updater := NewChIPRelation()
 	toolDS, _ := updater.newToolDataSet()
-	keyToDBItem := make(map[IPRelationKey]mysqlmodel.ChIPRelation)
+	keyToDBItem := make(map[IPRelationKey]metadbmodel.ChIPRelation)
 	updater.generateFromNATGateway(keyToDBItem, toolDS)
 
 	assert.Equal(t.T(), 3, len(keyToDBItem))
@@ -321,7 +321,7 @@ func (t *SuiteTest) TestGenerateFromLB() {
 
 	updater := NewChIPRelation()
 	toolDS, _ := updater.newToolDataSet()
-	keyToDBItem := make(map[IPRelationKey]mysqlmodel.ChIPRelation)
+	keyToDBItem := make(map[IPRelationKey]metadbmodel.ChIPRelation)
 	updater.generateFromLB(keyToDBItem, toolDS)
 
 	assert.Equal(t.T(), 5, len(keyToDBItem))
@@ -373,7 +373,7 @@ func (t *SuiteTest) TestGenerateFromPodService() {
 
 	updater := NewChIPRelation()
 	toolDS, _ := updater.newToolDataSet()
-	keyToDBItem := make(map[IPRelationKey]mysqlmodel.ChIPRelation)
+	keyToDBItem := make(map[IPRelationKey]metadbmodel.ChIPRelation)
 	updater.generateFromPodService(keyToDBItem, toolDS)
 
 	assert.Equal(t.T(), 2, len(keyToDBItem))
@@ -395,8 +395,8 @@ func (t *SuiteTest) TestGenerateFromPodService() {
 }
 
 func (t *SuiteTest) TestGenerateIPRelationUpdateInfo() {
-	newIPRelation := mysqlmodel.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
-	oldIPRelation := mysqlmodel.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
+	newIPRelation := metadbmodel.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
+	oldIPRelation := metadbmodel.ChIPRelation{VPCID: 1, IP: "1.1.1.1", LBID: 1, LBName: "lb1", LBListenerID: 1, LBListenerName: "lbListener1"}
 	updater := NewChIPRelation()
 	updateInfo, _ := updater.generateUpdateInfo(newIPRelation, oldIPRelation)
 	assert.Equal(t.T(), 0, len(updateInfo))

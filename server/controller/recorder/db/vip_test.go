@@ -21,12 +21,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBVIP() *mysqlmodel.VIP {
-	return &mysqlmodel.VIP{
-		Base:   mysqlmodel.Base{Lcuuid: uuid.New().String()},
+func newDBVIP() *metadbmodel.VIP {
+	return &metadbmodel.VIP{
+		Base:   metadbmodel.Base{Lcuuid: uuid.New().String()},
 		IP:     "192.168.1.216",
 		VTapID: 216,
 	}
@@ -36,14 +36,14 @@ func (t *SuiteTest) TestAddVIPBatchSuccess() {
 	operator := NewVIP()
 	itemToAdd := newDBVIP()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.VIP{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.VIP{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.VIP
+	var addedItem *metadbmodel.VIP
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VIP{})
 }
 
 func (t *SuiteTest) TestUpdateVIPSuccess() {
@@ -56,11 +56,11 @@ func (t *SuiteTest) TestUpdateVIPSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.VIP
+	var updatedItem *metadbmodel.VIP
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.IP, updateInfo["ip"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VIP{})
 }
 
 func (t *SuiteTest) TestDeleteVIPBatchSuccess() {
@@ -70,27 +70,27 @@ func (t *SuiteTest) TestDeleteVIPBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.VIP
+	var deletedItem *metadbmodel.VIP
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestVIPCreateAndFind() {
 	lcuuid := uuid.New().String()
-	vip := &mysqlmodel.VIP{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	vip := &metadbmodel.VIP{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(vip)
-	var resultVIP *mysqlmodel.VIP
+	var resultVIP *metadbmodel.VIP
 	err := t.db.Where("lcuuid = ?", lcuuid).First(&resultVIP).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), vip.Base.Lcuuid, resultVIP.Base.Lcuuid)
 
-	resultVIP = new(mysqlmodel.VIP)
+	resultVIP = new(metadbmodel.VIP)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultVIP)
 	assert.Equal(t.T(), vip.Base.Lcuuid, resultVIP.Base.Lcuuid)
 
-	resultVIP = new(mysqlmodel.VIP)
+	resultVIP = new(metadbmodel.VIP)
 	result := t.db.Where("lcuuid = ? and ip = ''", lcuuid).Find(&resultVIP)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

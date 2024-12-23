@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 
 	agentconf "github.com/deepflowio/deepflow/server/agent_config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 const SCRIPT_UPGRADE_VTAP_GROUP_CONFIG = "6.6.1.16"

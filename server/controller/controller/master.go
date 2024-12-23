@@ -23,7 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/http"
 	"github.com/deepflowio/deepflow/server/controller/http/service"

@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (b *DataSet) AddPodServicePort(dbItem *mysqlmodel.PodServicePort, seq int) {
+func (b *DataSet) AddPodServicePort(dbItem *metadbmodel.PodServicePort, seq int) {
 	b.PodServicePorts[dbItem.Lcuuid] = &PodServicePort{
 		DiffBase: DiffBase{
 			Sequence: seq,

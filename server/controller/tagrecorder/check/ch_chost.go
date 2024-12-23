@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChost struct {
-	UpdaterBase[mysqlmodel.ChChost, IDKey]
+	UpdaterBase[metadbmodel.ChChost, IDKey]
 }
 
 func NewChChost() *ChChost {
 	updater := &ChChost{
-		UpdaterBase[mysqlmodel.ChChost, IDKey]{
+		UpdaterBase[metadbmodel.ChChost, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_CHOST,
 		},
 	}
@@ -35,10 +35,10 @@ func NewChChost() *ChChost {
 	return updater
 }
 
-func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
+func (p *ChChost) generateNewData() (map[IDKey]metadbmodel.ChChost, bool) {
 	var (
-		chosts []mysqlmodel.VM
-		hosts  []mysqlmodel.Host
+		chosts []metadbmodel.VM
+		hosts  []metadbmodel.Host
 	)
 	err := p.db.Unscoped().Find(&chosts).Error
 	if err != nil {
@@ -56,10 +56,10 @@ func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
 		ipToHostID[host.IP] = host.ID
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChChost)
+	keyToItem := make(map[IDKey]metadbmodel.ChChost)
 	for _, chost := range chosts {
 		if chost.DeletedAt.Valid {
-			keyToItem[IDKey{ID: chost.ID}] = mysqlmodel.ChChost{
+			keyToItem[IDKey{ID: chost.ID}] = metadbmodel.ChChost{
 				ID:       chost.ID,
 				Name:     chost.Name + " (deleted)",
 				L3EPCID:  chost.VPCID,
@@ -70,7 +70,7 @@ func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
 				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
 		} else {
-			keyToItem[IDKey{ID: chost.ID}] = mysqlmodel.ChChost{
+			keyToItem[IDKey{ID: chost.ID}] = metadbmodel.ChChost{
 				ID:       chost.ID,
 				Name:     chost.Name,
 				L3EPCID:  chost.VPCID,
@@ -85,11 +85,11 @@ func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
 	return keyToItem, true
 }
 
-func (p *ChChost) generateKey(dbItem mysqlmodel.ChChost) IDKey {
+func (p *ChChost) generateKey(dbItem metadbmodel.ChChost) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChChost) generateUpdateInfo(oldItem, newItem mysqlmodel.ChChost) (map[string]interface{}, bool) {
+func (p *ChChost) generateUpdateInfo(oldItem, newItem metadbmodel.ChChost) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

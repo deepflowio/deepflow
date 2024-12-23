@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
 		*diffbase.NATRule,
-		*mysqlmodel.NATRule,
-		mysqlmodel.NATRule,
+		*metadbmodel.NATRule,
+		metadbmodel.NATRule,
 		*message.NATRuleAdd,
 		message.NATRuleAdd,
 		*message.NATRuleUpdate,
@@ -47,8 +47,8 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		newUpdaterBase[
 			cloudmodel.NATRule,
 			*diffbase.NATRule,
-			*mysqlmodel.NATRule,
-			mysqlmodel.NATRule,
+			*metadbmodel.NATRule,
+			metadbmodel.NATRule,
 			*message.NATRuleAdd,
 			message.NATRuleAdd,
 			*message.NATRuleUpdate,
@@ -73,7 +73,7 @@ func (r *NATRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATRule) (diffBas
 	return
 }
 
-func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysqlmodel.NATRule, bool) {
+func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmodel.NATRule, bool) {
 	var natGatewayID int
 	var exists bool
 	if cloudItem.NATGatewayLcuuid != "" {
@@ -98,7 +98,7 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysqlmode
 		}
 	}
 
-	dbItem := &mysqlmodel.NATRule{
+	dbItem := &metadbmodel.NATRule{
 		NATGatewayID:   natGatewayID,
 		VInterfaceID:   vinterfaceID,
 		Type:           cloudItem.Type,

@@ -17,9 +17,9 @@
 package edition
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/schema"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
 
 func UpgradeDatabase(cfg config.MySqlConfig) error {

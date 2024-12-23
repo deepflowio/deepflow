@@ -19,11 +19,11 @@ package encoder
 import (
 	"gorm.io/gorm/clause"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/constraint"
 )
 
-func addBatch[T constraint.OperateBatchModel](db *mysql.DB, toAdd []*T, resourceType string) error {
+func addBatch[T constraint.OperateBatchModel](db *metadb.DB, toAdd []*T, resourceType string) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

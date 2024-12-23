@@ -18,19 +18,19 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChDevice struct {
-	UpdaterBase[mysqlmodel.ChDevice, DeviceKey]
+	UpdaterBase[metadbmodel.ChDevice, DeviceKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 	updater := &ChDevice{
-		UpdaterBase[mysqlmodel.ChDevice, DeviceKey]{
+		UpdaterBase[metadbmodel.ChDevice, DeviceKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_DEVICE,
 		},
 		resourceTypeToIconID,
@@ -39,9 +39,9 @@ func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 	return updater
 }
 
-func (d *ChDevice) generateNewData() (map[DeviceKey]mysqlmodel.ChDevice, bool) {
+func (d *ChDevice) generateNewData() (map[DeviceKey]metadbmodel.ChDevice, bool) {
 	log.Infof("generate data for %s", d.resourceTypeName, d.db.LogPrefixORGID)
-	keyToItem := make(map[DeviceKey]mysqlmodel.ChDevice)
+	keyToItem := make(map[DeviceKey]metadbmodel.ChDevice)
 	ok := d.generateHostData(keyToItem)
 	if !ok {
 		return nil, false
@@ -103,14 +103,14 @@ func (d *ChDevice) generateNewData() (map[DeviceKey]mysqlmodel.ChDevice, bool) {
 	return keyToItem, true
 }
 
-func (d *ChDevice) generateKey(dbItem mysqlmodel.ChDevice) DeviceKey {
+func (d *ChDevice) generateKey(dbItem metadbmodel.ChDevice) DeviceKey {
 	return DeviceKey{
 		DeviceType: dbItem.DeviceType,
 		DeviceID:   dbItem.DeviceID,
 	}
 }
 
-func (d *ChDevice) generateUpdateInfo(oldItem, newItem mysqlmodel.ChDevice) (map[string]interface{}, bool) {
+func (d *ChDevice) generateUpdateInfo(oldItem, newItem metadbmodel.ChDevice) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
@@ -127,8 +127,8 @@ func (d *ChDevice) generateUpdateInfo(oldItem, newItem mysqlmodel.ChDevice) (map
 	return nil, false
 }
 
-func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var hosts []mysqlmodel.Host
+func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var hosts []metadbmodel.Host
 	err := d.db.Unscoped().Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -141,7 +141,7 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysqlmodel.ChDevice)
 			DeviceID:   host.ID,
 		}
 		if host.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_HOST,
 				DeviceID:   host.ID,
 				Name:       host.Name + " (deleted)",
@@ -152,7 +152,7 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysqlmodel.ChDevice)
 				DomainID:   tagrecorder.DomainToDomainID[host.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_HOST,
 				DeviceID:   host.ID,
 				Name:       host.Name,
@@ -168,8 +168,8 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysqlmodel.ChDevice)
 	return true
 }
 
-func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var vms []mysqlmodel.VM
+func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var vms []metadbmodel.VM
 	err := d.db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -183,7 +183,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 		}
 
 		if vm.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_VM,
 				DeviceID:   vm.ID,
 				Name:       vm.Name + " (deleted)",
@@ -195,7 +195,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 				DomainID:   tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_VM,
 				DeviceID:   vm.ID,
 				Name:       vm.Name,
@@ -211,8 +211,8 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 	return true
 }
 
-func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var vrouters []mysqlmodel.VRouter
+func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var vrouters []metadbmodel.VRouter
 	err := d.db.Unscoped().Find(&vrouters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -228,7 +228,7 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 		if vrouter.DeletedAt.Valid {
 			vrouterName += " (deleted)"
 		}
-		keyToItem[key] = mysqlmodel.ChDevice{
+		keyToItem[key] = metadbmodel.ChDevice{
 			DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
 			DeviceID:   vrouter.ID,
 			Name:       vrouterName,
@@ -240,8 +240,8 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 	return true
 }
 
-func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var dhcpPorts []mysqlmodel.DHCPPort
+func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var dhcpPorts []metadbmodel.DHCPPort
 	err := d.db.Unscoped().Find(&dhcpPorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -255,7 +255,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 		}
 
 		if dhcpPort.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
 				DeviceID:   dhcpPort.ID,
 				Name:       dhcpPort.Name + " (deleted)",
@@ -264,7 +264,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 				DomainID:   tagrecorder.DomainToDomainID[dhcpPort.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
 				DeviceID:   dhcpPort.ID,
 				Name:       dhcpPort.Name,
@@ -277,8 +277,8 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 	return true
 }
 
-func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var natGateways []mysqlmodel.NATGateway
+func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var natGateways []metadbmodel.NATGateway
 	err := d.db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -292,7 +292,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysqlmodel.ChD
 		}
 
 		if natGateway.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				DeviceID:   natGateway.ID,
 				Name:       natGateway.Name + " (deleted)",
@@ -302,7 +302,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				DomainID:   tagrecorder.DomainToDomainID[natGateway.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				DeviceID:   natGateway.ID,
 				Name:       natGateway.Name,
@@ -316,8 +316,8 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysqlmodel.ChD
 	return true
 }
 
-func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var lbs []mysqlmodel.LB
+func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var lbs []metadbmodel.LB
 	err := d.db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -331,7 +331,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 		}
 
 		if lb.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_LB,
 				DeviceID:   lb.ID,
 				Name:       lb.Name + " (deleted)",
@@ -341,7 +341,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 				DomainID:   tagrecorder.DomainToDomainID[lb.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_LB,
 				DeviceID:   lb.ID,
 				Name:       lb.Name,
@@ -355,8 +355,8 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) b
 	return true
 }
 
-func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var rdsInstances []mysqlmodel.RDSInstance
+func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var rdsInstances []metadbmodel.RDSInstance
 	err := d.db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -370,7 +370,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysqlmodel.Ch
 		}
 
 		if rdsInstance.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 				DeviceID:   rdsInstance.ID,
 				Name:       rdsInstance.Name + " (deleted)",
@@ -380,7 +380,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysqlmodel.Ch
 				DomainID:   tagrecorder.DomainToDomainID[rdsInstance.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 				DeviceID:   rdsInstance.ID,
 				Name:       rdsInstance.Name,
@@ -394,8 +394,8 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysqlmodel.Ch
 	return true
 }
 
-func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var redisInstances []mysqlmodel.RedisInstance
+func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var redisInstances []metadbmodel.RedisInstance
 	err := d.db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -409,7 +409,7 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysqlmodel.
 		}
 
 		if redisInstance.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 				DeviceID:   redisInstance.ID,
 				Name:       redisInstance.Name + " (deleted)",
@@ -419,7 +419,7 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysqlmodel.
 				DomainID:   tagrecorder.DomainToDomainID[redisInstance.Domain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 				DeviceID:   redisInstance.ID,
 				Name:       redisInstance.Name,
@@ -433,8 +433,8 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysqlmodel.
 	return true
 }
 
-func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var podServices []mysqlmodel.PodService
+func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var podServices []metadbmodel.PodService
 	err := d.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -451,7 +451,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:   podService.ID,
 			}
-			keyToItem[podServiceKey] = mysqlmodel.ChDevice{
+			keyToItem[podServiceKey] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:    podService.ID,
 				Name:        podService.Name + " (deleted)",
@@ -466,7 +466,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				DeviceType: CH_DEVICE_TYPE_SERVICE,
 				DeviceID:   podService.ID,
 			}
-			keyToItem[serviceKey] = mysqlmodel.ChDevice{
+			keyToItem[serviceKey] = metadbmodel.ChDevice{
 				DeviceType:  CH_DEVICE_TYPE_SERVICE,
 				DeviceID:    podService.ID,
 				Name:        podService.Name + " (deleted)",
@@ -481,7 +481,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:   podService.ID,
 			}
-			keyToItem[podServiceKey] = mysqlmodel.ChDevice{
+			keyToItem[podServiceKey] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:    podService.ID,
 				Name:        podService.Name,
@@ -496,7 +496,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				DeviceType: CH_DEVICE_TYPE_SERVICE,
 				DeviceID:   podService.ID,
 			}
-			keyToItem[serviceKey] = mysqlmodel.ChDevice{
+			keyToItem[serviceKey] = metadbmodel.ChDevice{
 				DeviceType:  CH_DEVICE_TYPE_SERVICE,
 				DeviceID:    podService.ID,
 				Name:        podService.Name,
@@ -510,8 +510,8 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysqlmodel.ChD
 	return true
 }
 
-func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var pods []mysqlmodel.Pod
+func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var pods []metadbmodel.Pod
 	err := d.db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -524,7 +524,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) 
 			DeviceID:   pod.ID,
 		}
 		if pod.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD,
 				DeviceID:    pod.ID,
 				Name:        pod.Name + " (deleted)",
@@ -534,7 +534,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) 
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD,
 				DeviceID:    pod.ID,
 				Name:        pod.Name,
@@ -548,8 +548,8 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) 
 	return true
 }
 
-func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var podGroups []mysqlmodel.PodGroup
+func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var podGroups []metadbmodel.PodGroup
 	err := d.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -562,7 +562,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 			DeviceID:   podGroup.ID,
 		}
 		if podGroup.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				DeviceID:    podGroup.ID,
 				Name:        podGroup.Name + " (deleted)",
@@ -572,7 +572,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
 				DeviceID:    podGroup.ID,
 				Name:        podGroup.Name,
@@ -586,8 +586,8 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 	return true
 }
 
-func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var podNodes []mysqlmodel.PodNode
+func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var podNodes []metadbmodel.PodNode
 	err := d.db.Unscoped().Find(&podNodes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -600,7 +600,7 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 			DeviceID:   podNode.ID,
 		}
 		if podNode.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
 				DeviceID:    podNode.ID,
 				Name:        podNode.Name + " (deleted)",
@@ -612,7 +612,7 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
 				DeviceID:    podNode.ID,
 				Name:        podNode.Name,
@@ -628,8 +628,8 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 	return true
 }
 
-func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	var podClusters []mysqlmodel.PodCluster
+func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	var podClusters []metadbmodel.PodCluster
 	err := d.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
@@ -642,7 +642,7 @@ func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysqlmodel.ChD
 			DeviceID:   podCluster.ID,
 		}
 		if podCluster.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
 				DeviceID:    podCluster.ID,
 				Name:        podCluster.Name + " (deleted)",
@@ -652,7 +652,7 @@ func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysqlmodel.ChD
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
 				DeviceID:    podCluster.ID,
 				Name:        podCluster.Name,
@@ -666,24 +666,24 @@ func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysqlmodel.ChD
 	return true
 }
 
-func (d *ChDevice) generateIPData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) {
+func (d *ChDevice) generateIPData(keyToItem map[DeviceKey]metadbmodel.ChDevice) {
 	key := DeviceKey{
 		DeviceType: CH_DEVICE_TYPE_IP,
 		DeviceID:   CH_DEVICE_TYPE_IP,
 	}
-	keyToItem[key] = mysqlmodel.ChDevice{
+	keyToItem[key] = metadbmodel.ChDevice{
 		DeviceType: CH_DEVICE_TYPE_IP,
 		DeviceID:   CH_DEVICE_TYPE_IP,
 		IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_IP}],
 	}
 }
 
-func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) {
+func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]metadbmodel.ChDevice) {
 	key := DeviceKey{
 		DeviceType: CH_DEVICE_TYPE_INTERNET,
 		DeviceID:   CH_DEVICE_TYPE_INTERNET,
 	}
-	keyToItem[key] = mysqlmodel.ChDevice{
+	keyToItem[key] = metadbmodel.ChDevice{
 		DeviceType: CH_DEVICE_TYPE_INTERNET,
 		DeviceID:   CH_DEVICE_TYPE_INTERNET,
 		Name:       "Internet",
@@ -691,8 +691,8 @@ func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysqlmodel.ChDev
 	}
 }
 
-func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
-	processes, err := query.FindInBatches[mysqlmodel.Process](d.db.Unscoped())
+func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]metadbmodel.ChDevice) bool {
+	processes, err := query.FindInBatches[metadbmodel.Process](d.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
@@ -703,7 +703,7 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 			DeviceID:   process.ID,
 		}
 		if process.DeletedAt.Valid {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
 				DeviceID:    process.ID,
 				Name:        process.Name + " (deleted)",
@@ -713,7 +713,7 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
-			keyToItem[key] = mysqlmodel.ChDevice{
+			keyToItem[key] = metadbmodel.ChDevice{
 				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
 				DeviceID:    process.ID,
 				Name:        process.Name,

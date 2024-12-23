@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type LANIP struct {
-	OperatorBase[*mysqlmodel.LANIP, mysqlmodel.LANIP]
+	OperatorBase[*metadbmodel.LANIP, metadbmodel.LANIP]
 }
 
 func NewLANIP() *LANIP {
 	return &LANIP{
-		newOperatorBase[*mysqlmodel.LANIP](
+		newOperatorBase[*metadbmodel.LANIP](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			false,
 			false,

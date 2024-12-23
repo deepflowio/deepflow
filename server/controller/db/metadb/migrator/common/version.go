@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/schema"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
 
 func CheckCEDBVersion(dc *DBConfig) error {

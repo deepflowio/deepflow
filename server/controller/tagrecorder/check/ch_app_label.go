@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"golang.org/x/exp/slices"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChAPPLabel struct {
-	UpdaterBase[mysqlmodel.ChAPPLabel, PrometheusAPPLabelKey]
+	UpdaterBase[metadbmodel.ChAPPLabel, PrometheusAPPLabelKey]
 }
 
 func NewChAPPLabel() *ChAPPLabel {
 	updater := &ChAPPLabel{
-		UpdaterBase[mysqlmodel.ChAPPLabel, PrometheusAPPLabelKey]{
+		UpdaterBase[metadbmodel.ChAPPLabel, PrometheusAPPLabelKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_APP_LABEL,
 		},
 	}
@@ -38,9 +38,9 @@ func NewChAPPLabel() *ChAPPLabel {
 	return updater
 }
 
-func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysqlmodel.ChAPPLabel, bool) {
-	var prometheusLabels []mysqlmodel.PrometheusLabel
-	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabels).Error
+func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel, bool) {
+	var prometheusLabels []metadbmodel.PrometheusLabel
+	err := metadb.DefaultDB.Unscoped().Find(&prometheusLabels).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
@@ -54,14 +54,14 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysqlmodel.ChA
 		return nil, false
 	}
 
-	keyToItem := make(map[PrometheusAPPLabelKey]mysqlmodel.ChAPPLabel)
+	keyToItem := make(map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel)
 	for _, prometheusLabel := range prometheusLabels {
 		labelName := prometheusLabel.Name
 		if slices.Contains(appLabelSlice, labelName) {
 			labelNameID := labelNameIDMap[labelName]
 			labelValue := prometheusLabel.Value
 			labelValueID := valueNameIDMap[labelValue]
-			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysqlmodel.ChAPPLabel{
+			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = metadbmodel.ChAPPLabel{
 				LabelNameID:  labelNameID,
 				LabelValue:   labelValue,
 				LabelValueID: labelValueID,
@@ -72,11 +72,11 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysqlmodel.ChA
 	return keyToItem, true
 }
 
-func (l *ChAPPLabel) generateKey(dbItem mysqlmodel.ChAPPLabel) PrometheusAPPLabelKey {
+func (l *ChAPPLabel) generateKey(dbItem metadbmodel.ChAPPLabel) PrometheusAPPLabelKey {
 	return PrometheusAPPLabelKey{LabelNameID: dbItem.LabelNameID, LabelValueID: dbItem.LabelValueID}
 }
 
-func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAPPLabel) (map[string]interface{}, bool) {
+func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem metadbmodel.ChAPPLabel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.LabelValue != newItem.LabelValue {
 		updateInfo["label_value"] = newItem.LabelValue
@@ -89,8 +89,8 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAPPLabel) 
 
 func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
 	appLabelSlice := []string{}
-	var prometheusAPPMetricAPPLabelLayouts []mysqlmodel.ChPrometheusMetricAPPLabelLayout
-	err := mysql.DefaultDB.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
+	var prometheusAPPMetricAPPLabelLayouts []metadbmodel.ChPrometheusMetricAPPLabelLayout
+	err := metadb.DefaultDB.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
@@ -106,17 +106,17 @@ func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
 func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, bool) {
 	labelNameIDMap := make(map[string]int)
 	valueNameIDMap := make(map[string]int)
-	var prometheusLabelNames []mysqlmodel.PrometheusLabelName
-	var prometheusLabelValues []mysqlmodel.PrometheusLabelValue
+	var prometheusLabelNames []metadbmodel.PrometheusLabelName
+	var prometheusLabelValues []metadbmodel.PrometheusLabelValue
 
-	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabelNames).Error
+	err := metadb.DefaultDB.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, nil, false
 	}
 
-	err = mysql.DefaultDB.Unscoped().Find(&prometheusLabelValues).Error
+	err = metadb.DefaultDB.Unscoped().Find(&prometheusLabelValues).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))

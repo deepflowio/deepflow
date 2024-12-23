@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type IconData struct {
@@ -35,7 +35,7 @@ type IconKey struct {
 	SubType  int
 }
 
-func (c *TagRecorder) UpdateIconInfo(db *mysql.DB) (map[string]int, map[IconKey]int, error) {
+func (c *TagRecorder) UpdateIconInfo(db *metadb.DB) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
 	if !c.cfg.DFWebService.Enabled {
@@ -81,7 +81,7 @@ func (c *TagRecorder) UpdateIconInfo(db *mysql.DB) (map[string]int, map[IconKey]
 			domainTypeToDefaultIconID[domainType] = icon.ID
 		}
 	}
-	var domains []mysqlmodel.Domain
+	var domains []metadbmodel.Domain
 	db.Unscoped().Find(&domains)
 	for _, domain := range domains {
 		if domain.IconID != 0 {

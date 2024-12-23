@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChAlarmPolicy struct {
-	UpdaterComponent[mysqlmodel.ChAlarmPolicy, IDKey]
+	UpdaterComponent[metadbmodel.ChAlarmPolicy, IDKey]
 }
 
 func NewChAlarmPolicy() *ChAlarmPolicy {
 	updater := &ChAlarmPolicy{
-		newUpdaterComponent[mysqlmodel.ChAlarmPolicy, IDKey](
+		newUpdaterComponent[metadbmodel.ChAlarmPolicy, IDKey](
 			RESOURCE_TYPE_CH_ALARM_POLICY,
 		),
 	}
@@ -35,18 +35,18 @@ func NewChAlarmPolicy() *ChAlarmPolicy {
 	return updater
 }
 
-func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChAlarmPolicy, bool) {
+func (p *ChAlarmPolicy) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChAlarmPolicy, bool) {
 	log.Infof("generate data for %s", p.resourceTypeName, db.LogPrefixORGID)
-	var alarmPolicys []mysqlmodel.AlarmPolicy
+	var alarmPolicys []metadbmodel.AlarmPolicy
 	err := db.Unscoped().Find(&alarmPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChAlarmPolicy)
+	keyToItem := make(map[IDKey]metadbmodel.ChAlarmPolicy)
 	for _, alarmPolicy := range alarmPolicys {
-		keyToItem[IDKey{ID: alarmPolicy.ID}] = mysqlmodel.ChAlarmPolicy{
+		keyToItem[IDKey{ID: alarmPolicy.ID}] = metadbmodel.ChAlarmPolicy{
 			ID:     alarmPolicy.ID,
 			Name:   alarmPolicy.Name,
 			UserID: alarmPolicy.UserID,
@@ -56,11 +56,11 @@ func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChAl
 	return keyToItem, true
 }
 
-func (p *ChAlarmPolicy) generateKey(dbItem mysqlmodel.ChAlarmPolicy) IDKey {
+func (p *ChAlarmPolicy) generateKey(dbItem metadbmodel.ChAlarmPolicy) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChAlarmPolicy) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAlarmPolicy) (map[string]interface{}, bool) {
+func (p *ChAlarmPolicy) generateUpdateInfo(oldItem, newItem metadbmodel.ChAlarmPolicy) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

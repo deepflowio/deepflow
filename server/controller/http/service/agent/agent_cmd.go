@@ -25,8 +25,8 @@ import (
 
 	grpcapi "github.com/deepflowio/deepflow/message/agent"
 	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type RemoteExecReq struct {
@@ -300,11 +300,11 @@ func GetNamespacesWithoutLock(key string, requestID uint64) []*grpcapi.LinuxName
 
 func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
-	var agent *mysqlmodel.VTap
+	var agent *metadbmodel.VTap
 	if err := dbInfo.Where("id = ?", agentID).Find(&agent).Error; err != nil {
 		return nil, err
 	}
@@ -369,11 +369,11 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 func RunAgentCMD(timeout, orgID, agentID int, req *grpcapi.RemoteExecRequest, CMD string) (string, error) {
 	serverLog := fmt.Sprintf("The deepflow-server is unable to execute the `%s` command."+
 		" Detailed error information is as follows:\n\n", CMD)
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", fmt.Errorf("%s%s", serverLog, err.Error())
 	}
-	var agent *mysqlmodel.VTap
+	var agent *metadbmodel.VTap
 	if err := dbInfo.Where("id = ?", agentID).Find(&agent).Error; err != nil {
 		return "", fmt.Errorf("%s%s", serverLog, err.Error())
 	}

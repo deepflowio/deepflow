@@ -17,21 +17,21 @@
 package idmng
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 // 资源的MySQL orm对象
 type MySQLModel interface {
-	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.SubDomain | mysqlmodel.Host | mysqlmodel.VM |
-		mysqlmodel.VPC | mysqlmodel.Network | mysqlmodel.VRouter |
-		mysqlmodel.DHCPPort |
-		mysqlmodel.NATGateway | mysqlmodel.LB |
-		mysqlmodel.CEN |
-		mysqlmodel.PeerConnection | mysqlmodel.RDSInstance | mysqlmodel.RedisInstance | mysqlmodel.PodCluster |
-		mysqlmodel.PodNode | mysqlmodel.VMPodNodeConnection | mysqlmodel.PodNamespace | mysqlmodel.PodIngress |
-		mysqlmodel.PodService |
-		mysqlmodel.PodGroup | mysqlmodel.PodReplicaSet |
-		mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VTap | mysqlmodel.ORG
+	metadbmodel.Region | metadbmodel.AZ | metadbmodel.SubDomain | metadbmodel.Host | metadbmodel.VM |
+		metadbmodel.VPC | metadbmodel.Network | metadbmodel.VRouter |
+		metadbmodel.DHCPPort |
+		metadbmodel.NATGateway | metadbmodel.LB |
+		metadbmodel.CEN |
+		metadbmodel.PeerConnection | metadbmodel.RDSInstance | metadbmodel.RedisInstance | metadbmodel.PodCluster |
+		metadbmodel.PodNode | metadbmodel.VMPodNodeConnection | metadbmodel.PodNamespace | metadbmodel.PodIngress |
+		metadbmodel.PodService |
+		metadbmodel.PodGroup | metadbmodel.PodReplicaSet |
+		metadbmodel.Pod | metadbmodel.Process | metadbmodel.VTap | metadbmodel.ORG
 
 	GetID() int
 }

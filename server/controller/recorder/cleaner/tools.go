@@ -21,15 +21,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
-func WhereFindPtr[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]*T, error) {
+func WhereFindPtr[T any](db *metadb.DB, query interface{}, args ...interface{}) ([]*T, error) {
 	var result []*T
 	err := db.Where(query, args...).Find(&result).Error
 	return result, err
@@ -43,7 +43,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func getIDs[MT constraint.MySQLModel](db *mysql.DB, domainLcuuid string) (ids []int) {
+func getIDs[MT constraint.MySQLModel](db *metadb.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
@@ -53,7 +53,7 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB, domainLcuuid string) (ids []
 }
 
 func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
-	db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
+	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
 	if err != nil {
@@ -81,7 +81,7 @@ func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
 	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
 }
 
-func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
+func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
 	msgMetadataToDBItems := make(map[*message.Metadata][]*MT)
 	for _, item := range dbItems {
 		var msgMetadata *message.Metadata
@@ -125,13 +125,13 @@ func (t *toolData) clean() {
 	t.subDomainLcuuidToMsgMetadata = make(map[string]*message.Metadata)
 }
 
-func (t *toolData) load(db *mysql.DB) error {
+func (t *toolData) load(db *metadb.DB) error {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
 	t.clean()
 
-	var domains []*mysqlmodel.Domain
+	var domains []*metadbmodel.Domain
 	if err := db.Find(&domains).Error; err != nil {
 		log.Errorf("failed to get domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
@@ -141,7 +141,7 @@ func (t *toolData) load(db *mysql.DB) error {
 		domainLcuuidToID[domain.Lcuuid] = domain.ID
 		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(db.ORGID, message.MetadataTeamID(domain.TeamID), message.MetadataDomainID(domain.ID))
 	}
-	var subDomains []*mysqlmodel.SubDomain
+	var subDomains []*metadbmodel.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
 		log.Errorf("failed to get sub_domain: %s", err.Error(), db.LogPrefixORGID)
 		return err

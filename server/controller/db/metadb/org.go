@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package metadb
 
 import (
 	"fmt"
@@ -25,8 +25,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 const ORG_TABLE = "org"

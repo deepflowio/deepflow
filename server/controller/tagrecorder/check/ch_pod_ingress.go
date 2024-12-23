@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodIngress struct {
-	UpdaterBase[mysqlmodel.ChPodIngress, IDKey]
+	UpdaterBase[metadbmodel.ChPodIngress, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 	updater := &ChPodIngress{
-		UpdaterBase[mysqlmodel.ChPodIngress, IDKey]{
+		UpdaterBase[metadbmodel.ChPodIngress, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_INGRESS,
 		},
 		resourceTypeToIconID,
@@ -38,14 +38,14 @@ func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 	return updater
 }
 
-func (p *ChPodIngress) generateNewData() (map[IDKey]mysqlmodel.ChPodIngress, bool) {
-	var podIngresses []mysqlmodel.PodIngress
+func (p *ChPodIngress) generateNewData() (map[IDKey]metadbmodel.ChPodIngress, bool) {
+	var podIngresses []metadbmodel.PodIngress
 	err := p.db.Unscoped().Find(&podIngresses).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
-	keyToItem := make(map[IDKey]mysqlmodel.ChPodIngress)
+	keyToItem := make(map[IDKey]metadbmodel.ChPodIngress)
 	for _, podIngress := range podIngresses {
 		teamID, err := tagrecorder.GetTeamID(podIngress.Domain, podIngress.SubDomain)
 		if err != nil {
@@ -53,7 +53,7 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysqlmodel.ChPodIngress, boo
 		}
 
 		if podIngress.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysqlmodel.ChPodIngress{
+			keyToItem[IDKey{ID: podIngress.ID}] = metadbmodel.ChPodIngress{
 				ID:           podIngress.ID,
 				PodClusterID: podIngress.PodClusterID,
 				PodNsID:      podIngress.PodNamespaceID,
@@ -63,7 +63,7 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysqlmodel.ChPodIngress, boo
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: podIngress.ID}] = mysqlmodel.ChPodIngress{
+			keyToItem[IDKey{ID: podIngress.ID}] = metadbmodel.ChPodIngress{
 				ID:           podIngress.ID,
 				PodClusterID: podIngress.PodClusterID,
 				PodNsID:      podIngress.PodNamespaceID,
@@ -77,11 +77,11 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysqlmodel.ChPodIngress, boo
 	return keyToItem, true
 }
 
-func (p *ChPodIngress) generateKey(dbItem mysqlmodel.ChPodIngress) IDKey {
+func (p *ChPodIngress) generateKey(dbItem metadbmodel.ChPodIngress) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPodIngress) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodIngress) (map[string]interface{}, bool) {
+func (p *ChPodIngress) generateUpdateInfo(oldItem, newItem metadbmodel.ChPodIngress) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

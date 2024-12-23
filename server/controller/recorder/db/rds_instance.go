@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type RDSInstance struct {
-	OperatorBase[*mysqlmodel.RDSInstance, mysqlmodel.RDSInstance]
+	OperatorBase[*metadbmodel.RDSInstance, metadbmodel.RDSInstance]
 }
 
 func NewRDSInstance() *RDSInstance {
 	operater := &RDSInstance{
-		newOperatorBase[*mysqlmodel.RDSInstance](
+		newOperatorBase[*metadbmodel.RDSInstance](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			true,
 			true,
