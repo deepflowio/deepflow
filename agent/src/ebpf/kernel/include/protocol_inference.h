@@ -2390,6 +2390,93 @@ static __inline enum message_type infer_brpc_message(const char *buf,
 	return MSG_REQUEST;
 }
 
+// check first 5 fields in tars request/response message
+const int TARS_MAX_CHECK_FIELDS_NUM = 5;
+
+const int TARS_FIELD_TYPE_INT1 = 0;
+const int TARS_FIELD_TYPE_INT2 = 1;
+const int TARS_FIELD_TYPE_INT4 = 2;
+const int TARS_FIELD_TYPE_INT8 = 3;
+const int TARS_FIELD_TYPE_STRING1 = 6;
+const int TARS_FIELD_TYPE_STRING4 = 7;
+const int TARS_FIELD_TYPE_ZERO = 12;
+
+static __inline enum message_type infer_tars_message(const char *infer_buf,
+						     size_t count,
+						     struct conn_info_s
+						     *conn_info)
+{
+	if (count < 4)
+		return MSG_UNKNOWN;
+
+	if (!protocol_port_check_2(PROTO_TARS, conn_info))
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_TARS)
+			return MSG_UNKNOWN;
+	}
+
+	char buf[4];
+
+	if (bpf_probe_read_kernel(buf, 4, infer_buf) != 0) {
+		return MSG_UNKNOWN;
+	}
+	unsigned int data_size = __bpf_ntohl(*(__u32 *) & buf[0]);
+	if (data_size != count) {
+		return MSG_UNKNOWN;
+	}
+
+	bool has_version = false;
+	enum message_type msg_type = MSG_UNKNOWN;
+	__u32 offset = 4;
+
+    // refer to https://doc.tarsyun.com/#/base/tars-protocol.md for message format
+#pragma unroll
+	for (int i = 0; i < TARS_MAX_CHECK_FIELDS_NUM; i++) {
+		if (offset + 1 >= count || bpf_probe_read_kernel(buf, 2, infer_buf + offset) != 0) {
+			return MSG_UNKNOWN;
+		}
+		__u8 field_type = buf[0] & 0x0F;
+		__u8 field_tag = buf[0] >> 4;
+		if (field_tag == 5) {
+			switch (field_type) {
+			case TARS_FIELD_TYPE_STRING1:
+			case TARS_FIELD_TYPE_STRING4:
+				msg_type = MSG_REQUEST;
+				break;
+			case TARS_FIELD_TYPE_INT4:
+			case TARS_FIELD_TYPE_ZERO:
+				msg_type = MSG_RESPONSE;
+				break;
+			default:
+				return MSG_UNKNOWN;
+			}
+			if (has_version) {
+				return msg_type;
+			}
+		} else if (field_tag == 1) {
+			if (field_type != TARS_FIELD_TYPE_INT1 || (buf[1] != 1 && buf[1] != 3)) {
+				return MSG_UNKNOWN;
+			}
+			has_version = true;
+			offset += 2;
+		} else if (field_type == TARS_FIELD_TYPE_ZERO) {
+			offset++;
+		} else if (field_type >= TARS_FIELD_TYPE_INT1 && field_type <= TARS_FIELD_TYPE_INT8) {
+			offset += 1 + (1 << field_type);
+		} else {
+			return MSG_UNKNOWN;
+		}
+	}
+
+	if (!has_version) {
+		return MSG_UNKNOWN;
+	}
+
+	return msg_type;
+}
+
 static __inline bool check_zmtp_mechanism(const char *buf)
 {
 	// check mechanism fields
@@ -3562,6 +3649,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_BRPC;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_TARS && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_tars_message(infer_buf, count,
+					  conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_TARS;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_SOME_IP && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3866,6 +3961,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				if (inferred_message.type == MSG_PRESTORE)
 					return inferred_message;
 				inferred_message.protocol = PROTO_KAFKA;
+				return inferred_message;
+			}
+			break;
+		case PROTO_TARS:
+			if ((inferred_message.type =
+			     infer_tars_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_TARS;
 				return inferred_message;
 			}
 			break;
