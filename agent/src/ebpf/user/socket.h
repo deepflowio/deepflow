@@ -251,8 +251,12 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "FastCGI";
 	case PROTO_BRPC:
 		return "bRPC";
+	case PROTO_TARS:
+		return "Tars";
 	case PROTO_MONGO:
 		return "MongoDB";
+	case PROTO_MEMCACHED:
+		return "Memcached";
 	case PROTO_TLS:
 		return "TLS";
 	case PROTO_DPDK_PKT:

@@ -85,7 +85,7 @@ fn flow_info(sd: *mut SK_BPF_DATA) -> String {
 
 fn date_time(ts: u64) -> String {
     // Creates a new SystemTime from the specified number of whole seconds
-    let d = UNIX_EPOCH + Duration::from_micros(ts);
+    let d = UNIX_EPOCH + Duration::from_nanos(ts);
     // Create DateTime from SystemTime
     let time = DateTime::<Utc>::from(d);
     let china_timezone = FixedOffset::east(8 * 3600);
@@ -235,6 +235,8 @@ extern "C" fn socket_trace_callback(_: *mut c_void, sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("FASTCGI");
         } else if sk_proto_safe(sd) == SOCK_DATA_BRPC {
             proto_tag.push_str("BRPC");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TARS {
+            proto_tag.push_str("TARS");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOME_IP {
             proto_tag.push_str("SomeIP");
         } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
@@ -402,6 +404,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
         enable_ebpf_protocol(SOCK_DATA_BRPC as c_int);
+        enable_ebpf_protocol(SOCK_DATA_TARS as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOME_IP as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
@@ -499,6 +502,13 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_BRPC as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_TARS as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
                 .as_c_str()
