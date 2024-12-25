@@ -89,8 +89,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
-	if err := metadb.GetDBs().Init(cfg.MySqlCfg); err != nil {
-		log.Errorf("init mysql failed: %s", err.Error())
+	if err := metadb.GetDBs().Init(cfg.MetadbCfg); err != nil {
+		log.Errorf("init metadb failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}

@@ -188,23 +188,23 @@ func (d *deleter) prepareData() error {
 func (d *deleter) delete() error {
 	var e error
 	if err := d.deleteExpiredMetricAPPLabelLayout(); err != nil {
-		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
+		log.Errorf("metadb delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	if err := d.deleteExpiredMetricName(); err != nil {
-		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
+		log.Errorf("metadb delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	if err := d.deleteExpiredLabel(); err != nil {
-		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
+		log.Errorf("metadb delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	if err := d.deleteExpiredLabelName(); err != nil {
-		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
+		log.Errorf("metadb delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	if err := d.deleteExpiredLabelValue(); err != nil {
-		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
+		log.Errorf("metadb delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	return e
@@ -297,7 +297,7 @@ func DeleteBatch[MT any](resourceType string, db *metadb.DB, items []MT) error {
 		}
 		toDel := items[start:end]
 		if err := db.Delete(&toDel).Error; err != nil {
-			log.Errorf("mysql delete %s failed: %v", resourceType, err, db.LogPrefixORGID)
+			log.Errorf("metadb delete %s failed: %v", resourceType, err, db.LogPrefixORGID)
 			return err
 		}
 		log.Infof("clear %s data count: %d", resourceType, len(toDel), db.LogPrefixORGID)

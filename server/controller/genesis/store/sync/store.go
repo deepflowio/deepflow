@@ -126,7 +126,7 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, data common.GenesisSyncDa
 
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 			return
 		}
 		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
@@ -237,7 +237,7 @@ func (s *SyncStorage) refreshDatabase() {
 		for _, orgID := range orgIDs {
 			db, err := metadb.GetDB(orgID)
 			if err != nil {
-				log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+				log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 				continue
 			}
 			vTaps := []metadbmodel.VTap{}

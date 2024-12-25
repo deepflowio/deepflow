@@ -145,7 +145,7 @@ func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
 		}
 		dbInfo, err := GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org id (%d) mysql session failed", orgID)
+			log.Errorf("get org id (%d) metadb session failed", orgID)
 			continue
 		}
 

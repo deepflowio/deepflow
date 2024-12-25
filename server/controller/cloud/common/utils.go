@@ -232,7 +232,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
 	}
 	vtaps := []metadbmodel.VTap{}

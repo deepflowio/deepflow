@@ -41,10 +41,10 @@ func NewEdition(schemeDir string, dbVersionTable string, dbVersionExpected strin
 
 type DBConfig struct {
 	DB     *gorm.DB
-	Config config.MySqlConfig
+	Config config.Config
 }
 
-func NewDBConfig(db *gorm.DB, cfg config.MySqlConfig) *DBConfig {
+func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
 	return &DBConfig{
 		DB:     db,
 		Config: cfg,
@@ -59,7 +59,7 @@ func (dc *DBConfig) SetDB(db *gorm.DB) {
 	dc.DB = db
 }
 
-func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
+func (dc *DBConfig) SetConfig(c config.Config) {
 	dc.Config = c
 }
 
@@ -67,7 +67,7 @@ func LogDBName(databaseName string, format string, a ...any) string {
 	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
 }
 
-func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
+func GetSessionWithoutName(cfg config.Config) (*gorm.DB, error) {
 	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
 	return common.InitSession(cfg, connector)
 }
 
-func GetSessionWithName(cfg config.MySqlConfig) (*gorm.DB, error) {
+func GetSessionWithName(cfg config.Config) (*gorm.DB, error) {
 	// set multiStatements=true in dsn only when migrating MySQL
 	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
 	if err != nil {

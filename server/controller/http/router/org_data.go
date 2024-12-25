@@ -31,14 +31,14 @@ import (
 )
 
 type ORGData struct {
-	mysqlCfg metadbcfg.MySqlConfig
-	cfg      *config.ControllerConfig
+	metadbCfg metadbcfg.Config
+	cfg       *config.ControllerConfig
 }
 
 func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 	return &ORGData{
-		mysqlCfg: cfg.MySqlCfg,
-		cfg:      cfg,
+		metadbCfg: cfg.MetadbCfg,
+		cfg:       cfg,
 	}
 }
 
@@ -59,7 +59,7 @@ func (d *ORGData) Create(c *gin.Context) {
 		return
 	}
 
-	resp, err := service.CreateORGData(body, d.mysqlCfg)
+	resp, err := service.CreateORGData(body, d.metadbCfg)
 	common.JsonResponse(c, map[string]interface{}{"DATABASE": resp}, err)
 }
 
@@ -69,7 +69,7 @@ func (d *ORGData) Delete(c *gin.Context) {
 		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 		return
 	}
-	err = service.DeleteORGData(orgID, d.mysqlCfg)
+	err = service.DeleteORGData(orgID, d.metadbCfg)
 	common.JsonResponse(c, nil, err)
 }
 

@@ -22,7 +22,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
 
-func UpgradeDatabase(cfg config.MySqlConfig) error {
+func UpgradeDatabase(cfg config.Config) error {
 	db, err := common.GetSessionWithName(cfg)
 	if err != nil {
 		return err
@@ -32,7 +32,7 @@ func UpgradeDatabase(cfg config.MySqlConfig) error {
 	return upgradeCE(dc, cfg)
 }
 
-func upgradeCE(dc *common.DBConfig, cfg config.MySqlConfig) error {
+func upgradeCE(dc *common.DBConfig, cfg config.Config) error {
 	versionTableExists, err := common.CheckCEDBVersionTableExists(dc)
 	if err != nil {
 		return err

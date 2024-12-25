@@ -108,7 +108,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return err
 	}
 
@@ -136,7 +136,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 		domainLcuuid = domain.Lcuuid
 		subDomainLcuuid = subDomains[0].Lcuuid
 	default:
-		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in mysql table sub_domain", clusterID))
+		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in metadb table sub_domain", clusterID))
 	}
 
 	var controller metadbmodel.Controller

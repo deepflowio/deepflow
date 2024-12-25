@@ -16,7 +16,41 @@
 
 package config
 
-type MySqlConfig struct {
+type Config struct {
+	Database               string `default:"deepflow" yaml:"database"`
+	Host                   string `default:"mysql" yaml:"host"`
+	Port                   uint32 `default:"30130" yaml:"port"`
+	ProxyHost              string `default:"" yaml:"proxy-host"`
+	ProxyPort              uint32 `default:"0" yaml:"proxy-port"`
+	UserName               string `default:"root" yaml:"user-name"`
+	UserPassword           string `default:"deepflow" yaml:"user-password"`
+	TimeOut                uint32 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
+	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
+	ResultSetMax           uint32 `default:"100000" yaml:"result_set_max"`
+	MaxOpenConns           uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns           uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime        uint16 `default:"60" yaml:"conn_max_life_time"`
+}
+
+func (c *Config) InitFromMySQL(mysqlCfg MySQLConfig) {
+	c.Database = mysqlCfg.Database
+	c.Host = mysqlCfg.Host
+	c.Port = mysqlCfg.Port
+	c.ProxyHost = mysqlCfg.ProxyHost
+	c.ProxyPort = mysqlCfg.ProxyPort
+	c.UserName = mysqlCfg.UserName
+	c.UserPassword = mysqlCfg.UserPassword
+	c.TimeOut = mysqlCfg.TimeOut
+	c.DropDatabaseEnabled = mysqlCfg.DropDatabaseEnabled
+	c.AutoIncrementIncrement = mysqlCfg.AutoIncrementIncrement
+	c.ResultSetMax = mysqlCfg.ResultSetMax
+	c.MaxOpenConns = mysqlCfg.MaxOpenConns
+	c.MaxIdleConns = mysqlCfg.MaxIdleConns
+	c.ConnMaxLifeTime = mysqlCfg.ConnMaxLifeTime
+}
+
+type MySQLConfig struct {
 	Database               string `default:"deepflow" yaml:"database"`
 	Host                   string `default:"mysql" yaml:"host"`
 	Port                   uint32 `default:"30130" yaml:"port"`

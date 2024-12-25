@@ -31,7 +31,7 @@ func ORGIDToDatabaseName(id int) string {
 	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + NON_DEFAULT_ORG_DATABASE_SUFFIX
 }
 
-func ReplaceConfigDatabaseName(cfg config.MySqlConfig, orgID int) config.MySqlConfig {
+func ReplaceConfigDatabaseName(cfg config.Config, orgID int) config.Config {
 	copiedCfg := cfg
 	copiedCfg.Database = ORGIDToDatabaseName(orgID)
 	return copiedCfg

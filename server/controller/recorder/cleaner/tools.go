@@ -57,7 +57,7 @@ func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
 	if err != nil {
-		log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+		log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		return
 	}
 	if len(items) == 0 {
@@ -72,7 +72,7 @@ func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
 			end = total
 		}
 		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
-			log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+			log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		} else {
 			publishTagrecorder(db, items, resourceType, toolData)
 		}

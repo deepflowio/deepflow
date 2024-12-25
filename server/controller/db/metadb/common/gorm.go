@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-func GetSession(cfg config.MySqlConfig) (*gorm.DB, error) {
+func GetSession(cfg config.Config) (*gorm.DB, error) {
 	connector, err := GetConnector(cfg, true, cfg.TimeOut, false)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func GetSession(cfg config.MySqlConfig) (*gorm.DB, error) {
 	return InitSession(cfg, connector)
 }
 
-func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
+func GetConnector(cfg config.Config, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
 	var database string
 	if useDatabase {
 		database = cfg.Database
@@ -74,7 +74,7 @@ func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, mult
 	return connector, nil
 }
 
-func InitSession(cfg config.MySqlConfig, connector driver.Connector) (*gorm.DB, error) {
+func InitSession(cfg config.Config, connector driver.Connector) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		Conn:                      sql.OpenDB(connector),
 		DefaultStringSize:         256,   // string 类型字段的默认长度

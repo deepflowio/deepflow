@@ -182,7 +182,7 @@ func (m *Manager) run(ctx context.Context) {
 	for _, orgID := range orgIDs {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 		// 获取所在控制器的IP

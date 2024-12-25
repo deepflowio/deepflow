@@ -140,7 +140,7 @@ func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Dur
 	for _, orgID := range orgIDs {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 		db.Where("node_ip = ?", nodeIP).Find(&items)
@@ -176,7 +176,7 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 	for orgID, dataMaps := range g.dataStore {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 

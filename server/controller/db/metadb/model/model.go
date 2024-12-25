@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-var log = logger.MustGetLogger("db.mysql")
+var log = logger.MustGetLogger("db.metadb")
 
 type Business struct {
 	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`

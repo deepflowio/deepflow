@@ -68,7 +68,7 @@ func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
 func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 

@@ -23,6 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
 )
 
-func CheckDBVersion(db *gorm.DB, cfg config.MySqlConfig) error {
+func CheckDBVersion(db *gorm.DB, cfg config.Config) error {
 	return common.CheckCEDBVersion(common.NewDBConfig(db, cfg))
 }
