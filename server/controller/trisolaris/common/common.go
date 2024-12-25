@@ -118,8 +118,6 @@ const (
 )
 
 const (
-	CONFIG_KEY_MAX_MEMORY                  = "global.limits.max_memory"
-	CONFIG_KEY_MAX_ESCAPE_DURATION         = "global.communication.max_escape_duration"
 	CONFIG_KEY_INGESTER_IP                 = "global.communication.ingester_ip"
 	CONFIG_KEY_INGESTER_PORT               = "global.communication.ingester_port"
 	CONFIG_KEY_PROXY_CONTROLLER_IP         = "global.communication.proxy_controller_ip"
