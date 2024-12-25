@@ -36,7 +36,7 @@ var log = logging.MustGetLogger("db.metadb.migrator")
 // if configured database exists, and db_version table exists, check whether db_version is the latest version
 //
 //	and upgrade based the result.
-func Migrate(cfg config.MySqlConfig) error {
+func Migrate(cfg config.Config) error {
 	if err := migrateDefaultDatabase(cfg); err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func Migrate(cfg config.MySqlConfig) error {
 	return nil
 }
 
-func migrateDefaultDatabase(cfg config.MySqlConfig) error {
+func migrateDefaultDatabase(cfg config.Config) error {
 	copiedCfg := cfg
 	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
@@ -66,7 +66,7 @@ func migrateDefaultDatabase(cfg config.MySqlConfig) error {
 	return upgradeDatabase(copiedCfg, databaseExisted)
 }
 
-func migrateNonDefaultDatabase(cfg config.MySqlConfig, orgID int) error {
+func migrateNonDefaultDatabase(cfg config.Config, orgID int) error {
 	copiedCfg := metadbcommon.ReplaceConfigDatabaseName(cfg, orgID)
 	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
@@ -76,14 +76,14 @@ func migrateNonDefaultDatabase(cfg config.MySqlConfig, orgID int) error {
 	return upgradeDatabase(copiedCfg, databaseExisted)
 }
 
-func upgradeDatabase(cfg config.MySqlConfig, run bool) error {
+func upgradeDatabase(cfg config.Config, run bool) error {
 	if run {
 		return edition.UpgradeDatabase(cfg)
 	}
 	return nil
 }
 
-func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
+func CreateDatabase(cfg config.Config) (databaseExisted bool, err error) {
 	db, err := common.GetSessionWithoutName(cfg)
 	if err != nil {
 		return
@@ -105,7 +105,7 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 	return
 }
 
-func DropDatabase(cfg config.MySqlConfig) error {
+func DropDatabase(cfg config.Config) error {
 	db, err := common.GetSessionWithoutName(cfg)
 	if err != nil {
 		return err

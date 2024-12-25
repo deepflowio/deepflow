@@ -46,12 +46,12 @@ import (
 
 // CreateORGData create database and backs up the controller and analyzer tables.
 // Returns the database name and error.
-func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg metadbcfg.MySqlConfig) (string, error) {
+func CreateORGData(dataCreate model.ORGDataCreate, metadbCfg metadbcfg.Config) (string, error) {
 	log.Infof("create org data", logger.NewORGPrefix(dataCreate.ORGID))
 	metadb.CheckORGNumberAndLog()
 
-	defaultDatabase := mysqlCfg.Database
-	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, dataCreate.ORGID)
+	defaultDatabase := metadbCfg.Database
+	cfg := common.ReplaceConfigDatabaseName(metadbCfg, dataCreate.ORGID)
 	existed, err := migrator.CreateDatabase(cfg) // TODO use orgID to create db
 	if err != nil {
 		return cfg.Database, err
@@ -82,9 +82,9 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg metadbcfg.MySqlConfi
 	return cfg.Database, nil
 }
 
-func DeleteORGData(orgID int, mysqlCfg metadbcfg.MySqlConfig) (err error) {
+func DeleteORGData(orgID int, metadbCfg metadbcfg.Config) (err error) {
 	log.Infof("delete org data", logger.NewORGPrefix(orgID))
-	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
+	cfg := common.ReplaceConfigDatabaseName(metadbCfg, orgID)
 	if err = migrator.DropDatabase(cfg); err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ import (
 	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	http "github.com/deepflowio/deepflow/server/controller/http/config"
@@ -84,7 +84,8 @@ type ControllerConfig struct {
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`
 
-	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
+	MetadbCfg     metadb.Config
+	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
@@ -144,6 +145,8 @@ func (c *Config) Load(path string) {
 	}
 	// from ingester exporter setting
 	c.ControllerConfig.TrisolarisCfg.SetExportersEnabled(shared_common.ExportersEnabled(path))
+
+	c.ControllerConfig.MetadbCfg.InitFromMySQL(c.ControllerConfig.MySqlCfg)
 }
 
 func DefaultConfig() *Config {

@@ -28,7 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-var log = logger.MustGetLogger("db.mysql")
+var log = logger.MustGetLogger("db.metadb")
 
 var (
 	DefaultDB *DB
@@ -41,11 +41,11 @@ func GetDB(orgID int) (*DB, error) {
 	return GetDBs().NewDBIfNotExists(orgID)
 }
 
-func GetConfig() config.MySqlConfig {
+func GetConfig() config.Config {
 	return GetDBs().GetConfig()
 }
 
-func InitDefaultDB(cfg config.MySqlConfig) error {
+func InitDefaultDB(cfg config.Config) error {
 	var err error
 	DefaultDB, err = NewDB(cfg, common.DEFAULT_ORG_ID)
 	if err != nil {
@@ -61,10 +61,10 @@ type DB struct {
 	LogPrefixORGID logger.Prefix
 	LogPrefixName  logger.Prefix
 
-	Config config.MySqlConfig
+	Config config.Config
 }
 
-func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
+func NewDB(cfg config.Config, orgID int) (*DB, error) {
 	var db *gorm.DB
 	var err error
 	copiedCfg := cfg
@@ -103,7 +103,7 @@ func (d *DB) GetName() string {
 }
 
 type DBs struct {
-	cfg config.MySqlConfig
+	cfg config.Config
 
 	mux       sync.Mutex
 	orgIDToDB map[int]*DB
@@ -118,7 +118,7 @@ func GetDBs() *DBs {
 	return dbs
 }
 
-func (c *DBs) Init(cfg config.MySqlConfig) error {
+func (c *DBs) Init(cfg config.Config) error {
 	var err error
 	c.cfg = cfg
 	DefaultDB, err = c.NewDBIfNotExists(common.DEFAULT_ORG_ID)
@@ -137,7 +137,7 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	return nil
 }
 
-func (c *DBs) GetConfig() config.MySqlConfig {
+func (c *DBs) GetConfig() config.Config {
 	return c.cfg
 }
 
