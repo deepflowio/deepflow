@@ -42,6 +42,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: [controller] add vm_count & pod_count in domain-api [#8770](https://github.com/deepflowio/deepflow/pull/8770) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: volcengine support vke [#8766](https://github.com/deepflowio/deepflow/pull/8766) by [askyrie](https://github.com/askyrie)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
 * feat: deprecated ipvlan [#8725](https://github.com/deepflowio/deepflow/pull/8725) by [askyrie](https://github.com/askyrie)
