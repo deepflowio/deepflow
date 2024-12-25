@@ -328,6 +328,8 @@ type Domain struct {
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`
 	RegionCount    int                    `json:"REGION_COUNT"`
+	VMCount        int                    `json:"VM_COUNT"`
+	PodCount       int                    `json:"POD_COUNT"`
 	PodClusters    []string               `json:"POD_CLUSTERS"`
 	CreatedAt      string                 `json:"CREATED_AT"`
 	SyncedAt       string                 `json:"SYNCED_AT"`
