@@ -60,6 +60,11 @@ var DOMAIN_PASSWORD_KEYS = map[string]bool{
 	"app_secret":          false,
 }
 
+type ResourceCount struct {
+	Domain string
+	Count  int
+}
+
 func getGrpcServerAndPort(db *metadb.DB, controllerIP string, cfg *config.ControllerConfig) (string, string) {
 	// get local controller ip
 	localControllerIP := os.Getenv(common.NODE_IP_KEY)
@@ -95,6 +100,22 @@ func getGrpcServerAndPort(db *metadb.DB, controllerIP string, cfg *config.Contro
 	}
 }
 
+func UnscopedSelectGroupByFind[T any, R any](db *metadb.DB, columns []string, groupBy string) ([]R, error) {
+	var results []R
+
+	// 构建查询
+	query := db.Model(new(T)).Select(columns).Unscoped()
+
+	// 如果需要分组
+	if groupBy != "" {
+		query = query.Group(groupBy)
+	}
+
+	// 执行查询
+	err := query.Find(&results).Error
+	return results, err
+}
+
 func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
 	var domains []metadbmodel.Domain
@@ -105,6 +126,8 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 	var domainToAZLcuuids map[string][]string
 	var domainToRegionLcuuidsToAZLcuuids map[string](map[string][]string)
 	var controllerIPToName map[string]string
+	var domainToVMCount map[string]int
+	var domainToPodCount map[string]int
 
 	db := orgDB.DB
 	if fLcuuid, ok := filter["lcuuid"]; ok {
@@ -165,6 +188,22 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 		)
 	}
 
+	domainToVMCount = make(map[string]int)
+	vmCounts, err := UnscopedSelectGroupByFind[metadbmodel.VM, ResourceCount](
+		orgDB, []string{"domain", "count(id) as count"}, "domain",
+	)
+	for _, item := range vmCounts {
+		domainToVMCount[item.Domain] = item.Count
+	}
+
+	domainToPodCount = make(map[string]int)
+	podCounts, err := UnscopedSelectGroupByFind[metadbmodel.Pod, ResourceCount](
+		orgDB, []string{"domain", "count(id) as count"}, "domain",
+	)
+	for _, item := range podCounts {
+		domainToPodCount[item.Domain] = item.Count
+	}
+
 	for _, domain := range domains {
 		syncedAt := ""
 		if domain.SyncedAt != nil {
@@ -196,6 +235,12 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 		}
 		if _, ok := controllerIPToName[domain.ControllerIP]; ok {
 			domainResp.ControllerName = controllerIPToName[domain.ControllerIP]
+		}
+		if _, ok := domainToVMCount[domain.Lcuuid]; ok {
+			domainResp.VMCount = domainToVMCount[domain.Lcuuid]
+		}
+		if _, ok := domainToPodCount[domain.Lcuuid]; ok {
+			domainResp.PodCount = domainToPodCount[domain.Lcuuid]
 		}
 
 		domainResp.Config = make(map[string]interface{})
