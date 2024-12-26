@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: trace tree writes error data [#8775](https://github.com/deepflowio/deepflow/pull/8775) by [lzf575](https://github.com/lzf575)
 * fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: agent - eBPF Correct the maximum data push delay [#8704](https://github.com/deepflowio/deepflow/pull/8704) by [yinjiping](https://github.com/yinjiping)
 * fix: update sub domain team_id [#8674](https://github.com/deepflowio/deepflow/pull/8674) by [xiaochaoren1](https://github.com/xiaochaoren1)

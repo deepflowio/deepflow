@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: not found watcher agent config [#8771](https://github.com/deepflowio/deepflow/pull/8771) by [askyrie](https://github.com/askyrie)
 * fix: Change oracle parse to accept multiple logs [#8756](https://github.com/deepflowio/deepflow/pull/8756) by [rvql](https://github.com/rvql)
 * fix: agent - eBPF Fix process event type size [#8752](https://github.com/deepflowio/deepflow/pull/8752) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Event Type Value [#8745](https://github.com/deepflowio/deepflow/pull/8745) by [yinjiping](https://github.com/yinjiping)
