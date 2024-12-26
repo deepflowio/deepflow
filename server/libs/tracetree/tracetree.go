@@ -101,7 +101,7 @@ func (t *TraceTree) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		t.SearchIndex,
 		t.TraceId,
-		utils.String(t.encodedTreeNodes),
+		string(t.encodedTreeNodes),
 	)
 }
 
