@@ -1006,6 +1006,7 @@ fn component_on_config_change(
             if links == components.tap_interfaces {
                 return;
             }
+            info!("Regular matching interface changes, dispatcher restart...");
 
             // By comparing current_interfaces and components.tap_interfaces, we can determine which
             // dispatcher_components should be closed and which dispatcher_components should be built
