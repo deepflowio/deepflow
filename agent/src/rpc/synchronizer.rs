@@ -848,7 +848,11 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled || exception_handler.has(Exception::SystemLoadCircuitBreaker) {
+        if !runtime_config.enabled {
+            info!("Set the status to disabled when agent set disabled.");
+            *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
+        } else if exception_handler.has(Exception::SystemLoadCircuitBreaker) {
+            info!("Set the status to disabled when the system load exceeds the threshold.");
             *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {

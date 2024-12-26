@@ -1997,7 +1997,14 @@ impl ConfigHandler {
             info!("tap_mode set to {:?}", new_config.tap_mode);
             candidate_config.tap_mode = new_config.tap_mode;
             if let Some(c) = components.as_mut() {
-                c.clear_dispatcher_components();
+                if yaml_config.local_dispatcher_count > 1 {
+                    info!("tap_mode changes and fanout is enabled, deepflow-agent restart...");
+                    crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                    return vec![];
+                } else {
+                    info!("tap_mode changes, dispatcher restart...");
+                    c.clear_dispatcher_components();
+                }
             }
         }
 
@@ -2246,8 +2253,11 @@ impl ConfigHandler {
             }
 
             if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
-                info!("enabled set to {}", new_config.dispatcher.enabled);
                 if new_config.dispatcher.enabled {
+                    info!(
+                        "enabled set to {}, dispatcher start...",
+                        new_config.dispatcher.enabled
+                    );
                     fn start_dispatcher(handler: &ConfigHandler, components: &mut AgentComponents) {
                         match handler.candidate_config.tap_mode {
                             TapMode::Analyzer => {
@@ -2278,6 +2288,10 @@ impl ConfigHandler {
                     }
                     callbacks.push(start_dispatcher);
                 } else {
+                    info!(
+                        "enabled set to {}, dispatcher stop...",
+                        new_config.dispatcher.enabled
+                    );
                     fn stop_dispatcher(_: &ConfigHandler, components: &mut AgentComponents) {
                         for d in components.dispatcher_components.iter_mut() {
                             d.stop();
@@ -3019,6 +3033,7 @@ impl ConfigHandler {
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
+                info!("Configuration changes and dispatcher restart...");
                 for d in components.dispatcher_components.iter_mut() {
                     d.stop();
                 }
