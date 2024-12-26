@@ -979,7 +979,7 @@ impl FlowMap {
     fn generate_flow_id(&mut self, timestamp: Timestamp, thread_id: u32) -> u64 {
         self.total_flow += 1;
         (timestamp.as_nanos() as u64 >> 30 & TIMER_FLOW_ID_MASK) << 32
-            | thread_id as u64 & THREAD_FLOW_ID_MASK << 24
+            | (thread_id as u64 & THREAD_FLOW_ID_MASK) << 24
             | self.total_flow as u64 & COUNTER_FLOW_ID_MASK
     }
 
