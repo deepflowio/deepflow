@@ -429,16 +429,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		from := sv.From.ToString()
-		if strings.Contains(from, "flow_tag.") {
-			buf.WriteString(" WHERE ")
-		} else if strings.Contains(from, "flow_metrics.") && !strings.HasSuffix(from, ".1m`") && !strings.HasSuffix(from, ".1s`") {
-			buf.WriteString(" WHERE ")
-		} else if !sv.NoPreWhere {
-			buf.WriteString(" PREWHERE ")
-		} else {
-			buf.WriteString(" WHERE ")
-		}
+		buf.WriteString(" WHERE ")
 		sv.Filters.WriteTo(buf)
 	}
 	if !sv.Groups.IsNull() {
