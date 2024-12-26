@@ -372,8 +372,8 @@ impl FirstPath {
         return false;
     }
 
-    fn memory_check(&self, size: u64) -> bool {
-        if self.memory_check_disable {
+    fn memory_check(&self, size: u64, disabled: bool) -> bool {
+        if self.memory_check_disable || disabled {
             return true;
         }
 
@@ -455,7 +455,7 @@ impl FirstPath {
                 * dst_ipv6_count
                 * acl.src_port_ranges.len().max(1)
                 * acl.dst_port_ranges.len().max(1);
-            if !self.memory_check(need_memory as u64) {
+            if !self.memory_check(need_memory as u64, false) {
                 warn!(
                     "Memory will exceed limit {} bytes, policy {} probably need memory {} bytes.",
                     self.memory_limit.load(Ordering::Relaxed),
@@ -571,7 +571,7 @@ impl FirstPath {
             let item_count = vector_4.count + vector_6.count;
             info!("Policy memory level {}, policy count {}, item count {} + {} = {}, vector size {}, probably need memory {}B bytes.",
                 self.current_level, policy_count, vector_4.count, vector_6.count, item_count, vector_size, need_memory + acl_memory);
-            ok = self.memory_check(need_memory);
+            ok = self.memory_check(need_memory, acls.is_empty());
             if !ok {
                 if self.current_level < Self::LEVEL_MAX && item_count > policy_count {
                     self.current_level += 1;

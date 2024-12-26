@@ -2681,6 +2681,7 @@ impl ConfigHandler {
             restart_dispatcher = !cfg!(target_os = "windows");
         }
 
+        let packet_fanout_count = config.inputs.cbpf.af_packet.tunning.packet_fanout_count;
         let common = &mut config.inputs.cbpf.common;
         let new_common = &mut new_config.user_config.inputs.cbpf.common;
         if common.capture_mode != new_common.capture_mode {
@@ -2691,7 +2692,14 @@ impl ConfigHandler {
             common.capture_mode = new_common.capture_mode;
             candidate_config.capture_mode = new_common.capture_mode;
             if let Some(c) = components.as_mut() {
-                c.clear_dispatcher_components();
+                if packet_fanout_count > 1 {
+                    info!("capture_mode changes and fanout is enabled, deepflow-agent restart...");
+                    crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                    return vec![];
+                } else {
+                    info!("capture_mode changes, dispatcher restart...");
+                    c.clear_dispatcher_components();
+                }
             }
             restart_agent = !first_run;
         }
@@ -3541,16 +3549,20 @@ impl ConfigHandler {
             common.kubernetes_api_enabled = new_common.kubernetes_api_enabled;
         }
         if common.enabled != new_common.enabled {
-            info!(
-                "Update global.common.enabled from {:?} to {:?}.",
-                common.enabled, new_common.enabled
-            );
-            common.enabled = new_common.enabled;
             callbacks.push(if new_common.enabled {
+                info!(
+                    "Update global.common.enabled from {:?} to {:?}, dispatcher start... ",
+                    common.enabled, new_common.enabled
+                );
                 Self::start_dispatcher
             } else {
+                info!(
+                    "Update global.common.enabled from {:?} to {:?}, dispatcher stop...",
+                    common.enabled, new_common.enabled
+                );
                 Self::stop_dispatcher
             });
+            common.enabled = new_common.enabled;
         }
         if common.region_id != new_common.region_id {
             info!(
