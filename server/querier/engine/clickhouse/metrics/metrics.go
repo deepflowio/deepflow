@@ -112,7 +112,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
+func GetAggMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == COUNT_METRICS_NAME {
 		return &Metrics{
@@ -125,7 +125,7 @@ func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			Table:       table,
 		}, true
 	}
-	return GetMetrics(field, db, table, orgID)
+	return GetMetrics(field, db, table, orgID, dynamicTag)
 }
 
 func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]*Metrics, db, table, orgID string) error {
@@ -221,7 +221,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 	return nil
 }
 
-func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
+func GetMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
 	// flow_tag database has no metrics
@@ -296,12 +296,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			}
 		}
 		// Dynamic tag metrics
-		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, context.Background(), nil)
-		if err != nil {
-			log.Error("Failed to get tag type dynamic metrics")
-			return nil, false
-		}
-		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+		GetTagTypeMetrics(dynamicTag, newAllMetrics, db, table, orgID)
 		metric, ok := newAllMetrics[field]
 		return metric, ok
 	}
