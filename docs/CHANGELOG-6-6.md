@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: not found watcher agent config [#8778](https://github.com/deepflowio/deepflow/pull/8778) by [askyrie](https://github.com/askyrie)
+* fix: trace tree writes error data [#8776](https://github.com/deepflowio/deepflow/pull/8776) by [lzf575](https://github.com/lzf575)
 * fix: tracemap error [#8755](https://github.com/deepflowio/deepflow/pull/8755) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Fix process event type size [#8753](https://github.com/deepflowio/deepflow/pull/8753) by [yinjiping](https://github.com/yinjiping)
 * fix: querier group by icon_id error [#8749](https://github.com/deepflowio/deepflow/pull/8749) by [xiaochaoren1](https://github.com/xiaochaoren1)
