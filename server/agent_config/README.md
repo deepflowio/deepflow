@@ -2505,6 +2505,37 @@ kernel to specify the desired packet distribution algorithm. Refer to:
 - https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
 - https://www.stackpath.com/blog/bpf-hook-points-part-1/
 
+##### Interface Promisc Enabled {#inputs.cbpf.af_packet.tunning.interface_promisc_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.tunning.interface_promisc_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      tunning:
+        interface_promisc_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+The following scenarios require promiscuous mode to be enabled:
+- capture_mode is 1 or 2
+- capture_mode is 0 and traffic to the virtual machine cannot be collected
+Note: After the NIC is enabled in promiscuous mode, more traffic will be collected, resulting in lower performance
+
 ### Special Network {#inputs.cbpf.special_network}
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
@@ -3368,8 +3399,8 @@ inputs:
 **Description**:
 
 Specify the appropriate packet transmission hook point according to the actual network card driver.
-To obtain the driver method and configure the transmission hook point, as well as precautions,
-refer to the description of 'rx_hooks'.
+To obtain the driver method and configure the transmission hook point, as well as precautions，refer
+to the description of 'rx_hooks'.
 
 Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 

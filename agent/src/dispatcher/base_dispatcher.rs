@@ -555,6 +555,20 @@ impl BaseDispatcher {
                 e
             );
         }
+
+        if self.options.lock().unwrap().promisc {
+            let if_indices = tap_interfaces
+                .iter()
+                .map(|i| i.if_index as i32)
+                .collect::<Vec<i32>>();
+            if let Err(e) = self.engine.set_promisc(&if_indices) {
+                warn!(
+                    "set_promisc failed with tap_interfaces count {}: {:?}",
+                    if_indices.len(),
+                    e
+                );
+            }
+        }
     }
 }
 

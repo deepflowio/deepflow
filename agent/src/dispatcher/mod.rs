@@ -571,6 +571,8 @@ pub struct Options {
     pub dpdk_ebpf_receiver: Option<Receiver<Box<packet::Packet<'static>>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fanout_enabled: bool,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub promisc: bool,
 }
 
 impl Options {

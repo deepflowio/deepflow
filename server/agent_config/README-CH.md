@@ -2448,6 +2448,37 @@ inputs:
 - https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
 - https://www.stackpath.com/blog/bpf-hook-points-part-1/
 
+##### 开启网卡混杂模式 {#inputs.cbpf.af_packet.tunning.interface_promisc_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.tunning.interface_promisc_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      tunning:
+        interface_promisc_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+如下场景需要开启混杂模式：
+- capture_mode 等于 1 或 2
+- capture_mode 等于 0 并且无法采集到虚拟机的流量
+注意：网卡开启混杂模式后会采集更多的流量导致性能降低。
+
 ### 特殊网络 {#inputs.cbpf.special_network}
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
@@ -3251,7 +3282,7 @@ Module: i40e
 
 配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
 
-注意：在当前 DPDK 驱动接口的突发模式下发送和接收数据包时，旧版 Linux 内核（低于 5.2）的 eBPF 指令数量限制为 4096。  
+注意：在当前 DPDK 驱动接口的突发模式下发送和接收数据包时，旧版 Linux 内核（低于 5.2）的 eBPF 指令数量限制为 4096。
 因此，在 DPDK 捕获数据包期间，最多只能捕获 16 个数据包。对于 Linux 5.2 及以上版本的内核，最多可捕获 32 个数
 据包（这通常是 DPDK 突发模式的默认值）。对于低于 Linux 5.2 的内核，如果突发大小超过 16，可能会发生数据包丢失。
 
