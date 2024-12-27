@@ -622,7 +622,7 @@ ingester:
   ## the maximum threshold for processing l4/l7 flow logs per second.(threshold for each flow log). If set to 0, the threshold for processing is not limited
   #throttle: 50000
   ## Sampling bucket count. The larger this value is, the more accurate the sampling current limit is, and the more memory it takes up.
-  #throttle-bucket: 8
+  #throttle-bucket: 3
 
   ## 分别控制l4流日志, l7流日志，默认值为0，表示使用throttle的设置值.若非0，则使用设置值
   #l4-throttle: 0
