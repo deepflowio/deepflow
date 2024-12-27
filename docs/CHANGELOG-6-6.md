@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: the throttler cannot write all data to the queue at once [#8792](https://github.com/deepflowio/deepflow/pull/8792) by [lzf575](https://github.com/lzf575)
 * fix: tracemap error [#8755](https://github.com/deepflowio/deepflow/pull/8755) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Fix process event type size [#8753](https://github.com/deepflowio/deepflow/pull/8753) by [yinjiping](https://github.com/yinjiping)
 * fix: querier group by icon_id error [#8749](https://github.com/deepflowio/deepflow/pull/8749) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -66,4 +67,5 @@
 
 
 #### Refactoring
+* refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
