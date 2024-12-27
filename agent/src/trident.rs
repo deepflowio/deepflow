@@ -3572,6 +3572,8 @@ fn build_dispatchers(
             dpdk_ebpf_receiver,
             #[cfg(target_os = "linux")]
             fanout_enabled,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            promisc: user_config.inputs.cbpf.af_packet.tunning.promisc,
             ..Default::default()
         })))
         .bpf_options(bpf_options)

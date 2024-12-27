@@ -129,6 +129,7 @@ pub(super) struct BaseDispatcher {
 
     // dispatcher id for easy debugging
     pub log_id: String,
+    pub promisc_if_indices: Vec<i32>,
 }
 
 impl BaseDispatcher {
@@ -554,6 +555,31 @@ impl BaseDispatcher {
                 tap_interfaces.len(),
                 e
             );
+        }
+
+        let if_indices = tap_interfaces
+            .iter()
+            .map(|i| i.if_index as i32)
+            .collect::<Vec<i32>>();
+        // When the configuration is changed, the deepflow-agent will restart,
+        // and the NIC configured in promiscuous mode will be retired
+        if self.options.lock().unwrap().promisc && self.promisc_if_indices != if_indices {
+            if let Err(e) = self.engine.set_promisc(&self.promisc_if_indices, false) {
+                warn!(
+                    "set_promisc disabled failed with tap_interfaces count {}: {:?}",
+                    self.promisc_if_indices.len(),
+                    e
+                );
+            }
+
+            if let Err(e) = self.engine.set_promisc(&if_indices, true) {
+                warn!(
+                    "set_promisc enabled failed with tap_interfaces count {}: {:?}",
+                    if_indices.len(),
+                    e
+                );
+            }
+            self.promisc_if_indices = if_indices;
         }
     }
 }

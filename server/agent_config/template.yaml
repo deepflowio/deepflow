@@ -1695,6 +1695,27 @@ inputs:
         #     - https://www.stackpath.com/blog/bpf-hook-points-part-1/
         # upgrade_from: static_config.packet-fanout-mode
         packet_fanout_mode: 0
+        # type: bool
+        # name:
+        #   en: Interface Promisc Enabled
+        #   ch: 开启网卡混杂模式
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The following scenarios require promiscuous mode to be enabled:
+        #     - capture_mode is 1 or 2
+        #     - capture_mode is 0 and traffic to the virtual machine cannot be collected
+        #     Note: After the NIC is enabled in promiscuous mode, more traffic will be collected, resulting in lower performance
+        #   ch: |-
+        #     如下场景需要开启混杂模式：
+        #     - capture_mode 等于 1 或 2
+        #     - capture_mode 等于 0 并且无法采集到虚拟机的流量
+        #     注意：网卡开启混杂模式后会采集更多的流量导致性能降低。
+        interface_promisc_enabled: false
     # type: section
     # name:
     #   en: Special Network
@@ -2295,7 +2316,7 @@ inputs:
           #
           #     配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
           #
-          #     注意：在当前 DPDK 驱动接口的突发模式下发送和接收数据包时，旧版 Linux 内核（低于 5.2）的 eBPF 指令数量限制为 4096。  
+          #     注意：在当前 DPDK 驱动接口的突发模式下发送和接收数据包时，旧版 Linux 内核（低于 5.2）的 eBPF 指令数量限制为 4096。
           #     因此，在 DPDK 捕获数据包期间，最多只能捕获 16 个数据包。对于 Linux 5.2 及以上版本的内核，最多可捕获 32 个数
           #     据包（这通常是 DPDK 突发模式的默认值）。对于低于 Linux 5.2 的内核，如果突发大小超过 16，可能会发生数据包丢失。
           # upgrade_from:
