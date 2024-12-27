@@ -628,6 +628,8 @@ pub struct AfPacketTunning {
     pub ring_blocks: usize,
     pub packet_fanout_count: usize,
     pub packet_fanout_mode: u32,
+    #[serde(rename = "interface_promisc_enabled")]
+    pub promisc: bool,
 }
 
 impl Default for AfPacketTunning {
@@ -638,6 +640,7 @@ impl Default for AfPacketTunning {
             ring_blocks: 128,
             packet_fanout_count: 1,
             packet_fanout_mode: 0,
+            promisc: false,
         }
     }
 }

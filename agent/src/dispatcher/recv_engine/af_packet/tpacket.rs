@@ -22,10 +22,10 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::process;
 
 use libc::{
-    c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, setsockopt, size_t,
-    sockaddr, sockaddr_ll, socket, socklen_t, write, AF_PACKET, ETH_P_ALL, MAP_LOCKED,
-    MAP_NORESERVE, MAP_SHARED, POLLERR, POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET,
-    SO_ATTACH_FILTER,
+    c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, packet_mreq, poll, pollfd, setsockopt,
+    size_t, sockaddr, sockaddr_ll, socket, socklen_t, write, AF_PACKET, ETH_P_ALL, MAP_LOCKED,
+    MAP_NORESERVE, MAP_SHARED, PACKET_ADD_MEMBERSHIP, PACKET_DROP_MEMBERSHIP, PACKET_MR_PROMISC,
+    POLLERR, POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 use log::{info, warn};
 use public::error::*;
@@ -131,19 +131,23 @@ impl Tpacket {
         Ok(())
     }
 
-    // TODO: 这里看起来不需要，golang版本未涉及该配置，后续有需要再添加
-    #[allow(dead_code)]
-    fn set_promisc(&self) -> Result<()> {
-        // 设置混杂模式
-
-        //raw_socket.set_flag(IFF_PROMISC as u64)?;
-
-        // TODO:
-        //let mut mreq: packet_mreq = std::mem::zeroed();
-        //mreq.mr_ifindex = interface.index as i32;
-        //mreq.mr_type = PACKET_MR_PROMISC as u16;
-
-        //raw_socket.setsockopt(SOL_PACKET, PACKET_ADD_MEMBERSHIP, (&mreq as *const packet_mreq) as *const libc::c_void);
+    pub fn set_promisc(&self, if_indices: &Vec<i32>, enabled: bool) -> Result<()> {
+        for i in if_indices {
+            let mreq = packet_mreq {
+                mr_type: PACKET_MR_PROMISC as u16,
+                mr_ifindex: *i,
+                mr_alen: 0,
+                mr_address: [0, 0, 0, 0, 0, 0, 0, 0],
+            };
+            let err = if enabled {
+                self.setsockopt(SOL_PACKET, PACKET_ADD_MEMBERSHIP, mreq)
+            } else {
+                self.setsockopt(SOL_PACKET, PACKET_DROP_MEMBERSHIP, mreq)
+            };
+            if err.is_err() {
+                warn!("Ifindex {} set promisc {} error: {:?}", i, enabled, err);
+            }
+        }
         Ok(())
     }
 

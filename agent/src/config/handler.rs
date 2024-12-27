@@ -2664,6 +2664,14 @@ impl ConfigHandler {
             tunning.packet_fanout_mode = new_tunning.packet_fanout_mode;
             restart_agent = !first_run;
         }
+        if tunning.promisc != new_tunning.promisc {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.interface_promisc_enabled from {:?} to {:?}.",
+                tunning.promisc, new_tunning.promisc
+            );
+            tunning.promisc = new_tunning.promisc;
+            restart_agent = !first_run;
+        }
         if tunning.ring_blocks != new_tunning.ring_blocks {
             info!(
                 "Update inputs.cbpf.af_packet.tunning.ring_blocks from {:?} to {:?}.",
