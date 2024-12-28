@@ -147,8 +147,8 @@ int bpf_table_get_fd(struct bpf_tracer *tracer, const char *tb_name)
 {
 	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
 	if (map == NULL) {
-		ebpf_warning("[%s] map name \"%s\" map is NULL.\n", __func__,
-			     tb_name);
+		ebpf_debug("[%s] map name \"%s\" map is NULL.\n", __func__,
+			   tb_name);
 		return -1;
 	}
 

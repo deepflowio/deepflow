@@ -425,6 +425,14 @@ pub struct SK_TRACE_STATS {
     pub period_push_avg_delay: u64, // The average latency time for periodic push events, in microseconds.
     pub proc_exec_event_count: u64, // The number of events for process execute.
     pub proc_exit_event_count: u64, // The number of events for process exits.
+
+    // Captured packet statistics
+    pub rx_packets: u64,
+    pub tx_packets: u64,
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+    pub missed_packets: u64,
+    pub invalid_packets: u64,
 }
 
 #[repr(C)]

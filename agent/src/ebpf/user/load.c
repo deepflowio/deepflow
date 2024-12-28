@@ -823,7 +823,7 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		     map_name, obj->maps_cnt, new_map->elf_offset,
 		     new_map->def.type, new_map->def.key_size,
 		     new_map->def.value_size, new_map->def.max_entries,
-		     new_map->def.feat);
+		     new_map->def.feat_flags);
 	}
 
 	return ETR_OK;

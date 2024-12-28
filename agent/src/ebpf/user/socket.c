@@ -837,7 +837,8 @@ static u32 copy_regular_file_data(void *dst, void *src, int len)
 	memcpy(&event, src, sizeof(event));
 	char *buffer = event.filename;
 	u32 buffer_len = event.len;
-	u32 buf_offset = offsetof(typeof(struct user_io_event_buffer), filename);
+	u32 buf_offset =
+	    offsetof(typeof(struct user_io_event_buffer), filename);
 
 	/*
 	 * Due to the maximum length limitation of the data, the file
@@ -1596,8 +1597,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
 	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
 	    struct_sock_common_ipv6only_offset < 0 ||
-	    struct_dentry_d_parent_offset < 0 ||
-	    struct_file_f_pos_offset < 0) {
+	    struct_dentry_d_parent_offset < 0 || struct_file_f_pos_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -2665,6 +2665,43 @@ static bool is_adapt_success(struct bpf_tracer *t)
 	return is_success;
 }
 
+static u64 prev_stats[STATS_TYPE_NUM];
+static u64 update_pkts_stats(struct bpf_tracer *t, enum pkts_stats_type type)
+{
+	u64 curr_num, diff;
+	if (!bpf_table_get_value
+	    (t, MAP_PKTS_STATES_NAME, type, (void *)&curr_num))
+		curr_num = prev_stats[type];
+
+	if (prev_stats[type] == 0)
+		prev_stats[type] = curr_num;
+
+	diff = curr_num - prev_stats[type];
+	prev_stats[type] = curr_num;
+
+	return diff;
+}
+
+static void pkts_stats(struct bpf_tracer *t, struct socket_trace_stats *stats)
+{
+	if (bpf_table_get_fd(t, MAP_PKTS_STATES_NAME) == -1) {
+		stats->rx_packets = 0;
+		stats->tx_packets = 0;
+		stats->rx_bytes = 0;
+		stats->tx_bytes = 0;
+		stats->missed_packets = 0;
+		stats->invalid_packets = 0;
+		return;
+	}
+
+	stats->rx_packets = update_pkts_stats(t, STATS_RECV_PKTS);
+	stats->tx_packets = update_pkts_stats(t, STATS_XMIT_PKTS);
+	stats->rx_bytes = update_pkts_stats(t, STATS_RECV_BYTES);
+	stats->tx_bytes = update_pkts_stats(t, STATS_XMIT_BYTES);
+	stats->missed_packets = update_pkts_stats(t, STATS_MISS_PKTS);
+	stats->invalid_packets = update_pkts_stats(t, STATS_INVAL_PKTS);
+}
+
 struct socket_trace_stats socket_tracer_stats(void)
 {
 	struct socket_trace_stats stats;
@@ -2684,6 +2721,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.socket_map_max_reclaim = conf_socket_map_max_reclaim;
 	stats.probes_count = t->probes_count;
 	stats.data_limit_max = socket_data_limit_max;
+	pkts_stats(t, &stats);
 
 	static int skip_count = 2;
 	static int curr_count = 0;
@@ -2701,9 +2739,11 @@ struct socket_trace_stats socket_tracer_stats(void)
 			     stats_total.period_event_count) / NS_IN_USEC;
 
 		if (stats_total.period_event_max_delay > 0) {
-			stats.period_push_max_delay = PUSH_DELAY_EXCEEDED_MARKER;
+			stats.period_push_max_delay =
+			    PUSH_DELAY_EXCEEDED_MARKER;
 		} else {
-			stats.period_push_max_delay = stats.period_push_avg_delay;
+			stats.period_push_max_delay =
+			    stats.period_push_avg_delay;
 		}
 
 		if (curr_count++ < skip_count) {
@@ -2846,8 +2886,9 @@ int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
 				 "latency=[%lu]\nfilename=[%s](len %d)\n",
-				 event->bytes_count, event->operation, event->offset,
-				 event->latency, event->filename, path_len);
+				 event->bytes_count, event->operation,
+				 event->offset, event->latency, event->filename,
+				 path_len);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"

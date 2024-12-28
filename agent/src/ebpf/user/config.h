@@ -35,6 +35,7 @@
 #define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
 #define MAP_PROTO_PORTS_BITMAPS_NAME	"__proto_ports_bitmap"
 #define MAP_ALLOW_REASM_PROTOS_NAME     "__allow_reasm_protos_map"
+#define MAP_PKTS_STATES_NAME		"__pkts_stats_map"
 
 //Program jmp tables
 #define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"
