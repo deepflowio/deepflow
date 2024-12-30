@@ -3294,7 +3294,7 @@ on the DPDK application and check the specific interface names. Alternatively, y
 `perf` command on the node where the agent is located:
 `perf record -F97 -a -g -p <DPDK application PID> -- sleep 30`
 and then use
-`perf script | grep -E 'recv|xmit'`
+`perf script | grep -E 'recv|xmit|rx|tx' | grep <drive_name>` (`drive_name` may be `ixgbe/i40e/mlx5`)
 to confirm the driver interfaces.
 
 Below are some common interface names for different drivers, for reference only:
@@ -3333,6 +3333,12 @@ Below are some common interface names for different drivers, for reference only:
 
 Example: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
 
+Note: When using the burst mode of the current DPDK driver interface to send and receive packets,
+the number of eBPF instructions is limited to 4096 in older Linux kernels (below Linux 5.2). As a
+result, during DPDK packet capture, only a maximum of 16 packets can be captured. For Linux kernels
+5.2 and above, up to 32 packets can be captured (this is typically the default value for DPDK
+burst mode). For kernels older than Linux 5.2, packet loss may occur (if the burst size exceeds 16).
+
 ###### DPDK Application TX Hooks Configuration {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
 **Tags**:
@@ -3362,7 +3368,8 @@ inputs:
 **Description**:
 
 Specify the appropriate packet transmission hook point according to the actual network card driver.
-To obtain the driver method and configure the transmission hook point, refer to the description of 'rx_hooks'.
+To obtain the driver method and configure the transmission hook point, as well as precautions,
+refer to the description of 'rx_hooks'.
 
 Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 

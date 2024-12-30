@@ -3211,7 +3211,8 @@ Module: i40e
 也被 DPDK 纳管), 真实驱动是 'i40e' (从 'Module: i40e' 得到)
 
 可以使用 deepflow 提供的可持续剖析功能对 DPDK 应用做函数剖析查看具体接口名字，也可以使用 perf 命令
-在agent所在节点上运行 `perf record -F97 -a -g -p <dpdk应用进程号> -- sleep 30`，`perf script | grep -E 'recv|xmit'`
+在agent所在节点上运行 `perf record -F97 -a -g -p <dpdk应用进程号> -- sleep 30`，
+`perf script | grep -E 'recv|xmit|rx|tx' | grep <drive_name>` (`drive_name` may be `ixgbe/i40e/mlx5`)
 来确认驱动接口。
 
 下面列出了不同驱动对应的接口名称，仅供参考:
@@ -3250,6 +3251,10 @@ Module: i40e
 
 配置样例: `rx_hooks: [ixgbe_recv_pkts, i40e_recv_pkts, virtio_recv_pkts, virtio_recv_mergeable_pkts]`
 
+注意：在当前 DPDK 驱动接口的突发模式下发送和接收数据包时，旧版 Linux 内核（低于 5.2）的 eBPF 指令数量限制为 4096。  
+因此，在 DPDK 捕获数据包期间，最多只能捕获 16 个数据包。对于 Linux 5.2 及以上版本的内核，最多可捕获 32 个数
+据包（这通常是 DPDK 突发模式的默认值）。对于低于 Linux 5.2 的内核，如果突发大小超过 16，可能会发生数据包丢失。
+
 ###### DPDK 应用数据包发送 hook 点设置 {#inputs.ebpf.socket.uprobe.dpdk.tx_hooks}
 
 **标签**:
@@ -3278,7 +3283,7 @@ inputs:
 
 **详细描述**:
 
-根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置参考 'rx_hooks' 的说明.
+根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置以及注意事项参考 'rx_hooks' 的说明.
 
 配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 

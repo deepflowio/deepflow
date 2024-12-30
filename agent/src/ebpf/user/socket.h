@@ -178,6 +178,16 @@ struct socket_trace_stats {
 	 */
 	uint64_t proc_exec_event_count;
 	uint64_t proc_exit_event_count;
+
+	/*
+	 * Captured packet statistics
+	 */
+	uint64_t rx_packets;
+	uint64_t tx_packets;
+	uint64_t rx_bytes;
+	uint64_t tx_bytes;
+	uint64_t missed_packets;
+	uint64_t invalid_packets;
 };
 
 struct bpf_offset_param_array {
