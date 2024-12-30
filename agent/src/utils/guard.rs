@@ -491,7 +491,11 @@ impl Guard {
                     }
                 }
 
-                if exception_handler.has(Exception::SystemLoadCircuitBreaker) || exception_handler.has(Exception::FreeMemExceeded) {
+                if exception_handler.has(Exception::SystemLoadCircuitBreaker) {
+                    info!("Set the state to melt_down when the system load exceeds the threshold.");
+                    state.melt_down();
+                } else if exception_handler.has(Exception::FreeMemExceeded) {
+                    info!("Set the state to melt_down when the free memory exceeds the threshold.");
                     state.melt_down();
                 } else {
                     state.recover();

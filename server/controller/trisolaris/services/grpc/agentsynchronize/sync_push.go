@@ -399,8 +399,6 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 					"open cluster(%s) kubernetes_api_enabled Agent(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t, kubernetes_watch_policy: %d)",
 					clusterID, ctrlIP, ctrlMac, k8sForceWatch, k8sWatchPoilcy, logger.NewORGPrefix(orgID))
 			}
-			viperConfig.Set(CONFIG_KEY_MAX_ESCAPE_DURATION, gAgentInfo.GetDefaultMaxEscapeSecondsStr())
-			viperConfig.Set(CONFIG_KEY_MAX_MEMORY, gAgentInfo.GetDefaultMaxMemory())
 		}
 
 		return &api.SyncResponse{
@@ -413,8 +411,6 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 	agentTypeForUnknowAgent := gAgentInfo.GetTridentTypeForUnknowVTap()
 	if agentTypeForUnknowAgent != 0 {
 		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(agentTypeForUnknowAgent)
-		viperConfig.Set(CONFIG_KEY_MAX_ESCAPE_DURATION, gAgentInfo.GetDefaultMaxEscapeSecondsStr())
-		viperConfig.Set(CONFIG_KEY_MAX_MEMORY, gAgentInfo.GetDefaultMaxMemory())
 		viperConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, true)
 
 		return &api.SyncResponse{

@@ -72,7 +72,6 @@ type VTapInfo struct {
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupShortIDToLcuuid       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
-	agentGroupLcuuidToYamlConfig   map[string]*agent_config.MySQLAgentGroupConfiguration
 	vtapGroupLcuuidToLocalConfig   map[string]string
 	vtapGroupLcuuidToEAHPEnabled   map[string]*int
 	noVTapTapPortsMac              mapset.Set
@@ -142,7 +141,6 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupShortIDToLcuuid:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
-		agentGroupLcuuidToYamlConfig:   make(map[string]*agent_config.MySQLAgentGroupConfiguration),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
 		noVTapTapPortsMac:              mapset.NewSet(),
@@ -437,7 +435,7 @@ func (v *VTapInfo) loadDefaultVtapConfig() {
 		log.Error(v.Logf("%s", err))
 	}
 
-	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration)
+	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration, "")
 }
 
 func (v *VTapInfo) loadBaseData() {
@@ -499,28 +497,24 @@ func AllowEmptyField(filed string) bool {
 	return false
 }
 
-func (v *VTapInfo) getAgentUserConfigs() {
-	yamlConfigs := v.metaData.GetDBDataCache().GetAgentGroupUserConfigsFromDB(v.db)
-	if yamlConfigs == nil {
+func (v *VTapInfo) getAgentConfigs() {
+	// agent configs
+	agentConfigs := v.metaData.GetDBDataCache().GetAgentGroupUserConfigsFromDB(v.db)
+	if agentConfigs == nil {
 		log.Error(v.Log("no agent user configs data"))
 		return
 	}
-
-	agentGroupLcuuidToYamlConfig := make(map[string]*agent_config.MySQLAgentGroupConfiguration)
-	for _, yamlConfig := range yamlConfigs {
-		agentGroupLcuuidToYamlConfig[yamlConfig.AgentGroupLcuuid] = yamlConfig
+	agentGroupLcuuidToConfigYaml := make(map[string]string)
+	for _, agentConfig := range agentConfigs {
+		agentGroupLcuuidToConfigYaml[agentConfig.AgentGroupLcuuid] = agentConfig.Yaml
 	}
-	v.agentGroupLcuuidToYamlConfig = agentGroupLcuuidToYamlConfig
-}
 
-func (v *VTapInfo) getAgentConfigs() {
-	v.getAgentUserConfigs()
+	// vtap configs
 	configs := v.metaData.GetDBDataCache().GetAgentGroupConfigsFromDB(v.db)
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
 	}
-
 	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
 	vtapGroupLcuuidToLocalConfig := make(map[string]string)
 	vtapGroupLcuuidToEAHPEnabled := make(map[string]*int)
@@ -569,7 +563,11 @@ func (v *VTapInfo) getAgentConfigs() {
 		} else {
 			log.Error(v.Logf("%s", err))
 		}
-		vTapConfig := NewVTapConfig(rtapConfiguration)
+		agentConfigYaml, ok := agentGroupLcuuidToConfigYaml[*config.VTapGroupLcuuid]
+		if !ok {
+			log.Error(v.Logf("vtap group lcuuid(%s) not found agent config", *config.VTapGroupLcuuid))
+		}
+		vTapConfig := NewVTapConfig(rtapConfiguration, agentConfigYaml)
 		if config.VTapGroupLcuuid != nil {
 			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
 		}

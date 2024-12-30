@@ -67,7 +67,13 @@ func (thq *ThrottlingQueue) SampleDisabled() bool {
 func (thq *ThrottlingQueue) flush() {
 	if thq.periodEmitCount > 0 {
 		if thq.flowLogWriter != nil {
-			thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+			for i := 0; i < thq.periodEmitCount; i += QUEUE_BATCH {
+				end := i + QUEUE_BATCH
+				if end > thq.periodEmitCount {
+					end = thq.periodEmitCount
+				}
+				thq.flowLogWriter.Put(thq.index, thq.sampleItems[i:end]...)
+			}
 		} else {
 			for i := range thq.sampleItems[:thq.periodEmitCount] {
 				if tItem, ok := thq.sampleItems[i].(throttleItem); ok {

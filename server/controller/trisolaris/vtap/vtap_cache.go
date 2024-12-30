@@ -183,11 +183,14 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *agent_config.AgentGroupConfigModel) *VTapConfig {
+func NewVTapConfig(config *agent_config.AgentGroupConfigModel, agentConfigYaml string) *VTapConfig {
 	vTapConfig := &VTapConfig{}
 	vTapConfig.AgentGroupConfigModel = *config
 	v := viper.New()
 	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
+		log.Error(err)
+	}
 	vTapConfig.UserConfig = v
 	vTapConfig.convertData()
 	return vTapConfig
@@ -1191,7 +1194,9 @@ func (c *VTapCache) initVTapConfig() {
 	realConfig := VTapConfig{}
 	vtapGroupLcuuid := c.GetVTapGroupLcuuid()
 
+	var agentConfigYaml string
 	if config, ok := v.vtapGroupLcuuidToConfiguration[vtapGroupLcuuid]; ok {
+		agentConfigYaml = config.GetUserConfig()
 		realConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
@@ -1202,10 +1207,8 @@ func (c *VTapCache) initVTapConfig() {
 	// viper object include map, not support deepcopy
 	viperConfig := viper.New()
 	viperConfig.SetConfigType("yaml")
-	if configYaml, ok := v.agentGroupLcuuidToYamlConfig[vtapGroupLcuuid]; ok {
-		if err := viperConfig.ReadConfig(bytes.NewBufferString(configYaml.Yaml)); err != nil {
-			log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", vtapGroupLcuuid, err))
-		}
+	if err := viperConfig.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
+		log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", vtapGroupLcuuid, err))
 	}
 	realConfig.UserConfig = viperConfig
 
@@ -1218,8 +1221,11 @@ func (c *VTapCache) initVTapConfig() {
 func (c *VTapCache) updateVTapConfigFromDB() {
 	v := c.vTapInfo
 	newConfig := VTapConfig{}
+
+	var agentConfigYaml string
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
+		agentConfigYaml = config.GetUserConfig()
 		newConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
@@ -1237,10 +1243,8 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	// viper object include map, not support deepcopy
 	viperConfig := viper.New()
 	viperConfig.SetConfigType("yaml")
-	if configYaml, ok := v.agentGroupLcuuidToYamlConfig[c.GetVTapGroupLcuuid()]; ok {
-		if err := viperConfig.ReadConfig(bytes.NewBufferString(configYaml.Yaml)); err != nil {
-			log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", c.GetVTapGroupLcuuid(), err))
-		}
+	if err := viperConfig.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
+		log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", c.GetVTapGroupLcuuid(), err))
 	}
 	newConfig.UserConfig = viperConfig
 
