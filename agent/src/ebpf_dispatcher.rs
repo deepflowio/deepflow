@@ -242,6 +242,36 @@ impl OwnedCountable for SyncEbpfCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(ebpf_counter.proc_exit_event_count as u64),
             ),
+            (
+                "rx_packets",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.rx_packets as u64),
+            ),
+            (
+                "tx_packets",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.tx_packets as u64),
+            ),
+            (
+                "rx_bytes",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.rx_bytes as u64),
+            ),
+            (
+                "tx_bytes",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.tx_bytes as u64),
+            ),
+            (
+                "missed_packets",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.missed_packets as u64),
+            ),
+            (
+                "invalid_packets",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.invalid_packets as u64),
+            ),
         ]
     }
     // EbpfCollector不会重复创建，这里都是false
