@@ -43,6 +43,9 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: agent - eBPF Adapt to TENCENT 5.4.119-19-0008.aarch64 [#8803](https://github.com/deepflowio/deepflow/pull/8803) by [yinjiping](https://github.com/yinjiping)
+* feat: eBPF tars infer support [#8802](https://github.com/deepflowio/deepflow/pull/8802) by [rvql](https://github.com/rvql)
+* feat agent - eBPF Add DPDK statistics and update configuration [#8800](https://github.com/deepflowio/deepflow/pull/8800) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
 * feat: deprecated ipvlan [#8725](https://github.com/deepflowio/deepflow/pull/8725) by [askyrie](https://github.com/askyrie)
