@@ -359,4 +359,15 @@ struct member_fields_offset {
 
 typedef struct member_fields_offset bpf_offset_param_t;
 
+// Used for obtaining packet statistics.
+enum pkts_stats_type {
+	STATS_RECV_PKTS,
+	STATS_XMIT_PKTS,
+	STATS_RECV_BYTES,
+	STATS_XMIT_BYTES,
+	STATS_MISS_PKTS,
+	STATS_INVAL_PKTS,
+	STATS_TYPE_NUM
+};
+
 #endif /* BPF_SOCKET_TRACE_COMMON */
