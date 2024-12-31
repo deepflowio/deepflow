@@ -1163,7 +1163,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			return;
 		}
 		int i;
-		for (i = nr; nr < buf->events_num; i++) {
+		for (i = nr; i < buf->events_num; i++) {
 			if (burst_data[i]->source == DATA_SOURCE_DPDK)
 				atomic64_inc(&tracer->dropped_pkts);
 		}
