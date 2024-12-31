@@ -433,7 +433,8 @@ pub struct SK_TRACE_STATS {
     pub tx_packets: u64,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
-    pub missed_packets: u64,
+    pub dropped_packets: u64,
+    pub kern_missed_packets: u64,
     pub invalid_packets: u64,
 }
 

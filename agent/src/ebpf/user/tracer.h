@@ -442,7 +442,13 @@ struct bpf_tracer {
 	 */
 	atomic64_t recv;	// User-level program event reception statistics. 
 	atomic64_t lost;	// User-level programs not receiving data in time can cause data loss in the kernel.
-	atomic64_t proto_status[PROTO_NUM];	// Statistical analysis based on different l7 protocols.
+	atomic64_t proto_stats[PROTO_NUM];	// Statistical analysis based on different l7 protocols.
+	// Packet Statistics Obtained from DPDK
+	atomic64_t rx_pkts;
+	atomic64_t tx_pkts;
+	atomic64_t rx_bytes;
+	atomic64_t tx_bytes;
+	atomic64_t dropped_pkts;
 
 	/*
 	 * maps re-config
@@ -519,7 +525,7 @@ struct bpf_tracer_param {
 	int state;
 	bool adapt_success;
 	uint32_t data_limit_max;
-	uint64_t proto_status[PROTO_NUM];
+	uint64_t proto_stats[PROTO_NUM];
 } __attribute__ ((__packed__));
 
 struct bpf_tracer_param_array {
