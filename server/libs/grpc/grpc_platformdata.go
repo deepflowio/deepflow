@@ -845,8 +845,8 @@ func (t *PlatformInfoTable) OrgString(orgId uint16) string {
 	sb := &strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("OrgID %d AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", orgId, t.analyzerID, t.regionID[orgId], t.otherRegionCount[orgId]))
-	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d\n",
-		t.moduleName, t.ctlIP, t.hostname, t.regionID[orgId]))
+	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d PlatformDataVersion:%d\n",
+		t.moduleName, t.ctlIP, t.hostname, t.regionID[orgId], t.versionPlatformData[orgId]))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	if len(t.epcIDIPV4Infos[orgId]) > 0 {
 		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podGroupType podID podClusterID azID isVip isWan vtapId       hitCount (ipv4平台信息)\n")
