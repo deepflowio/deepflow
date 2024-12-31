@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
+* fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
+* fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
 * fix: the throttler cannot write all data to the queue at once [#8792](https://github.com/deepflowio/deepflow/pull/8792) by [lzf575](https://github.com/lzf575)
 * fix: tracemap error [#8755](https://github.com/deepflowio/deepflow/pull/8755) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Fix process event type size [#8753](https://github.com/deepflowio/deepflow/pull/8753) by [yinjiping](https://github.com/yinjiping)
@@ -43,6 +46,7 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
 * feat: deprecated ipvlan [#8725](https://github.com/deepflowio/deepflow/pull/8725) by [askyrie](https://github.com/askyrie)
