@@ -52,6 +52,9 @@ type ParamData struct {
 	RpcIP                 string
 	RpcPort               string
 	Type                  string
+	PlatformDataVersion   uint64
+	GroupsVersion         uint64
+	ProcessName           string
 	PluginType            string
 	PluginName            string
 }
@@ -233,6 +236,9 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginName, "pname", "", "", "request plugin name")
+	trisolarisCmd.PersistentFlags().Uint64VarP(&paramData.PlatformDataVersion, "pver", "", 0, "platform-data version")
+	trisolarisCmd.PersistentFlags().Uint64VarP(&paramData.GroupsVersion, "gver", "", 0, "groups version")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ProcessName, "procname", "", "", "request process name")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		trisolarisCmd.AddCommand(handler)
@@ -269,12 +275,18 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	switch paramData.Type {
 	case "trident":
 		name = paramData.Type
+		if paramData.ProcessName != "" {
+			name = paramData.ProcessName
+		}
 		groupID = paramData.GroupID
 		clusterID = paramData.ClusterID
 		teamID = paramData.TeamID
 		orgID = paramData.OrgID
 	case "analyzer":
 		name = paramData.Type
+		if paramData.ProcessName != "" {
+			name = paramData.ProcessName
+		}
 		orgID = paramData.OrgID
 	default:
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
@@ -283,6 +295,8 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
+		VersionPlatformData:   proto.Uint64(paramData.PlatformDataVersion),
+		VersionGroups:         proto.Uint64(paramData.GroupsVersion),
 		CtrlIp:                &paramData.CtrlIP,
 		CtrlMac:               &paramData.CtrlMac,
 		VtapGroupIdRequest:    &groupID,
