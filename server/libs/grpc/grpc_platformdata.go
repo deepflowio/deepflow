@@ -1435,7 +1435,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 			if _, ok := IPV4CidrInfos[0]; !ok {
 				IPV4CidrInfos[0] = make([]*CidrInfo, 0, 128)
 			}
-			IPV4CidrInfos[0] = append(IPV4CidrInfos[epcID], cidrInfo)
+			IPV4CidrInfos[0] = append(IPV4CidrInfos[0], cidrInfo)
 		}
 	} else {
 		if _, ok := IPV6CidrInfos[epcID]; !ok {
