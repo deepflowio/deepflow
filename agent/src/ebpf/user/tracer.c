@@ -1523,7 +1523,7 @@ static int boot_time_update(void)
  */
 static void *kick_kern_push_data(void *arg)
 {
-	int cpu_id = *((int *)arg);	// Extract CPU ID from the argument
+	int cpu_id = (int)((uintptr_t)arg);	// Extract CPU ID from the argument
 	char thread_name[NAME_LEN];
 
 	// Set a descriptive thread name
@@ -1629,7 +1629,7 @@ static void period_process_main(__unused void *arg)
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (cpu_online[i])
 			if (pthread_create
-			    (&threads[i], NULL, kick_kern_push_data, &i) != 0) {
+			    (&threads[i], NULL, kick_kern_push_data, (void *)(uintptr_t)i) != 0) {
 				ebpf_warning("pthread_create failed");
 			}
 	}
