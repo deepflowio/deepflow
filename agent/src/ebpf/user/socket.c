@@ -1106,12 +1106,21 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 								 container_id));
 			submit_data->msg_type = sd->msg_type;
 			submit_data->socket_role = sd->socket_role;
+		} else {
+			if (sd->direction == T_EGRESS) {
+				atomic64_inc(&tracer->tx_pkts);
+				atomic64_add(&tracer->tx_bytes, sd->syscall_len);
+			} else {
+				atomic64_inc(&tracer->rx_pkts);
+				atomic64_add(&tracer->rx_bytes, sd->syscall_len);
+			}
 		}
+
 		// Statistics of Various Protocols
 		if (submit_data->l7_protocal_hint >= PROTO_NUM)
 			submit_data->l7_protocal_hint = PROTO_UNKNOWN;
 
-		atomic64_inc(&tracer->proto_status
+		atomic64_inc(&tracer->proto_stats
 			     [submit_data->l7_protocal_hint]);
 		int offset = 0;
 		if (len > 0) {
@@ -1152,6 +1161,11 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (lost == buf->events_num) {
 			free(socket_data_buff);
 			return;
+		}
+		int i;
+		for (i = nr; nr < buf->events_num; i++) {
+			if (burst_data[i]->source == DATA_SOURCE_DPDK)
+				atomic64_inc(&tracer->dropped_pkts);
 		}
 	}
 
@@ -2689,17 +2703,25 @@ static void pkts_stats(struct bpf_tracer *t, struct socket_trace_stats *stats)
 		stats->tx_packets = 0;
 		stats->rx_bytes = 0;
 		stats->tx_bytes = 0;
-		stats->missed_packets = 0;
+		stats->dropped_packets = 0;
+		stats->kern_missed_packets = 0;
 		stats->invalid_packets = 0;
 		return;
 	}
 
-	stats->rx_packets = update_pkts_stats(t, STATS_RECV_PKTS);
-	stats->tx_packets = update_pkts_stats(t, STATS_XMIT_PKTS);
-	stats->rx_bytes = update_pkts_stats(t, STATS_RECV_BYTES);
-	stats->tx_bytes = update_pkts_stats(t, STATS_XMIT_BYTES);
-	stats->missed_packets = update_pkts_stats(t, STATS_MISS_PKTS);
+	stats->rx_packets = atomic64_read(&t->rx_pkts);
+	stats->tx_packets = atomic64_read(&t->tx_pkts);
+	stats->rx_bytes = atomic64_read(&t->rx_bytes);
+	stats->tx_bytes = atomic64_read(&t->tx_bytes);
+	stats->dropped_packets = atomic64_read(&t->dropped_pkts);
+	stats->kern_missed_packets = update_pkts_stats(t, STATS_MISS_PKTS);
 	stats->invalid_packets = update_pkts_stats(t, STATS_INVAL_PKTS);
+
+	atomic64_init(&t->rx_pkts);
+	atomic64_init(&t->tx_pkts);
+	atomic64_init(&t->rx_bytes);
+	atomic64_init(&t->tx_bytes);
+	atomic64_init(&t->dropped_pkts);
 }
 
 struct socket_trace_stats socket_tracer_stats(void)

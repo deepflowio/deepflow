@@ -259,10 +259,10 @@ static void tracer_dump(struct bpf_tracer_param *param)
 
 	printf("\n-------------------- Protocol ------------------------\n");
 	for (j = 0; j < PROTO_NUM; j++) {
-		if (btp->proto_status[j] > 0) {
+		if (btp->proto_stats[j] > 0) {
 			printf("- %-10s(%d) %" PRIu64 "\n",
 			       get_proto_name((uint16_t) j),
-			       j, btp->proto_status[j]);
+			       j, btp->proto_stats[j]);
 		}
 	}
 

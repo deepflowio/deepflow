@@ -186,7 +186,8 @@ struct socket_trace_stats {
 	uint64_t tx_packets;
 	uint64_t rx_bytes;
 	uint64_t tx_bytes;
-	uint64_t missed_packets;
+	uint64_t dropped_packets;
+	uint64_t kern_missed_packets;
 	uint64_t invalid_packets;
 };
 
