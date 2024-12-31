@@ -362,9 +362,14 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 	bt->name[sizeof(bt->name) - 1] = '\0';
 	atomic64_init(&bt->recv);
 	atomic64_init(&bt->lost);
+	atomic64_init(&bt->rx_pkts);
+	atomic64_init(&bt->tx_pkts);
+	atomic64_init(&bt->rx_bytes);
+	atomic64_init(&bt->tx_bytes);
+	atomic64_init(&bt->dropped_pkts);
 	int i;
 	for (i = 0; i < PROTO_NUM; i++)
-		atomic64_init(&bt->proto_status[i]);
+		atomic64_init(&bt->proto_stats[i]);
 
 	snprintf(bt->bpf_load_name, sizeof(bt->bpf_load_name), "%s", load_name);
 	bt->bpf_load_name[sizeof(bt->bpf_load_name) - 1] = '\0';
@@ -1763,8 +1768,8 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		btp->data_limit_max = t->data_limit_max;
 
 		for (j = 0; j < PROTO_NUM; j++) {
-			btp->proto_status[j] =
-			    atomic64_read(&t->proto_status[j]);
+			btp->proto_stats[j] =
+			    atomic64_read(&t->proto_stats[j]);
 		}
 
 		for (j = 0; j < btp->dispatch_workers_nr; j++) {

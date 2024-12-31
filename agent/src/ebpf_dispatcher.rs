@@ -263,9 +263,14 @@ impl OwnedCountable for SyncEbpfCounter {
                 CounterValue::Unsigned(ebpf_counter.tx_bytes as u64),
             ),
             (
-                "missed_packets",
+                "dropped_packets",
                 CounterType::Counted,
-                CounterValue::Unsigned(ebpf_counter.missed_packets as u64),
+                CounterValue::Unsigned(ebpf_counter.dropped_packets as u64),
+            ),
+            (
+                "kern_missed_packets",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_missed_packets as u64),
             ),
             (
                 "invalid_packets",
