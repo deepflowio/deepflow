@@ -41,61 +41,62 @@ func DropDatabaseIfInitTablesFailed(dc *DBConfig, editionFunc EditionInitTablesF
 }
 
 func InitCETables(dc *DBConfig) error {
-	err := InitTables(dc, schema.FILE_DIR)
+	err := InitTables(dc, dc.SqlFmt.GetRawSqlFileDir())
 	if err != nil {
 		return err
 	}
 	return InsertDBVersion(dc, schema.DB_VERSION_TABLE, schema.DB_VERSION_EXPECTED)
 }
 
-func InitTables(dc *DBConfig, schemaDir string) error {
-	log.Info(LogDBName(dc.Config.Database, "initialize %s tables", schemaDir)) // TODO
+func InitTables(dc *DBConfig, rawSqlDir string) error {
+	log.Info(LogDBName(dc.Config.Database, "initialize %s tables", rawSqlDir))
+
+	err := InitDBVersionTable(dc, rawSqlDir)
+	if err != nil {
+		return err
+	}
 
 	// 先初始化所有组织需要的 CE 表，再判断数据库是否是 default 组织，如果是 default 组织，初始化仅 default 组织所需数据。
-	err := InitORGTables(dc, schemaDir)
+	err = InitORGTables(dc, rawSqlDir)
 	if err != nil {
 		return err
 	}
 
 	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
 	if !strings.HasSuffix(dc.Config.Database, common.NON_DEFAULT_ORG_DATABASE_SUFFIX) {
-		if err := InitDefaultORGTables(dc, schemaDir); err != nil {
+		if err := InitDefaultORGTables(dc, rawSqlDir); err != nil {
 			return err
 		}
 	}
 
-	log.Info(LogDBName(dc.Config.Database, "initialized %s tables successfully", schemaDir))
+	log.Info(LogDBName(dc.Config.Database, "initialized %s tables successfully", rawSqlDir))
 	return nil
 }
 
-func InitORGTables(dc *DBConfig, schemaDir string) error {
-	log.Info(LogDBName(dc.Config.Database, "initialize %s org tables", schemaDir))
-	initSQL, err := os.ReadFile(fmt.Sprintf("%s/init.sql", schemaDir))
+func InitDBVersionTable(dc *DBConfig, rawSqlDir string) error {
+	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/db_version.sql", rawSqlDir))
+}
+
+func InitORGTables(dc *DBConfig, rawSqlDir string) error {
+	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/init.sql", rawSqlDir))
+}
+
+func InitDefaultORGTables(dc *DBConfig, rawSqlDir string) error {
+	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/default_init.sql", rawSqlDir))
+}
+
+func ReadAndExecuteSqlFile(dc *DBConfig, sqlFile string) error {
+	log.Info(LogDBName(dc.Config.Database, "execute %s", sqlFile))
+	initSQL, err := os.ReadFile(sqlFile)
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to read %s org sql file: %s", schemaDir, err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to read %s sql file: %s", sqlFile, err.Error()))
 		return err
 	}
 	err = dc.DB.Exec(string(initSQL)).Error
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to initialize %s org tables: %s", schemaDir, err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to execute %s: %s", sqlFile, err.Error()))
 		return err
 	}
-	log.Info(LogDBName(dc.Config.Database, "initialized %s org tables successfully", schemaDir))
-	return nil
-}
-
-func InitDefaultORGTables(dc *DBConfig, schemaDir string) error {
-	log.Info(LogDBName(dc.Config.Database, "initialize %s default org tables", schemaDir))
-	initSQL, err := os.ReadFile(fmt.Sprintf("%s/default_init.sql", schemaDir))
-	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to read %s default org sql file: %s", schemaDir, err.Error()))
-		return err
-	}
-	err = dc.DB.Exec(string(initSQL)).Error
-	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to initialize %s default org tables: %s", schemaDir, err.Error()))
-		return err
-	}
-	log.Info(LogDBName(dc.Config.Database, "initialized %s default org tables successfully", schemaDir))
+	log.Info(LogDBName(dc.Config.Database, "executed %s successfully", sqlFile))
 	return nil
 }
