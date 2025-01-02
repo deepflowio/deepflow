@@ -573,6 +573,7 @@ type ChChost struct {
 	HostID    int       `gorm:"column:host_id;type:int" json:"HOST_ID"`
 	Hostname  string    `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
 	IP        string    `gorm:"column:ip;type:varchar(64)" json:"IP"`
+	SubnetID  int       `gorm:"column:subnet_id;type:int" json:"SUBNET_ID"`
 	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`

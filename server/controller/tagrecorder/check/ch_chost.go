@@ -66,6 +66,7 @@ func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
 				HostID:   ipToHostID[chost.LaunchServer],
 				Hostname: chost.Hostname,
 				IP:       chost.IP,
+				SubnetID: chost.NetworkID,
 				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
 				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
@@ -77,6 +78,7 @@ func (p *ChChost) generateNewData() (map[IDKey]mysqlmodel.ChChost, bool) {
 				HostID:   ipToHostID[chost.LaunchServer],
 				Hostname: chost.Hostname,
 				IP:       chost.IP,
+				SubnetID: chost.NetworkID,
 				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
 				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
@@ -99,6 +101,15 @@ func (p *ChChost) generateUpdateInfo(oldItem, newItem mysqlmodel.ChChost) (map[s
 	}
 	if oldItem.HostID != newItem.HostID {
 		updateInfo["host_id"] = newItem.HostID
+	}
+	if oldItem.Hostname != newItem.Hostname {
+		updateInfo["host_name"] = newItem.Hostname
+	}
+	if oldItem.IP != newItem.IP {
+		updateInfo["ip"] = newItem.IP
+	}
+	if oldItem.SubnetID != newItem.SubnetID {
+		updateInfo["subnet_id"] = newItem.SubnetID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

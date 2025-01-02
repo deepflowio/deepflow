@@ -95,6 +95,13 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 	if cloudItem.CloudTags != nil {
 		cloudTags = cloudItem.CloudTags
 	}
+	networkID, idExists := m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+	if !idExists {
+		log.Error(resourceAForResourceBNotFound(
+			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+		), m.metadata.LogPrefixes)
+	}
 	dbItem := &mysqlmodel.VM{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
@@ -110,6 +117,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,
 		CloudTags:    cloudTags,
+		NetworkID:    networkID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {
@@ -191,6 +199,18 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		tagsJson, _ := json.Marshal(updateTags)
 		mapInfo["cloud_tags"] = tagsJson
 		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
+	}
+	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
+		networkID, idExists := m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+		if !idExists {
+			log.Error(resourceAForResourceBNotFound(
+				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+			), m.metadata.LogPrefixes)
+		}
+		mapInfo["subnet_id"] = networkID
+		structInfo.NetworkID.SetNew(networkID)
+		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

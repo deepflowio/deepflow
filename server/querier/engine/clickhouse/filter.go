@@ -623,7 +623,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 								default:
 									filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, op, t.Value)
 								}
-
 							}
 						}
 					} else {
