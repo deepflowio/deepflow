@@ -386,10 +386,11 @@ impl TunnelInfo {
         ip_header_size: usize,
     ) -> usize {
         // TCE GRE：Version 0、Version 1两种
-        if flags & GRE_FLAGS_VER_MASK > 1 || flags & GRE_FLAGS_KEY_MASK == 0 {
+        if flags & GRE_FLAGS_VER_MASK > 1 {
             return 0;
         }
 
+        let has_key = flags & GRE_FLAGS_KEY_MASK > 0;
         let gre_header_size = GRE_HEADER_SIZE_DECAP + TunnelInfo::calc_gre_option_size(flags);
         let mut gre_key_offset = GRE_KEY_OFFSET;
         if flags & GRE_FLAGS_CSUM_MASK != 0 {
@@ -404,7 +405,9 @@ impl TunnelInfo {
         if self.tier == 0 {
             self.decapsulate_addr(l3_packet);
             self.tunnel_type = TunnelType::TencentGre;
-            self.id = bytes::read_u32_be(&l3_packet[ip_header_size + gre_key_offset..]);
+            if has_key {
+                self.id = bytes::read_u32_be(&l3_packet[ip_header_size + gre_key_offset..]);
+            }
         }
         self.tier += 1;
         let overlay_offset = gre_header_size + ip_header_size - ETH_HEADER_SIZE; // 伪造L2层信息
@@ -419,12 +422,23 @@ impl TunnelInfo {
         } else {
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x86, 0xdd]
         };
-        macs[4..6].copy_from_slice(
-            &l3_packet[ip_header_size + gre_key_offset + 2..ip_header_size + gre_key_offset + 4],
-        );
-        macs[10..12].copy_from_slice(
-            &l3_packet[ip_header_size + gre_key_offset..ip_header_size + gre_key_offset + 2],
-        );
+        if has_key {
+            // L2 Header
+            //
+            // 0                 4            6                10           12             14
+            // +-----------------+------------+----------------+------------+--------------+
+            // |                 | 2-Byte Key |                | 2-Byte Key | 0x800/0x86dd |
+            // +-----------------+------------+----------------+------------+--------------+
+            // | Dest MAC                     | Source MAC                  | EthType      |
+            macs[4..6].copy_from_slice(
+                &l3_packet
+                    [ip_header_size + gre_key_offset + 2..ip_header_size + gre_key_offset + 4],
+            );
+            macs[10..12].copy_from_slice(
+                &l3_packet[ip_header_size + gre_key_offset..ip_header_size + gre_key_offset + 2],
+            );
+        }
+
         l3_packet[overlay_offset..overlay_offset + 14].copy_from_slice(&macs[..]);
 
         overlay_offset
@@ -922,6 +936,50 @@ mod tests {
 
         assert_eq!(offset, expected_offset);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_decapsulate_tencent_gre_nokey() {
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::TencentGre, TunnelType::Vxlan]);
+        let expected = TunnelInfo {
+            src: Ipv4Addr::new(10, 184, 17, 156),
+            dst: Ipv4Addr::new(10, 128, 48, 25),
+            mac_src: 0x381fc0f2,
+            mac_dst: 0xdd09cd02,
+            id: 65877,
+            tunnel_type: TunnelType::Vxlan,
+            tier: 2,
+            is_ipv6: false,
+        };
+        let expected_overlay = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 69, 0, 0, 52, 237, 62, 64, 0, 63, 6, 184,
+            251, 10, 185, 192, 25, 10, 129, 192, 54,
+        ];
+
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("gre-nokey.pcap"), None).into();
+        let packet = packets[0].as_mut_slice();
+
+        let mut actual = TunnelInfo::default();
+        let expected_offset = 82;
+        let mut actual_offset = 0;
+        for l2_len in vec![22, 14] {
+            let offset = actual.decapsulate(&mut packet[actual_offset..], l2_len, &bitmap);
+            if actual.tunnel_type == TunnelType::None {
+                break;
+            }
+            if actual_offset + offset > packet.len() {
+                break;
+            }
+            actual_offset += l2_len + offset;
+        }
+
+        let actual_overlay: [u8; 34] = packet[actual_offset..actual_offset + 34]
+            .try_into()
+            .unwrap();
+        assert_eq!(expected_overlay, actual_overlay);
+        assert_eq!(actual, expected);
+        assert_eq!(actual_offset, expected_offset);
     }
 
     #[test]
