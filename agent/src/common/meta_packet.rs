@@ -420,6 +420,17 @@ impl<'a> MetaPacket<'a> {
                     }
                     offset += assume_length;
                 }
+                TcpOptionNumber(TCP_OPT_TRACING) if assume_length == TCP_TOT_LEN => {
+                    let magic = read_u16_be(&packet[offset + TCP_TOT_MAGIC_OFFSET..]);
+                    if magic == TCP_TOT_MAGIC {
+                        self.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOT;
+                        self.lookup_key.src_nat_ip = IpAddr::from(Ipv4Addr::from(read_u32_be(
+                            &packet[offset + TCP_TOT_IP_OFFSET..],
+                        )));
+                        self.process_id = read_u32_be(&packet[offset + TCP_TOT_PID_OFFSET..]);
+                    }
+                    offset += assume_length;
+                }
                 _ => offset += assume_length,
             }
         }
