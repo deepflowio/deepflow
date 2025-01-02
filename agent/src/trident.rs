@@ -2119,6 +2119,7 @@ impl AgentComponents {
             proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
             analyzer_source_ip: source_ip,
             analyzer_port: candidate_config.dispatcher.analyzer_port,
+            ignore_npb: candidate_config.tap_mode != TapMode::Analyzer,
         };
         let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
         #[cfg(any(target_os = "linux", target_os = "android"))]

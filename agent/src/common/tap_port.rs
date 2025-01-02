@@ -117,9 +117,10 @@ impl TapPort {
         )
     }
 
-    pub fn from_id(tunnel_type: TunnelType, id: u32) -> Self {
+    pub fn from_id(tunnel_type: TunnelType, id: u32, tunnel_from: u32) -> Self {
         Self(
-            id as u64
+            ((id as u64) & 0xff)
+                | ((tunnel_from << 8) as u64)
                 | ((tunnel_type as u64 & Self::TUNNEL_TYPE_MASK) << Self::TUNNEL_TYPE_OFFSET)
                 | ((Self::FROM_ID as u64) << Self::FROM_OFFSET),
         )
