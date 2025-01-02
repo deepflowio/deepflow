@@ -48,19 +48,20 @@ type Host struct {
 }
 
 type VM struct {
-	Lcuuid       string            `json:"lcuuid" binding:"required"`
-	Name         string            `json:"name" binding:"required"`
-	Label        string            `json:"label"`
-	IP           string            `json:"ip"`
-	Hostname     string            `json:"hostname"`
-	HType        int               `json:"htype" binding:"required"`
-	State        int               `json:"state" binding:"required"`
-	LaunchServer string            `json:"launch_server" binding:"required"`
-	CreatedAt    time.Time         `json:"created_at"`
-	VPCLcuuid    string            `json:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string            `json:"az_lcuuid" binding:"required"`
-	RegionLcuuid string            `json:"region_lcuuid" binding:"required"`
-	CloudTags    map[string]string `json:"cloud_tags"`
+	Lcuuid        string            `json:"lcuuid" binding:"required"`
+	Name          string            `json:"name" binding:"required"`
+	Label         string            `json:"label"`
+	IP            string            `json:"ip"`
+	Hostname      string            `json:"hostname"`
+	HType         int               `json:"htype" binding:"required"`
+	State         int               `json:"state" binding:"required"`
+	LaunchServer  string            `json:"launch_server" binding:"required"`
+	CreatedAt     time.Time         `json:"created_at"`
+	VPCLcuuid     string            `json:"vpc_lcuuid" binding:"required"`
+	AZLcuuid      string            `json:"az_lcuuid" binding:"required"`
+	RegionLcuuid  string            `json:"region_lcuuid" binding:"required"`
+	CloudTags     map[string]string `json:"cloud_tags"`
+	NetworkLcuuid string            `json:"network_lcuuid"`
 }
 
 type VMPodNodeConnection struct {

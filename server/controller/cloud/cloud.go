@@ -161,6 +161,7 @@ func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource 
 	for _, ip := range resource.IPs {
 		vinterfaceLcuuidToIP[ip.VInterfaceLcuuid] = ip.IP
 	}
+	vmIPToNetworkLcuuid := map[string]string{}
 	vmLcuuidToIPs := map[string][]string{}
 	for _, vinterface := range resource.VInterfaces {
 		if vinterface.DeviceType != common.VIF_DEVICE_TYPE_VM {
@@ -170,6 +171,7 @@ func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource 
 		if !ok || ip == "" {
 			continue
 		}
+		vmIPToNetworkLcuuid[vinterface.VPCLcuuid+ip] = vinterface.NetworkLcuuid
 		vmLcuuidToIPs[vinterface.DeviceLcuuid] = append(vmLcuuidToIPs[vinterface.DeviceLcuuid], ip)
 	}
 
@@ -209,6 +211,13 @@ func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource 
 			if ok && len(ips) > 0 {
 				sort.Strings(ips)
 				vm.IP = ips[0]
+			}
+		}
+		// add network lcuuid to vm
+		if vm.NetworkLcuuid == "" {
+			networkLcuuid, ok := vmIPToNetworkLcuuid[vm.VPCLcuuid+vm.IP]
+			if ok {
+				vm.NetworkLcuuid = networkLcuuid
 			}
 		}
 		// add hostname to vm
