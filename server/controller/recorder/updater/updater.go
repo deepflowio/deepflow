@@ -166,6 +166,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleAddAndUpdate() {
 	dbItemsToAdd := []*MT{}
 	logDebug := logDebugResourceTypeEnabled(u.resourceType)
+	log.Infof("handle add and update for %s started", u.resourceType, u.metadata.LogPrefixes)
 	for _, cloudItem := range u.cloudData {
 		if logDebug {
 			log.Info(debugCloudItem(u.resourceType, cloudItem), u.metadata.LogPrefixes)
@@ -186,6 +187,33 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 			}
 		}
 	}
+	log.Infof("handle add and update for %s completed", u.resourceType, u.metadata.LogPrefixes)
+
+	log.Infof("handle add for %s started", u.resourceType, u.metadata.LogPrefixes)
+	for _, cloudItem := range u.cloudData {
+		if logDebug {
+			log.Info(debugCloudItem(u.resourceType, cloudItem), u.metadata.LogPrefixes)
+		}
+		_, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
+		if exists {
+			continue
+		}
+	}
+	log.Infof("handle add for %s completed", u.resourceType, u.metadata.LogPrefixes)
+	log.Infof("handle update for %s started", u.resourceType, u.metadata.LogPrefixes)
+	for _, cloudItem := range u.cloudData {
+		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
+		if exists {
+			diffBase.SetSequence(u.cache.GetSequence())
+			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
+			if ok {
+				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase, u.metadata.LogPrefixes)
+				u.update(&cloudItem, diffBase, mapInfo, structInfo)
+			}
+		}
+	}
+	log.Infof("handle update for %s completed", u.resourceType, u.metadata.LogPrefixes)
+
 	if len(dbItemsToAdd) > 0 {
 		u.add(dbItemsToAdd)
 	}
@@ -193,12 +221,22 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleDelete() {
 	lcuuidsOfBatchToDelete := []string{}
+	log.Infof("handle deletion for %s started", u.resourceType, u.metadata.LogPrefixes)
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
 			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase, u.metadata.LogPrefixes)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}
+	log.Infof("handle deletion for %s completed", u.resourceType, u.metadata.LogPrefixes)
+	log.Infof("handle deletion for %s pure loop started", u.resourceType, u.metadata.LogPrefixes)
+	for lcuuid, _ := range u.diffBaseData {
+		if lcuuid == "" {
+			continue
+		}
+	}
+	log.Infof("handle deletion for %s pure loop completed", u.resourceType, u.metadata.LogPrefixes)
+
 	if len(lcuuidsOfBatchToDelete) > 0 {
 		u.delete(lcuuidsOfBatchToDelete)
 	}
