@@ -1619,6 +1619,7 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
         }
         const SEP: &'static str = "\r\n";
         let mut end = 0;
+        let mut is_ascii = true;
         loop {
             // handle the case len is odd (such as "HTTP/1.0 200 OK\r\n" where encounter in istio),
             if end == self.0.len() - 1
@@ -1639,7 +1640,7 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
                     end -= 1;
                     break;
                 }
-                c if !c.is_ascii() => return None,
+                c if !c.is_ascii() => is_ascii = false,
                 _ => (),
             }
             // the length of SEP is 2 so step 2 is ok
@@ -1648,12 +1649,15 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
         if end == 0 {
             None
         } else {
-            let result = unsafe {
+            let result = if is_ascii {
                 // this is safe because all bytes are checked to be ascii
-                str::from_utf8_unchecked(&self.0[..end])
+                unsafe { Some(str::from_utf8_unchecked(&self.0[..end])) }
+            } else {
+                str::from_utf8(&self.0[..end]).ok()
             };
             self.0 = &self.0[end + 2..];
-            Some(result)
+
+            result
         }
     }
 }
