@@ -74,6 +74,8 @@ use crate::policy::PolicyGetter;
 use crate::rpc::get_timestamp;
 use crate::utils::{process::ProcessListener, stats};
 
+#[cfg(feature = "extended_observability")]
+use public::queue::Error::Terminated;
 use public::{
     buffer::BatchedBox,
     counter::{Countable, Counter, CounterType, CounterValue, OwnedCountable},
@@ -543,7 +545,12 @@ impl EbpfCollector {
                     raw: Some(ptr),
                 };
                 if let Err(e) = DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
-                    warn!("meta packet send ebpf error: {:?}", e);
+                    if e == Terminated {
+                        error!("dpdk init error: {:?}, deepflow-agent restart...", e);
+                        crate::utils::notify_exit(1);
+                    } else {
+                        warn!("meta packet send ebpf error: {:?}", e);
+                    }
                 }
                 return;
             }
