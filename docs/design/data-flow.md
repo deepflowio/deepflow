@@ -368,4 +368,11 @@ TODO
 
 # 5. Agent Management
 
-TODO
+- Sync 接口：deepflow-agent 定期向 deepflow-server 请求配置和基础标签内容
+- Push 接口：deepflow-server 主动将配置和基础标签变化推送给 deepflow-agent
+- Upgrade 接口：deepflow-agent 升级
+- Plugin 接口：deepflow-agent 获取插件，目前支持 wasm-plugins 和 so-plugins
+- KubernetesAPISync 接口：deepflow-agent 上报 Kubernetes 资源信息
+- PrometheusAPISync 接口：deepflow-agent 上报 Prometheus target 和 config API 内容
+- GPIDSync 接口：deepflow-agent 上报包含本端 PID 的 Socket 信息
+- ShareGPIDLocalData 接口：deepflow-agent 定期向 deepflow-server 请求包含对端 PID 的 Socket 信息
