@@ -231,6 +231,7 @@ type VM struct {
 	Region         string            `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	UID            string            `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 	CloudTags      map[string]string `gorm:"column:cloud_tags;type:text;default:'';serializer:json" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"`
+	NetworkID      int               `gorm:"column:vl2id;type:int;default:null" json:"VL2ID" mapstructure:"VL2ID"`
 }
 
 func (VM) TableName() string {

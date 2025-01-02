@@ -70,11 +70,12 @@ type hostInfo struct {
 }
 
 type vmInfo struct {
-	Name     string
-	RegionID int
-	AZID     int
-	VPCID    int
-	HostID   int
+	Name      string
+	RegionID  int
+	AZID      int
+	VPCID     int
+	HostID    int
+	NetworkID int
 }
 
 type vrouterInfo struct {
