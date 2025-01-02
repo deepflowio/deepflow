@@ -146,7 +146,7 @@ func (t *FlowTag) GenCKTable(cluster, storagePolicy, tableName, ckdbType string,
 	engine := ckdb.ReplacingMergeTree
 
 	orderKeys := []string{
-		"table", "vpc_id", "pod_ns_id", "field_type", "field_name", "field_value_type",
+		"table", "field_type", "field_name", "field_value_type",
 	}
 	if t.TagType == TagFieldValue {
 		orderKeys = append(orderKeys, "field_value")
