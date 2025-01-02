@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
 
 type Edition struct {
@@ -42,12 +43,14 @@ func NewEdition(schemeDir string, dbVersionTable string, dbVersionExpected strin
 type DBConfig struct {
 	DB     *gorm.DB
 	Config config.Config
+	SqlFmt schema.SqlFmt
 }
 
 func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
 	return &DBConfig{
 		DB:     db,
 		Config: cfg,
+		SqlFmt: schema.GetSqlFmt(cfg),
 	}
 }
 
