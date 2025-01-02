@@ -69,6 +69,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	var podNodes []metadbmodel.PodNode
 	var pods []metadbmodel.Pod
 	var vtapRepos []metadbmodel.VTapRepo
+	var vpcs []metadbmodel.VPC
+	var vms []metadbmodel.VM
 
 	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := metadb.GetDB(userInfo.ORGID)
@@ -114,6 +116,12 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	if err := Db.Select("name", "branch", "rev_count").Find(&vtapRepos).Error; err != nil {
 		return nil, err
 	}
+	if err := Db.Select("id", "name").Find(&vpcs).Error; err != nil {
+		return nil, err
+	}
+	if err := Db.Select("id", "epc_id").Find(&vms).Error; err != nil {
+		return nil, err
+	}
 
 	lcuuidToRegion := make(map[string]string)
 	for _, region := range regions {
@@ -127,9 +135,21 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		azToRegion[az.Lcuuid] = az.Region
 	}
 
+	idToVPC := make(map[int]string)
+	for _, vpc := range vpcs {
+		idToVPC[vpc.ID] = vpc.Name
+	}
+
+	vmIDToVPCID := make(map[int]int)
+	for _, vm := range vms {
+		vmIDToVPCID[vm.ID] = vm.VPCID
+	}
+
 	idToPodCluster := make(map[int]string)
+	podClusterIDToVPCID := make(map[int]int)
 	for _, podCluster := range podClusters {
 		idToPodCluster[podCluster.ID] = podCluster.Name
+		podClusterIDToVPCID[podCluster.ID] = podCluster.VPCID
 	}
 
 	podIDToPodClusterID := make(map[int]int)
@@ -272,13 +292,18 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			vtapResp.LaunchServerID = vtap.LaunchServerID
 			vtapResp.SyncedControllerAt = vtap.SyncedControllerAt.Format(common.GO_BIRTHDAY)
 			vtapResp.SyncedAnalyzerAt = vtap.SyncedAnalyzerAt.Format(common.GO_BIRTHDAY)
+			vtapResp.VPCID = 0
 
-			// return pod_cluster_id/name for pod_host/pod_vm/k8s_sidecar
+			// return pod_cluster_id/name & vpc_id/name for pod_host/pod_vm/k8s_sidecar
+			// return vpc_id/name for workload_p/workload_v
 			if vtap.Type == common.VTAP_TYPE_POD_HOST || vtap.Type == common.VTAP_TYPE_POD_VM {
 				if podClusterID, ok := podNodeIDToPodClusterID[vtap.LaunchServerID]; ok {
 					vtapResp.PodClusterID = podClusterID
 					if podClusterName, _ok := idToPodCluster[podClusterID]; _ok {
 						vtapResp.PodClusterName = podClusterName
+					}
+					if vpcID, __ok := podClusterIDToVPCID[podClusterID]; __ok {
+						vtapResp.VPCID = vpcID
 					}
 				}
 			} else if vtap.Type == common.VTAP_TYPE_K8S_SIDECAR {
@@ -287,7 +312,17 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 					if podClusterName, _ok := idToPodCluster[podClusterID]; _ok {
 						vtapResp.PodClusterName = podClusterName
 					}
+					if vpcID, __ok := podClusterIDToVPCID[podClusterID]; __ok {
+						vtapResp.VPCID = vpcID
+					}
 				}
+			} else if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
+				if vpcID, _ok := vmIDToVPCID[vtap.LaunchServerID]; _ok {
+					vtapResp.VPCID = vpcID
+				}
+			}
+			if vpcName, ok := idToVPC[vtapResp.VPCID]; ok {
+				vtapResp.VPCName = vpcName
 			}
 		default:
 			if vtap.CreatedAt.Before(vtap.SyncedControllerAt) {

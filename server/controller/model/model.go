@@ -154,6 +154,8 @@ type Vtap struct {
 	AZName                    string  `json:"AZ_NAME"`
 	Region                    string  `json:"REGION"`
 	RegionName                string  `json:"REGION_NAME"`
+	VPCID                     int     `json:"EPC_ID"`
+	VPCName                   string  `json:"EPC_NAME"`
 	PodClusterID              int     `json:"POD_CLUSTER_ID"`
 	PodClusterName            string  `json:"POD_CLUSTER_NAME"`
 	CPUNum                    int     `json:"CPU_NUM"`
