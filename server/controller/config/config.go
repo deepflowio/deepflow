@@ -17,6 +17,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -85,6 +86,7 @@ type ControllerConfig struct {
 	FPermit      common.FPermit `yaml:"fpermit"`
 
 	MetadbCfg     metadb.Config
+	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
 	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
@@ -107,6 +109,12 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
+	if !c.ControllerConfig.MySqlCfg.Enabled && !c.ControllerConfig.PostgreSQLCfg.Enabled {
+		return fmt.Errorf("mysql or postgresql must be enabled")
+	}
+	if c.ControllerConfig.MySqlCfg.Enabled && c.ControllerConfig.PostgreSQLCfg.Enabled {
+		return fmt.Errorf("mysql and postgresql can not be enabled at the same time")
+	}
 	return nil
 }
 
@@ -147,6 +155,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetExportersEnabled(shared_common.ExportersEnabled(path))
 
 	c.ControllerConfig.MetadbCfg.InitFromMySQL(c.ControllerConfig.MySqlCfg)
+	c.ControllerConfig.MetadbCfg.InitFromPostgreSQL(c.ControllerConfig.PostgreSQLCfg)
 }
 
 func DefaultConfig() *Config {

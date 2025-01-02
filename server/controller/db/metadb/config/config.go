@@ -16,24 +16,49 @@
 
 package config
 
+const (
+	MetaDBTypeMySQL      = "MySQL"
+	MetaDBTypePostgreSQL = "PostgreSQL"
+)
+
 type Config struct {
-	Database               string `default:"deepflow" yaml:"database"`
-	Host                   string `default:"mysql" yaml:"host"`
-	Port                   uint32 `default:"30130" yaml:"port"`
-	ProxyHost              string `default:"" yaml:"proxy-host"`
-	ProxyPort              uint32 `default:"0" yaml:"proxy-port"`
-	UserName               string `default:"root" yaml:"user-name"`
-	UserPassword           string `default:"deepflow" yaml:"user-password"`
-	TimeOut                uint32 `default:"30" yaml:"timeout"`
-	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
-	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
-	ResultSetMax           uint32 `default:"100000" yaml:"result_set_max"`
-	MaxOpenConns           uint16 `default:"100" yaml:"max_open_conns"`
-	MaxIdleConns           uint16 `default:"50" yaml:"max_idle_conns"`
-	ConnMaxLifeTime        uint16 `default:"60" yaml:"conn_max_life_time"`
+	Type string
+
+	Database     string
+	Host         string
+	Port         uint32
+	ProxyHost    string
+	ProxyPort    uint32
+	UserName     string
+	UserPassword string
+	TimeOut      uint32
+
+	// PostgreSQL
+	Schema string
+
+	// MySQL
+	AutoIncrementIncrement uint32
+
+	DropDatabaseEnabled bool
+	MaxOpenConns        uint16
+	MaxIdleConns        uint16
+	ConnMaxLifeTime     uint16
+	BatchSize0          uint32
+	BatchSize1          uint32
+}
+
+func (c Config) GetAutoIncrementIncrement() uint32 {
+	if c.Type == MetaDBTypeMySQL {
+		return c.AutoIncrementIncrement
+	}
+	return 1
 }
 
 func (c *Config) InitFromMySQL(mysqlCfg MySQLConfig) {
+	if !mysqlCfg.Enabled {
+		return
+	}
+	c.Type = MetaDBTypeMySQL
 	c.Database = mysqlCfg.Database
 	c.Host = mysqlCfg.Host
 	c.Port = mysqlCfg.Port
@@ -42,15 +67,39 @@ func (c *Config) InitFromMySQL(mysqlCfg MySQLConfig) {
 	c.UserName = mysqlCfg.UserName
 	c.UserPassword = mysqlCfg.UserPassword
 	c.TimeOut = mysqlCfg.TimeOut
-	c.DropDatabaseEnabled = mysqlCfg.DropDatabaseEnabled
 	c.AutoIncrementIncrement = mysqlCfg.AutoIncrementIncrement
-	c.ResultSetMax = mysqlCfg.ResultSetMax
+	c.DropDatabaseEnabled = mysqlCfg.DropDatabaseEnabled
 	c.MaxOpenConns = mysqlCfg.MaxOpenConns
 	c.MaxIdleConns = mysqlCfg.MaxIdleConns
 	c.ConnMaxLifeTime = mysqlCfg.ConnMaxLifeTime
+	c.BatchSize0 = mysqlCfg.BatchSize0
+	c.BatchSize1 = mysqlCfg.BatchSize1
+}
+
+func (c *Config) InitFromPostgreSQL(postgreSQLCfg PostgreSQLConfig) {
+	if !postgreSQLCfg.Enabled {
+		return
+	}
+	c.Type = MetaDBTypePostgreSQL
+	c.Database = postgreSQLCfg.Database
+	c.Schema = postgreSQLCfg.Schema
+	c.Host = postgreSQLCfg.Host
+	c.Port = postgreSQLCfg.Port
+	c.ProxyHost = postgreSQLCfg.ProxyHost
+	c.ProxyPort = postgreSQLCfg.ProxyPort
+	c.UserName = postgreSQLCfg.UserName
+	c.UserPassword = postgreSQLCfg.UserPassword
+	c.TimeOut = postgreSQLCfg.TimeOut
+	c.DropDatabaseEnabled = postgreSQLCfg.DropDatabaseEnabled
+	c.MaxOpenConns = postgreSQLCfg.MaxOpenConns
+	c.MaxIdleConns = postgreSQLCfg.MaxIdleConns
+	c.ConnMaxLifeTime = postgreSQLCfg.ConnMaxLifeTime
+	c.BatchSize0 = postgreSQLCfg.BatchSize0
+	c.BatchSize1 = postgreSQLCfg.BatchSize1
 }
 
 type MySQLConfig struct {
+	Enabled                bool   `default:"true" yaml:"enabled"`
 	Database               string `default:"deepflow" yaml:"database"`
 	Host                   string `default:"mysql" yaml:"host"`
 	Port                   uint32 `default:"30130" yaml:"port"`
@@ -59,10 +108,30 @@ type MySQLConfig struct {
 	UserName               string `default:"root" yaml:"user-name"`
 	UserPassword           string `default:"deepflow" yaml:"user-password"`
 	TimeOut                uint32 `default:"30" yaml:"timeout"`
-	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
 	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
-	ResultSetMax           uint32 `default:"100000" yaml:"result_set_max"`
+	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
 	MaxOpenConns           uint16 `default:"100" yaml:"max_open_conns"`
 	MaxIdleConns           uint16 `default:"50" yaml:"max_idle_conns"`
 	ConnMaxLifeTime        uint16 `default:"60" yaml:"conn_max_life_time"`
+	BatchSize0             uint32 `default:"100000" yaml:"batch-size-0"`
+	BatchSize1             uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+type PostgreSQLConfig struct {
+	Enabled             bool   `default:"false" yaml:"enabled"`
+	Database            string `default:"deepflow" yaml:"database"`
+	Schema              string `default:"public" yaml:"schema"`
+	Host                string `default:"postgresql" yaml:"host"`
+	Port                uint32 `default:"5432" yaml:"port"`
+	ProxyHost           string `default:"" yaml:"proxy-host"`
+	ProxyPort           uint32 `default:"0" yaml:"proxy-port"`
+	UserName            string `default:"root" yaml:"user-name"`
+	UserPassword        string `default:"deepflow" yaml:"user-password"`
+	TimeOut             uint32 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
+	MaxOpenConns        uint16 `default:"100" yaml:"max-open-conns"`
+	MaxIdleConns        uint16 `default:"50" yaml:"max-idle-conns"`
+	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn-max-life-time"`
+	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
+	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
 }

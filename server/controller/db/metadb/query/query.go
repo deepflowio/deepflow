@@ -25,7 +25,7 @@ import (
 func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
 	data := make([]*T, 0)
 	pageIndex := 0
-	pageCount := int(metadb.GetConfig().ResultSetMax)
+	pageCount := int(metadb.GetConfig().BatchSize0)
 	pageData := make([]*T, 0)
 	for pageIndex == 0 || len(pageData) == pageCount {
 		err := query.Find(&pageData).Limit(pageCount).Offset(pageIndex * pageCount).Error
@@ -42,7 +42,7 @@ func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
 func FindInBatchesObj[T any](query *gorm.DB) ([]T, error) { // TODO unify return pointer or struct
 	data := make([]T, 0)
 	pageIndex := 0
-	pageCount := int(metadb.GetConfig().ResultSetMax)
+	pageCount := int(metadb.GetConfig().BatchSize0)
 	pageData := make([]T, 0)
 	for pageIndex == 0 || len(pageData) == pageCount {
 		err := query.Find(&pageData).Limit(pageCount).Offset(pageIndex * pageCount).Error

@@ -97,6 +97,7 @@ controller:
 
   # mysql相关配置
   mysql:
+    enabled: true
     database: deepflow
     user-name: root
     user-password: deepflow
@@ -105,15 +106,41 @@ controller:
     proxy-host:
     proxy-port:
     timeout: 30
+    
+    auto_increment_increment: 1
+    
     # whether drop database when init failed
     drop-database-enabled: false
-    auto_increment_increment: 1
-    # limit the total number of process queried at a time
-    result_set_max: 100000
     max_open_conns: 100
     max_idle_conns: 50
     # unit: minute
     conn_max_life_time: 60
+    # limit the size of batch operation for small tables like ch_process
+    batch-size-0: 100000
+    # limit the size of batch operation for large tables like pod
+    batch-size-1: 2500
+
+  # postgresql相关配置
+  postgresql:
+    enabled: false
+    database: deepflow
+    schema: public
+    user-name: postgres
+    user-password: deepflow
+    host: postgresql
+    port: 5432
+    timeout: 30
+    
+    # whether drop meta database when init failed
+    drop-database-enabled: false
+    max-open-conns: 100
+    max-idle-conns: 50
+    # unit: minute
+    conn-max-life-time: 60
+    # limit the size of batch operation for small tables like ch_process
+    batch-size-0: 100000
+    # limit the size of batch operation for large tables like pod
+    batch-size-1: 2500
 
   # redis相关配置
   redis:
