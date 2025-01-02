@@ -42,10 +42,12 @@
 * fix: trim-tunnel-type has not taken effect [#8578](https://github.com/deepflowio/deepflow/pull/8578) by [yuanchaoa](https://github.com/yuanchaoa)
 
 #### Performance
+* perf: change the flow_tag primary key to improve query speed [#8827](https://github.com/deepflowio/deepflow/pull/8827) by [lzf575](https://github.com/lzf575)
 * perf: add primary key for in_process table [#8624](https://github.com/deepflowio/deepflow/pull/8624) by [lzf575](https://github.com/lzf575)
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: http url supports utf8 [#8830](https://github.com/deepflowio/deepflow/pull/8830) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
