@@ -537,6 +537,11 @@ var (
 		input:  "SHOW tag chost_ip values from vtap_flow_port where chost_ip_id != 1",
 		output: []string{"SELECT id AS `value`, ip AS `display_name` FROM flow_tag.`chost_map` WHERE (not(value = 1)) AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000"},
 	}, {
+		name:   "test_show_chost_subnet_where",
+		db:     "flow_metrics",
+		input:  "SHOW tag chost values from vtap_flow_port where subnet_id != 1 and subnet !='xx'",
+		output: []string{"SELECT id AS `value`, name AS `display_name` FROM flow_tag.`chost_map` WHERE (not(subnet_id = 1) AND not(toUInt64(subnet_id) GLOBAL IN (SELECT id FROM flow_tag.subnet_map WHERE name = 'xx'))) GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000"},
+	}, {
 		name:   "test_application_log_body",
 		db:     "application_log",
 		input:  "SELECT user, user_id FROM log WHERE body!='log' LIMIT 1",

@@ -203,20 +203,22 @@ type HostUpdate struct {
 
 type VMFieldsUpdate struct {
 	Key
-	Name         fieldDetail[string]
-	IP           fieldDetail[string]
-	Label        fieldDetail[string]
-	State        fieldDetail[int]
-	HType        fieldDetail[int]
-	LaunchServer fieldDetail[string]
-	CloudTags    fieldDetail[map[string]string]
-	HostID       fieldDetail[int]
-	UID          fieldDetail[string]
-	Hostname     fieldDetail[string]
-	VPCID        fieldDetail[int]
-	VPCLcuuid    fieldDetail[string]
-	AZLcuuid     fieldDetail[string]
-	RegionLcuuid fieldDetail[string]
+	Name          fieldDetail[string]
+	IP            fieldDetail[string]
+	Label         fieldDetail[string]
+	State         fieldDetail[int]
+	HType         fieldDetail[int]
+	LaunchServer  fieldDetail[string]
+	CloudTags     fieldDetail[map[string]string]
+	HostID        fieldDetail[int]
+	UID           fieldDetail[string]
+	Hostname      fieldDetail[string]
+	VPCID         fieldDetail[int]
+	VPCLcuuid     fieldDetail[string]
+	AZLcuuid      fieldDetail[string]
+	RegionLcuuid  fieldDetail[string]
+	NetworkID     fieldDetail[int]
+	NetworkLcuuid fieldDetail[string]
 }
 
 type VMUpdate struct {

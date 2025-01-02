@@ -282,8 +282,9 @@ func (t *DataSet) AddVM(item *mysqlmodel.VM) {
 	t.vmLcuuidToID[item.Lcuuid] = item.ID
 	t.vmIDToLcuuid[item.ID] = item.Lcuuid
 	t.vmIDToInfo[item.ID] = &vmInfo{
-		Name:  item.Name,
-		VPCID: item.VPCID,
+		Name:      item.Name,
+		VPCID:     item.VPCID,
+		NetworkID: item.NetworkID,
 	}
 	if regionID, ok := t.GetRegionIDByLcuuid(item.Region); ok {
 		t.vmIDToInfo[item.ID].RegionID = regionID
@@ -312,6 +313,9 @@ func (t *DataSet) UpdateVM(cloudItem *cloudmodel.VM) {
 	}
 	if azID, ok := t.GetAZIDByLcuuid(cloudItem.AZLcuuid); ok {
 		info.AZID = azID
+	}
+	if networkID, ok := t.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid); ok {
+		info.NetworkID = networkID
 	}
 	if vpcID, ok := t.vpcLcuuidToID[cloudItem.Lcuuid]; ok {
 		info.VPCID = vpcID

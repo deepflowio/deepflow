@@ -56,6 +56,7 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 		IP:       source.IP,
 		TeamID:   md.TeamID,
 		DomainID: md.DomainID,
+		SubnetID: source.NetworkID,
 	})
 	return
 }
@@ -78,7 +79,9 @@ func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFields
 	if fieldsUpdate.IP.IsDifferent() {
 		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
-
+	if fieldsUpdate.NetworkID.IsDifferent() {
+		updateInfo["subnet_id"] = fieldsUpdate.NetworkID.GetNew()
+	}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChChost
 		db.Where("id = ?", sourceID).First(&chItem)
