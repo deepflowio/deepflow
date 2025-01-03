@@ -172,6 +172,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: support decap gre [#8839](https://github.com/deepflowio/deepflow/pull/8839) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: update vtap ignore fields [#8746](https://github.com/deepflowio/deepflow/pull/8746) by [askyrie](https://github.com/askyrie)
 *  feat: support fanout in mirror mode and analyzer mode [#8730](https://github.com/deepflowio/deepflow/pull/8730) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: deprecated ipvlan [#8724](https://github.com/deepflowio/deepflow/pull/8724) by [askyrie](https://github.com/askyrie)
