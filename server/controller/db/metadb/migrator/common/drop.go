@@ -16,16 +16,12 @@
 
 package common
 
-import (
-	"fmt"
-)
-
 func DropDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "drop database"))
 	var databaseName string
-	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
+	dc.DB.Raw(dc.SqlFmt.SelectDatabase()).Scan(&databaseName)
 	if databaseName == dc.Config.Database {
-		return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
+		return dc.DB.Exec(dc.SqlFmt.DropDatabase()).Error
 	} else {
 		log.Infof(LogDBName(dc.Config.Database, "database doesn't exist"))
 		return nil

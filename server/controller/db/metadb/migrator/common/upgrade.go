@@ -30,23 +30,23 @@ import (
 )
 
 func ExecuteCEIssues(dc *DBConfig, curVersion string) error {
-	return ExecuteIssues(dc, curVersion, schema.FILE_DIR)
+	return ExecuteIssues(dc, curVersion, dc.SqlFmt.GetRawSqlDirectory(schema.RAW_SQL_ROOT_DIR))
 }
 
-func ExecuteIssues(dc *DBConfig, curVersion string, schemaDir string) error {
-	issus, err := os.ReadDir(fmt.Sprintf("%s/issu", schemaDir))
+func ExecuteIssues(dc *DBConfig, curVersion string, rawSqlDir string) error {
+	issus, err := os.ReadDir(fmt.Sprintf("%s/issu", rawSqlDir))
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to read %s: %s", schemaDir, err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to read %s: %s", rawSqlDir, err.Error()))
 		return err
 	}
 	nextVersions := getAscSortedNextVersions(issus, curVersion)
-	log.Info(LogDBName(dc.Config.Database, "%s issues to be executed: %v", schemaDir, nextVersions))
+	log.Info(LogDBName(dc.Config.Database, "%s issues to be executed: %v", rawSqlDir, nextVersions))
 	for _, nv := range nextVersions {
 		err = executeScript(dc, nv)
 		if err != nil {
 			return err
 		}
-		err = executeIssue(dc, nv, schemaDir)
+		err = executeIssue(dc, nv, rawSqlDir)
 		if err != nil {
 			return err
 		}
@@ -54,24 +54,24 @@ func ExecuteIssues(dc *DBConfig, curVersion string, schemaDir string) error {
 	return nil
 }
 
-func executeIssue(dc *DBConfig, nextVersion string, schemaDir string) error {
-	byteSQL, err := os.ReadFile(fmt.Sprintf("%s/issu/%s.sql", schemaDir, nextVersion))
+func executeIssue(dc *DBConfig, nextVersion string, rawSqlDir string) error {
+	byteSQL, err := os.ReadFile(fmt.Sprintf("%s/issu/%s.sql", rawSqlDir, nextVersion))
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to read sql file (version: %s): %s", nextVersion, err.Error()))
 		return err
 	}
 	if len(byteSQL) == 0 {
-		log.Warning(LogDBName(dc.Config.Database, "%s issue with no content (version: %s)", schemaDir, nextVersion))
+		log.Warning(LogDBName(dc.Config.Database, "%s issue with no content (version: %s)", rawSqlDir, nextVersion))
 		return nil
 	}
 
 	strSQL := fmt.Sprintf("SET @defaultDatabaseName='%s';\n", "deepflow") + string(byteSQL) // TODO: remove hard code
 	err = dc.DB.Exec(strSQL).Error
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to execute %s issue (version: %s): %s", schemaDir, nextVersion, err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to execute %s issue (version: %s): %s", rawSqlDir, nextVersion, err.Error()))
 		return err
 	}
-	log.Info(LogDBName(dc.Config.Database, "executed %s issue (version: %s) successfully", schemaDir, nextVersion))
+	log.Info(LogDBName(dc.Config.Database, "executed %s issue (version: %s) successfully", rawSqlDir, nextVersion))
 	return nil
 }
 

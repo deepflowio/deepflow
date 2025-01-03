@@ -17,8 +17,6 @@
 package common
 
 import (
-	"fmt"
-
 	"github.com/op/go-logging"
 )
 
@@ -26,12 +24,12 @@ var log = logging.MustGetLogger("db.metadb.migrator.common")
 
 func CreateDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "create database"))
-	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
+	return dc.DB.Exec(dc.SqlFmt.CreateDatabase()).Error
 }
 
 func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
 	var databaseName string
-	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
+	dc.DB.Raw(dc.SqlFmt.SelectDatabase()).Scan(&databaseName)
 	if databaseName == dc.Config.Database {
 		return true, nil
 	} else {

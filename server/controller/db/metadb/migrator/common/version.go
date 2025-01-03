@@ -35,7 +35,7 @@ func CheckCEDBVersionTableExists(dc *DBConfig) (bool, error) {
 }
 
 func CreateCEDBVersionTable(dc *DBConfig) error {
-	return CreateTable(dc, schema.CREATE_TABLE_DB_VERSION)
+	return InitDBVersionTable(dc, dc.SqlFmt.GetRawSqlDirectory(schema.RAW_SQL_ROOT_DIR))
 }
 
 func CheckDBVersion(dc *DBConfig, tableName string, expectedVersion string) error {
@@ -53,7 +53,7 @@ func CheckDBVersion(dc *DBConfig, tableName string, expectedVersion string) erro
 
 func GetDBVersion(dc *DBConfig, tableName string) (string, error) {
 	var version string
-	err := dc.DB.Raw(fmt.Sprintf("SELECT version FROM %s", tableName)).Scan(&version).Error
+	err := dc.DB.Raw(dc.SqlFmt.SelectColumn(tableName, "version")).Scan(&version).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to get %s: %s", tableName, err.Error()))
 		return "", err
@@ -63,7 +63,7 @@ func GetDBVersion(dc *DBConfig, tableName string) (string, error) {
 
 func CheckTableExists(dc *DBConfig, tableName string) (bool, error) {
 	var table string
-	err := dc.DB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", dc.Config.Database, tableName)).Scan(&table).Error
+	err := dc.DB.Raw(dc.SqlFmt.SelectTable(tableName)).Scan(&table).Error
 
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to check table %s exists: %s", tableName, err.Error()))
@@ -72,17 +72,8 @@ func CheckTableExists(dc *DBConfig, tableName string) (bool, error) {
 	return table == tableName, nil
 }
 
-func CreateTable(dc *DBConfig, sql string) error {
-	err := dc.DB.Exec(sql).Error
-	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to create table %s: %s", sql, err.Error()))
-		return err
-	}
-	return nil
-}
-
 func InsertDBVersion(dc *DBConfig, tableName string, version string) error {
-	err := dc.DB.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUES ('%s')", tableName, version)).Error
+	err := dc.DB.Exec(dc.SqlFmt.InsertDBVersion(tableName, version)).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to insert %s: %s", tableName, err.Error()))
 		return err

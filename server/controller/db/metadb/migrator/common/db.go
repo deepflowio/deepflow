@@ -23,31 +23,20 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
-
-type Edition struct {
-	SchemeDir         string
-	DBVersionTable    string
-	DBVersionExpected string
-}
-
-func NewEdition(schemeDir string, dbVersionTable string, dbVersionExpected string) *Edition {
-	return &Edition{
-		SchemeDir:         schemeDir,
-		DBVersionTable:    dbVersionTable,
-		DBVersionExpected: dbVersionExpected,
-	}
-}
 
 type DBConfig struct {
 	DB     *gorm.DB
 	Config config.Config
+	SqlFmt schema.SqlFmt
 }
 
 func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
 	return &DBConfig{
 		DB:     db,
 		Config: cfg,
+		SqlFmt: schema.GetSqlFmt(cfg),
 	}
 }
 
