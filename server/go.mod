@@ -95,7 +95,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
 	gorm.io/driver/sqlite v1.3.4
-	gorm.io/gorm v1.23.5
+	gorm.io/gorm v1.25.10
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 	k8s.io/api v0.24.0
 	k8s.io/apimachinery v0.24.0
@@ -121,6 +121,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/grafana/pyroscope-go v1.2.0
 	github.com/klauspost/compress v1.17.11
+	github.com/lib/pq v1.10.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/orcaman/concurrent-map/v2 v2.0.1
@@ -129,6 +130,7 @@ require (
 	github.com/volcengine/volcengine-go-sdk v1.0.141
 	go.opentelemetry.io/collector/pdata v1.0.0
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
+	gorm.io/driver/postgres v1.5.11
 	skywalking.apache.org/repo/goapi v0.0.0-20230712035303-201c1fb2d6ec
 )
 
@@ -163,6 +165,10 @@ require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.5.5 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/gofork v1.7.6 // indirect

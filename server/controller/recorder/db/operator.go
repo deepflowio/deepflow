@@ -94,7 +94,7 @@ func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	// 		2. We need to use the ids of the created items
 	// 		3. Ids are not allocated by ourselves
 	// 		4. Use gorm to insert batch data
-	if metadb.GetConfig().AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
+	if metadb.GetConfig().GetAutoIncrementIncrement() != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
 		o.metadata.DB.Select(o.fieldsNeededAfterCreate).Where("lcuuid IN ?", lcuuidsToAdd).Find(&itemsToAdd)
 	}
 

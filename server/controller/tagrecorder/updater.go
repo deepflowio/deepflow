@@ -100,9 +100,7 @@ func (c *UpdaterManager) refresh() {
 		NewChNpbTunnel(),
 		NewChAlarmPolicy(),
 	}
-	if c.cfg.RedisCfg.Enabled {
-		updaters = append(updaters, NewChIPResource(c.tCtx))
-	}
+
 	if c.cfg.FPermit.Enabled {
 		updaters = append(updaters, NewChUser())
 	}

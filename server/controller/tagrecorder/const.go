@@ -817,6 +817,7 @@ const (
 		"    `l3_epc_id` UInt64,\n" +
 		"    `hostname` String,\n" +
 		"    `ip` String,\n" +
+		"    `subnet_id` UInt64,\n" +
 		"    `team_id` UInt64,\n" +
 		"    `domain_id` UInt64\n" +
 		")\n" +

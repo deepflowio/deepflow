@@ -153,9 +153,7 @@ func (c *TagRecorder) getUpdaters(db *metadb.DB, domainLcuuidToIconID map[string
 		// NewChPolicy(),
 		// NewChNpbTunnel(),
 	}
-	if c.cfg.RedisCfg.Enabled {
-		updaters = append(updaters, NewChIPResource(c.tCtx))
-	}
+
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg)
 		updater.SetDB(db)
