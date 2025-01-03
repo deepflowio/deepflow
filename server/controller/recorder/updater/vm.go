@@ -95,12 +95,15 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 	if cloudItem.CloudTags != nil {
 		cloudTags = cloudItem.CloudTags
 	}
-	networkID, idExists := m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-	if !idExists {
-		log.Error(resourceAForResourceBNotFound(
-			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-		), m.metadata.LogPrefixes)
+	networkID := 0
+	if cloudItem.NetworkLcuuid != "" {
+		networkID, exists = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+		if !exists {
+			log.Error(resourceAForResourceBNotFound(
+				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+			), m.metadata.LogPrefixes)
+		}
 	}
 	dbItem := &metadbmodel.VM{
 		Name:         cloudItem.Name,
@@ -201,14 +204,18 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
 	}
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
-		networkID, idExists := m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-		if !idExists {
-			log.Error(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-			), m.metadata.LogPrefixes)
+		networkID := 0
+		if cloudItem.NetworkLcuuid != "" {
+			var exists bool
+			networkID, exists = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+			if !exists {
+				log.Error(resourceAForResourceBNotFound(
+					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+					ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
+				), m.metadata.LogPrefixes)
+			}
 		}
-		mapInfo["subnet_id"] = networkID
+		mapInfo["vl2id"] = networkID
 		structInfo.NetworkID.SetNew(networkID)
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
