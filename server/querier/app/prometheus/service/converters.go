@@ -497,11 +497,11 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 	var err error
 	var tagsArray []string
 	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), "", orgID, false, ctx, nil)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, ctx, nil)
 	} else if db == chCommon.DB_NAME_EXT_METRICS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), "", orgID, false, ctx, nil)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, ctx, nil)
 	} else {
-		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), "", orgID, false, ctx, nil)
+		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, ctx, nil)
 	}
 	if err != nil || data == nil {
 		return tagsArray, err
