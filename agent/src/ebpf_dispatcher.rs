@@ -544,13 +544,15 @@ impl EbpfCollector {
                     data: slice::from_raw_parts_mut(ptr, sd.cap_len as usize),
                     raw: Some(ptr),
                 };
-                if let Err(e) = DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
-                    if e == Terminated {
-                        error!("dpdk init error: {:?}, deepflow-agent restart...", e);
+                match DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
+                    Err(Terminated(a, b)) => {
+                        error!("dpdk init error: {:?}, deepflow-agent restart...", (a, b));
                         crate::utils::notify_exit(1);
-                    } else {
+                    }
+                    Err(e) => {
                         warn!("meta packet send ebpf error: {:?}", e);
                     }
+                    _ => {}
                 }
                 return;
             }
