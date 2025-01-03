@@ -41,7 +41,7 @@ func DropDatabaseIfInitTablesFailed(dc *DBConfig, editionFunc EditionInitTablesF
 }
 
 func InitCETables(dc *DBConfig) error {
-	err := InitTables(dc, dc.SqlFmt.GetRawSqlFileDir())
+	err := InitTables(dc, dc.SqlFmt.GetRawSqlDirectory(schema.RAW_SQL_ROOT_DIR))
 	if err != nil {
 		return err
 	}

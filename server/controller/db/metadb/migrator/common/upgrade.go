@@ -25,11 +25,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/script"
 )
 
 func ExecuteCEIssues(dc *DBConfig, curVersion string) error {
-	return ExecuteIssues(dc, curVersion, dc.SqlFmt.GetRawSqlFileDir())
+	return ExecuteIssues(dc, curVersion, dc.SqlFmt.GetRawSqlDirectory(schema.RAW_SQL_ROOT_DIR))
 }
 
 func ExecuteIssues(dc *DBConfig, curVersion string, rawSqlDir string) error {
