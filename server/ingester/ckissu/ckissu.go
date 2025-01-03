@@ -381,7 +381,7 @@ func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isA
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 
-	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, i.ckdbType, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
+	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, i.ckdbType, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+"1m")]
 	// create table mv
 	aggrInterval := ckdb.AggregationHour
 	if d.interval == ckdb.TimeFuncDay {
