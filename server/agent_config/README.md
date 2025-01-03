@@ -3369,8 +3369,8 @@ inputs:
 **Description**:
 
 Specify the appropriate packet transmission hook point according to the actual network card driver.
-To obtain the driver method and configure the transmission hook point, as well as precautions,
-refer to the description of 'rx_hooks'.
+To obtain the driver method and configure the transmission hook point, as well as precautions，refer
+to the description of 'rx_hooks'.
 
 Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
@@ -5380,6 +5380,39 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | bool |
+
+## Vector {#inputs.vector}
+
+### Vector Component Disabled {#inputs.vector.enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.vector.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  vector:
+    enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+The switcher control for Vector component running.
+
+### Vector Component Config {#inputs.vector.config}
+
+The detail config for Vector Component, all availble config keys could be found in https://vector.dev/docs/reference/configuration
 
 # Processors {#processors}
 
