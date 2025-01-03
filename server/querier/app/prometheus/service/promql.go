@@ -866,7 +866,7 @@ func (p *prometheusExecutor) getAllOrganizations() []string {
 func (p *prometheusExecutor) loadExtraLabelsCache(orgID string) {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
 	showTags := fmt.Sprintf("show tags from %s", NETWORK_TABLE)
-	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, "", orgID, false, context.Background(), nil)
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, config.Cfg.Clickhouse.QueryCacheTTL, orgID, config.Cfg.Clickhouse.UseQueryCache, context.Background(), nil)
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
 		return
