@@ -493,7 +493,7 @@ mod stringifier {
     fn validate_null(payload: &[u8]) -> Result<&[u8]> {
         assert_eq!(payload[0], b'_');
 
-        if payload.get(1..3) == Some(b"\r\n") {
+        if payload.get(1..3) == Some(b"\r\n".as_ref()) {
             Ok(&payload[3..])
         } else {
             Err(Error::RedisLogParseFailed)

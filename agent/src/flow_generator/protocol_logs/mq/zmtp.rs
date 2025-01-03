@@ -412,7 +412,7 @@ impl ZmtpLog {
         let (payload, length) = parse_byte(payload).ok_or(Error::ZmtpLogParseFailed)?;
         // Due to a libzmq bug, "\x05ERROR" is treated as "\x5e" "RROR",
         // so we process it as an exceptional case.
-        let payload = if length == 0x5e && payload.get(0..4) == Some(b"RROR") {
+        let payload = if length == 0x5e && payload.get(0..4) == Some(b"RROR".as_ref()) {
             info.command_name = Some("ERROR".to_string());
             &payload[4..]
         } else {
