@@ -28,7 +28,7 @@
 #include "tracer.h"
 #include "probe.h"
 #include "table.h"
-#include "common.h"
+#include "utils.h"
 #include "socket.h"
 #include "log.h"
 #include "go_tracer.h"

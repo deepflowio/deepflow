@@ -42,7 +42,7 @@
 
 #ifndef AARCH64_MUSL
 #include "../config.h"
-#include "../common.h"
+#include "../utils.h"
 #include "../mem.h"
 #include "../log.h"
 #include "../types.h"

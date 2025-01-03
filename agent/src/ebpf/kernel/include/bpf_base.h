@@ -118,6 +118,11 @@ static int
     __attribute__ ((__unused__)) (*bpf_get_stack) (void *ctx, void *buf, __u32 size,
 						     int flags) = (void *)67;
 
+// Linux 4.14: Added support for BPF_MAP_TYPE_CPUMAP, allowing packets to be redirected to specific CPUs.
+static long
+    __attribute__ ((__unused__)) (*bpf_redirect_map)(void *map, __u32 key, __u64 flags) =
+							(void *)51;
+
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
 #else
@@ -292,6 +297,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 
 #define TP_SYSCALL_PROG(F) SEC("tracepoint/syscalls/sys_"__stringify(F)) int df_T_##F
 #define TP_SCHED_PROG(F) SEC("tracepoint/sched/sched_"__stringify(F)) int df_T_##F
+#define TP_XDP_PROG(F) SEC("tracepoint/xdp/xdp_"__stringify(F)) int df_T_##F
 #define PROGTP(F) SEC("prog/tp/"__stringify(F)) int df_TP_##F
 #define PROGKP(F) SEC("prog/kp/"__stringify(F)) int df_KP_##F
 #define PROGPE(F) SEC("prog/pe/"__stringify(F)) int df_PE_##F
