@@ -28,7 +28,7 @@ var log = logging.MustGetLogger("db.metadb.migrator.schema")
 
 type SqlFmt interface {
 	SetConfig(config.Config)
-	GetRawSqlFileDir() string
+	GetRawSqlDirectory(parentDir string) string
 	CreateDatabase() string
 	DropDatabase() string
 	SelectDatabase() string

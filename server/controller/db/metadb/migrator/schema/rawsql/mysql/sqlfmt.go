@@ -30,8 +30,8 @@ func (f *SqlFmt) SetConfig(cfg config.Config) {
 	f.cfg = cfg
 }
 
-func (f *SqlFmt) GetRawSqlFileDir() string {
-	return "/etc/metadb/schema/rawsql/mysql"
+func (f *SqlFmt) GetRawSqlDirectory(parentDir string) string {
+	return parentDir + "/mysql"
 }
 
 func (f *SqlFmt) CreateDatabase() string {

@@ -30,8 +30,8 @@ func (f *SqlFmt) SetConfig(cfg config.Config) {
 	f.cfg = cfg
 }
 
-func (f *SqlFmt) GetRawSqlFileDir() string {
-	return "/etc/metadb/schema/rawsql/postgres"
+func (f *SqlFmt) GetRawSqlDirectory(parentDir string) string {
+	return parentDir + "/postgres"
 }
 
 func (f *SqlFmt) CreateDatabase() string {
