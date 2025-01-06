@@ -99,3 +99,7 @@
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
+
+
+#### Refactoring
+* refactor: upgrade the go package crypto to 0.31 [#8864](https://github.com/deepflowio/deepflow/pull/8864) by [lzf575](https://github.com/lzf575)
