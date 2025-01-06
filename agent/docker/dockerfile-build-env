@@ -1,5 +1,7 @@
 FROM ghcr.io/deepflowio/rust-build:1.30
 
+WORKDIR /root
+RUN cp $CARGO_HOME/bin/sccache /root/sccache
 RUN rustup self uninstall -y
 RUN curl https://sh.rustup.rs -so rustup.sh; bash rustup.sh -y
 RUN sed -i -e 's/mirror.centos.org/vault.centos.org/g' \
@@ -8,8 +10,11 @@ RUN sed -i -e 's/mirror.centos.org/vault.centos.org/g' \
 
 RUN yum install -y perl-IPC-Cmd perl-core which gcc-c++ wget unzip
 
-WORKDIR /root
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.12.0/protoc-3.12.0-linux-x86_64.zip -O protoc-3.12.0.zip && unzip protoc-3.12.0.zip
-RUN unzip protoc-3.12.0.zip -d protoc-3.12.0
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.12.0/protoc-3.12.0-linux-x86_64.zip -O protoc-3.12.0.zip && unzip protoc-3.12.0.zip -d protoc-3.12.0
 RUN mv protoc-3.12.0/bin/* /usr/bin/ && cp -rf protoc-3.12.0/include/* /usr/include/
+RUN rm -rf protoc-3.12.0 && rm protoc-3.12.0.zip
 RUN yum clean all
+
+RUN rustup target add x86_64-unknown-linux-musl
+# sccache latest version require openssl3, not satisfied
+RUN mv /root/sccache $CARGO_HOME/bin/
