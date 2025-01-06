@@ -18,7 +18,6 @@ package agent_config
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/baidubce/bce-sdk-go/util/log"
@@ -42,21 +41,6 @@ func Upgrade(lowerVersionDBData *AgentGroupConfigModel, domainData *DomainData) 
 	}
 	upgrader := newUpgrader(toolData)
 	return upgrader.Upgrade(lowerVersionYAMLBytes)
-}
-
-func Downgrade(lowerVersionDBData *AgentGroupConfigModel, higherVersionYAMLBytes []byte, domainData *DomainData) error {
-	toolData, err := NewMigrationToolData(domainData)
-	if err != nil {
-		return fmt.Errorf("failed to init migration tool data: %s", err.Error())
-	}
-	downgrader := &Downgrader{
-		MigrationToolData: toolData,
-	}
-	lowerVersionYAMLBytes, err := downgrader.Downgrade(higherVersionYAMLBytes)
-	if err != nil {
-		return fmt.Errorf("failed to downgrade: %s, yaml: %s", err.Error(), string(higherVersionYAMLBytes))
-	}
-	return convertYAMLToDB(lowerVersionYAMLBytes, lowerVersionDBData)
 }
 
 type Upgrader struct {
@@ -328,178 +312,6 @@ func (m *Upgrader) convDictData(longKey string, value interface{}) interface{} {
 	return m.convDictDataValue(value, convMap, longKey)
 }
 
-type Downgrader struct {
-	dictDataConv
-	MigrationToolData
-}
-
-func (M *Downgrader) Downgrade(bytes []byte) ([]byte, error) {
-	data := make(map[string]interface{})
-	err := yaml.Unmarshal(bytes, &data)
-	if err != nil {
-		return []byte{}, fmt.Errorf("failed to unmarshal yaml: %v to map", err)
-	}
-	result := make(map[string]interface{})
-	M.higherToLower(data, "", result)
-	return mapToYaml(result)
-}
-
-func (m *Downgrader) higherToLower(higherVerData interface{}, ancestor string, lowerVerData map[string]interface{}) {
-	switch data := higherVerData.(type) {
-	case map[string]interface{}:
-		for key, value := range data {
-			newAncestor := m.appendAncestor(ancestor, key)
-			if lowers, ok := m.higherVerToLowerVerKeys[newAncestor]; ok {
-				for _, lower := range lowers {
-					m.setNestedValue(lowerVerData, lower, m.fmtHigherVersionValue(newAncestor, value))
-				}
-			}
-			m.higherToLower(value, newAncestor, lowerVerData)
-		}
-	default:
-		return
-	}
-}
-
-func (m *Downgrader) fmtHigherVersionValue(longKey string, value interface{}) interface{} {
-	if longKey == "inputs.cbpf.tunning.max_capture_pps" {
-		switch value := value.(type) {
-		case int:
-			return value / 1000
-		default:
-			return 1048576 / 1000
-		}
-	} else if longKey == "global.tunning.cpu_affinity" {
-		switch value := value.(type) {
-		case []interface{}:
-			if len(value) == 0 {
-				return ""
-			}
-			switch value[0].(type) {
-			case int:
-				var result string
-				for i := range value {
-					result += fmt.Sprintf("%d,", value[i].(int))
-				}
-				return result[:len(result)-1]
-			default:
-				return ""
-			}
-		case []int:
-			return convertIntSliceToString(value)
-		default:
-			return ""
-		}
-	} else if longKey == "inputs.resources.pull_resource_from_controller.domain_filter" {
-		switch value := value.(type) {
-		case []interface{}:
-			if len(value) == 0 {
-				return ""
-			}
-			switch value[0].(type) {
-			case int:
-				if len(value) == 1 && value[0].(int) == 0 {
-					return []string{"0"}
-				}
-				result := make([]string, 0)
-				for i := range value {
-					if lcuuid, ok := m.domainData.IDToLcuuid[value[i].(int)]; ok {
-						result = append(result, lcuuid)
-					}
-				}
-				return result
-			default:
-				return []string{}
-			}
-		case []int:
-			if len(value) == 1 && value[0] == 0 {
-				return []string{"0"}
-			}
-			result := make([]string, 0)
-			for i := range value {
-				if lcuuid, ok := m.domainData.IDToLcuuid[value[i]]; ok {
-					result = append(result, lcuuid)
-				}
-			}
-			return result
-		default:
-			return []string{}
-		}
-	} else if slices.Contains(m.higherVersionBoolToIntKeys, longKey) {
-		switch value := value.(type) {
-		case bool:
-			if value {
-				return 1
-			} else {
-				return 0
-			}
-		default:
-			return 0
-		}
-	} else if slices.Contains(m.higherVersionSecondToIntKeys, longKey) {
-		switch value := value.(type) {
-		case string:
-			v, err := strconv.Atoi(strings.TrimSuffix(value, "s"))
-			if err != nil {
-				log.Errorf("failed to convert %s value %s to int: %s ", longKey, value, err.Error())
-				return 60
-			}
-			return v
-		default:
-			return 60
-		}
-	} else if slices.Contains(m.higherVersionDayToIntKeys, longKey) {
-		switch value := value.(type) {
-		case string:
-			v, err := strconv.Atoi(strings.TrimSuffix(value, "d"))
-			if err != nil {
-				log.Errorf("failed to convert %s value %s to int: %s ", longKey, value, err.Error())
-				return 7
-			}
-			return v
-		default:
-			return 7
-		}
-	} else if slices.Contains(m.higherVersionListToStrKeys, longKey) {
-		switch value := value.(type) {
-		case []interface{}:
-			if len(value) == 0 {
-				return ""
-			}
-			switch value[0].(type) {
-			case string:
-				var result string
-				for i := range value {
-					result += fmt.Sprintf("%s,", value[i].(string))
-				}
-				return result[:len(result)-1]
-			default:
-				return ""
-			}
-		case []string:
-			return strings.Join(value, ",")
-		default:
-			return ""
-		}
-	} else if slices.Contains(m.higherVersionReverseKeys, longKey) {
-		switch value := value.(type) {
-		case bool:
-			return !value
-		default:
-			return value
-		}
-	}
-	return m.convDictData(longKey, value)
-}
-
-func (m *Downgrader) convDictData(longKey string, value interface{}) interface{} {
-	convMap, ok := m.dictValHigherKeyToLower[longKey]
-	if !ok {
-		return value
-	}
-	return m.convDictDataValue(value, convMap, longKey)
-}
-
 type dictDataConv struct{}
 
 func (m *dictDataConv) convDictDataValue(data interface{}, convMap map[string]interface{}, longKey string) interface{} {
@@ -586,20 +398,13 @@ type MigrationToolData struct {
 	higherVerToLowerVerKeys map[string][]string
 	lowerVerToHigherVerKey  map[string]string
 
-	dictValHigherKeyToLower map[string]map[string]interface{}
 	dictValLowerKeyToHigher map[string]map[string]interface{}
 
-	lowerVersionIntToBoolKeys    []string
-	higherVersionBoolToIntKeys   []string
-	lowerVersionIntToSecondKeys  []string
-	higherVersionSecondToIntKeys []string
-	lowerVersionIntToDayKeys     []string
-	higherVersionDayToIntKeys    []string
-	lowerVersionStrToListKeys    []string
-	higherVersionListToStrKeys   []string
-	lowerVersionReverseKeys      []string
-	higherVersionReverseKeys     []string
-
+	lowerVersionIntToBoolKeys          []string
+	lowerVersionIntToSecondKeys        []string
+	lowerVersionIntToDayKeys           []string
+	lowerVersionStrToListKeys          []string
+	lowerVersionReverseKeys            []string
 	lowerVersionKeysNeedHandleManually []string
 
 	domainData *DomainData
@@ -617,7 +422,6 @@ func NewMigrationToolData(domainData *DomainData) (MigrationToolData, error) {
 		higherVerToLowerVerKeys: make(map[string][]string),
 		lowerVerToHigherVerKey:  make(map[string]string),
 
-		dictValHigherKeyToLower: make(map[string]map[string]interface{}),
 		dictValLowerKeyToHigher: make(map[string]map[string]interface{}),
 
 		domainData: domainData,
@@ -671,41 +475,6 @@ func (p *MigrationToolData) generateHigherKeyToLowerKeys(data interface{}, ances
 }
 
 func (p *MigrationToolData) fmtDictValKeyMap() {
-	p.dictValHigherKeyToLower = map[string]map[string]interface{}{
-		// process handly
-		"inputs.proc.process_matcher": {
-			"match_regex": "match-regex",
-			"match_type":  "match-type",
-			// "only_with_tag":    "static_config.os-proc-sync-tagged-only", // TODO
-			"ignore":       "action",
-			"rewrite_name": "rewrite-name",
-			// "enabled_features": []string{"static_config.ebpf.on-cpu-profile.regex", "static_config.ebpf.off-cpu-profile.regex"}, // 无法升降级
-		},
-
-		"inputs.cbpf.af_packet.bond_interfaces": {
-			"slave_interfaces": "tap-interfaces",
-		},
-		"inputs.resources.kubernetes.api_resources": {
-			"name":           "name",
-			"group":          "group",
-			"version":        "version",
-			"disabled":       "disabled",
-			"field_selector": "field-selector",
-		},
-		"processors.request_log.tag_extraction.http_endpoint.match_rules": {
-			"url_prefix":    "prefix",
-			"keep_segments": "keep-segments",
-		},
-		// next level list dict
-		"processors.request_log.filters.tag_filters": {
-			"field_name":  "field-name",
-			"operator":    "operator",
-			"field_value": "value",
-		},
-		"processors.request_log.tag_extraction.custom_fields": {
-			"field_name": "field-name",
-		},
-	}
 	p.dictValLowerKeyToHigher = map[string]map[string]interface{}{
 		// process handly
 		"static_config.os-proc-regex": {
@@ -757,24 +526,6 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"static_config.ebpf.on-cpu-profile.cpu",
 		"static_config.ebpf.off-cpu-profile.cpu",
 	}
-	p.higherVersionBoolToIntKeys = []string{
-		"global.ntp.enabled",
-		"global.communication.request_via_nat_ip",
-		"global.self_monitoring.log.log_backhaul_enabled",
-		"inputs.resources.private_cloud.hypervisor_resource_enabled",
-		"inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster",
-		"inputs.integration.enabled",
-		"outputs.flow_metrics.enabled",
-		"outputs.flow_metrics.filters.inactive_server_port_aggregation",
-		"outputs.flow_metrics.filters.inactive_ip_aggregation",
-		"outputs.flow_metrics.filters.npm_metrics",
-		"outputs.flow_metrics.filters.apm_metrics",
-		"outputs.flow_metrics.filters.second_metrics",
-		"outputs.npb.traffic_global_dedup",
-
-		"inputs.epbf.profile.on_cpu.aggregate_by_cpu",
-		"inputs.epbf.profile.off_cpu.aggregate_by_cpu",
-	}
 	p.lowerVersionIntToSecondKeys = []string{
 		"bandwidth_probe_interval",
 		"sync_interval",
@@ -785,35 +536,15 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"static_config.ebpf.go-tracing-timeout",
 		"static_config.l7-protocol-inference-ttl",
 	}
-	p.higherVersionSecondToIntKeys = []string{
-		"global.circuit_breakers.tx_throughput.throughput_monitoring_interval",
-		"global.communication.proactive_request_interval",
-		"global.communication.max_escape_duration",
-		"inputs.resources.push_interval",
-		"inputs.proc.sync_interval",
-		"inputs.proc.min_lifetime",
-		"inputs.epbf.socket.uprobe.golang.tracing_timeout",
-		"processors.request_log.application_protocol_inference.inference_result_ttl",
-	}
 	p.lowerVersionIntToDayKeys = []string{
 		"log_retention",
-	}
-	p.higherVersionDayToIntKeys = []string{
-		"global.limits.local_log_retention",
 	}
 	p.lowerVersionStrToListKeys = []string{
 		"http_log_trace_id",
 		"http_log_span_id",
 	}
-	p.higherVersionListToStrKeys = []string{
-		"processors.request_log.tag_extraction.tracing_tag.apm_trace_id",
-		"processors.request_log.tag_extraction.tracing_tag.apm_span_id",
-	}
 	p.lowerVersionReverseKeys = []string{
 		"static_config.memory-trim-disabled",
-	}
-	p.higherVersionReverseKeys = []string{
-		"global.tunning.idle_memory_trimming",
 	}
 
 	p.lowerVersionKeysNeedHandleManually = []string{
