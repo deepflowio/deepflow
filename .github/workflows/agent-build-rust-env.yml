@@ -7,6 +7,12 @@ on:
       - 'agent/docker/DockerfileToFix-aarch64.build'
       - 'agent/docker/dockerfile-build-env'
       - 'agent/docker/dockerfile-build-env-aarch64'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true
+        type: string
 
 name: build agent env
 
