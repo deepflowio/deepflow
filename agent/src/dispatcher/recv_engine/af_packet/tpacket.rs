@@ -24,8 +24,8 @@ use std::process;
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, packet_mreq, poll, pollfd, setsockopt,
     size_t, sockaddr, sockaddr_ll, socket, socklen_t, write, AF_PACKET, ETH_P_ALL, MAP_LOCKED,
-    MAP_NORESERVE, MAP_SHARED, PACKET_ADD_MEMBERSHIP, PACKET_MR_PROMISC, POLLERR, POLLIN,
-    PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
+    MAP_NORESERVE, MAP_SHARED, PACKET_ADD_MEMBERSHIP, PACKET_DROP_MEMBERSHIP, PACKET_MR_PROMISC,
+    POLLERR, POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 use log::{info, warn};
 use public::error::*;
@@ -131,7 +131,7 @@ impl Tpacket {
         Ok(())
     }
 
-    pub fn set_promisc(&self, if_indices: &Vec<i32>) -> Result<()> {
+    pub fn set_promisc(&self, if_indices: &Vec<i32>, enabled: bool) -> Result<()> {
         for i in if_indices {
             let mreq = packet_mreq {
                 mr_type: PACKET_MR_PROMISC as u16,
@@ -139,9 +139,13 @@ impl Tpacket {
                 mr_alen: 0,
                 mr_address: [0, 0, 0, 0, 0, 0, 0, 0],
             };
-            let err = self.setsockopt(SOL_PACKET, PACKET_ADD_MEMBERSHIP, mreq);
+            let err = if enabled {
+                self.setsockopt(SOL_PACKET, PACKET_ADD_MEMBERSHIP, mreq)
+            } else {
+                self.setsockopt(SOL_PACKET, PACKET_DROP_MEMBERSHIP, mreq)
+            };
             if err.is_err() {
-                warn!("Ifindex {} set promisc error: {:?}", i, err);
+                warn!("Ifindex {} set promisc {} error: {:?}", i, enabled, err);
             }
         }
         Ok(())

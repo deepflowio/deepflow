@@ -123,10 +123,11 @@ impl RecvEngine {
         }
     }
 
-    pub fn set_promisc(&mut self, if_index: &Vec<i32>) -> Result<()> {
+    #[allow(unused_variables)]
+    pub fn set_promisc(&mut self, if_index: &Vec<i32>, enabled: bool) -> Result<()> {
         match self {
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            Self::AfPacket(e) => e.set_promisc(if_index).map_err(|e| e.into()),
+            Self::AfPacket(e) => e.set_promisc(if_index, enabled).map_err(|e| e.into()),
             _ => return Ok(()),
         }
     }
