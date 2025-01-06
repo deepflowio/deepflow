@@ -5,6 +5,8 @@ on:
     paths:
       - 'agent/docker/DockerfileToFix.build'
       - 'agent/docker/DockerfileToFix-aarch64.build'
+      - 'agent/docker/dockerfile-build-env'
+      - 'agent/docker/dockerfile-build-env-aarch64'
 
 name: build agent env
 
@@ -48,7 +50,8 @@ jobs:
         with:
           context: agent
           push: true
-          file: agent/docker/DockerfileToFix.build
+          #file: agent/docker/DockerfileToFix.build
+          file: agent/docker/dockerfile-build-env
           platforms: linux/amd64
           tags: |
             "ghcr.io/${{ github.repository_owner }}/rust-build:1.31"
@@ -95,7 +98,8 @@ jobs:
         with:
           context: agent
           push: true
-          file: agent/docker/DockerfileToFix-aarch64.build
+          #file: agent/docker/DockerfileToFix-aarch64.build
+          file: agent/docker/dockerfile-build-env-aarch64
           platforms: linux/arm64
           tags: |
             "ghcr.io/${{ github.repository_owner }}/rust-build:1.31-arm64"
