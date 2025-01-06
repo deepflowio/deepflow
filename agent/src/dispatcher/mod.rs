@@ -1064,6 +1064,7 @@ impl DispatcherBuilder {
                 .take()
                 .ok_or(Error::ConfigIncomplete("no trim tunnel type".into()))?,
             bond_group_map,
+            promisc_if_indices: vec![],
         };
         collector.register_countable(
             &stats::SingleTagModule("dispatcher", "id", base.id),
