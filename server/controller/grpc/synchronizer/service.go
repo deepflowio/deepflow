@@ -23,7 +23,6 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
@@ -82,22 +81,6 @@ func (s *service) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServ
 		statsd.AddGrpcCostStatsd(statsd.Upgrade, int(time.Now().Sub(startTime).Milliseconds()))
 	}()
 	return s.upgradeEvent.Upgrade(r, in)
-}
-
-func (s *service) GenesisSync(ctx context.Context, in *api.GenesisSyncRequest) (*api.GenesisSyncResponse, error) {
-	startTime := time.Now()
-	defer func() {
-		statsd.AddGrpcCostStatsd(statsd.GenesisSync, int(time.Now().Sub(startTime).Milliseconds()))
-	}()
-	return genesis.GenesisService.Synchronizer.GenesisSync(ctx, in)
-}
-
-func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISyncRequest) (*api.KubernetesAPISyncResponse, error) {
-	startTime := time.Now()
-	defer func() {
-		statsd.AddGrpcCostStatsd(statsd.KubernetesAPISync, int(time.Now().Sub(startTime).Milliseconds()))
-	}()
-	return genesis.GenesisService.Synchronizer.KubernetesAPISync(ctx, in)
 }
 
 func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusLabelRequest) (*api.PrometheusLabelResponse, error) {
