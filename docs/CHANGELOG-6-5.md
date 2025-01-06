@@ -270,6 +270,7 @@
 * feat: add change log [#7095](https://github.com/deepflowio/deepflow/pull/7095) by [Nick-0314](https://github.com/Nick-0314)
 
 #### Refactoring
+* refactor: upgrade the go package crypto to 0.31 [#8864](https://github.com/deepflowio/deepflow/pull/8864) by [lzf575](https://github.com/lzf575)
 * refactor: add logs [#8780](https://github.com/deepflowio/deepflow/pull/8780) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: agent adds the 'disabled-cgroups' configuration. [#8165](https://github.com/deepflowio/deepflow/pull/8165) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: agent adds a disable_cgroups option [#8159](https://github.com/deepflowio/deepflow/pull/8159) by [TomatoMr](https://github.com/TomatoMr)

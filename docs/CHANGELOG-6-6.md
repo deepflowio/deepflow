@@ -46,6 +46,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: add promisc to afpacket [#8861](https://github.com/deepflowio/deepflow/pull/8861) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: optimize the number of dynamic tag queries [#8858](https://github.com/deepflowio/deepflow/pull/8858) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: deepflow-ctl tool adds request parameters [#8809](https://github.com/deepflowio/deepflow/pull/8809) by [lzf575](https://github.com/lzf575)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
@@ -72,5 +74,6 @@
 
 
 #### Refactoring
+* refactor: upgrade the go package crypto to 0.31 [#8865](https://github.com/deepflowio/deepflow/pull/8865) by [lzf575](https://github.com/lzf575)
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
