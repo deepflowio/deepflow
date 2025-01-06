@@ -19,7 +19,6 @@ package cloud
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -580,22 +579,23 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // old content field: content
 // new centent field: compressed_content
 func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*metadbmodel.DomainAdditionalResource, error) {
-	var dbItem metadbmodel.DomainAdditionalResource
-	result := db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		result = db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	var dbItems []metadbmodel.DomainAdditionalResource
+	result := db.Select("content").Where("domain = ? AND content != ''", domainUUID).Find(&dbItems)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		result = db.Select("compressed_content").Where("domain = ?", domainUUID).Find(&dbItems)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		if result.RowsAffected == 0 {
 			return nil, nil
 		}
 	}
 
-	if result.RowsAffected != 0 {
-		return &dbItem, nil
-	}
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return &dbItem, nil
+	return &dbItems[0], nil
 }
 
 func (c *Cloud) appendCloudTags(resource model.Resource, additionalResource model.AdditionalResource) model.Resource {
