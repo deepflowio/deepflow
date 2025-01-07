@@ -232,6 +232,20 @@ const (
 		SQL_SOURCE_MYSQL +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
+	CREATE_VL2_DICTIONARY_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64,\n" +
+		"    `sub_domain_id` UInt64,\n" +
+		"    `l3_epc_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		SQL_SOURCE_MYSQL +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
 	CREATE_AZ_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -929,7 +943,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_REGION:                 CREATE_REGION_DICTIONARY_SQL,
 	CH_DICTIONARY_AZ:                     CREATE_AZ_DICTIONARY_SQL,
 	CH_DICTIONARY_VPC:                    CREATE_VPC_DICTIONARY_SQL,
-	CH_DICTIONARY_VL2:                    CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_VL2:                    CREATE_VL2_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_CLUSTER:            CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NAMESPACE:          CREATE_POD_NS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NODE:               CREATE_POD_NODE_DICTIONARY_SQL,
