@@ -85,7 +85,7 @@ int set_cpu_balancer_nics(const char *nic_name, size_t ring_size,
 	struct cpu_balancer_nic nic;
 	memset(&nic, 0, sizeof(nic));
 	snprintf(nic.name, sizeof(nic.name), "%s", nic_name);
-	nic.ring_size = ring_size;
+	nic.rx_ring_size = ring_size;
 	int len = strlen(nic_cpus) + 1;
 	nic.nic_cpus = malloc(len);
 	if (nic.nic_cpus == NULL) {

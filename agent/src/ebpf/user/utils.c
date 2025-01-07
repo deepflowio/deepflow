@@ -1835,7 +1835,7 @@ int set_nic_ring_size(const char *nic_name, size_t rx_sz, size_t tx_sz)
 	memset(&ering, 0, sizeof(ering));
 	strncpy(ifr.ifr_name, nic_name, IFNAMSIZ - 1);
 
-	ering.cmd = ETHTOOL_SRingPARAM;
+	ering.cmd = ETHTOOL_SRXCSUM;
 	ifr.ifr_data = (caddr_t) & ering;
 
 	// Only set rx_sz if it's greater than 0

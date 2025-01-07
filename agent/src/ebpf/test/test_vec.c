@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "../user/common.h"
+#include "../user/utils.h"
 #include "../user/mem.h"
 #include "../user/log.h"
 #include "../user/types.h"
