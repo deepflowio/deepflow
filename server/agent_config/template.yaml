@@ -94,6 +94,45 @@ global:
     #     用于 deepflow-agent 控制自身运行日志在本地的留存时长。
     # upgrade_from: log_retention
     local_log_retention: 300d
+    # type: int
+    # name:
+    #   en: Maximum Socket Count
+    #   ch: Socket 数量上限
+    # unit: count
+    # range: [16, 4096]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The maximum number of sockets that the agent can open.
+    #     Agent will restart if socket count exceeds this value.
+    #   ch: |-
+    #     用于控制 deepflow-agent 可以打开的 socket 数量上限。
+    #     超过限制时 agent 会重启。
+    # upgrade_from: static_config.max-sockets
+    max_sockets: 1024
+    # type: duration
+    # name:
+    #   en: Maximum Socket Count Tolerate Interval
+    #   ch: Socket 数量超限容忍时间
+    # unit:
+    # range: [0s, 3600s]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The interval to tolerate socket count exceeding max-sockets before restarting.
+    #     Agent will only restart if socket count exceeds max-sockets for this duration.
+    #     Restarts are triggered by guard module, so setting this value lower than guard-interval
+    #     will cause agent to restart immediately.
+    #   ch: |-
+    #     用于控制 deepflow-agent 在 socket 数量超过上限后，重启前的容忍时间。
+    #     只有当 socket 数量持续超过上限达到该时间后才会触发重启。
+    #     重启由 guard 模块触发，因此该值小于 guard-interval 时会导致立即重启。
+    # upgrade_from: static_config.max-sockets-tolerate-interval
+    max_sockets_tolerate_interval: 60s
   # type: section
   # name:
   #   en: Alerts

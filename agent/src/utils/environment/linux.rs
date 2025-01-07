@@ -28,9 +28,10 @@ use kube::{
     api::{Api, Patch, PatchParams},
     Client, Config,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use nix::sys::utsname::uname;
 use nom::AsBytes;
+use procfs::net::{TcpNetEntry, UdpNetEntry};
 
 use public::utils::net::get_link_enabled_features;
 
@@ -408,4 +409,137 @@ pub fn is_kernel_available(kernel_version: &str) -> bool {
         .unwrap_or_default()
         .0
         .ge(kernel_version)
+}
+
+pub struct SocketInfo {
+    pub tcp: Vec<TcpNetEntry>,
+    pub tcp6: Vec<TcpNetEntry>,
+    pub udp: Vec<UdpNetEntry>,
+    pub udp6: Vec<UdpNetEntry>,
+}
+
+fn tcp_filter(inodes: &[u64]) -> impl Fn(&TcpNetEntry) -> bool + '_ {
+    |entry| {
+        entry.state == procfs::net::TcpState::Established
+            && inodes.binary_search(&entry.inode).is_ok()
+    }
+}
+
+fn udp_filter(inodes: &[u64]) -> impl Fn(&UdpNetEntry) -> bool + '_ {
+    |entry| inodes.binary_search(&entry.inode).is_ok()
+}
+
+impl std::fmt::Display for SocketInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, entry) in self.tcp.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(f, "tcp:\n")?;
+            }
+            let _ = write!(
+                f,
+                "  {}:{} <-> {}:{}\n",
+                entry.local_address.ip().to_canonical(),
+                entry.local_address.port(),
+                entry.remote_address.ip().to_canonical(),
+                entry.remote_address.port()
+            );
+        }
+        for (i, entry) in self.tcp6.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(f, "tcp6:\n")?;
+            }
+            let _ = write!(
+                f,
+                "  {}:{} <-> {}:{}\n",
+                entry.local_address.ip().to_canonical(),
+                entry.local_address.port(),
+                entry.remote_address.ip().to_canonical(),
+                entry.remote_address.port()
+            );
+        }
+        for (i, entry) in self.udp.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(f, "udp:\n")?;
+            }
+            let _ = write!(
+                f,
+                "  {}:{} <-> {}:{}\n",
+                entry.local_address.ip().to_canonical(),
+                entry.local_address.port(),
+                entry.remote_address.ip().to_canonical(),
+                entry.remote_address.port()
+            );
+        }
+        for (i, entry) in self.udp6.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(f, "udp6:\n")?;
+            }
+            let _ = write!(
+                f,
+                "  {}:{} <-> {}:{}\n",
+                entry.local_address.ip().to_canonical(),
+                entry.local_address.port(),
+                entry.remote_address.ip().to_canonical(),
+                entry.remote_address.port()
+            );
+        }
+        Ok(())
+    }
+}
+
+impl SocketInfo {
+    pub fn get() -> procfs::ProcResult<Self> {
+        let mut socket_inodes = vec![];
+        let proc = procfs::process::Process::myself()?;
+        for fd in proc.fd()? {
+            match fd?.target {
+                procfs::process::FDTarget::Socket(inode) => socket_inodes.push(inode),
+                _ => {}
+            }
+        }
+        socket_inodes.sort_unstable();
+
+        Ok(Self {
+            tcp: match procfs::net::tcp() {
+                Ok(entries) => entries
+                    .into_iter()
+                    .filter(tcp_filter(&socket_inodes))
+                    .collect(),
+                Err(e) => {
+                    debug!("get tcp socket failed: {}", e);
+                    vec![]
+                }
+            },
+            tcp6: match procfs::net::tcp6() {
+                Ok(entries) => entries
+                    .into_iter()
+                    .filter(tcp_filter(&socket_inodes))
+                    .collect(),
+                Err(e) => {
+                    debug!("get tcp6 socket failed: {}", e);
+                    vec![]
+                }
+            },
+            udp: match procfs::net::udp() {
+                Ok(entries) => entries
+                    .into_iter()
+                    .filter(udp_filter(&socket_inodes))
+                    .collect(),
+                Err(e) => {
+                    debug!("get udp socket failed: {}", e);
+                    vec![]
+                }
+            },
+            udp6: match procfs::net::udp6() {
+                Ok(entries) => entries
+                    .into_iter()
+                    .filter(udp_filter(&socket_inodes))
+                    .collect(),
+                Err(e) => {
+                    debug!("get udp6 socket failed: {}", e);
+                    vec![]
+                }
+            },
+        })
+    }
 }

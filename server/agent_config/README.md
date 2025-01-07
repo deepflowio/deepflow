@@ -154,6 +154,69 @@ global:
 
 The retention time for deepflow-agent log files.
 
+### Maximum Socket Count {#global.limits.max_sockets}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets`
+
+Upgrade from old version: `static_config.max-sockets`
+
+**Default value**:
+```yaml
+global:
+  limits:
+    max_sockets: 1024
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | count |
+| Range | [16, 4096] |
+
+**Description**:
+
+The maximum number of sockets that the agent can open.
+Agent will restart if socket count exceeds this value.
+
+### Maximum Socket Count Tolerate Interval {#global.limits.max_sockets_tolerate_interval}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets_tolerate_interval`
+
+Upgrade from old version: `static_config.max-sockets-tolerate-interval`
+
+**Default value**:
+```yaml
+global:
+  limits:
+    max_sockets_tolerate_interval: 60s
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0s', '3600s'] |
+
+**Description**:
+
+The interval to tolerate socket count exceeding max-sockets before restarting.
+Agent will only restart if socket count exceeds max-sockets for this duration.
+Restarts are triggered by guard module, so setting this value lower than guard-interval
+will cause agent to restart immediately.
+
 ## Alerts {#global.alerts}
 
 ### Thread Limit {#global.alerts.thread_threshold}
@@ -5467,6 +5530,8 @@ inputs:
 **Description**:
 
 The detail config for Vector Component, all availble config keys could be found in [vector.dev](https://vector.dev/docs/reference/configuration)
+Here's an example for how to capture kubernetes logs、host metrics in virtual machine and kubelet metrics in kubernetes. It'll send to DeepFlow-Agent as output.
+
 ```yaml
 config:
   sources:
@@ -5484,7 +5549,7 @@ config:
     # capture host metrics
     host_metrics:
       type: host_metrics
-      scrape_interval_secs: 15
+      scrape_interval_secs: 10
       namespace: node
     # capture kubelet metrics
     kubelet_metrics:
@@ -5496,7 +5561,7 @@ config:
         token: $FIX_ME_K8S_TOKEN
       tls:
         verify_certificate: false
-      scrape_interval_secs: 15
+      scrape_interval_secs: 10
       scrape_timeout_secs: 10
       honor_labels: true
   transforms:
@@ -6204,12 +6269,12 @@ processors:
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
+        RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
         TLS: 443,6443
         Tars: 1-65535
         ZMTP: 1-65535
-        RocketMQ: 1-65535
         bRPC: 1-65535
 ```
 
@@ -6276,12 +6341,12 @@ processors:
         PostgreSQL: []
         Pulsar: []
         Redis: []
+        RocketMQ: []
         SOFARPC: []
         SomeIP: []
         TLS: []
         Tars: []
         ZMTP: []
-        RocketMQ: []
         bRPC: []
         gRPC: []
 ```
