@@ -64,6 +64,7 @@ func (n *ChNetwork) generateNewData() (map[IDKey]metadbmodel.ChNetwork, bool) {
 			TeamID:      teamID,
 			DomainID:    tagrecorder.DomainToDomainID[network.Domain],
 			SubDomainID: tagrecorder.SubDomainToSubDomainID[network.SubDomain],
+			L3EPCID:     network.VPCID,
 		}
 	}
 	return keyToItem, true
@@ -80,6 +81,9 @@ func (n *ChNetwork) generateUpdateInfo(oldItem, newItem metadbmodel.ChNetwork) (
 	}
 	if oldItem.IconID != newItem.IconID && newItem.IconID != 0 {
 		updateInfo["icon_id"] = newItem.IconID
+	}
+	if oldItem.L3EPCID != newItem.L3EPCID {
+		updateInfo["l3_epc_id"] = newItem.L3EPCID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

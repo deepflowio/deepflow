@@ -1812,6 +1812,7 @@ CREATE TABLE IF NOT EXISTS ch_subnet (
     team_id                 INTEGER,
     domain_id               INTEGER,
     sub_domain_id           INTEGER,
+    l3_epc_id               INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_subnet;
