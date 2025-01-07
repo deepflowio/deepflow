@@ -165,6 +165,7 @@ type ChNetwork struct {
 	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	L3EPCID     int       `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
