@@ -617,6 +617,7 @@ pub struct YamlConfig {
     pub os_proc_sync_tagged_only: bool,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
+    pub max_sockets: usize,
     pub check_core_file_disabled: bool,
     pub memory_trim_disabled: bool,
     pub forward_capacity: usize,
@@ -818,6 +819,8 @@ impl YamlConfig {
         {
             c.guard_interval = Duration::from_secs(10);
         }
+
+        c.max_sockets = c.max_sockets.clamp(2, 1024);
 
         if c.kubernetes_api_list_limit < 10 {
             c.kubernetes_api_list_limit = 10;
@@ -1039,6 +1042,7 @@ impl Default for YamlConfig {
             os_proc_sync_enabled: false,
             os_proc_sync_tagged_only: false,
             guard_interval: Duration::from_secs(10),
+            max_sockets: 20,
             check_core_file_disabled: false,
             memory_trim_disabled: false,
             fast_path_disabled: false,

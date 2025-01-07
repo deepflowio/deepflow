@@ -206,6 +206,7 @@ pub struct EnvironmentConfig {
     pub log_file_size: u32,
     pub tap_mode: TapMode,
     pub guard_interval: Duration,
+    pub max_sockets: usize,
     pub system_load_circuit_breaker_threshold: f32,
     pub system_load_circuit_breaker_recover: f32,
     pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
@@ -1459,6 +1460,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_file_size: conf.log_file_size,
                 tap_mode: conf.tap_mode,
                 guard_interval: conf.yaml_config.guard_interval,
+                max_sockets: conf.yaml_config.max_sockets,
                 system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold,
                 system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover,
                 system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric,
@@ -2524,6 +2526,11 @@ impl ConfigHandler {
                 info!("cpu set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_millicpus = max_millicpus;
             }
+        }
+
+        if candidate_config.environment.max_sockets != new_config.environment.max_sockets {
+            info!("max_sockets set to {}", new_config.environment.max_sockets);
+            candidate_config.environment.max_sockets = new_config.environment.max_sockets;
         }
 
         if candidate_config.environment.sys_free_memory_limit
