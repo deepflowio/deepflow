@@ -154,6 +154,68 @@ global:
 
 用于 deepflow-agent 控制自身运行日志在本地的留存时长。
 
+### Socket 数量上限 {#global.limits.max_sockets}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets`
+
+Upgrade from old version: `static_config.max-sockets`
+
+**默认值**:
+```yaml
+global:
+  limits:
+    max_sockets: 1024
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | count |
+| Range | [16, 4096] |
+
+**详细描述**:
+
+用于控制 deepflow-agent 可以打开的 socket 数量上限。
+超过限制时 agent 会重启。
+
+### Socket 数量超限容忍时间 {#global.limits.max_sockets_tolerate_interval}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets_tolerate_interval`
+
+Upgrade from old version: `static_config.max-sockets-tolerate-interval`
+
+**默认值**:
+```yaml
+global:
+  limits:
+    max_sockets_tolerate_interval: 60s
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0s', '3600s'] |
+
+**详细描述**:
+
+用于控制 deepflow-agent 在 socket 数量超过上限后，重启前的容忍时间。
+只有当 socket 数量持续超过上限达到该时间后才会触发重启。
+重启由 guard 模块触发，因此该值小于 guard-interval 时会导致立即重启。
+
 ## 告警 {#global.alerts}
 
 ### 线程数限制 {#global.alerts.thread_threshold}
@@ -5320,6 +5382,8 @@ inputs:
 **详细描述**:
 
 Vector 组件的具体配置，所有可用配置可在此链接中查找：[vector.dev](https://vector.dev/docs/reference/configuration)
+以下提供一份抓取 kubernetes 日志、宿主机指标及 kubernetes kubelet 指标的示例，并将这些数据发送到 DeepFlow-Agent。
+
 ```yaml
 config:
   sources:
@@ -5337,7 +5401,7 @@ config:
     # 抓取主机指标
     host_metrics:
       type: host_metrics
-      scrape_interval_secs: 15
+      scrape_interval_secs: 10
       namespace: node
     # 抓取 kubelet 指标
     kubelet_metrics:
@@ -5349,7 +5413,7 @@ config:
         token: $FIX_ME_K8S_TOKEN
       tls:
         verify_certificate: false
-      scrape_interval_secs: 15
+      scrape_interval_secs: 10
       scrape_timeout_secs: 10
       honor_labels: true
   transforms:
@@ -6045,12 +6109,12 @@ processors:
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
+        RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
         TLS: 443,6443
         Tars: 1-65535
         ZMTP: 1-65535
-        RocketMQ: 1-65535
         bRPC: 1-65535
 ```
 
@@ -6117,12 +6181,12 @@ processors:
         PostgreSQL: []
         Pulsar: []
         Redis: []
+        RocketMQ: []
         SOFARPC: []
         SomeIP: []
         TLS: []
         Tars: []
         ZMTP: []
-        RocketMQ: []
         bRPC: []
         gRPC: []
 ```

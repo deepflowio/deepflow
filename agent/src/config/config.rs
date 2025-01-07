@@ -1853,6 +1853,9 @@ pub struct Limits {
     pub max_local_log_file_size: u32,
     #[serde(with = "humantime_serde")]
     pub local_log_retention: Duration,
+    pub max_sockets: usize,
+    #[serde(with = "humantime_serde")]
+    pub max_sockets_tolerate_interval: Duration,
 }
 
 impl Default for Limits {
@@ -1863,6 +1866,8 @@ impl Default for Limits {
             max_log_backhaul_rate: 300,
             max_local_log_file_size: 1000 << 20,
             local_log_retention: Duration::from_secs(300 * 24 * 3600),
+            max_sockets: 1024,
+            max_sockets_tolerate_interval: Duration::from_secs(60),
         }
     }
 }

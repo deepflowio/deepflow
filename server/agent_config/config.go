@@ -191,6 +191,8 @@ type StaticConfig struct {
 	OsProcSyncEnabled                  *bool                        `yaml:"os-proc-sync-enabled,omitempty"`
 	OsProcSyncTaggedOnly               *bool                        `yaml:"os-proc-sync-tagged-only,omitempty"`
 	GuardInterval                      *string                      `yaml:"guard-interval,omitempty"`
+	MaxSockets                         *int                         `yaml:"max-sockets,omitempty"`
+	MaxSocketsTolerateInterval         *string                      `yaml:"max-sockets-tolerate-interval,omitempty"`
 	CheckCoreFileDisabled              *bool                        `yaml:"check-core-file-disabled,omitempty"`
 	SoPlugins                          []string                     `yaml:"so-plugins,omitempty"`
 	MemoryTrimDisabled                 *bool                        `yaml:"memory-trim-disabled,omitempty"`

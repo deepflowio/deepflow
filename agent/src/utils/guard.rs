@@ -21,7 +21,7 @@ use std::{
     string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use arc_swap::access::Access;
@@ -44,6 +44,8 @@ use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
 use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
@@ -356,6 +358,8 @@ impl Guard {
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
+            #[cfg(target_os = "linux")]
+            let mut last_over_max_sockets_limit = None;
             loop {
                 let config = config.load();
                 let capture_mode = config.capture_mode;
@@ -499,6 +503,39 @@ impl Guard {
                     state.melt_down();
                 } else {
                     state.recover();
+                }
+
+                #[cfg(target_os = "linux")]
+                match SocketInfo::get() {
+                    Ok(SocketInfo { tcp, tcp6, udp, udp6 }) => {
+                        let (n_tcp, n_tcp6, n_udp, n_udp6) = (tcp.len(), tcp6.len(), udp.len(), udp6.len());
+                        if n_tcp + n_tcp6 + n_udp + n_udp6 <= config.max_sockets {
+                            debug!("socket count check passed: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) <= {}", config.max_sockets);
+                            last_over_max_sockets_limit = None;
+                        } else {
+                            match last_over_max_sockets_limit {
+                                None => {
+                                    last_over_max_sockets_limit = Some(Instant::now());
+                                    warn!("the number of socket exceeds the limit: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) > {}", config.max_sockets);
+                                    warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                }
+                                Some(last) if last.elapsed() > config.max_sockets_tolerate_interval => {
+                                    warn!("the number of socket exceeds the limit longer than {:?}, deepflow-agent restart...", config.max_sockets_tolerate_interval);
+                                    warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                    crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                    break;
+                                }
+                                Some(last) => {
+                                    debug!("the number of socket exceeds the limit for {:?}", last.elapsed());
+                                    debug!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Check agent sockets failed: {e}");
+                        last_over_max_sockets_limit = None;
+                    }
                 }
 
                 let (running, notifier) = &*running_state;
