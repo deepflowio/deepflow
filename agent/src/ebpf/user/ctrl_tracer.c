@@ -27,6 +27,31 @@
 #define CMD_BUF_SZ	      256
 #define TIMEOUT_DEF	      60
 
+#define MAX_CPUS 1024
+#define MAX_CORES 128
+#define MAX_SOCKETS 8
+
+#define MAX_PATH_LEN 256
+#define MAX_NIC_NAME_LEN 64
+#define MAX_OUTPUT_LEN 512
+// Structure to hold NIC information
+struct cpu_balancer_nic {
+        char name[MAX_NIC_NAME_LEN];    // Network Interface Card (NIC) name
+        char pci_device_address[MAX_PATH_LEN];  // PCI device address
+        char driver[MAX_PATH_LEN];      // Driver name
+        int rx_channels;        // Number of NIC rx channels
+        int tx_channels;        // Number of NIC tx channels
+        size_t rx_ring_size;    // Receive ring size
+        size_t tx_ring_size;    // Transmit ring size
+        int promisc;            // The flag that indicates promiscuous mode in network card configuration. 
+        int numa_node;
+};
+
+static int cpu_socket[MAX_CPUS];
+static int cpu_core[MAX_CPUS];
+static int core_map[MAX_SOCKETS][MAX_CORES][MAX_CPUS];
+static int max_cpu_id = -1, max_core_id = -1, max_socket_id = -1;
+
 static char *match_str_def = ".*";
 static char *comm_str_def = "";
 
@@ -94,6 +119,23 @@ static void match_pids_help(void)
 	fprintf(stderr, "Usage:\n" "    %s match_pids print\n", DF_BPF_NAME);
 	fprintf(stderr, "For example:\n");
 	fprintf(stderr, "    %s match_pids print\n", DF_BPF_NAME);
+}
+
+static void cpu_layout_help(void)
+{
+	fprintf(stderr, "Print cpu layout\n");
+	fprintf(stderr, "Usage:\n" "    %s cpu_layout show\n", DF_BPF_NAME);
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s cpu_layout show\n", DF_BPF_NAME);
+}
+
+static void nicinfo_help(void)
+{
+	fprintf(stderr, "Print device information\n");
+	fprintf(stderr, "Usage:\n" "    %s nicinfo --interface=<nic-name>\n",
+		DF_BPF_NAME);
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s nicinfo --interface=eth0\n", DF_BPF_NAME);
 }
 
 static void cpdbg_help(void)
@@ -269,7 +311,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("\n");
 }
 
-static void offset_dump(int cpu, bpf_offset_param_t *param)
+static void offset_dump(int cpu, bpf_offset_param_t * param)
 {
 	printf("----------------------------------\n");
 	printf("cpu: \t%d\n", cpu);
@@ -600,6 +642,152 @@ static int match_pids_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	return ETR_OK;
 }
 
+static void parse_cpu_topology()
+{
+	for (int cpu = 0; cpu < MAX_CPUS; ++cpu) {
+		char path[128];
+		FILE *file;
+
+		// Check if the CPU exists
+		snprintf(path, sizeof(path),
+			 "/sys/devices/system/cpu/cpu%d/topology/physical_package_id",
+			 cpu);
+		file = fopen(path, "r");
+		if (!file)
+			break;	// Stop if the CPU does not exist
+		fscanf(file, "%d", &cpu_socket[cpu]);
+		fclose(file);
+
+		snprintf(path, sizeof(path),
+			 "/sys/devices/system/cpu/cpu%d/topology/core_id", cpu);
+		file = fopen(path, "r");
+		if (!file)
+			break;
+		fscanf(file, "%d", &cpu_core[cpu]);
+		fclose(file);
+
+		// Update maximum IDs
+		if (cpu_socket[cpu] > max_socket_id)
+			max_socket_id = cpu_socket[cpu];
+		if (cpu_core[cpu] > max_core_id)
+			max_core_id = cpu_core[cpu];
+		if (cpu > max_cpu_id)
+			max_cpu_id = cpu;
+	}
+}
+
+static void build_core_map()
+{
+	memset(core_map, 0, sizeof(core_map));
+	for (int cpu = 0; cpu <= max_cpu_id; ++cpu) {
+		int socket = cpu_socket[cpu];
+		int core = cpu_core[cpu];
+		for (int i = 0; i < MAX_CPUS; ++i) {
+			if (core_map[socket][core][i] == 0) {
+				core_map[socket][core][i] = cpu + 1;	// Store CPU + 1 to ensure no empty slots
+				break;
+			}
+		}
+	}
+}
+
+static void print_cpu_topology()
+{
+	printf
+	    ("======================================================================\n");
+	printf
+	    ("Core and Socket Information (as reported by '/sys/devices/system/cpu')\n");
+	printf
+	    ("======================================================================\n\n");
+
+	printf("cores =  [");
+	for (int core = 0; core <= max_core_id; ++core) {
+		if (core > 0)
+			printf(", ");
+		printf("%d", core);
+	}
+	printf("]\n");
+
+	printf("sockets =  [");
+	for (int socket = 0; socket <= max_socket_id; ++socket) {
+		if (socket > 0)
+			printf(", ");
+		printf("%d", socket);
+	}
+	printf("]\n\n");
+
+	printf("       ");
+	for (int socket = 0; socket <= max_socket_id; ++socket) {
+		printf("Socket %-10d", socket);
+	}
+	printf("\n       ");
+	for (int socket = 0; socket <= max_socket_id; ++socket) {
+		printf("------------    ");
+	}
+	printf("\n");
+
+	for (int core = 0; core <= max_core_id; ++core) {
+		printf("Core %-2d ", core);
+		for (int socket = 0; socket <= max_socket_id; ++socket) {
+			printf("[");
+			int first = 1;
+			for (int i = 0; i < MAX_CPUS; ++i) {
+				if (core_map[socket][core][i] > 0) {	// Check for valid CPU
+					if (!first)
+						printf(", ");
+					printf("%d", core_map[socket][core][i] - 1);	// Subtract 1 to restore actual CPU ID
+					first = 0;
+				}
+			}
+			printf("]         ");
+		}
+		printf("\n");
+	}
+}
+
+static int cpu_layout_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			     struct df_bpf_conf *conf)
+{
+	switch (conf->cmd) {
+	case DF_BPF_CMD_SHOW:
+		parse_cpu_topology();
+		build_core_map();
+		print_cpu_topology();
+		break;
+	default:
+		return ETR_NOTSUPP;
+	}
+
+	return ETR_OK;
+}
+
+static int nicinfo_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			  struct df_bpf_conf *conf)
+{
+	struct cpu_balancer_nic *nic = malloc(sizeof(struct cpu_balancer_nic));
+	if (nic == NULL) {
+		fprintf(stderr, "malloc() failed.\n");
+		return -1;
+	}
+
+	memset(nic, 0, sizeof(*nic));
+	snprintf(nic->name, sizeof(nic->name), "%s", conf->comm_str);
+	retrieve_pci_info_by_nic(nic->name, nic->pci_device_address,
+				 nic->driver, &nic->numa_node);
+	get_nic_channels(nic->name, &nic->rx_channels, &nic->tx_channels);
+	get_nic_ring_size(nic->name, &nic->rx_ring_size, &nic->tx_ring_size);
+	nic->promisc = is_promiscuous_mode(nic->name);
+	fprintf(stdout, "Device: %-8s\nAddress: %-14s\nDriver: %-8s\n"
+		"Rx-Channels: %-4d\nTx-Channels: %-4d\nRX-Ring-Size: %-5ld\nTX-Ring-Size: %-5ld\n"
+		"PROMISC: %-3d\nNumaNode: %d\n\n",
+		nic->name, nic->pci_device_address, nic->driver,
+		nic->rx_channels, nic->tx_channels, nic->rx_ring_size,
+		nic->tx_ring_size, nic->promisc, nic->numa_node);
+	fflush(stdout);
+	free(nic);
+	return ETR_OK;
+}
+
 static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			   struct df_bpf_conf *conf)
 {
@@ -732,8 +920,7 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 				snprintf(cmdbuf, sizeof(cmdbuf),
 					 "grep -n -A 1 \"%s\" %s",
 					 match_str,
-					 conf->
-					 is_all_files ?
+					 conf->is_all_files ?
 					 "/var/log/datadump-*.log" :
 					 "$(ls -t /var/log/datadump-*.log | head -n 1)");
 				printf("%s\n", cmdbuf);
@@ -858,14 +1045,26 @@ struct df_bpf_obj match_pids_obj = {
 	.do_cmd = match_pids_do_cmd,
 };
 
+struct df_bpf_obj cpu_layout_obj = {
+	.name = "cpu_layout",
+	.help = cpu_layout_help,
+	.do_cmd = cpu_layout_do_cmd,
+};
+
+struct df_bpf_obj nicinfo_obj = {
+	.name = "nicinfo",
+	.help = nicinfo_help,
+	.do_cmd = nicinfo_do_cmd,
+};
+
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
 		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids}\n"
-		"    COMMAND := { show list set print}\n"
+		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids cpu_layout nicinfo }\n"
+		"    COMMAND := { show list set print }\n"
 		"Options:\n"
 		"    -v, --verbose\n"
 		"    -h, --help\n" "    -V, --version\n" "    -C, --color\n");
@@ -883,6 +1082,10 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 		return &cpdbg_obj;
 	} else if (strcmp(name, "match_pids") == 0) {
 		return &match_pids_obj;
+	} else if (strcmp(name, "cpu_layout") == 0) {
+		return &cpu_layout_obj;
+	} else if (strcmp(name, "nicinfo") == 0) {
+		return &nicinfo_obj;
 	}
 
 	return NULL;
@@ -904,6 +1107,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"pid", required_argument, NULL, 'p'},
 		{"comm", required_argument, NULL, 'c'},
 		{"l7-proto", required_argument, NULL, 'l'},
+		{"interface", required_argument, NULL, 'i'},
 		{NULL, 0, NULL, 0},
 	};
 
@@ -923,7 +1127,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	}
 
 	while ((opt =
-		getopt_long(argc, argv, "vhVCOAt:m:p:c:l:", opts,
+		getopt_long(argc, argv, "vhVCOAt:m:p:c:l:i:", opts,
 			    NULL)) != -1) {
 		switch (opt) {
 		case 'v':
@@ -965,6 +1169,23 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				fprintf(stderr,
 					"Invalid option: --l7-proto, need >= 0\n");
 				return -1;
+			}
+			break;
+		case 'i':{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --interface\n");
+					return -1;
+				}
+				int len = strlen(optarg) + 1;
+				conf->comm_str = malloc(len);
+				if (conf->comm_str == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->comm_str, (void *)optarg,
+				       len);
+				conf->comm_str[len] = '\0';
 			}
 			break;
 		case 'c':{
@@ -1021,13 +1242,19 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	argv += optind;
 
 	conf->obj = argv[0];
-	if (argc < 2) {
+	if (argc < 1) {
 		obj = df_bpf_obj_get(conf->obj);
 		if (obj && obj->help)
 			obj->help();
 		else
 			usage();
 		exit(1);
+	}
+
+	if (strcmp(argv[0], "nicinfo") == 0) {
+		conf->argc = argc - 1;
+		conf->argv = argv + 1;
+		return 0;
 	}
 
 	if (strcmp(argv[1], "show") == 0 || strcmp(argv[1], "list") == 0) {
@@ -1044,7 +1271,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		goto show_exit;
 	} else if (strcmp(argv[1], "print") == 0) {
 		conf->cmd = DF_BPF_CMD_PRINT;
-    goto show_exit;
+		goto show_exit;
 	} else if (strcmp(argv[1], "ls") == 0) {
 		conf->cmd = DF_BPF_CMD_SHOW;
 		goto show_exit;

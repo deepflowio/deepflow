@@ -18,7 +18,6 @@
 #include <bcc/perf_reader.h>
 #include "../config.h"
 #include "../utils.h"
-#include "../common.h"
 #include "../mem.h"
 #include "../log.h"
 #include "../types.h"

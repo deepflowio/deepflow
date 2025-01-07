@@ -4457,6 +4457,126 @@ inputs:
 
 Set the maximum value of hash table entries for thread/coroutine tracking sessions.
 
+### CPU Balancer {#inputs.ebpf.cpu_balancer}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.cpu_balancer`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    cpu_balancer:
+    - nic_name: ""
+      ring_size: 4096
+      nic_rx_cpus: []
+      xdp_cpus: []
+      mode: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Through the combination of RSS and XDP technologies, network traffic can be distributed
+across different CPU cores to achieve more efficient network packet processing. The entire
+path from the network interface card (NIC) to final processing is as follows:
+
+  `[NIC] --(interrupt)--> [RSS receive CPU] --(XDP CPUMAP)--> [Softirq CPU1, CPU2 ...]`
+
+When the network interface card (NIC) receives a network packet, it triggers an interrupt
+signal. This is a hardware-level interrupt used to notify the system that a packet has arrived.
+Then, XDP CPUMAP is used to distribute the packet to other CPU cores for further processing.
+XDP CPUMAP is a mechanism that maps network packets from the receiving CPU and distributes them
+to multiple processing CPUs for more efficient soft interrupt handling.
+When the network interface receives encapsulated packets such as GRE, Double VLAN (QinQ), or VXLAN,
+which cannot be evenly distributed across CPUs using the network card's RSS (Receive Side Scaling),
+XDP CPUMAP can effectively alleviate this issue. We can use the `top` command to check the soft
+interrupt usage of each CPU and the `rxtxcpu` command to view the data collection counts for each CPU,
+helping to determine whether there is an imbalance in CPU data processing.
+
+`rxtxcpu` command：
+```
+# rxtxcpu -d rx <nic-name>
+110 packets captured on cpu0.
+93 packets captured on cpu1.
+112 packets captured on cpu2.
+77 packets captured on cpu3.
+853 packets captured on cpu4.
+53 packets captured on cpu5.
+...
+```
+You can view the statistics of received packets for each CPU. If the count for a specific CPU is
+significantly higher than others, it indicates an imbalance in CPU processing.
+
+Configuration Item:
+- nic_name: Network interface name. default value is ""
+- ring_size: Receive (RX) ring buffer size, default value is 4096
+- nic_rx_cpus: The list of CPUs that handle the network data received by the network interface
+  card (NIC), triggered by a physical interrupt. Since the network interface card (NIC) contains
+  multiple physical cores, and each physical core has multiple logical cores, we select the
+  physical core on the NUMA node where the NIC is located. This can be done as follows:
+
+  ```
+  # deepflow-ebpfctl nicinfo --interface=p1p1
+  Device: p1p1    
+  Address: 0000:41:00.0  
+  Driver: i40e
+  Rx-Channels: 64  
+  Tx-Channels: 64  
+  RX-Ring-Size: 512  
+  TX-Ring-Size: 512  
+  PROMISC: 0  
+  NumaNode: 1
+ 
+  # deepflow-ebpfctl cpu_layout show
+  cores =  [0, 1, 2, 3, 4, 5]
+  sockets =  [0, 1]
+      #
+          Socket 0         Socket 1         
+          ------------    ------------    
+  Core 0  [0, 12]         [1, 13]         
+  Core 1  [2, 14]         [3, 15]         
+  Core 2  [4, 16]         [5, 17]         
+  Core 3  [6, 18]         [7, 19]         
+  Core 4  [8, 20]         [9, 21]         
+  Core 5  [10, 22]        [11, 23]
+  ```
+  From the above information, we know that the NIC p1p1 is located on NUMA node 1. We need to
+  select cores from Socket 1, for example: selecting Core 0, Core 1. From Core 0, we can choose
+  logical cores 1 or 13, and from Core 1, we can choose logical cores 3 or 15. The configuration
+  can be set as [13,15].
+  Default value is []
+- xdp_cpus: XDP CPU distribution list, ensuring that the distributed CPUs do not overlap with nic_rx_cpus.
+  Default value is []
+- mode: CPU Balance Mode, default value is 0.
+
+Example:
+```yaml
+inputs:
+  ebpf:
+    cpu_balancer:
+    - nic_name: eth0
+      ring_size: 4096
+      nic_rx_cpus: [1,3]
+      xdp_cpus: [5,7,9,11]
+      mode: 0
+    - nic_name: eth1
+      ring_size: 4096
+      nic_rx_cpus: [13,15]
+      xdp_cpus: [17,18,19,21]
+      mode: 0
+```
+
 ## Resources {#inputs.resources}
 
 ### Push Interval {#inputs.resources.push_interval}

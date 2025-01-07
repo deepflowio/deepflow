@@ -35,7 +35,7 @@
 #include <limits.h>		//PATH_MAX(4096)
 #include <arpa/inet.h>
 #include <memory.h>
-#include "common.h"
+#include "utils.h"
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
 #include <bcc/bcc_syms.h>

@@ -19,7 +19,7 @@
 // https://github.com/davea42/libdwarf-code/blob/master/src/bin/dwarfexample/findfuncbypc.c
 
 #include "offset.h"
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include <fcntl.h>
 #include <libdwarf-0/dwarf.h>

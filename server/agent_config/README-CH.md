@@ -4323,6 +4323,113 @@ inputs:
 
 线程和协程追踪的最大哈希表条目数。
 
+### CPU 均衡器 {#inputs.ebpf.cpu_balancer}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.cpu_balancer`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    cpu_balancer:
+    - nic_name: ""
+      ring_size: 4096
+      nic_rx_cpus: []
+      xdp_cpus: []
+      mode: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+通过RSS和XDP技术的结合，网络流量可以分配到不同的CPU核心，从而实现更高效的网络数据包处理。整个从网卡
+（NIC）到最终处理的路径如下：
+
+  `[NIC] --(interrupt)--> [RSS receive CPU] --(XDP CPUMAP)--> [Softirq CPU1, CPU2 ...]`
+
+当网卡（NIC）接收到网络数据包时，它会触发一个中断信号。这是一个硬件级别的中断，用于通知系统有数据包到达。
+然后，使用XDP CPUMAP将数据包分配到其他CPU核心进行进一步处理。XDP CPUMAP是一种机制，用于将网络数据包从接收
+CPU映射并分发到多个处理CPU，从而实现更高效的软中断处理。
+当网络接口接收到诸如 GRE、Double VLAN（QinQ）或 VXLAN 等封装数据包时，由于网卡的 RSS（接收端扩展）无法将其均
+匀分配到各个 CPU 上，XDP CPUMAP 可以有效缓解这一问题。我们可以使用 `top` 命令查看每个 CPU 的软中断使用情况，
+以及使用 `rxtxcpu` 命令查看每个 CPU 的数据收集计数，从而判断 CPU 数据处理是否存在不均衡的情况。
+
+`rxtxcpu` 命令：
+```
+# rxtxcpu -d rx <nic-name>
+110 packets captured on cpu0.
+93 packets captured on cpu1.
+112 packets captured on cpu2.
+77 packets captured on cpu3.
+853 packets captured on cpu4.
+53 packets captured on cpu5.
+...
+```
+可以查看每个 CPU 接收数据包的统计信息。如果某个 CPU 的计数明显高于其他 CPU，这表明 CPU 处理存在不均衡的情况。
+
+配置项：
+- nic_name：网络接口名称，默认值：""
+- ring_size：接收（RX）环形缓冲区大小，默认值：4096
+- nic_rx_cpus：处理网卡（NIC）接收的网络数据的CPU列表，这些数据由物理中断触发。由于网卡（NIC）包含多个物理核心，
+  每个物理核心有多个逻辑核心，我们选择网卡所在NUMA节点的物理核心。可以按照以下方式进行操作：
+  ```
+  # deepflow-ebpfctl nicinfo --interface=p1p1
+  Device: p1p1    
+  Address: 0000:41:00.0  
+  Driver: i40e
+  Rx-Channels: 64  
+  Tx-Channels: 64  
+  RX-Ring-Size: 512  
+  TX-Ring-Size: 512  
+  PROMISC: 0  
+  NumaNode: 1
+
+  # deepflow-ebpfctl cpu_layout show
+  cores =  [0, 1, 2, 3, 4, 5]
+  sockets =  [0, 1]
+
+          Socket 0         Socket 1         
+          ------------    ------------    
+  Core 0  [0, 12]         [1, 13]         
+  Core 1  [2, 14]         [3, 15]         
+  Core 2  [4, 16]         [5, 17]         
+  Core 3  [6, 18]         [7, 19]         
+  Core 4  [8, 20]         [9, 21]         
+  Core 5  [10, 22]        [11, 23]
+  ```
+  从上述信息我们得知，网卡 p1p1 位于 NUMA 节点 1。我们需要从 Socket 1 中选择核心，例如：选择 Core 0 和 Core 1。
+  从 Core 0 中可以选择逻辑核心 1 或 13，从 Core 1 中可以选择逻辑核心 3 或 15。配置可以设置为 [13,15]。
+  默认值：[]
+- xdp_cpus: XDP CPU 分发列表，确保分发的 CPU 不与 nic_rx_cpus 重叠，默认值：[]
+- mode: CPU 均衡模式，默认值：0
+
+样例:
+```yaml
+inputs:
+  ebpf:
+    cpu_balancer:
+    - nic_name: eth0
+      ring_size: 4096
+      nic_rx_cpus: [1,3]
+      xdp_cpus: [5,7,9,11]
+      mode: 0
+    - nic_name: eth1
+      ring_size: 4096
+      nic_rx_cpus: [13,15]
+      xdp_cpus: [17,18,19,21]
+      mode: 0
+```
 ## 资源 {#inputs.resources}
 
 ### 推送间隔 {#inputs.resources.push_interval}

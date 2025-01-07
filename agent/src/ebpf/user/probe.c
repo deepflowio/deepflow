@@ -72,6 +72,8 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			__name += 4;
 		} else if (strncmp(__name, "sched_", 6) == 0) {
 			__name += 6;
+		} else if (strncmp(__name, "xdp_", 4) == 0) {
+			__name += 4;
 		}
 
 		res =

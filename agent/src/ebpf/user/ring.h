@@ -82,7 +82,7 @@
 #include <stdint.h>
 #include <sys/queue.h>
 #include <errno.h>
-#include "common.h"
+#include "utils.h"
 #include "atomic.h"
 
 #define TAILQ_RING_NAME "RING"
