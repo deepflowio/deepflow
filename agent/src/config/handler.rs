@@ -202,6 +202,8 @@ pub struct EnvironmentConfig {
     pub log_file_size: u32,
     pub capture_mode: PacketCaptureType,
     pub guard_interval: Duration,
+    pub max_sockets: usize,
+    pub max_sockets_tolerate_interval: Duration,
     pub system_load_circuit_breaker_threshold: f32,
     pub system_load_circuit_breaker_recover: f32,
     pub system_load_circuit_breaker_metric: agent::SystemLoadMetric,
@@ -1583,6 +1585,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 log_file_size: conf.global.limits.max_local_log_file_size,
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
                 guard_interval: conf.global.tunning.resource_monitoring_interval,
+                max_sockets: conf.global.limits.max_sockets,
+                max_sockets_tolerate_interval: conf.global.limits.max_sockets_tolerate_interval,
                 system_load_circuit_breaker_threshold: conf
                     .global
                     .circuit_breakers
@@ -3730,6 +3734,20 @@ impl ConfigHandler {
                 limits.max_millicpus, new_limits.max_millicpus
             );
             limits.max_millicpus = new_limits.max_millicpus;
+        }
+        if limits.max_sockets != new_limits.max_sockets {
+            info!(
+                "Update global.limits.max_sockets from {:?} to {:?}.",
+                limits.max_sockets, new_limits.max_sockets
+            );
+            limits.max_sockets = new_limits.max_sockets;
+        }
+        if limits.max_sockets_tolerate_interval != new_limits.max_sockets_tolerate_interval {
+            info!(
+                "Update global.limits.max_sockets_tolerate_interval from {:?} to {:?}.",
+                limits.max_sockets_tolerate_interval, new_limits.max_sockets_tolerate_interval
+            );
+            limits.max_sockets_tolerate_interval = new_limits.max_sockets_tolerate_interval;
         }
 
         let ntp = &mut config.global.ntp;
