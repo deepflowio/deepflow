@@ -154,6 +154,68 @@ global:
 
 用于 deepflow-agent 控制自身运行日志在本地的留存时长。
 
+### Socket 数量上限 {#global.limits.max_sockets}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets`
+
+Upgrade from old version: `static_config.max-sockets`
+
+**默认值**:
+```yaml
+global:
+  limits:
+    max_sockets: 1024
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | count |
+| Range | [16, 4096] |
+
+**详细描述**:
+
+用于控制 deepflow-agent 可以打开的 socket 数量上限。
+超过限制时 agent 会重启。
+
+### Socket 数量超限容忍时间 {#global.limits.max_sockets_tolerate_interval}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets_tolerate_interval`
+
+Upgrade from old version: `static_config.max-sockets-tolerate-interval`
+
+**默认值**:
+```yaml
+global:
+  limits:
+    max_sockets_tolerate_interval: 60s
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0s', '3600s'] |
+
+**详细描述**:
+
+用于控制 deepflow-agent 在 socket 数量超过上限后，重启前的容忍时间。
+只有当 socket 数量持续超过上限达到该时间后才会触发重启。
+重启由 guard 模块触发，因此该值小于 guard-interval 时会导致立即重启。
+
 ## 告警 {#global.alerts}
 
 ### 线程数限制 {#global.alerts.thread_threshold}

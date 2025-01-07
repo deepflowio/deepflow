@@ -154,6 +154,69 @@ global:
 
 The retention time for deepflow-agent log files.
 
+### Maximum Socket Count {#global.limits.max_sockets}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets`
+
+Upgrade from old version: `static_config.max-sockets`
+
+**Default value**:
+```yaml
+global:
+  limits:
+    max_sockets: 1024
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | count |
+| Range | [16, 4096] |
+
+**Description**:
+
+The maximum number of sockets that the agent can open.
+Agent will restart if socket count exceeds this value.
+
+### Maximum Socket Count Tolerate Interval {#global.limits.max_sockets_tolerate_interval}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.limits.max_sockets_tolerate_interval`
+
+Upgrade from old version: `static_config.max-sockets-tolerate-interval`
+
+**Default value**:
+```yaml
+global:
+  limits:
+    max_sockets_tolerate_interval: 60s
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0s', '3600s'] |
+
+**Description**:
+
+The interval to tolerate socket count exceeding max-sockets before restarting.
+Agent will only restart if socket count exceeds max-sockets for this duration.
+Restarts are triggered by guard module, so setting this value lower than guard-interval
+will cause agent to restart immediately.
+
 ## Alerts {#global.alerts}
 
 ### Thread Limit {#global.alerts.thread_threshold}
