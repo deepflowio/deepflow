@@ -1663,6 +1663,14 @@ vtap_group_id: g-xxxxxx
   ##   4. System load
   #guard-interval: 10s
 
+  ######################
+  ## Max Socket Count ##
+  ######################
+  ## The maximum number of sockets that the agent can open.
+  ## Default: 20. Unit: count. Range: [2, 1024].
+  ## Note: Agent will restart if socket count exceeds this value.
+  #max-sockets: 20
+
   #################
   ## Memory trim ##
   #################
