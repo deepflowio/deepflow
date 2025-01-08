@@ -43,6 +43,8 @@ use crate::common::{
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
 use public::proto::trident::{Exception, SystemLoadMetric, TapMode};
@@ -269,71 +271,18 @@ impl Guard {
 
     #[cfg(target_os = "linux")]
     fn check_agent_sockets_ok(limit: usize) -> procfs::ProcResult<bool> {
-        let mut socket_inodes = vec![];
-        let proc = procfs::process::Process::myself()?;
-        for fd in proc.fd()? {
-            match fd?.target {
-                procfs::process::FDTarget::Socket(inode) => socket_inodes.push(inode),
-                _ => {}
-            }
-        }
-        socket_inodes.sort_unstable();
+        let SocketInfo {
+            tcp,
+            tcp6,
+            udp,
+            udp6,
+        } = SocketInfo::get()?;
 
-        fn count_tcp_sockets(inodes: &[u64], entries: &[procfs::net::TcpNetEntry]) -> usize {
-            entries
-                .iter()
-                .filter(|entry| {
-                    entry.state == procfs::net::TcpState::Established
-                        && !entry.remote_address.ip().is_loopback()
-                        && inodes.binary_search(&entry.inode).is_ok()
-                })
-                .count()
-        }
-
-        fn count_udp_sockets(inodes: &[u64], entries: &[procfs::net::UdpNetEntry]) -> usize {
-            entries
-                .iter()
-                .filter(|entry| {
-                    !entry.remote_address.ip().is_loopback()
-                        && inodes.binary_search(&entry.inode).is_ok()
-                })
-                .count()
-        }
-
-        let n_tcp = match procfs::net::tcp() {
-            Ok(entries) => count_tcp_sockets(&socket_inodes, &entries),
-            Err(e) => {
-                debug!("get tcp socket failed: {}", e);
-                0
-            }
-        };
-        let n_tcp6 = match procfs::net::tcp6() {
-            Ok(entries) => count_tcp_sockets(&socket_inodes, &entries),
-            Err(e) => {
-                debug!("get tcp6 socket failed: {}", e);
-                0
-            }
-        };
-        let n_udp = match procfs::net::udp() {
-            Ok(entries) => count_udp_sockets(&socket_inodes, &entries),
-            Err(e) => {
-                debug!("get udp socket failed: {}", e);
-                0
-            }
-        };
-        let n_udp6 = match procfs::net::udp6() {
-            Ok(entries) => count_udp_sockets(&socket_inodes, &entries),
-            Err(e) => {
-                debug!("get udp6 socket failed: {}", e);
-                0
-            }
-        };
-
-        if n_tcp + n_tcp6 + n_udp + n_udp6 > limit {
-            warn!("the number of socket exceeds the limit: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) > {limit}");
+        if tcp + tcp6 + udp + udp6 > limit {
+            warn!("the number of socket exceeds the limit: {tcp}(tcp) + {tcp6}(tcp6) + {udp}(udp) + {udp6}(udp6) > {limit}");
             Ok(false)
         } else {
-            debug!("socket count check passed: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) <= {limit}");
+            debug!("socket count check passed: {tcp}(tcp) + {tcp6}(tcp6) + {udp}(udp) + {udp6}(udp6) <= {limit}");
             Ok(true)
         }
     }

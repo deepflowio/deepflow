@@ -1668,7 +1668,11 @@ vtap_group_id: g-xxxxxx
   ######################
   ## The maximum number of sockets that the agent can open.
   ## Default: 20. Unit: count. Range: [2, 1024].
-  ## Note: Agent will restart if socket count exceeds this value.
+  ## Note:
+  ##   Agent will restart if socket count exceeds this value.
+  ##   The following sockets are excluded from the count:
+  ##   1. Remote address is loopback (127.0.0.1 or ::1)
+  ##   2. Remote address is TLS port (443). Agent will use one connection for each Kubernetes resource, typically result in 10 connections.
   #max-sockets: 20
 
   #################
