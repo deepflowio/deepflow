@@ -275,7 +275,7 @@ impl KubeWatchPolicy {
     pub fn from_env() -> Self {
         // ONLY_WATCH_K8S_RESOURCE no longer supported
         if env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some() {
-            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY=watch-only instead!");
+            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY=watch-only instead! deepflow-agent restart...");
             thread::sleep(Duration::from_secs(60));
             crate::utils::notify_exit(-1);
             return KubeWatchPolicy::Normal;

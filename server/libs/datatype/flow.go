@@ -49,7 +49,7 @@ const (
 	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 	//	...
 
-	CloseTypeTCPFin                //  1: 正常结束
+	CloseTypeFinish                //  1: 正常结束
 	CloseTypeTCPServerRst          //  2: 传输-服务端重置
 	CloseTypeTimeout               //  3: 连接超时
 	_                              //  4: 【废弃】CloseTypeFlood
