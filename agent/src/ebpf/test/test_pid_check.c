@@ -18,8 +18,8 @@
 #include <math.h>
 #include <bcc/perf_reader.h>
 #include "../user/config.h"
+#include "../user/common_utils.h"
 #include "../user/utils.h"
-#include "../user/common.h"
 #include "../user/mem.h"
 #include "../user/log.h"
 #include "../user/types.h"
