@@ -37,7 +37,7 @@
 #include <dirent.h>		// for opendir()
 #include "../user/config.h"
 #include "../user/log.h"
-#include "../user/common.h"
+#include "../user/utils.h"
 #include "../user/symbol.h"
 #include "../user/tracer.h"
 #include "../user/go_tracer.h"

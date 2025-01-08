@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include "../user/common.h"
+#include "../user/utils.h"
 #include "../user/log.h"
 #include "../user/elf.h"
 #include <bcc/linux/bpf.h>
