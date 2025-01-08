@@ -1272,7 +1272,10 @@ fn component_on_config_change(
                         components.last_dispatcher_component_id += 1;
                     }
                     Err(e) => {
-                        warn!("build dispatcher_component failed: {}", e);
+                        warn!(
+                            "build dispatcher_component failed: {}, deepflow-agent restart...",
+                            e
+                        );
                         crate::utils::notify_exit(1);
                     }
                 }
@@ -1389,7 +1392,10 @@ fn component_on_config_change(
                         components.dispatcher_components.push(d);
                     }
                     Err(e) => {
-                        warn!("build dispatcher_component failed: {}", e);
+                        warn!(
+                            "build dispatcher_component failed: {}, deepflow-agent restart...",
+                            e
+                        );
                         crate::utils::notify_exit(1);
                     }
                 }
@@ -1527,7 +1533,7 @@ impl DomainNameListener {
                             let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
                                 Ok(tuple) => tuple,
                                 Err(e) => {
-                                    warn!("get ctrl ip and mac failed with error: {}", e);
+                                    warn!("get ctrl ip and mac failed with error: {}, deepflow-agent restart...", e);
                                     crate::utils::notify_exit(1);
                                     continue;
                                 }
@@ -1543,20 +1549,20 @@ impl DomainNameListener {
                                 // use host ip/mac as agent id if not in sidecar mode
                                 if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
-                                    warn!("setns error: {}", e);
+                                    warn!("setns error: {}, deepflow-agent restart...", e);
                                     crate::utils::notify_exit(1);
                                     continue;
                                 }
                                 let (ip, mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
                                     Ok(tuple) => tuple,
                                     Err(e) => {
-                                        warn!("get ctrl ip and mac failed with error: {}", e);
+                                        warn!("get ctrl ip and mac failed with error: {}, deepflow-agent restart...", e);
                                         crate::utils::notify_exit(1);
                                         continue;
                                     }
                                 };
                                 if let Err(e) = netns::reset_netns() {
-                                    warn!("reset setns error: {}", e);
+                                    warn!("reset setns error: {}, deepflow-agent restart...", e);
                                     crate::utils::notify_exit(1);
                                     continue;
                                 }
