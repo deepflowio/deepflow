@@ -26,7 +26,7 @@
 #include <signal.h>		/* kill() */
 #include <bcc/perf_reader.h>
 #include "../config.h"
-#include "../utils.h"
+#include "../common_utils.h"
 #include "../common.h"
 #include "../mem.h"
 #include "../log.h"
