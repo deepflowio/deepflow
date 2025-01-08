@@ -1022,7 +1022,7 @@ impl QuadrupleGenerator {
                         flow_meter.anomaly.server_establish_reset = 1
                     }
                     CloseType::ForcedReport
-                    | CloseType::TcpFin
+                    | CloseType::Finish
                     | CloseType::Unknown
                     | CloseType::TcpFinClientRst
                     | CloseType::Max => (),

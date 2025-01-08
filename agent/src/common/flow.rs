@@ -63,7 +63,7 @@ const COUNTER_FLOW_ID_MASK: u64 = 0x00FFFFFF;
 #[repr(u8)]
 pub enum CloseType {
     Unknown = 0,
-    TcpFin = 1,                 //  1: 正常结束
+    Finish = 1,                 //  1: 正常结束
     TcpServerRst = 2,           //  2: 传输-服务端重置
     Timeout = 3,                //  3: 连接超时
     ForcedReport = 5,           //  5: 周期性上报
@@ -1106,10 +1106,16 @@ impl Flow {
             FlowState::Exception => CloseType::Unknown,
             FlowState::Opening1 => CloseType::ClientSynRepeat,
             FlowState::Opening2 => CloseType::ServerSynAckRepeat,
-            FlowState::Established => CloseType::Timeout,
+            FlowState::Established => {
+                if self.flow_key.proto == IpProtocol::TCP {
+                    CloseType::Timeout
+                } else {
+                    CloseType::Finish
+                }
+            }
             FlowState::ClosingTx1 => CloseType::ServerHalfClose,
             FlowState::ClosingRx1 => CloseType::ClientHalfClose,
-            FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
+            FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::Finish,
             FlowState::Reset => {
                 if self.is_heartbeat() {
                     CloseType::TcpFinClientRst
