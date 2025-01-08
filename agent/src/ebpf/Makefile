@@ -71,7 +71,7 @@ CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="versi
 CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
 LIBTRACE := libtrace.a
 OBJS := user/elf.o \
-	user/common.o \
+	user/utils.o \
 	user/symbol.o \
 	user/proc.o \
 	user/go_tracer.o \
@@ -234,9 +234,9 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 
