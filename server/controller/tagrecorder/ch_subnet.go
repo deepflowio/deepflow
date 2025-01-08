@@ -59,6 +59,7 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
 		SubDomainID: md.SubDomainID,
+		L3EPCID:     source.VPCID,
 	})
 	return
 }
@@ -69,6 +70,9 @@ func (c *ChNetwork) onResourceUpdated(sourceID int, fieldsUpdate *message.Networ
 
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if fieldsUpdate.VPCID.IsDifferent() {
+		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChNetwork

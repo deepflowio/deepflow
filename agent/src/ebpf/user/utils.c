@@ -44,7 +44,7 @@
 #include "types.h"
 #include "clib.h"
 #include "list.h"
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include "string.h"
 #include "profile/java/config.h"

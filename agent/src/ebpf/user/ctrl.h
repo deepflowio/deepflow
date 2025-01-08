@@ -24,7 +24,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include "common.h"
+#include "utils.h"
 #include "list.h"
 
 #define UNIX_DOMAIN_DEF "/var/run/deepflow_bpf_ctrl"
