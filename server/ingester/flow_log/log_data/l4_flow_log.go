@@ -903,7 +903,10 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 }
 
 func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageStatus {
-	if t == datatype.CloseTypeTCPFin || t == datatype.CloseTypeForcedReport || t == datatype.CloseTypeTCPFinClientRst ||
+	if t == datatype.CloseTypeFinish || t == datatype.CloseTypeForcedReport || t == datatype.CloseTypeTCPFinClientRst ||
+		// NOTE:
+		//     At present, non-TCP flows close_type is CloseTypeFinish, and in order to be compatible with the old
+		// version of the agent, the code here is currently retained, and it can be deleted later.
 		(p != layers.IPProtocolTCP && t == datatype.CloseTypeTimeout) ||
 		t == datatype.CloseTypeClientHalfClose || t == datatype.CloseTypeServerHalfClose {
 		return datatype.STATUS_OK
