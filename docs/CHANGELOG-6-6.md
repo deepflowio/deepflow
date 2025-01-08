@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: memory profile data may not compressed [#8882](https://github.com/deepflowio/deepflow/pull/8882) by [lzf575](https://github.com/lzf575)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +47,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: agent - eBPF Rename the file common.c to utils.c (#8876) [#8883](https://github.com/deepflowio/deepflow/pull/8883) by [yinjiping](https://github.com/yinjiping)
+* feat: modify the close_type of a non-tcp flow [#8880](https://github.com/deepflowio/deepflow/pull/8880) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: deepflow-ctl tool adds request parameters [#8809](https://github.com/deepflowio/deepflow/pull/8809) by [lzf575](https://github.com/lzf575)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
