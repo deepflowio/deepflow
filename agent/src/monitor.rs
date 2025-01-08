@@ -29,8 +29,10 @@ use log::{debug, info, warn};
 use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
-use crate::config::handler::EnvironmentAccess;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::SocketInfo;
 use crate::{
+    config::handler::EnvironmentAccess,
     error::{Error, Result},
     utils::{
         process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
@@ -40,6 +42,7 @@ use crate::{
         },
     },
 };
+
 #[cfg(target_os = "linux")]
 use public::netns::{self, NsFile};
 use public::utils::net::{link_list, Link};
@@ -276,6 +279,21 @@ impl RefCountable for SysStatusBroker {
                 warn!("get process data failed, system status monitor has stopped");
             }
         }
+
+        #[cfg(target_os = "linux")]
+        metrics.push((
+            "open_sockets",
+            CounterType::Gauged,
+            match SocketInfo::get() {
+                Ok(SocketInfo {
+                    tcp,
+                    tcp6,
+                    udp,
+                    udp6,
+                }) => CounterValue::Unsigned((tcp + tcp6 + udp + udp6) as u64),
+                Err(_) => CounterValue::Unsigned(0),
+            },
+        ));
         metrics
     }
 }

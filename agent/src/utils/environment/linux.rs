@@ -28,7 +28,7 @@ use kube::{
     api::{Api, Patch, PatchParams},
     Client, Config,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use nix::sys::utsname::uname;
 use nom::AsBytes;
 
@@ -408,4 +408,84 @@ pub fn is_kernel_available(kernel_version: &str) -> bool {
         .unwrap_or_default()
         .0
         .ge(kernel_version)
+}
+
+pub struct SocketInfo {
+    pub tcp: usize,
+    pub tcp6: usize,
+    pub udp: usize,
+    pub udp6: usize,
+}
+
+impl SocketInfo {
+    pub fn get() -> procfs::ProcResult<Self> {
+        let mut socket_inodes = vec![];
+        let proc = procfs::process::Process::myself()?;
+        for fd in proc.fd()? {
+            match fd?.target {
+                procfs::process::FDTarget::Socket(inode) => socket_inodes.push(inode),
+                _ => {}
+            }
+        }
+        socket_inodes.sort_unstable();
+
+        fn count_tcp_sockets(inodes: &[u64], entries: &[procfs::net::TcpNetEntry]) -> usize {
+            entries
+                .iter()
+                .filter(|entry| {
+                    entry.state == procfs::net::TcpState::Established
+                        && !entry.remote_address.ip().is_loopback()
+                        && entry.remote_address.port() != public::l7_protocol::DEFAULT_TLS_PORT
+                        && inodes.binary_search(&entry.inode).is_ok()
+                })
+                .count()
+        }
+
+        fn count_udp_sockets(inodes: &[u64], entries: &[procfs::net::UdpNetEntry]) -> usize {
+            entries
+                .iter()
+                .filter(|entry| {
+                    !entry.remote_address.ip().is_loopback()
+                        && entry.remote_address.port() != public::l7_protocol::DEFAULT_TLS_PORT
+                        && inodes.binary_search(&entry.inode).is_ok()
+                })
+                .count()
+        }
+
+        let n_tcp = match procfs::net::tcp() {
+            Ok(entries) => count_tcp_sockets(&socket_inodes, &entries),
+            Err(e) => {
+                debug!("get tcp socket failed: {}", e);
+                0
+            }
+        };
+        let n_tcp6 = match procfs::net::tcp6() {
+            Ok(entries) => count_tcp_sockets(&socket_inodes, &entries),
+            Err(e) => {
+                debug!("get tcp6 socket failed: {}", e);
+                0
+            }
+        };
+        let n_udp = match procfs::net::udp() {
+            Ok(entries) => count_udp_sockets(&socket_inodes, &entries),
+            Err(e) => {
+                debug!("get udp socket failed: {}", e);
+                0
+            }
+        };
+        let n_udp6 = match procfs::net::udp6() {
+            Ok(entries) => count_udp_sockets(&socket_inodes, &entries),
+            Err(e) => {
+                debug!("get udp6 socket failed: {}", e);
+                0
+            }
+        };
+
+        Ok(Self {
+            tcp: n_tcp,
+            tcp6: n_tcp6,
+            udp: n_udp,
+            udp6: n_udp6,
+        })
+    }
 }

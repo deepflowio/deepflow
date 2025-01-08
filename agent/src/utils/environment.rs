@@ -376,5 +376,3 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         "failed getting control ip and mac, deepflow-agent restart...".to_owned(),
     ))
 }
-
-//TODO Windows 相关
