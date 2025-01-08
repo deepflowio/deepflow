@@ -32,7 +32,7 @@
 #include "clib.h"
 #include "probe.h"
 #include "table.h"
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include "symbol.h"
 #include "bihash_8_8.h"
