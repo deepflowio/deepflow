@@ -822,7 +822,7 @@ impl YamlConfig {
             c.guard_interval = Duration::from_secs(10);
         }
 
-        c.max_sockets = c.max_sockets.clamp(2, 1024);
+        c.max_sockets = c.max_sockets.clamp(16, 4096);
         c.max_sockets_tolerate_interval = c
             .max_sockets_tolerate_interval
             .min(Duration::from_secs(3600));
@@ -1047,7 +1047,7 @@ impl Default for YamlConfig {
             os_proc_sync_enabled: false,
             os_proc_sync_tagged_only: false,
             guard_interval: Duration::from_secs(10),
-            max_sockets: 20,
+            max_sockets: 1024,
             max_sockets_tolerate_interval: Duration::from_secs(60),
             check_core_file_disabled: false,
             memory_trim_disabled: false,
