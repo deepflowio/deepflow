@@ -421,18 +421,12 @@ pub struct SocketInfo {
 fn tcp_filter(inodes: &[u64]) -> impl Fn(&TcpNetEntry) -> bool + '_ {
     |entry| {
         entry.state == procfs::net::TcpState::Established
-            && !entry.remote_address.ip().is_loopback()
-            && entry.remote_address.port() != public::l7_protocol::DEFAULT_TLS_PORT
             && inodes.binary_search(&entry.inode).is_ok()
     }
 }
 
 fn udp_filter(inodes: &[u64]) -> impl Fn(&UdpNetEntry) -> bool + '_ {
-    |entry| {
-        !entry.remote_address.ip().is_loopback()
-            && entry.remote_address.port() != public::l7_protocol::DEFAULT_TLS_PORT
-            && inodes.binary_search(&entry.inode).is_ok()
-    }
+    |entry| inodes.binary_search(&entry.inode).is_ok()
 }
 
 impl std::fmt::Display for SocketInfo {
