@@ -207,6 +207,7 @@ pub struct EnvironmentConfig {
     pub tap_mode: TapMode,
     pub guard_interval: Duration,
     pub max_sockets: usize,
+    pub max_sockets_tolerate_interval: Duration,
     pub system_load_circuit_breaker_threshold: f32,
     pub system_load_circuit_breaker_recover: f32,
     pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
@@ -1461,6 +1462,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 tap_mode: conf.tap_mode,
                 guard_interval: conf.yaml_config.guard_interval,
                 max_sockets: conf.yaml_config.max_sockets,
+                max_sockets_tolerate_interval: conf.yaml_config.max_sockets_tolerate_interval,
                 system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold,
                 system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover,
                 system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric,
@@ -2531,6 +2533,17 @@ impl ConfigHandler {
         if candidate_config.environment.max_sockets != new_config.environment.max_sockets {
             info!("max_sockets set to {}", new_config.environment.max_sockets);
             candidate_config.environment.max_sockets = new_config.environment.max_sockets;
+        }
+
+        if candidate_config.environment.max_sockets_tolerate_interval
+            != new_config.environment.max_sockets_tolerate_interval
+        {
+            info!(
+                "max_sockets_tolerate_interval set to {:?}",
+                new_config.environment.max_sockets_tolerate_interval
+            );
+            candidate_config.environment.max_sockets_tolerate_interval =
+                new_config.environment.max_sockets_tolerate_interval;
         }
 
         if candidate_config.environment.sys_free_memory_limit

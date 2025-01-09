@@ -21,7 +21,7 @@ use std::{
     string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use arc_swap::access::Access;
@@ -269,24 +269,6 @@ impl Guard {
         (cpu_limit / 10) as f32 > cpu_usage // The cpu_usage is in percentage, and the unit of cpu_limit is milli-cores. Divide cpu_limit by 10 to align the units
     }
 
-    #[cfg(target_os = "linux")]
-    fn check_agent_sockets_ok(limit: usize) -> procfs::ProcResult<bool> {
-        let SocketInfo {
-            tcp,
-            tcp6,
-            udp,
-            udp6,
-        } = SocketInfo::get()?;
-
-        if tcp + tcp6 + udp + udp6 > limit {
-            warn!("the number of socket exceeds the limit: {tcp}(tcp) + {tcp6}(tcp6) + {udp}(udp) + {udp6}(udp6) > {limit}");
-            Ok(false)
-        } else {
-            debug!("socket count check passed: {tcp}(tcp) + {tcp6}(tcp6) + {udp}(udp) + {udp6}(udp6) <= {limit}");
-            Ok(true)
-        }
-    }
-
     pub fn start(&self) {
         {
             let (started, _) = &*self.running;
@@ -317,6 +299,7 @@ impl Guard {
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
+            let mut last_over_max_sockets_limit = None;
             loop {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
@@ -476,16 +459,36 @@ impl Guard {
                 }
 
                 #[cfg(target_os = "linux")]
-                match Self::check_agent_sockets_ok(config.max_sockets) {
-                    Ok(false) => {
-                        error!("the number of socket exceeds the limit, deepflow-agent restart...");
-                        crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
-                        break;
+                match SocketInfo::get() {
+                    Ok(SocketInfo { tcp, tcp6, udp, udp6 }) => {
+                        let (n_tcp, n_tcp6, n_udp, n_udp6) = (tcp.len(), tcp6.len(), udp.len(), udp6.len());
+                        if n_tcp + n_tcp6 + n_udp + n_udp6 <= config.max_sockets {
+                            debug!("socket count check passed: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) <= {}", config.max_sockets);
+                            last_over_max_sockets_limit = None;
+                        } else {
+                            match last_over_max_sockets_limit {
+                                None => {
+                                    last_over_max_sockets_limit = Some(Instant::now());
+                                    warn!("the number of socket exceeds the limit: {n_tcp}(tcp) + {n_tcp6}(tcp6) + {n_udp}(udp) + {n_udp6}(udp6) > {}", config.max_sockets);
+                                    warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                }
+                                Some(last) if last.elapsed() > config.max_sockets_tolerate_interval => {
+                                    warn!("the number of socket exceeds the limit longer than {:?}, deepflow-agent restart...", config.max_sockets_tolerate_interval);
+                                    warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                    crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                    break;
+                                }
+                                Some(last) => {
+                                    debug!("the number of socket exceeds the limit for {:?}", last.elapsed());
+                                    debug!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         warn!("Check agent sockets failed: {e}");
+                        last_over_max_sockets_limit = None;
                     }
-                    _ => (),
                 }
 
                 let (running, timer) = &*running;

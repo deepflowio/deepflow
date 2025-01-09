@@ -1675,6 +1675,17 @@ vtap_group_id: g-xxxxxx
   ##   2. Remote address is TLS port (443). Agent will use one connection for each Kubernetes resource, typically result in 10 connections.
   #max-sockets: 20
 
+  ####################################
+  ## Max Socket Tolerate Interval   ##
+  ####################################
+  ## The interval to tolerate socket count exceeding max-sockets before restarting.
+  ## Default: 60s. Unit: s. Range: [0, 3600s].
+  ## Note:
+  ##   Agent will only restart if socket count exceeds max-sockets for this duration.
+  ##   Restarts are triggered by guard module, so setting this value lower than guard-interval
+  ##   will cause agent to restart immediately.
+  #max-sockets-tolerate-interval: 60s
+
   #################
   ## Memory trim ##
   #################

@@ -618,6 +618,8 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub max_sockets: usize,
+    #[serde(with = "humantime_serde")]
+    pub max_sockets_tolerate_interval: Duration,
     pub check_core_file_disabled: bool,
     pub memory_trim_disabled: bool,
     pub forward_capacity: usize,
@@ -821,6 +823,9 @@ impl YamlConfig {
         }
 
         c.max_sockets = c.max_sockets.clamp(2, 1024);
+        c.max_sockets_tolerate_interval = c
+            .max_sockets_tolerate_interval
+            .min(Duration::from_secs(3600));
 
         if c.kubernetes_api_list_limit < 10 {
             c.kubernetes_api_list_limit = 10;
@@ -1043,6 +1048,7 @@ impl Default for YamlConfig {
             os_proc_sync_tagged_only: false,
             guard_interval: Duration::from_secs(10),
             max_sockets: 20,
+            max_sockets_tolerate_interval: Duration::from_secs(60),
             check_core_file_disabled: false,
             memory_trim_disabled: false,
             fast_path_disabled: false,

@@ -290,7 +290,9 @@ impl RefCountable for SysStatusBroker {
                     tcp6,
                     udp,
                     udp6,
-                }) => CounterValue::Unsigned((tcp + tcp6 + udp + udp6) as u64),
+                }) => {
+                    CounterValue::Unsigned((tcp.len() + tcp6.len() + udp.len() + udp6.len()) as u64)
+                }
                 Err(_) => CounterValue::Unsigned(0),
             },
         ));
