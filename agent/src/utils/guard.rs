@@ -299,6 +299,7 @@ impl Guard {
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
+            #[cfg(target_os = "linux")]
             let mut last_over_max_sockets_limit = None;
             loop {
                 let config = config.load();
