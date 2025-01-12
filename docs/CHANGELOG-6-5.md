@@ -99,3 +99,7 @@
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
+
+
+#### Refactoring
+* refactor: close_type is 0, which translates to Others [#8899](https://github.com/deepflowio/deepflow/pull/8899) by [lzf575](https://github.com/lzf575)
