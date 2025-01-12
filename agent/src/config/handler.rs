@@ -2011,21 +2011,24 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             warn!(
                                 "agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'."
                             );
-                            warn!("setns error: {}", e);
+                            warn!("setns error: {}, deepflow-agent restart...", e);
                             crate::utils::notify_exit(-1);
                             return MacAddr::ZERO;
                         }
                         let ctrl_mac = match get_ctrl_ip_and_mac(ip) {
                             Ok((_, mac)) => mac,
                             Err(e) => {
-                                warn!("get_ctrl_ip_and_mac error: {}", e);
+                                warn!(
+                                    "get_ctrl_ip_and_mac error: {}, deepflow-agent restart...",
+                                    e
+                                );
                                 crate::utils::notify_exit(-1);
                                 return MacAddr::ZERO;
                             }
                         };
                         #[cfg(target_os = "linux")]
                         if let Err(e) = public::netns::reset_netns() {
-                            warn!("reset setns error: {}", e);
+                            warn!("reset setns error: {}, deepflow-agent restart...", e);
                             crate::utils::notify_exit(-1);
                             return MacAddr::ZERO;
                         };
@@ -2500,6 +2503,19 @@ impl ConfigHandler {
         }
         components.npb_arp_table.set_need_resolve_mac(
             handler.candidate_config.npb.socket_type == agent::SocketType::RawUdp,
+        );
+    }
+
+    fn set_vector(handler: &ConfigHandler, components: &mut AgentComponents) {
+        components.vector_component.on_config_change(
+            handler.candidate_config.user_config.inputs.vector.enabled,
+            handler
+                .candidate_config
+                .user_config
+                .inputs
+                .vector
+                .config
+                .clone(),
         );
     }
 
@@ -4564,6 +4580,20 @@ impl ConfigHandler {
             restart_agent = !first_run;
         }
 
+        let vector = &mut config.inputs.vector;
+        let new_vector = &mut new_config.user_config.inputs.vector;
+        if vector.enabled != new_vector.enabled || vector.config != new_vector.config {
+            info!(
+                "vector inputs.vector from {:#?} to {:#?}",
+                vector, new_vector
+            );
+            if components.is_some() {
+                callbacks.push(Self::set_vector);
+            }
+            vector.enabled = new_vector.enabled;
+            vector.config = new_vector.config.clone();
+        }
+
         candidate_config.enabled = new_config.enabled;
         candidate_config.capture_mode = new_config.capture_mode;
         if candidate_config.dispatcher != new_config.dispatcher {
@@ -4865,7 +4895,7 @@ impl ConfigHandler {
         candidate_config.pcap = new_config.pcap.clone();
 
         if new_config != *candidate_config {
-            error!("Some configurations have not been updated, please check the code.");
+            error!("Some configurations have not been, updated deepflow-agent restart... please check the code.");
             error!(
                 "Configurations from {:#?} to {:#?}",
                 candidate_config, new_config

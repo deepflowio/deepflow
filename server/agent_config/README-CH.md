@@ -5265,6 +5265,121 @@ inputs:
 | ---- | ---------------------------- |
 | Type | bool |
 
+## vector {#inputs.vector}
+
+### 禁用 Vector 组件 {#inputs.vector.enabled}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.vector.enabled`
+
+**默认值**:
+```yaml
+inputs:
+  vector:
+    enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+对 Vector 组件的开关控制。
+
+### Vector 组件配置控制 {#inputs.vector.config}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.vector.config`
+
+**默认值**:
+```yaml
+inputs:
+  vector:
+    config: null
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+Vector 组件的具体配置，所有可用配置可在此链接中查找：[vector.dev](https://vector.dev/docs/reference/configuration)
+```yaml
+config:
+  sources:
+    # 抓取 kubernetes 日志
+    kubernetes_logs:
+      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+      namespace_annotation_fields:
+        namespace_labels: ""
+      node_annotation_fields:
+        node_labels: ""
+      pod_annotation_fields:
+        pod_annotations: ""
+        pod_labels: ""
+      type: kubernetes_logs
+    # 抓取主机指标
+    host_metrics:
+      type: host_metrics
+      scrape_interval_secs: 15
+      namespace: node
+    # 抓取 kubelet 指标
+    kubelet_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - http://kubelet.kube-system:10250/metrics
+      auth:
+        strategy: bearer
+        token: $FIX_ME_K8S_TOKEN
+      tls:
+        verify_certificate: false
+      scrape_interval_secs: 15
+      scrape_timeout_secs: 10
+      honor_labels: true
+  transforms:
+    tag_kubernetes_logs:
+      inputs:
+      - kubernetes_logs
+      source: |-
+        .app_service = .kubernetes.container_name
+        ._df_log_type = "system"
+      type: remap
+  sinks:
+    # 推送指标到 deepflow
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - kubelet_metrics
+      - host_metrics
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
+    # 推送日志到 deepflow
+    http:
+      encoding:
+        codec: json
+      inputs:
+      - tag_kubernetes_logs
+      type: http
+      uri: http://127.0.0.1:38086/api/v1/log
+```
+
 # 处理器 {#processors}
 
 ## Packet {#processors.packet}

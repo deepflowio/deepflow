@@ -19,13 +19,13 @@
 #include <sched.h>
 #include <sys/prctl.h>
 #include <arpa/inet.h>
-#include "../user/utils.h"
+#include "../user/common_utils.h"
 #include "../user/clib.h"
 #include "../user/symbol.h"
 #include "../user/tracer.h"
 #include "../user/probe.h"
 #include "../user/table.h"
-#include "../user/common.h"
+#include "../user/utils.h"
 #include "../user/socket.h"
 #include "../user/log.h"
 

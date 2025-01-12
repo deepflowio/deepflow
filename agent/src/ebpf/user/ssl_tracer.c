@@ -18,7 +18,7 @@
 #include "tracer.h"
 #include "proc.h"
 #include "socket.h"
-#include "common.h"
+#include "utils.h"
 #include "log.h"
 #include <dirent.h>
 #include <stdio.h>
