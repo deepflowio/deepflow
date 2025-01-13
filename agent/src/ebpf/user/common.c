@@ -1599,8 +1599,10 @@ int find_pid_by_name(const char *process_name, int exclude_pid)
 				snprintf(status_path, sizeof(status_path),
 					 "/proc/%d/status", pid);
 				if (find_proc_form_status_file
-				    (status_path, process_name) == 0)
+				    (status_path, process_name) == 0) {
+					closedir(proc);
 					return pid;
+				}
 			}
 		}
 	}
