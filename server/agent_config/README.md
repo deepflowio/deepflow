@@ -664,6 +664,43 @@ global:
 Proactive memory trimming can effectively reduce memory usage, but there may be
 performance loss.
 
+### Page Cache Reclaim Interval {#global.tunning.page_cache_reclaim_interval}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tunning.page_cache_reclaim_interval`
+
+Upgrade from old version: `static_config.page-cache-reclaim-interval`
+
+**Default value**:
+```yaml
+global:
+  tunning:
+    page_cache_reclaim_interval: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | [0, '1d'] |
+
+**Description**:
+
+Both anonymous memory and file page cache are accounted for in cgroup's memory usage.
+Under some circumstances, page cache alone can cause cgroup to OOM kill agent process.
+To avoid this, agent can reclaim page cache periodically. Although reclaming may not
+cause performance issues for agent who doesn't have much I/O, other processes in
+the same cgroup may be affected. Very low values are not recommended.
+Setting this value to 0 disables this feature.
+Note:
+- This feature is available for cgroups v1 only.
+- This feature is disabled if agent memory cgroup path is "/".
+
 ### Resource Monitoring Interval {#global.tunning.resource_monitoring_interval}
 
 **Tags**:
@@ -7254,7 +7291,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '10s'] |
+| Range | ['1s', '20s'] |
 
 **Description**:
 
@@ -7287,7 +7324,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['0s', '10s'] |
+| Range | ['0s', '20s'] |
 
 **Description**:
 

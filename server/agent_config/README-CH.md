@@ -652,6 +652,42 @@ global:
 
 开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
 
+### Page Cache 回收间隔 {#global.tunning.page_cache_reclaim_interval}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tunning.page_cache_reclaim_interval`
+
+Upgrade from old version: `static_config.page-cache-reclaim-interval`
+
+**默认值**:
+```yaml
+global:
+  tunning:
+    page_cache_reclaim_interval: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | [0, '1d'] |
+
+**详细描述**:
+
+Cgroup 的内存使用量包括匿名内存和文件页缓存。在某些情况下，仅仅是文件页缓存就可能导致
+cgroup 因为内存不足杀死 agent 进程。为了避免这种情况，agent 将定期强制清空文件页缓存，
+且由于 agent 的文件 I/O 量不大，这不太可能对 agent 的性能造成影响，但同一 cgroup 下的其他
+进程可能会受到影响。不建议设置很小的值。
+设置该值为 0 时，该特性不生效。
+注意：
+- 该特性仅支持 cgroups v1。
+- 如果 agent 的 memory cgroup 路径是 “/”，该特性不生效。
+
 ### 资源监控间隔 {#global.tunning.resource_monitoring_interval}
 
 **标签**:
@@ -7048,7 +7084,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['1s', '10s'] |
+| Range | ['1s', '20s'] |
 
 **详细描述**:
 
@@ -7079,7 +7115,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | ['0s', '10s'] |
+| Range | ['0s', '20s'] |
 
 **详细描述**:
 
