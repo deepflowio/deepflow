@@ -1514,7 +1514,6 @@ impl Default for ApplicationProtocolInference {
                 "MySQL".to_string(),
                 "Redis".to_string(),
                 "Kafka".to_string(),
-                "RocketMQ".to_string(),
                 "DNS".to_string(),
                 "TLS".to_string(),
             ],
