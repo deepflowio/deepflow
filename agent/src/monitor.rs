@@ -35,6 +35,7 @@ use crate::{
     config::handler::EnvironmentAccess,
     error::{Error, Result},
     utils::{
+        cgroups,
         process::{get_current_sys_memory_percentage, get_file_and_size_sum},
         stats::{
             self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
@@ -316,6 +317,16 @@ impl RefCountable for SysStatusBroker {
                     CounterValue::Unsigned((tcp.len() + tcp6.len() + udp.len() + udp6.len()) as u64)
                 }
                 Err(_) => CounterValue::Unsigned(0),
+            },
+        ));
+        #[cfg(target_os = "linux")]
+        metrics.push((
+            "page_cache",
+            CounterType::Gauged,
+            if let Some(m_stat) = cgroups::memory_info() {
+                CounterValue::Unsigned(m_stat.stat.cache)
+            } else {
+                CounterValue::Unsigned(0)
             },
         ));
         metrics
