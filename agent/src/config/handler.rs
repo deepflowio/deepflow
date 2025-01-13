@@ -207,6 +207,7 @@ pub struct EnvironmentConfig {
     pub system_load_circuit_breaker_threshold: f32,
     pub system_load_circuit_breaker_recover: f32,
     pub system_load_circuit_breaker_metric: agent::SystemLoadMetric,
+    pub page_cache_reclaim_percentage: u8,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1602,6 +1603,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .circuit_breakers
                     .relative_sys_load
                     .metric,
+                page_cache_reclaim_percentage: conf.global.tunning.page_cache_reclaim_percentage,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: conf.global.communication.proactive_request_interval,
@@ -3923,6 +3925,13 @@ impl ConfigHandler {
             );
             tunning.resource_monitoring_interval = new_tunning.resource_monitoring_interval;
             restart_agent = !first_run;
+        }
+        if tunning.page_cache_reclaim_percentage != new_tunning.page_cache_reclaim_percentage {
+            info!(
+                "Update global.tunning.page_cache_reclaim_percentage from {:?} to {:?}.",
+                tunning.page_cache_reclaim_percentage, new_tunning.page_cache_reclaim_percentage
+            );
+            tunning.page_cache_reclaim_percentage = new_tunning.page_cache_reclaim_percentage;
         }
 
         // dev
