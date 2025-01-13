@@ -1,8 +1,8 @@
 module github.com/deepflowio/deepflow/server
 
-go 1.23
+go 1.22.0
 
-toolchain go1.23.4
+toolchain go1.22.10
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
