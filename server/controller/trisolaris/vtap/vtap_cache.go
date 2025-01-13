@@ -742,6 +742,7 @@ func (c *VTapCache) GetConfigSyncInterval() int {
 func (c *VTapCache) GetUserConfig() string {
 	config := c.GetVTapConfig()
 	if config == nil {
+		log.Warning(c.vTapInfo.Log("vtap config is nil"))
 		return ""
 	}
 

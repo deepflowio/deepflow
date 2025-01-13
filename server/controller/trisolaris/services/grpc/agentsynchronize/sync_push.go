@@ -63,8 +63,12 @@ func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAg
 	userConfig := c.GetUserConfig()
 	viperConfig := viper.New()
 	viperConfig.SetConfigType("yaml")
-	if err := viperConfig.ReadConfig(bytes.NewBufferString(userConfig)); err != nil {
-		log.Errorf("viper read agent(%d) config yaml error: %v", c.GetVTapID(), err)
+	if userConfig != "" {
+		if err := viperConfig.ReadConfig(bytes.NewBufferString(userConfig)); err != nil {
+			log.Errorf("viper read agent(%d) config yaml error: %v", c.GetVTapID(), err)
+		}
+	} else {
+		log.Warningf("agent(%s) not found user config yaml", c.GetCtrlIP())
 	}
 
 	configTSDBIP := gAgentInfo.GetConfigTSDBIP()

@@ -504,18 +504,18 @@ func (v *VTapInfo) getAgentConfigs() {
 		log.Error(v.Log("no agent user configs data"))
 		return
 	}
-	agentGroupLcuuidToConfigYaml := make(map[string]string)
+	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
 	for _, agentConfig := range agentConfigs {
-		agentGroupLcuuidToConfigYaml[agentConfig.AgentGroupLcuuid] = agentConfig.Yaml
+		vtapGroupLcuuidToConfiguration[agentConfig.AgentGroupLcuuid] = NewVTapConfig(&agent_config.AgentGroupConfigModel{}, agentConfig.Yaml)
 	}
 
+	// TODO: delete
 	// vtap configs
 	configs := v.metaData.GetDBDataCache().GetAgentGroupConfigsFromDB(v.db)
 	if configs == nil {
 		log.Error(v.Log("no vtap configs data"))
 		return
 	}
-	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
 	vtapGroupLcuuidToLocalConfig := make(map[string]string)
 	vtapGroupLcuuidToEAHPEnabled := make(map[string]*int)
 	typeOfDefaultConfig := reflect.ValueOf(DefaultVTapGroupConfig).Elem()
@@ -563,11 +563,12 @@ func (v *VTapInfo) getAgentConfigs() {
 		} else {
 			log.Error(v.Logf("%s", err))
 		}
-		agentConfigYaml, ok := agentGroupLcuuidToConfigYaml[*config.VTapGroupLcuuid]
-		if !ok {
-			log.Error(v.Logf("vtap group lcuuid(%s) not found agent config", *config.VTapGroupLcuuid))
-		}
-		vTapConfig := NewVTapConfig(rtapConfiguration, agentConfigYaml)
+		// agentConfigYaml, ok := agentGroupLcuuidToConfigYaml[*config.VTapGroupLcuuid]
+		// if !ok {
+		// 	log.Error(v.Logf("vtap group lcuuid(%s) not found agent config", *config.VTapGroupLcuuid))
+		// }
+		// vTapConfig := NewVTapConfig(rtapConfiguration, agentConfigYaml)
+		vTapConfig := NewVTapConfig(rtapConfiguration, "")
 		if config.VTapGroupLcuuid != nil {
 			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
 		}
