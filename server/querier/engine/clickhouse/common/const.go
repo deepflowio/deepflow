@@ -60,5 +60,5 @@ var SHOW_TAG_VALUE_MAP = map[string][]string{
 	"gprocess_map":    []string{"gprocess", "chost", "l3_epc"},
 	"pod_ingress_map": []string{"pod_cluster", "pod_ns", "pod_ingress"},
 	"pod_node_map":    []string{"pod_cluster", "pod_node"},
-	"subnet_map":      []string{"l3_epc"},
+	"subnet_map":      []string{"l3_epc", "subnet"},
 }
