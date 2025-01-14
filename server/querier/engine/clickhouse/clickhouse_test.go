@@ -544,8 +544,8 @@ var (
 	}, {
 		name:   "test_show_subnet_vpc_where",
 		db:     "flow_metrics",
-		input:  "SHOW tag subnet values from vtap_flow_port where vpc_id != 1 and vpc !='xx'",
-		output: []string{"SELECT id AS `value`, name AS `display_name` FROM flow_tag.`subnet_map` WHERE (not(l3_epc_id = 1) AND not(toUInt64(l3_epc_id) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name = 'xx'))) GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000"},
+		input:  "SHOW tag subnet values from vtap_flow_port where vpc_id != 1 and vpc !='xx' and subnet_id != 1 and subnet !='xx'",
+		output: []string{"SELECT id AS `value`, name AS `display_name` FROM flow_tag.`subnet_map` WHERE (not(l3_epc_id = 1) AND not(toUInt64(l3_epc_id) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name = 'xx')) AND not(value = 1) AND not(display_name = 'xx')) GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000"},
 	}, {
 		name:   "test_application_log_body",
 		db:     "application_log",
