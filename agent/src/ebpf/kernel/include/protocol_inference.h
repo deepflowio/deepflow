@@ -21,7 +21,7 @@
 
 /*
  * Due to the limitation of the number of eBPF instructions to 4096 in Linux
- * kernels lower than version 5.12, the protocol inference code, when augmented
+ * kernels lower than version 5.2, the protocol inference code, when augmented
  * with new protocols, easily exceeds the instruction limit. To address this
  * issue, we have split the protocol inference into two separate programs.
  * The updated workflow is as follows:
