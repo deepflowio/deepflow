@@ -252,6 +252,8 @@ impl TunnelInfo {
         l2_len: usize,
         tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
+        let mac_prefix_0 = packet[0];
+        let mac_prefix_1 = packet[1];
         let l3_packet = &packet[l2_len..];
         let dst_port_offset = FIELD_OFFSET_DPORT - ETH_HEADER_SIZE;
         if dst_port_offset + PORT_LEN > l3_packet.len() {
@@ -262,13 +264,26 @@ impl TunnelInfo {
             LE_VXLAN_PROTO_UDP_DPORT | LE_VXLAN_PROTO_UDP_DPORT2 | LE_VXLAN_PROTO_UDP_DPORT3
                 if tunnel_types.has(TunnelType::Vxlan) =>
             {
-                self.decapsulate_vxlan(packet, l2_len)
+                return self.decapsulate_vxlan(packet, l2_len);
             }
             LE_GENEVE_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::Geneve) => {
-                self.decapsulate_geneve(packet, l2_len)
+                return self.decapsulate_geneve(packet, l2_len);
             }
-            _ => 0,
+            _ => {}
         }
+
+        // NOTE:
+        //     In this scenario, other components of DeepFlow set the destination MAC address to FF:FF
+        // in advance, and in order to improve the balance of VXLAN traffic, the UDP port was changed
+        // to a port number that supports the hash according to the inner ip.
+        if mac_prefix_0 == 0xff && mac_prefix_1 == 0xff && tunnel_types.has(TunnelType::Vxlan) {
+            let src_port = bytes::read_u16_le(&l3_packet[FIELD_OFFSET_SPORT - ETH_HEADER_SIZE..]);
+            if src_port == dst_port {
+                return self.decapsulate_vxlan(packet, l2_len);
+            }
+        }
+
+        0
     }
 
     pub fn decapsulate_vxlan(&mut self, packet: &[u8], l2_len: usize) -> usize {
@@ -657,6 +672,8 @@ impl TunnelInfo {
         l2_len: usize,
         tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
+        let mac_prefix_0 = packet[0];
+        let mac_prefix_1 = packet[1];
         let l3_packet = &packet[l2_len..];
         let dst_port_offset = IPV6_HEADER_SIZE + UDP_DPORT_OFFSET;
         if dst_port_offset + PORT_LEN > l3_packet.len() {
@@ -667,13 +684,26 @@ impl TunnelInfo {
             LE_VXLAN_PROTO_UDP_DPORT | LE_VXLAN_PROTO_UDP_DPORT2 | LE_VXLAN_PROTO_UDP_DPORT3
                 if tunnel_types.has(TunnelType::Vxlan) =>
             {
-                self.decapsulate_v6_vxlan(packet, l2_len)
+                return self.decapsulate_v6_vxlan(packet, l2_len)
             }
             LE_GENEVE_PROTO_UDP_DPORT if tunnel_types.has(TunnelType::Geneve) => {
-                self.decapsulate_v6_geneve(packet, l2_len)
+                return self.decapsulate_v6_geneve(packet, l2_len)
             }
-            _ => 0,
+            _ => {}
         }
+
+        // NOTE:
+        //     In this scenario, other components of DeepFlow set the destination MAC address to FF:FF
+        // in advance, and in order to improve the balance of VXLAN traffic, the UDP port was changed
+        // to a port number that supports the hash according to the inner ip.
+        if mac_prefix_0 == 0xff && mac_prefix_1 == 0xff && tunnel_types.has(TunnelType::Vxlan) {
+            let src_port = bytes::read_u16_le(&l3_packet[dst_port_offset - 2..]);
+            if src_port == dst_port {
+                return self.decapsulate_v6_vxlan(packet, l2_len);
+            }
+        }
+
+        0
     }
 
     pub fn decapsulate_v6(
@@ -935,6 +965,31 @@ mod tests {
         let expected_offset = 50 - l2_len;
 
         assert_eq!(offset, expected_offset);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_decapsulate_ff_vxlan() {
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan]);
+        let expected = TunnelInfo {
+            src: Ipv4Addr::new(10, 50, 15, 7),
+            dst: Ipv4Addr::new(10, 50, 15, 20),
+            mac_src: 0x3eaef6af,
+            mac_dst: 0x3e70073e,
+            id: 1,
+            tunnel_type: TunnelType::Vxlan,
+            tier: 1,
+            is_ipv6: false,
+        };
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ff-vxlan.pcap"), None).into();
+        let packet = packets[0].as_mut_slice();
+
+        let l2_len = 18;
+        let mut actual = TunnelInfo::default();
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
+
+        assert_eq!(offset, 36);
         assert_eq!(actual, expected);
     }
 
