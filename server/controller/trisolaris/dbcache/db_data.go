@@ -77,9 +77,10 @@ type DBDataCache struct {
 	processes               []*models.Process
 	vips                    []*models.VIP
 
-	podNSs    []*models.PodNamespace
-	vtaps     []*models.VTap
-	chDevices []*models.ChDevice
+	podNSs     []*models.PodNamespace
+	vtaps      []*models.VTap
+	vtapGroups []*models.VTapGroup
+	chDevices  []*models.ChDevice
 
 	config *config.Config
 
@@ -284,6 +285,10 @@ func (d *DBDataCache) GetPodNSsIDAndName() []*models.PodNamespace {
 
 func (d *DBDataCache) GetVTapsIDAndName() []*models.VTap {
 	return d.vtaps
+}
+
+func (d *DBDataCache) GetVTapGroupsIDAndLcuuid() []*models.VTapGroup {
+	return d.vtapGroups
 }
 
 func (d *DBDataCache) GetChDevicesIDTypeAndName() []*models.ChDevice {
@@ -623,9 +628,16 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id", "type"})
+	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id", "type", "vtap_group_lcuuid"})
 	if err == nil {
 		d.vtaps = vtaps
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	vtapGroups, err := dbmgr.DBMgr[models.VTapGroup](db).GetFields([]string{"id", "lcuuid"})
+	if err == nil {
+		d.vtapGroups = vtapGroups
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
