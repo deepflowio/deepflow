@@ -1,8 +1,8 @@
 module github.com/deepflowio/deepflow/server
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.10
+toolchain go1.23.4
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
@@ -49,7 +49,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-20250115060923-e5c3bd7dc41e
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/config/configdefaults v0.0.0-00010101000000-000000000000
@@ -112,7 +112,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/dd_import v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-20240822020041-cdaf0f82ce6f
+	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
