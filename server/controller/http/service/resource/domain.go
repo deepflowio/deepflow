@@ -134,7 +134,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 		db = db.Where("lcuuid = ?", fLcuuid)
 	}
 	if fName, ok := filter["name"]; ok {
-		db = db.Where("binary name = ?", fName)
+		db = db.Where("name = ?", fName)
 	}
 	if fTeamID, ok := filter["team_id"]; ok {
 		db = db.Where("team_id = ?", fTeamID)
@@ -294,12 +294,12 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo, db *metadb.DB, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
-	db.Model(&metadbmodel.Domain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
+	db.Model(&metadbmodel.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain (%s) already exist", domainCreate.Name))
 	}
 
-	db.Model(&metadbmodel.SubDomain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
+	db.Model(&metadbmodel.SubDomain{}).Where("name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
 	}
@@ -311,13 +311,13 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 		}
 
 		var domainCheck metadbmodel.Domain
-		count = db.Where("binary cluster_id = ?", domainCreate.KubernetesClusterID).First(&domainCheck).RowsAffected
+		count = db.Where("cluster_id = ?", domainCreate.KubernetesClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in domain (%s)", domainCreate.KubernetesClusterID, domainCheck.Name))
 		}
 
 		var subDomainCheck metadbmodel.SubDomain
-		count = db.Where("binary cluster_id = ?", domainCreate.KubernetesClusterID).First(&subDomainCheck).RowsAffected
+		count = db.Where("cluster_id = ?", domainCreate.KubernetesClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain (%s)", domainCreate.KubernetesClusterID, subDomainCheck.Name))
 		}
@@ -442,7 +442,8 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate), db.LogPrefixORGID)
 
-	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
+	// TODO 测试
+	err = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&domain).Error
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
@@ -733,7 +734,7 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 		db = db.Where("domain = ?", fDomain)
 	}
 	if fClusterID, ok := filter["cluster_id"]; ok {
-		db = db.Where("binary cluster_id = ?", fClusterID)
+		db = db.Where("cluster_id = ?", fClusterID)
 	}
 	if fTeamID, ok := filter["team_id"]; ok {
 		db = db.Where("team_id = ?", fTeamID)
@@ -813,7 +814,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *metadb.DB, userI
 	}
 
 	var count int64
-	db.Model(&metadbmodel.SubDomain{}).Where("binary name = ?", subDomainCreate.Name).Count(&count)
+	db.Model(&metadbmodel.SubDomain{}).Where("name = ?", subDomainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
 	}
@@ -823,13 +824,13 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *metadb.DB, userI
 		}
 
 		var domainCheck metadbmodel.Domain
-		count = db.Where("binary cluster_id = ?", subDomainCreate.ClusterID).First(&domainCheck).RowsAffected
+		count = db.Where("cluster_id = ?", subDomainCreate.ClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in domain (%s)", subDomainCreate.ClusterID, domainCheck.Name))
 		}
 
 		var subDomainCheck metadbmodel.SubDomain
-		count = db.Where("binary cluster_id = ?", subDomainCreate.ClusterID).First(&subDomainCheck).RowsAffected
+		count = db.Where("cluster_id = ?", subDomainCreate.ClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in sub_domain (%s)", subDomainCreate.ClusterID, subDomainCheck.Name))
 		}
