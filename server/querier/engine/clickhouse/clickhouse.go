@@ -104,7 +104,6 @@ type CHEngine struct {
 	DerivativeGroupBy  []string
 	ORGID              string
 	Language           string
-	DynamicTag         *common.Result
 }
 
 func init() {
@@ -1236,13 +1235,6 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				table = strings.ReplaceAll(table, "vtap_acl", "traffic_policy")
 			}
 			e.Table = table
-			// get dynamic tag
-			dynamicTag, err := tag.GetDynamicTagDescriptions(e.DB, e.Table, "", config.Cfg.Clickhouse.QueryCacheTTL, e.ORGID, config.Cfg.Clickhouse.UseQueryCache, context.Background(), nil)
-			if err != nil {
-				log.Error("Failed to get tag type dynamic metrics")
-				return err
-			}
-			e.DynamicTag = dynamicTag
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
@@ -1718,7 +1710,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.DynamicTag)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -1831,7 +1823,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.DynamicTag)
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID)
 			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 				whereTag = metricStruct.DBField
 			}
