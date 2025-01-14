@@ -155,8 +155,8 @@ var VTapTypeName = map[int]string{
 var VTapTypeChinese = map[int]string{
 	VTAP_TYPE_KVM:                  "KVM",
 	VTAP_TYPE_ESXI:                 "ESXI",
-	VTAP_TYPE_WORKLOAD_V:           "云服务器-V",
-	VTAP_TYPE_WORKLOAD_P:           "云服务器-P",
+	VTAP_TYPE_WORKLOAD_V:           "云主机-V",
+	VTAP_TYPE_WORKLOAD_P:           "云主机-P",
 	VTAP_TYPE_DEDICATED:            "专属服务器",
 	VTAP_TYPE_POD_HOST:             "容器-P",
 	VTAP_TYPE_POD_VM:               "容器-V",

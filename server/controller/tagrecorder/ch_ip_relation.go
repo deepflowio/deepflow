@@ -217,7 +217,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 			}
 		}
 		// VPCID：网关VPC
-		// IP：网关关联的云服务器自身IP
+		// IP：网关关联的云主机自身IP
 		for _, natVMConn := range natVMConns {
 			if natVMConn.NATGatewayID != natGateway.ID {
 				continue
@@ -299,7 +299,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysqlmodel.C
 			}
 		}
 		// VPCID：负载均衡器VPC
-		// IP：负载均衡器关联的云服务器自身IP
+		// IP：负载均衡器关联的云主机自身IP
 		for _, lbVMConn := range lbVMConns {
 			if lbVMConn.LBID != lb.ID {
 				continue
@@ -334,7 +334,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysqlmodel.C
 					TeamID:         DomainToTeamID[lb.Domain],
 				}
 			}
-			// VPCID：负载均衡器VPC、后端主机云服务器VPC
+			// VPCID：负载均衡器VPC、后端主机云主机VPC
 			// IP：后端主机IP
 			for _, lbTS := range lbListenerIDToLBTargetServers[lbListener.ID] {
 				parsedIP := net.ParseIP(lbTS.IP)
