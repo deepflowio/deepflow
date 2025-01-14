@@ -6,7 +6,7 @@ time                       , 触发时间                    , 将 end_time 取�
 region                    , 区域                     ,
 az                        , 可用区                   ,
 host                      , 宿主机                   , 承载虚拟机的宿主机。
-chost                     , 云服务器                 , 包括虚拟机、裸金属服务器。
+chost                     , 云主机                   , 包括虚拟机、裸金属服务器。
 vpc                       , VPC                      ,
 l2_vpc                    , 转发 VPC                 , MAC 地址所在的 VPC。
 subnet                    , 子网                     ,
@@ -32,15 +32,15 @@ auto_service_type         , 自动服务类型               , `auto_service`实
 auto_service              , 自动服务                   , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务，实例为IP时，auto_service_id显示为子网ID。
 gprocess                  , 进程                     ,
 tap_port_host             , 采集网卡所属宿主机       , 已废弃，请使用 capture_nic_host。
-tap_port_chost            , 采集网卡所属云服务器     , 已废弃，请使用 capture_nic_chost。
+tap_port_chost            , 采集网卡所属云主机       , 已废弃，请使用 capture_nic_chost。
 tap_port_pod_node         , 采集网卡所属容器节点     , 已废弃，请使用 capture_nic_pod_node。
 capture_nic_host          , 采集网卡所属宿主机       ,
-capture_nic_chost         , 采集网卡所属云服务器     ,
+capture_nic_chost         , 采集网卡所属云主机       ,
 capture_nic_pod_node      , 采集网卡所属容器节点     ,
 host_ip                   , 宿主机                   , 宿主机的管理 IP。
 host_hostname             , 宿主机                   , 宿主机的 Hostname。
-chost_ip                  , 云服务器                 , 云服务器的主 IP。
-chost_hostname            , 云服务器                 , 云服务器的 Hostname。
+chost_ip                  , 云主机                   , 云主机的主 IP。
+chost_hostname            , 云主机                   , 云主机的 Hostname。
 pod_node_ip               , K8s 容器节点             , 容器节点的主 IP。
 pod_node_hostname         , K8s 容器节点             , 容器节点的 Hostname。
 
