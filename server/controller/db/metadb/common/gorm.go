@@ -48,7 +48,7 @@ func GetConnector(cfg config.Config, useDatabase bool, timeout uint32, multiStat
 	case config.MetaDBTypeMySQL:
 		return getMySQLConnector(cfg, useDatabase, timeout, multiStatements)
 	case config.MetaDBTypePostgreSQL:
-		return getPostgreSQLConnector(cfg, useDatabase, timeout, multiStatements)
+		return getPostgreSQLConnector(cfg, useDatabase, timeout)
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
 	}
@@ -87,23 +87,21 @@ func getMySQLConnector(cfg config.Config, useDatabase bool, timeout uint32, mult
 	return connector, nil
 }
 
-func getPostgreSQLConnector(cfg config.Config, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
-	var database string
-	var schema string
-	if useDatabase {
-		database = cfg.Database
-		schema = cfg.Schema
-	}
-
+func getPostgreSQLConnector(cfg config.Config, useDatabase bool, timeout uint32) (driver.Connector, error) {
 	connStr := "user=" + cfg.UserName +
 		" password=" + cfg.UserPassword +
 		" host=" + cfg.Host +
 		" port=" + fmt.Sprintf("%d", cfg.Port) +
-		" dbname=" + database +
-		" search_path=" + schema +
 		" connect_timeout=" + fmt.Sprintf("%d", int(timeout)) +
 		" sslmode=disable" +
 		" client_encoding=UTF8"
+
+	database := "postgres" // TODO
+	if useDatabase {
+		database = cfg.Database
+	}
+	connStr += " dbname=" + database +
+		" search_path=" + cfg.Schema
 
 	connector, err := postgres_driver.NewConnector(connStr)
 	if err != nil {
@@ -149,16 +147,16 @@ func InitSession(cfg config.Config, connector driver.Connector) (*gorm.DB, error
 func getDialector(cfg config.Config, connector driver.Connector) gorm.Dialector {
 	switch cfg.Type {
 	case config.MetaDBTypeMySQL:
-		return getMySQLDialector(cfg, connector)
+		return getMySQLDialector(connector)
 	case config.MetaDBTypePostgreSQL:
-		return getPostgresDialector(cfg, connector)
+		return getPostgresDialector(connector)
 	default:
 		log.Errorf("unsupported database type: %s", cfg.Type)
 		return nil
 	}
 }
 
-func getMySQLDialector(cfg config.Config, conn driver.Connector) gorm.Dialector {
+func getMySQLDialector(conn driver.Connector) gorm.Dialector {
 	return mysql.New(mysql.Config{
 		Conn:                      sql.OpenDB(conn),
 		DefaultStringSize:         256,   // string 类型字段的默认长度
@@ -169,7 +167,7 @@ func getMySQLDialector(cfg config.Config, conn driver.Connector) gorm.Dialector 
 	})
 }
 
-func getPostgresDialector(cfg config.Config, conn driver.Connector) gorm.Dialector {
+func getPostgresDialector(conn driver.Connector) gorm.Dialector {
 	return postgres.New(postgres.Config{
 		Conn: sql.OpenDB(conn),
 	})

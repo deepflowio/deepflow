@@ -53,63 +53,63 @@ func (obj *_DBMgr[M]) GetFields(fields []string) (results []*M, err error) {
 
 // GetBatchFromType 批量查找type类型数据
 func (obj *_DBMgr[M]) GetBatchFromTypes(types []int) (results []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`type` IN (?)", types).Find(&results).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("type IN (?)", types).Find(&results).Error
 
 	return
 }
 
 // GetBatchFromIDs 批量查找id类型数据
 func (obj *_DBMgr[M]) GetBatchFromIDs(ids []int) (results []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`id` IN (?)", ids).Find(&results).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("id IN (?)", ids).Find(&results).Error
 
 	return
 }
 
 // GetFromID 查找id类型数据
 func (obj *_DBMgr[M]) GetFromID(id int) (results *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`id` = ?", id).First(&results).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("id = ?", id).First(&results).Error
 
 	return
 }
 
 // GetFromLcuuid 查找id类型数据
 func (obj *_DBMgr[M]) GetFromLcuuid(lcuuid string) (results *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`lcuuid` = ?", lcuuid).First(&results).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("lcuuid = ?", lcuuid).First(&results).Error
 
 	return
 }
 
 // GetFirstFromBatchIPs 查找ip相同数据
 func (obj *_DBMgr[M]) GetFirstFromBatchIPs(ips []string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`ip` IN (?)", ips).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("ip IN (?)", ips).First(&result).Error
 
 	return
 }
 
 // GetFirstFromBatchIDs 查找ids相同数据
 func (obj *_DBMgr[M]) GetFirstFromBatchIDs(ids []int) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`id` IN (?)", ids).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("id IN (?)", ids).First(&result).Error
 
 	return
 }
 
 // GetBatchFromIP 批量查找ips相同数据
 func (obj *_DBMgr[M]) GetBatchFromIPs(ips []string) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`ip` IN (?)", ips).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("ip IN (?)", ips).Find(&result).Error
 
 	return
 }
 
 // GetBatchFromState
 func (obj *_DBMgr[M]) GetBatchFromState(state int) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`state` = ?", state).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("state = ?", state).Find(&result).Error
 
 	return
 }
 
 // GetBatchFromName 查找name相同数据
 func (obj *_DBMgr[M]) GetBatchFromName(name string) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`name` = ?", name).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("name = ?", name).Find(&result).Error
 
 	return
 }
@@ -124,78 +124,78 @@ func (obj *_DBMgr[M]) InsertIgnore(data *M) (err error) {
 
 // GetFromPodNodeID 通过podNodeID获取内容
 func (obj *_DBMgr[M]) GetFromPodNodeID(podeNodeID int) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`pod_node_id` = ?", podeNodeID).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("pod_node_id = ?", podeNodeID).First(&result).Error
 	return
 }
 
 // GetFromControllerIP 通过ControllerIP获取内容
 func (obj *_DBMgr[M]) GetFromControllerIP(controllerIP string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`controller_ip` = ?", controllerIP).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("controller_ip = ?", controllerIP).First(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetBatchFromControllerIP(controllerIP string) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`controller_ip` = ?", controllerIP).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("controller_ip = ?", controllerIP).Find(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetBatchFromAnalyzerIP(analyzerIP string) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`analyzer_ip` = ?", analyzerIP).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("analyzer_ip = ?", analyzerIP).Find(&result).Error
 	return
 }
 
 // GetBatchFromPodNodeIDs 通过podNodeID获取内容
 func (obj *_DBMgr[M]) GetBatchFromPodNodeIDs(podNodeIDs []int) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`pod_node_id` IN (?)", podNodeIDs).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("pod_node_id IN (?)", podNodeIDs).Find(&result).Error
 	return
 }
 
 // GetFromClusterID 通过clusterID获取内容
 func (obj *_DBMgr[M]) GetFromClusterID(clusterID string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`cluster_id` = ?", clusterID).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("cluster_id = ?", clusterID).First(&result).Error
 	return
 }
 
 // GetFromName 通过name获取内容
 func (obj *_DBMgr[M]) GetFromName(name string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`name` = ?", name).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("name = ?", name).First(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetFieldsFromName(fields []string, name string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Select(fields).Where("`name` = ?", name).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Select(fields).Where("name = ?", name).First(&result).Error
 
 	return
 }
 
 // GetFromRegion 通过region获取内容
 func (obj *_DBMgr[M]) GetFromRegion(region string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`region` = ?", region).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("region = ?", region).First(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetFromCAMD5(md5 string) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`ca_md5` = ?", md5).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("ca_md5 = ?", md5).First(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetBatchFromRegion(region string) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`region` = ?", region).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("region = ?", region).Find(&result).Error
 	return
 }
 
 func (obj *_DBMgr[M]) GetVInterfaceFromDeviceIDs(ctrlMac string, region string, deviceType int, deviceIDs []int) (result *M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`mac` = ?", ctrlMac).Where(
-		"`region` = ?", region).Where("`devicetype` = ?", deviceType).Where(
-		"`deviceid`in (?)", deviceIDs).First(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("mac = ?", ctrlMac).Where(
+		"region = ?", region).Where("devicetype = ?", deviceType).Where(
+		"deviceid in (?)", deviceIDs).First(&result).Error
 
 	return
 }
 
 func (obj *_DBMgr[M]) GetBatchVInterfaceFromIDs(ctrlMac string, region string, deviceType int, ids []int) (result []*M, err error) {
-	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`mac` = ?", ctrlMac).Where(
-		"`region` = ?", region).Where("`devicetype` = ?", deviceType).Where(
-		"`id`in (?)", ids).Find(&result).Error
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("mac = ?", ctrlMac).Where(
+		"region = ?", region).Where("devicetype = ?", deviceType).Where(
+		"id in (?)", ids).Find(&result).Error
 
 	return
 }

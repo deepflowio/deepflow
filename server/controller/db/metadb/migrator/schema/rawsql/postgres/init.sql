@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS resource_event (
     id                  SERIAL PRIMARY KEY,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    resource_lcuuid     CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    resource_lcuuid     VARCHAR(64) DEFAULT '',
     content             TEXT,
     created_at          TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -10,7 +10,7 @@ TRUNCATE TABLE resource_event;
 
 CREATE TABLE IF NOT EXISTS domain_additional_resource (
     id                  SERIAL PRIMARY KEY,
-    domain              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
     content             TEXT,
     created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     compressed_content  BYTEA
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS domain (
     name                VARCHAR(64),
     icon_id             INTEGER,
     display_name        VARCHAR(64) DEFAULT '',
-    cluster_id          CHAR(64),
+    cluster_id          VARCHAR(64),
     ip                  VARCHAR(64),
     role                INTEGER DEFAULT 0,
     type                INTEGER DEFAULT 0,
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS domain (
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT 1,
     state               INTEGER NOT NULL DEFAULT 1,
-    controller_ip       CHAR(64),
-    lcuuid              CHAR(64) DEFAULT '',
+    controller_ip       VARCHAR(64),
+    lcuuid              VARCHAR(64) DEFAULT '',
     synced_at           TIMESTAMP DEFAULT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,16 +50,16 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     id                  SERIAL PRIMARY KEY,
     team_id             INTEGER DEFAULT 1,
     user_id             INTEGER DEFAULT 1,
-    domain              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
     name                VARCHAR(64) DEFAULT '',
     display_name        VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
-    cluster_id          CHAR(64) DEFAULT '',
+    cluster_id          VARCHAR(64) DEFAULT '',
     config              TEXT,
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT 1,
     state               INTEGER NOT NULL DEFAULT 1,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     synced_at           TIMESTAMP DEFAULT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS region (
     label               VARCHAR(64) DEFAULT '',
     longitude           DOUBLE PRECISION,
     latitude            DOUBLE PRECISION,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL,
@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS az (
     name                VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL,
@@ -110,18 +110,18 @@ CREATE TABLE IF NOT EXISTS epc (
     name                VARCHAR(256) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     order_id            INTEGER DEFAULT 0,
     tunnel_id           INTEGER DEFAULT 0,
     operationid         INTEGER DEFAULT 0,
     mode                INTEGER DEFAULT 2,
     topped              INTEGER DEFAULT 0,
-    cidr                CHAR(64) DEFAULT '',
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    cidr                VARCHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL,
@@ -138,12 +138,12 @@ CREATE TABLE IF NOT EXISTS vl2 (
     name                VARCHAR(256) NOT NULL,
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     isp                 INTEGER DEFAULT 0,
     userid              INTEGER DEFAULT 0,
     epc_id              INTEGER DEFAULT 0,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS vl2 (
     shared              INTEGER DEFAULT 0,
     topped              INTEGER DEFAULT 0,
     is_vip              INTEGER DEFAULT 0,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL,
@@ -167,15 +167,15 @@ VALUES (0, 'PublicNetwork', 3, 7, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'fffff
 
 CREATE TABLE IF NOT EXISTS vl2_net (
     id                  SERIAL PRIMARY KEY,
-    prefix              CHAR(64) DEFAULT '',
-    netmask             CHAR(64) DEFAULT '',
+    prefix              VARCHAR(64) DEFAULT '',
+    netmask             VARCHAR(64) DEFAULT '',
     vl2id               INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     name                VARCHAR(256) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -185,15 +185,15 @@ CREATE TABLE IF NOT EXISTS vnet (
     id                  SERIAL PRIMARY KEY,
     state               INTEGER NOT NULL,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
     epc_id              INTEGER DEFAULT 0,
-    gw_launch_server    CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    gw_launch_server    VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     userid              INTEGER,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -208,8 +208,8 @@ CREATE TABLE IF NOT EXISTS routing_table (
     destination         TEXT,
     nexthop_type        TEXT,
     nexthop             TEXT,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64),
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64),
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -218,12 +218,12 @@ TRUNCATE TABLE routing_table;
 CREATE TABLE IF NOT EXISTS dhcp_port (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     userid              INTEGER DEFAULT 0,
     epc_id              INTEGER DEFAULT 0,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -235,10 +235,10 @@ CREATE TABLE IF NOT EXISTS host_device (
     type                INTEGER,
     state               INTEGER,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
-    ip                  CHAR(64) DEFAULT '',
-    hostname            CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
+    hostname            VARCHAR(64) DEFAULT '',
     htype               INTEGER,
     create_method       INTEGER DEFAULT 0,
     user_name           VARCHAR(64) DEFAULT '',
@@ -248,11 +248,11 @@ CREATE TABLE IF NOT EXISTS host_device (
     rack                VARCHAR(64),
     rackid              INTEGER,
     topped              INTEGER DEFAULT 0,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
     extra_info          TEXT,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     synced_at           TIMESTAMP NOT NULL DEFAULT NOW(),
     created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -269,23 +269,23 @@ CREATE TABLE IF NOT EXISTS vm (
     id                  SERIAL PRIMARY KEY,
     state               INTEGER NOT NULL,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
-    ip                  CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
     vl2id               INTEGER DEFAULT 0,
-    hostname            CHAR(64) DEFAULT '',
+    hostname            VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     htype               INTEGER DEFAULT 1,
-    launch_server       CHAR(64) DEFAULT '',
+    launch_server       VARCHAR(64) DEFAULT '',
     host_id             INTEGER DEFAULT 0,
     cloud_tags          TEXT,
     epc_id              INTEGER DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
     userid              INTEGER,
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -299,24 +299,24 @@ COMMENT ON COLUMN vm.cloud_tags IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS vinterface (
     id                  SERIAL PRIMARY KEY,
-    name                CHAR(64) DEFAULT '',
+    name                VARCHAR(64) DEFAULT '',
     ifindex             INTEGER NOT NULL,
     state               INTEGER NOT NULL,
     create_method       INTEGER DEFAULT 0,
     iftype              INTEGER DEFAULT 0,
-    mac                 CHAR(32) DEFAULT '',
-    vmac                CHAR(32) DEFAULT '',
-    tap_mac             CHAR(32) DEFAULT '',
+    mac                 VARCHAR(32) DEFAULT '',
+    vmac                VARCHAR(32) DEFAULT '',
+    tap_mac             VARCHAR(32) DEFAULT '',
     subnetid            INTEGER DEFAULT 0,
     vlantag             INTEGER DEFAULT 0,
     devicetype          INTEGER,
     deviceid            INTEGER,
     netns_id            INTEGER DEFAULT 0,
     vtap_id             INTEGER DEFAULT 0,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -329,18 +329,18 @@ COMMENT ON COLUMN vinterface.deviceid IS 'unknown: Senseless ID, vm: vm ID, vgw/
 
 CREATE TABLE IF NOT EXISTS vinterface_ip (
     id                  SERIAL PRIMARY KEY,
-    ip                  CHAR(64) DEFAULT '',
-    netmask             CHAR(64) DEFAULT '',
-    gateway             CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
+    netmask             VARCHAR(64) DEFAULT '',
+    gateway             VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     vl2id               INTEGER DEFAULT 0,
     vl2_net_id          INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
     vifid               INTEGER DEFAULT 0,
     isp                 INTEGER DEFAULT 0,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -352,19 +352,19 @@ COMMENT ON COLUMN vinterface_ip.isp IS 'Used for multi-ISP access';
 
 CREATE TABLE IF NOT EXISTS ip_resource (
     id                  SERIAL PRIMARY KEY,
-    ip                  CHAR(64) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     netmask             INTEGER,
-    gateway             CHAR(64) DEFAULT '',
+    gateway             VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     userid              INTEGER DEFAULT 0,
     isp                 INTEGER,
     vifid               INTEGER DEFAULT 0,
     vl2_net_id          INTEGER DEFAULT 0,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -375,13 +375,13 @@ COMMENT ON COLUMN ip_resource.create_method IS '0.learning 1.user_defined';
 
 CREATE TABLE IF NOT EXISTS floatingip (
     id                  SERIAL PRIMARY KEY,
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
     epc_id              INTEGER DEFAULT 0,
     vl2_id              INTEGER,
     vm_id               INTEGER,
-    ip                  CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -389,9 +389,9 @@ TRUNCATE TABLE floatingip;
 
 CREATE TABLE IF NOT EXISTS vip (
     id                  SERIAL PRIMARY KEY,
-    lcuuid              CHAR(64),
-    ip                  CHAR(64),
-    domain              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64),
+    ip                  VARCHAR(64),
+    domain              VARCHAR(64) DEFAULT '',
     vtap_id             INTEGER,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -401,14 +401,14 @@ TRUNCATE TABLE vip;
 CREATE TABLE IF NOT EXISTS peer_connection (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     local_epc_id        INTEGER DEFAULT 0,
     remote_epc_id       INTEGER DEFAULT 0,
     local_region_id     INTEGER DEFAULT 0,
     remote_region_id    INTEGER DEFAULT 0,
     create_method       INTEGER DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -419,11 +419,11 @@ COMMENT ON COLUMN peer_connection.create_method IS '0.learning 1.user_defined';
 CREATE TABLE IF NOT EXISTS cen (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     epc_ids             TEXT,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -434,14 +434,14 @@ COMMENT ON COLUMN cen.epc_ids IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS nat_gateway (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     floating_ips        TEXT,
     epc_id              INTEGER DEFAULT 0,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -452,15 +452,15 @@ COMMENT ON COLUMN nat_gateway.floating_ips IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS nat_rule (
     id                  SERIAL PRIMARY KEY,
     nat_id              INTEGER DEFAULT 0,
-    type                CHAR(16) DEFAULT '',
-    protocol            CHAR(64) DEFAULT '',
-    floating_ip         CHAR(64) DEFAULT '',
+    type                VARCHAR(16) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
+    floating_ip         VARCHAR(64) DEFAULT '',
     floating_ip_port    INTEGER DEFAULT NULL,
-    fixed_ip            CHAR(64) DEFAULT '',
+    fixed_ip            VARCHAR(64) DEFAULT '',
     fixed_ip_port       INTEGER DEFAULT NULL,
     port_id             INTEGER DEFAULT NULL,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -471,8 +471,8 @@ CREATE TABLE IF NOT EXISTS nat_vm_connection (
     id                  SERIAL PRIMARY KEY,
     nat_id              INTEGER,
     vm_id               INTEGER,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -481,15 +481,15 @@ TRUNCATE TABLE nat_vm_connection;
 CREATE TABLE IF NOT EXISTS lb (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     model               INTEGER DEFAULT 0,
     vip                 TEXT,
     epc_id              INTEGER DEFAULT 0,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -504,11 +504,11 @@ CREATE TABLE IF NOT EXISTS lb_listener (
     name                VARCHAR(256) DEFAULT '',
     ips                 TEXT,
     snat_ips            TEXT,
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     port                INTEGER DEFAULT NULL,
-    protocol            CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -523,12 +523,12 @@ CREATE TABLE IF NOT EXISTS lb_target_server (
     lb_listener_id      INTEGER DEFAULT 0,
     epc_id              INTEGER DEFAULT 0,
     type                INTEGER DEFAULT 0,
-    ip                  CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
     vm_id               INTEGER DEFAULT 0,
     port                INTEGER DEFAULT NULL,
-    protocol            CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -539,8 +539,8 @@ CREATE TABLE IF NOT EXISTS lb_vm_connection (
     id                  SERIAL PRIMARY KEY,
     lb_id               INTEGER,
     vm_id               INTEGER,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -549,17 +549,17 @@ TRUNCATE TABLE lb_vm_connection;
 CREATE TABLE IF NOT EXISTS redis_instance (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     state               SMALLINT NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     epc_id              INTEGER DEFAULT 0,
-    version             CHAR(64) DEFAULT '',
+    version             VARCHAR(64) DEFAULT '',
     internal_host       VARCHAR(128) DEFAULT '',
     public_host         VARCHAR(128) DEFAULT '',
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -570,18 +570,18 @@ COMMENT ON COLUMN redis_instance.state IS '0. Unknown 1. Running 2. Recovering';
 CREATE TABLE IF NOT EXISTS rds_instance (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    label               CHAR(64) DEFAULT '',
+    label               VARCHAR(64) DEFAULT '',
     state               SMALLINT NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     epc_id              INTEGER DEFAULT 0,
     type                INTEGER DEFAULT 0,
-    version             CHAR(64) DEFAULT '',
+    version             VARCHAR(64) DEFAULT '',
     series              SMALLINT NOT NULL DEFAULT 0,
     model               SMALLINT NOT NULL DEFAULT 0,
-    uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -598,11 +598,11 @@ CREATE TABLE IF NOT EXISTS pod_cluster (
     cluster_name        VARCHAR(256) DEFAULT '',
     version             VARCHAR(256) DEFAULT '',
     epc_id              INTEGER,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -612,21 +612,21 @@ TRUNCATE TABLE pod_cluster;
 CREATE TABLE IF NOT EXISTS pod_node (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     type                INTEGER DEFAULT NULL,
     server_type         INTEGER DEFAULT NULL,
     state               INTEGER DEFAULT 1,
-    ip                  CHAR(64) DEFAULT '',
-    hostname            CHAR(64) DEFAULT '',
+    ip                  VARCHAR(64) DEFAULT '',
+    hostname            VARCHAR(64) DEFAULT '',
     vcpu_num            INTEGER DEFAULT 0,
     mem_total           INTEGER DEFAULT 0,
     pod_cluster_id      INTEGER,
-    region              CHAR(64) DEFAULT '',
-    az                  CHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
     epc_id              INTEGER DEFAULT NULL,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -641,9 +641,9 @@ CREATE TABLE IF NOT EXISTS vm_pod_node_connection (
     id                  SERIAL PRIMARY KEY,
     vm_id               INTEGER,
     pod_node_id         INTEGER,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -652,14 +652,14 @@ TRUNCATE TABLE vm_pod_node_connection;
 CREATE TABLE IF NOT EXISTS pod_namespace (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     cloud_tags          TEXT,
     pod_cluster_id      INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -670,14 +670,14 @@ COMMENT ON COLUMN pod_namespace.cloud_tags IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS pod_ingress (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -687,12 +687,12 @@ TRUNCATE TABLE pod_ingress;
 CREATE TABLE IF NOT EXISTS pod_ingress_rule (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    protocol            CHAR(64) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
     host                TEXT,
     pod_ingress_id      INTEGER DEFAULT NULL,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -705,9 +705,9 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
     pod_service_id      INTEGER DEFAULT NULL,
     pod_ingress_rule_id INTEGER DEFAULT NULL,
     pod_ingress_id      INTEGER DEFAULT NULL,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -718,20 +718,20 @@ CREATE TABLE IF NOT EXISTS pod_service (
     name                VARCHAR(256) DEFAULT '',
     label               TEXT,
     annotation          TEXT,
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     type                INTEGER DEFAULT NULL,
     selector            TEXT,
     external_ip         TEXT,
-    service_cluster_ip  CHAR(64) DEFAULT '',
+    service_cluster_ip  VARCHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
     epc_id              INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -748,14 +748,14 @@ COMMENT ON COLUMN pod_service.external_ip IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS pod_service_port (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    protocol            CHAR(64) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
     port                INTEGER,
     target_port         INTEGER,
     node_port           INTEGER,
     pod_service_id      INTEGER DEFAULT NULL,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64),
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64),
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -764,17 +764,17 @@ TRUNCATE TABLE pod_service_port;
 CREATE TABLE IF NOT EXISTS pod_group (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     type                INTEGER DEFAULT NULL,
     pod_num             INTEGER DEFAULT 1,
     label               TEXT,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -786,13 +786,13 @@ COMMENT ON COLUMN pod_group.label IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS pod_group_port (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    protocol            CHAR(64) DEFAULT '',
+    protocol            VARCHAR(64) DEFAULT '',
     port                INTEGER,
     pod_group_id        INTEGER DEFAULT NULL,
     pod_service_id      INTEGER DEFAULT NULL,
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -801,17 +801,17 @@ TRUNCATE TABLE pod_group_port;
 CREATE TABLE IF NOT EXISTS pod_rs (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     label               TEXT,
     pod_num             INTEGER DEFAULT 1,
     pod_group_id        INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -822,7 +822,7 @@ COMMENT ON COLUMN pod_rs.label IS 'separated by ,';
 CREATE TABLE IF NOT EXISTS pod (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
+    alias               VARCHAR(64) DEFAULT '',
     label               TEXT,
     annotation          TEXT,
     env                 TEXT,
@@ -835,11 +835,11 @@ CREATE TABLE IF NOT EXISTS pod (
     pod_node_id         INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
     epc_id              INTEGER DEFAULT NULL,
-    az                  CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -868,10 +868,10 @@ CREATE TABLE IF NOT EXISTS process (
     start_time          TIMESTAMP NOT NULL DEFAULT NOW(),
     os_app_tags         TEXT,
     netns_id            INTEGER CHECK (netns_id >= 0),
-    sub_domain          CHAR(64) DEFAULT '',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
-    container_id        CHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              VARCHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
+    container_id        VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at          TIMESTAMP DEFAULT NULL
@@ -880,8 +880,8 @@ TRUNCATE TABLE process;
 COMMENT ON COLUMN process.os_app_tags IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS genesis_vpc (
-    lcuuid          CHAR(64),
-    node_ip         CHAR(48),
+    lcuuid          VARCHAR(64),
+    node_ip         VARCHAR(48),
     vtap_id         INTEGER,
     name            VARCHAR(256),
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
@@ -890,58 +890,58 @@ TRUNCATE TABLE genesis_vpc;
 
 CREATE TABLE IF NOT EXISTS genesis_network (
     name            VARCHAR(256),
-    lcuuid          CHAR(64),
+    lcuuid          VARCHAR(64),
     segmentation_id INTEGER,
     net_type        INTEGER,
     external        SMALLINT,
-    vpc_lcuuid      CHAR(64),
+    vpc_lcuuid      VARCHAR(64),
     vtap_id         INTEGER,
-    node_ip         CHAR(48),
+    node_ip         VARCHAR(48),
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_network;
 
 CREATE TABLE IF NOT EXISTS genesis_port (
-    lcuuid          CHAR(64),
+    lcuuid          VARCHAR(64),
     type            INTEGER,
     device_type     INTEGER,
-    mac             CHAR(32),
-    device_lcuuid   CHAR(64),
-    network_lcuuid  CHAR(64),
-    vpc_lcuuid      CHAR(64),
+    mac             VARCHAR(32),
+    device_lcuuid   VARCHAR(64),
+    network_lcuuid  VARCHAR(64),
+    vpc_lcuuid      VARCHAR(64),
     vtap_id         INTEGER,
-    node_ip         CHAR(48),
+    node_ip         VARCHAR(48),
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_port;
 
 CREATE TABLE IF NOT EXISTS genesis_vinterface (
     netns_id              INTEGER DEFAULT 0,
-    lcuuid                CHAR(64),
-    name                  CHAR(64),
-    mac                   CHAR(32),
+    lcuuid                VARCHAR(64),
+    name                  VARCHAR(64),
+    mac                   VARCHAR(32),
     ips                   TEXT,
-    tap_name              CHAR(64),
-    tap_mac               CHAR(32),
-    device_lcuuid         CHAR(64),
+    tap_name              VARCHAR(64),
+    tap_mac               VARCHAR(32),
+    device_lcuuid         VARCHAR(64),
     device_name           VARCHAR(512),
-    device_type           CHAR(64),
-    if_type               CHAR(64) DEFAULT '',
-    host_ip               CHAR(48),
-    node_ip               CHAR(48),
+    device_type           VARCHAR(64),
+    if_type               VARCHAR(64) DEFAULT '',
+    host_ip               VARCHAR(48),
+    node_ip               VARCHAR(48),
     last_seen             TIMESTAMP,
     vtap_id               INTEGER,
-    kubernetes_cluster_id CHAR(64),
+    kubernetes_cluster_id VARCHAR(64),
     team_id               INTEGER DEFAULT 1,
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_vinterface;
 
 CREATE TABLE IF NOT EXISTS genesis_ip (
-    lcuuid              CHAR(64),
-    ip                  CHAR(64),
-    vinterface_lcuuid   CHAR(64),
-    node_ip             CHAR(48),
+    lcuuid              VARCHAR(64),
+    ip                  VARCHAR(64),
+    vinterface_lcuuid   VARCHAR(64),
+    node_ip             VARCHAR(48),
     last_seen           TIMESTAMP,
     vtap_id             INTEGER,
     masklen             INTEGER DEFAULT 0,
@@ -950,31 +950,31 @@ CREATE TABLE IF NOT EXISTS genesis_ip (
 TRUNCATE TABLE genesis_ip;
 
 CREATE TABLE IF NOT EXISTS genesis_vip (
-    lcuuid      CHAR(64),
-    ip          CHAR(64),
+    lcuuid      VARCHAR(64),
+    ip          VARCHAR(64),
     vtap_id     INTEGER,
-    node_ip     CHAR(48),
+    node_ip     VARCHAR(48),
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_vip;
 
 CREATE TABLE IF NOT EXISTS genesis_host (
-    lcuuid      CHAR(64),
+    lcuuid      VARCHAR(64),
     hostname    VARCHAR(256),
-    ip          CHAR(64),
+    ip          VARCHAR(64),
     vtap_id     INTEGER,
-    node_ip     CHAR(48),
+    node_ip     VARCHAR(48),
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_host;
 
 CREATE TABLE IF NOT EXISTS genesis_vm (
-    lcuuid          CHAR(64),
+    lcuuid          VARCHAR(64),
     name            VARCHAR(256),
-    label           CHAR(64),
-    vpc_lcuuid      CHAR(64),
-    launch_server   CHAR(64),
-    node_ip         CHAR(48),
+    label           VARCHAR(64),
+    vpc_lcuuid      VARCHAR(64),
+    launch_server   VARCHAR(64),
+    node_ip         VARCHAR(48),
     state           INTEGER,
     vtap_id         INTEGER,
     created_at      TIMESTAMP,
@@ -983,10 +983,10 @@ CREATE TABLE IF NOT EXISTS genesis_vm (
 TRUNCATE TABLE genesis_vm;
 
 CREATE TABLE IF NOT EXISTS genesis_lldp (
-    lcuuid                  CHAR(64),
-    host_ip                 CHAR(48),
-    host_interface          CHAR(64),
-    node_ip                 CHAR(48),
+    lcuuid                  VARCHAR(64),
+    host_ip                 VARCHAR(48),
+    host_interface          VARCHAR(64),
+    node_ip                 VARCHAR(48),
     system_name             VARCHAR(512),
     management_address      VARCHAR(512),
     vinterface_lcuuid       VARCHAR(512),
@@ -1001,14 +1001,14 @@ CREATE TABLE IF NOT EXISTS genesis_process (
     netns_id            INTEGER DEFAULT 0,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              VARCHAR(64) DEFAULT '',
     name                TEXT,
     process_name        TEXT,
     cmd_line            TEXT,
     user_name           VARCHAR(256) DEFAULT '',
-    container_id        CHAR(64) DEFAULT '',
+    container_id        VARCHAR(64) DEFAULT '',
     os_app_tags         TEXT,
-    node_ip             CHAR(48) DEFAULT '',
+    node_ip             VARCHAR(48) DEFAULT '',
     start_time          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
@@ -1017,7 +1017,7 @@ TRUNCATE TABLE genesis_process;
 
 CREATE TABLE IF NOT EXISTS genesis_storage (
     vtap_id     INTEGER NOT NULL PRIMARY KEY,
-    node_ip     CHAR(48)
+    node_ip     VARCHAR(48)
 );
 TRUNCATE TABLE genesis_storage;
 
@@ -1037,10 +1037,10 @@ COMMENT ON COLUMN plugin.user_name IS '1: agent 2: server';
 
 CREATE TABLE IF NOT EXISTS sys_configuration (
     id                  SERIAL PRIMARY KEY,
-    param_name          CHAR(64) NOT NULL,
+    param_name          VARCHAR(64) NOT NULL,
     value               VARCHAR(256),
     comments            TEXT,
-    lcuuid              CHAR(64)
+    lcuuid              VARCHAR(64)
 );
 TRUNCATE TABLE sys_configuration;
 INSERT INTO sys_configuration (id, param_name, value, comments, lcuuid) VALUES (1, 'cloud_sync_timer', '60', 'unit: s', gen_random_uuid());
@@ -1055,25 +1055,25 @@ CREATE TABLE IF NOT EXISTS vtap (
     state                   INTEGER DEFAULT 1,
     enable                  INTEGER DEFAULT 1,
     type                    INTEGER DEFAULT 0,
-    ctrl_ip                 CHAR(64) NOT NULL,
-    ctrl_mac                CHAR(64),
-    tap_mac                 CHAR(64),
-    analyzer_ip             CHAR(64) NOT NULL,
-    cur_analyzer_ip         CHAR(64) NOT NULL,
-    controller_ip           CHAR(64) NOT NULL,
-    cur_controller_ip       CHAR(64) NOT NULL,
-    launch_server           CHAR(64) NOT NULL,
+    ctrl_ip                 VARCHAR(64) NOT NULL,
+    ctrl_mac                VARCHAR(64),
+    tap_mac                 VARCHAR(64),
+    analyzer_ip             VARCHAR(64) NOT NULL,
+    cur_analyzer_ip         VARCHAR(64) NOT NULL,
+    controller_ip           VARCHAR(64) NOT NULL,
+    cur_controller_ip       VARCHAR(64) NOT NULL,
+    launch_server           VARCHAR(64) NOT NULL,
     launch_server_id        INTEGER,
-    az                      CHAR(64) DEFAULT '',
-    region                  CHAR(64) DEFAULT '',
+    az                      VARCHAR(64) DEFAULT '',
+    region                  VARCHAR(64) DEFAULT '',
     revision                VARCHAR(256),
     synced_controller_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     synced_analyzer_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     boot_time               INTEGER DEFAULT 0,
     exceptions              INTEGER DEFAULT 0,
-    vtap_lcuuid             CHAR(64) DEFAULT NULL,
-    vtap_group_lcuuid       CHAR(64) DEFAULT NULL,
+    vtap_lcuuid             VARCHAR(64) DEFAULT NULL,
+    vtap_group_lcuuid       VARCHAR(64) DEFAULT NULL,
     cpu_num                 INTEGER DEFAULT 0,
     memory_size             BIGINT DEFAULT 0,
     arch                    VARCHAR(256),
@@ -1082,15 +1082,15 @@ CREATE TABLE IF NOT EXISTS vtap (
     process_name            VARCHAR(256),
     current_k8s_image       VARCHAR(512),
     license_type            INTEGER,
-    license_functions       CHAR(64),
-    enable_features         CHAR(64) DEFAULT NULL,
-    disable_features        CHAR(64) DEFAULT NULL,
-    follow_group_features   CHAR(64) DEFAULT NULL,
+    license_functions       VARCHAR(64),
+    enable_features         VARCHAR(64) DEFAULT NULL,
+    disable_features        VARCHAR(64) DEFAULT NULL,
+    follow_group_features   VARCHAR(64) DEFAULT NULL,
     tap_mode                INTEGER,
     team_id                 INTEGER,
     expected_revision       TEXT,
     upgrade_package         TEXT,
-    lcuuid                  CHAR(64)
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE vtap;
 COMMENT ON COLUMN vtap.state IS '0.not-connected 1.normal';
@@ -1110,9 +1110,9 @@ CREATE TABLE IF NOT EXISTS vtap_group (
     name                    VARCHAR(64) NOT NULL,
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                  CHAR(64),
-    license_functions       CHAR(64),
-    short_uuid              CHAR(32)
+    lcuuid                  VARCHAR(64),
+    license_functions       VARCHAR(64),
+    short_uuid              VARCHAR(32)
 );
 TRUNCATE TABLE vtap_group;
 DO $$
@@ -1157,16 +1157,16 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     rsyslog_enabled                         SMALLINT       CHECK (rsyslog_enabled IN (0, 1)),
     system_load_circuit_breaker_threshold   NUMERIC(8,2),
     system_load_circuit_breaker_recover     NUMERIC(8,2),
-    system_load_circuit_breaker_metric      CHAR(64),
+    system_load_circuit_breaker_metric      VARCHAR(64),
     max_tx_bandwidth                        BIGINT,
     bandwidth_probe_interval                INTEGER,
     tap_interface_regex                     TEXT,
     max_escape_seconds                      INTEGER,
     mtu                                     INTEGER,
     output_vlan                             INTEGER,
-    collector_socket_type                   CHAR(64),
-    compressor_socket_type                  CHAR(64),
-    npb_socket_type                         CHAR(64),
+    collector_socket_type                   VARCHAR(64),
+    compressor_socket_type                  VARCHAR(64),
+    npb_socket_type                         VARCHAR(64),
     npb_vlan_mode                           INTEGER,
     collector_enabled                       SMALLINT       CHECK (collector_enabled IN (0, 1)),
     vtap_flow_1s_enabled                    SMALLINT       CHECK (vtap_flow_1s_enabled IN (0, 1)),
@@ -1180,11 +1180,11 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     capture_packet_size                     INTEGER,
     inactive_server_port_enabled            SMALLINT       CHECK (inactive_server_port_enabled IN (0, 1)),
     inactive_ip_enabled                     SMALLINT       CHECK (inactive_ip_enabled IN (0, 1)),
-    vtap_group_lcuuid                       CHAR(64),
+    vtap_group_lcuuid                       VARCHAR(64),
     log_threshold                           INTEGER,
-    log_level                               CHAR(64),
+    log_level                               VARCHAR(64),
     log_retention                           INTEGER,
-    http_log_proxy_client                   CHAR(64),
+    http_log_proxy_client                   VARCHAR(64),
     http_log_trace_id                       TEXT,
     l7_log_packet_size                      INTEGER,
     l4_log_collect_nps_threshold            INTEGER,
@@ -1204,8 +1204,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     pod_cluster_internal_ip                 SMALLINT       CHECK (pod_cluster_internal_ip IN (0, 1)),
     domains                                 TEXT,
     http_log_span_id                        TEXT,
-    http_log_x_request_id                   CHAR(64),
-    sys_free_memory_metric                  CHAR(64),
+    http_log_x_request_id                   VARCHAR(64),
+    sys_free_memory_metric                  VARCHAR(64),
     sys_free_memory_limit                   INTEGER,
     log_file_size                           INTEGER,
     external_agent_http_proxy_enabled       SMALLINT       CHECK (external_agent_http_proxy_enabled IN (0, 1)),
@@ -1217,14 +1217,14 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     wasm_plugins                            TEXT,
     so_plugins                              TEXT,
     yaml_config                             TEXT,
-    lcuuid                                  CHAR(64)
+    lcuuid                                  VARCHAR(64)
 );
 TRUNCATE TABLE vtap_group_configuration;
 
 CREATE TABLE IF NOT EXISTS agent_group_configuration (
     id                  SERIAL PRIMARY KEY,
-    lcuuid              CHAR(64) NOT NULL,
-    agent_group_lcuuid  CHAR(64) NOT NULL,
+    lcuuid              VARCHAR(64) NOT NULL,
+    agent_group_lcuuid  VARCHAR(64) NOT NULL,
     yaml                TEXT,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1236,10 +1236,10 @@ COMMENT ON COLUMN agent_group_configuration.updated_at IS 'Timestamp when the re
 CREATE TABLE IF NOT EXISTS controller (
     id                  SERIAL PRIMARY KEY,
     state               INTEGER,
-    name                CHAR(64),
+    name                VARCHAR(64),
     description         VARCHAR(256),
-    ip                  CHAR(64),
-    nat_ip              CHAR(64),
+    ip                  VARCHAR(64),
+    nat_ip              VARCHAR(64),
     cpu_num             INTEGER DEFAULT 0,
     memory_size         BIGINT DEFAULT 0,
     arch                VARCHAR(256),
@@ -1250,11 +1250,11 @@ CREATE TABLE IF NOT EXISTS controller (
     nat_ip_enabled      SMALLINT DEFAULT 0,
     node_type           INTEGER DEFAULT 2,
     region_domain_prefix VARCHAR(256) DEFAULT '',
-    node_name           CHAR(64),
-    pod_ip              CHAR(64),
-    pod_name            CHAR(64),
-    ca_md5              CHAR(64),
-    lcuuid              CHAR(64)
+    node_name           VARCHAR(64),
+    pod_ip              VARCHAR(64),
+    pod_name            VARCHAR(64),
+    ca_md5              VARCHAR(64),
+    lcuuid              VARCHAR(64)
 );
 TRUNCATE TABLE controller;
 COMMENT ON COLUMN controller.state IS '0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception';
@@ -1266,10 +1266,10 @@ CREATE TABLE IF NOT EXISTS analyzer (
     id                      SERIAL PRIMARY KEY,
     state                   INTEGER,
     ha_state                INTEGER DEFAULT 1,
-    name                    CHAR(64),
+    name                    VARCHAR(64),
     description             VARCHAR(256),
-    ip                      CHAR(64),
-    nat_ip                  CHAR(64),
+    ip                      VARCHAR(64),
+    nat_ip                  VARCHAR(64),
     agg                     INTEGER DEFAULT 1,
     cpu_num                 INTEGER DEFAULT 0,
     memory_size             BIGINT DEFAULT 0,
@@ -1277,16 +1277,16 @@ CREATE TABLE IF NOT EXISTS analyzer (
     os                      VARCHAR(256),
     kernel_version          VARCHAR(256),
     tsdb_shard_id           INTEGER,
-    tsdb_replica_ip         CHAR(64),
+    tsdb_replica_ip         VARCHAR(64),
     tsdb_data_mount_path    VARCHAR(256),
     pcap_data_mount_path    VARCHAR(256),
     vtap_max                INTEGER DEFAULT 200,
     synced_at               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     nat_ip_enabled          SMALLINT DEFAULT 0,
-    pod_ip                  CHAR(64),
-    pod_name                CHAR(64),
-    ca_md5                  CHAR(64),
-    lcuuid                  CHAR(64)
+    pod_ip                  VARCHAR(64),
+    pod_name                VARCHAR(64),
+    ca_md5                  VARCHAR(64),
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE analyzer;
 COMMENT ON COLUMN analyzer.state IS '0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception';
@@ -1296,19 +1296,19 @@ COMMENT ON COLUMN analyzer.nat_ip_enabled IS '0: disabled 1:enabled';
 
 CREATE TABLE IF NOT EXISTS az_analyzer_connection (
     id                      SERIAL PRIMARY KEY,
-    az                      CHAR(64) DEFAULT 'ALL',
-    region                  CHAR(64) DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    analyzer_ip             CHAR(64),
-    lcuuid                  CHAR(64)
+    az                      VARCHAR(64) DEFAULT 'ALL',
+    region                  VARCHAR(64) DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    analyzer_ip             VARCHAR(64),
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE az_analyzer_connection;
 
 CREATE TABLE IF NOT EXISTS az_controller_connection (
     id                      SERIAL PRIMARY KEY,
-    az                      CHAR(64) DEFAULT 'ALL',
-    region                  CHAR(64) DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    controller_ip           CHAR(64),
-    lcuuid                  CHAR(64)
+    az                      VARCHAR(64) DEFAULT 'ALL',
+    region                  VARCHAR(64) DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    controller_ip           VARCHAR(64),
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE az_controller_connection;
 
@@ -1317,22 +1317,22 @@ CREATE TABLE IF NOT EXISTS third_party_device (
     epc_id              INTEGER DEFAULT 0,
     vm_id               INTEGER,
     curr_time           TIMESTAMP NOT NULL DEFAULT NOW(),
-    sys_uptime          CHAR(32),
+    sys_uptime          VARCHAR(32),
     type                INTEGER,
     state               INTEGER,
     errno               INTEGER DEFAULT 0,
     name                VARCHAR(256),
-    label               CHAR(64),
+    label               VARCHAR(64),
     poolid              INTEGER DEFAULT 0,
     community           VARCHAR(256),
-    mgmt_ip             CHAR(64),
-    data_ip             CHAR(64),
-    ctrl_ip             CHAR(64),
-    ctrl_mac            CHAR(32),
-    data1_mac           CHAR(32),
-    data2_mac           CHAR(32),
-    data3_mac           CHAR(32),
-    launch_server       CHAR(64),
+    mgmt_ip             VARCHAR(64),
+    data_ip             VARCHAR(64),
+    ctrl_ip             VARCHAR(64),
+    ctrl_mac            VARCHAR(32),
+    data1_mac           VARCHAR(32),
+    data2_mac           VARCHAR(32),
+    data3_mac           VARCHAR(32),
+    launch_server       VARCHAR(64),
     user_name           VARCHAR(64),
     user_passwd         VARCHAR(64),
     vnc_port            INTEGER DEFAULT 0,
@@ -1352,15 +1352,15 @@ CREATE TABLE IF NOT EXISTS third_party_device (
     nic_data            VARCHAR(256),
     rack_name           VARCHAR(256),
     userid              INTEGER,
-    domain              CHAR(64),
-    region              CHAR(64),
-    lcuuid              CHAR(64),
+    domain              VARCHAR(64),
+    region              VARCHAR(64),
+    lcuuid              VARCHAR(64),
     order_id            INTEGER,
-    product_specification_lcuuid CHAR(64),
+    product_specification_lcuuid VARCHAR(64),
     role                INTEGER DEFAULT 1,
     create_time         TIMESTAMP,
-    gateway             CHAR(64) DEFAULT '',
-    raid_support        CHAR(64) DEFAULT ''
+    gateway             VARCHAR(64) DEFAULT '',
+    raid_support        VARCHAR(64) DEFAULT ''
 );
 TRUNCATE TABLE third_party_device;
 COMMENT ON COLUMN third_party_device.type IS '1.VM 2.Gateway 3.Compute 4.Network 5.Storage 6.Security';
@@ -1378,7 +1378,7 @@ CREATE TABLE IF NOT EXISTS voucher (
     status              INTEGER DEFAULT 0,
     name                VARCHAR(256),
     value               BYTEA,
-    lcuuid              CHAR(64)
+    lcuuid              VARCHAR(64)
 );
 TRUNCATE TABLE voucher;
 
@@ -1421,7 +1421,7 @@ CREATE TABLE IF NOT EXISTS mail_server (
     ntlm_enabled            INTEGER,
     ntlm_name               TEXT,
     ntlm_password           TEXT,
-    lcuuid                  CHAR(64) DEFAULT ''
+    lcuuid                  VARCHAR(64) DEFAULT ''
 );
 TRUNCATE TABLE mail_server;
 
@@ -1447,16 +1447,16 @@ COMMENT ON COLUMN dial_test_task.dial_frequency IS 'unit: ms';
 
 CREATE TABLE IF NOT EXISTS data_source (
     id                          SERIAL PRIMARY KEY,
-    display_name                CHAR(64),
-    data_table_collection       CHAR(64),
+    display_name                VARCHAR(64),
+    data_table_collection       VARCHAR(64),
     state                       INTEGER DEFAULT 1,
     base_data_source_id         INTEGER,
     interval_time               INTEGER NOT NULL,
     retention_time              INTEGER NOT NULL,
-    summable_metrics_operator   CHAR(64),
-    unsummable_metrics_operator CHAR(64),
+    summable_metrics_operator   VARCHAR(64),
+    unsummable_metrics_operator VARCHAR(64),
     updated_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                      CHAR(64)
+    lcuuid                      VARCHAR(64)
 );
 TRUNCATE TABLE data_source;
 COMMENT ON COLUMN data_source.state IS '0: Exception 1: Normal';
@@ -1548,12 +1548,12 @@ COMMENT ON COLUMN report.policy_id IS 'report_policy ID';
 CREATE TABLE IF NOT EXISTS acl (
     id                     SERIAL PRIMARY KEY,
     business_id            INTEGER NOT NULL,
-    name                   CHAR(64),
+    name                   VARCHAR(64),
     team_id                INTEGER DEFAULT 1,
     type                   INTEGER DEFAULT 2,
     tap_type               INTEGER DEFAULT 3,
     state                  INTEGER DEFAULT 1,
-    applications           CHAR(64) NOT NULL,
+    applications           VARCHAR(64) NOT NULL,
     epc_id                 INTEGER,
     src_group_ids          TEXT,
     dst_group_ids          TEXT,
@@ -1563,7 +1563,7 @@ CREATE TABLE IF NOT EXISTS acl (
     vlan                   INTEGER,
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                 CHAR(64)
+    lcuuid                 VARCHAR(64)
 );
 TRUNCATE TABLE acl;
 COMMENT ON COLUMN acl.type IS '1-epc; 2-custom';
@@ -1620,7 +1620,7 @@ CREATE TABLE IF NOT EXISTS group_acl (
     team_id                INTEGER DEFAULT 1,
     group_id               INTEGER NOT NULL,
     acl_id                 INTEGER NOT NULL,
-    lcuuid                 CHAR(64)
+    lcuuid                 VARCHAR(64)
 );
 TRUNCATE TABLE group_acl;
 
@@ -1635,17 +1635,17 @@ COMMENT ON COLUMN policy_acl_group.acl_ids IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS tap_type (
     id                  SERIAL PRIMARY KEY,
-    name                CHAR(64) NOT NULL,
+    name                VARCHAR(64) NOT NULL,
     type                INTEGER NOT NULL DEFAULT 1,
-    region              CHAR(64),
+    region              VARCHAR(64),
     value               INTEGER NOT NULL,
     vlan                INTEGER,
-    src_ip              CHAR(64),
+    src_ip              VARCHAR(64),
     interface_index     INTEGER CHECK (interface_index > 0 AND interface_index <= 4294967295),
-    interface_name      CHAR(64),
+    interface_name      VARCHAR(64),
     sampling_rate       INTEGER CHECK (sampling_rate > 0 AND sampling_rate <= 4294967295),
     description         VARCHAR(256),
-    lcuuid              CHAR(64)
+    lcuuid              VARCHAR(64)
 );
 TRUNCATE TABLE tap_type;
 COMMENT ON COLUMN tap_type.type IS '1:packet, 2:sFlow, 3:NetFlow V5 4:NetStream v5';
@@ -1658,7 +1658,7 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     id                     SERIAL PRIMARY KEY,
     user_id                INTEGER DEFAULT 1,
     team_id                INTEGER DEFAULT 1,
-    name                   CHAR(64),
+    name                   VARCHAR(64),
     state                  INTEGER DEFAULT 1,
     business_id            INTEGER NOT NULL,
     direction              SMALLINT DEFAULT 1,
@@ -1671,7 +1671,7 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     vtap_ids               TEXT,
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                 CHAR(64)
+    lcuuid                 VARCHAR(64)
 );
 TRUNCATE TABLE npb_policy;
 COMMENT ON COLUMN npb_policy.state IS '0-disable; 1-enable';
@@ -1684,13 +1684,13 @@ CREATE TABLE IF NOT EXISTS npb_tunnel (
     id                  SERIAL PRIMARY KEY,
     user_id             INTEGER DEFAULT 1,
     team_id             INTEGER DEFAULT 1,
-    name                CHAR(64) NOT NULL,
-    ip                  CHAR(64),
+    name                VARCHAR(64) NOT NULL,
+    ip                  VARCHAR(64),
     type                INTEGER,
     vni_input_type      SMALLINT DEFAULT 1,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid              CHAR(64)
+    lcuuid              VARCHAR(64)
 );
 TRUNCATE TABLE npb_tunnel;
 COMMENT ON COLUMN npb_tunnel.type IS '(0-VXLAN；1-ERSPAN)';
@@ -1700,7 +1700,7 @@ COMMENT ON COLUMN npb_tunnel.updated_at IS 'Timestamp when the record was last u
 
 CREATE TABLE IF NOT EXISTS pcap_policy (
     id                     SERIAL PRIMARY KEY,
-    name                   CHAR(64),
+    name                   VARCHAR(64),
     state                  INTEGER DEFAULT 1,
     business_id            INTEGER NOT NULL,
     acl_id                 INTEGER,
@@ -1710,7 +1710,7 @@ CREATE TABLE IF NOT EXISTS pcap_policy (
     user_id                INTEGER,
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                 CHAR(64),
+    lcuuid                 VARCHAR(64),
     team_id                INTEGER DEFAULT 1
 );
 TRUNCATE TABLE pcap_policy;
@@ -1735,7 +1735,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     sub_view_metrics        TEXT,
     sub_view_extra          TEXT,
     user_id                 INTEGER,
-    name                    CHAR(128) NOT NULL,
+    name                    VARCHAR(128) NOT NULL,
     level                   SMALLINT NOT NULL,
     state                   SMALLINT DEFAULT 1,
     app_type                SMALLINT NOT NULL,
@@ -1748,7 +1748,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     target_line_uid         TEXT,
     target_line_name        TEXT,
     target_field            TEXT,
-    data_level              CHAR(64) NOT NULL DEFAULT '1m',
+    data_level              VARCHAR(64) NOT NULL DEFAULT '1m',
     upper_threshold         DOUBLE PRECISION,
     lower_threshold         DOUBLE PRECISION,
     agg                     SMALLINT DEFAULT 0,
@@ -1761,11 +1761,11 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     query_params            TEXT,
     query_conditions        TEXT,
     tag_conditions          TEXT,
-    monitoring_frequency    CHAR(64) DEFAULT '1m',
-    monitoring_interval     CHAR(64) DEFAULT '1m',
+    monitoring_frequency    VARCHAR(64) DEFAULT '1m',
+    monitoring_interval     VARCHAR(64) DEFAULT '1m',
     trigger_info_event      INTEGER DEFAULT 0,
     trigger_recovery_event  INTEGER DEFAULT 1,
-    lcuuid                  CHAR(64)
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE alarm_policy;
 COMMENT ON COLUMN alarm_policy.level IS '0.low 1.middle 2.high';
@@ -2045,7 +2045,7 @@ VALUES (
 
 CREATE TABLE IF NOT EXISTS alarm_event (
     id                      SERIAL PRIMARY KEY,
-    status                  CHAR(64),
+    status                  VARCHAR(64),
     timestamp               TIMESTAMP,
     end_time                BIGINT,
     policy_id               INTEGER,
@@ -2054,7 +2054,7 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     policy_app_type         SMALLINT,
     policy_sub_type         SMALLINT,
     policy_contrast_type    SMALLINT,
-    policy_data_level       CHAR(64),
+    policy_data_level       VARCHAR(64),
     policy_target_uid       TEXT,
     policy_target_name      TEXT,
     policy_go_to            TEXT,
@@ -2065,16 +2065,16 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     trigger_condition       TEXT,
     trigger_value           INTEGER,
     end_value               TEXT,
-    value_unit              CHAR(64),
+    value_unit              VARCHAR(64),
     endpoint_results        TEXT,
     event_level             INTEGER,
-    lcuuid                  CHAR(64)
+    lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE alarm_event;
 
 CREATE TABLE IF NOT EXISTS report_policy (
     id                      SERIAL PRIMARY KEY,
-    name                    CHAR(64) NOT NULL,
+    name                    VARCHAR(64) NOT NULL,
     view_id                 INTEGER NOT NULL,
     user_id                 INTEGER,
     data_level              VARCHAR(2) NOT NULL DEFAULT '1m' CHECK (data_level IN ('1s','1m')),
@@ -2087,7 +2087,7 @@ CREATE TABLE IF NOT EXISTS report_policy (
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     begin_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                  CHAR(64) NOT NULL
+    lcuuid                  VARCHAR(64) NOT NULL
 );
 TRUNCATE TABLE report_policy;
 COMMENT ON COLUMN report_policy.report_format IS 'Type of format (1-html)';
@@ -2195,7 +2195,7 @@ TRUNCATE TABLE ch_az;
 CREATE TABLE IF NOT EXISTS ch_l3_epc (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
-    uid                     CHAR(64),
+    uid                     VARCHAR(64),
     icon_id                 INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
@@ -2217,7 +2217,7 @@ TRUNCATE TABLE ch_subnet;
 
 CREATE TABLE IF NOT EXISTS ch_ip_relation (
     l3_epc_id           INTEGER NOT NULL,
-    ip                  CHAR(64) NOT NULL,
+    ip                  VARCHAR(64) NOT NULL,
     natgw_id            INTEGER,
     natgw_name          VARCHAR(256),
     lb_id               INTEGER,
@@ -2303,9 +2303,9 @@ CREATE TABLE IF NOT EXISTS ch_device (
     devicetype              INTEGER NOT NULL,
     deviceid                INTEGER NOT NULL,
     name                    TEXT,
-    uid                     CHAR(64),
+    uid                     VARCHAR(64),
     icon_id                 INTEGER,
-    ip                      CHAR(64),
+    ip                      VARCHAR(64),
     hostname                VARCHAR(256),
     team_id                 INTEGER,
     domain_id               INTEGER,
@@ -2564,7 +2564,7 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     name                        VARCHAR(256),
     host_id                     INTEGER,
     l3_epc_id                   INTEGER,
-    ip                          CHAR(64),
+    ip                          VARCHAR(64),
     subnet_id                   INTEGER,
     hostname                    VARCHAR(256),
     team_id                     INTEGER,
