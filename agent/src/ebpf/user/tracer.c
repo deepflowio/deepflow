@@ -2091,9 +2091,6 @@ int set_feature_pids(int feature, const int *match_pids, int num)
 		if (kill(match_pids[i], 0) == -1 && errno == ESRCH) {
 			ebpf_warning("The process with PID %d does not exist\n",
 				     match_pids[i]);
-		} else if (!is_user_process(match_pids[i])) {
-			ebpf_warning("PID %d is not a user process.\n",
-				     match_pids[i]);
 		} else {
 			pids[j++] = match_pids[i];
 		}
