@@ -114,7 +114,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetAggMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*Metrics, bool) {
+func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == COUNT_METRICS_NAME {
 		return &Metrics{
@@ -127,7 +127,7 @@ func GetAggMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*
 			Table:       table,
 		}, true
 	}
-	return GetMetrics(field, db, table, orgID, dynamicTag)
+	return GetMetrics(field, db, table, orgID)
 }
 
 func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]*Metrics, db, table, orgID string) error {
@@ -223,7 +223,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 	return nil
 }
 
-func GetMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*Metrics, bool) {
+func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
 	// flow_tag database has no metrics
@@ -298,6 +298,7 @@ func GetMetrics(field, db, table, orgID string, dynamicTag *common.Result) (*Met
 			}
 		}
 		// Dynamic tag metrics
+		dynamicTag := tag.GetDynamicMetric(db, table, field)
 		GetTagTypeMetrics(dynamicTag, newAllMetrics, db, table, orgID)
 		metric, ok := newAllMetrics[field]
 		return metric, ok
