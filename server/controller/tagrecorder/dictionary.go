@@ -163,10 +163,10 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		username = c.cfg.PostgreSQLCfg.UserName
 		password = c.cfg.PostgreSQLCfg.UserPassword
 		if c.cfg.PostgreSQLCfg.ProxyHost != "" {
-			host = c.cfg.PostgreSQLCfg.ProxyHost
+			host = "HOST '" + c.cfg.PostgreSQLCfg.ProxyHost + "' "
 			port = c.cfg.PostgreSQLCfg.ProxyPort
 		} else {
-			host = c.cfg.PostgreSQLCfg.Host
+			host = "HOST '" + c.cfg.PostgreSQLCfg.Host + "' "
 			port = c.cfg.PostgreSQLCfg.Port
 		}
 	} else if c.cfg.MySqlCfg.Enabled {
