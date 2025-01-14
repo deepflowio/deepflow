@@ -87,7 +87,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		regions = append(regions, kubernetesGatherResource.Region)
 	}
 
-	// 将所有容器节点默认同步为云服务器
+	// 将所有容器节点默认同步为云主机
 	vms := []model.VM{}
 	vmPodNodeConnections := []model.VMPodNodeConnection{}
 	for _, node := range kubernetesGatherResource.PodNodes {

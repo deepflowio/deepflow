@@ -95,14 +95,14 @@ parse/
                 "chost",
                 "chost_0",
                 "chost_1",
-                "云服务器",
+                "云主机",
                 "resource_id"
               ],
               [
                 "chost_name",
                 "chost_name_0",
                 "chost_name_1",
-                "云服务器名称",
+                "云主机名称",
                 "resource_name"
               ]
           ]

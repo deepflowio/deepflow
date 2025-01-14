@@ -423,7 +423,7 @@ func TestParsePromQLTag(t *testing.T) {
 	}
 	p.getExternalTagFromCache = executor.convertExternalTagToQuerierAllowTag
 	tagdescription.TAG_ENUMS["l7_protocol"] = []*tagdescription.TagEnum{{Value: 20, DisplayNameEN: "HTTP"}}
-	tagdescription.TAG_ENUMS["auto_service_type.ch"] = []*tagdescription.TagEnum{{Value: 1, DisplayNameZH: "云服务器"}}
+	tagdescription.TAG_ENUMS["auto_service_type.ch"] = []*tagdescription.TagEnum{{Value: 1, DisplayNameZH: "云主机"}}
 	tagdescription.TAG_ENUMS["auto_service_type.en"] = []*tagdescription.TagEnum{{Value: 1, DisplayNameEN: "Cloud Host"}}
 
 	// Test cases generation
