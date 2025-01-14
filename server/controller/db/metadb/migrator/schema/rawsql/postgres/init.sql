@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS vl2 (
     epc_id              INTEGER DEFAULT 0,
     segmentation_id     INTEGER DEFAULT 0,
     tunnel_id           INTEGER DEFAULT 0,
-    shared              INTEGER DEFAULT 0,
+    shared              BOOLEAN DEFAULT FALSE,
     topped              INTEGER DEFAULT 0,
     is_vip              INTEGER DEFAULT 0,
     lcuuid              VARCHAR(64) DEFAULT '',
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     vlantag             INTEGER DEFAULT 0,
     devicetype          INTEGER,
     deviceid            INTEGER,
-    netns_id            INTEGER DEFAULT 0,
+    netns_id            BIGINT DEFAULT 0 CHECK (netns_id >= 0 AND netns_id <= 4294967295),
     vtap_id             INTEGER DEFAULT 0,
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
@@ -867,7 +867,7 @@ CREATE TABLE IF NOT EXISTS process (
     user_name           VARCHAR(256) DEFAULT '',
     start_time          TIMESTAMP NOT NULL DEFAULT NOW(),
     os_app_tags         TEXT,
-    netns_id            INTEGER CHECK (netns_id >= 0),
+    netns_id            BIGINT DEFAULT 0 CHECK (netns_id >= 0 AND netns_id <= 4294967295),
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
     lcuuid              VARCHAR(64) DEFAULT '',
@@ -916,7 +916,7 @@ CREATE TABLE IF NOT EXISTS genesis_port (
 TRUNCATE TABLE genesis_port;
 
 CREATE TABLE IF NOT EXISTS genesis_vinterface (
-    netns_id              INTEGER DEFAULT 0,
+    netns_id              BIGINT DEFAULT 0 CHECK (netns_id >= 0 AND netns_id <= 4294967295),
     lcuuid                VARCHAR(64),
     name                  VARCHAR(64),
     mac                   VARCHAR(32),
@@ -998,7 +998,7 @@ CREATE TABLE IF NOT EXISTS genesis_lldp (
 TRUNCATE TABLE genesis_lldp;
 
 CREATE TABLE IF NOT EXISTS genesis_process (
-    netns_id            INTEGER DEFAULT 0,
+    netns_id            BIGINT DEFAULT 0 CHECK (netns_id >= 0 AND netns_id <= 4294967295),
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
     lcuuid              VARCHAR(64) DEFAULT '',
@@ -1071,7 +1071,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     synced_analyzer_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     boot_time               INTEGER DEFAULT 0,
-    exceptions              INTEGER DEFAULT 0,
+    exceptions              INTEGER DEFAULT 0 CHECK (exceptions >= 0),
     vtap_lcuuid             VARCHAR(64) DEFAULT NULL,
     vtap_group_lcuuid       VARCHAR(64) DEFAULT NULL,
     cpu_num                 INTEGER DEFAULT 0,
@@ -1641,9 +1641,9 @@ CREATE TABLE IF NOT EXISTS tap_type (
     value               INTEGER NOT NULL,
     vlan                INTEGER,
     src_ip              VARCHAR(64),
-    interface_index     INTEGER CHECK (interface_index > 0 AND interface_index <= 4294967295),
+    interface_index     BIGINT CHECK (interface_index > 0 AND interface_index <= 4294967295),
     interface_name      VARCHAR(64),
-    sampling_rate       INTEGER CHECK (sampling_rate > 0 AND sampling_rate <= 4294967295),
+    sampling_rate       BIGINT CHECK (sampling_rate > 0 AND sampling_rate <= 4294967295),
     description         VARCHAR(256),
     lcuuid              VARCHAR(64)
 );
