@@ -242,7 +242,7 @@ func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpda
 
 	// 删除操作的顺序，是创建的逆序
 	// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
-	// 原因：避免数据量大时，此数据删除后，云服务器、容器节点还在，导致采集器类型变化
+	// 原因：避免数据量大时，此数据删除后，云主机、容器节点还在，导致采集器类型变化
 	processUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-1]
 	vmPodNodeConnectionUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-2]
 	// 因为 processUpdater 是 -1，VMPodNodeConnection 是 -2，特殊处理后，逆序删除从 -3 开始

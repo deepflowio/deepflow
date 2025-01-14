@@ -56,7 +56,7 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 # 软件架构
 
-DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、传统服务器或云服务器中运行一个 Agent ，负责该服务器上所有应用进程的数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、标签注入、数据写入、数据查询服务。
+DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、传统服务器或云主机中运行一个 Agent ，负责该服务器上所有应用进程的数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、标签注入、数据写入、数据查询服务。
 
 ![DeepFlow 软件架构](./docs/deepflow-architecture.png)
 

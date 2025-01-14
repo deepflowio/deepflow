@@ -7,7 +7,7 @@ timestamp                  , 时间微秒                   , 单位: 微秒
 region                     , 区域                       ,
 az                         , 可用区                     ,
 host                       , 宿主机                     , 承载虚拟机的宿主机。
-chost                      , 云服务器                   , 包括虚拟机、裸金属服务器。
+chost                      , 云主机                     , 包括虚拟机、裸金属服务器。
 vpc                        , VPC                        ,
 router                     , 路由器                     ,
 subnet                     , 子网                       ,
@@ -31,8 +31,8 @@ auto_service               , 自动服务                   , 在`auto_instance`
 gprocess                   , 进程                       ,
 host_ip                    , 宿主机                     , 宿主机的管理 IP。
 host_hostname              , 宿主机                     , 宿主机的 Hostname。
-chost_ip                   , 云服务器                   , 云服务器的主 IP。
-chost_hostname             , 云服务器                   , 云服务器的 Hostname。
+chost_ip                   , 云主机                     , 云主机的主 IP。
+chost_hostname             , 云主机                     , 云主机的 Hostname。
 pod_node_ip                , K8s 容器节点               , 容器节点的主 IP。
 pod_node_hostname          , K8s 容器节点               , 容器节点的 Hostname。
 user                       , 用户                       , 
