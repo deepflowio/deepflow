@@ -3515,6 +3515,93 @@ check:
 		return MSG_RESPONSE;
 }
 
+static __inline enum message_type infer_rocketmq_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s *conn_info)
+{
+#define ROCKETMQ_SERIALIZE_TYPE_JSON 0
+#define ROCKETMQ_SERIALIZE_TYPE_ROCKETMQ 0x1
+#define ROCKETMQ_REQUEST 0
+#define ROCKETMQ_RESPONSE 0x1
+#define ROCKETMQ_ONEWAY_REQUEST 0x2
+	// length(4B) + origin_header_length(4B) + header_data(at least 13B)
+	if (count < 21) {
+		return MSG_UNKNOWN;
+	}
+
+	if (!protocol_port_check_2(PROTO_ROCKETMQ, conn_info)) {
+		return MSG_UNKNOWN;
+	}
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_ROCKETMQ) {
+			return MSG_UNKNOWN;
+		}
+	}
+
+	const __s32 length = __bpf_ntohl(*(__s32 *)buf);
+	// origin_header_length(4B) and maximum packet length(65535B)
+	if (length < 4 || length > 65535) {
+		return MSG_UNKNOWN;
+	}
+
+	const __s32 origin_header_length = __bpf_ntohl(*(__s32 *)(buf + 4));
+	const __s32 header_length = origin_header_length & 0xFFFFFF;
+	if (header_length > length - 4) {
+		return MSG_UNKNOWN;
+	}
+
+	const __s8 serialize_type = (origin_header_length >> 24) & 0xFF;
+	switch (serialize_type) {
+	case ROCKETMQ_SERIALIZE_TYPE_JSON:
+		// there must be the following characters
+		// {"code":0,"flag":1,"language":"","opaque":1,"serializeTypeCurrentRPC":"JSON","version":0}
+		// in header data at least, total: 89B
+		if (header_length < 89) {
+			return MSG_UNKNOWN;
+		}
+		// compressed judgement due to instruction limit
+		if (buf[8] != '{' || buf[9] != '"'
+		//	|| buf[10] != 'c' || buf[11] != 'o'
+		//	|| buf[12] != 'd' || buf[13] != 'e'
+			|| buf[14] != '"' || buf[15] != ':') {
+			return MSG_UNKNOWN;
+		}
+		if (buf[16] >= '0' && buf[16] <= '4' && buf[17] == ',') {
+			return MSG_RESPONSE;
+		}
+		// judgement based on flag (no extFields ahead), and code maybe 10, 200, 2000, -1000
+		if (count >= 30) {
+			__u8 i;
+			for (i = 26; i <= 29; i++) {
+				if (buf[i-1] == ':' && buf[i] == '1') {
+					return MSG_RESPONSE;
+				}
+			}
+		}
+		break;
+	case ROCKETMQ_SERIALIZE_TYPE_ROCKETMQ:
+		// there must be code(2B), language(1B), version(2B), opaque(4B) and flag(4B)
+		// in header data at least, total: 2 + 1 + 2 + 4 + 4 = 13B
+		if (header_length < 13) {
+			return MSG_UNKNOWN;
+		}
+		__s32 flag = __bpf_ntohl(*(__s32 *)(buf + 17));
+		if (flag == ROCKETMQ_REQUEST || flag == ROCKETMQ_ONEWAY_REQUEST) {
+			return MSG_REQUEST;
+		} else if (flag == ROCKETMQ_RESPONSE) {
+			return MSG_RESPONSE;
+		} else {
+			return MSG_UNKNOWN;
+		}
+		break;
+	default:
+		return MSG_UNKNOWN;
+	}
+
+	return MSG_REQUEST;
+}
+
 static __inline bool drop_msg_by_comm(void)
 {
 	char comm[TASK_COMM_LEN];
@@ -3715,6 +3802,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 		    infer_mongo_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MONGO;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_ROCKETMQ && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_rocketmq_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ROCKETMQ;
 	}
 
 	if (conn_info->enable_reasm) {
@@ -4067,6 +4162,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						syscall_infer_len,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ZMTP;
+				return inferred_message;
+			}
+			break;
+		case PROTO_ROCKETMQ:
+			if ((inferred_message.type =
+			     infer_rocketmq_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_ROCKETMQ;
 				return inferred_message;
 			}
 			break;
