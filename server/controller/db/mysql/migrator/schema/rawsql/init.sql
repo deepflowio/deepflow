@@ -1085,7 +1085,9 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     payload_slice          INTEGER DEFAULT NULL,
     acl_id                 INTEGER,
     policy_acl_group_id    INTEGER,
+    vtap_type              TINYINT(1) COMMENT '1: vtap; 2: vtap_group',
     vtap_ids               TEXT COMMENT 'separated by ,',
+    vtap_group_ids         TEXT COMMENT 'separated by ,',
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     lcuuid                 CHAR(64)
