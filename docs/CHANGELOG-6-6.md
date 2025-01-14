@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: querier show subnet error when subnet filtering [#8923](https://github.com/deepflowio/deepflow/pull/8923) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +47,9 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support decap special vxlan [#8924](https://github.com/deepflowio/deepflow/pull/8924) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - Update protocol_inference.h [#8921](https://github.com/deepflowio/deepflow/pull/8921) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Remove user process restrictions in the profile [#8918](https://github.com/deepflowio/deepflow/pull/8918) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
