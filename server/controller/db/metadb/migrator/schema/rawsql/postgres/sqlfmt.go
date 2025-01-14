@@ -47,7 +47,7 @@ func (f *SqlFmt) SelectDatabase() string {
 }
 
 func (f *SqlFmt) SelectTable(tableName string) string {
-	return fmt.Sprintf("SELECT tablename FROM pg_catalog.pg_tables WHERE datname='%s' AND schemaname='%s' AND tablename='%s'", f.cfg.Database, f.cfg.Schema, tableName)
+	return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_catalog='%s' AND table_schema='%s' AND table_name='%s'", f.cfg.Database, f.cfg.Schema, tableName)
 }
 
 func (f *SqlFmt) SelectColumn(tableName, columnName string) string {
