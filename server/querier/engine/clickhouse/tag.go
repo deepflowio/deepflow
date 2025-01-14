@@ -268,7 +268,7 @@ func GetPrometheusAllTagTranslator(e *CHEngine) (string, string, error) {
 }
 
 func GetMetricsTag(name string, alias string, e *CHEngine) (Statement, error) {
-	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), e.DB, e.Table, e.ORGID, e.DynamicTag)
+	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), e.DB, e.Table, e.ORGID)
 	if !ok {
 		return nil, nil
 	}
