@@ -326,28 +326,28 @@ static u32 delete_all_stackmap_elems(struct bpf_tracer *tracer,
 
 	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
 
-	ebpf_info("[%s] table %s find_count %u reclaim_count :%u\n",
-		  __func__, stack_map_name, find_count, reclaim_count);
+	ebpf_debug("[%s] table %s find_count %u reclaim_count :%u\n",
+		   __func__, stack_map_name, find_count, reclaim_count);
 
 	return reclaim_count;
 }
 
-#define CLEAN_STACK_MAP(stack_map)													\
-do {																				\
-	int *sid;																		\
-	vec_foreach(sid, stack_map->clear_ids) {										\
-		int id = *sid;																\
-		if (!bpf_table_delete_key(t, stack_map->name, (u64) id)) {					\
-			/*																		\
-			 * It may be due to the disorder in the perf buffer transmission,		\
-			 * leading to the repetitive deletion of the same stack ID.				\
-			 */																		\
-			ctx->stackmap_clear_failed_count++;										\
-		}																			\
-		clear_bitmap(stack_map->ids.bitmap, id);									\
-	}																				\
-	vec_free(stack_map->clear_ids);													\
-	stack_map->ids.count = 0;														\
+#define CLEAN_STACK_MAP(stack_map)						           \
+do {											   \
+	int *sid;									   \
+	vec_foreach(sid, stack_map->clear_ids) {					   \
+		int id = *sid;								   \
+		if (!bpf_table_delete_key(t, stack_map->name, (u64) id)) {		   \
+			/*								   \
+			 * It may be due to the disorder in the perf buffer transmission,  \
+			 * leading to the repetitive deletion of the same stack ID.	   \
+			 */								   \
+			ctx->stackmap_clear_failed_count++;				   \
+		}									   \
+		clear_bitmap(stack_map->ids.bitmap, id);				   \
+	}										   \
+	vec_free(stack_map->clear_ids);							   \
+	stack_map->ids.count = 0;							   \
 } while (0)
 
 static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
