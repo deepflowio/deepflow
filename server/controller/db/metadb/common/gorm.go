@@ -35,6 +35,18 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
+type ClickHouseSource struct {
+	Name         string
+	Database     string
+	Host         string
+	Port         uint32
+	ProxyHost    string
+	ProxyPort    uint32
+	UserName     string
+	UserPassword string
+	ReplicaSQL   string
+}
+
 func GetSession(cfg config.Config) (*gorm.DB, error) {
 	connector, err := GetConnector(cfg, true, cfg.TimeOut, false)
 	if err != nil {
@@ -171,4 +183,37 @@ func getPostgresDialector(conn driver.Connector) gorm.Dialector {
 	return postgres.New(postgres.Config{
 		Conn: sql.OpenDB(conn),
 	})
+}
+
+func GetClickhouseSource(cfg config.Config) ClickHouseSource {
+	source := ClickHouseSource{}
+	switch cfg.Type {
+	case config.MetaDBTypeMySQL:
+		source.Name = SOURCE_MYSQL
+		source.Database = cfg.Database
+		source.Host = ""
+		source.UserName = cfg.UserName
+		source.UserPassword = cfg.UserPassword
+		if cfg.ProxyHost != "" {
+			source.ReplicaSQL = fmt.Sprintf(SQL_REPLICA, cfg.ProxyHost) + " "
+			source.Port = cfg.ProxyPort
+		} else {
+			source.ReplicaSQL = fmt.Sprintf(SQL_REPLICA, cfg.Host) + " "
+			source.Port = cfg.Port
+		}
+	case config.MetaDBTypePostgreSQL:
+		source.Name = SOURCE_POSTGRESQL
+		source.Database = cfg.Database
+		source.ReplicaSQL = ""
+		source.UserName = cfg.UserName
+		source.UserPassword = cfg.UserPassword
+		if cfg.ProxyHost != "" {
+			source.Host = "HOST '" + cfg.ProxyHost + "' "
+			source.Port = cfg.ProxyPort
+		} else {
+			source.Host = "HOST '" + cfg.Host + "' "
+			source.Port = cfg.Port
+		}
+	}
+	return source
 }
