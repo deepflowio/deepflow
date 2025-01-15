@@ -150,12 +150,16 @@ impl TryFrom<&Process> for ProcessData {
     type Error = ProcError;
     // will not set the username
     fn try_from(proc: &Process) -> Result<Self, Self::Error> {
-        let (cmd, cmd_with_args, uid, status) =
-            (proc.exe()?, proc.cmdline()?, proc.uid()?, proc.status()?);
+        let (cmd, cmd_with_args, uid, status) = (
+            proc.exe().unwrap_or_default(),
+            proc.cmdline().unwrap_or_default(),
+            proc.uid().unwrap_or_default(),
+            proc.status()?,
+        );
         let command = if let Some(f) = cmd.file_name() {
             f.to_string_lossy().to_string()
         } else {
-            return Err(ProcError::Other(format!("pid {} cmd parse fail", proc.pid)));
+            "".to_string()
         };
         let (ppid, start_time) = if let Ok(stat) = proc.stat().as_ref() {
             let z = stat.starttime().unwrap_or_default();
@@ -176,7 +180,7 @@ impl TryFrom<&Process> for ProcessData {
             user: "".to_string(),
             start_time,
             os_app_tags: vec![],
-            netns_id: get_proc_netns(proc)? as u32,
+            netns_id: get_proc_netns(proc).unwrap_or_default() as u32,
             container_id: get_container_id(proc).unwrap_or("".to_string()),
         })
     }
