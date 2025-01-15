@@ -2473,7 +2473,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             Some(pcap_packet_shared_connection.clone()),
-            SenderEncoder::Raw,
+            if user_config.outputs.compression.pcap {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";

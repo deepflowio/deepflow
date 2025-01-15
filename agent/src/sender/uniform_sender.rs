@@ -48,6 +48,7 @@ const PRE_FILE_SUFFIX: &str = ".pre";
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {
+    raw_bytes: AtomicU64,
     pub rx: AtomicU64,
     pub tx: AtomicU64,
     pub tx_bytes: AtomicU64,
@@ -56,6 +57,12 @@ pub struct SenderCounter {
 
 impl RefCountable for SenderCounter {
     fn get_counters(&self) -> Vec<Counter> {
+        let mut compression_ratio = 0;
+        let tx_bytes = self.tx_bytes.swap(0, Ordering::Relaxed);
+        let raw_bytes = self.raw_bytes.swap(0, Ordering::Relaxed);
+        if raw_bytes > 0 {
+            compression_ratio = ((1.0 - tx_bytes as f64 / raw_bytes as f64) * 100.0).round() as u64;
+        }
         vec![
             (
                 "rx",
@@ -70,7 +77,12 @@ impl RefCountable for SenderCounter {
             (
                 "tx-bytes",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.tx_bytes.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(tx_bytes),
+            ),
+            (
+                "compression-ratio",
+                CounterType::Counted,
+                CounterValue::Unsigned(compression_ratio),
             ),
             (
                 "dropped",
@@ -496,6 +508,9 @@ impl<T: Sendable> UniformSender<T> {
     fn flush_encoder(&mut self) {
         self.cached = true;
         if self.encoder.buffer_len() > 0 {
+            self.counter
+                .raw_bytes
+                .fetch_add(self.encoder.buffer_len() as u64, Ordering::Relaxed);
             self.encoder.compress_buffer();
             self.encoder.set_header_frame_size();
             self.send_buffer();
