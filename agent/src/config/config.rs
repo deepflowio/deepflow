@@ -2398,12 +2398,14 @@ impl Default for Npb {
 #[serde(default)]
 pub struct OutputCompression {
     pub application_log: bool,
+    pub pcap: bool,
 }
 
 impl Default for OutputCompression {
     fn default() -> Self {
         Self {
             application_log: true,
+            pcap: true,
         }
     }
 }
