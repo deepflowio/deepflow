@@ -108,7 +108,7 @@ func GetAggFunc(name string, args []string, alias string, derivativeArgs []strin
 	if !ok {
 		return nil, 0, "", nil
 	}
-	metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.DynamicTag)
+	metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 	if !ok {
 		return nil, 0, "", nil
 	}
@@ -175,7 +175,7 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	for i, field := range fields {
 
 		field = strings.Trim(field, "`")
-		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.DynamicTag)
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
@@ -272,7 +272,7 @@ func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
 		field = strings.Trim(field, "`")
-		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.DynamicTag)
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
