@@ -172,6 +172,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: Support reclaiming page cache for agent [#8948](https://github.com/deepflowio/deepflow/pull/8948) by [rvql](https://github.com/rvql)
+* feat: optimize the storage usage of recorder log [#8940](https://github.com/deepflowio/deepflow/pull/8940) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: update vtap ignore fields [#8746](https://github.com/deepflowio/deepflow/pull/8746) by [askyrie](https://github.com/askyrie)
 *  feat: support fanout in mirror mode and analyzer mode [#8730](https://github.com/deepflowio/deepflow/pull/8730) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: deprecated ipvlan [#8724](https://github.com/deepflowio/deepflow/pull/8724) by [askyrie](https://github.com/askyrie)
