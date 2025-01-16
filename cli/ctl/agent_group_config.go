@@ -50,7 +50,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create <agent-group ID> -f <filename>",
 		Short:   "create config",
-		Example: "deepflow-ctl agent-group-config create -f deepflow-config.yaml",
+		Example: "deepflow-ctl agent-group-config create g-xxxxxx -f deepflow-config.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			createAgentGroupConfig(cmd, args, createFilename)
 		},
@@ -62,7 +62,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	update := &cobra.Command{
 		Use:     "update <agent-group ID> -f <filename>",
 		Short:   "update agent-group config",
-		Example: "deepflow-ctl agent-group-config update -f deepflow-config.yaml",
+		Example: "deepflow-ctl agent-group-config update g-xxxxxx -f deepflow-config.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateAgentGroupConfig(cmd, args, updateFilename)
 		},
@@ -188,6 +188,9 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 		for i := range response.Get("DATA").MustArray() {
 			agentGroupLcuuid := response.Get("DATA").GetIndex(i).Get("AGENT_GROUP_LCUUID")
 			if info, ok := vtapLcuuidToInfo[agentGroupLcuuid.MustString()]; ok {
+				if agentGroupShortUUID != "" && agentGroupShortUUID != info.shortUUID {
+					continue
+				}
 				tableItems = append(tableItems, []string{
 					info.name,
 					info.shortUUID,
