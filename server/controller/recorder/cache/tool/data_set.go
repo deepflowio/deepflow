@@ -993,8 +993,8 @@ func (t *DataSet) RefreshVTaps(v []*mysql.VTap) {
 	for _, item := range v {
 		t.vtapIDToType[item.ID] = item.Type
 		t.vtapIDToLaunchServerID[item.ID] = item.LaunchServerID
-		t.GetLogFunc()(t.metadata.Logf(addToToolMap(ctrlrcommon.RESOURCE_TYPE_VTAP_EN, item.Lcuuid)))
 	}
+	log.Infof("refreshed %s count: %d", ctrlrcommon.RESOURCE_TYPE_VTAP_EN, len(v))
 }
 
 func (t *DataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
