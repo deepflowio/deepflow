@@ -17,6 +17,7 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,14 +32,54 @@ type Response struct {
 	OptStatus   string      `json:"OPT_STATUS"`
 	Description string      `json:"DESCRIPTION"`
 	Data        interface{} `json:"DATA"`
+	Page        Page        `json:"PAGE"`
 }
 
-func HttpResponse(c *gin.Context, httpCode int, data interface{}, optStatus string, description string) {
-	c.JSON(httpCode, Response{
-		OptStatus:   optStatus,
-		Description: description,
-		Data:        data,
-	})
+// String returns the string representation of the response when Data is a byte slice.
+func (r Response) String() string {
+	return fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s,"PAGE":%s}`, r.OptStatus, r.Description, string(r.Data.([]byte)), r.Page.String())
+}
+
+// Bytes returns the byte slice representation of the response when Data is a byte slice.
+func (r Response) Bytes() []byte {
+	return []byte(r.String())
+}
+
+type Page struct {
+	Index     int `json:"INDEX"`
+	Size      int `json:"SIZE"`
+	Total     int `json:"TOTAL"`
+	TotalItem int `json:"TOTAL_ITEM"`
+}
+
+func (p Page) String() string {
+	bytes, _ := json.Marshal(p)
+	return string(bytes)
+}
+
+type ResponseOption func(resp *Response)
+
+func WithPage(p Page) ResponseOption {
+	return func(resp *Response) {
+		resp.Page = p
+	}
+}
+
+func WithDescription(description string) ResponseOption {
+	return func(resp *Response) {
+		resp.Description = description
+	}
+}
+
+func HttpResponse(c *gin.Context, httpCode int, data interface{}, optStatus string, options ...ResponseOption) {
+	resp := Response{
+		OptStatus: optStatus,
+		Data:      data,
+	}
+	for _, option := range options {
+		option(&resp)
+	}
+	c.JSON(httpCode, resp)
 }
 
 func BadRequestResponse(c *gin.Context, optStatus string, description string) {
@@ -79,9 +120,10 @@ func StatusForbiddenResponse(c *gin.Context, description string) {
 	})
 }
 
-func JsonResponse(c *gin.Context, data interface{}, err error) {
+// TODO refactor, use ResponseOption
+func JsonResponse(c *gin.Context, data interface{}, err error, respOptions ...ResponseOption) {
 	if _, ok := data.([]byte); ok {
-		bytesResponse(c, data, err)
+		bytesResponse(c, data, err, respOptions...)
 		return
 	}
 
@@ -110,47 +152,47 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 			InternalErrorResponse(c, data, httpcommon.FAIL, err.Error())
 		}
 	} else {
-		HttpResponse(c, 200, data, httpcommon.SUCCESS, "")
+		HttpResponse(c, 200, data, httpcommon.SUCCESS, respOptions...)
 	}
 }
 
-func bytesResponse(c *gin.Context, data interface{}, err error) {
+func bytesResponse(c *gin.Context, data interface{}, err error, respOptions ...ResponseOption) {
+	resp := Response{Data: data}
+	for _, opt := range respOptions {
+		opt(&resp)
+	}
 	if err != nil {
 		switch t := err.(type) {
 		case *servicecommon.ServiceError:
+			resp.OptStatus = t.Status
+			resp.Description = t.Message
 			switch t.Status {
 			case httpcommon.NO_PERMISSIONS:
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusForbidden, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusForbidden, gin.MIMEJSON, resp.Bytes())
 			case httpcommon.RESOURCE_NOT_FOUND, httpcommon.INVALID_POST_DATA, httpcommon.RESOURCE_NUM_EXCEEDED,
 				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED, httpcommon.RESOURCE_ALREADY_EXIST,
 				httpcommon.PARAMETER_ILLEGAL, httpcommon.INVALID_PARAMETERS:
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusBadRequest, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusBadRequest, gin.MIMEJSON, resp.Bytes())
 			case httpcommon.SERVER_ERROR, httpcommon.CONFIG_PENDING:
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusInternalServerError, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusInternalServerError, gin.MIMEJSON, resp.Bytes())
 			case httpcommon.SERVICE_UNAVAILABLE:
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusServiceUnavailable, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusServiceUnavailable, gin.MIMEJSON, resp.Bytes())
 			case httpcommon.STATUES_PARTIAL_CONTENT:
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusPartialContent, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusPartialContent, gin.MIMEJSON, resp.Bytes())
 			default:
 				if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
-					d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-					c.Data(http.StatusForbidden, gin.MIMEJSON, []byte(d))
+					c.Data(http.StatusForbidden, gin.MIMEJSON, resp.Bytes())
 					return
 				}
-				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
-				c.Data(http.StatusBadRequest, gin.MIMEJSON, []byte(d))
+				c.Data(http.StatusBadRequest, gin.MIMEJSON, resp.Bytes())
 			}
 		default:
-			d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, httpcommon.FAIL, err.Error(), string(data.([]byte)))
-			c.Data(http.StatusInternalServerError, gin.MIMEJSON, []byte(d))
+			resp.OptStatus = httpcommon.FAIL
+			resp.Description = err.Error()
+			c.Data(http.StatusInternalServerError, gin.MIMEJSON, resp.Bytes())
 		}
 	} else {
-		d := fmt.Sprintf(`{"OPT_STATUS":"SUCCESS","DESCRIPTION":"","DATA": %v}`, string(data.([]byte)))
-		c.Data(http.StatusOK, gin.MIMEJSON, []byte(d))
+		resp.OptStatus = httpcommon.SUCCESS
+		c.Data(http.StatusOK, gin.MIMEJSON, resp.Bytes())
 	}
 }
