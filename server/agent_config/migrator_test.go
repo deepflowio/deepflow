@@ -294,6 +294,177 @@ static_config:
 	}
 }
 
+func TestDowngrade(t *testing.T) {
+	type args struct {
+		bytes []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "case01",
+			args: args{
+				bytes: []byte(`global:
+  limits:
+    max_millicpus: 1000
+inputs:
+  proc:
+    process_matcher:
+      - match_regex: deepflow-.*
+      - ignore: true
+        match_regex: deepflow-server.*
+processors:
+  request_log:
+    filters:
+      tag_filters:
+        HTTP:
+          - field_name: HTTP
+            field_value: HTTP
+        HTTP2:
+          - field_name: HTTP2-1
+`),
+			},
+			want: []byte(`max_millicpus: 1000
+static_config:
+  os-proc-regex:
+    - match-regex: deepflow-.*
+    - match-regex: deepflow-server.*
+      action: drop
+  l7-log-blacklist:
+    HTTP:
+      - field-name: HTTP
+        value: HTTP
+    HTTP2:
+      - field-name: HTTP2-1
+`),
+			wantErr: false,
+		},
+		{
+			name: "case02",
+			args: args{
+				bytes: []byte(`inputs:
+  cbpf:
+    af_packet:
+      bond_interfaces:
+        - slave_interfaces:
+            - eth0
+            - eth1
+`),
+			},
+			want: []byte(`static_config:
+  tap-interface-bond-groups:
+    - tap-interfaces:
+        - eth0
+        - eth1
+`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		if tt.name != "case02" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			toolData, err := NewMigrationToolData(nil)
+			if err != nil {
+				t.Fatalf("Failed to create toolData: %v", err)
+				return
+			}
+			migrator := &Downgrader{
+				MigrationToolData: toolData,
+			}
+			got, err := migrator.Downgrade(tt.args.bytes)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Upgrade() error = \"%v\", wantErr \"%v\"", err, tt.wantErr)
+				return
+			}
+			os.Mkdir("test_tmp", 0755)
+			if err := os.WriteFile(fmt.Sprintf("test_tmp/downgrade_%s.yaml", tt.name), got, os.ModePerm); err != nil {
+				t.Fatalf("Failed to write to file: %v", err)
+			}
+			if err := os.WriteFile(fmt.Sprintf("test_tmp/downgrade_%s_want.yaml", tt.name), tt.want, os.ModePerm); err != nil {
+				t.Fatalf("Failed to write to file: %v", err)
+			}
+			if string(got) != string(tt.want) {
+				t.Errorf("Upgrade() = \"%v\", want \"%v\"", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func TestFmtHigherVersionValue(t *testing.T) {
+	type args struct {
+		longKey    string
+		value      interface{}
+		domainData *DomainData
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{
+			name: "case01",
+			args: args{
+				longKey:    "global.tunning.cpu_affinity",
+				value:      []interface{}{1, 2, 3},
+				domainData: &DomainData{},
+			},
+			want: "1,2,3",
+		},
+		{
+			name: "case02",
+			args: args{
+				longKey: "inputs.resources.pull_resource_from_controller.domain_filter",
+				value:   []interface{}{1, 2},
+				domainData: &DomainData{
+					IDToLcuuid: map[int]string{
+						1: "lcuuid1",
+						2: "lcuuid2",
+					},
+				},
+			},
+			want: []string{"lcuuid1", "lcuuid2"},
+		},
+		{
+			name: "case03",
+			args: args{
+				longKey:    "global.tunning.cpu_affinity",
+				value:      []int{1, 2, 3},
+				domainData: &DomainData{},
+			},
+			want: "1,2,3",
+		},
+		{
+			name: "case04",
+			args: args{
+				longKey: "inputs.resources.pull_resource_from_controller.domain_filter",
+				value:   []int{1, 2},
+				domainData: &DomainData{
+					IDToLcuuid: map[int]string{
+						1: "lcuuid1",
+						2: "lcuuid2",
+					},
+				},
+			},
+			want: []string{"lcuuid1", "lcuuid2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			migrator := &Downgrader{}
+			migrator.domainData = tt.args.domainData
+			got := migrator.fmtHigherVersionValue(tt.args.longKey, tt.args.value)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("fmtHigherVersionValue() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFmtLowerVersionValue(t *testing.T) {
 	type args struct {
 		longKey    string
@@ -623,6 +794,241 @@ func TestLowerToHigher(t *testing.T) {
 			migrator.lowerToHigher(tt.args.data, tt.args.ancestor, tt.args.result)
 			if !reflect.DeepEqual(tt.args.result, tt.want) {
 				t.Errorf("sourceToTarget() = %#v, want %#v", tt.args.result, tt.want)
+			}
+		})
+	}
+}
+
+func TestHigherToLower(t *testing.T) {
+	type args struct {
+		higherToLower           map[string][]string
+		dictValHigherKeyToLower map[string]map[string]interface{}
+		ancestor                string
+		data                    interface{}
+		result                  map[string]interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]interface{}
+	}{
+		{
+			name: "case01",
+			args: args{
+				higherToLower: map[string][]string{
+					"global.limits.max_millicpus":    {"max_millicpus"},
+					"global.alerts.thread_threshold": {"thread_threshold", "static_config.os-proc-sync-thread-threshold"},
+					"inputs.proc.enabled":            {"static_config.os-proc-sync-enabled"},
+					"inputs.proc.process_matcher":    {"static_config.os-proc-regex"},
+				},
+				ancestor: "",
+				data: map[string]interface{}{
+					"global": map[string]interface{}{
+						"limits": map[string]interface{}{
+							"max_millicpus": 1000,
+						},
+						"alerts": map[string]interface{}{
+							"thread_threshold": 500,
+						},
+					},
+					"inputs": map[string]interface{}{
+						"proc": map[string]interface{}{
+							"enabled": false,
+							"process_matcher": []interface{}{
+								map[string]interface{}{
+									"match_regex":       "deepflow-*",
+									"only_in_container": false,
+									"enabled_features": []interface{}{
+										"ebpf.profile.on_cpu",
+										"ebpf.profile.off_cpu",
+										"proc.gprocess_info",
+									},
+								},
+							},
+						},
+					},
+				},
+				result: map[string]interface{}{},
+			},
+			want: map[string]interface{}{
+				"max_millicpus":    1000,
+				"thread_threshold": 500,
+				"static_config": map[string]interface{}{
+					"os-proc-sync-thread-threshold": 500,
+					"os-proc-sync-enabled":          false,
+					"os-proc-regex": []interface{}{
+						map[string]interface{}{
+							"match_regex":       "deepflow-*",
+							"only_in_container": false,
+							"enabled_features": []interface{}{
+								"ebpf.profile.on_cpu",
+								"ebpf.profile.off_cpu",
+								"proc.gprocess_info",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "case02",
+			args: args{
+				higherToLower: map[string][]string{
+					"global.limits.max_millicpus":    {"max_millicpus"},
+					"global.alerts.thread_threshold": {"thread_threshold", "static_config.os-proc-sync-thread-threshold"},
+					"inputs.proc.enabled":            {"static_config.os-proc-sync-enabled"},
+					"inputs.proc.process_matcher":    {"static_config.os-proc-regex"},
+				},
+				ancestor: "",
+				data: map[string]interface{}{
+					"global": map[string]interface{}{
+						"limits": map[string]interface{}{
+							"max_millicpus": 1000,
+						},
+						"alerts": map[string]interface{}{
+							"thread_threshold": 500,
+						},
+					},
+					"inputs": map[string]interface{}{
+						"proc": map[string]interface{}{
+							"enabled": false,
+							"process_matcher": []interface{}{
+								map[string]interface{}{
+									"match-regex":       "deepflow-*",
+									"only_in_container": false,
+									"enabled_features": []interface{}{
+										"ebpf.profile.on_cpu",
+										"ebpf.profile.off_cpu",
+										"proc.gprocess_info",
+									},
+								},
+							},
+						},
+					},
+				},
+				result: map[string]interface{}{},
+			},
+			want: map[string]interface{}{
+				"max_millicpus":    1000,
+				"thread_threshold": 500,
+				"static_config": map[string]interface{}{
+					"os-proc-sync-thread-threshold": 500,
+					"os-proc-sync-enabled":          false,
+					"os-proc-regex": []interface{}{
+						map[string]interface{}{
+							"match-regex":       "deepflow-*",
+							"only_in_container": false,
+							"enabled_features": []interface{}{
+								"ebpf.profile.on_cpu",
+								"ebpf.profile.off_cpu",
+								"proc.gprocess_info",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "case03",
+			args: args{
+				higherToLower: map[string][]string{
+					"processors.request_log.tag_extraction.custom_fields": {"static_config.l7-protocol-advanced-features.extra-log-fields"},
+				},
+				dictValHigherKeyToLower: map[string]map[string]interface{}{
+					"processors.request_log.tag_extraction.custom_fields": {
+						"field_name": "field-name",
+					},
+				},
+				ancestor: "",
+				data: map[string]interface{}{
+					"processors": map[string]interface{}{
+						"request_log": map[string]interface{}{
+							"tag_extraction": map[string]interface{}{
+								"custom_fields": map[string]interface{}{
+									"HTTP": []map[string]interface{}{
+										{
+											"field_name": "HTTP",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				result: map[string]interface{}{},
+			},
+			want: map[string]interface{}{
+				"static_config": map[string]interface{}{
+					"l7-protocol-advanced-features": map[string]interface{}{
+						"extra-log-fields": map[string]interface{}{
+							"HTTP": []map[string]interface{}{
+								{
+									"field-name": "HTTP",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "case04",
+			args: args{
+				higherToLower: map[string][]string{
+					"inputs.cbpf.af_packet.bond_interfaces": {"static_config.tap-interface-bond-groups"},
+				},
+				dictValHigherKeyToLower: map[string]map[string]interface{}{
+					"inputs.cbpf.af_packet.bond_interfaces": {
+						"slave_interfaces": "tap-interfaces",
+					},
+				},
+				ancestor: "",
+				data: map[string]interface{}{
+					"inputs": map[string]interface{}{
+						"cbpf": map[string]interface{}{
+							"af_packet": map[string]interface{}{
+								"bond_interfaces": []map[string]interface{}{
+									{
+										"slave_interfaces": []string{"eth0", "eth1"},
+									},
+									{
+										"slave_interfaces": []string{"eth2", "eth3"},
+									},
+								},
+							},
+						},
+					},
+				},
+				result: map[string]interface{}{},
+			},
+			want: map[string]interface{}{
+				"static_config": map[string]interface{}{
+					"tap-interface-bond-groups": []map[string]interface{}{
+						{
+							"tap-interfaces": []string{"eth0", "eth1"},
+						},
+						{
+							"tap-interfaces": []string{"eth2", "eth3"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		if tt.name != "case04" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			migrator := &Downgrader{
+				MigrationToolData: MigrationToolData{
+					higherVerToLowerVerKeys: tt.args.higherToLower,
+					dictValHigherKeyToLower: tt.args.dictValHigherKeyToLower,
+				},
+			}
+			migrator.higherToLower(tt.args.data, tt.args.ancestor, tt.args.result)
+			if !reflect.DeepEqual(tt.args.result, tt.want) {
+				t.Errorf("targetToSource() = %v, want %v", tt.args.result, tt.want)
 			}
 		})
 	}

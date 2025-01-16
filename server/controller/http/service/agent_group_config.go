@@ -285,8 +285,50 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 		}
 	}
 
+	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
+
 	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.strToBytes(agentGroupConfig.Yaml, dataType)
+}
+
+func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *metadb.DB, groupLcuuid string, newVersionYaml string) {
+	var domains []model.Domain
+	if err := dbInfo.Select("id", "lcuuid").Find(&domains).Error; err != nil {
+		log.Errorf("failed to get domain info: %v", err)
+		return
+	}
+	domainIDToLcuuid := make(map[int]string)
+	for _, domain := range domains {
+		domainIDToLcuuid[domain.ID] = domain.Lcuuid
+	}
+	domainData := &agentconf.DomainData{IDToLcuuid: domainIDToLcuuid}
+	var vtapGroupConfig *agentconf.AgentGroupConfigModel
+	if err := dbInfo.Where("vtap_group_lcuuid = ?", groupLcuuid).First(&vtapGroupConfig).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err := agentconf.Downgrade(vtapGroupConfig, []byte(newVersionYaml), domainData)
+			if err != nil {
+				log.Errorf("failed to downgrade agent group lcuuid %s: %v", groupLcuuid, err)
+				return
+			}
+			uid := uuid.New().String()
+			vtapGroupConfig.Lcuuid = &uid
+			vtapGroupConfig.VTapGroupLcuuid = &groupLcuuid
+			if err := dbInfo.Create(vtapGroupConfig).Error; err != nil {
+				log.Errorf("failed to create agent group lcuuid %s old version yaml: %v", groupLcuuid, err)
+			}
+		} else {
+			log.Errorf("failed to get agent group config (lcuuid %s): %v", groupLcuuid, err)
+		}
+		return
+	}
+	err := agentconf.Downgrade(vtapGroupConfig, []byte(newVersionYaml), domainData)
+	if err != nil {
+		log.Errorf("failed to downgrade agent group lcuuid %s: %v", groupLcuuid, err)
+		return
+	}
+	if err := dbInfo.Save(&vtapGroupConfig).Error; err != nil {
+		log.Errorf("failed to update agent group lcuuid %s old version yaml: %v", groupLcuuid, err)
+	}
 }
 
 func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data interface{}, dataType int) ([]byte, error) {
@@ -322,6 +364,8 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 			return nil, err
 		}
 	}
+
+	a.compatibleWithOldVersion(dbInfo, groupLcuuid, strYaml)
 
 	refresh.RefreshCache(dbInfo.GetORGID(), []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return a.GetAgentGroupConfig(groupLcuuid, dataType)
