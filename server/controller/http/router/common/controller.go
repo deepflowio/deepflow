@@ -26,7 +26,7 @@ import (
 	"github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("common/controller")
+var log = logging.MustGetLogger("http.router.common")
 
 func ForwardMasterController(c *gin.Context, masterControllerName string, port int) {
 	requestHosts := strings.Split(c.Request.Host, ":")
