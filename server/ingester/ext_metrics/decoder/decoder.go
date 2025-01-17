@@ -235,6 +235,16 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
+	// adapt to the name of the metric sent by Trident
+	if m.VTableName == "deepflow_agent_collect_sender" {
+		for i, name := range m.MetricsFloatNames {
+			if name == "tx_bytes" {
+				m.MetricsFloatNames = append(m.MetricsFloatNames, "tx-bytes")
+				m.MetricsFloatValues = append(m.MetricsFloatValues, m.MetricsFloatValues[i])
+				break
+			}
+		}
+	}
 	return m
 }
 
