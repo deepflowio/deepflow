@@ -591,12 +591,16 @@ static int load_obj__progs(struct ebpf_object *obj)
 		// Modify eBPF instructions based on BTF relocation information.
 		obj_relocate_core(new_prog);
 
+		int stderr_fd = suspend_stderr();
+		if (stderr_fd < 0) {
+			ebpf_warning("Failed to suspend stderr\n");
+		}
 		new_prog->prog_fd =
 		    bcc_prog_load(new_prog->type, new_prog->name,
 				  new_prog->insns, desc->size, obj->license,
 				  obj->kern_version, 0, NULL,
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
-
+		resume_stderr(stderr_fd);
 		if (new_prog->prog_fd < 0) {
 			ebpf_warning
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
@@ -608,7 +612,14 @@ static int load_obj__progs(struct ebpf_object *obj)
 				     new_prog->insns_cnt, BPF_MAXINSNS);
 			}
 
-			return ETR_INVAL;
+			if (memcmp(desc->name, "uprobe/", 7) &&
+			    memcmp(desc->name, "uretprobe/", 10)) {
+				return ETR_INVAL;
+			} else {
+				ebpf_warning("The reason for the eBPF uprobe program "
+					     "loading failure is that the linux version "
+					     "needs to be 3.10 or 4.17+.\n");
+			}
 		}
 
 		ebpf_debug
