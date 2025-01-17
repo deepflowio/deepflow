@@ -35,22 +35,24 @@ import (
 )
 
 type PolicyRawData struct {
-	idToNpbTunnel      map[int]*models.NpbTunnel
-	idToACL            map[int]*models.ACL
-	aclIDToNpbPolices  map[int][]*models.NpbPolicy
-	aclIDToPcapPolices map[int][]*models.PcapPolicy
-	idToNpbPolicy      map[int]*models.NpbPolicy
-	idToPcapPolicy     map[int]*models.PcapPolicy
+	vtapGroupIDToAgentIDs map[int][]int
+	idToNpbTunnel         map[int]*models.NpbTunnel
+	idToACL               map[int]*models.ACL
+	aclIDToNpbPolices     map[int][]*models.NpbPolicy
+	aclIDToPcapPolices    map[int][]*models.PcapPolicy
+	idToNpbPolicy         map[int]*models.NpbPolicy
+	idToPcapPolicy        map[int]*models.PcapPolicy
 }
 
 func newPolicyRawData() *PolicyRawData {
 	return &PolicyRawData{
-		idToNpbTunnel:      make(map[int]*models.NpbTunnel),
-		idToACL:            make(map[int]*models.ACL),
-		aclIDToNpbPolices:  make(map[int][]*models.NpbPolicy),
-		aclIDToPcapPolices: make(map[int][]*models.PcapPolicy),
-		idToNpbPolicy:      make(map[int]*models.NpbPolicy),
-		idToPcapPolicy:     make(map[int]*models.PcapPolicy),
+		vtapGroupIDToAgentIDs: make(map[int][]int),
+		idToNpbTunnel:         make(map[int]*models.NpbTunnel),
+		idToACL:               make(map[int]*models.ACL),
+		aclIDToNpbPolices:     make(map[int][]*models.NpbPolicy),
+		aclIDToPcapPolices:    make(map[int][]*models.PcapPolicy),
+		idToNpbPolicy:         make(map[int]*models.NpbPolicy),
+		idToPcapPolicy:        make(map[int]*models.PcapPolicy),
 	}
 }
 
@@ -351,8 +353,23 @@ func (op *PolicyDataOP) generateRawData() {
 	acls := dbDataCache.GetACLs()
 	npbPolicies := dbDataCache.GetNpbPolicies()
 	pcapPolicies := dbDataCache.GetPcapPolicies()
+	vtaps := dbDataCache.GetVTapsIDAndName()
+	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
+	vtapGroupLcuuidToID := map[string]int{}
+	for _, vtapGroup := range vtapGroups {
+		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
+	}
+	for _, vtap := range vtaps {
+		vtapGroupID, ok := vtapGroupLcuuidToID[vtap.VtapGroupLcuuid]
+		if !ok {
+			log.Warning(op.Logf("agent(%s) group lcuuid(%s) not found group id", vtap.Name, vtap.VtapGroupLcuuid))
+			continue
+		}
+		rawData.vtapGroupIDToAgentIDs[vtapGroupID] = append(rawData.vtapGroupIDToAgentIDs[vtapGroupID], vtap.ID)
+	}
+
 	for _, npbTunnel := range npbTunnels {
 		rawData.idToNpbTunnel[npbTunnel.ID] = npbTunnel
 	}
@@ -600,9 +617,8 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 				NpbAclGroupId:     proto.Uint32(uint32(npbPolicy.PolicyACLGroupID)),
 				Direction:         &direction,
 			}
-			if len(npbPolicy.VtapIDs) == 0 {
-				allAgentNpbActions = append(allAgentNpbActions, npbAction)
-			} else {
+			switch npbPolicy.VtapType {
+			case POLICY_VTAP_TYPE_VTAP:
 				for _, agentIDStr := range strings.Split(npbPolicy.VtapIDs, ",") {
 					agentIDInt, err := strconv.Atoi(agentIDStr)
 					if err != nil {
@@ -611,6 +627,24 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 					}
 					agentIDToNpbActions[agentIDInt] = append(agentIDToNpbActions[agentIDInt], npbAction)
 				}
+			case POLICY_VTAP_TYPE_VTAP_GROUP:
+				for _, vtapGroupIDStr := range strings.Split(npbPolicy.VtapGroupIDs, ",") {
+					vtapGroupIDInt, err := strconv.Atoi(vtapGroupIDStr)
+					if err != nil {
+						log.Errorf(op.Logf("err: %s, vtapGroupIDs: %s", err, npbPolicy.VtapGroupIDs))
+						continue
+					}
+					agentIDs, ok := rawData.vtapGroupIDToAgentIDs[vtapGroupIDInt]
+					if !ok {
+						log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
+						continue
+					}
+					for agentID := range agentIDs {
+						agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
+					}
+				}
+			default:
+				allAgentNpbActions = append(allAgentNpbActions, npbAction)
 			}
 		}
 	case APPLICATION_PCAP:

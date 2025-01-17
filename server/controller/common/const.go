@@ -263,6 +263,11 @@ const (
 )
 
 const (
+	POLICY_VTAP_TYPE_VTAP       = 1
+	POLICY_VTAP_TYPE_VTAP_GROUP = 2
+)
+
+const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
 	DEFAULT_ALL_MATCH_REGEX     = ".*"
 	DEFAULT_NOT_MATCH_REGEX     = "^$"
