@@ -1011,8 +1011,13 @@ extern uint32_t k_version;
 // Lower version kernels do not support hooking so files in containers
 bool kernel_version_check(void)
 {
-	return ((k_version == KERNEL_VERSION(3, 10, 0))
-		|| (k_version >= KERNEL_VERSION(4, 17, 0)));
+	bool ret = ((k_version == KERNEL_VERSION(3, 10, 0))
+		    || (k_version >= KERNEL_VERSION(4, 17, 0)));
+	if (!ret)
+		ebpf_warning("UPROBE feature requires linux "
+			     "version of 3.10 or 4.17+.\n");
+
+	return ret;
 }
 
 bool process_probing_check(int pid)
