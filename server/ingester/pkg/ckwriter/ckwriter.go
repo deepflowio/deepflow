@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/libs/nativetag"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -72,6 +73,10 @@ func (m *CKWriterManager) DropOrg(orgId uint16) error {
 		ckwriter.dropOrg(orgId)
 	}
 	ckwriterManager.Unlock()
+	return nil
+}
+
+func (m *CKWriterManager) UpdateNativeTag(op nativetag.NativeTagOP, orgId uint16, nativeTag *nativetag.NativeTag) error {
 	return nil
 }
 
@@ -212,6 +217,7 @@ func (qc *QueueContext) initConn(connIndex int) error {
 type CKItem interface {
 	OrgID() uint16
 	Release()
+	NativeTagVersion() uint32
 	NewColumnBlock() ckdb.CKColumnBlock
 	AppendToColumnBlock(ckdb.CKColumnBlock)
 }
@@ -473,6 +479,7 @@ type Cache struct {
 	orgID         uint16
 	prepare       string
 	columnBlock   ckdb.CKColumnBlock
+	ItemVersion   uint32
 	protoInput    proto.Input
 	size          int
 	writeCounter  int
@@ -542,8 +549,11 @@ func (w *CKWriter) queueProcess(queueID int) {
 }
 
 func (c *Cache) Add(item CKItem) error {
-	if IsNil(c.columnBlock) {
+	if IsNil(c.columnBlock) ||
+		(c.size == 0 && c.ItemVersion != item.NativeTagVersion()) {
 		c.columnBlock = item.NewColumnBlock()
+		log.Info("orgId %d (%s) update item version from %d to %d", c.orgID, c.prepare, c.ItemVersion, item.NativeTagVersion())
+		c.ItemVersion = item.NativeTagVersion()
 	}
 	item.AppendToColumnBlock(c.columnBlock)
 	item.Release()
