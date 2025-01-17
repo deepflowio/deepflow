@@ -617,34 +617,40 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 				NpbAclGroupId:     proto.Uint32(uint32(npbPolicy.PolicyACLGroupID)),
 				Direction:         &direction,
 			}
-			switch npbPolicy.VtapType {
-			case POLICY_VTAP_TYPE_VTAP:
-				for _, agentIDStr := range strings.Split(npbPolicy.VtapIDs, ",") {
-					agentIDInt, err := strconv.Atoi(agentIDStr)
-					if err != nil {
-						log.Errorf(op.Logf("err: %s, agentIDs: %s", err, npbPolicy.VtapIDs))
-						continue
-					}
-					agentIDToNpbActions[agentIDInt] = append(agentIDToNpbActions[agentIDInt], npbAction)
-				}
-			case POLICY_VTAP_TYPE_VTAP_GROUP:
-				for _, vtapGroupIDStr := range strings.Split(npbPolicy.VtapGroupIDs, ",") {
-					vtapGroupIDInt, err := strconv.Atoi(vtapGroupIDStr)
-					if err != nil {
-						log.Errorf(op.Logf("err: %s, vtapGroupIDs: %s", err, npbPolicy.VtapGroupIDs))
-						continue
-					}
-					agentIDs, ok := rawData.vtapGroupIDToAgentIDs[vtapGroupIDInt]
-					if !ok {
-						log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
-						continue
-					}
-					for agentID := range agentIDs {
-						agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
+
+			if npbPolicy.VtapType == POLICY_VTAP_TYPE_VTAP {
+				if len(npbPolicy.VtapIDs) == 0 {
+					allAgentNpbActions = append(allAgentNpbActions, npbAction)
+				} else {
+					for _, agentIDStr := range strings.Split(npbPolicy.VtapIDs, ",") {
+						agentIDInt, err := strconv.Atoi(agentIDStr)
+						if err != nil {
+							log.Errorf(op.Logf("err: %s, agentIDs: %s", err, npbPolicy.VtapIDs))
+							continue
+						}
+						agentIDToNpbActions[agentIDInt] = append(agentIDToNpbActions[agentIDInt], npbAction)
 					}
 				}
-			default:
-				allAgentNpbActions = append(allAgentNpbActions, npbAction)
+			} else {
+				if len(npbPolicy.VtapGroupIDs) == 0 {
+					allAgentNpbActions = append(allAgentNpbActions, npbAction)
+				} else {
+					for _, vtapGroupIDStr := range strings.Split(npbPolicy.VtapGroupIDs, ",") {
+						vtapGroupIDInt, err := strconv.Atoi(vtapGroupIDStr)
+						if err != nil {
+							log.Errorf(op.Logf("err: %s, vtapGroupIDs: %s", err, npbPolicy.VtapGroupIDs))
+							continue
+						}
+						agentIDs, ok := rawData.vtapGroupIDToAgentIDs[vtapGroupIDInt]
+						if !ok {
+							log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
+							continue
+						}
+						for agentID := range agentIDs {
+							agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
+						}
+					}
+				}
 			}
 		}
 	case APPLICATION_PCAP:

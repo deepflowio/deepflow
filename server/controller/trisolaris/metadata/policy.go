@@ -641,34 +641,39 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 				Direction:     &direction,
 			}
 
-			switch npbPolicy.VtapType {
-			case POLICY_VTAP_TYPE_VTAP:
-				for _, vtapIDStr := range strings.Split(npbPolicy.VtapIDs, ",") {
-					vtapIDInt, err := strconv.Atoi(vtapIDStr)
-					if err != nil {
-						log.Errorf(op.Logf("err: %s, vtapIDs: %s", err, npbPolicy.VtapIDs))
-						continue
-					}
-					vtapIDToNpbActions[vtapIDInt] = append(vtapIDToNpbActions[vtapIDInt], npbAction)
-				}
-			case POLICY_VTAP_TYPE_VTAP_GROUP:
-				for _, vtapGroupIDStr := range strings.Split(npbPolicy.VtapGroupIDs, ",") {
-					vtapGroupIDInt, err := strconv.Atoi(vtapGroupIDStr)
-					if err != nil {
-						log.Errorf(op.Logf("err: %s, vtapGroupIDs: %s", err, npbPolicy.VtapGroupIDs))
-						continue
-					}
-					vtapIDs, ok := rawData.vtapGroupIDToVtapIDs[vtapGroupIDInt]
-					if !ok {
-						log.Errorf(op.Logf("not found vtap in vtap group id(%d)", vtapGroupIDInt))
-						continue
-					}
-					for vtapID := range vtapIDs {
-						vtapIDToNpbActions[vtapID] = append(vtapIDToNpbActions[vtapID], npbAction)
+			if npbPolicy.VtapType == POLICY_VTAP_TYPE_VTAP {
+				if len(npbPolicy.VtapIDs) == 0 {
+					allVTapNpbActions = append(allVTapNpbActions, npbAction)
+				} else {
+					for _, vtapIDStr := range strings.Split(npbPolicy.VtapIDs, ",") {
+						vtapIDInt, err := strconv.Atoi(vtapIDStr)
+						if err != nil {
+							log.Errorf(op.Logf("err: %s, vtapIDs: %s", err, npbPolicy.VtapIDs))
+							continue
+						}
+						vtapIDToNpbActions[vtapIDInt] = append(vtapIDToNpbActions[vtapIDInt], npbAction)
 					}
 				}
-			default:
-				allVTapNpbActions = append(allVTapNpbActions, npbAction)
+			} else {
+				if len(npbPolicy.VtapGroupIDs) == 0 {
+					allVTapNpbActions = append(allVTapNpbActions, npbAction)
+				} else {
+					for _, vtapGroupIDStr := range strings.Split(npbPolicy.VtapGroupIDs, ",") {
+						vtapGroupIDInt, err := strconv.Atoi(vtapGroupIDStr)
+						if err != nil {
+							log.Errorf(op.Logf("err: %s, vtapGroupIDs: %s", err, npbPolicy.VtapGroupIDs))
+							continue
+						}
+						vtapIDs, ok := rawData.vtapGroupIDToVtapIDs[vtapGroupIDInt]
+						if !ok {
+							log.Errorf(op.Logf("not found vtap in vtap group id(%d)", vtapGroupIDInt))
+							continue
+						}
+						for _, vtapID := range vtapIDs {
+							vtapIDToNpbActions[vtapID] = append(vtapIDToNpbActions[vtapID], npbAction)
+						}
+					}
+				}
 			}
 		}
 	case APPLICATION_PCAP:
