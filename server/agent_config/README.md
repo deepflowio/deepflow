@@ -8804,6 +8804,34 @@ Whether to compress the integrated application log data received by deepflow-age
 ratio is about 5:1~20:1. Turning on this feature will result in higher CPU consumption
 of deepflow-agent.
 
+### Pcap {#outputs.compression.pcap}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.pcap`
+
+**Default value**:
+```yaml
+outputs:
+  compression:
+    pcap: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the captured pcap data received by deepflow-agent. The compression
+ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+of deepflow-agent.
+
 # Plugins {#plugins}
 
 ## Wasm Plugins {#plugins.wasm_plugins}
