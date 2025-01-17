@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{fmt, str};
+use std::{cell::OnceCell, collections::HashMap, fmt, str};
 
 use serde::{Serialize, Serializer};
 
@@ -626,6 +626,66 @@ mod stringifier {
     }
 }
 
+struct Command {
+    cmd: String,
+    sub: Vec<String>,
+}
+
+thread_local! {
+    static ALL_COMMANDS: OnceCell<Vec<Command>> = OnceCell::new();
+    static MAX_COMMAND_LENGTH: OnceCell<usize> = OnceCell::new();
+}
+
+fn max_command_length() -> usize {
+    MAX_COMMAND_LENGTH.with(|cell| {
+        let len = cell.get_or_init(|| {
+            ALL_COMMANDS.with(|cell| {
+                let cmds = cell.get_or_init(all_commands);
+                cmds.iter().map(|cmd| cmd.cmd.len()).max().unwrap()
+            })
+        });
+        *len
+    })
+}
+
+fn all_commands() -> Vec<Command> {
+    let mut command_map: HashMap<&str, Vec<String>> = HashMap::new();
+    for line in ALL_COMMNADS_STR.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut keys = line.split_whitespace();
+        let key0 = keys.next().unwrap();
+        let key1 = keys.next().unwrap_or_default();
+        command_map.entry(key0).or_default().push(key1.to_owned());
+    }
+    let mut commands = command_map
+        .into_iter()
+        .map(|(cmd, mut sub)| {
+            // remove `sub` for commands without sub commands to save memory
+            // commands (for example, JSON.DEBUG) that can have zero or one more sub commands
+            // can also be removed because validate the second word is pointless
+            if sub.is_empty() || sub.iter().any(|s| s.is_empty()) {
+                Command {
+                    cmd: cmd.to_owned(),
+                    sub: vec![],
+                }
+            } else {
+                sub.sort_unstable();
+                Command {
+                    cmd: cmd.to_owned(),
+                    sub,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    commands.sort_unstable_by(|k1, k2| k1.cmd.cmp(&k2.cmd));
+    commands
+}
+
+// The list is from https://redis.io/docs/latest/commands/
+const ALL_COMMNADS_STR: &str = include_str!("redis-commands");
+
 struct CommandLine<'a> {
     payload: &'a [u8],
     cmd_upper: String,
@@ -633,8 +693,6 @@ struct CommandLine<'a> {
 }
 
 impl<'a> CommandLine<'a> {
-    const MAX_COMMAND_LENGTH: usize = 17;
-
     fn new(payload: &'a [u8]) -> Result<Self> {
         if payload.len() < "*0\r\n".len() || payload[0] != b'*' {
             return Err(Error::RedisLogParseFailed);
@@ -642,14 +700,22 @@ impl<'a> CommandLine<'a> {
 
         let (payload, length) = stringifier::read_length(&payload[1..])?;
 
-        let mut cmd_upper = String::new();
         // read command
         let (mut payload_iter, command) = Self::decode_bulk_string(payload)?;
-        if command.len() <= Self::MAX_COMMAND_LENGTH && command.is_ascii() {
-            // SAFTY: checked ascii string
-            unsafe {
-                cmd_upper = str::from_utf8_unchecked(command).to_ascii_uppercase();
-            }
+        if command.len() > max_command_length() {
+            return Err(Error::RedisLogParseFailed);
+        }
+        let Ok(cmd_upper) = str::from_utf8(command).map(|s| s.to_ascii_uppercase()) else {
+            return Err(Error::RedisLogParseFailed);
+        };
+
+        let valid = if length > 1 {
+            Self::check_command(&cmd_upper, Some(payload_iter))
+        } else {
+            Self::check_command(&cmd_upper, None)
+        };
+        if !valid {
+            return Err(Error::RedisLogParseFailed);
         }
 
         // validate rest of the buffer
@@ -664,6 +730,30 @@ impl<'a> CommandLine<'a> {
             payload,
             cmd_upper,
             length: length as usize,
+        })
+    }
+
+    fn check_command(cmd_upper: &str, next_cmds: Option<&[u8]>) -> bool {
+        ALL_COMMANDS.with(|cell| {
+            let cmds = cell.get_or_init(all_commands);
+            match cmds.binary_search_by_key(&cmd_upper, |cmd| &cmd.cmd) {
+                Ok(id) if cmds[id].sub.is_empty() => true,
+                Ok(id) => {
+                    if let Some(next) = next_cmds {
+                        let Ok((_, next_cmd)) = Self::decode_bulk_string(next) else {
+                            return false;
+                        };
+                        let Ok(next_cmd) = str::from_utf8(next_cmd) else {
+                            return false;
+                        };
+                        let next_cmd_upper = next_cmd.to_ascii_uppercase();
+                        cmds[id].sub.binary_search(&next_cmd_upper).is_ok()
+                    } else {
+                        false
+                    }
+                }
+                Err(_) => false,
+            }
         })
     }
 
@@ -1103,6 +1193,35 @@ mod tests {
     }
 
     #[test]
+    fn check_command() {
+        // single word command
+        assert!(CommandLine::check_command("SET", None));
+        assert!(CommandLine::check_command("SET", Some(b"$3\r\nkey\r\n")));
+
+        // multi word command
+        assert!(CommandLine::check_command("ACL", Some(b"$4\r\nLIST\r\n")));
+        assert!(CommandLine::check_command(
+            "ACL",
+            Some(b"$7\r\nGENPASS\r\n")
+        ));
+        assert!(!CommandLine::check_command(
+            "ACL",
+            Some(b"$7\r\nINVALID\r\n")
+        ));
+
+        // single or multi
+        assert!(CommandLine::check_command("JSON.DEBUG", None));
+        assert!(CommandLine::check_command(
+            "JSON.DEBUG",
+            Some(b"$6\r\nMEMORY\r\n")
+        ));
+        assert!(CommandLine::check_command(
+            "JSON.DEBUG",
+            Some(b"$14\r\nSOMETHING_ELSE\r\n")
+        ));
+    }
+
+    #[test]
     fn check_perf() {
         let expected = vec![
             (
@@ -1225,7 +1344,7 @@ mod tests {
                 ("BITFIELD key GET type offset INCRBY type", "BITFIELD key GET type offset INCRBY type"),
                 ("BITFIELD key SET type offset", "BITFIELD key SET type offset"),
                 ("CONFIG SET parameter value", "CONFIG SET parameter ?"),
-                ("CONFIG foo bar baz", "CONFIG foo bar baz"),
+                ("CONFIG GET foo bar baz", "CONFIG GET foo bar baz"),
                 ("GEOADD key longitude latitude member longitude latitude member longitude latitude member", "GEOADD key longitude latitude ? longitude latitude ? longitude latitude ?"),
                 ("GEOADD key longitude latitude member longitude latitude member", "GEOADD key longitude latitude ? longitude latitude ?"),
                 ("GEOADD key longitude latitude member", "GEOADD key longitude latitude ?"),
@@ -1275,14 +1394,14 @@ mod tests {
                 ("ZADD key XX INCR score member score member", "ZADD key XX INCR score ? score ?"),
                 ("ZADD key XX INCR score member", "ZADD key XX INCR score ?"),
                 ("ZADD key XX INCR score", "ZADD key XX INCR score"),
-                ("CONFIG command SET k v", "CONFIG command SET k ?"),
                 ("SET *😊®© ❤️", "SET *😊®© ?"),
-                ("SET😊 ❤️*😊®© ❤️", "SET😊 ❤️*😊®© ❤️"),
                 ("ZADD key 😊 member score 😊", "ZADD key 😊 ? score ?"),
             ];
         for (input, expected) in testcases.iter() {
             let redis_str = encode_redis_command(input);
-            let cmdline = CommandLine::new(&redis_str).unwrap();
+            let Ok(cmdline) = CommandLine::new(&redis_str) else {
+                panic!("parse cmdline failed at: {input}");
+            };
             let output = cmdline.stringify(true);
             assert_eq!(
                 str::from_utf8(output.as_slice()).unwrap(),
