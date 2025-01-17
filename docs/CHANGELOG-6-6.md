@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: traffic Balancing cannot get traffic from Trident [#8965](https://github.com/deepflowio/deepflow/pull/8965) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Mitigating Memory Profile Load Failures [#8960](https://github.com/deepflowio/deepflow/pull/8960) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +48,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: Validate redis command [#8967](https://github.com/deepflowio/deepflow/pull/8967) by [rvql](https://github.com/rvql)
+* feat: add cloud common for fc [#8958](https://github.com/deepflowio/deepflow/pull/8958) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
