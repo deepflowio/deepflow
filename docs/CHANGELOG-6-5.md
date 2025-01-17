@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: traffic Balancing cannot get traffic from Trident [#8964](https://github.com/deepflowio/deepflow/pull/8964) by [lzf575](https://github.com/lzf575)
 * fix: wan type cidr may not be tagged [#8813](https://github.com/deepflowio/deepflow/pull/8813) by [lzf575](https://github.com/lzf575)
 * fix: the throttler cannot write all data to the queue at once [#8793](https://github.com/deepflowio/deepflow/pull/8793) by [lzf575](https://github.com/lzf575)
 * fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -172,6 +173,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: Validate redis command [#8968](https://github.com/deepflowio/deepflow/pull/8968) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8746](https://github.com/deepflowio/deepflow/pull/8746) by [askyrie](https://github.com/askyrie)
 *  feat: support fanout in mirror mode and analyzer mode [#8730](https://github.com/deepflowio/deepflow/pull/8730) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: deprecated ipvlan [#8724](https://github.com/deepflowio/deepflow/pull/8724) by [askyrie](https://github.com/askyrie)
