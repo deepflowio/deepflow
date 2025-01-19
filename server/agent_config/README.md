@@ -664,7 +664,7 @@ global:
 Proactive memory trimming can effectively reduce memory usage, but there may be
 performance loss.
 
-### Page Cache Reclaim Interval {#global.tunning.page_cache_reclaim_interval}
+### Page Cache Reclaim Percentage {#global.tunning.page_cache_reclaim_percentage}
 
 **Tags**:
 
@@ -672,34 +672,36 @@ performance loss.
 
 **FQCN**:
 
-`global.tunning.page_cache_reclaim_interval`
+`global.tunning.page_cache_reclaim_percentage`
 
-Upgrade from old version: `static_config.page-cache-reclaim-interval`
+Upgrade from old version: `static_config.page-cache-reclaim-percentage`
 
 **Default value**:
 ```yaml
 global:
   tunning:
-    page_cache_reclaim_interval: 0
+    page_cache_reclaim_percentage: 100
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | duration |
-| Range | [0, '1d'] |
+| Type | int |
+| Range | [0, 100] |
 
 **Description**:
 
+A page cache reclaim is triggered when the pecentage of page cache and
+cgroups memory.limit_in_bytes exceeds this value.
 Both anonymous memory and file page cache are accounted for in cgroup's memory usage.
 Under some circumstances, page cache alone can cause cgroup to OOM kill agent process.
 To avoid this, agent can reclaim page cache periodically. Although reclaming may not
 cause performance issues for agent who doesn't have much I/O, other processes in
 the same cgroup may be affected. Very low values are not recommended.
-Setting this value to 0 disables this feature.
 Note:
 - This feature is available for cgroups v1 only.
 - This feature is disabled if agent memory cgroup path is "/".
+- The minimal interval of reclaims is 1 minute.
 
 ### Resource Monitoring Interval {#global.tunning.resource_monitoring_interval}
 
@@ -4296,6 +4298,37 @@ inputs:
 **Description**:
 
 The interval at which deepflow-agent aggregates and reports memory profile data.
+
+##### LRU length for process allocated addresses {#inputs.ebpf.profile.memory.allocated_addresses_lru_len}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.allocated_addresses_lru_len`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        allocated_addresses_lru_len: 131072
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 4194704] |
+
+**Description**:
+
+Agent uses LRU cache to record process allocated addresses to avoid uncontrolled
+memory usage. Each record in this LRU is about 80B.
 
 #### Preprocess {#inputs.ebpf.profile.preprocess}
 
