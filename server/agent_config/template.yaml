@@ -2942,6 +2942,23 @@ inputs:
         #     deepflow-agent 聚合和上报内存剖析数据的间隔。
         # upgrade_from: static_config.ebpf.memory-profile.report-interval
         report_interval: 10s
+        # type: int
+        # name:
+        #   en: LRU length for process allocated addresses
+        #   ch: 进程分配地址 LRU 长度
+        # unit:
+        # range: [1024, 4194704]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Agent uses LRU cache to record process allocated addresses to avoid uncontrolled
+        #     memory usage. Each record in this LRU is about 80B.
+        #   ch: |-
+        #     采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 80B 内存。
+        # upgrade_from:
+        allocated_addresses_lru_len: 131072
       # type: section
       # name:
       #   en: Preprocess
