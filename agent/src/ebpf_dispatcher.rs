@@ -501,6 +501,7 @@ pub struct EbpfCollector {
     config_handle: ConfigHandle,
 
     counter: Arc<EbpfCounter>,
+    stats_collector: Arc<stats::Collector>,
 
     exception_handler: ExceptionHandler,
     process_listener: Arc<ProcessListener>,
@@ -688,11 +689,12 @@ impl EbpfCollector {
         ebpf_profile_sender: DebugSender<Profile>,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
+        stats_collector: &stats::Collector,
         process_listener: &ProcessListener,
     ) -> Result<ConfigHandle> {
         // ebpf和ebpf collector通信配置初始化
         unsafe {
-            let handle = Self::ebpf_core_init(process_listener, config);
+            let handle = Self::ebpf_core_init(process_listener, config, stats_collector);
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
@@ -707,12 +709,13 @@ impl EbpfCollector {
         }
     }
 
+    #[allow(unused)]
     unsafe fn ebpf_core_init(
         process_listener: &ProcessListener,
         config: &EbpfConfig,
+        stats_collector: &stats::Collector,
     ) -> Result<ConfigHandle> {
         // ebpf core modules init
-        #[allow(unused_mut)]
         let mut handle = ConfigHandle::default();
         ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
         if config.ebpf.socket.uprobe.golang.enabled {
@@ -975,9 +978,14 @@ impl EbpfCollector {
             {
                 let mp_ctx = memory_profile::MemoryContext::new(
                     memory.report_interval,
+                    memory.allocated_addresses_lru_len,
                     ebpf_conf.profile.preprocess.stack_compression,
                 );
                 handle.memory_profile_settings = Some(mp_ctx.settings());
+                stats_collector.register_countable(
+                    &stats::NoTagModule("ebpf-memory-profiler"),
+                    Countable::Ref(mp_ctx.counters()),
+                );
                 contexts[ebpf::PROFILER_CTX_MEMORY_IDX] =
                     Box::into_raw(Box::new(mp_ctx)) as *mut c_void;
             }
@@ -1212,6 +1220,7 @@ impl EbpfCollector {
             ebpf_profile_sender,
             policy_getter,
             time_diff.clone(),
+            &stats_collector,
             process_listener,
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
@@ -1228,7 +1237,7 @@ impl EbpfCollector {
                 output,
                 l7_stats_output,
                 flow_map_config,
-                stats_collector,
+                stats_collector: stats_collector.clone(),
                 collector_config,
                 pause: Arc::new(AtomicBool::new(true)),
             },
@@ -1238,6 +1247,7 @@ impl EbpfCollector {
                 rx: AtomicU64::new(0),
                 get_token_failed: AtomicU64::new(0),
             }),
+            stats_collector,
             exception_handler,
             process_listener: process_listener.clone(),
         }))
@@ -1286,7 +1296,9 @@ impl EbpfCollector {
                             as *mut memory_profile::MemoryContext,
                     ));
                 }
-                if let Ok(handle) = Self::ebpf_core_init(&self.process_listener, config) {
+                if let Ok(handle) =
+                    Self::ebpf_core_init(&self.process_listener, config, &self.stats_collector)
+                {
                     self.config_handle = handle;
                 } else {
                     warn!("ebpf start_continuous_profiler error.");
@@ -1297,6 +1309,7 @@ impl EbpfCollector {
             #[cfg(feature = "extended_observability")]
             if let Some(s) = self.config_handle.memory_profile_settings.as_ref() {
                 s.set_report_interval(ecfg.memory.report_interval);
+                s.set_address_lru_len(ecfg.memory.allocated_addresses_lru_len);
             }
         }
         if config.l7_log_enabled() || config.dpdk_enabled {
