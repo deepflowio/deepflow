@@ -2976,6 +2976,14 @@ impl ConfigHandler {
             memory.report_interval = new_memory.report_interval;
             restart_agent = !first_run;
         }
+        if memory.allocated_addresses_lru_len != new_memory.allocated_addresses_lru_len {
+            info!(
+                "Update inputs.ebpf.profile.memory.allocated_addresses_lru_len from {:?} to {:?}.",
+                memory.allocated_addresses_lru_len, new_memory.allocated_addresses_lru_len
+            );
+            memory.allocated_addresses_lru_len = new_memory.allocated_addresses_lru_len;
+            restart_agent = !first_run;
+        }
 
         let off_cpu = &mut ebpf.profile.off_cpu;
         let new_off_cpu = &mut new_ebpf.profile.off_cpu;

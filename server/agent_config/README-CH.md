@@ -652,7 +652,7 @@ global:
 
 开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
 
-### Page Cache 回收间隔 {#global.tunning.page_cache_reclaim_interval}
+### Page Cache 回收百分比 {#global.tunning.page_cache_reclaim_percentage}
 
 **标签**:
 
@@ -660,33 +660,34 @@ global:
 
 **FQCN**:
 
-`global.tunning.page_cache_reclaim_interval`
+`global.tunning.page_cache_reclaim_percentage`
 
-Upgrade from old version: `static_config.page-cache-reclaim-interval`
+Upgrade from old version: `static_config.page-cache-reclaim-percentage`
 
 **默认值**:
 ```yaml
 global:
   tunning:
-    page_cache_reclaim_interval: 0
+    page_cache_reclaim_percentage: 100
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | duration |
-| Range | [0, '1d'] |
+| Type | int |
+| Range | [0, 100] |
 
 **详细描述**:
 
+当文件页缓存和 cgroup 内存限制的百分比超过此阈值时，agent 将清空文件页缓存。
 Cgroup 的内存使用量包括匿名内存和文件页缓存。在某些情况下，仅仅是文件页缓存就可能导致
 cgroup 因为内存不足杀死 agent 进程。为了避免这种情况，agent 将定期强制清空文件页缓存，
 且由于 agent 的文件 I/O 量不大，这不太可能对 agent 的性能造成影响，但同一 cgroup 下的其他
 进程可能会受到影响。不建议设置很小的值。
-设置该值为 0 时，该特性不生效。
 注意：
 - 该特性仅支持 cgroups v1。
 - 如果 agent 的 memory cgroup 路径是 “/”，该特性不生效。
+- 回收的最小间隔是 1 分钟。
 
 ### 资源监控间隔 {#global.tunning.resource_monitoring_interval}
 
@@ -4169,6 +4170,36 @@ inputs:
 **详细描述**:
 
 deepflow-agent 聚合和上报内存剖析数据的间隔。
+
+##### 进程分配地址 LRU 长度 {#inputs.ebpf.profile.memory.allocated_addresses_lru_len}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.allocated_addresses_lru_len`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        allocated_addresses_lru_len: 131072
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 4194704] |
+
+**详细描述**:
+
+采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 80B 内存。
 
 #### 预处理 {#inputs.ebpf.profile.preprocess}
 
