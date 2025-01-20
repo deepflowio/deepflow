@@ -27,6 +27,7 @@ type ExSpan struct {
 	TapSide         string `json:"tap_side"` // spankind=server: s-app/ spankind=client: c-app/ spankind=internal: app
 	L7Protocol      int    `json:"l7_protocol"`
 	L7ProtocolStr   string `json:"l7_protocol_str"`
+	L7ProtocolEnum  string `json:"Enum(l7_protocol)"` // required, will show in span bar name in flamegraph
 	TraceID         string `json:"trace_id"`
 	SpanID          string `json:"span_id"`
 	ParentSpanID    string `json:"parent_span_id"`
@@ -34,6 +35,7 @@ type ExSpan struct {
 	Endpoint        string `json:"endpoint"`
 	RequestType     string `json:"request_type"`     // method
 	RequestResource string `json:"request_resource"` // path
+	ResponseCode    int    `json:"response_code"`
 	ResponseStatus  int    `json:"response_status"`
 	AppService      string `json:"app_service"`   // service name
 	AppInstance     string `json:"app_instance"`  // service instance name

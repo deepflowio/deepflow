@@ -17,6 +17,10 @@
 package service
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/model"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service"
 	"github.com/op/go-logging"
@@ -40,4 +44,27 @@ func Register() error {
 		log_base.Debugf("external apm %s register success")
 	}
 	return nil
+}
+
+func ParseUrlPath(rawURL string) (string, error) {
+	parts := strings.SplitN(rawURL, "://", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return "", fmt.Errorf("invalid URL format")
+	}
+	pathStart := strings.Index(parts[1], "/")
+	if pathStart == -1 {
+		return "/", nil
+	}
+
+	return parts[1][pathStart:], nil
+}
+
+func HttpCodeToResponseStatus(code int) datatype.LogMessageStatus {
+	if code >= 400 && code <= 499 {
+		return datatype.STATUS_CLIENT_ERROR
+	} else if code >= 500 && code <= 600 {
+		return datatype.STATUS_SERVER_ERROR
+	} else {
+		return datatype.STATUS_OK
+	}
 }
