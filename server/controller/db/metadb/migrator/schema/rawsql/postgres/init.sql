@@ -1668,7 +1668,9 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     payload_slice          INTEGER DEFAULT NULL,
     acl_id                 INTEGER,
     policy_acl_group_id    INTEGER,
+    vtap_type              SMALLINT DEFAULT 0,
     vtap_ids               TEXT,
+    vtap_group_ids         TEXT,
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     lcuuid                 VARCHAR(64)
@@ -1677,7 +1679,9 @@ TRUNCATE TABLE npb_policy;
 COMMENT ON COLUMN npb_policy.state IS '0-disable; 1-enable';
 COMMENT ON COLUMN npb_policy.direction IS '1-all; 2-forward; 3-backward;';
 COMMENT ON COLUMN npb_policy.distribute IS '0-drop, 1-distribute';
+COMMENT ON COLUMN npb_policy.vtap_type IS '1-vtap; 2-vtap_group';
 COMMENT ON COLUMN npb_policy.vtap_ids IS 'separated by ,';
+COMMENT ON COLUMN npb_policy.vtap_group_ids IS 'separated by ,';
 
 
 CREATE TABLE IF NOT EXISTS npb_tunnel (
@@ -1704,7 +1708,9 @@ CREATE TABLE IF NOT EXISTS pcap_policy (
     state                  INTEGER DEFAULT 1,
     business_id            INTEGER NOT NULL,
     acl_id                 INTEGER,
+    vtap_type              SMALLINT DEFAULT 0,
     vtap_ids               TEXT,
+    vtap_group_ids         TEXT,
     payload_slice          INTEGER,
     policy_acl_group_id    INTEGER,
     user_id                INTEGER,
@@ -1715,7 +1721,9 @@ CREATE TABLE IF NOT EXISTS pcap_policy (
 );
 TRUNCATE TABLE pcap_policy;
 COMMENT ON COLUMN pcap_policy.state IS '0-disable; 1-enable';
+COMMENT ON COLUMN npb_policy.vtap_type IS '1-vtap; 2-vtap_group';
 COMMENT ON COLUMN pcap_policy.vtap_ids IS 'separated by ,';
+COMMENT ON COLUMN npb_policy.vtap_group_ids IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS alarm_label (
     id                      SERIAL PRIMARY KEY,
