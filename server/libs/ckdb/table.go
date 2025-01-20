@@ -511,7 +511,7 @@ FROM %s`,
 
 func (t *Table) MakeAggrGlobalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
 	if t.DBType == CKDBTypeByconity {
-		return "SELECT VERSION()"
+		return t.MakeAggrLocalTableCreateSQL(orgID, aggrInterval)
 	}
 	tableGlobal := fmt.Sprintf("%s.%s", t.tablePrefix(), aggrInterval.String())
 	tableLocal := fmt.Sprintf("%s.%s_local", t.tablePrefix(), aggrInterval.String())
