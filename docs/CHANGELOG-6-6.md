@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: query skywalking data update resource info [#8986](https://github.com/deepflowio/deepflow/pull/8986) by [taloric](https://github.com/taloric)
+* fix: Memory profile memory leak [#8983](https://github.com/deepflowio/deepflow/pull/8983) by [rvql](https://github.com/rvql)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +48,7 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: querier add timeout_ratio [#8982](https://github.com/deepflowio/deepflow/pull/8982) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
@@ -71,5 +74,6 @@
 
 
 #### Refactoring
+* refactor: rename cloud server to cloud host [#8976](https://github.com/deepflowio/deepflow/pull/8976) by [lzf575](https://github.com/lzf575)
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
