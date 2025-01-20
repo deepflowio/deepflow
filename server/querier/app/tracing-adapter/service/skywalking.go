@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"skywalking.apache.org/repo/goapi/query"
 
+	"github.com/baidubce/bce-sdk-go/util/log"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/common"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	"github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/model"
@@ -54,12 +57,25 @@ const (
 	SpanTypeClient = "Exit"
 	SpanTypeServer = "Entry"
 
-	AttributeHTTPMethod      = "http.method"
-	AttributeHTTPStatus_Code = "http.status_code"
-	AttributeHTTPStatusCode  = "http.status.code"
-	AttributeDbStatement     = "db.statement"
-	AttributeCacheCmd        = "cache.cmd"
-	AttributeCacheKey        = "cache.key"
+	AttributeURL               = "url"
+	AttributeHttpURL           = "http.url"
+	AttributeHTTPMethod        = "http.method"
+	AttributeHttpScheme        = "http.scheme"
+	AttributeHTTPStatus        = "http.status"
+	AttributeHTTPStatus_Code   = "http.status_code"
+	AttributeHTTPStatusCode    = "http.status.code"
+	AttributeCacheCmd          = "cache.cmd"
+	AttributeCacheKey          = "cache.key"
+	AttributeDbType            = "db.type"
+	AttributeDbSystem          = "db.system"
+	AttributeDbStatement       = "db.statement"
+	AttributeDbOperation       = "db.operation"
+	AttributeRpcMethod         = "rpc.method"
+	AttributeRpcSystem         = "rpc.system"
+	AttributeRpcService        = "rpc.service"
+	AttributeMessagingURL      = "messaging.url"
+	AttributeMessagingSystem   = "messaging.system"
+	AttributeMessagingProtocol = "messaging.protocol"
 
 	// layer possible values: Unknown, Database, RPCFramework, Http, MQ and Cache
 	// ref: https://github.com/apache/skywalking-query-protocol/blob/master/trace.graphqls#L94
@@ -267,58 +283,56 @@ func (s *SkyWalkingAdapter) swTagsToSpanRequestInfo(layer string, tags []*query.
 	if tags == nil {
 		return
 	}
-	span.L7Protocol, span.L7ProtocolStr = s.getL7Protocol(layer)
-	switch layer {
-	case LayerDatabase:
-		s.getDBTags(tags, span)
-	case LayerHTTP:
-		s.getHTTPTags(tags, span)
-	case LayerCache:
-		s.getCacheTags(tags, span)
-	default:
-		// Unknown
-		return
-	}
-}
-
-func (s *SkyWalkingAdapter) getL7Protocol(layer string) (int, string) {
 	if layer == LayerHTTP {
-		// the only protocol can get from span now
-		return 20, "HTTP"
-	} else {
-		return 0, ""
+		span.L7Protocol, span.L7ProtocolStr, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
 	}
-}
-
-func (s *SkyWalkingAdapter) getHTTPTags(tags []*query.KeyValue, span *model.ExSpan) {
-	for _, v := range tags {
-		switch v.Key {
-		case AttributeHTTPMethod:
-			span.RequestType = *v.Value // http method
-		case AttributeHTTPStatusCode, AttributeHTTPStatus_Code:
-			code, err := strconv.Atoi(*v.Value)
-			if err == nil {
-				span.ResponseStatus = code
+	s.getTagValue(tags, span)
+	// for which not match l7protocol, but found l7protocolstr by tag.value, try to match
+	if span.L7Protocol == 0 && len(span.L7ProtocolStr) > 0 {
+		l7ProtocolStrLower := strings.ToLower(span.L7ProtocolStr)
+		for l7ProtocolEnumStr, l7ProtocolMap := range datatype.L7ProtocolStringMap {
+			if strings.Contains(l7ProtocolEnumStr, l7ProtocolStrLower) {
+				span.L7Protocol = int(l7ProtocolMap)
+				span.L7ProtocolEnum = l7ProtocolEnumStr
+				break
 			}
 		}
 	}
 }
 
-func (s *SkyWalkingAdapter) getDBTags(tags []*query.KeyValue, span *model.ExSpan) {
+func (s *SkyWalkingAdapter) getTagValue(tags []*query.KeyValue, span *model.ExSpan) {
+	httpURL := ""
 	for _, v := range tags {
-		if v.Key == AttributeDbStatement {
-			span.RequestResource = *v.Value
+		if span.L7Protocol == 0 && len(span.L7ProtocolStr) == 0 {
+			// if layer != http (maybe is unknown), but have some http attributes, it's http
+			if strings.HasPrefix(v.Key, "http") {
+				span.L7Protocol, span.L7ProtocolStr, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
+			}
 		}
-	}
-}
-
-func (s *SkyWalkingAdapter) getCacheTags(tags []*query.KeyValue, span *model.ExSpan) {
-	for _, v := range tags {
 		switch v.Key {
-		case AttributeCacheCmd:
+		case AttributeURL, AttributeHttpURL:
+			httpURL = *v.Value
+		case AttributeHTTPMethod, AttributeCacheCmd, AttributeDbOperation, AttributeRpcMethod:
 			span.RequestType = *v.Value
-		case AttributeCacheKey:
+		case AttributeHTTPStatusCode, AttributeHTTPStatus_Code, AttributeHTTPStatus:
+			code, err := strconv.Atoi(*v.Value)
+			if err == nil {
+				span.ResponseCode = code
+			}
+		case AttributeDbStatement, AttributeCacheKey:
 			span.RequestResource = *v.Value
+		case AttributeDbType, AttributeDbSystem, AttributeHttpScheme, AttributeRpcSystem, AttributeMessagingSystem, AttributeMessagingProtocol:
+			span.L7ProtocolStr = *v.Value
 		}
 	}
+
+	if span.RequestResource == "" && httpURL != "" {
+		parsedURLPath, err := ParseUrlPath(httpURL)
+		if err != nil {
+			log.Warnf("query skywalking data get http.url (%s) parsed failed : %s", httpURL, err)
+		} else {
+			span.RequestResource = parsedURLPath
+		}
+	}
+	span.ResponseStatus = int(HttpCodeToResponseStatus(span.ResponseCode))
 }
