@@ -37,7 +37,11 @@ type Response struct {
 
 // String returns the string representation of the response when Data is a byte slice.
 func (r Response) String() string {
-	return fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s,"PAGE":%s}`, r.OptStatus, r.Description, string(r.Data.([]byte)), r.Page.String())
+	if r.Page.IsValid() {
+		return fmt.Sprintf(`{"OPT_STATUS":"%s","DESCRIPTION":"%s","DATA":%s,"PAGE":%s}`, r.OptStatus, r.Description, string(r.Data.([]byte)), string(r.Page.Bytes()))
+	} else {
+		return fmt.Sprintf(`{"OPT_STATUS":"%s","DESCRIPTION":"%s","DATA":%s}`, r.OptStatus, r.Description, string(r.Data.([]byte)))
+	}
 }
 
 // Bytes returns the byte slice representation of the response when Data is a byte slice.
@@ -50,6 +54,15 @@ type Page struct {
 	Size      int `json:"SIZE"`
 	Total     int `json:"TOTAL"`
 	TotalItem int `json:"TOTAL_ITEM"`
+}
+
+func (p Page) IsValid() bool {
+	return p.Index > 0 && p.Size > 0
+}
+
+func (p Page) Bytes() []byte {
+	bytes, _ := json.Marshal(p)
+	return bytes
 }
 
 func (p Page) String() string {
@@ -123,7 +136,7 @@ func StatusForbiddenResponse(c *gin.Context, description string) {
 // TODO refactor, use ResponseOption
 func JsonResponse(c *gin.Context, data interface{}, err error, respOptions ...ResponseOption) {
 	if _, ok := data.([]byte); ok {
-		bytesResponse(c, data, err, respOptions...)
+		BytesResponse(c, data, err, respOptions...)
 		return
 	}
 
@@ -156,7 +169,7 @@ func JsonResponse(c *gin.Context, data interface{}, err error, respOptions ...Re
 	}
 }
 
-func bytesResponse(c *gin.Context, data interface{}, err error, respOptions ...ResponseOption) {
+func BytesResponse(c *gin.Context, data interface{}, err error, respOptions ...ResponseOption) {
 	resp := Response{Data: data}
 	for _, opt := range respOptions {
 		opt(&resp)
