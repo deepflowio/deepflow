@@ -13,4 +13,5 @@ timeout                     , 超时                 , 个   , 应用超时的�
 error_ratio                 , 异常比例             , %    , `异常 / 响应`
 client_error_ratio          , 客户端异常比例       , %    , `客户端异常 / 响应`
 server_error_ratio          , 服务端异常比例       , %    , `服务端异常 / 响应`
+timeout_ratio               , 超时比例            , %    , `超时 / 请求`
 row                         , 行数                , 个   ,  
