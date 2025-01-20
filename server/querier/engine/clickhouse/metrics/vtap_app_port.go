@@ -24,6 +24,7 @@ var VTAP_APP_PORT_METRICS_REPLACE = map[string]*Metrics{
 	"error_ratio":        NewReplaceMetrics("error/response", ""),
 	"client_error_ratio": NewReplaceMetrics("client_error/response", ""),
 	"server_error_ratio": NewReplaceMetrics("server_error/response", ""),
+	"timeout_ratio":      NewReplaceMetrics("timeout/request", ""),
 }
 
 func GetVtapAppPortMetrics() map[string]*Metrics {
