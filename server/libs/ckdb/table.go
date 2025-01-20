@@ -255,14 +255,14 @@ SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1%s`,
 
 func (t *Table) MakeLocalTableCreateSQL() string {
 	if t.DBType == CKDBTypeByconity {
-		return "SELECT VERSION()"
+		return t.makeGlobalTableCreateSQL(t.Database)
 	}
 	return t.makeLocalTableCreateSQL(t.Database)
 }
 
 func (t *Table) MakeOrgLocalTableCreateSQL(orgID uint16) string {
 	if t.DBType == CKDBTypeByconity {
-		return "SELECT VERSION()"
+		return t.makeGlobalTableCreateSQL(t.OrgDatabase(orgID))
 	}
 	return t.makeLocalTableCreateSQL(t.OrgDatabase(orgID))
 }
