@@ -3574,6 +3574,69 @@ inputs:
       #     - adaptive: deepflow-agent 优先使用 active 模式获取其他 POD 的 MAC 和 IP 信息。
       # upgrade_from: static_config.kubernetes-poller-type
       pod_mac_collection_method: adaptive
+    # type: section
+    # name:
+    #   en: Pull Resource From Controller
+    #   ch: 从控制器拉取资源
+    # description:
+    #   en: |-
+    #     Configurations for deepflow-server on pulling resources from controller.
+    #     DeepFlow-agent will not read this section.
+    #   ch: |-
+    #     DeepFlow-server 从控制器拉取资源的配置。
+    #     DeepFlow-agent 不会读取此部分。
+    pull_resource_from_controller:
+      # type: string
+      # name:
+      #   en: Domain Filter
+      #   ch: 云平台过滤器
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Default value `0` means all domains, or can be set to a list of lcuuid of a
+      #     series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
+      #
+      #     Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
+      #     into data. This configuration can reduce the number and frequency of MAC and
+      #     IP addresses delivered by deepflow-server to deepflow-agent. When there is no
+      #     cross-domain service request, deepflow-server can be configured to only deliver
+      #     the information in the local domain to deepflow-agent.
+      #   ch: |-
+      #     在运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
+      #     向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
+      #     以减少下发的数据量。当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
+      #     下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
+      #     仅获取部分云平台的数据。
+      # upgrade_from: domains
+      domain_filter: ["0"]
+      # type: bool
+      # name:
+      #   en: Only K8s Pod IP in Local Cluster
+      #   ch: 仅下发本集群中的 K8s Pod IP
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The list of MAC and IP addresses is used by deepflow-agent to inject tags
+      #     into data. This configuration can reduce the number and frequency of MAC and IP
+      #     addresses delivered by deepflow-server to deepflow-agent. When the Pod IP is not
+      #     used for direct communication between the K8s cluster and the outside world,
+      #     deepflow-server can be configured to only deliver the information in the local
+      #     K8s cluster to deepflow-agent.
+      #   ch: |-
+      #     运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
+      #     向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
+      #     减少下发的数据量。当 Kubernetes 内部的 POD IP 不会直接与外部通信时，可以配置仅向 deepflow-agent
+      #     下发本集群的 POD IP、MAC 数据。参数默认值为`false`，表示发送全部。
+      # upgrade_from: pod_cluster_internal_ip
+      only_kubernetes_pod_ip_in_local_cluster: false
   # type: section
   # name:
   #   en: Integration
