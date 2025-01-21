@@ -4541,6 +4541,34 @@ impl ConfigHandler {
                 .clone();
             restart_agent = !first_run;
         }
+        let timeouts = &mut request_log.timeouts;
+        let new_timeouts = &mut new_request_log.timeouts;
+        if timeouts.tcp_request_timeout != new_timeouts.tcp_request_timeout {
+            info!(
+                "Update processors.request_log.timeouts.tcp_request_timeout from {:?} to {:?}.",
+                timeouts.tcp_request_timeout, new_timeouts.tcp_request_timeout
+            );
+            timeouts.tcp_request_timeout = new_timeouts.tcp_request_timeout;
+            restart_agent = !first_run;
+        }
+        if timeouts.udp_request_timeout != new_timeouts.udp_request_timeout {
+            info!(
+                "Update processors.request_log.timeouts.udp_request_timeout from {:?} to {:?}.",
+                timeouts.udp_request_timeout, new_timeouts.udp_request_timeout
+            );
+            timeouts.udp_request_timeout = new_timeouts.udp_request_timeout;
+            restart_agent = !first_run;
+        }
+        if timeouts.session_aggregate_window_duration
+            != new_timeouts.session_aggregate_window_duration
+        {
+            info!("Update processors.request_log.timeouts.session_aggregate_window_duration from {:?} to {:?}.",
+            timeouts.session_aggregate_window_duration, new_timeouts.session_aggregate_window_duration);
+            timeouts.session_aggregate_window_duration =
+                new_timeouts.session_aggregate_window_duration;
+            restart_agent = !first_run;
+        }
+
         let tag_extraction = &mut request_log.tag_extraction;
         let new_tag_extraction = &mut new_request_log.tag_extraction;
         if tag_extraction.custom_fields != new_tag_extraction.custom_fields {
