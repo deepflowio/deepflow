@@ -357,7 +357,7 @@ type NpbPolicy struct {
 	PayloadSlice     *int      `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
 	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
-	VtapType         int       `gorm:"column:vtap_type;type:type:tinyint(1);default:1" json:"VTAP_TYPE"` // 1: vtap; 2: vtap_group
+	VtapType         int       `gorm:"column:vtap_type;type:type:tinyint(1);default:0" json:"VTAP_TYPE"` // 1-vtap; 2-vtap_group
 	VtapIDs          string    `gorm:"column:vtap_ids;type:text" json:"VTAP_IDS"`                        // separated by ,
 	VtapGroupIDs     string    `gorm:"column:vtap_group_ids;type:text" json:"VTAP_GROUP_IDS"`            // separated by ,
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
@@ -394,7 +394,9 @@ type PcapPolicy struct {
 	State            int       `gorm:"column:state;type:int;default:0" json:"STATE"` // 0-disable; 1-enable
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
-	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"` // separated by ,
+	VtapType         int       `gorm:"column:vtap_type;type:type:tinyint(1);default:0" json:"VTAP_TYPE"`   // 1-vtap; 2-vtap_group
+	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"`             // separated by ,
+	VtapGroupIDs     string    `gorm:"column:vtap_group_ids;type:text;default:null" json:"VTAP_GROUP_IDS"` // separated by ,
 	PayloadSlice     *int      `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
 	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
 	UserID           int       `gorm:"column:user_id;type:int;default:null" json:"USER_ID"`

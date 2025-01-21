@@ -24,9 +24,9 @@ BEGIN
     END IF;
 END;
 
-CALL AddColumnIfNotExists('npb_policy', 'vtap_type', "TINYINT(1) DEFAULT 0 COMMENT '1-vtap; 2-vtap_group'", 'policy_acl_group_id');
-CALL AddColumnIfNotExists('npb_policy', 'vtap_group_ids', "TEXT COMMENT 'separated by ,'", 'vtap_ids');
+CALL AddColumnIfNotExists('pcap_policy', 'vtap_type', "TINYINT(1) DEFAULT 0 COMMENT '1-vtap; 2-vtap_group'", 'acl_id');
+CALL AddColumnIfNotExists('pcap_policy', 'vtap_group_ids', "TEXT COMMENT 'separated by ,'", 'vtap_ids');
 
 DROP PROCEDURE AddColumnIfNotExists;
 
-UPDATE db_version SET version='7.0.1.3';
+UPDATE db_version SET version='7.0.1.4';
