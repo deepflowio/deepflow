@@ -43,7 +43,6 @@ type DBDataCache struct {
 	azs                     []*models.AZ
 	hostDevices             []*models.Host
 	podNodes                []*models.PodNode
-	agentGroupConfigs       []*agent_config.AgentGroupConfigModel
 	domains                 []*models.Domain
 	subDomains              []*models.SubDomain
 	chVTapPorts             []*models.ChVTapPort
@@ -172,14 +171,6 @@ func (d *DBDataCache) GetVmPodNodeConns() []*models.VMPodNodeConnection {
 
 func (d *DBDataCache) GetVipDomains() []*models.Domain {
 	return d.vipDomains
-}
-
-func (d *DBDataCache) GetAgentGroupConfigsFromDB(db *gorm.DB) []*agent_config.AgentGroupConfigModel {
-	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
-	if err != nil {
-		log.Error(d.Log(err.Error()))
-	}
-	return agentGroupConfigs
 }
 
 func (d *DBDataCache) GetAgentGroupUserConfigsFromDB(db *gorm.DB) []*agent_config.MySQLAgentGroupConfiguration {
@@ -391,13 +382,6 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	podNodes, err := dbmgr.DBMgr[models.PodNode](db).Gets()
 	if err == nil {
 		d.podNodes = podNodes
-	} else {
-		log.Error(d.Log(err.Error()))
-	}
-
-	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
-	if err == nil {
-		d.agentGroupConfigs = agentGroupConfigs
 	} else {
 		log.Error(d.Log(err.Error()))
 	}

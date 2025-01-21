@@ -133,7 +133,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 	log.Debug(v.Logf("set platfrom data to %s %s %s", c.GetCtrlIP(), c.GetCtrlMac(), c.getPodDomains()))
 	vTapGroupLcuuid := c.GetVTapGroupLcuuid()
 	vtapConfig := c.GetVTapConfig()
-	if vtapConfig == nil {
+	if vtapConfig == nil || vtapConfig.PodClusterInternalIP == nil {
 		return
 	}
 	log.Debug(v.Logf("%d %s", vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains))

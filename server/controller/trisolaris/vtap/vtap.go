@@ -18,7 +18,6 @@ package vtap
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -34,7 +33,6 @@ import (
 
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	mysql_model "github.com/deepflowio/deepflow/server/controller/db/metadb/model" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
@@ -73,7 +71,6 @@ type VTapInfo struct {
 	vtapGroupShortIDToLcuuid       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
-	vtapGroupLcuuidToEAHPEnabled   map[string]*int
 	noVTapTapPortsMac              mapset.Set
 	kvmVTapCtrlIPToTapPorts        map[string]mapset.Set
 	kcData                         *KubernetesCluster
@@ -142,7 +139,6 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		vtapGroupShortIDToLcuuid:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
-		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
 		noVTapTapPortsMac:              mapset.NewSet(),
 		kvmVTapCtrlIPToTapPorts:        make(map[string]mapset.Set),
 		pluginNameToUpdateTime:         make(map[string]uint32),
@@ -424,18 +420,7 @@ func (v *VTapInfo) loadVTaps() {
 }
 
 func (v *VTapInfo) loadDefaultVtapConfig() {
-	deafaultConfiguration := &agent_config.AgentGroupConfigModel{}
-	b, err := json.Marshal(DefaultVTapGroupConfig)
-	if err == nil {
-		err = json.Unmarshal(b, deafaultConfiguration)
-		if err != nil {
-			log.Error(v.Logf("%s", err))
-		}
-	} else {
-		log.Error(v.Logf("%s", err))
-	}
-
-	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration, "")
+	v.realDefaultConfig = NewVTapConfig("")
 }
 
 func (v *VTapInfo) loadBaseData() {
@@ -501,80 +486,16 @@ func (v *VTapInfo) getAgentConfigs() {
 	// agent configs
 	agentConfigs := v.metaData.GetDBDataCache().GetAgentGroupUserConfigsFromDB(v.db)
 	if agentConfigs == nil {
-		log.Error(v.Log("no agent user configs data"))
+		log.Error(v.Log("no agent configs data"))
 		return
-	}
-	agentGroupLcuuidToConfigYaml := make(map[string]string)
-	for _, agentConfig := range agentConfigs {
-		agentGroupLcuuidToConfigYaml[agentConfig.AgentGroupLcuuid] = agentConfig.Yaml
 	}
 
-	// vtap configs
-	configs := v.metaData.GetDBDataCache().GetAgentGroupConfigsFromDB(v.db)
-	if configs == nil {
-		log.Error(v.Log("no vtap configs data"))
-		return
-	}
 	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
-	vtapGroupLcuuidToLocalConfig := make(map[string]string)
-	vtapGroupLcuuidToEAHPEnabled := make(map[string]*int)
-	typeOfDefaultConfig := reflect.ValueOf(DefaultVTapGroupConfig).Elem()
-	for _, config := range configs {
-		if config.VTapGroupLcuuid == nil {
-			continue
-		}
-		vtapGroupLcuuidToEAHPEnabled[*config.VTapGroupLcuuid] = config.ExternalAgentHTTPProxyEnabled
-		if config.YamlConfig != nil {
-			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = *config.YamlConfig
-		} else {
-			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = ""
-		}
-		tapConfiguration := &agent_config.AgentGroupConfigModel{}
-		typeOfVTapConfiguration := reflect.ValueOf(tapConfiguration).Elem()
-		tt := reflect.TypeOf(config).Elem()
-		tv := reflect.ValueOf(config).Elem()
-		for i := 0; i < tv.NumField(); i++ {
-			field := tt.Field(i)
-			value := tv.Field(i)
-			if JudgeField(field.Name) {
-				typeOfVTapConfiguration.Field(i).Set(value)
-				continue
-			}
-			// Allow empty values not to be overwritten as default values. For example, it can be set: `tap_interface_regex: ""`
-			if AllowEmptyField(field.Name) && value.Kind() == reflect.Ptr && !value.IsNil() {
-				typeOfVTapConfiguration.Field(i).Set(value)
-				continue
-			}
-			defaultValue := typeOfDefaultConfig.Field(i)
-			if !isBlank(value) {
-				typeOfVTapConfiguration.Field(i).Set(value)
-			} else {
-				typeOfVTapConfiguration.Field(i).Set(defaultValue)
-			}
-		}
-		// 转换结构体类型
-		rtapConfiguration := &agent_config.AgentGroupConfigModel{}
-		b, err := json.Marshal(tapConfiguration)
-		if err == nil {
-			err = json.Unmarshal(b, rtapConfiguration)
-			if err != nil {
-				log.Error(v.Logf("%s", err))
-			}
-		} else {
-			log.Error(v.Logf("%s", err))
-		}
-		agentConfigYaml, ok := agentGroupLcuuidToConfigYaml[*config.VTapGroupLcuuid]
-		if !ok {
-			log.Error(v.Logf("vtap group lcuuid(%s) not found agent config", *config.VTapGroupLcuuid))
-		}
-		vTapConfig := NewVTapConfig(rtapConfiguration, agentConfigYaml)
-		if config.VTapGroupLcuuid != nil {
-			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
-		}
+	for _, config := range agentConfigs {
+		vTapConfig := NewVTapConfig(config.Yaml)
+		vtapGroupLcuuidToConfiguration[config.AgentGroupLcuuid] = vTapConfig
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
-	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig
-	v.vtapGroupLcuuidToEAHPEnabled = vtapGroupLcuuidToEAHPEnabled
 }
 
 func (v *VTapInfo) GetVTapConfigFromShortID(shortID string) *VTapConfig {
