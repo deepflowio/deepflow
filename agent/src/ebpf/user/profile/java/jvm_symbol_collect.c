@@ -485,8 +485,9 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 	}
 
 	int unload_count = vec_len(unload_addrs);
-	if ((args->task->need_refresh && unload_count > 0)
-	    || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
+	if (args->map_fp != NULL &&
+	    ((args->task->need_refresh && unload_count > 0)
+	     || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH)) {
 		fclose(args->map_fp);
 		int count;
 		if ((count = delete_method_unload_symbol(args)) < 0) {
@@ -656,6 +657,21 @@ static int destroy_task(symbol_collect_task_t * task,
 	return 0;
 }
 
+static inline void refresh_symbol_file_and_notify(receiver_args_t *args,
+						  int ret_val)
+{
+	if (!(args != NULL && args->task != NULL))
+		return;
+
+	if (args->task->need_refresh) {
+		pthread_mutex_lock(&args->task->mutex);
+		args->task->update_status = ret_val;
+		args->task->need_refresh = false;
+		pthread_cond_signal(&args->task->cond);
+		pthread_mutex_unlock(&args->task->mutex);
+	}
+}
+	
 static void *ipc_receiver_main(void *arguments)
 {
 	receiver_args_t *args = (receiver_args_t *) arguments;
@@ -727,17 +743,16 @@ static void *ipc_receiver_main(void *arguments)
 			}
 		}
 
-		if (args->task->need_refresh) {
-			int ret_val = update_java_perf_map_file(args, NULL);
-			pthread_mutex_lock(&args->task->mutex);
-			args->task->update_status = ret_val;
-			args->task->need_refresh = false;
-			pthread_cond_signal(&args->task->cond);
-			pthread_mutex_unlock(&args->task->mutex);
-		}
+		refresh_symbol_file_and_notify(args, update_java_perf_map_file(args, NULL));
 	}
 
 cleanup:
+	/*
+	 * If an exception occurs and the thread exits, a signal must be sent to the
+	 * thread retrieving Java symbols; otherwise, the Java symbol thread will be blocked.
+	 */
+	refresh_symbol_file_and_notify(args, -1);
+
 	/* Return to worker_thread() to handle unified resource cleanup. */
 	return NULL;
 }
