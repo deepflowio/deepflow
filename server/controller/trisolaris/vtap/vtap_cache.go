@@ -143,18 +143,20 @@ func (f *VTapConfig) modifyUserConfig(c *VTapCache) {
 	if !f.UserConfig.IsSet(CONFIG_KEY_INGESTER_IP) {
 		f.UserConfig.Set(CONFIG_KEY_INGESTER_IP, c.GetTSDBIP())
 	}
-	domainFilters := f.UserConfig.GetIntSlice(CONFIG_KEY_DOMAIN_FILTER)
+	domainFilters := f.UserConfig.GetStringSlice(CONFIG_KEY_DOMAIN_FILTER)
 	if len(domainFilters) > 0 {
-		sort.Ints(domainFilters)
-		f.UserConfig.Set(CONFIG_KEY_DOMAIN_FILTER, domainFilters)
+		sort.Strings(domainFilters)
+	} else {
+		domainFilters = []string{"0"}
 	}
+	f.UserConfig.Set(CONFIG_KEY_DOMAIN_FILTER, domainFilters)
 }
 
-func (f *VTapConfig) getDomainFilters() []int {
+func (f *VTapConfig) getDomainFilters() []string {
 	if f.UserConfig == nil {
 		return nil
 	}
-	return f.UserConfig.GetIntSlice(CONFIG_KEY_DOMAIN_FILTER)
+	return f.UserConfig.GetStringSlice(CONFIG_KEY_DOMAIN_FILTER)
 }
 
 func (f *VTapConfig) getPodClusterInternalIP() bool {
@@ -165,27 +167,8 @@ func (f *VTapConfig) getPodClusterInternalIP() bool {
 	return f.UserConfig.GetBool("inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster")
 }
 
-func (f *VTapConfig) modifyConfig(v *VTapInfo) {
-	for _, plugin := range f.ConvertedWasmPlugins {
-		if updateTime, ok := v.pluginNameToUpdateTime[plugin]; ok {
-			if f.PluginNewUpdateTime < updateTime {
-				f.PluginNewUpdateTime = updateTime
-			}
-		}
-	}
-
-	for _, plugin := range f.ConvertedSoPlugins {
-		if updateTime, ok := v.pluginNameToUpdateTime[plugin]; ok {
-			if f.PluginNewUpdateTime < updateTime {
-				f.PluginNewUpdateTime = updateTime
-			}
-		}
-	}
-}
-
-func NewVTapConfig(config *agent_config.AgentGroupConfigModel, agentConfigYaml string) *VTapConfig {
+func NewVTapConfig(agentConfigYaml string) *VTapConfig {
 	vTapConfig := &VTapConfig{}
-	vTapConfig.AgentGroupConfigModel = *config
 	v := viper.New()
 	v.SetConfigType("yaml")
 	if err := v.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
@@ -469,128 +452,47 @@ func (c *VTapCache) GetLocalConfig() string {
 var NetWorkL7ProtocolEnabled = []string{"HTTP", "DNS"}
 
 func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
-	if configure == nil {
+	if configure == nil || configure.UserConfig == nil {
 		log.Error("vtap configure is nil")
 		return
 	}
 	if c.EnabledCallMonitoring() == false && c.EnabledNetworkMonitoring() == false {
-		*configure.L7MetricsEnabled = DISABLED
-		configure.ConvertedL7LogStoreTapTypes = nil
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("outputs.flow_metrics.filters.apm_metrics", false)
-			configure.UserConfig.Set("outputs.flow_log.filters.l7_capture_network_types", []int{-1})
-		}
+		configure.UserConfig.Set("outputs.flow_metrics.filters.apm_metrics", false)
+		configure.UserConfig.Set("outputs.flow_log.filters.l7_capture_network_types", []int{-1})
 	}
 
 	if c.EnabledNetworkMonitoring() == false {
-		*configure.L4PerformanceEnabled = DISABLED
-		configure.ConvertedL4LogTapTypes = nil
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("outputs.flow_metrics.filters.npm_metrics", false)
-			configure.UserConfig.Set("outputs.flow_log.filters.l4_capture_network_types", []int{-1})
-		}
-	}
-	v := c.vTapInfo
-	// modify static config
-	yamlConfig := &agent_config.StaticConfig{}
-	if configure.YamlConfig != nil {
-		if err := yaml.Unmarshal([]byte(*configure.YamlConfig), yamlConfig); err != nil {
-			log.Error(v.Logf("%s", err))
-			return
-		}
+		configure.UserConfig.Set("outputs.flow_metrics.filters.npm_metrics", false)
+		configure.UserConfig.Set("outputs.flow_log.filters.l4_capture_network_types", []int{-1})
 	}
 
 	if c.EnabledNetworkMonitoring() == true && c.EnabledCallMonitoring() == false {
-		yamlConfig.L7ProtocolEnabled = NetWorkL7ProtocolEnabled
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", NetWorkL7ProtocolEnabled)
-		}
+		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", NetWorkL7ProtocolEnabled)
 	} else if c.EnabledNetworkMonitoring() == false && c.EnabledCallMonitoring() == false {
-		yamlConfig.L7ProtocolEnabled = nil
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", []string{})
-		}
+		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", []string{})
 	}
 
 	if c.EnabledCallMonitoring() == false {
-		disabled := int(DISABLED)
-		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &agent_config.EbpfConfig{
-				Disabled:           proto.Bool(true),
-				IOEventCollectMode: &disabled,
-			}
-		} else {
-			yamlConfig.Ebpf.Disabled = proto.Bool(true)
-			yamlConfig.Ebpf.IOEventCollectMode = &disabled
-		}
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("inputs.ebpf.disabled", true)
-			configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", 0)
-		}
+		configure.UserConfig.Set("inputs.ebpf.disabled", true)
+		configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", 0)
 	}
 
 	if c.EnabledFunctionMonitoring() == false {
-		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &agent_config.EbpfConfig{}
-		}
-		if yamlConfig.Ebpf.OnCpuProfile == nil {
-			yamlConfig.Ebpf.OnCpuProfile = &agent_config.OnCpuProfile{
-				Disabled: proto.Bool(true),
-			}
-		} else {
-			yamlConfig.Ebpf.OnCpuProfile.Disabled = proto.Bool(true)
-		}
-		if yamlConfig.Ebpf.OffCpuProfile == nil {
-			yamlConfig.Ebpf.OffCpuProfile = &agent_config.OffCpuProfile{
-				Disabled: proto.Bool(true),
-			}
-		} else {
-			yamlConfig.Ebpf.OffCpuProfile.Disabled = proto.Bool(true)
-		}
-
-		yamlConfig.ExternalProfileIntegrationDisabled = proto.Bool(true)
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("inputs.ebpf.profile.on_cpu.disabled", true)
-			configure.UserConfig.Set("inputs.ebpf.profile.off_cpu.disabled", true)
-			configure.UserConfig.Set("inputs.integration.feature_control.profile_integration_disabled", true)
-		}
+		configure.UserConfig.Set("inputs.ebpf.profile.on_cpu.disabled", true)
+		configure.UserConfig.Set("inputs.ebpf.profile.off_cpu.disabled", true)
+		configure.UserConfig.Set("inputs.integration.feature_control.profile_integration_disabled", true)
 	}
 
 	if c.EnabledApplicationMonitoring() == false {
-		yamlConfig.ExternalTraceIntegrationDisabled = proto.Bool(true)
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("inputs.integration.feature_control.trace_integration_disabled", true)
-		}
+		configure.UserConfig.Set("inputs.integration.feature_control.trace_integration_disabled", true)
 	}
 
 	if c.EnabledIndicatorMonitoring() == false {
-		yamlConfig.ExternalMetricIntegrationDisabled = proto.Bool(true)
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("inputs.integration.feature_control.metric_integration_disabled", true)
-		}
+		configure.UserConfig.Set("inputs.integration.feature_control.metric_integration_disabled", true)
 	}
 	if c.EnabledLogMonitoring() == false {
-		yamlConfig.ExternalLogIntegrationDisabled = proto.Bool(true)
-
-		if configure.UserConfig != nil {
-			configure.UserConfig.Set("inputs.integration.feature_control.log_integration_disabled", true)
-		}
+		configure.UserConfig.Set("inputs.integration.feature_control.log_integration_disabled", true)
 	}
-
-	b, err := yaml.Marshal(yamlConfig)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	configure.YamlConfig = proto.String(string(b))
 }
 
 func (c *VTapCache) EnabledCallMonitoring() bool {
@@ -834,12 +736,6 @@ func (c *VTapCache) GetLaunchServer() string {
 var regV = regexp.MustCompile("B_LC_RELEASE_v6_[12]")
 
 func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig() int {
-	v := c.vTapInfo
-	if enabled, ok := v.vtapGroupLcuuidToEAHPEnabled[c.GetVTapGroupLcuuid()]; ok {
-		if enabled != nil {
-			return *enabled
-		}
-	}
 	if regV.MatchString(c.GetRevision()) {
 		return 0
 	}
@@ -1213,7 +1109,6 @@ func (c *VTapCache) initVTapConfig() {
 	realConfig.UserConfig = viperConfig
 
 	c.modifyVTapConfigByLicense(&realConfig)
-	realConfig.modifyConfig(v)
 	realConfig.modifyUserConfig(c)
 	c.updateVTapConfig(&realConfig)
 }
@@ -1235,7 +1130,10 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	oldConfig := c.GetVTapConfig()
 	if oldConfig != nil {
 		// 采集器配置发生变化 重新生成平台数据
-		if newConfig.Domains != oldConfig.Domains || newConfig.PodClusterInternalIP != oldConfig.PodClusterInternalIP {
+		oldDomainFilterStr := strings.Join(oldConfig.getDomainFilters(), "")
+		newDomainFilterStr := strings.Join(newConfig.getDomainFilters(), "")
+		if newDomainFilterStr != oldDomainFilterStr ||
+			newConfig.getPodClusterInternalIP() != oldConfig.getPodClusterInternalIP() {
 			v.setVTapChangedForPD()
 		}
 	}
@@ -1249,7 +1147,6 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	newConfig.UserConfig = viperConfig
 
 	c.modifyVTapConfigByLicense(&newConfig)
-	newConfig.modifyConfig(v)
 	newConfig.modifyUserConfig(c)
 	c.updateVTapConfig(&newConfig)
 }
@@ -1259,10 +1156,7 @@ func (c *VTapCache) GetConfigTapMode() int {
 	if config == nil {
 		return -1
 	}
-	if config.TapMode == nil {
-		return -1
-	}
-	return *config.TapMode
+	return config.UserConfig.GetInt(CONFIG_KEY_CAPTURE_MODE)
 }
 
 func (c *VTapCache) updateVTapCacheFromDB(vtap *metadbmodel.VTap) {
