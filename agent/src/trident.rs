@@ -261,7 +261,9 @@ impl AgentState {
             // log only the first time
             info!("Agent state changed to {:?}", State::Terminated);
         }
+        let sg = self.state.lock().unwrap();
         self.notifier.notify_one();
+        info!("Agent terminate with state: {:?}", sg);
     }
 
     pub fn update_config(&self, config: ChangedConfig) {
