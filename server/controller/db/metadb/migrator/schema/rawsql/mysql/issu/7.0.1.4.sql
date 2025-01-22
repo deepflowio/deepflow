@@ -24,7 +24,7 @@ BEGIN
     END IF;
 END;
 
-CALL AddColumnIfNotExists('pcap_policy', 'vtap_type', "TINYINT(1) DEFAULT 0 COMMENT '1-vtap; 2-vtap_group'", 'acl_id');
+CALL AddColumnIfNotExists('pcap_policy', 'vtap_type', "TINYINT(1) COMMENT '1-vtap; 2-vtap_group'", 'acl_id');
 CALL AddColumnIfNotExists('pcap_policy', 'vtap_group_ids', "TEXT COMMENT 'separated by ,'", 'vtap_ids');
 
 DROP PROCEDURE AddColumnIfNotExists;
