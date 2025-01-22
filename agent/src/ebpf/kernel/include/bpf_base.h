@@ -118,6 +118,16 @@ static int
     __attribute__ ((__unused__)) (*bpf_get_stack) (void *ctx, void *buf, __u32 size,
 						     int flags) = (void *)67;
 
+/* llvm builtin functions that eBPF C program may use to 
+ * emit BPF_LD_ABS and BPF_LD_IND instructions 
+ */
+unsigned long long load_byte(void *skb,
+			     unsigned long long off) asm("llvm.bpf.load.byte");
+unsigned long long load_half(void *skb,
+			     unsigned long long off) asm("llvm.bpf.load.half");
+unsigned long long load_word(void *skb,
+			     unsigned long long off) asm("llvm.bpf.load.word");
+
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
 #else
@@ -300,6 +310,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define UPROG(F) SEC("uprobe/"__stringify(F)) int df_U_##F
 #define URETPROG(F) SEC("uretprobe/"__stringify(F)) int df_UR_##F
 #define PERF_EVENT_PROG(F) SEC("perf_event") int df_##F
+#define SOCKPROG(F) SEC("socket/"__stringify(F)) int df_S_##F
 
 #define ___bpf_concat(a, b) a ## b
 #define ___bpf_apply(fn, n) ___bpf_concat(fn, n)
