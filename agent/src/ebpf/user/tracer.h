@@ -707,4 +707,31 @@ struct probe *create_probe(struct bpf_tracer *tracer,
 			   enum probe_type type, void *private,
 			   bool add_tracer);
 void free_probe_from_conf(struct probe *pb, struct tracer_probes_conf *conf);
+
+/**
+ * @brief Creates and initializes an eBPF object from provided BPF bytecode.
+ *
+ * This function opens and initializes an eBPF object using the specified BPF bytecode,
+ * size, and name. If the initialization fails, a warning message is logged, and `NULL` 
+ * is returned.
+ *
+ * @param[in] bpf_code A pointer to the BPF bytecode buffer.
+ * @param[in] code_size The size of the BPF bytecode buffer in bytes.
+ * @param[in] name A null-terminated string specifying the name of the eBPF program.
+ *
+ * @return A pointer to the initialized `ebpf_object` on success, or `NULL` on failure.
+ */
+struct ebpf_object *create_ebpf_object(const void *bpf_code,
+                                       size_t code_size, const char *name);
+/**
+ * @brief Loads an eBPF object into the kernel.
+ *
+ * This function takes an eBPF object and loads it into the kernel, preparing it
+ * for use in attaching to specific hooks or operations.
+ *
+ * @param[in] obj A pointer to the eBPF object to be loaded.
+ *
+ * @return 0 on success, or a non-zero value on error.
+ */
+int load_ebpf_object(struct ebpf_object *obj);
 #endif /* DF_USER_TRACER_H */

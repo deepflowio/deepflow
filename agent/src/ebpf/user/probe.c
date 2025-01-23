@@ -99,6 +99,15 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return -1;
 		}
+	} else if (strstr(__name, "socket/")) {
+		__name += (sizeof("socket/") - 1);
+		res =
+		    snprintf((char *)prog_name, sizeof(prog_name),
+			     "df_S_%s", __name);
+		if (res < 0 || res >= sizeof(prog_name)) {
+			ebpf_warning("name (%s) snprintf() failed.\n", __name);
+			return -1;
+		}
 	} else
 		safe_buf_copy(prog_name, sizeof(prog_name), __name,
 			      strlen(__name));
