@@ -26,6 +26,8 @@ pub enum Error {
     LinkError(String),
     #[error("option invalid: {0}")]
     InvalidOption(&'static str),
+    #[error("fanout: {0}")]
+    FanoutError(&'static str),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
