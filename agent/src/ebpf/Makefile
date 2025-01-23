@@ -38,6 +38,8 @@ MUSL_CC ?= musl-gcc
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
 
+-include user/extended/feature.top.mk
+
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
 	@cd kernel && make clean --no-print-directory && make socket_trace.bpf.elf $(2) --no-print-directory && cd ../
@@ -147,9 +149,9 @@ SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_rt.c
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
-	user/perf_profiler_bpf_5_2_plus.c \
+	user/perf_profiler_bpf_5_2_plus.c
 
-ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS)
+ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(AF_PACKET_FANOUT_ELFS)
 
 tools/bintobuffer:
 	$(call msg,TOOLS,tools/bintobuffer)
@@ -245,6 +247,8 @@ libs/jattach/build/libjattach.a:
 	$(Q)patch -p1 -d libs/jattach -Ns --no-backup-if-mismatch <libs/0001-Add-compilation-for-static-lib.patch || true
 	$(Q)$(MAKE) -sC libs/jattach dll --no-print-directory
 
+-include user/extended/feature.bottom.mk
+
 rust-sample: .socket-tracer .profiler
 socket-tracer: .socket-tracer
 profiler: .profiler
@@ -325,4 +329,3 @@ test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
 
 .PHONY: all build clean tools test rust-sample .socket-tracer .profiler
-
