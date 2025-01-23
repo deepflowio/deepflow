@@ -52,4 +52,5 @@ int extended_proc_event_handler(int pid, const char *name,
  *        status output.
  */
 void extended_print_cp_tracer_status(void);
+int set_socket_fanout_ebpf(int socket, int group_id);
 #endif /* DF_PROFILE_EXT_H */
