@@ -29,7 +29,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/message/trident"
+	agentmessage "github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
@@ -208,7 +208,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 
 		userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
 		if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
-			var cmds []*trident.RemoteCommand
+			var cmds []*agentmessage.RemoteCommand
 			for _, item := range data.RemoteCommand {
 				_, ok1 := profileCommandMap[*item.Cmd]
 				_, ok2 := probeCommandMap[*item.Cmd]
@@ -220,7 +220,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 		}
 
 		if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
-			var cmds []*trident.RemoteCommand
+			var cmds []*agentmessage.RemoteCommand
 			for _, item := range data.RemoteCommand {
 				if item.Cmd == nil {
 					continue
@@ -271,8 +271,8 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			}
 		}
 
-		agentReq := trident.RemoteExecRequest{
-			ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
+		agentReq := agentmessage.RemoteExecRequest{
+			ExecType: agentmessage.ExecutionType_RUN_COMMAND.Enum(),
 			// CommandId:    req.CommandId, // deprecated
 			CommandIdent: req.CommandIdent,
 			LinuxNsPid:   req.LinuxNsPid,
@@ -296,7 +296,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			return
 		}
 
-		if req.OutputFormat.String() == trident.OutputFormat_TEXT.String() {
+		if req.OutputFormat.String() == agentmessage.OutputFormat_TEXT.String() {
 			JsonResponse(c, content, nil)
 			return
 		}
