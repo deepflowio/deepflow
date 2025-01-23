@@ -675,6 +675,27 @@ extern "C" {
     pub fn disable_oncpu_profiler() -> c_int;
     pub fn show_collect_pool();
 
+    /**
+     * @brief Sets the eBPF program for the fanout group of a PACKET socket.
+     *
+     * In the af_packet fanout mode, multiple sockets share the same fanout_group_id.
+     * Correspondingly, multiple `struct packet_sock` in the kernel point to the same
+     * `struct packet_fanout`. The `packet_fanout` structure contains the address of
+     * the eBPF program. This means that by setting the eBPF program for one of the raw
+     * sockets in the fanout group, we don't need to set the program for all the sockets.
+     *
+     * When closing a PACKET socket, `packet_release()` will call `fanout_release(sk)`.
+     *
+     * @note The `group_id` parameter is considered for future use when extending to
+     *       support multiple groups using different eBPF programs.
+     *
+     * @param socket The file descriptor of the socket to which the eBPF program will be set.
+     * @param group_id The fanout group ID, used for managing multiple groups in the future.
+     *
+     * @return 0 on success, -1 on failure.
+     */
+    pub fn set_socket_fanout_ebpf(socket: c_int, group_id: c_int) -> c_int;
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "off_cpu")] {
             pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
@@ -688,7 +709,7 @@ extern "C" {
             pub fn set_offcpu_minblock_time(
                 block_time: c_uint,
             ) -> c_int;
-        }
+       }
     }
 }
 
