@@ -34,6 +34,8 @@ use socket2::Socket;
 
 use super::{bpf, header, options};
 
+#[cfg(feature = "extended_observability")]
+use crate::ebpf::set_socket_fanout_ebpf;
 use crate::utils::environment::is_kernel_available;
 use crate::utils::stats;
 use public::utils::net::{self, link_by_name};
@@ -44,7 +46,8 @@ const PACKET_FANOUT: c_int = 18;
 const PACKET_STATISTICS: c_int = 6;
 const MILLI_SECONDS: u32 = 1000000;
 const MIN_KERNEL_VERSION_SUPPORT_PACKET_FANOUT: &'static str = "3.1";
-
+#[cfg(feature = "extended_observability")]
+const FANOUT_MODE_EBPF: u32 = 7;
 // https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html
 const LINKTYPE_ETHERNET: c_int = 1;
 
@@ -231,7 +234,16 @@ impl Tpacket {
         // The first 16 bits encode the fanout group ID, and the second set of 16 bits encode the fanout mode and options.
         let fanout_group_id = process::id() & 0xffff;
         let fanout_arg: c_uint = fanout_group_id | (packet_fanout_mode << 16);
-        self.setsockopt(SOL_PACKET, PACKET_FANOUT, fanout_arg)
+        self.setsockopt(SOL_PACKET, PACKET_FANOUT, fanout_arg)?;
+        #[cfg(feature = "extended_observability")]
+        if packet_fanout_mode == FANOUT_MODE_EBPF {
+            unsafe {
+                if set_socket_fanout_ebpf(self.raw_socket.as_raw_fd(), fanout_group_id as i32) < 0 {
+                    return Err(af_packet::Error::FanoutError("set FANOUT_MODE_EBPF failed"));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn mmap_ring(&mut self) -> af_packet::Result<()> {
