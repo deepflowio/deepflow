@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -225,7 +225,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 			"interval_time":         dataSourceCreate.IntervalTime,
 		},
 	).First(&dataSource); ret.Error == nil {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval_time: %v) already exists",
 				dataSourceCreate.DataTableCollection, dataSourceCreate.IntervalTime),
@@ -233,7 +233,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	}
 
 	if dataSourceCreate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("data_source retention_time should le %d", d.cfg.Spec.DataSourceRetentionTimeMax),
 		)
@@ -243,34 +243,34 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		return model.DataSource{}, err
 	}
 	if int(dataSourceCount) >= d.cfg.Spec.DataSourceMax {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
 			fmt.Sprintf("data_source count exceeds (limit %d)", d.cfg.Spec.DataSourceMax),
 		)
 	}
 
 	if ret := db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("base data_source (%d) not exist", dataSourceCreate.BaseDataSourceID),
 		)
 	}
 
 	if baseDataSource.DataTableCollection != dataSourceCreate.DataTableCollection || baseDataSource.IntervalTime == common.INTERVAL_1DAY {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL,
 			"base data_source tsdb_type should the same as tsdb and interval_time should ne 1 day",
 		)
 	}
 
 	if baseDataSource.IntervalTime >= dataSourceCreate.IntervalTime {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL, "interval_time should gt base data_source interval_time",
 		)
 	}
 
 	if baseDataSource.SummableMetricsOperator == "Sum" && dataSourceCreate.SummableMetricsOperator != "Sum" {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL,
 			"summable_metrics_operator only support Sum, if base data_source summable_metrics_operator is Sum",
 		)
@@ -278,7 +278,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 
 	if (baseDataSource.SummableMetricsOperator == "Max" || baseDataSource.SummableMetricsOperator == "Min") &&
 		!(dataSourceCreate.SummableMetricsOperator == "Max" || dataSourceCreate.SummableMetricsOperator == "Min") {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.PARAMETER_ILLEGAL,
 			"summable_metrics_operator only support Max/Min, if base data_source summable_metrics_operator is Max/Min",
 		)
@@ -321,7 +321,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	}
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
-		err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
+		err = response.ServiceError(httpcommon.PARTIAL_CONTENT, errMsg)
 		log.Error(errMsg, dbInfo.LogPrefixORGID)
 	}
 
@@ -345,7 +345,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	db := dbInfo.DB
 	var dataSource metadbmodel.DataSource
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
 	}
@@ -357,7 +357,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 
 	if dataSourceUpdate.RetentionTime != nil &&
 		*dataSourceUpdate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source retention_time should le %d", d.cfg.Spec.DataSourceRetentionTimeMax),
 		)
@@ -365,7 +365,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	// can not update default data source
 	if dataSourceUpdate.DisplayName != nil &&
 		utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("can not update default data source(name: %s)", dataSource.DisplayName),
 		)
@@ -373,7 +373,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	// can not update name to default data source name
 	if dataSourceUpdate.DisplayName != nil &&
 		utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, *dataSourceUpdate.DisplayName) {
-		return model.DataSource{}, NewError(
+		return model.DataSource{}, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("can not update name to default data source name(%s)", *dataSourceUpdate.DisplayName),
 		)
@@ -440,7 +440,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 			).Error; err != nil {
 				return model.DataSource{}, err
 			}
-			err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
+			err = response.ServiceError(httpcommon.PARTIAL_CONTENT, errMsg)
 			break
 		}
 	}
@@ -448,8 +448,8 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	for _, e := range errs {
 		if errors.Is(e, httpcommon.ErrorPending) {
 			warnMsg := fmt.Sprintf("pending %s", e.Error())
-			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg), dbInfo.LogPrefixORGID)
-			err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
+			log.Warning(warnMsg, dbInfo.LogPrefixORGID)
+			err = response.ServiceError(httpcommon.CONFIG_PENDING, warnMsg)
 			break
 		}
 	}
@@ -468,7 +468,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	var baseDataSource metadbmodel.DataSource
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
-		return map[string]string{}, NewError(
+		return map[string]string{}, response.ServiceError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
 	}
@@ -482,14 +482,14 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	sort.Strings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES)
 	index := sort.SearchStrings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName)
 	if index < len(DEFAULT_DATA_SOURCE_DISPLAY_NAMES) && DEFAULT_DATA_SOURCE_DISPLAY_NAMES[index] == dataSource.DisplayName {
-		return map[string]string{}, NewError(
+		return map[string]string{}, response.ServiceError(
 			httpcommon.INVALID_POST_DATA, "Not support delete default data_source",
 		)
 	}
 
 	// 被其他数据源引用的数据源禁止删除
 	if ret := db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
-		return map[string]string{}, NewError(
+		return map[string]string{}, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source (%s) is used by other data_source", dataSource.DisplayName),
 		)
@@ -528,7 +528,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	}
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
-		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		err = response.ServiceError(httpcommon.SERVER_ERROR, errMsg)
 		log.Error(errMsg, dbInfo.LogPrefixORGID)
 	}
 	if e := db.Delete(&dataSource).Error; e != nil {
@@ -709,7 +709,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.DisplayName,
 				)
 				log.Error(errMsg, dbInfo.LogPrefixORGID)
-				err = NewError(httpcommon.SERVER_ERROR, errMsg)
+				err = response.ServiceError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 		} else {
@@ -717,7 +717,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 			if !ok {
 				errMsg := fmt.Sprintf("base data_source (%d) not exist", dataSource.BaseDataSourceID)
 				log.Error(errMsg, dbInfo.LogPrefixORGID)
-				err = NewError(httpcommon.SERVER_ERROR, errMsg)
+				err = response.ServiceError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 			if d.CallIngesterAPIAddRP(orgID, ip, dataSource, baseDataSource) != nil {
@@ -725,7 +725,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.DisplayName,
 				)
 				log.Error(errMsg, dbInfo.LogPrefixORGID)
-				err = NewError(httpcommon.SERVER_ERROR, errMsg)
+				err = response.ServiceError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 		}

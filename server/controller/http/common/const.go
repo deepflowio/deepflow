@@ -16,33 +16,68 @@
 
 package common
 
-import "errors"
+import (
+	"net/http"
+)
 
 const (
-	SUCCESS                         = "SUCCESS"
-	FAIL                            = "FAIL"
-	CONFIG_PENDING                  = "CONFIG_PENDING"
+	// map to http.StatusOK
+	SUCCESS = "SUCCESS"
+
+	// map to http.StatusBadRequest
 	INVALID_PARAMETERS              = "INVALID_PARAMETERS"
-	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND"
 	RESOURCE_ALREADY_EXIST          = "RESOURCE_ALREADY_EXIST"
 	PARAMETER_ILLEGAL               = "PARAMETER_ILLEGAL"
 	INVALID_POST_DATA               = "INVALID_POST_DATA"
-	SERVER_ERROR                    = "SERVER_ERROR"
 	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
 	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
-	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
 	GET_ORG_DB_FAIL                 = "GET_ORG_DB_FAIL"
-	K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
 	ORG_ID_INVALID                  = "ORG_ID_INVALID"
 	CHECK_SCOPE_TEAMS_FAIL          = "CHECK_SCOPE_TEAMS_FAIL"
-	SET_RESOUORCE_FAIL              = "SET_RESOUORCE_FAIL"
-	NO_PERMISSIONS                  = "NO_PERMISSIONS"
+	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND" // TODO map to http.StatusNotFound ?
+	// K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
+	// SET_RESOUORCE_FAIL              = "SET_RESOUORCE_FAIL"
 
-	// http status codes
-	STATUES_PARTIAL_CONTENT = "STATUES_PARTIAL_CONTENT" // 206
+	// map to http.StatusInternalServerError
+	FAIL              = "FAIL"
+	SERVER_ERROR      = "SERVER_ERROR"
+	CONFIG_PENDING    = "CONFIG_PENDING"
+	FPERMIT_EXCEPTION = "FPERMIT_EXCEPTION"
+
+	// map to http.StatusServiceUnavailable
+	SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+
+	// map to http.StatusForbidden
+	NO_PERMISSIONS = "NO_PERMISSIONS"
+
+	// map to http.StatusPartialContent
+	PARTIAL_CONTENT = "PARTIAL_RESULT"
 )
 
 var (
-	ERR_NO_PERMISSIONS    = errors.New("NO_PERMISSIONS")
-	ERR_FPERMIT_EXCEPTION = errors.New("FPERMIT_EXCEPTION")
+	OptStatusToHTTPStatus = map[string]int{
+		SUCCESS: http.StatusOK,
+
+		INVALID_PARAMETERS:              http.StatusBadRequest,
+		RESOURCE_ALREADY_EXIST:          http.StatusBadRequest,
+		PARAMETER_ILLEGAL:               http.StatusBadRequest,
+		INVALID_POST_DATA:               http.StatusBadRequest,
+		RESOURCE_NUM_EXCEEDED:           http.StatusBadRequest,
+		SELECTED_RESOURCES_NUM_EXCEEDED: http.StatusBadRequest,
+		GET_ORG_DB_FAIL:                 http.StatusBadRequest,
+		ORG_ID_INVALID:                  http.StatusBadRequest,
+		CHECK_SCOPE_TEAMS_FAIL:          http.StatusBadRequest,
+		RESOURCE_NOT_FOUND:              http.StatusBadRequest,
+
+		FAIL:              http.StatusInternalServerError,
+		SERVER_ERROR:      http.StatusInternalServerError,
+		CONFIG_PENDING:    http.StatusInternalServerError,
+		FPERMIT_EXCEPTION: http.StatusInternalServerError,
+
+		SERVICE_UNAVAILABLE: http.StatusServiceUnavailable,
+
+		NO_PERMISSIONS: http.StatusForbidden,
+
+		PARTIAL_CONTENT: http.StatusPartialContent,
+	}
 )

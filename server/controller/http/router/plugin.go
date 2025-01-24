@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
@@ -47,23 +47,23 @@ func (p *Plugin) RegisterTo(e *gin.Engine) {
 func getPlugin(c *gin.Context) {
 	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	data, err := service.GetPlugin(dbInfo, nil)
 
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func createPlugin(c *gin.Context) {
 	t, err := strconv.Atoi(c.PostForm("TYPE"))
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	u, err := strconv.Atoi(c.PostForm("USER"))
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	plugin := &metadbmodel.Plugin{
@@ -75,34 +75,34 @@ func createPlugin(c *gin.Context) {
 	// get file
 	file, _, err := c.Request.FormFile("IMAGE")
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	defer file.Close()
 	buf := bytes.NewBuffer(nil)
 	_, err = io.Copy(buf, file)
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	plugin.Image = buf.Bytes()
 
 	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	data, err := service.CreatePlugin(dbInfo, plugin)
 	if err == nil {
 		refresh.RefreshCache(dbInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func deletePlugin(c *gin.Context) {
 	dbInfo, err := metadb.GetDB(httpcommon.GetUserInfo(c).ORGID)
 	if err != nil {
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 
@@ -110,5 +110,5 @@ func deletePlugin(c *gin.Context) {
 	if err = service.DeletePlugin(dbInfo, name); err == nil {
 		refresh.RefreshCache(dbInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
-	JsonResponse(c, nil, err)
+	response.JSON(c, response.SetError(err))
 }

@@ -23,7 +23,7 @@ import (
 
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -43,7 +43,7 @@ func (vr *VtapRepo) RegisterTo(e *gin.Engine) {
 
 func getVtapRepo(c *gin.Context) {
 	data, err := service.GetVtapRepo(httpcommon.GetUserInfo(c).ORGID, nil)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func createVtapRepo(c *gin.Context) {
@@ -61,7 +61,7 @@ func createVtapRepo(c *gin.Context) {
 	if len(vtapRepo.K8sImage) == 0 {
 		file, fileHeader, err := c.Request.FormFile("IMAGE")
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 		defer file.Close()
@@ -69,13 +69,13 @@ func createVtapRepo(c *gin.Context) {
 		vtapRepo.Image = make([]byte, fileHeader.Size)
 		_, err = file.Read(vtapRepo.Image)
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 	}
 
 	data, err := service.CreateVtapRepo(httpcommon.GetUserInfo(c).ORGID, vtapRepo)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 type VTapRepoDelete struct {
@@ -91,5 +91,5 @@ func deleteVtapRepo(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
 		return
 	}
-	JsonResponse(c, nil, service.DeleteVtapRepo(orgID, vtapRepo.ImageName))
+	response.JSON(c, response.SetError(service.DeleteVtapRepo(orgID, vtapRepo.ImageName)))
 }

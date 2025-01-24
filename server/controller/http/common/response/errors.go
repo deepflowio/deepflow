@@ -14,25 +14,30 @@
  * limitations under the License.
  */
 
-package common
+package response
 
 import (
 	"encoding/json"
 )
 
-type ServiceError struct {
+type serviceError struct {
 	Status  string
 	Message string
 }
 
-func (e *ServiceError) Error() string {
+func (e *serviceError) Error() string {
 	err, _ := json.Marshal(e)
 	return string(err)
 }
 
-func NewError(status string, message string) error {
-	return &ServiceError{
+func ServiceError(status string, message string) error {
+	return &serviceError{
 		Status:  status,
 		Message: message,
 	}
+}
+
+func IsServiceError(err error) (*serviceError, bool) {
+	e, ok := err.(*serviceError)
+	return e, ok
 }

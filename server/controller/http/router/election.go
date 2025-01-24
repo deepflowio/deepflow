@@ -18,7 +18,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
@@ -34,5 +34,5 @@ func (el *Election) RegisterTo(e *gin.Engine) {
 
 func getLeaderInfo(c *gin.Context) {
 	data, err := service.GetLeaderInfo()
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }

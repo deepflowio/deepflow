@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 )
@@ -228,7 +228,7 @@ func UpdateController(
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
-		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
+		return nil, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate, dbInfo.LogPrefixORGID)
@@ -275,7 +275,7 @@ func UpdateController(
 	if _, ok := controllerUpdate["AZS"]; ok {
 		azs := controllerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
-			return nil, NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf(
 					"max az num associated controller is (%d)", cfg.Spec.AZMaxPerServer,
@@ -471,14 +471,14 @@ func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (res
 	var vtapCount int64
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
-		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
+		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete controller (%s)", controller.Name, dbInfo.LogPrefixORGID)
 
 	db.Where("controller_ip = ?", controller.IP).Count(&vtapCount)
 	if vtapCount > 0 {
-		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
+		return map[string]string{}, response.ServiceError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
 	}
 
 	db.Delete(metadbmodel.AZControllerConnection{}, "controller_ip = ?", controller.IP)

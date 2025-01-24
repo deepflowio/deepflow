@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -87,10 +87,10 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 
 	if lcuuid != "" {
 		if ret := metadb.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
-			return model.MailServer{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mailServer (%s) not found", lcuuid))
+			return model.MailServer{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mailServer (%s) not found", lcuuid))
 		}
 	} else {
-		return model.MailServer{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify lcuuid")
+		return model.MailServer{}, response.ServiceError(httpcommon.INVALID_PARAMETERS, "must specify lcuuid")
 	}
 
 	log.Infof("update mailServer(%s) config %v", mailServer.UserName, mailServerUpdate)
@@ -113,7 +113,7 @@ func DeleteMailServer(lcuuid string) (map[string]string, error) {
 	var mailServer metadbmodel.MailServer
 
 	if ret := metadb.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
-		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))
+		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete mail server (%s)", mailServer.UserName)

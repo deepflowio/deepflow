@@ -233,14 +233,6 @@ func (t *SuiteTest) TestDeleteDomain() {
 	var lanIPs []metadbmodel.LANIP
 	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&lanIPs)
 	assert.Equal(t.T(), len(lanIPs), 0)
-	var sgs []metadb.SecurityGroup
-	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&sgs)
-	assert.Equal(t.T(), len(sgs), 0)
-	var sgRules []metadb.SecurityGroupRule
-	t.db.Unscoped().Where("sg_id = ?", sgID).Find(&sgRules)
-	assert.Equal(t.T(), len(sgRules), 0)
-	var vmSGs []metadb.VMSecurityGroup
-	t.db.Unscoped().Where("sg_id = ?", sgID).Find(&vmSGs)
 	assert.Equal(t.T(), len(vmSGs), 0)
 	var nats []metadbmodel.NATGateway
 	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&nats)

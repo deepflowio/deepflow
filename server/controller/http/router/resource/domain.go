@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -77,7 +78,7 @@ func getDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if uValue, ok := c.GetQuery("user_id"); ok {
 			userID, err := strconv.Atoi(uValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["user_id"] = userID
@@ -85,27 +86,27 @@ func getDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if tValue, ok := c.GetQuery("team_id"); ok {
 			teamID, err := strconv.Atoi(tValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["team_id"] = teamID
 		}
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		excludeTeamIDs := []int{}
 		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.CHECK_SCOPE_TEAMS_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		for k := range teamIDs {
 			excludeTeamIDs = append(excludeTeamIDs, k)
 		}
 		data, err := resource.GetDomains(db, excludeTeamIDs, args)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -118,7 +119,7 @@ func getDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if uValue, ok := c.GetQuery("user_id"); ok {
 			userID, err := strconv.Atoi(uValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["user_id"] = userID
@@ -126,27 +127,27 @@ func getDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if tValue, ok := c.GetQuery("team_id"); ok {
 			teamID, err := strconv.Atoi(tValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["team_id"] = teamID
 		}
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		excludeTeamIDs := []int{}
 		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.CHECK_SCOPE_TEAMS_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		for k := range teamIDs {
 			excludeTeamIDs = append(excludeTeamIDs, k)
 		}
 		data, err := resource.GetDomains(db, excludeTeamIDs, args)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -158,7 +159,7 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// message validation
 		err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription(err.Error()))
 			return
 		}
 		if domainCreate.TeamID == 0 {
@@ -167,13 +168,13 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		//create with the user id in the header
 		data, err := resource.CreateDomain(domainCreate, httpcommon.GetUserInfo(c), db, cfg)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -185,7 +186,7 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// message validation
 		err = c.ShouldBindBodyWith(&domainUpdate, binding.JSON)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -197,12 +198,12 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		data, err := resource.UpdateDomain(lcuuid, patchMap, httpcommon.GetUserInfo(c), cfg, db)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -210,13 +211,13 @@ func deleteDomainByNameOrUUID(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		nameOrUUID := c.Param("name-or-uuid")
 		data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db, httpcommon.GetUserInfo(c), cfg)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -224,7 +225,7 @@ func deleteDomainByName(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		rawQuery := strings.Split(c.Request.URL.RawQuery, "name=")
 		if len(rawQuery) < 1 {
-			common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
+			response.JSON(c, response.SetError(response.ServiceError(httpcommon.PARAMETER_ILLEGAL, fmt.Sprintf("please fill in the name parameter: domains/?name={}"))))
 			return
 		}
 		name := rawQuery[1]
@@ -236,11 +237,11 @@ func deleteDomainByName(cfg *config.ControllerConfig) gin.HandlerFunc {
 		log.Infof("delete domain by name(%v)", name)
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := resource.DeleteDomainByNameOrUUID(name, db, httpcommon.GetUserInfo(c), cfg)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -250,13 +251,13 @@ func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		args["lcuuid"] = c.Param("lcuuid")
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		if uValue, ok := c.GetQuery("user_id"); ok {
 			userID, err := strconv.Atoi(uValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["user_id"] = userID
@@ -264,7 +265,7 @@ func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if tValue, ok := c.GetQuery("team_id"); ok {
 			teamID, err := strconv.Atoi(tValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["team_id"] = teamID
@@ -272,14 +273,14 @@ func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		excludeTeamIDs := []int{}
 		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.CHECK_SCOPE_TEAMS_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		for k := range teamIDs {
 			excludeTeamIDs = append(excludeTeamIDs, k)
 		}
 		data, err := resource.GetSubDomains(db, excludeTeamIDs, args)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -295,7 +296,7 @@ func getSubDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if uValue, ok := c.GetQuery("user_id"); ok {
 			userID, err := strconv.Atoi(uValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["user_id"] = userID
@@ -303,27 +304,27 @@ func getSubDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if tValue, ok := c.GetQuery("team_id"); ok {
 			teamID, err := strconv.Atoi(tValue)
 			if err != nil {
-				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 				return
 			}
 			args["team_id"] = teamID
 		}
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		excludeTeamIDs := []int{}
 		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.CHECK_SCOPE_TEAMS_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		for k := range teamIDs {
 			excludeTeamIDs = append(excludeTeamIDs, k)
 		}
 		data, err := resource.GetSubDomains(db, excludeTeamIDs, args)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -335,18 +336,18 @@ func createSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&subDomainCreate, binding.JSON)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription(err.Error()))
 			return
 		}
 
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		data, err := resource.CreateSubDomain(subDomainCreate, db, httpcommon.GetUserInfo(c), cfg)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -356,13 +357,13 @@ func deleteSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		lcuuid := c.Param("lcuuid")
 		data, err := resource.DeleteSubDomain(lcuuid, db, httpcommon.GetUserInfo(c), cfg)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -374,7 +375,7 @@ func updateSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&subDomainUpdate, binding.JSON)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -387,24 +388,24 @@ func updateSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 
 		data, err := resource.UpdateSubDomain(lcuuid, db, httpcommon.GetUserInfo(c), cfg, patchMap)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func applyDomainAddtionalResource(c *gin.Context) {
 	b, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 		return
 	}
 	err = common.CheckJSONParam(string(b), model.AdditionalResource{})
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 		return
 	}
 
@@ -412,18 +413,18 @@ func applyDomainAddtionalResource(c *gin.Context) {
 	err = json.Unmarshal(b, &data)
 	// invalidate request body
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 		return
 	}
 
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 		return
 	}
 
 	err = resource.ApplyDomainAddtionalResource(data, db)
-	common.JsonResponse(c, map[string]interface{}{}, err)
+	response.JSON(c, response.SetError(err))
 }
 
 func listDomainAddtionalResource(c *gin.Context) {
@@ -437,29 +438,29 @@ func listDomainAddtionalResource(c *gin.Context) {
 		resourceName = name
 	}
 	if resourceName != "" && resourceType == "" {
-		common.JsonResponse(c, httpcommon.PARAMETER_ILLEGAL, fmt.Errorf("please enter resource type, resource name(%v)", resourceName))
+		response.JSON(c, response.SetError(response.ServiceError(httpcommon.PARAMETER_ILLEGAL, fmt.Sprintf("please enter resource type, resource name(%v)", resourceName))))
 		return
 	}
 
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 		return
 	}
 
 	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName, db)
-	common.JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func GetDomainAdditionalResourceExample(c *gin.Context) {
 	data, err := resource.GetDomainAdditionalResourceExample()
-	common.JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 		return
 	}
 
@@ -467,22 +468,22 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 	err = c.ShouldBindBodyWith(&data, binding.YAML)
 	if err == nil || err == io.EOF {
 		if err = resource.ApplyDomainAddtionalResource(*data, db); err != nil {
-			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 		d, err := resource.GetDomainAdditionalResource("", "", db)
 		if err != nil {
-			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 		b, err := yaml.Marshal(d)
 		if err != nil {
-			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
-		common.JsonResponse(c, string(b), err)
+		response.JSON(c, response.SetData(string(b))) // TODO 不需要转换类型
 	} else {
-		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 		return
 	}
 }
@@ -490,19 +491,19 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 func getDomainAddtionalResourceAdvanced(c *gin.Context) {
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 		return
 	}
 
 	d, err := resource.GetDomainAdditionalResource("", "", db)
 	if err != nil {
-		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
 	b, err := yaml.Marshal(d)
 	if err != nil {
-		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
+		response.JSON(c, response.SetError(err))
 		return
 	}
-	common.JsonResponse(c, string(b), err)
+	response.JSON(c, response.SetData(string(b))) // TODO 不需要转换类型
 }
