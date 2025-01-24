@@ -1568,6 +1568,7 @@ impl Default for Filters {
                 ("RocketMQ".to_string(), "1-65535".to_string()),
                 ("DNS".to_string(), "53,5353".to_string()),
                 ("TLS".to_string(), "443,6443".to_string()),
+                ("PING".to_string(), "1-65535".to_string()),
                 ("Custom".to_string(), "1-65535".to_string()),
             ]),
             tag_filters: HashMap::from([
@@ -1596,6 +1597,7 @@ impl Default for Filters {
                 ("RocketMQ".to_string(), vec![]),
                 ("DNS".to_string(), vec![]),
                 ("TLS".to_string(), vec![]),
+                ("PING".to_string(), vec![]),
             ]),
             unconcerned_dns_nxdomain_response_suffixes: Default::default(),
         }

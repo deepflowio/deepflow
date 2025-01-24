@@ -74,7 +74,7 @@ func spanKindToTapSide(spanKind v1.Span_SpanKind) flow_metrics.TAPSideEnum {
 
 func spanStatusToResponseStatus(status *v1.Status) datatype.LogMessageStatus {
 	if status == nil {
-		return datatype.STATUS_NOT_EXIST
+		return datatype.STATUS_TIMEOUT
 	}
 	switch status.Code {
 	case v1.Status_STATUS_CODE_OK:
@@ -82,9 +82,9 @@ func spanStatusToResponseStatus(status *v1.Status) datatype.LogMessageStatus {
 	case v1.Status_STATUS_CODE_ERROR:
 		return datatype.STATUS_SERVER_ERROR
 	case v1.Status_STATUS_CODE_UNSET:
-		return datatype.STATUS_NOT_EXIST
+		return datatype.STATUS_TIMEOUT
 	}
-	return datatype.STATUS_NOT_EXIST
+	return datatype.STATUS_TIMEOUT
 }
 
 func HttpCodeToResponseStatus(code int32) datatype.LogMessageStatus {

@@ -60,7 +60,7 @@ type LogMessageStatus uint8
 const (
 	STATUS_OK LogMessageStatus = iota
 	STATUS_ERROR
-	STATUS_NOT_EXIST
+	STATUS_TIMEOUT
 	STATUS_SERVER_ERROR
 	STATUS_CLIENT_ERROR
 )
@@ -76,7 +76,7 @@ func (t LogMessageStatus) String() string {
 	case STATUS_CLIENT_ERROR:
 		return "Client Error"
 	default:
-		return "Unknown"
+		return "Timeout"
 	}
 }
 
