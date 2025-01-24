@@ -661,6 +661,7 @@ pub struct AfPacket {
     pub src_interfaces: Vec<String>,
     pub vlan_pcp_in_physical_mirror_traffic: u16,
     pub bpf_filter_disabled: bool,
+    pub skip_npb_bpf: bool,
     pub tunning: AfPacketTunning,
 }
 
@@ -674,6 +675,7 @@ impl Default for AfPacket {
             extra_bpf_filter: "".to_string(),
             vlan_pcp_in_physical_mirror_traffic: 0,
             bpf_filter_disabled: false,
+            skip_npb_bpf: false,
             tunning: AfPacketTunning::default(),
             src_interfaces: vec![],
         }

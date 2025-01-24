@@ -517,7 +517,7 @@ impl BaseDispatcher {
                 // vxlan-erspan：隧道信息为空
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
                 // erspan-vxlan-erspan；隧道信息为空
-                *tunnel_info = Default::default();
+                tunnel_info.reset_and_retain_erspan_from();
             }
             decap_len += offset;
         }
@@ -806,6 +806,7 @@ impl BaseDispatcherListener {
             proxy_controller_port: self.proxy_controller_port,
             analyzer_source_ip: source_ip.unwrap(),
             analyzer_port: self.analyzer_port,
+            skip_npb_bpf: options.skip_npb_bpf,
         };
 
         let mut bpf_options = self.bpf_options.lock().unwrap();
