@@ -727,7 +727,7 @@ func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageSta
 	} else if p == layers.IPProtocolTCP && t.IsServerError() {
 		return datatype.STATUS_SERVER_ERROR
 	} else {
-		return datatype.STATUS_NOT_EXIST
+		return datatype.STATUS_TIMEOUT
 	}
 }
 

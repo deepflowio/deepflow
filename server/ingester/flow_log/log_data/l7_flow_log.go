@@ -309,7 +309,7 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
 	}
 
-	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
+	h.ResponseStatus = uint8(datatype.STATUS_TIMEOUT)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
 	h.fillL7FlowLog(l, cfg)
@@ -393,7 +393,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 	case datatype.L7_PROTOCOL_KAFKA:
 		if l.Req != nil {
 			if h.responseCode == 0 && !IsKafkaSupportedCommand(l.Req.ReqType) {
-				h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
+				h.ResponseStatus = uint8(datatype.STATUS_TIMEOUT)
 				h.ResponseCode = nil
 			}
 			h.RequestId = &h.requestId

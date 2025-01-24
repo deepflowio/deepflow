@@ -1921,6 +1921,7 @@ mod tests {
             buf_size: 0,
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
+            icmp_data: None,
         };
 
         //测试长度不正确
