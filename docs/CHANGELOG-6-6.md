@@ -46,6 +46,9 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
+* feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF DPDK User-Space Packet Statistics [#8807](https://github.com/deepflowio/deepflow/pull/8807) by [yinjiping](https://github.com/yinjiping)
 * feat: Enable agent after first guard check [#8751](https://github.com/deepflowio/deepflow/pull/8751) by [rvql](https://github.com/rvql)
 * feat: update vtap ignore fields [#8747](https://github.com/deepflowio/deepflow/pull/8747) by [askyrie](https://github.com/askyrie)
