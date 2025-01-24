@@ -1,5 +1,5 @@
 # Value , DisplayName     , Description
 0       , Success         ,
-2       , Unknown         ,
+2       , Timeout         ,
 3       , Server Error    ,
 4       , Client Error    ,

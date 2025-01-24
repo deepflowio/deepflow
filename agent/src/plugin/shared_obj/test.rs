@@ -85,6 +85,7 @@ fn get_req_param<'a>(
         buf_size: 0,
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
+        icmp_data: None,
     }
 }
 
@@ -122,6 +123,7 @@ fn get_resp_param<'a>(
         buf_size: 0,
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
+        icmp_data: None,
     }
 }
 
