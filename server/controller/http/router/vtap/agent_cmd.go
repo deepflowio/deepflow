@@ -35,7 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	service "github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 )
 
@@ -94,21 +94,21 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		db, err := mysql.GetDB(orgID.(int))
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 			c.Abort()
 			return
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			c.Abort()
 			return
 		}
 		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 			c.Abort()
 			return
 		}
@@ -120,7 +120,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			v, err := strconv.Atoi(timesStr)
 			if err != nil {
 				log.Error(err, db.LogPrefixORGID)
-				BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+				response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 				return
 			}
 			forwardTimes = v
@@ -132,7 +132,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err, db.LogPrefixORGID)
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 			c.Abort()
 			return
 		}
@@ -171,7 +171,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 			c.Abort()
 			return
 		}
@@ -186,23 +186,23 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		db, err := mysql.GetDB(orgID.(int))
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 
 		data, err := service.GetCMDAndNamespace(a.cfg.AgentCommandTimeout, orgID.(int), agentID)
 		if err != nil {
-			JsonResponse(c, data, err)
+			response.JSON(c, response.SetData(data), response.SetError(err))
 			return
 		}
 
@@ -233,7 +233,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 			data.LinuxNamespace = nil
 
 		}
-		JsonResponse(c, data, nil)
+		response.JSON(c, response.SetData(data))
 	}
 }
 
@@ -257,7 +257,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		req := service.RemoteExecReq{}
 		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		// Profile commands and probe commands are available to everyone.
@@ -266,7 +266,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			_, ok1 := profileCommandMap[req.CMD]
 			_, ok2 := probeCommandMap[req.CMD]
 			if !(ok1 || ok2) {
-				StatusForbiddenResponse(c, fmt.Sprintf("only super admin and admin can operate command(%s)", req.CMD))
+				response.JSON(c, response.SetStatus(httpcommon.NO_PERMISSIONS), response.SetDescription(fmt.Sprintf("only super admin and admin can operate command(%s)", req.CMD)))
 				return
 			}
 		}
@@ -282,22 +282,22 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		db, err := mysql.GetDB(orgID.(int))
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		content, err := service.RunAgentCMD(a.cfg.AgentCommandTimeout, orgID.(int), agentID, &agentReq, req.CMD)
 		if err != nil {
-			InternalErrorResponse(c, content, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetData(content), response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
 			return
 		}
 
 		if req.OutputFormat.String() == trident.OutputFormat_TEXT.String() {
-			JsonResponse(c, content, nil)
+			response.JSON(c, response.SetData(content))
 			return
 		}
 		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(content)))

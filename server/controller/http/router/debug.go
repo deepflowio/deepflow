@@ -27,7 +27,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -69,14 +70,14 @@ func getCloudBasicInfo(m *manager.Manager) gin.HandlerFunc {
 		args := make(map[string]string)
 		args["lcuuid"] = c.Param("lcuuid")
 		data, err := service.GetCloudBasicInfos(args, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getCloudBasicInfos(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetCloudBasicInfos(map[string]string{}, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -84,7 +85,7 @@ func getCloudResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		lcuuid := c.Param("lcuuid")
 		data, err := service.GetCloudResource(lcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -92,52 +93,52 @@ func triggerDomain(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		lcuuid := c.Param("lcuuid")
 		err := service.TriggerDomain(lcuuid, m)
-		JsonResponse(c, nil, err)
+		response.JSON(c, response.SetError(err))
 	})
 }
 
 func getKubernetesGatherBasicInfos(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetKubernetesGatherBasicInfos(c.Param("lcuuid"), m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getSubDomainResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		db, err := GetContextOrgDB(c)
+		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
 		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := service.GetSubDomainResource(subDomain.Domain, subDomainLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getKubernetesGatherResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		db, err := GetContextOrgDB(c)
+		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
 		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := service.GetKubernetesGatherResource(subDomain.Domain, subDomainLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -146,7 +147,7 @@ func getRecorderCache(m *manager.Manager) gin.HandlerFunc {
 		domainLcuuid := c.Param("domainLcuuid")
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		data, err := service.GetRecorderDomainCache(domainLcuuid, subDomainLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -155,7 +156,7 @@ func getRecorderCacheDiffBaseDataSet(m *manager.Manager) gin.HandlerFunc {
 		domainLcuuid := c.Param("domainLcuuid")
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		data, err := service.GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -164,7 +165,7 @@ func getRecorderCacheToolDataSet(m *manager.Manager) gin.HandlerFunc {
 		domainLcuuid := c.Param("domainLcuuid")
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		data, err := service.GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -174,7 +175,7 @@ func getRecorderDiffBaseDataSetByResourceType(m *manager.Manager) gin.HandlerFun
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		resourceType := c.Param("resourceType")
 		data, err := service.GetRecorderDiffBaseDataSetByResourceType(domainLcuuid, subDomainLcuuid, resourceType, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -185,7 +186,7 @@ func getRecorderDiffBase(m *manager.Manager) gin.HandlerFunc {
 		resourceType := c.Param("resourceType")
 		resourceLcuuid := c.Param("resourceLcuuid")
 		data, err := service.GetRecorderDiffBaseByResourceLcuuid(domainLcuuid, subDomainLcuuid, resourceType, resourceLcuuid, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -195,43 +196,43 @@ func getRecorderCacheToolMap(m *manager.Manager) gin.HandlerFunc {
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		field := c.Param("field")
 		data, err := service.GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field, m)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		orgID, err := GetContextOrgID(c)
+		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := service.GetAgentStats(g, strconv.Itoa(orgID), c.Param("vtapID"))
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		db, err := GetContextOrgDB(c)
+		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		orgID, err := GetContextOrgID(c)
+		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
 			return
 		}
 		dataType := c.Param("type")
@@ -303,19 +304,19 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 		default:
 			err = errors.New("not found " + dataType + " data")
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		orgID, err := GetContextOrgID(c)
+		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
 			return
 		}
 		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -325,15 +326,15 @@ func triggerKubernetesRefresh(m *manager.Manager) gin.HandlerFunc {
 		subDomainLcuuid := c.Query("sub_domain_lcuuid")
 		versionString := c.Query("version")
 		if domainLcuuid == "" || subDomainLcuuid == "" || versionString == "" {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "required parameter missing")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("required parameter missing"))
 			return
 		}
 		version, err := strconv.Atoi(versionString)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		err = service.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version, m)
-		JsonResponse(c, struct{}{}, err)
+		response.JSON(c, response.SetError(err))
 	})
 }

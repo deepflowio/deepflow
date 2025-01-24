@@ -35,7 +35,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -73,7 +74,7 @@ func (v *Vtap) getVtap() gin.HandlerFunc {
 		args := make(map[string]interface{})
 		args["lcuuid"] = c.Param("lcuuid")
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(args)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -97,7 +98,7 @@ func (v *Vtap) getVtaps() gin.HandlerFunc {
 			args["team_id"] = value
 		}
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(args)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -109,12 +110,12 @@ func (v *Vtap) createVtap() gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapCreate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Create(vtapCreate)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -126,7 +127,7 @@ func (v *Vtap) updateVtap() gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -138,7 +139,7 @@ func (v *Vtap) updateVtap() gin.HandlerFunc {
 		lcuuid := c.Param("lcuuid")
 		name := c.Param("name")
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Update(lcuuid, name, patchMap)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -150,7 +151,7 @@ func (v *Vtap) batchUpdateVtap() gin.HandlerFunc {
 		vtapUpdateList := make(map[string][]model.VtapUpdate)
 		err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -160,11 +161,11 @@ func (v *Vtap) batchUpdateVtap() gin.HandlerFunc {
 
 		// 参数校验
 		if _, ok := updateMap["DATA"]; !ok {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("No DATA in request body"))
 		}
 
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchUpdate(updateMap["DATA"])
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -176,7 +177,7 @@ func (v *Vtap) updateVtapLicenseType() gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -187,7 +188,7 @@ func (v *Vtap) updateVtapLicenseType() gin.HandlerFunc {
 
 		lcuuid := c.Param("lcuuid")
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).UpdateVtapLicenseType(lcuuid, patchMap)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -199,7 +200,7 @@ func (v *Vtap) batchUpdateVtapLicenseType() gin.HandlerFunc {
 		vtapUpdateList := make(map[string][]model.VtapUpdate)
 		err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -209,11 +210,11 @@ func (v *Vtap) batchUpdateVtapLicenseType() gin.HandlerFunc {
 
 		// 参数校验
 		if _, ok := updateMap["DATA"]; !ok {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("No DATA in request body"))
 		}
 
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchUpdateVtapLicenseType(updateMap["DATA"])
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -223,7 +224,7 @@ func (v *Vtap) deleteVtap() gin.HandlerFunc {
 
 		lcuuid := c.Param("lcuuid")
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Delete(lcuuid)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -237,12 +238,12 @@ func (v *Vtap) batchDeleteVtap() gin.HandlerFunc {
 
 		// 参数校验
 		if _, ok := deleteMap["DATA"]; !ok {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("No DATA in request body"))
 			return
 		}
 
 		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchDelete(deleteMap["DATA"])
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -251,14 +252,14 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			routercommon.ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		dbInfo, err := mysql.GetDB(orgID.(int))
 		if err != nil {
-			JsonResponse(c, nil, err)
+			response.JSON(c, response.SetError(err))
 			return
 		}
 
@@ -273,23 +274,23 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if value, ok := c.GetQuery("type"); ok {
 			args["type"] = value
 			if args["type"] != "controller" && args["type"] != "analyzer" {
-				BadRequestResponse(
-					c, httpcommon.INVALID_PARAMETERS,
-					fmt.Sprintf("ORG(id=%d database=%s) type (%s) is not supported", dbInfo.ORGID, dbInfo.Name, args["type"]),
+				response.JSON(
+					c, response.SetStatus(httpcommon.INVALID_PARAMETERS),
+					response.SetDescription(fmt.Sprintf("ORG(id=%d database=%s) type (%s) is not supported", dbInfo.ORGID, dbInfo.Name, args["type"])),
 				)
 				return
 			}
 		} else {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "must specify type")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("must specify type"))
 			return
 		}
 
 		data, err := service.VTapRebalance(dbInfo, args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
 		if err != nil {
-			JsonResponse(c, nil, fmt.Errorf("ORG(id=%d database=%s) %s", dbInfo.ORGID, dbInfo.Name, err.Error()))
+			response.JSON(c, response.SetError(fmt.Errorf("ORG(id=%d database=%s) %s", dbInfo.ORGID, dbInfo.Name, err.Error())))
 			return
 		}
-		JsonResponse(c, data, nil)
+		response.JSON(c, response.SetData(data))
 	})
 }
 
@@ -297,18 +298,18 @@ func (v *Vtap) getVtapCSV() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		value, ok := c.GetPostForm("CSV_HEADERS")
 		if !ok {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("can not not get form data(CSV_HEADERS)"))
 			return
 		}
 		var headers []model.CSVHeader
 		if err := json.Unmarshal([]byte(value), &headers); err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("parse form data(CSV_HEADERS) failed"))
 			return
 		}
 
 		vtaps, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(nil)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, "get vtaps failed")
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetError(fmt.Errorf("get vtaps failed: %s", err.Error())))
 			return
 		}
 
@@ -385,11 +386,11 @@ func getVtapCSVData(headerMap map[string]int, vtap *model.Vtap) []string {
 func getVTapPorts(c *gin.Context) {
 	count, err := service.GetVTapPortsCount()
 	if err != nil {
-		BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 		return
 	}
 	resp := map[string]int{
 		"COUNT": count,
 	}
-	JsonResponse(c, resp, nil)
+	response.JSON(c, response.SetData(resp))
 }

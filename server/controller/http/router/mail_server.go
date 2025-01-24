@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -47,7 +47,7 @@ func getMailServer(c *gin.Context) {
 		args["lcuuid"] = value
 	}
 	data, err := service.GetMailServer(args)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func createMailServer(c *gin.Context) {
@@ -57,12 +57,12 @@ func createMailServer(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&mailCreate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 		return
 	}
 
 	data, err := service.CreateMailServer(mailCreate)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func updateMailServer(c *gin.Context) {
@@ -72,7 +72,7 @@ func updateMailServer(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&mailServerUpdate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 		return
 	}
 
@@ -83,7 +83,7 @@ func updateMailServer(c *gin.Context) {
 
 	lcuuid := c.Param("lcuuid")
 	data, err := service.UpdateMailServer(lcuuid, patchMap)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func deleteMailServer(c *gin.Context) {
@@ -91,5 +91,5 @@ func deleteMailServer(c *gin.Context) {
 
 	lcuuid := c.Param("lcuuid")
 	data, err := service.DeleteMailServer(lcuuid)
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }

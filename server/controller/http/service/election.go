@@ -22,7 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 )
 
 func GetLeaderInfo() (resp map[string]string, err error) {
@@ -30,7 +30,7 @@ func GetLeaderInfo() (resp map[string]string, err error) {
 	// node_name/node_ip/pod_name/pod_ip
 	leaderInfo := strings.Split(leaderID, "/")
 	if len(leaderInfo) != election.ID_ITEM_NUM || leaderInfo[0] == "" {
-		return map[string]string{}, NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("id (%s) is not expected", leaderID))
+		return map[string]string{}, response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("id (%s) is not expected", leaderID))
 	}
 	return map[string]string{
 		"NODE_NAME": leaderInfo[0],

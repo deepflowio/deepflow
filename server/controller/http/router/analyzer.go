@@ -23,7 +23,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
@@ -59,7 +60,7 @@ func getAnalyzer(c *gin.Context) {
 	if err != nil {
 		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 	}
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func getAnalyzers(c *gin.Context) {
@@ -82,7 +83,7 @@ func getAnalyzers(c *gin.Context) {
 	if err != nil {
 		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 	}
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
@@ -93,14 +94,14 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		// 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			routercommon.ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&analyzerUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -115,7 +116,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		if err != nil {
 			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -124,7 +125,7 @@ func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		// if not master controller，should forward to master controller
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			routercommon.ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
@@ -134,6 +135,6 @@ func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		if err != nil {
 			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }

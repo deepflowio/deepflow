@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -102,7 +102,7 @@ func fullUpdateDB(orgDB *mysql.DB, dbItems []mysqlmodel.DomainAdditionalResource
 		return tx.Create(&dbItems).Error
 	})
 	if err != nil {
-		return servicecommon.NewError(
+		return response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("apply domain additional resources error: %s", err.Error()),
 		)
@@ -117,7 +117,7 @@ func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.Ad
 	for domainUUID, cloudMD := range domainUUIDToCloudModelData {
 		content, err := json.Marshal(cloudMD)
 		if err != nil {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("json marshal domain (uuid: %s) cloud data (detail: %#v) failed: %s", domainUUID, cloudMD, err.Error()),
 			)
@@ -155,7 +155,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, az := range additionalRsc.AZs {
 		toolDS, ok := domainUUIDToToolDataSet[az.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("az (name: %s) domain (uuid: %s) not found", az.Name, az.DomainUUID),
 			)
@@ -174,7 +174,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, vpc := range additionalRsc.VPCs {
 		toolDS, ok := domainUUIDToToolDataSet[vpc.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("vpc (name: %s) domain (uuid: %s) not found", vpc.Name, vpc.DomainUUID),
 			)
@@ -212,19 +212,19 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, subnet := range additionalRsc.Subnets {
 		toolDS, ok := domainUUIDToToolDataSet[subnet.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) domain (uuid: %s) not found", subnet.Name, subnet.DomainUUID),
 			)
 		}
 		if subnet.AZUUID != "" && !common.Contains(toolDS.azUUIDs, subnet.AZUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) az (uuid: %s) not found", subnet.Name, subnet.AZUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, subnet.VPCUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) vpc (uuid: %s) not found", subnet.Name, subnet.VPCUUID),
 			)
@@ -240,7 +240,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		for _, cidr := range subnet.CIDRs {
 			cidr := formatCIDR(cidr)
 			if cidr == "" {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.INVALID_PARAMETERS,
 					fmt.Sprintf("subnet (name: %s) cidr: %s is invalid", subnet.Name, cidr),
 				)
@@ -259,13 +259,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, host := range additionalRsc.Hosts {
 		toolDS, ok := domainUUIDToToolDataSet[host.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("host (name: %s) domain (uuid: %s) not found", host.Name, host.DomainUUID),
 			)
 		}
 		if !common.Contains(toolDS.azUUIDs, host.AZUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("host (name: %s) az (uuid: %s) not found", host.Name, host.AZUUID),
 			)
@@ -275,7 +275,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		for _, vif := range host.VInterfaces {
 			if vif.SubnetUUID == "" {
 				if len(vif.IPs) != 0 {
-					return nil, servicecommon.NewError(
+					return nil, response.ServiceError(
 						httpcommon.RESOURCE_NOT_FOUND,
 						fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
 					)
@@ -283,7 +283,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 				continue
 			}
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
 				)
@@ -291,7 +291,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 			for _, ip := range vif.IPs {
 				ip := formatIP(ip)
 				if ip == "" {
-					return nil, servicecommon.NewError(
+					return nil, response.ServiceError(
 						httpcommon.INVALID_PARAMETERS,
 						fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is invalid", host.Name, vif.Mac, ip),
 					)
@@ -303,25 +303,25 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, chost := range additionalRsc.CHosts {
 		toolDS, ok := domainUUIDToToolDataSet[chost.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) domain (uuid: %s) not found", chost.Name, chost.DomainUUID),
 			)
 		}
 		if !common.Contains(toolDS.azUUIDs, chost.AZUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) az (uuid: %s) not found", chost.Name, chost.AZUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, chost.VPCUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", chost.Name, chost.VPCUUID),
 			)
 		}
 		if _, ok := toolDS.hostIPToUUID[chost.HostIP]; !ok && chost.HostIP != "" {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) host (ip: %s) not found", chost.Name, chost.HostIP),
 			)
@@ -329,7 +329,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		toolDS.additionalCHosts = append(toolDS.additionalCHosts, chost)
 		for _, vif := range chost.VInterfaces {
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("chost (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", chost.Name, vif.Mac, vif.SubnetUUID),
 				)
@@ -340,26 +340,26 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, lb := range additionalRsc.LB {
 		toolDS, ok := domainUUIDToToolDataSet[lb.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("lb (name: %s) domain (uuid: %s) not found", lb.Name, lb.DomainUUID),
 			)
 		}
 		if toolDS.regionUUID != lb.RegionUUID {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("lb (name: %s) domain (uuid: %s) region(: %s) not found", lb.Name, lb.DomainUUID, lb.RegionUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, lb.VPCUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", lb.Name, lb.VPCUUID),
 			)
 		}
 		for _, vif := range lb.VInterfaces {
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("lb (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", lb.Name, vif.Mac, vif.SubnetUUID),
 				)
@@ -385,7 +385,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, cloudTag := range additionalRsc.CloudTags {
 		toolDS, ok := domainUUIDToToolDataSet[cloudTag.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
 			)
@@ -394,20 +394,20 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		// add cloud tags to subdomain
 		if cloudTag.SubDomainUUID != "" {
 			if cloudTag.ResourceType != CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource type: %s) subdomain (uuid: %s) not support", cloudTag.ResourceType, cloudTag.SubDomainUUID),
 				)
 			}
 			podNSNameToInfo, ok := subdomainUUIDToPodNSNameToInfo[cloudTag.SubDomainUUID]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag subdomain (uuid: %s) not found", cloudTag.SubDomainUUID))
 			}
 			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) subdomain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
@@ -423,14 +423,14 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_CHOST {
 			chostNameToInfo, ok := domainUUIDToCHostNameToInfo[cloudTag.DomainUUID]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
 				)
 			}
 			chost, ok := chostNameToInfo[cloudTag.ResourceName]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
@@ -442,13 +442,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		} else if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
 			podNSNameToInfo, ok := domainUUIDToPodNSNameToInfo[cloudTag.DomainUUID]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
 			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
 			if !ok {
-				return nil, servicecommon.NewError(
+				return nil, response.ServiceError(
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
@@ -458,7 +458,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 			}
 			toolDS.cloudTagPodNamespaces = append(toolDS.cloudTagPodNamespaces, podNS)
 		} else {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("cloud tag (resource type: %s) not support", cloudTag.ResourceType),
 			)
@@ -468,33 +468,33 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 	for _, peerConn := range additionalRsc.PeerConnections {
 		toolDS, ok := domainUUIDToToolDataSet[peerConn.DomainUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("peer_connection (name: %s) domain (uuid: %s) not found", peerConn.Name, peerConn.DomainUUID),
 			)
 		}
 		if peerConn.LocalVPCUUID == peerConn.RemoteVPCUUID {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("peer_connection (name: %s) local vpc and remote vpc cannot be equal", peerConn.Name),
 			)
 		}
 		regionUUIDs := toolDS.peerConnectionRegionUUIDs
 		if len(regionUUIDs) == 0 {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated region", peerConn.DomainUUID),
 			)
 		}
 		if !common.Contains[string](regionUUIDs, peerConn.LocalRegionUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated with local region (uuid: %s), support regions: %#v",
 					peerConn.DomainUUID, peerConn.LocalRegionUUID, regionUUIDs),
 			)
 		}
 		if !common.Contains[string](regionUUIDs, peerConn.RemoteRegionUUID) {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated with remote region (uuid: %s), support regions: %#v",
 					peerConn.DomainUUID, peerConn.RemoteRegionUUID, regionUUIDs),
@@ -502,13 +502,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		}
 		regionUUID, ok := toolDS.vpcUUIDToRegionUUID[peerConn.LocalVPCUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated local vpc (uuid: %v)", peerConn.DomainUUID, peerConn.LocalVPCUUID),
 			)
 		}
 		if peerConn.LocalRegionUUID != regionUUID {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) local vpc (uuid: %v) cannot be associated local region (uuid: %v), wanted region (uuid: %v)",
 					peerConn.DomainUUID, peerConn.LocalVPCUUID, peerConn.LocalRegionUUID, regionUUID),
@@ -516,13 +516,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *mysql.DB
 		}
 		regionUUID, ok = toolDS.vpcUUIDToRegionUUID[peerConn.RemoteVPCUUID]
 		if !ok {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated remote vpc (uuid: %v)", peerConn.DomainUUID, peerConn.RemoteVPCUUID),
 			)
 		}
 		if peerConn.RemoteRegionUUID != regionUUID {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) remote vpc (uuid: %v) cannot be associated remote region (uuid: %v), wanted region (uuid: %v)",
 					peerConn.DomainUUID, peerConn.RemoteVPCUUID, peerConn.RemoteRegionUUID, regionUUID),
@@ -655,7 +655,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 						}
 					}
 					if subnetCIDRUUID == "" {
-						return nil, servicecommon.NewError(
+						return nil, response.ServiceError(
 							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", host.Name, vif.Mac, ip),
 						)
@@ -714,7 +714,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 						}
 					}
 					if subnetCIDRUUID == "" {
-						return nil, servicecommon.NewError(
+						return nil, response.ServiceError(
 							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("chost (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", chost.Name, vif.Mac, ip),
 						)
@@ -791,7 +791,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 						}
 					}
 					if subnetCIDRUUID == "" {
-						return nil, servicecommon.NewError(
+						return nil, response.ServiceError(
 							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("lb (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", lb.Name, vif.Mac, ip),
 						)
@@ -875,7 +875,7 @@ func getRegionDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]stri
 	var dbItems []mysqlmodel.Domain
 	err := orgDB.Where("lcuuid IN (?)", domainUUIDs).Find(&dbItems).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query domain failed: %s", err.Error()),
 		)
@@ -885,7 +885,7 @@ func getRegionDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]stri
 		conf := make(map[string]interface{})
 		err := json.Unmarshal([]byte(domain.Config), &conf)
 		if err != nil {
-			return nil, servicecommon.NewError(
+			return nil, response.ServiceError(
 				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("get domain (uuid: %s) region info failed: %s", domain.Lcuuid, err.Error()),
 			)
@@ -899,7 +899,7 @@ func getAZDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string
 	var azs []mysqlmodel.AZ
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query az failed: %s", err.Error()),
 		)
@@ -915,7 +915,7 @@ func getVPCDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]strin
 	var vpcs []mysqlmodel.VPC
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query vpc failed: %s", err.Error()),
 		)
@@ -931,7 +931,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 	var subnets []mysqlmodel.Network
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
 	if err != nil {
-		return nil, nil, servicecommon.NewError(
+		return nil, nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query subnet failed: %s", err.Error()),
 		)
@@ -950,7 +950,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 		var subnetCIDRs []mysqlmodel.Subnet
 		err := orgDB.Where("vl2id = ?", subnet.ID).Find(&subnetCIDRs).Error
 		if err != nil {
-			return nil, nil, servicecommon.NewError(
+			return nil, nil, response.ServiceError(
 				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("db query subnet_cidr failed: %s", err.Error()),
 			)
@@ -958,7 +958,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 		for _, subnetCIDR := range subnetCIDRs {
 			cidr := ipAndStrMaskToCIDR(subnetCIDR.Prefix, subnetCIDR.Netmask)
 			if cidr == "" {
-				return nil, nil, servicecommon.NewError(
+				return nil, nil, response.ServiceError(
 					httpcommon.SERVER_ERROR,
 					fmt.Sprintf("format db subnet_cidr (uuid: %s) failed", subnetCIDR.Lcuuid),
 				)
@@ -974,7 +974,7 @@ func getDataInfoFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[st
 	var hosts []mysqlmodel.Host
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query host failed: %s", err.Error()),
 		)
@@ -1028,7 +1028,7 @@ func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[stri
 	var chosts []mysqlmodel.VM
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query vm failed: %s", err.Error()),
 		)
@@ -1047,7 +1047,7 @@ func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]ma
 	var podNamespaces []mysqlmodel.PodNamespace
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
@@ -1066,7 +1066,7 @@ func getPodNamespaceInSubdomainFromDB(orgDB *mysql.DB, domainUUIDs []string) (ma
 	var podNamespaces []mysqlmodel.PodNamespace
 	err := orgDB.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
@@ -1133,7 +1133,7 @@ func getPeerConnectionDomainToRegionUUIDs(orgDB *mysql.DB, domainUUIDs []string)
 	var azs []mysqlmodel.AZ
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query az failed: %s", err),
 		)
@@ -1151,7 +1151,7 @@ func getVPCUUIDToRegionUUID(orgDB *mysql.DB, domainUUIDs []string) (map[string]m
 	var vpcs []mysqlmodel.VPC
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
-		return nil, servicecommon.NewError(
+		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query vpc failed: %s", err),
 		)
