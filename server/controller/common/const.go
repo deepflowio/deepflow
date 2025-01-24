@@ -684,10 +684,15 @@ const (
 
 const (
 	HEADER_KEY_CONTENT_TYPE = "Content-Type"
-	HEADER_KEY_ACCEPT       = "Accept"
 	CONTENT_TYPE_JSON       = "application/json"
-	CONTEXT_TYPE_FORM       = "application/x-www-form-urlencoded"
-	ACCEPT_JSON             = "application/json, text/plain"
+	CONTENT_TYPE_FORM       = "application/x-www-form-urlencoded"
+	CONTENT_TYPE_CSV        = "text/csv"
+
+	HEADER_KEY_CONTENT_DISPOSITION          = "Content-Disposition"
+	CONTENT_DISPOSITION_ATTACHMENT_FILENAME = "attachment; filename=%s"
+
+	HEADER_KEY_ACCEPT = "Accept"
+	ACCEPT_JSON       = "application/json, text/plain"
 
 	HEADER_KEY_X_ORG_ID    = "X-Org-Id"
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"

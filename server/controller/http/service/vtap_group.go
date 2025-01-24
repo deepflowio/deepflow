@@ -31,8 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
@@ -163,14 +163,14 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 
 	db.Model(&mysqlmodel.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {
-		return model.VtapGroup{}, NewError(
+		return model.VtapGroup{}, response.ServiceError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
 			fmt.Sprintf("vtap_group count exceeds (limit %d)", cfg.Spec.VTapGroupMax),
 		)
 	}
 
 	if len(vtapGroupCreate.VtapLcuuids) > cfg.Spec.VTapMaxPerGroup {
-		return model.VtapGroup{}, NewError(
+		return model.VtapGroup{}, response.ServiceError(
 			httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
 			fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
 		)
@@ -194,7 +194,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	groupID := vtapGroupCreate.GroupID
 	// verify vtap group id in deepflow-ctl command model
 	if err := verifyGroupID(db, groupID); err != nil {
-		return model.VtapGroup{}, NewError(httpcommon.INVALID_POST_DATA, err.Error())
+		return model.VtapGroup{}, response.ServiceError(httpcommon.INVALID_POST_DATA, err.Error())
 	}
 	if groupID != "" {
 		shortUUID = groupID
@@ -241,7 +241,7 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 		return nil
 	}
 	if !IsVtapGroupShortUUID(groupID) {
-		return NewError(
+		return response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",
 				groupID, VTAP_GROUP_SHORT_UUID_PREFIX, common.SHORT_UUID_LENGTH),
@@ -251,7 +251,7 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 	var vtapGroupCount int64
 	db.Model(&mysqlmodel.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
-		return NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
+		return response.ServiceError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
 	}
 	return nil
 }
@@ -345,7 +345,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 		// update agents in agent group
 		if _, ok := vtapGroupUpdate["VTAP_LCUUIDS"]; ok {
 			if len(vtapGroupUpdate["VTAP_LCUUIDS"].([]interface{})) > cfg.Spec.VTapMaxPerGroup {
-				return NewError(
+				return response.ServiceError(
 					httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
 					fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
 				)
@@ -378,7 +378,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 
 			var defaultVtapGroup mysqlmodel.VTapGroup
 			if ret := tx.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
-				return NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
+				return response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 			}
 
 			var agents []mysqlmodel.VTap
@@ -439,19 +439,19 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 
 	var vtapGroup mysqlmodel.VTapGroup
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
-		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT_GROUP, vtapGroup.Lcuuid); err != nil {
 		return nil, err
 	}
 	var agents []mysqlmodel.VTap
 	if err = db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&agents).Error; err != nil {
-		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
 	var defaultVtapGroup mysqlmodel.VTapGroup
 	if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
-		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
+		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 	}
 
 	log.Infof("delete vtap_group (%s)", vtapGroup.Name, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)

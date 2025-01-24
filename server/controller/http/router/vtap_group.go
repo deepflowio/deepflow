@@ -23,7 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -50,7 +50,7 @@ func (v *VtapGroup) getVtapGroup() gin.HandlerFunc {
 		args["lcuuid"] = c.Param("lcuuid")
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -74,7 +74,7 @@ func (v *VtapGroup) getVtapGroups() gin.HandlerFunc {
 		}
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
@@ -86,7 +86,7 @@ func (v *VtapGroup) createVtapGroup() gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapGroupCreate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 		if vtapGroupCreate.TeamID == 0 {
@@ -95,7 +95,7 @@ func (v *VtapGroup) createVtapGroup() gin.HandlerFunc {
 
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Create(vtapGroupCreate)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -106,7 +106,7 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 
 		err = c.ShouldBindBodyWith(&vtapGroupUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -114,13 +114,13 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		// 避免struct会有默认值，这里转为map作为函数入参
 		patchMap := map[string]interface{}{}
 		if err := c.ShouldBindBodyWith(&patchMap, binding.JSON); err != nil {
-			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			return
 		}
 
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Update(c.Param("lcuuid"), patchMap, v.cfg)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -131,6 +131,6 @@ func (v *VtapGroup) deleteVtapGroup() gin.HandlerFunc {
 		lcuuid := c.Param("lcuuid")
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Delete(lcuuid)
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
