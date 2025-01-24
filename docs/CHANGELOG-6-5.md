@@ -172,6 +172,11 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Add a Musl flag option [#9022](https://github.com/deepflowio/deepflow/pull/9022) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add an extended directory [#9019](https://github.com/deepflowio/deepflow/pull/9019) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add compilation for extension files [#9015](https://github.com/deepflowio/deepflow/pull/9015) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9014](https://github.com/deepflowio/deepflow/pull/9014) by [yinjiping](https://github.com/yinjiping)
+* feat: updatae tunnel decap feature [#8591](https://github.com/deepflowio/deepflow/pull/8591) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: update vtap ignore fields [#8746](https://github.com/deepflowio/deepflow/pull/8746) by [askyrie](https://github.com/askyrie)
 *  feat: support fanout in mirror mode and analyzer mode [#8730](https://github.com/deepflowio/deepflow/pull/8730) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: deprecated ipvlan [#8724](https://github.com/deepflowio/deepflow/pull/8724) by [askyrie](https://github.com/askyrie)
