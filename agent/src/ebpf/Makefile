@@ -190,6 +190,7 @@ user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
+	$(Q)mkdir -p $@/user/extended
 	$(Q)mkdir -p $@/user/profile/{java,extended}
 
 $(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OBJDIR)
