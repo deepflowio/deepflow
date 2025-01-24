@@ -73,6 +73,7 @@ pub enum L7Protocol {
     // INFRA
     DNS = 120,
     TLS = 121,
+    Ping = 122,
 
     Custom = 127,
 
@@ -90,6 +91,7 @@ impl L7Protocol {
             | Self::Dubbo
             | Self::SofaRPC
             | Self::SomeIp
+            | Self::Ping
             | Self::Custom => true,
             _ => false,
         }
@@ -125,6 +127,7 @@ impl From<String> for L7Protocol {
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "tls" => Self::TLS,
+            "ping" => Self::Ping,
             "some/ip" | "someip" => Self::SomeIp,
             _ => Self::Unknown,
         }
