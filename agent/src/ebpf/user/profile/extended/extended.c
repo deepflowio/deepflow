@@ -46,3 +46,8 @@ int __attribute__ ((weak)) extended_proc_event_handler(int pid,
 void __attribute__ ((weak)) extended_print_cp_tracer_status(void)
 {
 }
+
+int __attribute__ ((weak)) set_socket_fanout_ebpf(int socket, int group_id)
+{
+	return 0;
+}

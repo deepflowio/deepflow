@@ -17,7 +17,8 @@ CLANG ?= /usr/bin/clang
 LLVM_STRIP ?= /usr/bin/llvm-strip
 LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
 CC ?= gcc
-TAEGET_KERN_SRC = socket_trace.bpf.c perf_profiler.bpf.c
+TAEGET_KERN_SRC := socket_trace.bpf.c perf_profiler.bpf.c
+TAEGET_KERN_SRC += $(KERN_SRC_EXTRA)
 TAEGET_KERN_LL = $(TAEGET_KERN_SRC:c=ll)
 TAEGET_KERN_ELF = $(TAEGET_KERN_SRC:c=elf)
 ifeq ($(V),1)
@@ -69,6 +70,7 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -D__BPF_TRACING__ -D GROUP_LEADER_OFFSET_O
 	$(Q)$(LLVM_STRIP) -g $@ # strip useless DWARF info
 
 clean:
+	@rm -f ../user/extended/bpf/*.bpf.elf ../user/extended/bpf/*.bpf.ll
 	@rm $(TAEGET_KERN_ELF) $(TARGET) ${TAEGET_KERN_ELF:.elf=.ll} *.S *.objdump -rf
 
 .PHONY: all clean

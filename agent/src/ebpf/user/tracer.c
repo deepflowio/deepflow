@@ -503,29 +503,27 @@ static int map_resize_set(struct ebpf_object *obj, struct map_config *m_conf)
 	return ebpf_map_size_adjust(map, m_conf->max_entries);
 }
 
-int tracer_bpf_load(struct bpf_tracer *tracer)
+struct ebpf_object *create_ebpf_object(const void *bpf_code,
+				       size_t code_size, const char *name)
 {
 	struct ebpf_object *obj;
-	int ret;
-	obj = ebpf_open_buffer(tracer->buffer_ptr,
-			       tracer->buffer_sz, tracer->bpf_load_name);
+	obj = ebpf_open_buffer(bpf_code, code_size, name);
 	if (IS_NULL(obj)) {
 		ebpf_warning("ebpf_open_buffer() \"%s\" failed, error:%s\n",
-			     tracer->bpf_load_name, strerror(errno));
-		return ETR_INVAL;
+			     name, strerror(errno));
+		return NULL;
 	}
 
-	struct map_config *m_conf;
-	list_for_each_entry(m_conf, &tracer->maps_conf_head, list) {
-		if ((ret = map_resize_set(obj, m_conf)))
-			return ret;
-	}
+	return obj;
+}
 
-	ret = ebpf_obj_load(obj);
+int load_ebpf_object(struct ebpf_object *obj)
+{
+	int ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_warning("bpf load \"%s\" failed, error:%s (%d).\n",
-			     tracer->bpf_load_name, strerror(errno), errno);
-		if (!strcmp(tracer->bpf_load_name, "socket-trace-bpf-linux-kfunc")) {
+		ebpf_warning("bpf load '%s' failed, error:%s (%d).\n",
+			     obj->name, strerror(errno), errno);
+		if (!strcmp(obj->name, "socket-trace-bpf-linux-kfunc")) {
 			ebpf_info("Try other eBPF bytecode binaries ...\n");
 			return ret;
 		}
@@ -553,11 +551,34 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 		ebpf_warning("eBPF load failed, If you want to run normally, "
 			     "you can disable the eBPF feature.\n");
+	}
+
+	return ret;
+}
+
+int tracer_bpf_load(struct bpf_tracer *tracer)
+{
+	struct ebpf_object *obj;
+	int ret;
+	obj = create_ebpf_object(tracer->buffer_ptr,
+				 tracer->buffer_sz, tracer->bpf_load_name);
+	if (IS_NULL(obj)) {
+		return ETR_INVAL;
+	}
+
+	struct map_config *m_conf;
+	list_for_each_entry(m_conf, &tracer->maps_conf_head, list) {
+		if ((ret = map_resize_set(obj, m_conf)))
+			return ret;
+	}
+
+	ret = load_ebpf_object(obj);
+	if (ret != 0) {
 		return ret;
 	}
 
 	tracer->obj = obj;
-	ebpf_info("bpf load \"%s\" succeed.\n", tracer->bpf_load_name);
+	ebpf_info("bpf load \"%s\" succeed.\n", obj->name);
 	return ETR_OK;
 }
 
@@ -1523,7 +1544,7 @@ static int boot_time_update(void)
  */
 static void *kick_kern_push_data(void *arg)
 {
-	int cpu_id = (int)((uintptr_t)arg);	// Extract CPU ID from the argument
+	int cpu_id = (int)((uintptr_t) arg);	// Extract CPU ID from the argument
 	char thread_name[NAME_LEN];
 
 	// Set a descriptive thread name
@@ -1629,7 +1650,8 @@ static void period_process_main(__unused void *arg)
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (cpu_online[i])
 			if (pthread_create
-			    (&threads[i], NULL, kick_kern_push_data, (void *)(uintptr_t)i) != 0) {
+			    (&threads[i], NULL, kick_kern_push_data,
+			     (void *)(uintptr_t) i) != 0) {
 				ebpf_warning("pthread_create failed");
 			}
 	}

@@ -38,6 +38,7 @@ target/
 /agent/src/ebpf/user/socket_trace_bpf_5_2_plus.c
 /agent/src/ebpf/user/socket_trace_bpf_kylin.c
 /agent/src/ebpf/user/perf_profiler_bpf_common.c
+/agent/src/ebpf/user/af_packet_fanout_bpf_common.c
 /agent/src/ebpf/user/profile/java_agent_so_gnu.c
 /agent/src/ebpf/user/profile/java_agent_so_musl.c
 /agent/src/ebpf/tools/bintobuffer

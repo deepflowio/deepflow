@@ -38,6 +38,8 @@ MUSL_CC ?= musl-gcc
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
 
+-include user/extended/feature.top.mk
+
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
 	@cd kernel && make clean --no-print-directory && make socket_trace.bpf.elf $(2) --no-print-directory && cd ../
@@ -90,6 +92,7 @@ OBJS := user/elf.o \
 	user/vec.o \
 	user/bihash.o \
 	user/profile/profile_common.o \
+	$(patsubst %.c,%.o,$(wildcard user/extended/*.c)) \
 	$(patsubst %.c,%.o,$(wildcard user/profile/extended/*.c)) \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
@@ -143,7 +146,7 @@ SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c
 
-ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS)
+ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(AF_PACKET_FANOUT_ELFS)
 
 tools/bintobuffer:
 	$(call msg,TOOLS,tools/bintobuffer)
@@ -187,6 +190,7 @@ user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
+	$(Q)mkdir -p $@/user/extended
 	$(Q)mkdir -p $@/user/profile/{java,extended}
 
 $(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OBJDIR)
@@ -233,6 +237,8 @@ libs/jattach/build/libjattach.a:
 	$(call msg,MAKE,$@)
 	$(Q)patch -p1 -d libs/jattach -Ns --no-backup-if-mismatch <libs/0001-Add-compilation-for-static-lib.patch || true
 	$(Q)$(MAKE) -sC libs/jattach dll --no-print-directory
+
+-include user/extended/feature.bottom.mk
 
 rust-sample: .socket-tracer .profiler
 socket-tracer: .socket-tracer
@@ -314,4 +320,3 @@ test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
 
 .PHONY: all build clean tools test rust-sample .socket-tracer .profiler
-
