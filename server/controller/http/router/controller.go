@@ -26,7 +26,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
@@ -61,7 +62,7 @@ func getController(c *gin.Context) {
 	if err != nil {
 		err = fmt.Errorf("org id(%v), %s", orgID, err.Error())
 	}
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func getControllers(c *gin.Context) {
@@ -93,7 +94,7 @@ func getControllers(c *gin.Context) {
 	if err != nil {
 		err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 	}
-	JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
@@ -104,14 +105,14 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		// 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			routercommon.ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&controllerUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
 			return
 		}
 
@@ -126,7 +127,7 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		if err != nil {
 			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }
 
@@ -135,7 +136,7 @@ func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		// if not master controller，should forward to master controller
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			routercommon.ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
@@ -145,7 +146,7 @@ func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		if err != nil {
 			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
 		}
-		JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 		return
 	})
 }

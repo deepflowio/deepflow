@@ -25,8 +25,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	metadbcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	"github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
@@ -55,49 +55,49 @@ func (d *ORGData) Create(c *gin.Context) {
 	var body model.ORGDataCreate
 	err = c.ShouldBindBodyWith(&body, binding.JSON)
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 		return
 	}
 
 	resp, err := service.CreateORGData(body, d.metadbCfg)
-	common.JsonResponse(c, map[string]interface{}{"DATABASE": resp}, err)
+	response.JSON(c, response.SetData(map[string]interface{}{"DATABASE": resp}), response.SetError(err))
 }
 
 func (d *ORGData) Delete(c *gin.Context) {
 	orgID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 		return
 	}
 	err = service.DeleteORGData(orgID, d.metadbCfg)
-	common.JsonResponse(c, nil, err)
+	response.JSON(c, response.SetError(err))
 }
 
 func (d *ORGData) DeleteNonRealTime(c *gin.Context) {
 	orgIDs, ok := c.GetQueryArray("org_id")
 	if !ok {
-		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, "org_id is required")
+		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription("org_id is required"))
 		return
 	}
 	ints := make([]int, 0, len(orgIDs))
 	for _, id := range orgIDs {
 		i, err := strconv.Atoi(id)
 		if err != nil {
-			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription(err.Error()))
 			return
 		}
 		ints = append(ints, i)
 	}
 	err := service.DeleteORGDataNonRealTime(ints)
-	common.JsonResponse(c, nil, err)
+	response.JSON(c, response.SetError(err))
 }
 
 func (d *ORGData) Get(c *gin.Context) {
 	data, err := service.GetORGData(d.cfg)
-	common.JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
 func (d *ORGData) AllocORGID(c *gin.Context) {
 	data, err := service.AllocORGID()
-	common.JsonResponse(c, data, err)
+	response.JSON(c, response.SetData(data), response.SetError(err))
 }

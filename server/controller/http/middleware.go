@@ -23,7 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,8 +35,7 @@ func HandleORGIDMiddleware() gin.HandlerFunc {
 			var err error
 			orgID, err = strconv.Atoi(orgIDString)
 			if err != nil {
-				errStr := fmt.Sprintf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)
-				routercommon.BadRequestResponse(ctx, httpcommon.ORG_ID_INVALID, errStr)
+				response.JSON(ctx, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(fmt.Sprintf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)))
 				ctx.Abort()
 				return
 			}

@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -43,7 +43,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *metadbmodel.VTapRepo) (*model.Vta
 	var vtapRepoFirst metadbmodel.VTapRepo
 	if err := db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, NewError(httpcommon.SERVER_ERROR,
+			return nil, response.ServiceError(httpcommon.SERVER_ERROR,
 				fmt.Sprintf("fail to query vtap_repo by name(%s), error: %s", vtapRepoCreate.Name, err))
 		}
 
@@ -106,11 +106,11 @@ func DeleteVtapRepo(orgID int, name string) error {
 	db := dbInfo.DB
 	var vtapRepo metadbmodel.VTapRepo
 	if err := db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
-		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
+		return response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
 	}
 
 	if err := db.Where("name = ?", name).Delete(&metadbmodel.VTapRepo{}).Error; err != nil {
-		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete vtap_repo (name: %s) failed", name))
+		return response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete vtap_repo (name: %s) failed", name))
 	}
 	return nil
 }

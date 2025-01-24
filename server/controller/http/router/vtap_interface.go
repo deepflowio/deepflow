@@ -21,7 +21,7 @@ import (
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 )
 
@@ -47,6 +47,6 @@ func (v *VTapInterface) getVTapInterfaces() gin.HandlerFunc {
 			args["user_id"] = value
 		}
 		data, err := vtap.NewVTapInterface(v.cfg, httpcommon.GetUserInfo(c)).Get(args)
-		common.JsonResponse(c, data, err)
+		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }

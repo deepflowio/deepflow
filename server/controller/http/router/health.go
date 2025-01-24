@@ -23,8 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -48,7 +47,7 @@ func NewHealth() *Health {
 func (s *Health) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/health/", func(c *gin.Context) {
 		if curStage == OK {
-			JsonResponse(c, make(map[string]string), nil)
+			response.JSON(c)
 		} else {
 			curStageCost := time.Since(curStageStartedAt)
 			msg := fmt.Sprintf("server is in stage: %s now, time cost: %v", curStage, curStageCost)
@@ -56,9 +55,9 @@ func (s *Health) RegisterTo(e *gin.Engine) {
 			if curStage == StageMySQLMigration && curStageCost > 30*time.Second {
 				log.Warningf("MySQL migration is taking too long, please add initialDelaySeconds of server to wait for migration to complete")
 			}
-			JsonResponse(
-				c, make(map[string]string),
-				servicecommon.NewError(httpcommon.SERVICE_UNAVAILABLE, msg),
+			response.JSON(
+				c,
+				response.SetError(response.ServiceError(httpcommon.SERVICE_UNAVAILABLE, msg)),
 			)
 		}
 	})

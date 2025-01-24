@@ -154,6 +154,6 @@ func CURLForm(method string, url string, values url.Values, options ...HeaderOpt
 		log.Error(err)
 		return errResponse, err
 	}
-	req.Header.Set(HEADER_KEY_CONTENT_TYPE, CONTEXT_TYPE_FORM)
+	req.Header.Set(HEADER_KEY_CONTENT_TYPE, CONTENT_TYPE_FORM)
 	return doRequest(req, url, options...)
 }

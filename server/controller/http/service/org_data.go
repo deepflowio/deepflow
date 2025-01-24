@@ -38,8 +38,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -160,7 +160,7 @@ func AllocORGID() (map[string]int, error) {
 	}
 	if len(ids) != 1 {
 		log.Errorf("request ids=%v err", ids)
-		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("request ids=%v err", ids))
+		return nil, response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("request ids=%v err", ids))
 	}
 	return map[string]int{"ID": ids[0]}, nil
 }
