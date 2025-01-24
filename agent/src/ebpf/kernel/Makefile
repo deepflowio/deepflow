@@ -56,7 +56,7 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
 
 %.elf: %.c
 	$(call msg,BPF,$@,$(CORE))	
-	$(Q)$(CLANG) $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -std=gnu99 -Wimplicit-function-declaration \
+	$(Q)$(CLANG) $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -DCOMPILE_MUSL=$(C_USE_STATIC) -std=gnu99 -Wimplicit-function-declaration \
 		-ffreestanding -fno-builtin -Wall \
 		-Wno-deprecated-declarations \
 		-Wno-gnu-variable-sized-type-not-at-end \
