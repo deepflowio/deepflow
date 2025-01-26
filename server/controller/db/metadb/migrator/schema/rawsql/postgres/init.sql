@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS epc (
     UNIQUE (lcuuid)
 );
 TRUNCATE TABLE epc;
+CREATE INDEX epc_region_index ON epc (region);
 COMMENT ON COLUMN epc.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN epc.mode IS '1:route, 2:transparent';
 
@@ -159,6 +160,7 @@ CREATE TABLE IF NOT EXISTS vl2 (
     UNIQUE (lcuuid)
 );
 TRUNCATE TABLE vl2;
+CREATE INDEX vl2_region_index ON vl2 (region);
 COMMENT ON COLUMN vl2.state IS '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.Destroyed';
 COMMENT ON COLUMN vl2.net_type IS '1.CTRL 2.SERVICE 3.WAN 4.LAN';
 COMMENT ON COLUMN vl2.create_method IS '0.learning 1.user_defined';
@@ -214,6 +216,7 @@ CREATE TABLE IF NOT EXISTS routing_table (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE routing_table;
+CREATE INDEX vnet_id_index ON routing_table (vnet_id);
 
 CREATE TABLE IF NOT EXISTS dhcp_port (
     id                  SERIAL PRIMARY KEY,
@@ -292,6 +295,10 @@ CREATE TABLE IF NOT EXISTS vm (
 );
 TRUNCATE TABLE vm;
 CREATE INDEX vm_state_server_index ON vm (state, launch_server);
+CREATE INDEX vm_launch_server_index ON vm (launch_server);
+CREATE INDEX vm_epc_id_index ON vm (epc_id);
+CREATE INDEX vm_az_index ON vm (az);
+CREATE INDEX vm_region_index ON vm (region);
 COMMENT ON COLUMN vm.state IS '0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8.To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying';
 COMMENT ON COLUMN vm.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN vm.htype IS '1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s';
@@ -313,6 +320,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     deviceid            INTEGER,
     netns_id            BIGINT DEFAULT 0 CHECK (netns_id >= 0 AND netns_id <= 4294967295),
     vtap_id             INTEGER DEFAULT 0,
+    epc_id              INTEGER DEFAULT 0,
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
     region              VARCHAR(64) DEFAULT '',
@@ -321,6 +329,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE vinterface;
+CREATE INDEX vinterface_epc_id_index ON vinterface (epc_id);
 COMMENT ON COLUMN vinterface.state IS '1. Attached 2.Detached 3.Exception';
 COMMENT ON COLUMN vinterface.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN vinterface.iftype IS '0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool';
@@ -514,6 +523,7 @@ CREATE TABLE IF NOT EXISTS lb_listener (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE lb_listener;
+CREATE INDEX lb_listener_lb_id_index ON lb_listener (lb_id);
 COMMENT ON COLUMN lb_listener.ips IS 'separated by ,';
 COMMENT ON COLUMN lb_listener.snat_ips IS 'separated by ,';
 
@@ -533,6 +543,7 @@ CREATE TABLE IF NOT EXISTS lb_target_server (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE lb_target_server;
+CREATE INDEX lb_target_server_lb_id_index ON lb_target_server (lb_id);
 COMMENT ON COLUMN lb_target_server.type IS '1.VM 2.IP';
 
 CREATE TABLE IF NOT EXISTS lb_vm_connection (
@@ -632,6 +643,10 @@ CREATE TABLE IF NOT EXISTS pod_node (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE pod_node;
+CREATE INDEX pod_node_pod_cluster_id_index ON pod_node (pod_cluster_id);
+CREATE INDEX pod_node_epc_id_index ON pod_node (epc_id);
+CREATE INDEX pod_node_az_index ON pod_node (az);
+CREATE INDEX pod_node_region_index ON pod_node (region);
 COMMENT ON COLUMN pod_node.type IS '1: Master 2: Node';
 COMMENT ON COLUMN pod_node.server_type IS '1: Host 2: VM';
 COMMENT ON COLUMN pod_node.state IS '0: Exception 1: Normal';
@@ -697,6 +712,7 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE pod_ingress_rule;
+CREATE INDEX pod_ingress_rule_pod_ingress_id_index ON pod_ingress_rule (pod_ingress_id);
 
 CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
     id                  SERIAL PRIMARY KEY,
@@ -737,6 +753,9 @@ CREATE TABLE IF NOT EXISTS pod_service (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE pod_service;
+CREATE INDEX pod_service_pod_ingress_id_index ON pod_service (pod_ingress_id);
+CREATE INDEX pod_service_pod_namespace_id_index ON pod_service (pod_namespace_id);
+CREATE INDEX pod_service_pod_cluster_id_index ON pod_service (pod_cluster_id);
 CREATE INDEX pod_service_domain_index ON pod_service (domain);
 
 COMMENT ON COLUMN pod_service.label IS 'separated by ,';
@@ -760,6 +779,7 @@ CREATE TABLE IF NOT EXISTS pod_service_port (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE pod_service_port;
+CREATE INDEX pod_service_port_pod_service_id_index ON pod_service_port (pod_service_id);
 
 CREATE TABLE IF NOT EXISTS pod_group (
     id                  SERIAL PRIMARY KEY,
@@ -780,6 +800,8 @@ CREATE TABLE IF NOT EXISTS pod_group (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE pod_group;
+CREATE INDEX pod_group_pod_namespace_id_index ON pod_group (pod_namespace_id);
+CREATE INDEX pod_group_pod_cluster_id_index ON pod_group (pod_cluster_id);
 COMMENT ON COLUMN pod_group.type IS '1: Deployment 2: StatefulSet 3: ReplicationController';
 COMMENT ON COLUMN pod_group.label IS 'separated by ,';
 
@@ -817,6 +839,8 @@ CREATE TABLE IF NOT EXISTS pod_rs (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE pod_rs;
+CREATE INDEX pod_rs_pod_group_id_index ON pod_rs (pod_group_id);
+CREATE INDEX pod_rs_pod_namespace_id_index ON pod_rs (pod_namespace_id);
 COMMENT ON COLUMN pod_rs.label IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS pod (
@@ -844,8 +868,17 @@ CREATE TABLE IF NOT EXISTS pod (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          TIMESTAMP DEFAULT NULL
 );
-CREATE INDEX pod_domain_index ON pod (domain);
 TRUNCATE TABLE pod;
+CREATE INDEX pod_state_index ON pod (state);
+CREATE INDEX pod_pod_rs_id_index ON pod (pod_rs_id);
+CREATE INDEX pod_pod_group_id_index ON pod (pod_group_id);
+CREATE INDEX pod_pod_namespace_id_index ON pod (pod_namespace_id);
+CREATE INDEX pod_pod_node_id_index ON pod (pod_node_id);
+CREATE INDEX pod_pod_cluster_id_index ON pod (pod_cluster_id);
+CREATE INDEX pod_epc_id_index ON pod (epc_id);
+CREATE INDEX pod_az_index ON pod (az);
+CREATE INDEX pod_region_index ON pod (region);
+CREATE INDEX pod_domain_index ON pod (domain);
 COMMENT ON COLUMN pod.label IS 'separated by ,';
 COMMENT ON COLUMN pod.annotation IS 'separated by ,';
 COMMENT ON COLUMN pod.env IS 'separated by ,';

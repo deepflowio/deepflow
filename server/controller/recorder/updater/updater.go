@@ -131,7 +131,7 @@ func newUpdaterBase[
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 	)
 
-	log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
+	// log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
 	u.initPubSub()
 	return u
 }

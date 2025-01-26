@@ -32,6 +32,13 @@ func (b *DataSet) AddVInterface(dbItem *metadbmodel.VInterface, seq int, toolDat
 	if dbItem.DeviceID != 0 {
 		deviceLcuuid, _ = toolDataSet.GetDeviceLcuuidByID(dbItem.DeviceType, dbItem.DeviceID)
 	}
+	var vpcID int
+	if dbItem.DeviceType != ctrlrcommon.VIF_DEVICE_TYPE_HOST {
+		vpcID, _ = toolDataSet.GetDeviceVPCIDByID(dbItem.DeviceType, dbItem.DeviceID)
+	}
+	if vpcID == 0 {
+		vpcID, _ = toolDataSet.GetNetworkVPCIDByID(dbItem.NetworkID)
+	}
 	b.VInterfaces[dbItem.Lcuuid] = &VInterface{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -42,6 +49,7 @@ func (b *DataSet) AddVInterface(dbItem *metadbmodel.VInterface, seq int, toolDat
 		VtapID:          dbItem.VtapID,
 		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
+		VPCID:           dbItem.VPCID,
 		DeviceType:      dbItem.DeviceType,
 		DeviceLcuuid:    deviceLcuuid,
 		NetworkLcuuid:   networkLcuuid,
@@ -63,6 +71,7 @@ type VInterface struct {
 	TapMac          string `json:"tap_mac"`
 	NetnsID         uint32 `json:"netns_id"`
 	VtapID          uint32 `json:"vtap_id"`
+	VPCID           int    `json:"vpc_id"`
 	DeviceType      int    `json:"device_type"`
 	DeviceLcuuid    string `json:"device_lcuuid"`
 	NetworkLcuuid   string `json:"network_lcuuid"`
@@ -76,6 +85,7 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.TapMac = cloudItem.TapMac
 	v.NetnsID = cloudItem.NetnsID
 	v.VtapID = cloudItem.VTapID
+	v.VPCID = cloudItem.VPCID
 	v.DeviceLcuuid = cloudItem.DeviceLcuuid
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
