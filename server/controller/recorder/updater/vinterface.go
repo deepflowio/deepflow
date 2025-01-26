@@ -105,6 +105,27 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 			i.metadata.LogPrefixes)
 		return nil, false
 	}
+	var vpcID int
+	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
+		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByID(cloudItem.DeviceType, deviceID)
+		if !exists {
+			log.Errorf(
+				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
+				cloudItem.DeviceType, cloudItem.DeviceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				i.metadata.LogPrefixes)
+		}
+	}
+	if vpcID == 0 {
+		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByID(networkID)
+		if !exists {
+			log.Error(
+				"vpc for network (id: %d) for %s (lcuuid: %s) not found",
+				networkID, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				i.metadata.LogPrefixes)
+			return nil, false
+		}
+	}
 
 	dbItem := &mysqlmodel.VInterface{
 		Name:       cloudItem.Name,
@@ -116,6 +137,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		DeviceType: cloudItem.DeviceType,
 		DeviceID:   deviceID,
 		VlanTag:    0,
+		VPCID:      vpcID,
 		SubDomain:  cloudItem.SubDomainLcuuid,
 		Domain:     i.metadata.Domain.Lcuuid,
 		Region:     cloudItem.RegionLcuuid,
@@ -186,5 +208,32 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 		mapInfo["vtap_id"] = cloudItem.VTapID
 		structInfo.VTapID.Set(diffBase.VtapID, cloudItem.VTapID)
 	}
+
+	var vpcID int
+	var exists bool
+	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
+		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		if !exists {
+			log.Errorf(
+				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
+				cloudItem.DeviceType, cloudItem.DeviceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				i.metadata.LogPrefixes)
+		}
+	}
+	if vpcID == 0 {
+		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByLcuuid(cloudItem.NetworkLcuuid)
+		if !exists {
+			log.Error(
+				"vpc for network (lcuuid: %d) for %s (lcuuid: %s) not found",
+				cloudItem.NetworkLcuuid, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				i.metadata.LogPrefixes)
+		}
+	}
+	cloudItem.VPCID = vpcID
+	if exists && diffBase.VPCID != cloudItem.VPCID {
+		mapInfo["epc_id"] = vpcID
+	}
+
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

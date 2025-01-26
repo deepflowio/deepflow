@@ -57,6 +57,7 @@ type DataSet struct {
 	publicNetworkID   int
 	networkLcuuidToID map[string]int
 	networkIDToLcuuid map[int]string
+	networkIDToVPCID  map[int]int
 
 	subnetLcuuidToID map[string]int
 	subnetIDToLcuuid map[int]string
@@ -140,6 +141,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 
 		networkLcuuidToID: make(map[string]int),
 		networkIDToLcuuid: make(map[int]string),
+		networkIDToVPCID:  make(map[int]int),
 
 		subnetLcuuidToID: make(map[string]int),
 		subnetIDToLcuuid: make(map[int]string),
@@ -359,6 +361,7 @@ func (t *DataSet) AddNetwork(item *mysqlmodel.Network) {
 	t.networkLcuuidToID[item.Lcuuid] = item.ID
 	t.networkIDToLcuuid[item.ID] = item.Lcuuid
 	t.networkIDToName[item.ID] = item.Name
+	t.networkIDToVPCID[item.ID] = item.VPCID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -366,6 +369,10 @@ func (t *DataSet) UpdateNetwork(cloudItem *cloudmodel.Network) {
 	id, exists := t.GetNetworkIDByLcuuid(cloudItem.Lcuuid)
 	if exists {
 		t.networkIDToName[id] = cloudItem.Name
+	}
+	vpcID, exists := t.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if exists {
+		t.networkIDToVPCID[id] = vpcID
 	}
 	log.Info(updateToolMap(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -375,6 +382,7 @@ func (t *DataSet) DeleteNetwork(lcuuid string) {
 	delete(t.networkIDToLcuuid, id)
 	delete(t.networkIDToName, id)
 	delete(t.networkLcuuidToID, lcuuid)
+	delete(t.networkIDToVPCID, id)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -1313,6 +1321,31 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 }
 
+func (t *DataSet) GetNetworkVPCIDByLcuuid(lcuuid string) (int, bool) {
+	id, exists := t.GetNetworkIDByLcuuid(lcuuid)
+	if !exists {
+		return 0, false
+	}
+	return t.GetNetworkVPCIDByID(id)
+}
+
+func (t *DataSet) GetNetworkVPCIDByID(id int) (int, bool) {
+	vpcID, exists := t.networkIDToVPCID[id]
+	if exists {
+		return vpcID, true
+	}
+	log.Warningf("cache %s vpc id (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id, t.metadata.LogPrefixes)
+	var network mysqlmodel.Network
+	result := t.metadata.DB.Where("id = ?", id).Find(&network)
+	if result.RowsAffected == 1 {
+		t.AddNetwork(&network)
+		return network.VPCID, true
+	} else {
+		log.Errorf("db %s vpc id (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id, t.metadata.LogPrefixes)
+		return vpcID, false
+	}
+}
+
 func (t *DataSet) GetVRouterIDByLcuuid(lcuuid string) (int, bool) {
 	id, exists := t.vrouterLcuuidToID[lcuuid]
 	if exists {
@@ -1471,6 +1504,88 @@ func (t *DataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid string)
 		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return 0, false
 	}
+}
+
+func (t *DataSet) GetDeviceVPCIDByLcuuid(deviceType int, deviceLcuuid string) (int, bool) {
+	id, exists := t.GetDeviceIDByDeviceLcuuid(deviceType, deviceLcuuid)
+	if !exists {
+		return 0, false
+	}
+	return t.GetDeviceVPCIDByID(deviceType, id)
+}
+
+func (t *DataSet) GetDeviceVPCIDByID(deviceType, deviceID int) (int, bool) {
+	var vpcID int
+	var err error
+	if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
+		var info *vmInfo
+		info, err = t.GetVMInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_VROUTER {
+		var info *vrouterInfo
+		info, err = t.GetVRouterInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT {
+		var info *dhcpPortInfo
+		info, err = t.GetDHCPPortInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY {
+		var info *natGatewayInfo
+		info, err = t.GetNATGatewayInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_LB {
+		var info *lbInfo
+		info, err = t.GetLBInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE {
+		var info *rdsInstanceInfo
+		info, err = t.GetRDSInstanceInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE {
+		var info *redisInstanceInfo
+		info, err = t.GetRedisInstanceInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
+		var info *podNodeInfo
+		info, err = t.GetPodNodeInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE {
+		var info *podServiceInfo
+		info, err = t.GetPodServiceInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
+		var info *podInfo
+		info, err = t.GetPodInfoByID(deviceID)
+		if info != nil {
+			vpcID = info.VPCID
+		}
+	} else {
+		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
+		return 0, false
+	}
+	if err != nil {
+		log.Errorf("failed to get vpc id by device id %d, device type %d: %s", deviceID, deviceType, err.Error(), t.metadata.LogPrefixes)
+		return 0, false
+	}
+	return vpcID, true
 }
 
 func (t *DataSet) GetDeviceNameByDeviceID(deviceType, deviceID int) (string, error) { // TODO 统一风格，使用bool
