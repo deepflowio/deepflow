@@ -23,7 +23,7 @@ cfg_if::cfg_if! {
         mod linux_socket;
 
         pub use linux::SocketSynchronizer;
-        pub use linux_process::{ProcessData, ProcessDataOp, get_container_id, get_os_app_tag_by_exec, OsAppTag};
+        pub use linux_process::{ProcessData, ProcessDataOp, get_os_app_tag_by_exec, OsAppTag};
     } else if #[cfg(target_os = "windows")] {
         pub struct ProcessData {}
     }
