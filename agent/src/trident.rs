@@ -199,6 +199,11 @@ pub struct AgentState {
 }
 
 impl AgentState {
+    pub fn get(&self) -> State {
+        let sg = self.state.lock().unwrap();
+        sg.0.into()
+    }
+
     pub fn enable(&self) {
         if self.terminated.load(Ordering::Relaxed) {
             return;
