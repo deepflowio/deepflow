@@ -323,7 +323,14 @@ func InitTable(addr, user, password, timeZone string, t *ckdb.Table, orgID uint1
 }
 
 func (w *CKWriter) InitTable(queueID int, orgID uint16) error {
-	for _, conn := range w.queueContexts[queueID].conns {
+	queueContext := w.queueContexts[queueID]
+	for i, conn := range queueContext.conns {
+		if conn == nil || conn.IsClosed() {
+			if err := queueContext.initConn(i); err != nil {
+				return err
+			}
+			conn = queueContext.conns[i]
+		}
 		if err := initTable(conn, w.timeZone, w.table, orgID); err != nil {
 			return err
 		}
