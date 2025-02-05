@@ -150,6 +150,7 @@ type VInterface struct {
 	NetnsID         uint32 `json:"netns_id"`
 	VTapID          uint32 `json:"vtap_id" binding:"required"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	VPCID           int    // TODO @zhengya remove
 }
 
 type IP struct {

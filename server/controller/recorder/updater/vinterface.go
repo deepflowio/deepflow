@@ -21,7 +21,6 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	// "github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -81,6 +80,27 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		)
 		return nil, false
 	}
+	var vpcID int
+	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
+		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByID(cloudItem.DeviceType, deviceID)
+		if !exists {
+			log.Errorf(
+				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
+				cloudItem.DeviceType, cloudItem.DeviceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			)
+		}
+	}
+	if vpcID == 0 {
+		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByID(networkID)
+		if !exists {
+			log.Error(
+				"vpc for network (id: %d) for %s (lcuuid: %s) not found",
+				networkID, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			)
+			return nil, false
+		}
+	}
 
 	dbItem := &mysql.VInterface{
 		Name:       cloudItem.Name,
@@ -92,6 +112,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		DeviceType: cloudItem.DeviceType,
 		DeviceID:   deviceID,
 		VlanTag:    0,
+		VPCID:      vpcID,
 		SubDomain:  cloudItem.SubDomainLcuuid,
 		Domain:     i.cache.DomainLcuuid,
 		Region:     cloudItem.RegionLcuuid,
@@ -155,5 +176,32 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 	if diffBase.VtapID != cloudItem.VTapID {
 		updateInfo["vtap_id"] = cloudItem.VTapID
 	}
+
+	var vpcID int
+	var exists bool
+	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
+		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		if !exists {
+			log.Errorf(
+				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
+				cloudItem.DeviceType, cloudItem.DeviceLcuuid,
+				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			)
+		}
+	}
+	if vpcID == 0 {
+		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByLcuuid(cloudItem.NetworkLcuuid)
+		if !exists {
+			log.Error(
+				"vpc for network (lcuuid: %d) for %s (lcuuid: %s) not found",
+				cloudItem.NetworkLcuuid, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			)
+		}
+	}
+	cloudItem.VPCID = vpcID
+	if exists && diffBase.VPCID != cloudItem.VPCID {
+		updateInfo["epc_id"] = vpcID
+	}
+
 	return updateInfo, len(updateInfo) > 0
 }
