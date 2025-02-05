@@ -68,7 +68,7 @@ use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROL
 use crate::config::UserConfig;
 use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
-use crate::trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, VersionInfo};
+use crate::trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo};
 #[cfg(any(target_os = "linux"))]
 use crate::utils::environment::{get_current_k8s_image, get_k8s_namespace};
 use crate::utils::{
@@ -811,6 +811,13 @@ impl Synchronizer {
         if let Some(dynamic_config) = resp.dynamic_config.as_ref() {
             user_config.set_dynamic_config(dynamic_config);
         }
+
+        if !user_config.global.common.enabled {
+            // when agent is diabled, server will not provide platform/acl/group data
+            // set agent state to disabled and skip updating
+            agent_state.disable();
+            return;
+        }
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
@@ -1247,10 +1254,11 @@ impl Synchronizer {
         session: &Session,
         new_revision: &str,
         agent_id: &AgentId,
-    ) -> Result<(), String> {
+        agent_state: &AgentState,
+    ) -> Result<bool, String> {
         if running_in_container() {
             info!("running in a non-k8s containter, exit directly and try to recreate myself using a new version docker image...");
-            return Ok(());
+            return Ok(true);
         }
 
         let response = session
@@ -1293,6 +1301,10 @@ impl Synchronizer {
         {
             if !running.load(Ordering::SeqCst) {
                 return Err("Upgrade terminated".to_owned());
+            }
+            if agent_state.get() != State::Running {
+                info!("Upgrade halted because agent is no longer in running state");
+                return Ok(false);
             }
             if message.status() != pb::Status::Success {
                 return Err("Upgrade failed in server response".to_owned());
@@ -1377,7 +1389,7 @@ impl Synchronizer {
         // ignore failure as upgrade succeeded anyway
         let _ = fs::remove_file(backup_path);
 
-        Ok(())
+        Ok(true)
     }
 
     fn run_standalone(&self) {
@@ -1548,13 +1560,14 @@ impl Synchronizer {
                         #[cfg(any(target_os = "windows", target_os = "android"))]
                         warn!("does not support upgrading environment");
                     } else {
-                        match Self::upgrade(&running, &session, &revision, &id).await {
-                            Ok(_) => {
+                        match Self::upgrade(&running, &session, &revision, &id, &agent_state).await {
+                            Ok(true) => {
                                 agent_state.terminate();
                                 warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
                                 crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                                 return;
                             },
+                            Ok(false) => (), // upgrade terminated
                             Err(e) => {
                                 exception_handler.set(Exception::ControllerSocketError);
                                 error!("upgrade failed: {:?}", e);
