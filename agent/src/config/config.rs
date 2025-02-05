@@ -41,7 +41,7 @@ use crate::common::l7_protocol_log::L7ProtocolParser;
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, MemcachedLog, OracleLog, TlsLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use crate::platform::{get_container_id, OsAppTag, ProcessData};
+use crate::platform::{OsAppTag, ProcessData};
 use crate::{
     common::DEFAULT_LOG_FILE, metric::document::TapSide, rpc::Session, trident::RunningMode,
 };
@@ -385,13 +385,13 @@ impl ProcessMatcher {
     // TODO: match_languages
     pub fn get_process_data(
         &self,
-        process: &Process,
+        pdata: &ProcessData,
         tag_map: &HashMap<u64, OsAppTag>,
     ) -> Option<ProcessData> {
-        if self.only_in_container && get_container_id(process).is_none() {
+        if self.only_in_container && pdata.container_id.is_empty() {
             return None;
         }
-        if self.only_with_tag && !tag_map.contains_key(&(process.pid as u64)) {
+        if self.only_with_tag && !tag_map.contains_key(&pdata.pid) {
             return None;
         }
 
@@ -404,9 +404,7 @@ impl ProcessMatcher {
                 }),
             )
         };
-        let Ok(mut process_data) = ProcessData::try_from(process) else {
-            return None;
-        };
+        let mut process_data = pdata.clone();
         let mut match_replace_fn = |reg: &Regex, ignored: bool, s: &String, replace: &String| {
             if reg.is_match(s.as_str()) {
                 if !ignored && !replace.is_empty() {
