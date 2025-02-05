@@ -120,7 +120,7 @@ func newUpdaterBase[
 		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
 	)
 
-	log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
+	// log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
 	u.initPubSub()
 	return u
 }

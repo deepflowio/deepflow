@@ -331,7 +331,7 @@ type Network struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
 	ISP            int    `gorm:"column:isp;type:int;default:0" json:"ISP" mapstructure:"ISP"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"EPC_ID"`
 	SegmentationID int    `gorm:"column:segmentation_id;type:int;default:0" json:"SEGMENTATION_ID" mapstructure:"SEGMENTATION_ID"`
 	TunnelID       int    `gorm:"column:tunnel_id;type:int;default:0" json:"TUNNEL_ID" mapstructure:"TUNNEL_ID"`
 	Shared         bool   `gorm:"column:shared;type:int;default:0" json:"SHARED" mapstructure:"SHARED"`
@@ -409,7 +409,7 @@ type DHCPPort struct {
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"EPC_ID"`
 }
 
 func (DHCPPort) TableName() string {
@@ -440,6 +440,7 @@ type VInterface struct {
 	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"DEVICE_ID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
 	NetnsID      uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID" mapstructure:"NETNS_ID"`   // used to associate processes with cloud and container resources
 	VtapID       uint32    `gorm:"column:vtap_id;type:int;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
+	VPCID        int       `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"EPC_ID"`
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
@@ -787,7 +788,7 @@ type PodCluster struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	ClusterName    string `gorm:"column:cluster_name;type:varchar(256);default:''" json:"CLUSTER_NAME" mapstructure:"CLUSTER_NAME"`
 	Version        string `gorm:"column:version;type:varchar(256);default:''" json:"VERSION" mapstructure:"VERSION"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"EPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
@@ -838,7 +839,7 @@ type PodNode struct {
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"EPC_ID"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
@@ -906,7 +907,7 @@ type PodService struct {
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID" mapstructure:"POD_INGRESS_ID"`
 	PodNamespaceID   int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodClusterID     int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
-	VPCID            int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID            int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"EPC_ID"`
 	AZ               string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
 	Region           string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
@@ -1038,7 +1039,7 @@ type Pod struct {
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodNodeID       int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
-	VPCID           int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"VPC_ID"`
+	VPCID           int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID" mapstructure:"EPC_ID"`
 	AZ              string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
 	Region          string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain       string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
