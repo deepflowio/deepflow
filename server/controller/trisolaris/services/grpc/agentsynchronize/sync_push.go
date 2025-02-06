@@ -324,6 +324,16 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		log.Errorf("agent(%s) has no ingester_ip, "+
 			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
 	}
+
+	// if agent is disabled, only return user_config and dynamic_config
+	if vtapCache.GetVTapEnabled() == 0 {
+		return &api.SyncResponse{
+			Status:        &STATUS_SUCCESS,
+			UserConfig:    proto.String(e.formateViperConfigToString(userConfig)),
+			DynamicConfig: dynamicConfig,
+		}, nil
+	}
+
 	localSegments := vtapCache.GetAgentLocalSegments()
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	upgradeRevision := vtapCache.GetExpectedRevision()
@@ -551,6 +561,16 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		log.Errorf("agent(%s) has no ingester_ip, "+
 			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
 	}
+
+	// if agent is disabled, only return user_config and dynamic_config
+	if vtapCache.GetVTapEnabled() == 0 {
+		return &api.SyncResponse{
+			Status:        &STATUS_SUCCESS,
+			UserConfig:    proto.String(e.formateViperConfigToString(userConfig)),
+			DynamicConfig: dynamicConfig,
+		}, nil
+	}
+
 	localSegments := vtapCache.GetAgentLocalSegments()
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	skipInterface := gAgentInfo.GetAgentSkipInterface(vtapCache)
