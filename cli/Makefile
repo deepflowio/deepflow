@@ -1,6 +1,8 @@
 MESSAGE = github.com/deepflowio/deepflow/message
 LIBS = github.com/deepflowio/deepflow/server/libs
 SERVER = github.com/deepflowio/deepflow/server
+SERVER_LIBS = ../server/libs
+MSG = ../message/
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
@@ -14,18 +16,17 @@ BINARY_SUFFIX :=
 all: cli
 
 vendor:
+	cp ${MSG}/metric.proto ${SERVER_LIBS}/flow-metrics/pb
+	cp ${MSG}/flow_log.proto ${SERVER_LIBS}/datatype/pb
+	cp ${MSG}/stats.proto ${SERVER_LIBS}/stats/pb
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/flow-metrics/pb/metric.proto
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/datatype/pb/flow_log.proto
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/stats/pb/stats.proto
+	cd ${SERVER_LIBS}/ && go generate ./...
 	go mod tidy && go mod download && go mod vendor
-	cp -r ../message/* vendor/${MESSAGE}/
-	cp -r ../server/go.* vendor/${SERVER}/
+	cp -r ${MSG}/* vendor/${MESSAGE}/
 	find vendor -type d -exec chmod +w {} \;
-	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/flow-metrics/pb
-	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
-	cp vendor/${MESSAGE}/stats.proto vendor/${LIBS}/stats/pb
-	sed -i '6,10s/^...//' vendor/${LIBS}/flow-metrics/pb/metric.proto
-	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
-	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
 	cd vendor/${MESSAGE} && go generate ./...
-	cd vendor/${LIBS} && go generate ./...
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < ../server/patch/clickhouse-go/write_improve.patch
 	patch -p1 -d vendor/github.com/cornelk/hashmap < ../server/patch/cornelk_hashmap/complex128.patch
 
