@@ -46,6 +46,7 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: [controller] only send user_config & dynamic_config to disabled… [#9045](https://github.com/deepflowio/deepflow/pull/9045) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
@@ -77,3 +78,11 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### Chore
+* chore: Update github workflow artifact actions [#9041](https://github.com/deepflowio/deepflow/pull/9041) by [rvql](https://github.com/rvql)
+
+
+#### OTHER
+* Cherry-picks from main [#9048](https://github.com/deepflowio/deepflow/pull/9048) by [rvql](https://github.com/rvql)
