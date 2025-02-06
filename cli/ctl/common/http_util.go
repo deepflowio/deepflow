@@ -30,11 +30,14 @@ import (
 	"strings"
 	"time"
 
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
-
 	simplejson "github.com/bitly/go-simplejson"
 	"github.com/spf13/cobra"
 	_ "github.com/vishvananda/netlink"
+)
+
+const (
+	HEADER_KEY_X_ORG_ID = "X-Org-Id"
+	DEFAULT_ORG_ID      = 1
 )
 
 // Filter query string parameters
@@ -84,7 +87,7 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 		return nil, err
 	}
 	if cfg.ORGID != 0 {
-		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
+		req.Header.Set(HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
@@ -136,7 +139,7 @@ func CURLPostFormData(url, contentType string, body *bytes.Buffer, opts ...HTTPO
 		return nil, err
 	}
 	if cfg.ORGID != 0 {
-		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
+		req.Header.Set(HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
@@ -165,7 +168,7 @@ func CURLResponseRawJson(method string, url string, opts ...HTTPOption) (*simple
 		return errResponse, err
 	}
 	if cfg.ORGID != 0 {
-		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
+		req.Header.Set(HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
 	}
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")

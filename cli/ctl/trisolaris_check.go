@@ -20,10 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
 	"sort"
 	"strconv"
@@ -31,6 +28,7 @@ import (
 
 	. "encoding/binary"
 
+	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/golang/protobuf/proto"
@@ -52,8 +50,6 @@ type ParamData struct {
 	RpcIP                 string
 	RpcPort               string
 	Type                  string
-	PluginType            string
-	PluginName            string
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -171,14 +167,6 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
-	pluginCmd := &cobra.Command{
-		Use:   "plugin",
-		Short: "get plugin from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			plugin(cmd)
-		},
-	}
-
 	agentCacheCmd := &cobra.Command{
 		Use:   "agent-cache",
 		Short: "get agent-cache from deepflow-server",
@@ -215,7 +203,7 @@ func regiterCommand() []*cobra.Command {
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd, universalTagNameCmd, orgIDsCmd}
+		realGlobalCmd, ripToVipCmd, agentCacheCmd, allCmd, universalTagNameCmd, orgIDsCmd}
 	return commands
 }
 
@@ -231,8 +219,6 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.TeamID, "tid", "", "", "agent team ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "agent k8s cluster ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginName, "pname", "", "", "request plugin name")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		trisolarisCmd.AddCommand(handler)
@@ -315,8 +301,8 @@ func gpidAgentResponse(cmd *cobra.Command) {
 	}
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := trident.NewSynchronizerClient(conn)
-	reqData := &trident.GPIDSyncRequest{
+	c := agent.NewSynchronizerClient(conn)
+	reqData := &agent.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
 		TeamId:  &paramData.TeamID,
@@ -332,7 +318,7 @@ func gpidAgentResponse(cmd *cobra.Command) {
 	}
 }
 
-func formatEntries(entry *trident.GPIDSyncEntry) string {
+func formatEntries(entry *agent.GPIDSyncEntry) string {
 	buffer := bytes.Buffer{}
 	format := "{protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
 		"epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, epc_id_real: %d, " +
@@ -345,7 +331,7 @@ func formatEntries(entry *trident.GPIDSyncEntry) string {
 	return buffer.String()
 }
 
-func formatGlobalEntry(entry *trident.GlobalGPIDEntry) string {
+func formatGlobalEntry(entry *agent.GlobalGPIDEntry) string {
 	buffer := bytes.Buffer{}
 	format := "{ protocol: %d, agent_id_1: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, gpid_1: %d " +
 		"agent_id_0: %d, epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, gpid_0: %d, netns_idx: %d}"
@@ -365,8 +351,8 @@ func gpidGlobalTable(cmd *cobra.Command) {
 	}
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := trident.NewDebugClient(conn)
-	reqData := &trident.GPIDSyncRequest{
+	c := agent.NewDebugClient(conn)
+	reqData := &agent.GPIDSyncRequest{
 		TeamId: &paramData.TeamID,
 	}
 	response, err := c.DebugGPIDGlobalData(context.Background(), reqData)
@@ -387,20 +373,20 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	}
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := trident.NewDebugClient(conn)
-	reqData := &trident.GPIDSyncRequest{
+	c := agent.NewDebugClient(conn)
+	reqData := &agent.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
 		TeamId:  &paramData.TeamID,
 	}
-	response, err := c.DebugGPIDVTapData(context.Background(), reqData)
+	response, err := c.DebugGPIDAgentData(context.Background(), reqData)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	req := response.GetSyncRequest()
 	tm := time.Unix(int64(response.GetUpdateTime()), 0)
-	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s agent_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
+	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s agent_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetAgentId(), tm.Format("2006-01-02 15:04:05"))
 	fmt.Println("Entries:")
 	if req == nil {
 		return
@@ -410,7 +396,7 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	}
 }
 
-func formatRealEntry(entry *trident.RealClientToRealServer) string {
+func formatRealEntry(entry *agent.RealClientToRealServer) string {
 	buffer := bytes.Buffer{}
 	format := "{epc_id_1: %d, ipv4_1: %s, port_1: %d, " +
 		"epc_id_0: %d, ipv4_0: %s, port_0: %d, " +
@@ -430,8 +416,8 @@ func realGlobal(cmd *cobra.Command) {
 	}
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := trident.NewDebugClient(conn)
-	reqData := &trident.GPIDSyncRequest{
+	c := agent.NewDebugClient(conn)
+	reqData := &agent.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
 		TeamId:  &paramData.TeamID,
@@ -447,7 +433,7 @@ func realGlobal(cmd *cobra.Command) {
 	}
 }
 
-func formatRVEntry(entry *trident.RipToVip) string {
+func formatRVEntry(entry *agent.RipToVip) string {
 	buffer := bytes.Buffer{}
 	format := "{protocol: %d, epc_id: %d, r_ipv4: %s, r_port: %d, " +
 		" v_ipv4: %s, v_port: %d, }"
@@ -466,8 +452,8 @@ func ripToVip(cmd *cobra.Command) {
 	}
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := trident.NewDebugClient(conn)
-	reqData := &trident.GPIDSyncRequest{
+	c := agent.NewDebugClient(conn)
+	reqData := &agent.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
 		TeamId:  &paramData.TeamID,
@@ -672,60 +658,6 @@ func vpcIP(response *trident.SyncResponse) {
 	for index, podIP := range response.GetPodIps() {
 		JsonFormat(index+1, podIP)
 	}
-}
-
-func plugin(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	var pluginType trident.PluginType
-	switch paramData.PluginType {
-	case "wasm":
-		pluginType = trident.PluginType_WASM
-	default:
-		fmt.Printf("request pluginType(%s) not supported, pluginType must be in %s\n",
-			paramData.PluginType, []string{"wasm"})
-		return
-	}
-	c := trident.NewSynchronizerClient(conn)
-	reqData := &trident.PluginRequest{
-		CtrlIp:     &paramData.CtrlIP,
-		CtrlMac:    &paramData.CtrlMac,
-		TeamId:     &paramData.TeamID,
-		PluginType: &pluginType,
-		PluginName: &paramData.PluginName,
-	}
-	stream, err := c.Plugin(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	var (
-		data []byte
-		md5  string
-	)
-	for {
-		if res, err := stream.Recv(); err == nil {
-			data = append(data, res.GetContent()...)
-			md5 = res.GetMd5()
-		} else {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			fmt.Println(res, err)
-			return
-		}
-	}
-	fileName := paramData.PluginType + "-" + paramData.PluginName
-	err = ioutil.WriteFile(fileName, data, 0666)
-	if err != nil {
-		fmt.Printf("save plugin(%s) fail %s\n", fileName, err)
-		return
-	}
-	fmt.Printf("save plugin(%s) success, md5=%s\n", fileName, md5)
 }
 
 func universalTagName(cmd *cobra.Command) {
