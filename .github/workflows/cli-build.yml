@@ -62,7 +62,7 @@ jobs:
           sha256sum * > deepflow-agent.sha256sum.txt
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deepflow-cli
           path: ./cli/bin/*
