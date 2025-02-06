@@ -96,7 +96,7 @@ jobs:
           chmod a+x agent/output/target/release/ecapture
 
       - name: Archive code build results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent build results amd64
           path: |
@@ -257,7 +257,7 @@ jobs:
           chmod a+x agent/output/target/release/ecapture
 
       - name: Archive code build results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent build results arm64
           path: |
@@ -317,7 +317,7 @@ jobs:
           tar cvf package-artifact-arm64.tar  agent/artifacts-rpm.zip agent/artifacts-deb.zip agent/bin-package/deepflow-agent.tar.gz agent/output/target/release/deepflow-agent-ctl
 
       - name: Archive Arm64 package results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent arm64 package results
           path: |
@@ -349,19 +349,19 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Download code build results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: agent build results arm64
           path: .
 
       - name: Download code build results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: agent build results amd64
           path: .
 
       - name: Download code build results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: agent arm64 package results
           path: .
@@ -662,7 +662,7 @@ jobs:
           tar cvf package-artifact-arm64.tar  agent/artifacts-rpm.zip agent/artifacts-deb.zip agent/bin-package/deepflow-agent.tar.gz agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl
 
       - name: Archive Arm64 package results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent arm64 package results static link
           path: |
@@ -682,7 +682,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download code build results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: agent arm64 package results static link
           path: .
