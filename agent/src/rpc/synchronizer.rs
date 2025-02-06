@@ -812,12 +812,6 @@ impl Synchronizer {
             user_config.set_dynamic_config(dynamic_config);
         }
 
-        if !user_config.global.common.enabled {
-            // when agent is diabled, server will not provide platform/acl/group data
-            // set agent state to disabled and skip updating
-            agent_state.disable();
-            return;
-        }
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
