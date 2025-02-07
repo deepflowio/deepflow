@@ -173,6 +173,12 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 				log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 				break
 			}
+
+			// if upgrade is canceled/completed, should close stream
+			if vtapCache.GetExpectedRevision() == "" {
+				log.Warningf("vtap(%s) teamID:%s-%d upgrade is canceled/completed", vtapCacheKey, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
+				break
+			}
 		}
 	}
 
