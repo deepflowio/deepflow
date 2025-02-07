@@ -101,10 +101,51 @@ func Upgrade(c *gin.Context) {
 		return
 	}
 	vTapCache.UpdateUpgradeInfo(expectedRevision, upgradeInfo.ImageName)
-	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", orgIDInt, vtap.Name, key, expectedRevision, upgradeInfo.ImageName, logger.NewORGPrefix(orgIDInt))
+	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", vtap.Name, key, expectedRevision, upgradeInfo.ImageName)
+	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
+}
+
+func CancelUpgrade(c *gin.Context) {
+	var err error
+	lcuuid := c.Param("lcuuid")
+	if lcuuid == "" {
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not find lcuuid param"))
+		return
+	}
+	orgID, _ := c.Get(HEADER_KEY_X_ORG_ID)
+	orgIDInt := orgID.(int)
+	db, err := metadb.GetDB(orgIDInt)
+	if err != nil {
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
+		return
+	}
+
+	vtap, err := dbmgr.DBMgr[models.VTap](db.DB).GetFromLcuuid(lcuuid)
+	if err != nil {
+		log.Error(err)
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, %s", orgIDInt, err)))
+		return
+	}
+	key := vtap.CtrlIP + "-" + vtap.CtrlMac
+	vTapCache := trisolaris.GetORGVTapInfo(orgIDInt).GetVTapCache(key)
+	if vTapCache == nil {
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, not found vtap cache", orgIDInt)))
+		return
+	}
+
+	// if upgrade is completed, should return error message
+	if vTapCache.GetExpectedRevision() == "" || vTapCache.GetExpectedRevision() == vTapCache.GetRevision() {
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, vtap(%s, %s) upgrade is completed, unable to cancel", orgIDInt, key)))
+		return
+	}
+
+	// cancel upgrade
+	vTapCache.UpdateUpgradeInfo("", "")
+	log.Infof("vtap(%s, %s) upgrade is canceled", vtap.Name, key)
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
 
 func (*UpgradeService) Register(mux *gin.Engine) {
 	mux.PATCH("v1/upgrade/vtap/:lcuuid/", Upgrade)
+	mux.PATCH("v1/cancel-upgrade/vtap/:lcuuid/", CancelUpgrade)
 }
