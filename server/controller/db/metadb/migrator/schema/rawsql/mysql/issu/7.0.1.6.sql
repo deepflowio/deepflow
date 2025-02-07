@@ -28,8 +28,8 @@ CALL AddColumnIfNotExists('vinterface', 'epc_id', "INTEGER DEFAULT 0", 'vtap_id'
 
 DROP PROCEDURE AddColumnIfNotExists;
 
-DROP PROCEDURE UpdateVInterfaceEpcID;
-DELIMITER //
+DROP PROCEDURE IF EXISTS UpdateVInterfaceEpcID;
+
 CREATE PROCEDURE UpdateVInterfaceEpcID(
     IN deviceTable VARCHAR(255),  -- vm 表名
     IN deviceType INT             -- vinterface.devicetype
@@ -47,9 +47,7 @@ BEGIN
     PREPARE stmt FROM @update_sql;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
-END //
-
-DELIMITER ;
+END;
 
 -- 调用存储过程
 CALL UpdateVInterfaceEpcID('vm', 1);
