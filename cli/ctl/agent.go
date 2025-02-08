@@ -136,9 +136,16 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
 		Example: "deepflow-ctl agent-upgrade list\n" +
-			"deepflow-ctl agent-upgrade agent-name --image-name=deepflow-agent\n",
+			"deepflow-ctl agent-upgrade agent-name --image-name=deepflow-agent\n" +
+			"deepflow-ctl agent-upgrade cancel agent-name\n",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 1 {
+			if len(args) == 2 {
+				if args[0] == "cancel" {
+					cancelUpgadeAgent(cmd, args)
+				} else {
+					fmt.Println(cmd.Example)
+				}
+			} else if len(args) == 1 {
 				if args[0] == "list" {
 					listAgentUpgrade(cmd, args)
 				} else if imageName != "" {
@@ -478,6 +485,80 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 			continue
 		} else {
 			fmt.Printf("set agent %s upgrate image(%s) to server(%s) success\n", vtapName, imageName, host)
+		}
+	}
+}
+
+func cancelUpgadeAgent(cmd *cobra.Command, args []string) {
+	if len(args) != 2 {
+		fmt.Fprintf(os.Stderr, "must specify name. Examples: \n%s", cmd.Example)
+		return
+	}
+	vtapName := args[1]
+
+	server := common.GetServerInfo(cmd)
+	serverURL := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
+	response, err := common.CURLPerform("GET", serverURL, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	controllerArray := response.Get("DATA").MustArray()
+	hosts := map[string]struct{}{
+		server.IP: struct{}{},
+	}
+	if len(controllerArray) > 0 {
+		for index, _ := range controllerArray {
+			nodeType := response.Get("DATA").GetIndex(index).Get("NODE_TYPE").MustInt()
+			ip := response.Get("DATA").GetIndex(index).Get("IP").MustString()
+			if nodeType == 1 && ip != "" {
+				hosts[ip] = struct{}{}
+			}
+		}
+	} else {
+		fmt.Printf("get server info failed, url: %s\n", serverURL)
+		return
+	}
+
+	vtapURL := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
+	response, err = common.CURLPerform("GET", vtapURL, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var (
+		vtapController string
+		vtapLcuuid     string
+	)
+
+	if len(response.Get("DATA").MustArray()) > 0 {
+		vtapLcuuid = response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+		vtapController = response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
+	} else {
+		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		return
+	}
+	if vtapController == "" || vtapLcuuid == "" {
+		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		return
+	}
+
+	hosts[vtapController] = struct{}{}
+	url_format := "http://%s:%d/v1/cancel-upgrade/vtap/%s/"
+	body := map[string]interface{}{}
+	for host, _ := range hosts {
+		url := fmt.Sprintf(url_format, host, server.Port, vtapLcuuid)
+		response, err := common.CURLPerform("PATCH", url, body, "",
+			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Printf("cancel upgrade agent %s server %s failed, response: %s\n", vtapName, host, response)
+			continue
+		} else {
+			fmt.Printf("cancel agent %s upgrade to server(%s) success\n", vtapName, host)
 		}
 	}
 }
