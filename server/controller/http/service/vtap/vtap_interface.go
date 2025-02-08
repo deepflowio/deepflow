@@ -449,12 +449,13 @@ func newToolDataSet(db *metadb.DB) (toolDS *vpToolDataSet, err error) {
 	}
 
 	var hosts []*metadbmodel.Host
-	if err = db.Select("id", "name").Unscoped().Find(&hosts).Error; err != nil {
+	if err = db.Select("id", "name", "ip").Unscoped().Find(&hosts).Error; err != nil {
 		log.Error(dbQueryResourceFailed("host_device", err), db.LogPrefixORGID)
 		return
 	}
 	for _, host := range hosts {
 		toolDS.hostIDToName[host.ID] = host.Name
+		toolDS.hostIPToID[host.IP] = host.ID
 	}
 
 	var vms []*metadbmodel.VM
