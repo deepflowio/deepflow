@@ -662,10 +662,19 @@ impl Labeler {
         }
     }
 
+    fn is_private(ip: &Ipv4Addr) -> bool {
+        match ip.octets() {
+            // The Shared Address Space address range is 100.64.0.0/10.
+            // Defined in https://www.rfc-editor.org/rfc/rfc6598.html
+            [100, b, ..] if b >= 64 && b <= 127 => true,
+            _ => ip.is_private(),
+        }
+    }
+
     fn is_intranet_address(ip: &IpAddr) -> bool {
         let is_multicast = Self::is_multicast(ip);
         match ip {
-            IpAddr::V4(a) => a.is_link_local() || a.is_private() || is_multicast,
+            IpAddr::V4(a) => a.is_link_local() || Self::is_private(a) || is_multicast,
             IpAddr::V6(a) => is_unicast_link_local(a) || is_multicast,
         }
     }
