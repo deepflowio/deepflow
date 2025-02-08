@@ -221,7 +221,7 @@ func (obj *_DBMgr[M]) AgentUpdateBulk(data []*M) (err error) {
 		err = obj.DB.WithContext(obj.ctx).Model(&d).Omit("id", "enable", "name",
 			"analyzer_ip", "controller_ip", "launch_server", "launch_server_id",
 			"az", "region", "vtap_group_lcuuid", "license_type", "license_functions",
-			"enable_features", "disable_features", "follow_group_features", "expected_revision").Select("*").Updates(d).Error
+			"enable_features", "disable_features", "follow_group_features").Select("*").Updates(d).Error
 	}
 	return
 }
