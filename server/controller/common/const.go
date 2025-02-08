@@ -682,7 +682,7 @@ const (
 const (
 	HEADER_KEY_CONTENT_TYPE = "Content-Type"
 	CONTENT_TYPE_JSON       = "application/json"
-	CONTENT_TYPE_FORM       = "applicatiTRANSFER_ENCODINGon/x-www-form-urlencoded"
+	CONTENT_TYPE_FORM       = "application/x-www-form-urlencoded"
 	CONTENT_TYPE_CSV        = "text/csv"
 
 	HEADER_KEY_CONTENT_DISPOSITION          = "Content-Disposition"
