@@ -19,6 +19,7 @@ package vtap
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
@@ -28,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -44,7 +46,7 @@ func NewVTapInterface(cfg common.FPermit, userInfo *httpcommon.UserInfo) *VTapIn
 	}
 }
 
-func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*simplejson.Json, map[string]interface{}, *vpToolDataSet) []model.VTapInterface) ([]model.VTapInterface, error) {
+func (v *VTapInterface) getVIF(filter map[string]interface{}, fmtAndFilter func(*simplejson.Json, map[string]interface{}, *vpToolDataSet) []model.VTapInterface) ([]model.VTapInterface, error) {
 	// only super admin and admin can get vtap interfaces
 	if v.userInfo.Type != common.USER_TYPE_SUPER_ADMIN && v.userInfo.Type != common.USER_TYPE_ADMIN {
 		return []model.VTapInterface{}, nil
@@ -87,7 +89,7 @@ func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*sim
 	masterRegionVVIFs := v.getRawVTapVinterfacesByRegion(common.LOCALHOST, common.GConfig.HTTPPort, syncAPIQuery)
 
 	var vtapVIFs []model.VTapInterface
-	vtapVIFs = append(vtapVIFs, function(masterRegionVVIFs, filter, toolDS)...)
+	vtapVIFs = append(vtapVIFs, fmtAndFilter(masterRegionVVIFs, filter, toolDS)...)
 	for slaveRegion, regionControllerIPs := range slaveRegionLcuuidToHealthyControllerIPs {
 		log.Infof("get region (lcuuid: %s) vtap interfaces", slaveRegion, v.db.LogPrefixORGID)
 		for _, ip := range regionControllerIPs {
@@ -95,7 +97,7 @@ func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*sim
 			if err != nil {
 				log.Error(err.Error(), v.db.LogPrefixORGID)
 			} else {
-				vtapVIFs = append(vtapVIFs, function(v.getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort, syncAPIQuery), filter, toolDS)...)
+				vtapVIFs = append(vtapVIFs, fmtAndFilter(v.getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort, syncAPIQuery), filter, toolDS)...)
 				break
 			}
 		}
@@ -103,12 +105,24 @@ func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*sim
 	return vtapVIFs, nil
 }
 
-func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterface, error) {
-	return v.getVIF(filter, v.formatVTapVInterfaces)
+func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterface, *response.Page, error) {
+	data, err := v.getVIF(filter, v.fmtAndFilterForWeb)
+	if err != nil {
+		return nil, nil, err // TODO refactor
+	}
+	if filter["page_index"] == nil || filter["page_size"] == nil {
+		return data, nil, nil
+	}
+	page := response.NewPage(filter["page_index"].(int), filter["page_size"].(int))
+	if !page.IsValid() {
+		return data, page, nil
+	}
+	start, end := page.Fill(len(data))
+	return data[start:end], page, nil
 }
 
 func (v *VTapInterface) GetVIFResource(filter map[string]interface{}) ([]model.VTapInterface, error) {
-	return v.getVIF(filter, v.formatVTapResource)
+	return v.getVIF(filter, v.fmtAndFilterForCH)
 }
 
 func (v *VTapInterface) formatSyncAPIQuery(filter map[string]interface{}) (queryStr string, dropAll bool, err error) {
@@ -168,16 +182,41 @@ func (v *VTapInterface) getRawVTapVinterfacesByRegion(host string, port int, que
 	return resp.Get("DATA")
 }
 
-func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
+func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
 	var vtapVIFs []model.VTapInterface
+	filterName, hasName := filter["name"].(string)
+	filterDeviceType, hasDeviceType := filter["device_type"].(int)
+	filterVTapType, hasVTapType := filter["vtap_type"].(int)
+
+	fuzzyName, hasFuzzyName := filter["fuzzy_name"].(string)
+	fuzzyMac, hasFuzzyMac := filter["fuzzy_mac"].(string)
+	fuzzyTapName, hasFuzzyTapName := filter["fuzzy_tap_name"].(string)
+	fuzzyTapMAC, hasFuzzyTapMAC := filter["fuzzy_tap_mac"].(string)
+	fuzzyDeviceName, hasFuzzyDeviceName := filter["fuzzy_device_name"].(string)
+	fuzzyVTapName, hasFuzzyVTapName := filter["fuzzy_vtap_name"].(string)
 	for i := range vifs.MustArray() {
 		jVIF := vifs.GetIndex(i)
 		name := jVIF.Get("NAME").MustString()
-		if n, ok := filter["name"]; ok {
-			if n != name {
-				continue
-			}
+		if hasName && filterName != name {
+			continue
 		}
+
+		if hasFuzzyName && ((name != "" && !strings.Contains(name, fuzzyName)) || name == "") {
+			continue
+		}
+		mac := jVIF.Get("MAC").MustString()
+		if hasFuzzyMac && ((mac != "" && !strings.Contains(mac, fuzzyMac)) || mac == "") {
+			continue
+		}
+		tapName := jVIF.Get("TAP_NAME").MustString()
+		if hasFuzzyTapName && ((tapName != "" && !strings.Contains(tapName, fuzzyTapName)) || tapName == "") {
+			continue
+		}
+		tapMAC := jVIF.Get("TAP_MAC").MustString()
+		if hasFuzzyTapMAC && ((tapMAC != "" && !strings.Contains(tapMAC, fuzzyTapMAC)) || tapMAC == "") {
+			continue
+		}
+
 		vtapID := jVIF.Get("VTAP_ID").MustInt()
 		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
 		if err != nil {
@@ -187,9 +226,9 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 			ID:       jVIF.Get("ID").MustInt(),
 			TeamID:   jVIF.Get("TEAM_ID").MustInt(),
 			Name:     name,
-			MAC:      jVIF.Get("MAC").MustString(),
-			TapName:  jVIF.Get("TAP_NAME").MustString(),
-			TapMAC:   jVIF.Get("TAP_MAC").MustString(),
+			MAC:      mac,
+			TapName:  tapName,
+			TapMAC:   tapMAC,
 			VTapID:   vtapID,
 			HostIP:   jVIF.Get("HOST_IP").MustString(),
 			NodeIP:   jVIF.Get("NODE_IP").MustString(),
@@ -201,6 +240,12 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
 			vtapVIF.VTapType = vtap.Type
 			vtapVIF.VTapName = vtap.Name
+			if hasVTapType && filterVTapType != vtapVIF.VTapType {
+				continue
+			}
+			if hasFuzzyVTapName && ((vtapVIF.VTapName != "" && !strings.Contains(vtapVIF.VTapName, fuzzyVTapName)) || vtapVIF.VTapName == "") {
+				continue
+			}
 
 			macVIFs := toolDS.macToVIFs[vtapVIF.MAC]
 			if len(macVIFs) > 0 {
@@ -238,6 +283,9 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					}
 				}
 				vtapVIF.DeviceType = macVIF.DeviceType
+				if hasDeviceType && filterDeviceType != vtapVIF.DeviceType {
+					continue
+				}
 				vtapVIF.DeviceID = macVIF.DeviceID
 
 				switch vtapVIF.DeviceType {
@@ -296,13 +344,22 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 		} else if vtapID != 0 {
 			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)
 		}
+		if hasVTapType && filterVTapType != vtapVIF.VTapType {
+			continue
+		}
+		if hasDeviceType && filterDeviceType != vtapVIF.DeviceType {
+			continue
+		}
+		if hasFuzzyDeviceName && ((vtapVIF.DeviceName != "" && !strings.Contains(vtapVIF.DeviceName, fuzzyDeviceName)) || vtapVIF.DeviceName == "") {
+			continue
+		}
 		vtapVIFs = append(vtapVIFs, vtapVIF)
 	}
 	return vtapVIFs
 }
 
 // get host, chost, pod_node by vtap
-func (v *VTapInterface) formatVTapResource(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
+func (v *VTapInterface) fmtAndFilterForCH(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
 	var vtapVIFs []model.VTapInterface
 	for i := range vifs.MustArray() {
 		jVIF := vifs.GetIndex(i)
