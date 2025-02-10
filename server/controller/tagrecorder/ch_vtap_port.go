@@ -485,8 +485,9 @@ func sortVTapPortJoinedNames(vtapPort *metadbmodel.ChVTapPort) []string {
 }
 
 func getVTapInterfaces(orgID int) (resp []model.VTapInterface, err error) {
-	return vtap.NewVTapInterface(
+	resp, _, err = vtap.NewVTapInterface(
 		common.FPermit{},
 		httpcommon.NewUserInfo(common.USER_TYPE_SUPER_ADMIN, common.USER_ID_SUPER_ADMIN, orgID),
 	).Get(map[string]interface{}{})
+	return
 }

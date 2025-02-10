@@ -19,6 +19,7 @@ package response
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/gin-gonic/gin"
 
@@ -144,8 +145,36 @@ func (r Response) CSVBytes() []byte {
 type Page struct {
 	Index     int `json:"INDEX"`
 	Size      int `json:"SIZE"`
-	Total     int `json:"TOTAL"`
-	TotalItem int `json:"TOTAL_ITEM"`
+	Total     int `json:"TOTAL"`      // total count of page
+	TotalItem int `json:"TOTAL_ITEM"` // total count of data
+}
+
+func NewPage(index, size int) *Page {
+	return &Page{
+		Index: index,
+		Size:  size,
+	}
+}
+
+func (p *Page) Fill(dataLength int) (start, end int) {
+	if dataLength == 0 {
+		return 0, 0
+	}
+	p.Total = int(math.Ceil(float64(dataLength) / float64(p.Size)))
+	p.TotalItem = dataLength
+	if !p.IsValid() {
+		return 0, 0
+	}
+	if p.Index > p.Total {
+		p.Index = p.Total
+	}
+
+	start = (p.Index - 1) * p.Size
+	end = start + p.Size
+	if end > dataLength {
+		end = dataLength
+	}
+	return
 }
 
 func (p Page) IsValid() bool {
@@ -174,11 +203,28 @@ func JSON(c *gin.Context, options ...ResponseSetter) {
 	c.JSON(resp.HttpStatus, resp.JSON())
 }
 
-// CSV writes a CSV file to the response. You should set []byte as the data in the response.
-func CSV(c *gin.Context, fileName string, options ...ResponseSetter) {
-	resp := NewResponse(options...)
+// DownloadCSV writes a DownloadCSV file to the response. You should set []byte as the data in the response.
+func DownloadCSV(c *gin.Context, fileName string, opts ...ResponseSetter) {
+	resp := NewResponse(opts...)
+	resp.HttpStatus = httpcommon.OptStatusToHTTPStatus[resp.OptStatus]
 
+	c.Writer.WriteHeader(resp.HttpStatus)
 	c.Header(common.HEADER_KEY_CONTENT_TYPE, common.CONTENT_TYPE_CSV)
-	c.Header(common.HEADER_KEY_CONTENT_DISPOSITION, fmt.Sprintf(common.CONTENT_DISPOSITION_ATTACHMENT_FILENAME, fileName+".csv"))
-	c.Writer.Write(resp.CSVBytes())
+	c.Header(common.HEADER_KEY_CONTENT_DISPOSITION, fmt.Sprintf(common.CONTENT_DISPOSITION_ATTACHMENT_FILENAME, fileName))
+	c.Header("Transfer-Encoding", "chunked")
+	data := resp.Data.([]byte)
+	chunkSize := 100 * 1024
+	for len(data) > 0 {
+		end := chunkSize
+		if len(data) < chunkSize {
+			end = len(data)
+		}
+		n, err := c.Writer.Write(data[:end])
+		if err != nil {
+			JSON(c, SetError(err))
+			return
+		}
+		c.Writer.Flush()
+		data = data[n:]
+	}
 }
