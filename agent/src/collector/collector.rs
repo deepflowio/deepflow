@@ -32,8 +32,9 @@ use log::{debug, info, warn};
 
 use super::{
     consts::{QUEUE_BATCH_SIZE, RCV_TIMEOUT},
+    reset_delay_seconds,
     types::{AppMeterWithFlow, FlowMeterWithFlow, MiniFlow},
-    MetricsType, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
+    MetricsType, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, SECONDS_IN_MINUTE,
 };
 use crate::{
     common::{
@@ -57,8 +58,6 @@ use public::{
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
 };
-
-const MINUTE: u64 = 60;
 
 #[derive(Default)]
 pub struct CollectorCounter {
@@ -357,8 +356,9 @@ impl Stash {
         };
 
         let start_time = Duration::from_secs(
-            get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / MINUTE * MINUTE
-                - 2 * MINUTE,
+            get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / SECONDS_IN_MINUTE
+                * SECONDS_IN_MINUTE
+                - 2 * SECONDS_IN_MINUTE,
         );
         let inner = HashMap::with_capacity(Self::MIN_STASH_CAPACITY);
         let stash_init_capacity = inner.capacity();
@@ -396,7 +396,7 @@ impl Stash {
         if acc_flow.is_none() && time_in_second >= self.context.delay_seconds {
             match self.context.metric_type {
                 MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
-                _ => time_in_second -= self.context.delay_seconds - MINUTE,
+                _ => time_in_second -= self.context.delay_seconds - SECONDS_IN_MINUTE,
             }
         }
 
@@ -645,7 +645,7 @@ impl Stash {
         if meter.is_none() && time_in_second >= self.context.delay_seconds {
             match self.context.metric_type {
                 MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
-                _ => time_in_second -= self.context.delay_seconds - MINUTE,
+                _ => time_in_second -= self.context.delay_seconds - SECONDS_IN_MINUTE,
             }
         }
 
@@ -1195,6 +1195,20 @@ pub struct Collector {
     context: Context,
 }
 
+fn metric_type_to_tag(
+    metric_type: MetricsType,
+    delay_seconds: u64,
+) -> (&'static str, &'static str, u64) {
+    match metric_type {
+        MetricsType::MINUTE => (
+            "minute",
+            "minute_collector",
+            reset_delay_seconds(delay_seconds),
+        ),
+        _ => ("second", "second_collector", delay_seconds),
+    }
+}
+
 impl Collector {
     pub fn new(
         id: u32,
@@ -1207,16 +1221,7 @@ impl Collector {
         ntp_diff: Arc<AtomicI64>,
         agent_mode: RunningMode,
     ) -> Self {
-        let (kind, name) = match metric_type {
-            MetricsType::MINUTE => {
-                if delay_seconds < MINUTE || delay_seconds >= MINUTE * 2 {
-                    panic!("delay_seconds必须在[60, 120)秒内");
-                }
-                ("minute", "minute_collector")
-            }
-            _ => ("second", "second_collector"),
-        };
-
+        let (kind, name, delay_seconds) = metric_type_to_tag(metric_type, delay_seconds);
         let running = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(CollectorCounter {
             running: running.clone(),
@@ -1348,16 +1353,7 @@ impl L7Collector {
         ntp_diff: Arc<AtomicI64>,
         agent_mode: RunningMode,
     ) -> Self {
-        let (kind, name) = match metric_type {
-            MetricsType::MINUTE => {
-                if delay_seconds < MINUTE || delay_seconds >= MINUTE * 2 {
-                    panic!("delay_seconds必须在[60, 120)秒内");
-                }
-                ("minute", "minute_collector")
-            }
-            _ => ("second", "second_collector"),
-        };
-
+        let (kind, name, delay_seconds) = metric_type_to_tag(metric_type, delay_seconds);
         let running = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(CollectorCounter {
             running: running.clone(),

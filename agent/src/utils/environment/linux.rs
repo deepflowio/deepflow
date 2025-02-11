@@ -37,7 +37,7 @@ use public::utils::net::get_link_enabled_features;
 
 use super::{get_k8s_namespace, running_in_container, running_in_k8s};
 use crate::{
-    common::{CONTAINER_NAME, DAEMONSET_NAME, PROCESS_NAME},
+    common::{CONTAINER_NAME, DAEMONSET_NAME, PROCESS_NAME, PROCESS_NAME_SECONDARY},
     error::{Error, Result},
     exception::ExceptionHandler,
 };
@@ -182,9 +182,9 @@ pub fn core_file_check() {
         }
         let elf_data = &mut elf_data[..n.unwrap()];
         unsafe {
-            if String::from_utf8_unchecked(elf_data.to_vec())
-                .find(PROCESS_NAME)
-                .is_none()
+            let context = String::from_utf8_unchecked(elf_data.to_vec());
+            if context.find(PROCESS_NAME).is_none()
+                && context.find(PROCESS_NAME_SECONDARY).is_none()
             {
                 continue;
             }

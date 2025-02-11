@@ -29,7 +29,7 @@ use thread::JoinHandle;
 use super::{
     check_active,
     consts::*,
-    round_to_minute,
+    reset_delay_seconds, round_to_minute,
     types::{AppMeterWithFlow, MiniFlow},
     MetricsType, QgStats,
 };
@@ -529,10 +529,7 @@ impl L7QuadrupleGenerator {
     ) -> Self {
         let collector_config = config.load();
         info!("new l7 quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, collector_config.l7_metrics_enabled, collector_config.vtap_flow_1s_enabled, collector_config.enabled);
-        if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
-        {
-            panic!("minute_delay_seconds must be in [60, 120)s")
-        }
+        let minute_delay_seconds = reset_delay_seconds(minute_delay_seconds);
 
         let second_slots = second_delay_seconds as usize;
         let minute_slots = 2 as usize;
