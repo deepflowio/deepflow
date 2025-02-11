@@ -188,14 +188,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[hostIDSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"",
-				hostIDSuffix+"!=0",
+				"",
 				"",
 				"",
 			)}
 		tagResourceMap[hostNameSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
-				hostIDSuffix+"!=0",
+				"",
 				"toUInt64("+hostIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
 				"toUInt64("+hostIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
 			),
@@ -1529,14 +1529,14 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			tagResourceMap[hostIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]",
-					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
+					"",
 					"(if(indexOf(tag_int_names,'"+hostIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+hostIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+hostIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_1')]) %s %s)",
 					"",
 				)}
 			tagResourceMap[hostNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet('flow_tag.device_map', 'name', (toUInt64(6),toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')])))",
-					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
+					"",
 					"if(indexOf(tag_string_names,'"+hostNameSuffix+"')=0 AND indexOf(tag_string_names,'"+hostNameSuffix+"_0')=0 AND indexOf(tag_string_names,'"+hostNameSuffix+"_1')=0,1!=1,(tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"')] %s %s OR tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"_0')] %s %s OR tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"_1')] %s %s))",
 					"if(indexOf(tag_string_names,'"+hostNameSuffix+"')=0 AND indexOf(tag_string_names,'"+hostNameSuffix+"_0')=0 AND indexOf(tag_string_names,'"+hostNameSuffix+"_1')=0,1!=1,(%s(tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"')], %s) OR %s(tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"_0')], %s) OR %s(tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"_1')], %s)))",
 				),
@@ -1557,14 +1557,14 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			tagResourceMap[hostIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]",
-					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
+					"",
 					"if(indexOf(tag_int_names,'"+hostIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) %s %s",
 					"",
 				)}
 			tagResourceMap[hostNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet('flow_tag.device_map', 'name', (toUInt64(6),toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')])))",
-					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
+					"",
 					"if(indexOf(tag_string_names,'"+hostNameSuffix+"')=0,1!=1,tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"')] %s %s)",
 					"if(indexOf(tag_string_names,'"+hostNameSuffix+"')=0,1!=1,%s(tag_string_values[indexOf(tag_string_names,'"+hostNameSuffix+"')], %s))",
 				),
