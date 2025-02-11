@@ -512,7 +512,7 @@ impl From<&UserConfig> for FlowConfig {
                 .flow_log
                 .time_window
                 .max_tolerable_packet_delay,
-            flush_interval: conf.processors.packet.pcap_stream.flush_interval,
+            flush_interval: conf.processors.flow_log.conntrack.flow_flush_interval,
             flow_timeout: FlowTimeout::from(TcpTimeout {
                 established: conf
                     .processors
