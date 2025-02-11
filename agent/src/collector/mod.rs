@@ -28,6 +28,7 @@ use std::time::Duration;
 pub use collector::{Collector, L7Collector};
 
 use bitflags::bitflags;
+use log::info;
 
 use crate::{
     common::endpoint::EPC_INTERNET,
@@ -60,6 +61,26 @@ pub fn check_active(
         check_active_host(now, possible_host, &flow.peers[0], &flow.flow_key.ip_src),
         check_active_host(now, possible_host, &flow.peers[1], &flow.flow_key.ip_dst),
     )
+}
+
+pub fn reset_delay_seconds(delay_seconds: u64) -> u64 {
+    if (SECONDS_IN_MINUTE..SECONDS_IN_MINUTE * 2).contains(&delay_seconds) {
+        delay_seconds
+    } else if delay_seconds < SECONDS_IN_MINUTE {
+        info!(
+            "delay_seconds {} < {}, reset delay_seconds to {}.",
+            delay_seconds, SECONDS_IN_MINUTE, SECONDS_IN_MINUTE
+        );
+        SECONDS_IN_MINUTE
+    } else {
+        info!(
+            "delay_seconds {} >= {}, reset delay_seconds to {}.",
+            delay_seconds,
+            SECONDS_IN_MINUTE * 2,
+            SECONDS_IN_MINUTE * 2 - 1
+        );
+        SECONDS_IN_MINUTE * 2 - 1
+    }
 }
 
 pub fn check_active_host(
