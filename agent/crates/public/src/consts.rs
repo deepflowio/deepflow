@@ -18,6 +18,8 @@ use std::time::Duration;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub const PROCESS_NAME: &str = "deepflow-agent";
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub const PROCESS_NAME_SECONDARY: &str = "trident";
 #[cfg(target_os = "windows")]
 pub const PROCESS_NAME: &str = "deepflow-agent.exe";
 pub const DAEMONSET_NAME: &str = "deepflow-agent";
