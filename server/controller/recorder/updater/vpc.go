@@ -18,6 +18,7 @@ package updater
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -74,6 +75,9 @@ func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffb
 }
 
 func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, bool) {
+	if cloudItem.Label == "" {
+		cloudItem.Label = common.GenerateVPCShortUUID()
+	}
 	dbItem := &metadbmodel.VPC{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
@@ -95,9 +99,18 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
+
+	if cloudItem.Label == "" {
+		if diffBase.Label == "" {
+			cloudItem.Label = common.GenerateVPCShortUUID()
+		} else {
+			cloudItem.Label = diffBase.Label
+		}
+	}
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
+		mapInfo["uid"] = cloudItem.Label
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
