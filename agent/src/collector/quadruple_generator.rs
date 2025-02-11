@@ -30,7 +30,7 @@ use thread::JoinHandle;
 use super::{
     check_active_host,
     consts::*,
-    round_to_minute,
+    reset_delay_seconds, round_to_minute,
     types::{FlowMeterWithFlow, MiniFlow},
     MetricsType, QgStats,
 };
@@ -737,10 +737,7 @@ impl QuadrupleGenerator {
     ) -> Self {
         let conf = config.load();
         info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, conf.l7_metrics_enabled, conf.vtap_flow_1s_enabled, conf.enabled);
-        if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
-        {
-            panic!("minute_delay_seconds须在[60, 120)秒内")
-        }
+        let minute_delay_seconds = reset_delay_seconds(minute_delay_seconds);
 
         let second_slots = second_delay_seconds as usize;
         let minute_slots = 2 as usize;

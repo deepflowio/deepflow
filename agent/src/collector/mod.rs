@@ -28,6 +28,7 @@ use std::time::Duration;
 pub use collector::{Collector, L7Collector};
 
 use bitflags::bitflags;
+use log::info;
 
 use crate::{
     common::endpoint::EPC_INTERNET,
@@ -49,6 +50,26 @@ bitflags! {
 
 pub fn round_to_minute(t: Duration) -> Duration {
     Duration::from_secs(t.as_secs() / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE)
+}
+
+pub fn reset_delay_seconds(delay_seconds: u64) -> u64 {
+    if (SECONDS_IN_MINUTE..SECONDS_IN_MINUTE * 2).contains(&delay_seconds) {
+        delay_seconds
+    } else if delay_seconds < SECONDS_IN_MINUTE {
+        info!(
+            "delay_seconds {} < {}, reset delay_seconds to {}.",
+            delay_seconds, SECONDS_IN_MINUTE, SECONDS_IN_MINUTE
+        );
+        SECONDS_IN_MINUTE
+    } else {
+        info!(
+            "delay_seconds {} >= {}, reset delay_seconds to {}.",
+            delay_seconds,
+            SECONDS_IN_MINUTE * 2,
+            SECONDS_IN_MINUTE * 2 - 1
+        );
+        SECONDS_IN_MINUTE * 2 - 1
+    }
 }
 
 pub fn check_active(now: u64, possible_host: &mut PossibleHost, flow: &MiniFlow) -> (bool, bool) {
