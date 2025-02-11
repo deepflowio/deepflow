@@ -223,6 +223,27 @@ func agentGetConn(cmd *cobra.Command) *grpc.ClientConn {
 	return conn
 }
 
+func agentCache(teamID, ctrlIP, ctrlMAC string, cmd *cobra.Command) {
+	conn := agentGetConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s) ,team(%s) ctrl ip(%s) mac(%s)\n", conn.Target(), teamID, ctrlIP, ctrlMAC)
+	c := agent.NewDebugClient(conn)
+	reqData := &agent.AgentCacheRequest{
+		TeamId:  &teamID,
+		CtrlIp:  &ctrlIP,
+		CtrlMac: &ctrlMAC,
+	}
+	response, err := c.DebugAgentCache(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(response.GetContent()))
+}
+
 func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
 	conn := agentGetConn(cmd)
 	if conn == nil {

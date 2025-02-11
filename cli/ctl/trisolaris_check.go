@@ -167,14 +167,6 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
-	agentCacheCmd := &cobra.Command{
-		Use:   "agent-cache",
-		Short: "get agent-cache from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			agentCache(paramData.TeamID, paramData.CtrlIP, paramData.CtrlMac, cmd)
-		},
-	}
-
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from deepflow-server",
@@ -203,7 +195,7 @@ func regiterCommand() []*cobra.Command {
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, agentCacheCmd, allCmd, universalTagNameCmd, orgIDsCmd}
+		realGlobalCmd, ripToVipCmd, allCmd, universalTagNameCmd, orgIDsCmd}
 	return commands
 }
 
@@ -467,27 +459,6 @@ func ripToVip(cmd *cobra.Command) {
 	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, formatRVEntry(entry))
 	}
-}
-
-func agentCache(teamID, ctrlIP, ctrlMAC string, cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s) ,team(%s) ctrl ip(%s) mac(%s)\n", conn.Target(), teamID, ctrlIP, ctrlMAC)
-	c := trident.NewDebugClient(conn)
-	reqData := &trident.AgentCacheRequest{
-		TeamId:  &teamID,
-		CtrlIp:  &ctrlIP,
-		CtrlMac: &ctrlMAC,
-	}
-	response, err := c.DebugAgentCache(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Printf("%s\n", response.GetContent())
 }
 
 func JsonFormat(index int, v interface{}) {

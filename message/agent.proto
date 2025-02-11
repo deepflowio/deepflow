@@ -26,6 +26,7 @@ service Debug {
     rpc DebugGPIDAgentData(GPIDSyncRequest) returns (GPIDAgentData) {}
     rpc DebugRealGlobalData(GPIDSyncRequest) returns (RealGlobalData) {}
     rpc DebugRIPToVIP(GPIDSyncRequest) returns (RVData) {}
+    rpc DebugAgentCache(AgentCacheRequest) returns (AgentCacheResponse) {}
 }
 
 enum AgentType {
@@ -649,6 +650,16 @@ message GPIDSyncRequest {
 message GPIDSyncResponse {
     optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 1 [default = COMPRESS_ALRO_NONE];
     repeated GPIDSyncEntry entries = 2;
+}
+
+message AgentCacheRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional string team_id = 3; // agent team identity
+}
+
+message AgentCacheResponse {
+    optional bytes content = 1;  // json数据
 }
 
 message GlobalGPIDEntry {
