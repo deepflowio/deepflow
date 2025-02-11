@@ -46,6 +46,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support rfc 6598 [#9063](https://github.com/deepflowio/deepflow/pull/9063) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: adds epc_id to vinterface table [#9055](https://github.com/deepflowio/deepflow/pull/9055) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
