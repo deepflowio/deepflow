@@ -66,6 +66,8 @@ const (
 	RESOURCE_TYPE_IP_EN      = "ip"
 	RESOURCE_TYPE_ALL_IP_EN  = "all_ip"
 	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
+
+	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "custom_service"
 )
 
 var VIF_DEVICE_TYPE_TO_RESOURCE_TYPE = map[int]string{
