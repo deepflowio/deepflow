@@ -19,37 +19,26 @@ package ctl
 import (
 	"bytes"
 	"context"
+	. "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
 	"sort"
 	"strconv"
-	"time"
 
-	. "encoding/binary"
-
-	"github.com/deepflowio/deepflow/message/agent"
-	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/message/trident"
 )
 
 type ParamData struct {
-	KubernetesWatchPolicy int32
-	OrgID                 uint32
-	CtrlIP                string
-	CtrlMac               string
-	GroupID               string
-	ClusterID             string
-	TeamID                string
-	RpcIP                 string
-	RpcPort               string
-	Type                  string
+	OrgID       uint32
+	RpcIP       string
+	RpcPort     string
+	CtrlIP      string
+	ProcessName string
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -66,6 +55,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{platformData})
 		},
 	}
+
 	ipGroupsCmd := &cobra.Command{
 		Use:   "ip-groups",
 		Short: "get ip groups from deepflow-servr",
@@ -73,6 +63,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{ipGroups})
 		},
 	}
+
 	flowAclsCmd := &cobra.Command{
 		Use:   "flow-acls",
 		Short: "get flow-acls from deepflow-server",
@@ -80,6 +71,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{flowAcls})
 		},
 	}
+
 	tapTypesCmd := &cobra.Command{
 		Use:   "tap-types",
 		Short: "get tap-types from deepflow-server",
@@ -87,6 +79,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{tapTypes})
 		},
 	}
+
 	segmentsCmd := &cobra.Command{
 		Use:   "segments",
 		Short: "get segments from deepflow-server",
@@ -94,6 +87,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{segments})
 		},
 	}
+
 	containersCmd := &cobra.Command{
 		Use:   "containers",
 		Short: "get containers from deepflow-server",
@@ -101,6 +95,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{containers})
 		},
 	}
+
 	vpcIPCmd := &cobra.Command{
 		Use:   "vpc-ip",
 		Short: "get vpc-ip from deepflow-server",
@@ -108,13 +103,7 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{vpcIP})
 		},
 	}
-	configCmd := &cobra.Command{
-		Use:   "config",
-		Short: "get config from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			initCmd(cmd, []CmdExecute{configData})
-		},
-	}
+
 	skipInterfaceCmd := &cobra.Command{
 		Use:   "skip-interface",
 		Short: "get skip-interface from deepflow-server",
@@ -122,48 +111,12 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{skipInterface})
 		},
 	}
+
 	localServersCmd := &cobra.Command{
 		Use:   "local-servers",
 		Short: "get local-servers from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{localServers})
-		},
-	}
-	gpidAgentResponseCmd := &cobra.Command{
-		Use:   "gpid-agent-response",
-		Short: "get gpid-agent-response from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			gpidAgentResponse(cmd)
-		},
-	}
-	gpidGlobalTableCmd := &cobra.Command{
-		Use:   "gpid-global-table",
-		Short: "get gpid-global-table from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			gpidGlobalTable(cmd)
-		},
-	}
-
-	gpidAgentRequestCmd := &cobra.Command{
-		Use:   "gpid-agent-request",
-		Short: "get gpid-agent-request from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			gpidAgentRequest(cmd)
-		},
-	}
-	realGlobalCmd := &cobra.Command{
-		Use:   "realclient-to-realserver",
-		Short: "get realclient-to-realserver from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			realGlobal(cmd)
-		},
-	}
-
-	ripToVipCmd := &cobra.Command{
-		Use:   "rip-to-vip",
-		Short: "get rip-to-vip from deepflow-server",
-		Run: func(cmd *cobra.Command, args []string) {
-			ripToVip(cmd)
 		},
 	}
 
@@ -172,7 +125,7 @@ func regiterCommand() []*cobra.Command {
 		Short: "get all data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes,
-				segments, containers, vpcIP, configData, skipInterface, localServers})
+				segments, containers, vpcIP, skipInterface, localServers})
 		},
 	}
 
@@ -193,24 +146,18 @@ func regiterCommand() []*cobra.Command {
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
-		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, allCmd, universalTagNameCmd, orgIDsCmd}
+		tapTypesCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
+		localServersCmd, allCmd, universalTagNameCmd, orgIDsCmd}
 	return commands
 }
 
 func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd := &cobra.Command{
-		Use:   "trisolaris.check",
+		Use:   "trisolaris.ingester-check",
 		Short: "pull grpc data from deepflow-server",
 	}
-	trisolarisCmd.PersistentFlags().Int32VarP(&paramData.KubernetesWatchPolicy, "kwp", "", 0, "agent k8s watch policy: 0.normal 1.only 2.disabled")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "agent ctrl ip")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "agent ctrl mac")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "agent group ID")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.TeamID, "tid", "", "", "agent team ID")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "agent k8s cluster ID")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "ctrl ip")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ProcessName, "pname", "", "analyzer", "process name")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		trisolarisCmd.AddCommand(handler)
@@ -241,223 +188,20 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		return
 	}
 	defer conn.Close()
-	var name, groupID, clusterID, teamID string
-	var orgID uint32
-	var kubernetesWatchPolicy = trident.KubernetesWatchPolicy(paramData.KubernetesWatchPolicy)
-	switch paramData.Type {
-	case "trident":
-		name = paramData.Type
-		groupID = paramData.GroupID
-		clusterID = paramData.ClusterID
-		teamID = paramData.TeamID
-		orgID = paramData.OrgID
-	case "analyzer":
-		name = paramData.Type
-		orgID = paramData.OrgID
-	default:
-		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
-		return
-	}
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
-		CtrlIp:                &paramData.CtrlIP,
-		CtrlMac:               &paramData.CtrlMac,
-		VtapGroupIdRequest:    &groupID,
-		KubernetesClusterId:   &clusterID,
-		KubernetesWatchPolicy: &kubernetesWatchPolicy,
-		ProcessName:           &name,
-		TeamId:                &teamID,
-		OrgId:                 &orgID,
+		OrgId:       &paramData.OrgID,
+		CtrlIp:      &paramData.CtrlIP,
+		ProcessName: &paramData.ProcessName,
 	}
-	var response *trident.SyncResponse
-	var err error
-	if paramData.Type == "trident" {
-		response, err = c.Sync(context.Background(), reqData)
-	} else {
-		response, err = c.AnalyzerSync(context.Background(), reqData)
-	}
+	response, err := c.AnalyzerSync(context.Background(), reqData)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	for _, cmd := range cmds {
 		cmd(response)
-	}
-}
-
-func gpidAgentResponse(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := agent.NewSynchronizerClient(conn)
-	reqData := &agent.GPIDSyncRequest{
-		CtrlIp:  &paramData.CtrlIP,
-		CtrlMac: &paramData.CtrlMac,
-		TeamId:  &paramData.TeamID,
-	}
-	response, err := c.GPIDSync(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("gpid:")
-	for index, entry := range response.Entries {
-		JsonFormat(index+1, formatEntries(entry))
-	}
-}
-
-func formatEntries(entry *agent.GPIDSyncEntry) string {
-	buffer := bytes.Buffer{}
-	format := "{protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
-		"epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, epc_id_real: %d, " +
-		"ipv4_real: %s, port_real: %d, pid_real: %d, role_real: %d, netns_idx: %d}"
-	buffer.WriteString(fmt.Sprintf(format,
-		entry.GetProtocol(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(),
-		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
-		utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRoleReal(), entry.GetNetnsIdx()),
-	)
-	return buffer.String()
-}
-
-func formatGlobalEntry(entry *agent.GlobalGPIDEntry) string {
-	buffer := bytes.Buffer{}
-	format := "{ protocol: %d, agent_id_1: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, gpid_1: %d " +
-		"agent_id_0: %d, epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, gpid_0: %d, netns_idx: %d}"
-	buffer.WriteString(fmt.Sprintf(format,
-		entry.GetProtocol(),
-		entry.GetAgentId_1(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(), entry.GetGpid_1(),
-		entry.GetAgentId_0(), entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetGpid_0(),
-		entry.GetNetnsIdx()))
-
-	return buffer.String()
-}
-
-func gpidGlobalTable(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := agent.NewDebugClient(conn)
-	reqData := &agent.GPIDSyncRequest{
-		TeamId: &paramData.TeamID,
-	}
-	response, err := c.DebugGPIDGlobalData(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("GPIDGlobalData:")
-	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, formatGlobalEntry(entry))
-	}
-}
-
-func gpidAgentRequest(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := agent.NewDebugClient(conn)
-	reqData := &agent.GPIDSyncRequest{
-		CtrlIp:  &paramData.CtrlIP,
-		CtrlMac: &paramData.CtrlMac,
-		TeamId:  &paramData.TeamID,
-	}
-	response, err := c.DebugGPIDAgentData(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	req := response.GetSyncRequest()
-	tm := time.Unix(int64(response.GetUpdateTime()), 0)
-	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s agent_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetAgentId(), tm.Format("2006-01-02 15:04:05"))
-	fmt.Println("Entries:")
-	if req == nil {
-		return
-	}
-	for index, entry := range req.GetEntries() {
-		JsonFormat(index+1, formatEntries(entry))
-	}
-}
-
-func formatRealEntry(entry *agent.RealClientToRealServer) string {
-	buffer := bytes.Buffer{}
-	format := "{epc_id_1: %d, ipv4_1: %s, port_1: %d, " +
-		"epc_id_0: %d, ipv4_0: %s, port_0: %d, " +
-		"epc_id_real: %d, ipv4_real: %s, port_real: %d, pid_real: %d, agent_id_real: %d}"
-	buffer.WriteString(fmt.Sprintf(format,
-		entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(),
-		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(),
-		entry.GetEpcIdReal(), utils.IpFromUint32(entry.GetIpv4Real()).String(),
-		entry.GetPortReal(), entry.GetPidReal(), entry.GetAgentIdReal()))
-	return buffer.String()
-}
-
-func realGlobal(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := agent.NewDebugClient(conn)
-	reqData := &agent.GPIDSyncRequest{
-		CtrlIp:  &paramData.CtrlIP,
-		CtrlMac: &paramData.CtrlMac,
-		TeamId:  &paramData.TeamID,
-	}
-	response, err := c.DebugRealGlobalData(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Entries:")
-	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, formatRealEntry(entry))
-	}
-}
-
-func formatRVEntry(entry *agent.RipToVip) string {
-	buffer := bytes.Buffer{}
-	format := "{protocol: %d, epc_id: %d, r_ipv4: %s, r_port: %d, " +
-		" v_ipv4: %s, v_port: %d, }"
-	buffer.WriteString(fmt.Sprintf(format,
-		entry.GetProtocol(), entry.GetEpcId(),
-		utils.IpFromUint32(entry.GetRIpv4()).String(), entry.GetRPort(),
-		utils.IpFromUint32(entry.GetVIpv4()).String(), entry.GetVPort(),
-	))
-	return buffer.String()
-}
-
-func ripToVip(cmd *cobra.Command) {
-	conn := getConn(cmd)
-	if conn == nil {
-		return
-	}
-	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
-	c := agent.NewDebugClient(conn)
-	reqData := &agent.GPIDSyncRequest{
-		CtrlIp:  &paramData.CtrlIP,
-		CtrlMac: &paramData.CtrlMac,
-		TeamId:  &paramData.TeamID,
-	}
-	response, err := c.DebugRIPToVIP(context.Background(), reqData)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Entries:")
-	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, formatRVEntry(entry))
 	}
 }
 
@@ -564,17 +308,6 @@ func platformData(response *trident.SyncResponse) {
 			}
 		}
 	}
-}
-
-func configData(response *trident.SyncResponse) {
-	fmt.Println("config:")
-	config := response.GetConfig()
-	fmt.Println(proto.MarshalTextString(config))
-	fmt.Println("revision:", response.GetRevision())
-	fmt.Println("self_update_url:", response.GetSelfUpdateUrl())
-
-	fmt.Println("\nAnalyzerconfig:")
-	fmt.Println(proto.MarshalTextString(response.GetAnalyzerConfig()))
 }
 
 func skipInterface(response *trident.SyncResponse) {

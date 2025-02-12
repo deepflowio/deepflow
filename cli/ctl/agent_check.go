@@ -23,20 +23,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"time"
 
-	"github.com/deepflowio/deepflow/message/agent"
-	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/message/agent"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type AgentParamData struct {
@@ -649,7 +648,7 @@ func Aplugin(cmd *cobra.Command) {
 		}
 	}
 	fileName := agentParamData.PluginType + "-" + agentParamData.PluginName
-	err = ioutil.WriteFile(fileName, data, 0666)
+	err = os.WriteFile(fileName, data, 0666)
 	if err != nil {
 		fmt.Printf("save plugin(%s) fail %s\n", fileName, err)
 		return

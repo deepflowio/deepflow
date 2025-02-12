@@ -13,7 +13,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.5.0
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/net v0.26.0
 	google.golang.org/grpc v1.62.1
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -108,6 +107,7 @@ require (
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.19.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
