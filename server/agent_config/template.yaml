@@ -3901,128 +3901,27 @@ inputs:
     #     The detail config for Vector Component, all availble config keys could be found in [vector.dev](https://vector.dev/docs/reference/configuration)
     #     Here's an example for how to capture kubernetes logs、host metrics in virtual machine and kubelet metrics in kubernetes. It'll send to DeepFlow-Agent as output.
     #
-    #     ```yaml
-    #     config:
-    #       sources:
-    #         # capture kubernetes logs
-    #         kubernetes_logs:
-    #           self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-    #           namespace_annotation_fields:
-    #             namespace_labels: ""
-    #           node_annotation_fields:
-    #             node_labels: ""
-    #           pod_annotation_fields:
-    #             pod_annotations: ""
-    #             pod_labels: ""
-    #           type: kubernetes_logs
-    #         # capture host metrics
-    #         host_metrics:
-    #           type: host_metrics
-    #           scrape_interval_secs: 10
-    #           namespace: node
-    #         # capture kubelet metrics
-    #         kubelet_metrics:
-    #           type: prometheus_scrape
-    #           endpoints:
-    #           - http://kubelet.kube-system:10250/metrics
-    #           auth:
-    #             strategy: bearer
-    #             token: $FIX_ME_K8S_TOKEN
-    #           tls:
-    #             verify_certificate: false
-    #           scrape_interval_secs: 10
-    #           scrape_timeout_secs: 10
-    #           honor_labels: true
-    #       transforms:
-    #         tag_kubernetes_logs:
-    #           inputs:
-    #           - kubernetes_logs
-    #           source: |-
-    #             .app_service = .kubernetes.container_name
-    #             ._df_log_type = "system"
-    #           type: remap
-    #       sinks:
-    #         # push metrics to deepflow
-    #         prometheus_remote_write:
-    #           type: prometheus_remote_write
-    #           inputs:
-    #           - kubelet_metrics
-    #           - host_metrics
-    #           endpoint: http://127.0.0.1:38086/api/v1/prometheus
-    #           healthcheck:
-    #             enabled: false
-    #         # push logs to deepflow
-    #         http:
-    #           encoding:
-    #             codec: json
-    #           inputs:
-    #           - tag_kubernetes_logs
-    #           type: http
-    #           uri: http://127.0.0.1:38086/api/v1/log
-    #     ```
+    #     scrape host metrics:
+    #     {{ file: vector_host_metrics.yaml }}
+    #
+    #     scrape kubernetes metrics
+    #     {{ file: vector_k8s_metrics.yaml }}
+    #
+    #     scrape kubernentes logs (capture DeepFlow Pod logs as example, if other Pod logs is required, update `extra_label_selector` add custom filters)
+    #     {{ file: vector_k8s_logs.yaml }}
+    #
     #   ch: |-
     #     Vector 组件的具体配置，所有可用配置可在此链接中查找：[vector.dev](https://vector.dev/docs/reference/configuration)
     #     以下提供一份抓取 kubernetes 日志、宿主机指标及 kubernetes kubelet 指标的示例，并将这些数据发送到 DeepFlow-Agent。
     #
-    #     ```yaml
-    #     config:
-    #       sources:
-    #         # 抓取 kubernetes 日志
-    #         kubernetes_logs:
-    #           self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-    #           namespace_annotation_fields:
-    #             namespace_labels: ""
-    #           node_annotation_fields:
-    #             node_labels: ""
-    #           pod_annotation_fields:
-    #             pod_annotations: ""
-    #             pod_labels: ""
-    #           type: kubernetes_logs
-    #         # 抓取主机指标
-    #         host_metrics:
-    #           type: host_metrics
-    #           scrape_interval_secs: 10
-    #           namespace: node
-    #         # 抓取 kubelet 指标
-    #         kubelet_metrics:
-    #           type: prometheus_scrape
-    #           endpoints:
-    #           - http://kubelet.kube-system:10250/metrics
-    #           auth:
-    #             strategy: bearer
-    #             token: $FIX_ME_K8S_TOKEN
-    #           tls:
-    #             verify_certificate: false
-    #           scrape_interval_secs: 10
-    #           scrape_timeout_secs: 10
-    #           honor_labels: true
-    #       transforms:
-    #         tag_kubernetes_logs:
-    #           inputs:
-    #           - kubernetes_logs
-    #           source: |-
-    #             .app_service = .kubernetes.container_name
-    #             ._df_log_type = "system"
-    #           type: remap
-    #       sinks:
-    #         # 推送指标到 deepflow
-    #         prometheus_remote_write:
-    #           type: prometheus_remote_write
-    #           inputs:
-    #           - kubelet_metrics
-    #           - host_metrics
-    #           endpoint: http://127.0.0.1:38086/api/v1/prometheus
-    #           healthcheck:
-    #             enabled: false
-    #         # 推送日志到 deepflow
-    #         http:
-    #           encoding:
-    #             codec: json
-    #           inputs:
-    #           - tag_kubernetes_logs
-    #           type: http
-    #           uri: http://127.0.0.1:38086/api/v1/log
-    #     ```
+    #     抓取主机指标
+    #     {{ file: vector_host_metrics.yaml }}
+    #
+    #     抓取 kubernetes 指标
+    #     {{ file: vector_k8s_metrics.yaml }}
+    #
+    #     抓取 kubernetes 日志(以采集 DeepFlow Pod 日志为例，若需要采集其他 Pod 日志可修改 `extra_label_selector` 并加上具体条件)
+    #     {{ file: vector_k8s_logs.yaml }}
     config:
 
 # type: section

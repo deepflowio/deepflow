@@ -5077,6 +5077,82 @@ inputs:
   时需要 SYS_ADMIN 权限）。
 - adaptive: deepflow-agent 优先使用 active 模式获取其他 POD 的 MAC 和 IP 信息。
 
+### 从控制器拉取资源 {#inputs.resources.pull_resource_from_controller}
+
+DeepFlow-server 从控制器拉取资源的配置。
+DeepFlow-agent 不会读取此部分。
+
+#### 云平台过滤器 {#inputs.resources.pull_resource_from_controller.domain_filter}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.pull_resource_from_controller.domain_filter`
+
+Upgrade from old version: `domains`
+
+**默认值**:
+```yaml
+inputs:
+  resources:
+    pull_resource_from_controller:
+      domain_filter:
+      - '0'
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+在运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
+向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
+以减少下发的数据量。当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
+下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
+仅获取部分云平台的数据。
+
+#### 仅下发本集群中的 K8s Pod IP {#inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster`
+
+Upgrade from old version: `pod_cluster_internal_ip`
+
+**默认值**:
+```yaml
+inputs:
+  resources:
+    pull_resource_from_controller:
+      only_kubernetes_pod_ip_in_local_cluster: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
+向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
+减少下发的数据量。当 Kubernetes 内部的 POD IP 不会直接与外部通信时，可以配置仅向 deepflow-agent
+下发本集群的 POD IP、MAC 数据。参数默认值为`false`，表示发送全部。
+
 ## 集成 {#inputs.integration}
 
 ### Enabled {#inputs.integration.enabled}
@@ -5482,64 +5558,259 @@ inputs:
 Vector 组件的具体配置，所有可用配置可在此链接中查找：[vector.dev](https://vector.dev/docs/reference/configuration)
 以下提供一份抓取 kubernetes 日志、宿主机指标及 kubernetes kubelet 指标的示例，并将这些数据发送到 DeepFlow-Agent。
 
+抓取主机指标
 ```yaml
 config:
   sources:
-    # 抓取 kubernetes 日志
-    kubernetes_logs:
-      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-      namespace_annotation_fields:
-        namespace_labels: ""
-      node_annotation_fields:
-        node_labels: ""
-      pod_annotation_fields:
-        pod_annotations: ""
-        pod_labels: ""
-      type: kubernetes_logs
-    # 抓取主机指标
     host_metrics:
       type: host_metrics
       scrape_interval_secs: 10
       namespace: node
-    # 抓取 kubelet 指标
-    kubelet_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - http://kubelet.kube-system:10250/metrics
-      auth:
-        strategy: bearer
-        token: $FIX_ME_K8S_TOKEN
-      tls:
-        verify_certificate: false
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
   transforms:
-    tag_kubernetes_logs:
-      inputs:
-      - kubernetes_logs
-      source: |-
-        .app_service = .kubernetes.container_name
-        ._df_log_type = "system"
+    host_metrics_relabel:
       type: remap
+      inputs:
+      - host_metrics
+      source: |
+        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+        .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+        # map to prometheus metric name
+        metrics_map = {
+          "boot_time": "boot_time_seconds",
+          "memory_active_bytes": "memory_Active_bytes",
+          "memory_available_bytes": "memory_MemAvailable_bytes",
+          "memory_buffers_bytes": "memory_Buffers_bytes",
+          "memory_cached_bytes": "memory_Cached_bytes",
+          "memory_free_bytes": "memory_MemFree_bytes",
+          "memory_swap_free_bytes": "memory_SwapFree_bytes",
+          "memory_swap_total_bytes": "memory_SwapTotal_bytes",
+          "memory_swap_used_bytes": "memory_SwapCached_bytes",
+          "memory_total_bytes": "memory_MemTotal_bytes",
+          "network_transmit_packets_drop_total": "network_transmit_drop_total",
+          "uptime": "uname_info",
+          "filesystem_total_bytes": "filesystem_size_bytes",
+        }
+        metric_name = get!(value: metrics_map, path: [.name])
+        if !is_null(metric_name) {
+          .name = metric_name
+        }
+        if .tags.collector == "filesystem" {
+          .tags.fstype = .tags.filesystem
+          del(.tags.filesystem)
+        }
   sinks:
-    # 推送指标到 deepflow
     prometheus_remote_write:
       type: prometheus_remote_write
       inputs:
-      - kubelet_metrics
-      - host_metrics
+      - host_metrics_relabel
       endpoint: http://127.0.0.1:38086/api/v1/prometheus
       healthcheck:
         enabled: false
-    # 推送日志到 deepflow
-    http:
-      encoding:
-        codec: json
+```
+
+抓取 kubernetes 指标
+```yaml
+config:
+  secret:
+    kube_token:
+      type: directory
+      path: /var/run/secrets/kubernetes.io/serviceaccount
+  sources:
+    cadvisor_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
+      auth:
+        strategy: bearer
+        token: SECRET[kube_token.token]
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+      tls:
+        verify_certificate: false
+    kubelet_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+      auth:
+        strategy: bearer
+        token: SECRET[kube_token.token]
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+      tls:
+        verify_certificate: false
+    kube_state_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - http://opensource-kube-state-metrics:8080/metrics
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+  transforms:
+    cadvisor_relabel_filter:
+      type: filter
       inputs:
-      - tag_kubernetes_logs
-      type: http
-      uri: http://127.0.0.1:38086/api/v1/log
+      - cadvisor_metrics
+      condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+    kubelet_relabel_filter:
+      type: filter
+      inputs:
+      - kubelet_metrics
+      condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
+    kube_state_relabel_filter:
+      type: filter
+      inputs:
+      - kube_state_metrics
+      condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
+    common_relabel_config:
+      type: remap
+      inputs:
+      - cadvisor_relabel_filter
+      - kubelet_relabel_filter
+      - kube_state_relabel_filter
+      source: |
+        if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
+        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
+        }
+    sinks:
+      prometheus_remote_write:
+        type: prometheus_remote_write
+        inputs:
+        - common_relabel_config
+        endpoint: http://127.0.0.1:38086/api/v1/prometheus
+        healthcheck:
+          enabled: false
+```
+
+抓取 kubernetes 日志(以采集 DeepFlow Pod 日志为例，若需要采集其他 Pod 日志可修改 `extra_label_selector` 并加上具体条件)
+```yaml
+config:
+ data_dir: /vector-log-checkpoint
+ sources:
+   kubernetes_logs:
+     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+     type: kubernetes_logs
+     namespace_annotation_fields:
+       namespace_labels: ""
+     node_annotation_fields:
+       node_labels: ""
+     pod_annotation_fields:
+       pod_annotations: ""
+       pod_labels: ""
+     extra_label_selector: "app=deepflow,component!=front-end"
+   kubernetes_logs_frontend:
+     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+     type: kubernetes_logs
+     namespace_annotation_fields:
+       namespace_labels: ""
+     node_annotation_fields:
+       node_labels: ""
+     pod_annotation_fields:
+       pod_annotations: ""
+       pod_labels: ""
+     extra_label_selector: "app=deepflow,component=front-end"
+ transforms:
+   multiline_kubernetes_logs:
+     type: reduce
+     inputs:
+       - kubernetes_logs
+     group_by:
+       - file
+       - stream
+     merge_strategies:
+       message: concat_newline
+     starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
+     expire_after_ms: 2000
+     flush_period_ms: 500
+   flush_kubernetes_logs:
+    type: remap
+    inputs:
+      - multiline_kubernetes_logs
+    source: |-
+        .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
+   remap_kubernetes_logs:
+     type: remap
+     inputs:
+     - flush_kubernetes_logs
+     - kubernetes_logs_frontend
+     source: |-
+         # try to parse json
+         if is_string(.message) && is_json(string!(.message)) {
+             tags = parse_json(.message) ?? {}
+             ._df_log_type = tags._df_log_type
+             .org_id = to_int(tags.org_id) ?? 0
+             .user_id = to_int(tags.user_id) ?? 0
+             .message = tags.message || tags.msg # extract from tags.message
+             del(tags._df_log_type)
+             del(tags.org_id)
+             del(tags.user_id)
+             del(tags.message)
+             del(tags.msg)
+             .json = tags
+         }
+         if !exists(.level) {
+            if exists(.json) {
+               .level = to_string!(.json.level)
+               del(.json.level)
+            } else {
+              # match log level
+              # allow DEBU/ERRO
+              # INFO|INFOMATION|INFORMATION|WARN|WARNING|DEBUG|ERROR|TRACE|FATAL|CRITICAL
+              # (?i) ignore case, but require `[]` or linux color code surround
+              level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
+              if !exists(level_tags.level) {
+                 # for logs like ' INFO ' surround by whitespace, to avoid level match error, require uppercase strictly
+                 level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
+              }
+              if exists(level_tags.level) {
+                 level_tags.level = upcase(string!(level_tags.level))
+                 if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
+                     level_tags.level = "INFO"
+                 }
+                 if level_tags.level == "WARNING" {
+                     level_tags.level = "WARN"
+                 }
+                 if level_tags.level == "DEBU" {
+                     level_tags.level = "DEBUG"
+                 }
+                 if level_tags.level == "ERRO" {
+                     level_tags.level = "ERROR"
+                 }
+                 if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
+                     level_tags.level = "FATAL"
+                 }
+                 .level = level_tags.level
+              }
+            }
+         }
+         if !exists(._df_log_type) {
+             ._df_log_type = "system"
+         }
+         if !exists(.app_service) {
+             .app_service = .kubernetes.container_name
+         }
+ sinks:
+   http:
+     type: http
+     inputs: [remap_kubernetes_logs]
+     uri: http://127.0.0.1:38086/api/v1/log
+     encoding:
+       codec: json
+       sinks:
+         http:
+           encoding:
+             codec: json
+           inputs:
+           - tag_kubernetes_logs
+           type: http
+           uri: http://127.0.0.1:38086/api/v1/log
 ```
 
 # 处理器 {#processors}
