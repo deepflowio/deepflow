@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: packet loss in l7 qg [#9089](https://github.com/deepflowio/deepflow/pull/9089) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: too many core files [#9087](https://github.com/deepflowio/deepflow/pull/9087) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -77,3 +79,8 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### OTHER
+* V66 vtap interfaces kv [#9092](https://github.com/deepflowio/deepflow/pull/9092) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* V66 http response [#9086](https://github.com/deepflowio/deepflow/pull/9086) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
