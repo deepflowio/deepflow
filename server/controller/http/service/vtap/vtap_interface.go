@@ -350,6 +350,9 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 		if hasDeviceType && filterDeviceType != vtapVIF.DeviceType {
 			continue
 		}
+		if hasFuzzyVTapName && ((vtapVIF.VTapName != "" && !strings.Contains(vtapVIF.VTapName, fuzzyVTapName)) || vtapVIF.VTapName == "") {
+			continue
+		}
 		if hasFuzzyDeviceName && ((vtapVIF.DeviceName != "" && !strings.Contains(vtapVIF.DeviceName, fuzzyDeviceName)) || vtapVIF.DeviceName == "") {
 			continue
 		}
