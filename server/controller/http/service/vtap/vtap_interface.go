@@ -185,8 +185,8 @@ func (v *VTapInterface) getRawVTapVinterfacesByRegion(host string, port int, que
 func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
 	var vtapVIFs []model.VTapInterface
 	filterName, hasName := filter["name"].(string)
-	filterDeviceType, hasDeviceType := filter["device_type"].(int)
-	filterVTapType, hasVTapType := filter["vtap_type"].(int)
+	filterDeviceType, hasDeviceType := filter["device_type"].([]int)
+	filterVTapType, hasVTapType := filter["vtap_type"].([]int)
 
 	fuzzyName, hasFuzzyName := filter["fuzzy_name"].(string)
 	fuzzyMac, hasFuzzyMac := filter["fuzzy_mac"].(string)
@@ -240,7 +240,7 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
 			vtapVIF.VTapType = vtap.Type
 			vtapVIF.VTapName = vtap.Name
-			if hasVTapType && filterVTapType != vtapVIF.VTapType {
+			if hasVTapType && !slices.Contains(filterVTapType, vtapVIF.VTapType) {
 				continue
 			}
 			if hasFuzzyVTapName && ((vtapVIF.VTapName != "" && !strings.Contains(vtapVIF.VTapName, fuzzyVTapName)) || vtapVIF.VTapName == "") {
@@ -283,7 +283,7 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 					}
 				}
 				vtapVIF.DeviceType = macVIF.DeviceType
-				if hasDeviceType && filterDeviceType != vtapVIF.DeviceType {
+				if hasDeviceType && !slices.Contains(filterDeviceType, vtapVIF.DeviceType) {
 					continue
 				}
 				vtapVIF.DeviceID = macVIF.DeviceID
@@ -344,10 +344,10 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 		} else if vtapID != 0 {
 			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)
 		}
-		if hasVTapType && filterVTapType != vtapVIF.VTapType {
+		if hasVTapType && !slices.Contains(filterVTapType, vtapVIF.VTapType) {
 			continue
 		}
-		if hasDeviceType && filterDeviceType != vtapVIF.DeviceType {
+		if hasDeviceType && !slices.Contains(filterDeviceType, vtapVIF.DeviceType) {
 			continue
 		}
 		if hasFuzzyVTapName && ((vtapVIF.VTapName != "" && !strings.Contains(vtapVIF.VTapName, fuzzyVTapName)) || vtapVIF.VTapName == "") {
