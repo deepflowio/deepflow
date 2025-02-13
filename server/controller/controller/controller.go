@@ -108,7 +108,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	}
 
 	// 初始化Redis
-	if cfg.RedisCfg.Enabled {
+	if cfg.RedisCfg.Enabled && cfg.TrisolarisCfg.NodeType == "master" {
 		router.SetInitStageForHealthChecker("Redis init")
 
 		err := redis.Init(ctx, cfg.RedisCfg)
