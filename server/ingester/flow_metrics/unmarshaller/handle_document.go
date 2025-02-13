@@ -149,7 +149,7 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		t.PodID1 = info1.PodID
 		t.PodClusterID1 = uint16(info1.PodClusterID)
 		if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
-			t.ServiceID1 = platformData.QueryService(t.OrgId, t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.Protocol, t.ServerPort)
+			t.ServiceID1 = platformData.QueryPodService(t.OrgId, t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.Protocol, t.ServerPort)
 		}
 		if info == nil {
 			var ip0 net.IP
@@ -175,7 +175,8 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		}
 	}
 	t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), t.L3EpcID1)
-	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID1, uint32(t.PodClusterID1), t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), podGroupType1, t.L3EpcID1)
+	customSeriviceID1 := platformData.QueryCustomService(t.OrgId, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.ServerPort)
+	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(customSeriviceID1, t.ServiceID1, t.PodGroupID1, t.GPID1, uint32(t.PodClusterID1), t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), podGroupType1, t.L3EpcID1)
 
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
@@ -193,10 +194,10 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
 			//for a single-side table (vtap_xxx_port), if ServerPort is valid, it needs to match the serviceID
 			if t.ServerPort > 0 && t.Code&EdgeCode == 0 {
-				t.ServiceID = platformData.QueryService(t.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, t.ServerPort)
+				t.ServiceID = platformData.QueryPodService(t.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, t.ServerPort)
 				// for the 0-side of the double-side table (vtap_xxx_edge_port) or serverPort is invalid, if it is PodServiceIP, then need to match the serviceID
 			} else if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) { //On the 0 side, if it is just Pod Node, there is no need to match the service
-				t.ServiceID = platformData.QueryService(t.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, 0)
+				t.ServiceID = platformData.QueryPodService(t.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, t.Protocol, 0)
 			}
 		}
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
@@ -230,7 +231,13 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		}
 	}
 	t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), t.L3EpcID)
-	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
+	serverPort := uint16(0)
+	//for a single-side table (network,application), it needs to match the cuustomServiceID with ServerPort
+	if t.Code&EdgeCode == 0 {
+		serverPort = t.ServerPort
+	}
+	customServiceID := platformData.QueryCustomService(t.OrgId, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, serverPort)
+	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(customServiceID, t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {
 		// only show OTel data for services as 'server side'

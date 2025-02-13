@@ -684,17 +684,19 @@ func (k *KnowledgeGraph) fill(
 
 	// 0端如果是clusterIP或后端podIP需要匹配service_id
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
-		k.ServiceID0 = platformData.QueryService(k.OrgId, k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
+		k.ServiceID0 = platformData.QueryPodService(k.OrgId, k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
 	}
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
-		k.ServiceID1 = platformData.QueryService(k.OrgId, k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
+		k.ServiceID1 = platformData.QueryPodService(k.OrgId, k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
 	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.L3EpcID0)
-	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, uint32(k.PodClusterID0), k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
+	customServiceID0 := platformData.QueryCustomService(k.OrgId, l3EpcID0, isIPv6, ip40, ip60, 0)
+	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(customServiceID0, k.ServiceID0, k.PodGroupID0, gpID0, uint32(k.PodClusterID0), k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.L3EpcID1)
-	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
+	customServiceID1 := platformData.QueryCustomService(k.OrgId, l3EpcID1, isIPv6, ip41, ip61, port)
+	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(customServiceID1, k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
