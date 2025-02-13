@@ -62,4 +62,4 @@ CALL AddIndexIfNotExists('pod_ingress_rule', 'pod_ingress_id_index', 'pod_ingres
 
 DROP PROCEDURE AddIndexIfNotExists;
 
-UPDATE db_version SET version='7.0.1.7';
+UPDATE db_version SET version='6.6.1.24';
