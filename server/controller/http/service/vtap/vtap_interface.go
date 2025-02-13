@@ -294,29 +294,26 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 					vtapVIF.DeviceHostID = vtapVIF.DeviceID
 					vtapVIF.DeviceHostName = vtapVIF.DeviceName
 				case common.VIF_DEVICE_TYPE_VM:
+					vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceCHostID = vtapVIF.DeviceID
+					vtapVIF.DeviceCHostName = vtapVIF.DeviceName
+					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
 						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
 						vtapVIF.DeviceID = podNodeID
 						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
-						vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[podNodeID]
-						vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
 						vtapVIF.DevicePodNodeID = podNodeID
 						vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[podNodeID]
-					} else {
-						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
-						vtapVIF.DeviceCHostID = vtapVIF.DeviceID
-						vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceID]
 					}
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				case common.VIF_DEVICE_TYPE_POD_NODE:
 					vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DeviceID]
 					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
 					vtapVIF.DevicePodNodeID = vtapVIF.DeviceID
 					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				case common.VIF_DEVICE_TYPE_VROUTER:
 					vtapVIF.DeviceName = toolDS.vrouterIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_DHCP_PORT:
@@ -333,12 +330,12 @@ func (v *VTapInterface) fmtAndFilterForWeb(vifs *simplejson.Json, filter map[str
 					vtapVIF.DeviceName = toolDS.podServiceIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_POD:
 					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
-					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]
-					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
 					vtapVIF.DevicePodNodeID = toolDS.podIDToPodNodeID[vtapVIF.DeviceID]
 					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DevicePodNodeID]
+					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DevicePodNodeID]
+					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				}
 			}
 		} else if vtapID != 0 {
@@ -408,37 +405,34 @@ func (v *VTapInterface) fmtAndFilterForCH(vifs *simplejson.Json, filter map[stri
 				vtapVIF.DeviceHostID = vtapVIF.DeviceID
 				vtapVIF.DeviceHostName = vtapVIF.DeviceName
 			case common.VIF_DEVICE_TYPE_VM:
+				vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
+				vtapVIF.DeviceCHostID = vtapVIF.DeviceID
+				vtapVIF.DeviceCHostName = vtapVIF.DeviceName
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
 					vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
 					vtapVIF.DeviceID = podNodeID
 					vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
-					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[podNodeID]
-					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
 					vtapVIF.DevicePodNodeID = podNodeID
 					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[podNodeID]
-				} else {
-					vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
-					vtapVIF.DeviceCHostID = vtapVIF.DeviceID
-					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceID]
 				}
-				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
-				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 			case common.VIF_DEVICE_TYPE_POD_NODE:
 				vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
-				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
-				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DeviceID]
 				vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				vtapVIF.DevicePodNodeID = vtapVIF.DeviceID
 				vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
 			case common.VIF_DEVICE_TYPE_POD:
 				vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
-				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]]]
-				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
-				vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]
-				vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
 				vtapVIF.DevicePodNodeID = toolDS.podIDToPodNodeID[vtapVIF.DeviceID]
 				vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DevicePodNodeID]
+				vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DevicePodNodeID]
+				vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceCHostID]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 			}
 		} else if vtapID != 0 {
 			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)
