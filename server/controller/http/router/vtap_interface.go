@@ -73,7 +73,7 @@ func (v *VTapInterface) getVTapInterfaces() gin.HandlerFunc {
 			}
 		}
 
-		for _, field := range []string{"page_index", "page_size", "device_type", "vtap_type"} {
+		for _, field := range []string{"page_index", "page_size"} {
 			if v, ok := c.GetQuery(field); ok {
 				value, err := strconv.Atoi(v)
 				if err != nil {
@@ -81,6 +81,20 @@ func (v *VTapInterface) getVTapInterfaces() gin.HandlerFunc {
 					return
 				}
 				args[field] = value
+			}
+		}
+
+		for _, field := range []string{"device_type", "vtap_type"} {
+			if values := c.QueryArray(field); len(values) > 0 {
+				intValues := make([]int, 0, len(values))
+				for _, v := range values {
+					if intVal, err := strconv.Atoi(v); err == nil {
+						intValues = append(intValues, intVal)
+					}
+				}
+				if len(intValues) > 0 {
+					args[field] = intValues
+				}
 			}
 		}
 
