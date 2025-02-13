@@ -29,10 +29,12 @@ import (
 )
 
 type ServiceTable struct {
-	epcIDIPv4Table    [trident.ServiceProtocol_UDP_SERVICE + 1]map[uint64]uint32
-	epcIDIPv6Table    map[EpcIDIPv6Key]uint32
-	podClusterIDTable map[uint64]uint32
-	podGroupIDTable   map[uint64]uint32
+	epcIDIPv4Table         [trident.ServiceProtocol_UDP_SERVICE + 1]map[uint64]uint32
+	epcIDIPv6Table         map[EpcIDIPv6Key]uint32
+	podClusterIDTable      map[uint64]uint32
+	podGroupIDTable        map[uint64]uint32
+	customServiceIpv4Table map[uint64]uint32
+	customServiceIpv6Table map[EpcIDIPv6Key]uint32
 }
 
 type EpcIDIPv6Key struct {
@@ -84,7 +86,7 @@ func toServiceProtocol(protocol layers.IPProtocol) trident.ServiceProtocol {
 	}
 }
 
-func (s *ServiceTable) QueryService(podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
+func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
 	if epcID <= 0 {
 		return 0
 	}
@@ -108,6 +110,22 @@ func (s *ServiceTable) QueryService(podID, podNodeID, podClusterID, podGroupID u
 		return s.epcIDIPv6Table[genEpcIDIPv6Key(epcID, ipv6, serviceProtocol, serverPort)]
 	}
 	return s.epcIDIPv4Table[serviceProtocol][genEpcIDIPv4Key(epcID, ipv4, serverPort)]
+}
+
+func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort uint16) uint32 {
+	if epcID <= 0 {
+		return 0
+	}
+	if isIPv6 {
+		if len(s.customServiceIpv6Table) == 0 {
+			return 0
+		}
+		return s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, serverPort)]
+	}
+	if len(s.customServiceIpv4Table) == 0 {
+		return 0
+	}
+	return s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, serverPort)]
 }
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
@@ -149,6 +167,8 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 		// Service from 'clusterIp + port' generate 'epc + ip + port' table
 		case trident.ServiceType_POD_SERVICE_IP:
 			s.addPodServiceIp(svc)
+		case trident.ServiceType_CUSTOM_SERVICE:
+			s.addCustomService(svc)
 		}
 	}
 	return s
@@ -197,6 +217,32 @@ func (s *ServiceTable) addPodServiceIp(svc *trident.ServiceInfo) {
 			// add Protocol ANY
 			key.protocol = uint8(trident.ServiceProtocol_ANY)
 			s.epcIDIPv6Table[key] = serviceId
+		}
+	}
+}
+
+func (s *ServiceTable) addCustomService(svc *trident.ServiceInfo) {
+	epcId := int32(svc.GetEpcId())
+	serviceId := svc.GetId()
+
+	ports := svc.GetServerPorts()
+	for i, ip := range svc.GetIps() {
+		port := uint16(0)
+		if i < len(ports) {
+			port = uint16(ports[i])
+		}
+		netIp := net.ParseIP(ip)
+		if netIp == nil {
+			continue
+		}
+		ipv4 := netIp.To4()
+		if ipv4 != nil {
+			ipv4U32 := utils.IpToUint32(ipv4)
+			key := genEpcIDIPv4Key(epcId, ipv4U32, port)
+			s.customServiceIpv4Table[key] = serviceId
+		} else {
+			key := genEpcIDIPv6Key(epcId, netIp, 0, port)
+			s.customServiceIpv6Table[key] = serviceId
 		}
 	}
 }
@@ -279,5 +325,44 @@ func (s *ServiceTable) String() string {
 		fmt.Fprintf(sb, "  %-6d            %-12s %-15d %-6d \n", groupID, protocol, port, id)
 	}
 
+	if len(s.customServiceIpv4Table) > 0 {
+		sb.WriteString("\ncustom service\n")
+		sb.WriteString("5  epcID   ipv4            port            serviceID\n")
+		sb.WriteString("----------------------------------------------------\n")
+	}
+	epcIP4s = epcIP4s[:0]
+	for epcIP, _ := range s.customServiceIpv4Table {
+		epcIP4s = append(epcIP4s, epcIP)
+	}
+	sort.Slice(epcIP4s, func(i, j int) bool {
+		return epcIP4s[i] < epcIP4s[j]
+	})
+	for _, epcIP := range epcIP4s {
+		id := s.customServiceIpv4Table[epcIP]
+		epcID, ipv4, port := parseEpcIDIPv4Key(epcIP)
+		fmt.Fprintf(sb, "   %-6d  %-15s %-15d %-6d \n", epcID, ipv4, port, id)
+	}
+
+	if len(s.customServiceIpv6Table) > 0 {
+		sb.WriteString("\n6  epcID   ipv6            port            serviceID\n")
+		sb.WriteString("------------------------------------------------------\n")
+	}
+	epcIP6s = epcIP6s[:0]
+	for epcIP := range s.customServiceIpv6Table {
+		epcIP6s = append(epcIP6s, epcIP)
+	}
+	sort.Slice(epcIP6s, func(i, j int) bool {
+		if epcIP6s[i].epcID < epcIP6s[j].epcID {
+			return true
+		} else if epcIP6s[i].epcID == epcIP6s[j].epcID {
+			return bytes.Compare(epcIP6s[i].IPv6[:], epcIP6s[j].IPv6[:]) <= 0
+		}
+		return false
+	})
+	for _, epcIP := range epcIP6s {
+		id := s.customServiceIpv6Table[epcIP]
+		epcID, ipv6, _, port := parseEpcIDIPv6Key(&epcIP)
+		fmt.Fprintf(sb, "  %-6d  %-15s %-15d %-6d \n", epcID, ipv6, port, id)
+	}
 	return sb.String()
 }
