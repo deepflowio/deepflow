@@ -69,4 +69,4 @@ JOIN vl2 ON vinterface.subnetid = vl2.id
 SET vinterface.epc_id = vl2.epc_id
 WHERE vinterface.devicetype = 6;
 
-UPDATE db_version SET version='7.0.1.6';
+UPDATE db_version SET version='6.6.1.23';
