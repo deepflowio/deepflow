@@ -633,7 +633,7 @@ impl Trident {
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
-            if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
+            if let Err(e) = netns::NsFile::Root.open_and_setns() {
                 return Err(anyhow!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'. setns error: {}", e));
             }
             let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
@@ -1215,7 +1215,7 @@ fn component_on_config_change(
                     #[cfg(target_os = "linux")]
                     d.dispatcher_listener.netns(),
                 );
-                if links.is_empty() {
+                if links.is_empty() && !conf.inner_interface_capture_enabled {
                     info!("No interfaces found, stopping dispatcher {}", d.id);
                     d.stop();
                     return false;
@@ -1237,7 +1237,7 @@ fn component_on_config_change(
                     #[cfg(target_os = "linux")]
                     &netns::NsFile::Root,
                 );
-                if links.is_empty() {
+                if links.is_empty() && !conf.inner_interface_capture_enabled {
                     return;
                 }
                 match build_dispatchers(
@@ -1555,7 +1555,7 @@ impl DomainNameListener {
                                 AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
-                                if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
+                                if let Err(e) = netns::NsFile::Root.open_and_setns() {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}, deepflow-agent restart...", e);
                                     crate::utils::notify_exit(1);
@@ -2141,7 +2141,9 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             &netns::NsFile::Root,
         );
-        if interfaces_and_ns.is_empty() && !links.is_empty() {
+        if interfaces_and_ns.is_empty()
+            && (!links.is_empty() || candidate_config.dispatcher.inner_interface_capture_enabled)
+        {
             if packet_fanout_count > 1 || candidate_config.capture_mode == PacketCaptureType::Local
             {
                 for _ in 0..packet_fanout_count {
@@ -3633,6 +3635,7 @@ fn build_dispatchers(
         .flow_map_config(config_handler.flow())
         .log_parse_config(config_handler.log_parser())
         .collector_config(config_handler.collector())
+        .dispatcher_config(config_handler.dispatcher())
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())

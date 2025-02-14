@@ -246,7 +246,7 @@ impl AnalyzerModeDispatcher {
         receiver: Receiver<Packet>,
         sender: DebugSender<(CaptureNetworkType, MiniPacket<'static>)>,
     ) {
-        let base = &self.base;
+        let base = &self.base.is;
 
         let terminated = base.terminated.clone();
         let tunnel_type_bitmap = base.tunnel_type_bitmap.clone();
@@ -445,9 +445,9 @@ impl AnalyzerModeDispatcher {
         &mut self,
         receiver: Receiver<(CaptureNetworkType, MiniPacket<'static>)>,
     ) {
-        let base = &self.base;
+        let base = &self.base.is;
         let terminated = base.terminated.clone();
-        let handler_builder = self.base.handler_builder.clone();
+        let handler_builder = base.handler_builder.clone();
         let id = base.id;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
@@ -512,7 +512,7 @@ impl AnalyzerModeDispatcher {
     }
 
     fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
-        let id = self.base.id;
+        let id = self.base.is.id;
         let name = "0.1-raw-packet-to-flow-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
@@ -536,7 +536,7 @@ impl AnalyzerModeDispatcher {
 
     pub(super) fn run(&mut self) {
         let sender_to_parser = self.setup_inner_thread_and_queue();
-        let base = &mut self.base;
+        let base = &mut self.base.is;
         info!("Start analyzer dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
@@ -559,7 +559,7 @@ impl AnalyzerModeDispatcher {
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
-                    &mut base.engine,
+                    &mut self.base.engine,
                     &base.leaky_bucket,
                     &base.exception_handler,
                     &mut prev_timestamp,
@@ -578,7 +578,7 @@ impl AnalyzerModeDispatcher {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 drop(recved);
-                base.check_and_update_bpf();
+                base.check_and_update_bpf(&mut self.base.engine);
                 continue;
             }
             if base.pause.load(Ordering::Relaxed) {
@@ -600,12 +600,13 @@ impl AnalyzerModeDispatcher {
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
                 if_index: 0,
+                ns_ino: 0,
             };
             batch.push(info);
 
             drop(packet);
 
-            base.check_and_update_bpf();
+            base.check_and_update_bpf(&mut self.base.engine);
         }
         if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
@@ -614,8 +615,8 @@ impl AnalyzerModeDispatcher {
             let _ = handler.join();
         }
 
-        base.terminate_handler();
-        info!("Stopped dispatcher {}", base.log_id);
+        self.base.terminate_handler();
+        info!("Stopped dispatcher {}", self.base.is.log_id);
     }
 
     pub(super) fn decap_tunnel<T: AsMut<[u8]>>(

@@ -227,7 +227,7 @@ impl MirrorPlusModeDispatcher {
     pub(super) fn init(&mut self) -> Result<()> {
         info!(
             "Mirror plus mode dispatcher {} init with 0x{:x}.",
-            self.base.id, self.mac
+            self.base.is.id, self.mac
         );
         self.base.init()
     }
@@ -244,7 +244,7 @@ impl MirrorPlusModeDispatcher {
     }
 
     fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
-        let id = self.base.id;
+        let id = self.base.is.id;
         let name = "0.1-raw-packet-to-flow-generator-and-pipeline";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
@@ -265,7 +265,7 @@ impl MirrorPlusModeDispatcher {
     // 5. Generate tagged flow
     // 6. Pipeline (NPB AND PCAP)
     fn run_flow_generator_and_pipeline(&mut self, receiver: Receiver<Packet>) {
-        let base = &self.base;
+        let base = &self.base.is;
         let updated = self.updated.clone();
         let terminated = base.terminated.clone();
         let counter = base.counter.clone();
@@ -284,8 +284,8 @@ impl MirrorPlusModeDispatcher {
         let tunnel_type_bitmap = base.tunnel_type_bitmap.clone();
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
         let mut tunnel_info = TunnelInfo::default();
-        let handler_builder = self.base.handler_builder.clone();
-        let npb_dedup_enabled = self.base.npb_dedup_enabled.clone();
+        let handler_builder = base.handler_builder.clone();
+        let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let mac = self.mac;
         let agent_type = self.agent_type.clone();
         let local_vm_mac_set = self.local_vm_mac_set.clone();
@@ -467,11 +467,11 @@ impl MirrorPlusModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
-        info!("Start mirror plus dispatcher {}", self.base.log_id);
+        info!("Start mirror plus dispatcher {}", self.base.is.log_id);
         let sender_to_parser = self.setup_inner_thread_and_queue();
-        let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
+        let base = &mut self.base.is;
+        let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
-        let base = &mut self.base;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let id = base.id;
         let mut allocator = Allocator::new(self.raw_packet_block_size);
@@ -488,7 +488,7 @@ impl MirrorPlusModeDispatcher {
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
-                    &mut base.engine,
+                    &mut self.base.engine,
                     &base.leaky_bucket,
                     &base.exception_handler,
                     &mut prev_timestamp,
@@ -508,7 +508,7 @@ impl MirrorPlusModeDispatcher {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 drop(recved);
-                base.check_and_update_bpf();
+                base.check_and_update_bpf(&mut self.base.engine);
                 continue;
             }
             if base.pause.load(Ordering::Relaxed) {
@@ -532,17 +532,18 @@ impl MirrorPlusModeDispatcher {
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
                 if_index: packet.if_index,
+                ns_ino: 0,
             };
             batch.push(info);
 
             drop(packet);
-            base.check_and_update_bpf();
+            base.check_and_update_bpf(&mut self.base.engine);
         }
         if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
         }
         self.base.terminate_handler();
-        info!("Stopped dispatcher {}", self.base.log_id);
+        info!("Stopped dispatcher {}", self.base.is.log_id);
     }
 
     fn decap_tunnel(

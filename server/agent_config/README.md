@@ -2195,6 +2195,61 @@ Kube-OVN       [0-9a-f]+_h$
 When the `tap_interface_regex` is not configured, it indicates
 that network card traffic is not being collected
 
+#### Inner Net Namespace Capture Enabled {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_capture_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_capture_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to collect traffic in sub net namespaces.
+
+#### Inner Net Namespace Interface Regex {#inputs.cbpf.af_packet.inner_interface_regex}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_regex`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_regex: ^eth\d+$
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+| Range | [0, 65535] |
+
+**Description**:
+
+Regular expression of NIC name for collecting traffic in sub net namespaces.
+
 #### Bond Interfaces {#inputs.cbpf.af_packet.bond_interfaces}
 
 **Tags**:

@@ -91,7 +91,7 @@ impl LocalPlusModeDispatcher {
         receiver: Receiver<Packet>,
         sender: DebugSender<MiniPacket<'static>>,
     ) {
-        let base = &self.base;
+        let base = &self.base.is;
 
         let terminated = base.terminated.clone();
         let counter = base.counter.clone();
@@ -163,7 +163,7 @@ impl LocalPlusModeDispatcher {
                         for mut packet in batch.drain(..) {
                             let pipeline = {
                                 let pipelines = pipelines.lock().unwrap();
-                                if let Some(p) = pipelines.get(&(packet.if_index as u32)) {
+                                if let Some(p) = pipelines.get(&(packet.if_index as u64)) {
                                     p.clone()
                                 } else if pipelines.is_empty() {
                                     continue;
@@ -300,7 +300,7 @@ impl LocalPlusModeDispatcher {
     // 1. Lookup pipeline
     // 2. NPB/PCAP/...
     fn run_additional_packet_pipeline(&mut self, receiver: Receiver<MiniPacket<'static>>) {
-        let base = &self.base;
+        let base = &self.base.is;
         let terminated = base.terminated.clone();
         let pipelines = base.pipelines.clone();
 
@@ -320,7 +320,7 @@ impl LocalPlusModeDispatcher {
                         for mini_packet in batch.drain(..) {
                             let pipeline = {
                                 let pipelines = pipelines.lock().unwrap();
-                                if let Some(p) = pipelines.get(&(mini_packet.if_index() as u32)) {
+                                if let Some(p) = pipelines.get(&(mini_packet.if_index() as u64)) {
                                     p.clone()
                                 } else if pipelines.is_empty() {
                                     continue;
@@ -354,7 +354,7 @@ impl LocalPlusModeDispatcher {
     }
 
     fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
-        let id = self.base.id;
+        let id = self.base.is.id;
         let name = "0.1-raw-packet-to-flow-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
@@ -378,7 +378,7 @@ impl LocalPlusModeDispatcher {
 
     pub(super) fn run(&mut self) {
         let sender_to_parser = self.setup_inner_thread_and_queue();
-        let base = &mut self.base;
+        let base = &mut self.base.is;
         info!("Start local plus dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
@@ -393,7 +393,7 @@ impl LocalPlusModeDispatcher {
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
-                    &mut base.engine,
+                    &mut self.base.engine,
                     &base.leaky_bucket,
                     &base.exception_handler,
                     &mut prev_timestamp,
@@ -412,7 +412,7 @@ impl LocalPlusModeDispatcher {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 drop(recved);
-                base.check_and_update_bpf();
+                base.check_and_update_bpf(&mut self.base.engine);
                 continue;
             }
             if base.pause.load(Ordering::Relaxed) {
@@ -436,11 +436,12 @@ impl LocalPlusModeDispatcher {
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
                 if_index: packet.if_index,
+                ns_ino: 0,
             };
             batch.push(info);
 
             drop(packet);
-            base.check_and_update_bpf();
+            base.check_and_update_bpf(&mut self.base.engine);
         }
         if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
@@ -449,8 +450,8 @@ impl LocalPlusModeDispatcher {
             let _ = handler.join();
         }
 
-        base.terminate_handler();
-        info!("Stopped dispatcher {}", base.log_id);
+        self.base.terminate_handler();
+        info!("Stopped dispatcher {}", self.base.is.log_id);
     }
 
     pub(super) fn listener(&self) -> LocalPlusModeDispatcherListener {
@@ -520,10 +521,7 @@ impl LocalPlusModeDispatcherListener {
         let mut interfaces = interfaces.to_vec();
         // interfaces为实际TAP口的集合，macs为TAP口对应主机的MAC地址集合
         interfaces.sort_by_key(|link| link.if_index);
-        let keys = interfaces
-            .iter()
-            .map(|link| link.if_index)
-            .collect::<Vec<_>>();
+        let keys: Vec<u64> = interfaces.iter().map(|link| link.if_index as u64).collect();
         let macs = self.get_mapped_macs(
             &interfaces,
             if_mac_source,

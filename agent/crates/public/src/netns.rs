@@ -153,7 +153,7 @@ pub enum NsFile {
 }
 
 impl NsFile {
-    fn get_inode(&self) -> Result<u64> {
+    pub fn get_inode(&self) -> Result<u64> {
         match self {
             Self::Root => Ok(fs::metadata(ROOT_NS_PATH)?.ino()),
             Self::Named(name) => {
@@ -162,6 +162,27 @@ impl NsFile {
             }
             Self::Proc(ino) => Ok(*ino),
         }
+    }
+
+    // opening root and named namespaces is consistent
+    //
+    // opening a proc namespace will need to iterate /proc/$pid/ns/net entries to find netns file
+    // which cost more cpu and can fail when process terminates
+    pub fn open_and_setns(&self) -> Result<()> {
+        if !supported() {
+            return Ok(());
+        }
+        let path = match self {
+            NsFile::Root => Cow::Borrowed(Path::new(ROOT_NS_PATH)),
+            NsFile::Named(name) => Cow::Owned(Path::new(NAMED_PATH).join(name)),
+            NsFile::Proc(inode) => Cow::Owned(get_proc_path_by_inode(*inode)?),
+        };
+        let fp = File::open(&*path)?;
+        let r = set_netns(&fp);
+        if let Err(e) = r.as_ref() {
+            debug!("open {} and setns failed: {:?}", path.display(), e);
+        }
+        r
     }
 }
 
@@ -621,23 +642,6 @@ pub fn reset_netns() -> Result<()> {
     })
 }
 
-pub fn open_named_and_setns(ns: &NsFile) -> Result<()> {
-    if !supported() {
-        return Ok(());
-    }
-    let path = match ns {
-        NsFile::Root => Cow::Borrowed(Path::new(ROOT_NS_PATH)),
-        NsFile::Named(name) => Cow::Owned(Path::new(NAMED_PATH).join(name)),
-        _ => unimplemented!(),
-    };
-    let fp = File::open(&*path)?;
-    let r = set_netns(&fp);
-    if let Err(e) = r.as_ref() {
-        debug!("open {} and setns failed: {:?}", path.display(), e);
-    }
-    r
-}
-
 fn get_named_file_paths() -> Vec<PathBuf> {
     let paths = if let Ok(entries) = fs::read_dir(NAMED_PATH) {
         entries
@@ -679,7 +683,33 @@ fn open_root_or_named_ns_file(ns: &NsFile) -> Result<(File, PathBuf)> {
     }
 }
 
-fn get_proc_cache() -> Result<HashMap<u64, Vec<u32>>> {
+// get a possible path by netns inode from process net namespaces
+fn get_proc_path_by_inode(inode: u64) -> Result<PathBuf> {
+    for proc in fs::read_dir(PROC_PATH)? {
+        let Ok(proc) = proc else {
+            // ignore file not found probably caused by process terminated
+            continue;
+        };
+        match proc.file_type() {
+            Ok(t) if t.is_dir() => (),
+            _ => {
+                debug!("skipped {}", proc.path().display());
+                continue;
+            }
+        }
+
+        let mut ns_path = proc.path();
+        ns_path.extend(&["ns", "net"]);
+        if let Ok(fp) = fs::metadata(&ns_path) {
+            if fp.ino() == inode {
+                return Ok(ns_path);
+            }
+        }
+    }
+    Err(Error::NotFound)
+}
+
+pub fn get_proc_cache() -> Result<HashMap<u64, Vec<u32>>> {
     let mut cache = HashMap::new();
     for proc in fs::read_dir(PROC_PATH)? {
         let Ok(proc) = proc else {
@@ -757,28 +787,28 @@ impl WrappedSocket {
 }
 
 pub fn link_by_name_in_netns<S: AsRef<str>>(name: S, ns: &NsFile) -> Result<Link> {
-    let _ = open_named_and_setns(ns)?;
+    let _ = ns.open_and_setns()?;
     let link = link_by_name(name.as_ref())?;
     reset_netns()?;
     Ok(link)
 }
 
 pub fn links_by_name_regex_in_netns<S: AsRef<str>>(regex: S, ns: &NsFile) -> Result<Vec<Link>> {
-    let _ = open_named_and_setns(ns)?;
+    let _ = ns.open_and_setns()?;
     let links = links_by_name_regex(regex.as_ref())?;
     reset_netns()?;
     Ok(links)
 }
 
 pub fn link_list_in_netns(ns: &NsFile) -> Result<Vec<Link>> {
-    let _ = open_named_and_setns(ns)?;
+    let _ = ns.open_and_setns()?;
     let links = link_list()?;
     reset_netns()?;
     Ok(links)
 }
 
 pub fn addr_list_in_netns(ns: &NsFile) -> Result<Vec<Addr>> {
-    let _ = open_named_and_setns(ns)?;
+    let _ = ns.open_and_setns()?;
     let addrs = addr_list()?;
     reset_netns()?;
     Ok(addrs)

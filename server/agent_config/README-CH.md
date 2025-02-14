@@ -2146,6 +2146,61 @@ inputs:
 
 需要采集流量的网络接口的正则表达式。
 
+#### 内网络命名空间采集开关 {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_capture_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_capture_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否采集内网络命名空间流量。
+
+#### 内网络命名空间网卡名正则表达式 {#inputs.cbpf.af_packet.inner_interface_regex}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_regex`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_regex: ^eth\d+$
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+| Range | [0, 65535] |
+
+**详细描述**:
+
+需要采集流量的内网络命名空间网卡的正则表达式。
+
 #### Bond 网卡列表 {#inputs.cbpf.af_packet.bond_interfaces}
 
 **标签**:
