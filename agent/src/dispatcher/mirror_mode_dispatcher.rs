@@ -435,7 +435,7 @@ impl MirrorModeDispatcher {
     pub(super) fn init(&mut self) -> Result<()> {
         info!(
             "Mirror mode dispatcher {} init with 0x{:x}.",
-            self.base.id, self.mac
+            self.base.is.id, self.mac
         );
         self.base.init()
     }
@@ -543,24 +543,25 @@ impl MirrorModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
-        info!("Start mirror dispatcher {}", self.base.log_id);
-        let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
+        let base = &mut self.base.is;
+        info!("Start mirror dispatcher {}", base.log_id);
+        let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
         let mut flow_map = FlowMap::new(
-            self.base.id as u32,
-            Some(self.base.flow_output_queue.clone()),
-            self.base.l7_stats_output_queue.clone(),
-            self.base.policy_getter,
-            self.base.log_output_queue.clone(),
-            self.base.ntp_diff.clone(),
-            &self.base.flow_map_config.load(),
-            Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            self.base.stats.clone(),
+            base.id as u32,
+            Some(base.flow_output_queue.clone()),
+            base.l7_stats_output_queue.clone(),
+            base.policy_getter,
+            base.log_output_queue.clone(),
+            base.ntp_diff.clone(),
+            &base.flow_map_config.load(),
+            Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
+            base.stats.clone(),
             false, // !from_ebpf
         );
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        let cpu_set = self.base.options.lock().unwrap().cpu_set;
+        let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if cpu_set != CpuSet::new() {
             if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
@@ -568,45 +569,45 @@ impl MirrorModeDispatcher {
             }
         }
 
-        while !self.base.terminated.load(Ordering::Relaxed) {
+        while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
-                flow: &self.base.flow_map_config.load(),
-                log_parser: &self.base.log_parse_config.load(),
-                collector: &self.base.collector_config.load(),
+                flow: &base.flow_map_config.load(),
+                log_parser: &base.log_parse_config.load(),
+                collector: &base.collector_config.load(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 ebpf: None,
             };
-            if self.base.reset_whitelist.swap(false, Ordering::Relaxed) {
-                self.base.tap_interface_whitelist.reset();
+            if base.reset_whitelist.swap(false, Ordering::Relaxed) {
+                base.tap_interface_whitelist.reset();
             }
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
                     &mut self.base.engine,
-                    &self.base.leaky_bucket,
-                    &self.base.exception_handler,
+                    &base.leaky_bucket,
+                    &base.exception_handler,
                     &mut prev_timestamp,
-                    &self.base.counter,
-                    &self.base.ntp_diff,
+                    &base.counter,
+                    &base.ntp_diff,
                 )
             };
             if recved.is_none() {
                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
-                if self.base.tap_interface_whitelist.next_sync(Duration::ZERO) {
-                    self.base.need_update_bpf.store(true, Ordering::Relaxed);
+                if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
+                    base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 drop(recved);
-                self.base.check_and_update_bpf();
+                base.check_and_update_bpf(&mut self.base.engine);
                 continue;
             }
-            if self.base.pause.load(Ordering::Relaxed) {
+            if base.pause.load(Ordering::Relaxed) {
                 continue;
             }
             let (mut packet, mut timestamp) = recved.unwrap();
 
             match swap_last_timestamp(
                 &mut self.last_timestamp_array,
-                &self.base.counter,
+                &base.counter,
                 packet.if_index,
                 timestamp,
                 config.flow.cloud_gateway_traffic,
@@ -615,9 +616,8 @@ impl MirrorModeDispatcher {
                 Err(_) => continue,
             }
 
-            self.base.counter.rx.fetch_add(1, Ordering::Relaxed);
-            self.base
-                .counter
+            base.counter.rx.fetch_add(1, Ordering::Relaxed);
+            base.counter
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
@@ -626,11 +626,11 @@ impl MirrorModeDispatcher {
                 // 这里需要decap并将tunnel信息保存在flow中，目前仅保存最外层的tunnel
                 let len = Self::decap_tunnel(
                     &mut packet,
-                    &self.base.tap_type_handler,
-                    &mut self.base.tunnel_info,
-                    &self.base.tunnel_type_bitmap,
-                    self.base.tunnel_type_trim_bitmap,
-                    &self.base.counter,
+                    &base.tap_type_handler,
+                    &mut base.tunnel_info,
+                    &base.tunnel_type_bitmap,
+                    base.tunnel_type_trim_bitmap,
+                    &base.counter,
                 ) as usize;
                 if len > packet.capture_length as usize {
                     warn!("Decap tunnel error.");
@@ -649,16 +649,13 @@ impl MirrorModeDispatcher {
                 continue;
             }
 
-            let (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac) = get_key(
-                &self.local_vm_mac_set,
-                overlay_packet,
-                self.base.tunnel_info,
-            );
+            let (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac) =
+                get_key(&self.local_vm_mac_set, overlay_packet, base.tunnel_info);
             let agent_type = self.agent_type.read().unwrap().clone();
             let cloud_gateway_traffic = config.flow.cloud_gateway_traffic;
             if sa_gateway_vmac == 0 && da_gateway_vmac == 0 {
                 let _ = handler(
-                    self.base.id,
+                    base.id,
                     self.mac, // In order for two-way traffic to be handled by the same pipeline, self.mac is used as the key here
                     false,
                     false,
@@ -667,21 +664,21 @@ impl MirrorModeDispatcher {
                     original_length,
                     &self.updated,
                     &mut self.pipelines,
-                    &self.base.handler_builder,
-                    &self.base.tunnel_info,
+                    &base.handler_builder,
+                    &base.tunnel_info,
                     &config,
                     &mut flow_map,
-                    &self.base.counter,
+                    &base.counter,
                     agent_type,
                     self.mac,
-                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
+                    base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
                 continue;
             }
 
             if sa_gateway_vmac > 0 {
                 let _ = handler(
-                    self.base.id,
+                    base.id,
                     sa_key,
                     true,
                     false,
@@ -690,23 +687,23 @@ impl MirrorModeDispatcher {
                     original_length,
                     &self.updated,
                     &mut self.pipelines,
-                    &self.base.handler_builder,
-                    &self.base.tunnel_info,
+                    &base.handler_builder,
+                    &base.tunnel_info,
                     &config,
                     &mut flow_map,
-                    &self.base.counter,
+                    &base.counter,
                     agent_type,
                     if cloud_gateway_traffic {
                         sa_gateway_vmac
                     } else {
                         self.mac
                     },
-                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
+                    base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
             if da_gateway_vmac > 0 {
                 let _ = handler(
-                    self.base.id,
+                    base.id,
                     da_key,
                     false,
                     true,
@@ -715,30 +712,30 @@ impl MirrorModeDispatcher {
                     original_length,
                     &self.updated,
                     &mut self.pipelines,
-                    &self.base.handler_builder,
-                    &self.base.tunnel_info,
+                    &base.handler_builder,
+                    &base.tunnel_info,
                     &config,
                     &mut flow_map,
-                    &self.base.counter,
+                    &base.counter,
                     agent_type,
                     if cloud_gateway_traffic {
                         da_gateway_vmac
                     } else {
                         self.mac
                     },
-                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
+                    base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
 
             drop(packet);
 
-            self.base.check_and_update_bpf();
+            base.check_and_update_bpf(&mut self.base.engine);
         }
 
         self.pipelines.clear();
         self.base.terminate_handler();
         self.last_timestamp_array.clear();
-        info!("Stopped dispatcher {}", self.base.log_id);
+        info!("Stopped dispatcher {}", self.base.is.log_id);
     }
 
     fn decap_tunnel(

@@ -21,10 +21,14 @@ mod base_dispatcher;
 
 mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
+#[cfg(target_os = "linux")]
+mod local_multins_mode_dispatcher;
 mod local_plus_mode_dispatcher;
 mod mirror_mode_dispatcher;
 mod mirror_plus_mode_dispatcher;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::collections::HashSet;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use std::{
@@ -35,6 +39,8 @@ use std::{
     },
 };
 
+#[cfg(target_os = "linux")]
+use arc_swap::access::Access;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use log::error;
 use log::{debug, info, warn};
@@ -47,9 +53,13 @@ use special_recv_engine::Libpcap;
 use special_recv_engine::{Dpdk, VhostUser};
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
-use base_dispatcher::{BaseDispatcher, CaptureNetworkTypeHandler};
+use base_dispatcher::{BaseDispatcher, CaptureNetworkTypeHandler, InternalState};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
+#[cfg(target_os = "linux")]
+use local_multins_mode_dispatcher::{
+    LocalMultinsModeDispatcher, LocalMultinsModeDispatcherListener,
+};
 use local_plus_mode_dispatcher::{LocalPlusModeDispatcher, LocalPlusModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
 use mirror_plus_mode_dispatcher::{MirrorPlusModeDispatcher, MirrorPlusModeDispatcherListener};
@@ -62,9 +72,6 @@ pub use recv_engine::{
 #[cfg(target_os = "linux")]
 use special_recv_engine::DpdkFromEbpf;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use self::base_dispatcher::TapInterfaceWhitelist;
-
 use crate::common::decapsulate::TunnelTypeBitmap;
 #[cfg(target_os = "linux")]
 use crate::platform::LibvirtXmlExtractor;
@@ -74,7 +81,7 @@ use crate::{
         FlowAclListenerId, TaggedFlow,
     },
     config::{
-        handler::{CollectorAccess, FlowAccess, LogParserAccess},
+        handler::{CollectorAccess, DispatcherAccess, FlowAccess, LogParserAccess},
         DispatcherConfig, DpdkSource,
     },
     exception::ExceptionHandler,
@@ -105,11 +112,14 @@ pub struct Packet {
     pub original_length: u32,
     pub raw_length: u32,
     pub if_index: isize,
+    pub ns_ino: u32,
 }
 
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcher),
+    #[cfg(target_os = "linux")]
+    LocalMultins(LocalMultinsModeDispatcher),
     LocalPlus(LocalPlusModeDispatcher),
     Mirror(MirrorModeDispatcher),
     MirrorPlus(MirrorPlusModeDispatcher),
@@ -119,6 +129,8 @@ impl DispatcherFlavor {
     fn init(&mut self) -> Result<()> {
         match self {
             DispatcherFlavor::Local(d) => d.base.init(),
+            #[cfg(target_os = "linux")]
+            DispatcherFlavor::LocalMultins(_) => Ok(()), // engines are initialized in threads
             DispatcherFlavor::LocalPlus(d) => d.base.init(),
             DispatcherFlavor::Mirror(d) => d.init(),
             DispatcherFlavor::MirrorPlus(d) => d.init(),
@@ -129,6 +141,8 @@ impl DispatcherFlavor {
     fn run(&mut self) {
         match self {
             DispatcherFlavor::Local(d) => d.run(),
+            #[cfg(target_os = "linux")]
+            DispatcherFlavor::LocalMultins(d) => d.run(),
             DispatcherFlavor::LocalPlus(d) => d.run(),
             DispatcherFlavor::Mirror(d) => d.run(),
             DispatcherFlavor::MirrorPlus(d) => d.run(),
@@ -139,6 +153,8 @@ impl DispatcherFlavor {
     fn listener(&self) -> DispatcherListener {
         match self {
             DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
+            #[cfg(target_os = "linux")]
+            DispatcherFlavor::LocalMultins(d) => DispatcherListener::LocalMultins(d.listener()),
             DispatcherFlavor::LocalPlus(d) => DispatcherListener::LocalPlus(d.listener()),
             DispatcherFlavor::Mirror(d) => DispatcherListener::Mirror(d.listener()),
             DispatcherFlavor::MirrorPlus(d) => DispatcherListener::MirrorPlus(d.listener()),
@@ -222,6 +238,8 @@ impl Dispatcher {
 pub enum DispatcherListener {
     Analyzer(AnalyzerModeDispatcherListener), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcherListener),
+    #[cfg(target_os = "linux")]
+    LocalMultins(LocalMultinsModeDispatcherListener),
     LocalPlus(LocalPlusModeDispatcherListener),
     Mirror(MirrorModeDispatcherListener),
     MirrorPlus(MirrorPlusModeDispatcherListener),
@@ -240,6 +258,8 @@ impl FlowAclListener for DispatcherListener {
     ) -> Result<(), String> {
         match self {
             DispatcherListener::Local(a) => a.flow_acl_change(),
+            #[cfg(target_os = "linux")]
+            DispatcherListener::LocalMultins(a) => a.flow_acl_change(),
             DispatcherListener::LocalPlus(a) => a.flow_acl_change(),
             DispatcherListener::Mirror(a) => a.flow_acl_change(),
             DispatcherListener::MirrorPlus(a) => a.flow_acl_change(),
@@ -251,6 +271,8 @@ impl FlowAclListener for DispatcherListener {
     fn id(&self) -> usize {
         let id = match self {
             DispatcherListener::Local(a) => a.id(),
+            #[cfg(target_os = "linux")]
+            DispatcherListener::LocalMultins(a) => a.id(),
             DispatcherListener::LocalPlus(a) => a.id(),
             DispatcherListener::Mirror(a) => a.id(),
             DispatcherListener::MirrorPlus(a) => a.id(),
@@ -265,6 +287,8 @@ impl DispatcherListener {
     pub(super) fn netns(&self) -> &NsFile {
         match self {
             Self::Local(a) => a.netns(),
+            #[cfg(target_os = "linux")]
+            Self::LocalMultins(a) => a.netns(),
             Self::LocalPlus(a) => a.netns(),
             Self::Mirror(a) => a.netns(),
             Self::MirrorPlus(a) => a.netns(),
@@ -275,6 +299,8 @@ impl DispatcherListener {
     fn id(&self) -> usize {
         match self {
             Self::Local(a) => a.id(),
+            #[cfg(target_os = "linux")]
+            Self::LocalMultins(a) => a.id(),
             Self::LocalPlus(a) => a.id(),
             Self::Mirror(a) => a.id(),
             Self::MirrorPlus(a) => a.id(),
@@ -285,6 +311,8 @@ impl DispatcherListener {
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
+            #[cfg(target_os = "linux")]
+            Self::LocalMultins(l) => l.base.on_config_change(config),
             Self::LocalPlus(l) => l.on_config_change(config),
             Self::Analyzer(l) => l.on_config_change(config), // Enterprise Edition Feature: analyzer_mode
             Self::Mirror(l) => l.on_config_change(config),
@@ -317,6 +345,9 @@ impl DispatcherListener {
     ) {
         match self {
             Self::LocalPlus(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
+            }
+            Self::LocalMultins(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
             }
             Self::Local(l) => {
@@ -365,7 +396,7 @@ impl BpfOptions {
     fn skip_tap_interface(
         &self,
         tap_interfaces: &Vec<Link>,
-        white_list: &TapInterfaceWhitelist,
+        white_list: &HashSet<usize>,
         snap_len: usize,
     ) -> Vec<BpfSyntax> {
         let mut bpf_syntax = self.bpf_syntax.clone();
@@ -397,7 +428,7 @@ impl BpfOptions {
             let total = x.len();
             for (j, if_index) in x.iter().enumerate() {
                 let mut skip_true = (total - j) as u8;
-                if white_list.has(*if_index as usize) {
+                if white_list.contains(&(*if_index as usize)) {
                     skip_true += 1;
                 }
                 let mut skip_false = 0;
@@ -471,7 +502,7 @@ impl BpfOptions {
     pub fn get_bpf_instructions(
         &self,
         tap_interfaces: &Vec<Link>,
-        white_list: &TapInterfaceWhitelist,
+        white_list: &HashSet<usize>,
         snap_len: usize,
     ) -> Vec<RawInstruction> {
         let mut syntaxs = vec![];
@@ -704,6 +735,7 @@ pub struct DispatcherBuilder {
     flow_map_config: Option<FlowAccess>,
     log_parse_config: Option<LogParserAccess>,
     collector_config: Option<CollectorAccess>,
+    dispatcher_config: Option<DispatcherAccess>,
     policy_getter: Option<PolicyGetter>,
     #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<crate::platform::GenericPoller>>,
@@ -835,6 +867,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn dispatcher_config(mut self, v: DispatcherAccess) -> Self {
+        self.dispatcher_config = Some(v);
+        self
+    }
+
     pub fn policy_getter(mut self, v: PolicyGetter) -> Self {
         self.policy_getter = Some(v);
         self
@@ -896,7 +933,7 @@ impl DispatcherBuilder {
         let netns = self.netns.unwrap_or_default();
         // set ns before creating af packet socket
         #[cfg(target_os = "linux")]
-        let _ = public::netns::open_named_and_setns(&netns)?;
+        let _ = netns.open_and_setns()?;
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -908,7 +945,7 @@ impl DispatcherBuilder {
         let dispatcher_queue = options.lock().unwrap().dispatcher_queue;
         let engine = Self::get_engine(
             &self.pcap_interfaces,
-            &mut self.src_interface,
+            &self.src_interface,
             capture_mode,
             &options,
             &queue_debugger,
@@ -955,7 +992,7 @@ impl DispatcherBuilder {
             .take()
             .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
 
-        let base = BaseDispatcher {
+        let is = InternalState {
             log_id: {
                 let mut lid = vec![id.to_string()];
                 if &src_interface != "" {
@@ -967,7 +1004,6 @@ impl DispatcherBuilder {
                 }
                 format!("({})", lid.join(", "))
             },
-            engine,
 
             id,
             src_interface: src_interface.clone(),
@@ -988,6 +1024,10 @@ impl DispatcherBuilder {
             tunnel_type_bitmap: Default::default(),
             tunnel_info: Default::default(),
 
+            need_update_bpf: Arc::new(AtomicBool::new(true)),
+            reset_whitelist: Default::default(),
+            tap_interface_whitelist: Default::default(),
+
             tap_type_handler: CaptureNetworkTypeHandler {
                 tap_typer: self
                     .tap_typer
@@ -1000,10 +1040,6 @@ impl DispatcherBuilder {
                     .ok_or(Error::ConfigIncomplete("no mirror_traffic_pcp".into()))?,
                 capture_mode,
             },
-
-            need_update_bpf: Arc::new(AtomicBool::new(true)),
-            reset_whitelist: Default::default(),
-            tap_interface_whitelist: Default::default(),
 
             analyzer_dedup_disabled: self
                 .analyzer_dedup_disabled
@@ -1037,6 +1073,10 @@ impl DispatcherBuilder {
                 .collector_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no collector config".into()))?,
+            dispatcher_config: self
+                .dispatcher_config
+                .take()
+                .ok_or(Error::ConfigIncomplete("no dispatcher config".into()))?,
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
@@ -1067,8 +1107,9 @@ impl DispatcherBuilder {
             bond_group_map,
             promisc_if_indices: vec![],
         };
+        let base = BaseDispatcher { engine, is };
         collector.register_countable(
-            &stats::SingleTagModule("dispatcher", "id", base.id),
+            &stats::SingleTagModule("dispatcher", "id", base.is.id),
             stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
         );
         let mut dispatcher = match capture_mode {
@@ -1096,11 +1137,19 @@ impl DispatcherBuilder {
                         )?,
                     })
                 } else {
-                    DispatcherFlavor::Local(LocalModeDispatcher {
-                        base,
-                        #[cfg(target_os = "linux")]
-                        extractor,
-                    })
+                    #[cfg(target_os = "linux")]
+                    if base
+                        .is
+                        .dispatcher_config
+                        .load()
+                        .inner_interface_capture_enabled
+                    {
+                        DispatcherFlavor::LocalMultins(LocalMultinsModeDispatcher::new(base))
+                    } else {
+                        DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    DispatcherFlavor::Local(LocalModeDispatcher { base })
                 }
             }
             PacketCaptureType::Mirror => {
@@ -1180,7 +1229,7 @@ impl DispatcherBuilder {
             _ => {
                 return Err(Error::ConfigInvalid(format!(
                     "invalid capture mode {:?}",
-                    &base.options.lock().unwrap().capture_mode
+                    &base.is.options.lock().unwrap().capture_mode
                 )))
             }
         };
@@ -1196,9 +1245,9 @@ impl DispatcherBuilder {
     }
 
     #[allow(unused_variables)]
-    fn get_engine(
+    pub(crate) fn get_engine(
         pcap_interfaces: &Option<Vec<Link>>,
-        src_interface: &mut Option<String>,
+        src_interface: &Option<String>,
         capture_mode: PacketCaptureType,
         options: &Arc<Mutex<Options>>,
         queue_debugger: &Arc<QueueDebugger>,
@@ -1324,3 +1373,14 @@ impl DispatcherBuilder {
 }
 
 const L2_MAC_ADDR_OFFSET: usize = 12;
+
+pub(crate) fn set_cpu_affinity(options: &Mutex<Options>) {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let cpu_set = options.lock().unwrap().cpu_set;
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    if cpu_set != CpuSet::new() {
+        if let Err(e) = nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set) {
+            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+        }
+    }
+}
