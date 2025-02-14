@@ -235,15 +235,14 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 				case common.VIF_DEVICE_TYPE_HOST:
 					vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_VM:
+					vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
+					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
 						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
 						vtapVIF.DeviceID = podNodeID
 						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
-					} else {
-						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
 					}
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				case common.VIF_DEVICE_TYPE_POD_NODE:
 					vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
 					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
@@ -339,6 +338,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 	}
 	for _, host := range hosts {
 		toolDS.hostIDToName[host.ID] = host.Name
+		toolDS.hostIPToID[host.IP] = host.ID
 	}
 
 	var vms []*mysql.VM
