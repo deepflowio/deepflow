@@ -16,12 +16,14 @@
 
 use std::io::Read;
 use std::path::Path;
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 use std::{
     fs::{self, File},
     string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
-    time::{Duration, Instant, UNIX_EPOCH},
+    time::{Duration, UNIX_EPOCH},
 };
 
 use arc_swap::access::Access;

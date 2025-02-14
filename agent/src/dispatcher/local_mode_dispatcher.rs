@@ -32,8 +32,11 @@ use nix::{
 };
 use regex::Regex;
 
-use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
-use super::error::Result;
+use super::{
+    base_dispatcher::{BaseDispatcher, BaseDispatcherListener, InternalState},
+    error::Result,
+    TunnelTypeBitmap,
+};
 
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, LibvirtXmlExtractor, Poller};
@@ -63,8 +66,154 @@ pub(super) struct LocalModeDispatcher {
 impl LocalModeDispatcher {
     const VALID_MAC_INDEX: usize = 3;
 
+    pub(super) fn process_packet<'a>(
+        is: &mut InternalState,
+        config: &Config,
+        flow_map: &mut FlowMap,
+        tunnel_type_trim_bitmap: TunnelTypeBitmap,
+        timestamp: &mut Duration,
+        if_index: u64,
+        data: &'a mut [u8],
+    ) -> Option<MetaPacket<'a>> {
+        let pipeline = {
+            let pipelines = is.pipelines.lock().unwrap();
+            if let Some(p) = pipelines.get(&if_index) {
+                p.clone()
+            } else if pipelines.is_empty() {
+                return None;
+            } else {
+                // send to one of the pipelines if packet is LLDP
+                let mut eth_type: EthernetType = read_u16_be(&data[FIELD_OFFSET_ETH_TYPE..]).into();
+                if eth_type == EthernetType::DOT1Q {
+                    eth_type =
+                        read_u16_be(&data[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..]).into();
+                }
+                if eth_type != EthernetType::LINK_LAYER_DISCOVERY {
+                    return None;
+                }
+                pipelines.iter().next().unwrap().1.clone()
+            }
+        };
+        let mut pipeline = pipeline.lock().unwrap();
+
+        if *timestamp + Duration::from_millis(1) < pipeline.timestamp {
+            // FIXME: just in case
+            is.counter.retired.fetch_add(1, Ordering::Relaxed);
+            return None;
+        } else if *timestamp < pipeline.timestamp {
+            *timestamp = pipeline.timestamp;
+        }
+
+        pipeline.timestamp = *timestamp;
+
+        // compare 3 low bytes
+        let mac_low = &pipeline.vm_mac.octets()[Self::VALID_MAC_INDEX..];
+        // src mac
+        let src_local =
+            mac_low == &data[MAC_ADDR_LEN + Self::VALID_MAC_INDEX..MAC_ADDR_LEN + MAC_ADDR_LEN];
+        // dst mac
+        let dst_local = !src_local
+            && (mac_low == &data[Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
+                || MacAddr::is_multicast(&data[..]));
+
+        // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
+
+        let tunnel_type_bitmap = is.tunnel_type_bitmap.read().unwrap().clone();
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let decap_length = match BaseDispatcher::decap_tunnel(
+            data,
+            &is.tap_type_handler,
+            &mut is.tunnel_info,
+            tunnel_type_bitmap,
+            tunnel_type_trim_bitmap,
+        ) {
+            Ok((l, _)) => l,
+            Err(e) => {
+                is.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                warn!("decap_tunnel failed: {:?}", e);
+                return None;
+            }
+        };
+
+        #[cfg(target_os = "windows")]
+        let decap_length = match BaseDispatcher::decap_tunnel(
+            data,
+            &is.tap_type_handler,
+            &mut is.tunnel_info,
+            tunnel_type_bitmap,
+            tunnel_type_trim_bitmap,
+        ) {
+            Ok((l, _)) => l,
+            Err(e) => {
+                is.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                warn!("decap_tunnel failed: {:?}", e);
+                return None;
+            }
+        };
+        let overlay_packet = &data[decap_length..];
+        let mut meta_packet = MetaPacket::empty();
+        let offset = Duration::ZERO;
+        if let Err(e) = meta_packet.update(
+            overlay_packet,
+            src_local,
+            dst_local,
+            *timestamp + offset,
+            data.len() - decap_length,
+        ) {
+            is.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+            warn!("meta_packet update failed: {:?}", e);
+            return None;
+        }
+
+        is.counter.rx.fetch_add(1, Ordering::Relaxed);
+        is.counter
+            .rx_bytes
+            .fetch_add(data.len() as u64, Ordering::Relaxed);
+
+        if is.tunnel_info.tunnel_type != TunnelType::None {
+            meta_packet.tunnel = Some(is.tunnel_info);
+            if is.tunnel_info.tunnel_type == TunnelType::TencentGre
+                || is.tunnel_info.tunnel_type == TunnelType::Vxlan
+            {
+                // 腾讯TCE、青云私有云需要通过TunnelID查询云平台信息
+                // 这里只需要考虑单层隧道封装的情况
+                // 双层封装的场景下认为内层MAC存在且有效（VXLAN-VXLAN）或者需要通过IP来判断（VXLAN-IPIP）
+                meta_packet.lookup_key.tunnel_id = is.tunnel_info.id;
+            }
+        } else {
+            // 无隧道并且MAC地址都是0一定是loopback流量
+            if meta_packet.lookup_key.src_mac == MacAddr::ZERO
+                && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
+            {
+                meta_packet.lookup_key.l2_end_0 = true;
+                meta_packet.lookup_key.l2_end_1 = true;
+            }
+        }
+
+        meta_packet.tap_port = TapPort::from_local_mac(
+            meta_packet.lookup_key.get_nat_source(),
+            is.tunnel_info.tunnel_type,
+            u64::from(pipeline.bond_mac) as u32,
+        );
+        BaseDispatcher::prepare_flow(
+            &mut meta_packet,
+            TapType::Cloud,
+            false,
+            is.id as u8,
+            is.npb_dedup_enabled.load(Ordering::Relaxed),
+        );
+        flow_map.inject_meta_packet(&config, &mut meta_packet);
+        let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
+        for h in pipeline.handlers.iter_mut() {
+            h.handle(&mini_packet);
+        }
+
+        Some(meta_packet)
+    }
+
     pub(super) fn run(&mut self) {
-        let base = &mut self.base;
+        let base = &mut self.base.is;
         info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
@@ -105,7 +254,7 @@ impl LocalModeDispatcher {
             // The lifecycle of the recved will end before the next call to recv.
             let recved = unsafe {
                 BaseDispatcher::recv(
-                    &mut base.engine,
+                    &mut self.base.engine,
                     &base.leaky_bucket,
                     &base.exception_handler,
                     &mut prev_timestamp,
@@ -119,152 +268,24 @@ impl LocalModeDispatcher {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 drop(recved);
-                base.check_and_update_bpf();
+                base.check_and_update_bpf(&mut self.base.engine);
                 continue;
             }
             if base.pause.load(Ordering::Relaxed) {
                 continue;
             }
-            #[cfg(target_os = "windows")]
             let (mut packet, mut timestamp) = recved.unwrap();
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let (packet, mut timestamp) = recved.unwrap();
-
-            let pipeline = {
-                let pipelines = base.pipelines.lock().unwrap();
-                if let Some(p) = pipelines.get(&(packet.if_index as u32)) {
-                    p.clone()
-                } else if pipelines.is_empty() {
-                    continue;
-                } else {
-                    // send to one of the pipelines if packet is LLDP
-                    let mut eth_type: EthernetType =
-                        read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE..]).into();
-                    if eth_type == EthernetType::DOT1Q {
-                        eth_type =
-                            read_u16_be(&packet.data[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..])
-                                .into();
-                    }
-                    if eth_type != EthernetType::LINK_LAYER_DISCOVERY {
-                        continue;
-                    }
-                    pipelines.iter().next().unwrap().1.clone()
-                }
-            };
-            let mut pipeline = pipeline.lock().unwrap();
-
-            if timestamp + Duration::from_millis(1) < pipeline.timestamp {
-                // FIXME: just in case
-                base.counter.retired.fetch_add(1, Ordering::Relaxed);
-                continue;
-            } else if timestamp < pipeline.timestamp {
-                timestamp = pipeline.timestamp;
-            }
-
-            pipeline.timestamp = timestamp;
-
-            // compare 3 low bytes
-            let mac_low = &pipeline.vm_mac.octets()[Self::VALID_MAC_INDEX..];
-            // src mac
-            let src_local = mac_low
-                == &packet.data[MAC_ADDR_LEN + Self::VALID_MAC_INDEX..MAC_ADDR_LEN + MAC_ADDR_LEN];
-            // dst mac
-            let dst_local = !src_local
-                && (mac_low == &packet.data[Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
-                    || MacAddr::is_multicast(&packet.data));
-
-            // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
-
-            let tunnel_type_bitmap = base.tunnel_type_bitmap.read().unwrap().clone();
-
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let decap_length = match BaseDispatcher::decap_tunnel(
-                packet.data,
-                &base.tap_type_handler,
-                &mut base.tunnel_info,
-                tunnel_type_bitmap,
+            let Some(meta_packet) = Self::process_packet(
+                base,
+                &config,
+                &mut flow_map,
                 tunnel_type_trim_bitmap,
-            ) {
-                Ok((l, _)) => l,
-                Err(e) => {
-                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                    warn!("decap_tunnel failed: {:?}", e);
-                    continue;
-                }
-            };
-
-            #[cfg(target_os = "windows")]
-            let decap_length = match BaseDispatcher::decap_tunnel(
+                &mut timestamp,
+                packet.if_index as u64,
                 &mut packet.data,
-                &base.tap_type_handler,
-                &mut base.tunnel_info,
-                tunnel_type_bitmap,
-                tunnel_type_trim_bitmap,
-            ) {
-                Ok((l, _)) => l,
-                Err(e) => {
-                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                    warn!("decap_tunnel failed: {:?}", e);
-                    continue;
-                }
-            };
-            let overlay_packet = &packet.data[decap_length..];
-            let mut meta_packet = MetaPacket::empty();
-            let offset = Duration::ZERO;
-            if let Err(e) = meta_packet.update(
-                overlay_packet,
-                src_local,
-                dst_local,
-                timestamp + offset,
-                packet.data.len() - decap_length,
-            ) {
-                base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                warn!("meta_packet update failed: {:?}", e);
+            ) else {
                 continue;
-            }
-
-            base.counter.rx.fetch_add(1, Ordering::Relaxed);
-            base.counter
-                .rx_bytes
-                .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
-
-            if base.tunnel_info.tunnel_type != TunnelType::None {
-                meta_packet.tunnel = Some(base.tunnel_info);
-                if base.tunnel_info.tunnel_type == TunnelType::TencentGre
-                    || base.tunnel_info.tunnel_type == TunnelType::Vxlan
-                {
-                    // 腾讯TCE、青云私有云需要通过TunnelID查询云平台信息
-                    // 这里只需要考虑单层隧道封装的情况
-                    // 双层封装的场景下认为内层MAC存在且有效（VXLAN-VXLAN）或者需要通过IP来判断（VXLAN-IPIP）
-                    meta_packet.lookup_key.tunnel_id = base.tunnel_info.id;
-                }
-            } else {
-                // 无隧道并且MAC地址都是0一定是loopback流量
-                if meta_packet.lookup_key.src_mac == MacAddr::ZERO
-                    && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
-                {
-                    meta_packet.lookup_key.l2_end_0 = true;
-                    meta_packet.lookup_key.l2_end_1 = true;
-                }
-            }
-
-            meta_packet.tap_port = TapPort::from_local_mac(
-                meta_packet.lookup_key.get_nat_source(),
-                base.tunnel_info.tunnel_type,
-                u64::from(pipeline.bond_mac) as u32,
-            );
-            BaseDispatcher::prepare_flow(
-                &mut meta_packet,
-                TapType::Cloud,
-                false,
-                base.id as u8,
-                base.npb_dedup_enabled.load(Ordering::Relaxed),
-            );
-            flow_map.inject_meta_packet(&config, &mut meta_packet);
-            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
-            for h in pipeline.handlers.iter_mut() {
-                h.handle(&mini_packet);
-            }
+            };
 
             if let Some(policy) = meta_packet.policy_data.as_ref() {
                 if policy.acl_id > 0 && !base.tap_interface_whitelist.has(packet.if_index as usize)
@@ -280,11 +301,11 @@ impl LocalModeDispatcher {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }
             drop(packet);
-            base.check_and_update_bpf();
+            base.check_and_update_bpf(&mut self.base.engine);
         }
 
-        base.terminate_handler();
-        info!("Stopped dispatcher {}", base.log_id);
+        self.base.terminate_handler();
+        info!("Stopped dispatcher {}", self.base.is.log_id);
     }
 
     pub(super) fn listener(&self) -> LocalModeDispatcherListener {
@@ -312,10 +333,10 @@ pub struct LocalModeDispatcherListener {
 
 pub fn skip_by_blacklist(
     id: &String,
-    keys: Vec<u32>,
+    keys: Vec<u64>,
     macs: Vec<MacAddr>,
     blacklist: &Vec<u64>,
-) -> (Vec<u32>, Vec<MacAddr>) {
+) -> (Vec<u64>, Vec<MacAddr>) {
     if blacklist.is_empty() {
         return (keys, macs);
     }
@@ -392,7 +413,7 @@ impl LocalModeDispatcherListener {
         interfaces.sort_by_key(|link| link.if_index);
         let keys = interfaces
             .iter()
-            .map(|link| link.if_index)
+            .map(|link| link.if_index as u64)
             .collect::<Vec<_>>();
         let macs = self.get_mapped_macs(
             &interfaces,

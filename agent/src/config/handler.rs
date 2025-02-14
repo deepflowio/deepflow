@@ -329,6 +329,8 @@ pub struct DispatcherConfig {
     #[cfg(target_os = "linux")]
     pub extra_netns_regex: String,
     pub tap_interface_regex: String,
+    pub inner_interface_capture_enabled: bool,
+    pub inner_tap_interface_regex: String,
     pub if_mac_source: IfMacSource,
     pub analyzer_ip: String,
     pub analyzer_port: u16,
@@ -350,6 +352,8 @@ pub struct DispatcherConfig {
     pub bond_group: Vec<String>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub cpu_set: CpuSet,
+    pub raw_packet_buffer_block_size: usize,
+    pub raw_packet_queue_size: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1498,6 +1502,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.extra_netns_regex.to_string(),
                 tap_interface_regex: conf.tap_interface_regex.to_string(),
+                inner_interface_capture_enabled: conf.yaml_config.inner_interface_capture_enabled,
+                inner_tap_interface_regex: conf.yaml_config.inner_tap_interface_regex.clone(),
                 if_mac_source: conf.if_mac_source,
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.analyzer_port,
@@ -1525,6 +1531,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 cpu_set: CpuSet::new(),
+                raw_packet_buffer_block_size: conf.yaml_config.analyzer_raw_packet_block_size,
+                raw_packet_queue_size: conf.yaml_config.analyzer_queue_size,
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
@@ -1783,9 +1791,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     fn get_ctrl_mac(ip: &IpAddr) -> MacAddr {
                         // use host mac
                         #[cfg(target_os = "linux")]
-                        if let Err(e) =
-                            public::netns::open_named_and_setns(&public::netns::NsFile::Root)
-                        {
+                        if let Err(e) = public::netns::NsFile::Root.open_and_setns() {
                             warn!(
                                 "agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'."
                             );

@@ -442,7 +442,7 @@ impl Trident {
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
-            if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
+            if let Err(e) = netns::NsFile::Root.open_and_setns() {
                 return Err(anyhow!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'. setns error: {}", e));
             }
             let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
@@ -1257,7 +1257,7 @@ impl DomainNameListener {
                                 AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
-                                if let Err(e) = netns::open_named_and_setns(&netns::NsFile::Root) {
+                                if let Err(e) = netns::NsFile::Root.open_and_setns() {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}", e);
                                     crate::utils::notify_exit(1);
@@ -1804,7 +1804,9 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             &netns::NsFile::Root,
         );
-        if interfaces_and_ns.is_empty() && !links.is_empty() {
+        if interfaces_and_ns.is_empty()
+            && (!links.is_empty() || candidate_config.dispatcher.inner_interface_capture_enabled)
+        {
             if packet_fanout_count > 1 || candidate_config.tap_mode == TapMode::Local {
                 for _ in 0..packet_fanout_count {
                     #[cfg(target_os = "linux")]
@@ -3027,6 +3029,7 @@ fn build_dispatchers(
         .flow_map_config(config_handler.flow())
         .log_parse_config(config_handler.log_parser())
         .collector_config(config_handler.collector())
+        .dispatcher_config(config_handler.dispatcher())
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())

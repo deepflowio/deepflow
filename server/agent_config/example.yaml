@@ -1782,6 +1782,23 @@ vtap_group_id: g-xxxxxx
   ## Default: 10s
   #ntp-min-interval = 10s
 
+  ## Inner Net Namespace Capture
+  ## Default: false. Options: true, false
+  ## Note: Whether to collect traffic in sub net namespaces.
+  ##   When enabled, agent will spawn recv engine threads to capture traffic in different namespaces,
+  ##   causing additional memory consumption for each namespace captured.
+  ##   The default setting of inputs.cbpf.af_packet.tunning.ring_blocks is 128,
+  ##   which means that the memory consumption will be 128 * 1MB for each namespace.
+  ##   For example, a node with 20 pods will require 20 * 128 * 1MB = 2.56GB for dispatcher.
+  ##   Make sure to estimate this memory consumption before enabling this feature.
+  ##   Enable afpacket-blocks-enabled and change afpacket-blocks to reduce memory consumption.
+  #inner-interface-capture-enabled: false
+
+  ## Inner Net Namespace Interface Regex
+  ## Default: ^eth\d+$
+  ## Note: Regular expression of NIC name for collecting traffic in sub net namespaces.
+  #inner-tap-interface-regex: ^eth\d+$
+
   #################
   ## FeatureFlag ##
   #################

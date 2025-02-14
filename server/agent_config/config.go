@@ -206,6 +206,8 @@ type StaticConfig struct {
 	DispatcherQueue                    *bool                        `yaml:"dispatcher-queue,omitempty"`
 	EbpfCollectorQueueSize             *int                         `yaml:"ebpf-collector-queue-size,omitempty"`
 	SkipNpbBpf                         *bool                        `yaml:"skip-npb-bpf,omitempty"`
+	InnerInterfaceCaptureEnabled       *bool                        `yaml:"inner-interface-capture-enabled,omitempty"`
+	InnerTapInterfaceRegex             *string                      `yaml:"inner-tap-interface-regex,omitempty"`
 }
 
 type XflowCollectorConfig struct {
