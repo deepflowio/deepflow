@@ -1520,6 +1520,53 @@ inputs:
       #     需要采集流量的网络接口的正则表达式。
       # upgrade_from: tap_interface_regex
       interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
+      # type: bool
+      # name:
+      #   en: Inner Net Namespace Capture Enabled
+      #   ch: 内网络命名空间采集开关
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether to collect traffic in sub net namespaces.
+      #     When enabled, agent will spawn recv engine threads to capture traffic in different namespaces,
+      #     causing additional memory consumption for each namespace captured.
+      #     The default setting of inputs.cbpf.af_packet.tunning.ring_blocks is 128,
+      #     which means that the memory consumption will be 128 * 1MB for each namespace.
+      #     For example, a node with 20 pods will require 20 * 128 * 1MB = 2.56GB for dispatcher.
+      #     Make sure to estimate this memory consumption before enabling this feature.
+      #     Enabling inputs.cbpf.af_packet.tunning.ring_blocks_enabled and change
+      #     inputs.cbpf.af_packet.tunning.ring_blocks to reduce memory consumption.
+      #   ch: |-
+      #     是否采集内网络命名空间流量。
+      #     设置为启用会使采集器为每个内网络命名空间创建一个独立的接收引擎线程，
+      #     这会导致额外的内存消耗。
+      #     默认配置 inputs.cbpf.af_packet.tunning.ring_blocks 为 128，
+      #     这意味着每个网络命名空间将消耗 128 * 1MB 的内存。
+      #     一个有 20 个 POD 的节点将需要 20 * 128 * 1MB = 2.56GB 的内存。
+      #     请在启用此功能之前估计内存消耗，启用 inputs.cbpf.af_packet.tunning.ring_blocks_enabled
+      #     并调整 inputs.cbpf.af_packet.tunning.ring_blocks 以减少内存消耗。
+      # upgrade_from:
+      inner_interface_capture_enabled: false
+      # type: string
+      # name:
+      #   en: Inner Net Namespace Interface Regex
+      #   ch: 内网络命名空间网卡名正则表达式
+      # unit:
+      # range: [0, 65535]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Regular expression of NIC name for collecting traffic in sub net namespaces.
+      #   ch: |-
+      #     需要采集流量的内网络命名空间网卡的正则表达式。
+      # upgrade_from:
+      inner_interface_regex: ^eth\d+$
       # type: dict
       # name:
       #   en: Bond Interfaces
@@ -1967,15 +2014,25 @@ inputs:
       # ee_feature: true
       # description:
       #   en: |-
-      #     In analyzer mode, raw packets will go through a queue before being processed.
+      #     In certain modes, raw packets will go through a queue before being processed.
       #     To avoid memory allocation for each packet, a memory block of size
       #     raw_packet_buffer_block_size is allocated for multiple packets.
       #     Larger value will reduce memory allocation for raw packet, but will also
       #     delay memory free.
+      #     This configuration is effective for the following dispatcher modes:
+      #     - analyzer mode
+      #     - local mode with inner_interface_capture_enabled = true
+      #     - local mode with dispatcher_queue = true
+      #     - mirror mode with dispatcher_queue = true
       #   ch: |-
       #     Analyzer 模式下采集到的包进入队列前需要分配内存暂存。为避免每个包进行内存申请，每次开辟
       #     raw_packet_buffer_block_size 大小的内存块给数个包使用。
       #     更大的配置可以减少内存分配，但会延迟内存释放。
+      #     该配置对以下采集模式生效：
+      #     - analyzer 模式
+      #     - local 模式，且 inner_interface_capture_enabled = true
+      #     - local 模式，且 dispatcher_queue = true
+      #     - mirror 模式，且 dispatcher_queue = true
       # upgrade_from: static_config.analyzer-raw-packet-block-size
       raw_packet_buffer_block_size: 65536
       # type: int

@@ -4298,6 +4298,7 @@ dependencies = [
  "ahash",
  "btf-rs",
  "cc",
+ "cfg-if",
  "env_logger 0.11.5",
  "gimli 0.31.0",
  "libc",
