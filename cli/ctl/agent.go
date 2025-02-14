@@ -50,7 +50,7 @@ func RegisterAgentCommand() *cobra.Command {
 		Use:   "agent",
 		Short: "agent operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'list | delete | update | update-example | rebalance'.\n")
+			fmt.Printf("please run with 'list'.\n")
 		},
 	}
 
@@ -135,44 +135,39 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 	agentUpgrade := &cobra.Command{
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
+		Example: "deepflow-ctl agent-upgrade list\n" +
+			"deepflow-ctl agent-upgrade agent-name --image-name=deepflow-agent\n" +
+			"deepflow-ctl agent-upgrade cancel agent-name\n",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'list | upgrade | cancel'.\n")
+			if len(args) == 2 {
+				if args[0] == "cancel" {
+					cancelUpgadeAgent(cmd, args)
+				} else {
+					fmt.Println(cmd.Example)
+				}
+			} else if len(args) == 1 {
+				if args[0] == "list" {
+					listAgentUpgrade(cmd, args)
+				} else if imageName != "" {
+					if filepath.IsAbs(imageName) {
+						printutil.ErrorfWithColor(
+							"invalid image name(%s), please use command `deepflow-ctl repo agent list` to get image name\n"+
+								"reference doc: https://deepflow.io/docs/zh/install/upgrade/",
+							imageName,
+						)
+						return
+					}
+					upgadeAgent(cmd, args)
+				} else {
+					fmt.Println(cmd.Example)
+				}
+
+			} else {
+				fmt.Println(cmd.Example)
+			}
 		},
 	}
-
-	list := &cobra.Command{
-		Use:     "list",
-		Short:   "list agent upgrade info",
-		Example: "deepflow-ctl agent-upgrade list.\n",
-		Run: func(cmd *cobra.Command, args []string) {
-			listAgentUpgrade(cmd, args)
-		},
-	}
-
-	var imageName string
-	upgrade := &cobra.Command{
-		Use:     "upgrade [name]",
-		Short:   "upgrade agent",
-		Example: "deepflow-ctl agent-upgrade upgrade agent-name --image-name=deepflow-agent.\n",
-		Run: func(cmd *cobra.Command, args []string) {
-			upgradeAgent(cmd, imageName, args)
-		},
-	}
-	upgrade.Flags().StringVarP(&imageName, "image-name", "I", "", "image name to upgrade to")
-	upgrade.MarkFlagRequired("image-name")
-
-	cancel := &cobra.Command{
-		Use:     "cancel [name]",
-		Short:   "cancel agent upgrade",
-		Example: "deepflow-ctl agent-upgrade cancel agent-name.\n",
-		Run: func(cmd *cobra.Command, args []string) {
-			cancelUpgadeAgent(cmd, args)
-		},
-	}
-
-	agentUpgrade.AddCommand(list)
-	agentUpgrade.AddCommand(upgrade)
-	agentUpgrade.AddCommand(cancel)
+	agentUpgrade.Flags().StringVarP(&imageName, "image-name", "I", "", "")
 
 	return agentUpgrade
 }
@@ -416,16 +411,9 @@ func executeCommand(command string) (string, error) {
 	return string(output), err
 }
 
-func upgradeAgent(cmd *cobra.Command, imageName string, args []string) {
-	if filepath.IsAbs(imageName) {
-		printutil.ErrorfWithColor(
-			"invalid image name(%s), please use command `deepflow-ctl repo agent list` to get image name\n"+
-				"reference doc: https://deepflow.io/docs/zh/install/upgrade/",
-			imageName,
-		)
-		return
-	}
+var imageName string
 
+func upgadeAgent(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "must specify name and package. Examples: \n%s", cmd.Example)
 		return
@@ -502,11 +490,11 @@ func upgradeAgent(cmd *cobra.Command, imageName string, args []string) {
 }
 
 func cancelUpgadeAgent(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
+	if len(args) != 2 {
 		fmt.Fprintf(os.Stderr, "must specify name. Examples: \n%s", cmd.Example)
 		return
 	}
-	vtapName := args[0]
+	vtapName := args[1]
 
 	server := common.GetServerInfo(cmd)
 	serverURL := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
