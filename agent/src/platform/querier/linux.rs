@@ -287,7 +287,7 @@ impl Querier {
         self.raw_ip_addrs.clear();
         self.raw_ip_netns.clear();
         for ns in netns {
-            if let Err(e) = netns::open_named_and_setns(&ns) {
+            if let Err(e) = ns.open_and_setns() {
                 warn!("setns to {:?} failed: {}", ns, e);
                 continue;
             }

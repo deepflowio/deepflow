@@ -418,7 +418,7 @@ impl Monitor {
             let mut link_map_guard = link_map.lock().unwrap();
 
             #[cfg(target_os = "linux")]
-            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+            if let Err(e) = NsFile::Root.open_and_setns() {
                 warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                 warn!("setns error: {}", e);
                 return;
