@@ -38,7 +38,7 @@ pub use recv_engine::af_packet::{bpf::*, BpfSyntax};
 
 use special_recv_engine::Libpcap;
 
-use crate::config::handler::{CollectorAccess, LogParserAccess};
+use crate::config::handler::{CollectorAccess, DispatcherAccess, LogParserAccess};
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -70,7 +70,13 @@ use public::{
 
 pub(super) struct BaseDispatcher {
     pub(super) engine: RecvEngine,
+    pub(super) is: InternalState,
+}
 
+// BaseDispatcher::recv() takes mutable reference of BaseDispatcher.engine,
+// which make it impossible to use &mut BaseDispatcher before dropping the outcome of recv().
+// Separating fields into InternalState to solve this problem (we can take &mut RecvEngine and &mut InternalState).
+pub(super) struct InternalState {
     pub(super) id: usize,
     pub(super) src_interface_index: u32,
     pub(super) src_interface: String,
@@ -81,11 +87,12 @@ pub(super) struct BaseDispatcher {
 
     pub(super) leaky_bucket: Arc<LeakyBucket>,
     pub(super) handler_builder: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
-    pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
+    pub(super) pipelines: Arc<Mutex<HashMap<u64, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
     pub(super) log_parse_config: LogParserAccess,
     pub(super) collector_config: CollectorAccess,
+    pub(super) dispatcher_config: DispatcherAccess,
 
     pub(super) tunnel_type_bitmap: Arc<RwLock<TunnelTypeBitmap>>,
     pub(super) tunnel_type_trim_bitmap: TunnelTypeBitmap,
@@ -150,49 +157,50 @@ impl BaseDispatcher {
     }
 
     pub(super) fn listener(&self) -> BaseDispatcherListener {
-        let default_address: IpAddr = if self.options.lock().unwrap().is_ipv6 {
+        let is = &self.is;
+        let default_address: IpAddr = if is.options.lock().unwrap().is_ipv6 {
             Ipv6Addr::UNSPECIFIED.into()
         } else {
             Ipv4Addr::UNSPECIFIED.into()
         };
         BaseDispatcherListener {
-            id: self.id,
-            src_interface: self.src_interface.clone(),
-            src_interface_index: self.src_interface_index as usize,
-            options: self.options.clone(),
-            bpf_options: self.bpf_options.clone(),
-            pipelines: self.pipelines.clone(),
-            tap_interfaces: self.tap_interfaces.clone(),
-            need_update_bpf: self.need_update_bpf.clone(),
+            id: is.id,
+            src_interface: is.src_interface.clone(),
+            src_interface_index: is.src_interface_index as usize,
+            options: is.options.clone(),
+            bpf_options: is.bpf_options.clone(),
+            pipelines: is.pipelines.clone(),
+            tap_interfaces: is.tap_interfaces.clone(),
+            need_update_bpf: is.need_update_bpf.clone(),
             #[cfg(target_os = "linux")]
-            platform_poller: self.platform_poller.clone(),
+            platform_poller: is.platform_poller.clone(),
             capture_bpf: "".into(),
             proxy_controller_ip: default_address.to_string(),
             proxy_controller_port: DEFAULT_CONTROLLER_PORT,
             analyzer_ip: default_address.to_string(),
             analyzer_port: DEFAULT_INGESTER_PORT,
-            tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
-            tunnel_type_trim_bitmap: self.tunnel_type_trim_bitmap.clone(),
-            handler_builders: self.handler_builder.clone(),
+            tunnel_type_bitmap: is.tunnel_type_bitmap.clone(),
+            tunnel_type_trim_bitmap: is.tunnel_type_trim_bitmap.clone(),
+            handler_builders: is.handler_builder.clone(),
             #[cfg(target_os = "linux")]
-            netns: self.netns.clone(),
-            npb_dedup_enabled: self.npb_dedup_enabled.clone(),
-            log_id: self.log_id.clone(),
-            reset_whitelist: self.reset_whitelist.clone(),
-            pause: self.pause.clone(),
-            bond_group_map: self.bond_group_map.clone(),
+            netns: is.netns.clone(),
+            npb_dedup_enabled: is.npb_dedup_enabled.clone(),
+            log_id: is.log_id.clone(),
+            reset_whitelist: is.reset_whitelist.clone(),
+            pause: is.pause.clone(),
+            bond_group_map: is.bond_group_map.clone(),
         }
     }
 
     pub fn terminate_handler(&mut self) {
-        self.pipelines.lock().unwrap().clear();
+        self.is.pipelines.lock().unwrap().clear();
     }
 
     pub(super) fn switch_recv_engine(&mut self, config: &DispatcherConfig) -> Result<()> {
         #[cfg(target_os = "linux")]
         let pcap_interfaces = match public::netns::links_by_name_regex_in_netns(
             &config.tap_interface_regex,
-            &self.netns,
+            &self.is.netns,
         ) {
             Err(e) => {
                 warn!("get interfaces by name regex failed: {}", e);
@@ -208,7 +216,7 @@ impl BaseDispatcher {
             }
             Ok(links) => links,
         };
-        let options = self.options.lock().unwrap();
+        let options = self.is.options.lock().unwrap();
         self.engine = if options.capture_mode == PacketCaptureType::Local && options.libpcap_enabled
         {
             if pcap_interfaces.is_empty() {
@@ -230,14 +238,14 @@ impl BaseDispatcher {
                 src_ifaces.clone(),
                 options.packet_blocks,
                 options.snap_len,
-                &self.queue_debugger,
+                &self.is.queue_debugger,
             )
             .map_err(|e| Error::Libpcap(e.to_string()))?;
             info!(
                 "libpcap init with {:?} block {} snap {}",
                 src_ifaces, options.packet_blocks, options.snap_len
             );
-            self.need_update_bpf.store(true, Ordering::Relaxed);
+            self.is.need_update_bpf.store(true, Ordering::Relaxed);
             RecvEngine::Libpcap(Some(libpcap))
         } else {
             todo!()
@@ -391,16 +399,17 @@ impl BaseDispatcher {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
+}
 
-    pub(super) fn check_and_update_bpf(&mut self) {
+#[cfg(target_os = "windows")]
+impl InternalState {
+    pub(super) fn check_and_update_bpf(&mut self, engine: &mut RecvEngine) {
         if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
             return;
         }
 
         let bpf_options = self.bpf_options.lock().unwrap();
-        if let Err(e) = self
-            .engine
-            .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
+        if let Err(e) = engine.set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
@@ -436,7 +445,8 @@ impl BaseDispatcher {
             BpfSyntax::RetConstant(RetConstant { val: 0 }),
         ];
 
-        self.bpf_options
+        self.is
+            .bpf_options
             .lock()
             .unwrap()
             .bpf_syntax
@@ -446,9 +456,9 @@ impl BaseDispatcher {
     pub(super) fn init(&mut self) -> Result<()> {
         match self.engine.init() {
             Ok(_) => {
-                if &self.src_interface != "" {
-                    if let Ok(link) = net::link_by_name(&self.src_interface) {
-                        self.src_interface_index = link.if_index;
+                if &self.is.src_interface != "" {
+                    if let Ok(link) = net::link_by_name(&self.is.src_interface) {
+                        self.is.src_interface_index = link.if_index;
                     }
                 }
                 Ok(())
@@ -534,18 +544,21 @@ impl BaseDispatcher {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
+}
 
-    pub(super) fn check_and_update_bpf(&mut self) {
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl InternalState {
+    pub(super) fn check_and_update_bpf(&mut self, engine: &mut RecvEngine) {
         if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
             return;
         }
 
         let tap_interfaces = self.tap_interfaces.lock().unwrap();
         let bpf_options = self.bpf_options.lock().unwrap();
-        if let Err(e) = self.engine.set_bpf(
+        if let Err(e) = engine.set_bpf(
             bpf_options.get_bpf_instructions(
                 &tap_interfaces,
-                &self.tap_interface_whitelist,
+                self.tap_interface_whitelist.as_set(),
                 self.options.lock().unwrap().snap_len,
             ),
             &CString::new(bpf_options.get_bpf_syntax()).unwrap(),
@@ -564,7 +577,7 @@ impl BaseDispatcher {
         // When the configuration is changed, the deepflow-agent will restart,
         // and the NIC configured in promiscuous mode will be retired
         if self.options.lock().unwrap().promisc && self.promisc_if_indices != if_indices {
-            if let Err(e) = self.engine.set_promisc(&self.promisc_if_indices, false) {
+            if let Err(e) = engine.set_promisc(&self.promisc_if_indices, false) {
                 warn!(
                     "set_promisc disabled failed with tap_interfaces count {}: {:?}",
                     self.promisc_if_indices.len(),
@@ -572,7 +585,7 @@ impl BaseDispatcher {
                 );
             }
 
-            if let Err(e) = self.engine.set_promisc(&if_indices, true) {
+            if let Err(e) = engine.set_promisc(&if_indices, true) {
                 warn!(
                     "set_promisc enabled failed with tap_interfaces count {}: {:?}",
                     if_indices.len(),
@@ -700,6 +713,10 @@ impl TapInterfaceWhitelist {
         self.whitelist.contains(&index)
     }
 
+    pub fn as_set(&self) -> &HashSet<usize> {
+        &self.whitelist
+    }
+
     pub fn reset(&mut self) {
         self.updated = self.whitelist.is_empty();
         self.whitelist.clear();
@@ -730,7 +747,7 @@ pub struct BaseDispatcherListener {
     pub options: Arc<Mutex<Options>>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
     pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
-    pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
+    pub pipelines: Arc<Mutex<HashMap<u64, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_bpf: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
@@ -840,7 +857,7 @@ impl BaseDispatcherListener {
         self.on_npb_dedup_change(config);
     }
 
-    pub(super) fn on_vm_change(&self, keys: &[u32], vm_macs: &[MacAddr]) {
+    pub(super) fn on_vm_change(&self, keys: &[u64], vm_macs: &[MacAddr]) {
         assert_eq!(keys.len(), vm_macs.len());
         // assert keys in assending order for bsearch
         assert!(keys.windows(2).all(|w| w[0] <= w[1]));
@@ -886,7 +903,7 @@ impl BaseDispatcherListener {
                 .collect();
             let bond_mac = self
                 .bond_group_map
-                .get(key)
+                .get(&(*key as u32))
                 .unwrap_or_else(|| &vm_mac)
                 .clone();
             pipelines.insert(

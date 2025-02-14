@@ -2145,6 +2145,68 @@ inputs:
 
 需要采集流量的网络接口的正则表达式。
 
+#### 内网络命名空间采集开关 {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_capture_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_capture_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否采集内网络命名空间流量。
+设置为启用会使采集器为每个内网络命名空间创建一个独立的接收引擎线程，
+这会导致额外的内存消耗。
+默认配置 inputs.cbpf.af_packet.tunning.ring_blocks 为 128，
+这意味着每个网络命名空间将消耗 128 * 1MB 的内存。
+一个有 20 个 POD 的节点将需要 20 * 128 * 1MB = 2.56GB 的内存。
+请在启用此功能之前估计内存消耗，启用 inputs.cbpf.af_packet.tunning.ring_blocks_enabled
+并调整 inputs.cbpf.af_packet.tunning.ring_blocks 以减少内存消耗。
+
+#### 内网络命名空间网卡名正则表达式 {#inputs.cbpf.af_packet.inner_interface_regex}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_regex`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_regex: ^eth\d+$
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+| Range | [0, 65535] |
+
+**详细描述**:
+
+需要采集流量的内网络命名空间网卡的正则表达式。
+
 #### Bond 网卡列表 {#inputs.cbpf.af_packet.bond_interfaces}
 
 **标签**:
@@ -2880,6 +2942,11 @@ inputs:
 Analyzer 模式下采集到的包进入队列前需要分配内存暂存。为避免每个包进行内存申请，每次开辟
 raw_packet_buffer_block_size 大小的内存块给数个包使用。
 更大的配置可以减少内存分配，但会延迟内存释放。
+该配置对以下采集模式生效：
+- analyzer 模式
+- local 模式，且 inner_interface_capture_enabled = true
+- local 模式，且 dispatcher_queue = true
+- mirror 模式，且 dispatcher_queue = true
 
 #### 裸包队列大小 {#inputs.cbpf.tunning.raw_packet_queue_size}
 
