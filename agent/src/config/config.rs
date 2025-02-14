@@ -646,6 +646,8 @@ pub struct YamlConfig {
     pub server_ports: Vec<u16>,
     pub consistent_timestamp_in_l7_metrics: bool,
     pub skip_npb_bpf: bool,
+    pub inner_interface_capture_enabled: bool,
+    pub inner_tap_interface_regex: String,
 }
 
 impl YamlConfig {
@@ -1079,6 +1081,8 @@ impl Default for YamlConfig {
             server_ports: vec![],
             consistent_timestamp_in_l7_metrics: false,
             skip_npb_bpf: false,
+            inner_interface_capture_enabled: false,
+            inner_tap_interface_regex: "".to_string(),
         }
     }
 }

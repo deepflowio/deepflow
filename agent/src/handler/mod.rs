@@ -192,10 +192,13 @@ pub enum PacketHandlerBuilder {
 }
 
 impl PacketHandlerBuilder {
-    pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> PacketHandler {
+    pub fn build_with(&self, id: usize, if_index: u64, mac: MacAddr) -> PacketHandler {
         match self {
             PacketHandlerBuilder::Pcap(s) => PacketHandler::Pcap(s.clone()),
-            PacketHandlerBuilder::Npb(b) => PacketHandler::Npb(b.build_with(id, if_index, mac)),
+            // high 32 bits is ns_ino
+            PacketHandlerBuilder::Npb(b) => {
+                PacketHandler::Npb(b.build_with(id, if_index as u32, mac))
+            }
         }
     }
 
