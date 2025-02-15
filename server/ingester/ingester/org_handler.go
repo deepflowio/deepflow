@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/prometheus"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/nativetag"
 )
 
 var CleanDatabaseList = []string{
@@ -92,4 +93,59 @@ func (o *OrgHandler) dropOrgCaches(orgId uint16) {
 		return
 	}
 	o.promHander.DropOrg(orgId)
+}
+
+func (o *OrgHandler) UpdateNativeTag(op nativetag.NativeTagOP, orgId uint16, nativeTag *nativetag.NativeTag) error {
+	if nativeTag == nil {
+		return nil
+	}
+
+	if op == nativetag.NATIVE_TAG_ADD {
+		return o.addNativeTag(orgId, nativeTag)
+	} else if op == nativetag.NATIVE_TAG_DELETE {
+		// the drop operation is time-consuming and should be handled asynchronously
+		go o.dropNativeTag(orgId, nativeTag)
+	} else {
+		return fmt.Errorf("unknown native tag op %d", op)
+	}
+	return nil
+}
+
+func (o *OrgHandler) addNativeTag(orgId uint16, nativeTag *nativetag.NativeTag) error {
+	if nativeTag == nil || len(nativeTag.ColumnNames) == 0 {
+		return nil
+	}
+	conns, err := common.NewCKConnections(*o.cfg.CKDB.ActualAddrs, o.cfg.CKDBAuth.Username, o.cfg.CKDBAuth.Password)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	defer conns.Close()
+	for _, conn := range conns {
+		err := nativetag.CKAddNativeTag(o.cfg.CKDB.Type == ckdb.CKDBTypeByconity, conn, orgId, nativeTag)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *OrgHandler) dropNativeTag(orgId uint16, nativeTag *nativetag.NativeTag) error {
+	if nativeTag == nil || len(nativeTag.ColumnNames) == 0 {
+		return nil
+	}
+	conns, err := common.NewCKConnections(*o.cfg.CKDB.ActualAddrs, o.cfg.CKDBAuth.Username, o.cfg.CKDBAuth.Password)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	defer conns.Close()
+	for _, conn := range conns {
+		err := nativetag.CKDropNativeTag(o.cfg.CKDB.Type == ckdb.CKDBTypeByconity, conn, orgId, nativeTag)
+		if err != nil {
+			log.Error(err)
+		}
+	}
+	return nil
 }
