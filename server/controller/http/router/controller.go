@@ -112,7 +112,7 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&controllerUpdate, binding.JSON)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 

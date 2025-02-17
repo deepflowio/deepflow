@@ -35,7 +35,7 @@ func HandleORGIDMiddleware() gin.HandlerFunc {
 			var err error
 			orgID, err = strconv.Atoi(orgIDString)
 			if err != nil {
-				response.JSON(ctx, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(fmt.Sprintf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)))
+				response.JSON(ctx, response.SetOptStatus(httpcommon.ORG_ID_INVALID), response.SetError(fmt.Errorf("invalid header (%s) value (%s)", common.HEADER_KEY_X_ORG_ID, orgIDString)))
 				ctx.Abort()
 				return
 			}
