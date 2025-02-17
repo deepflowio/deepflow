@@ -108,14 +108,14 @@ func getSubDomainResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
 		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		data, err := service.GetSubDomainResource(subDomain.Domain, subDomainLcuuid, m)
@@ -127,14 +127,14 @@ func getKubernetesGatherResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
 		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		data, err := service.GetKubernetesGatherResource(subDomain.Domain, subDomainLcuuid, m)
@@ -204,7 +204,7 @@ func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.ORG_ID_INVALID), response.SetError(err))
 			return
 		}
 		data, err := service.GetAgentStats(g, strconv.Itoa(orgID), c.Param("vtapID"))
@@ -216,7 +216,7 @@ func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		db, err := routercommon.GetContextOrgDB(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.GET_ORG_DB_FAIL), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))
 			return
 		}
 		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
@@ -232,7 +232,7 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.ORG_ID_INVALID), response.SetError(err))
 			return
 		}
 		dataType := c.Param("type")
@@ -312,7 +312,7 @@ func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		orgID, err := routercommon.GetContextOrgID(c)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.ORG_ID_INVALID), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.ORG_ID_INVALID), response.SetError(err))
 			return
 		}
 		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
@@ -326,12 +326,12 @@ func triggerKubernetesRefresh(m *manager.Manager) gin.HandlerFunc {
 		subDomainLcuuid := c.Query("sub_domain_lcuuid")
 		versionString := c.Query("version")
 		if domainLcuuid == "" || subDomainLcuuid == "" || versionString == "" {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription("required parameter missing"))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(fmt.Errorf("required parameter missing")))
 			return
 		}
 		version, err := strconv.Atoi(versionString)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		err = service.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version, m)
