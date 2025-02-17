@@ -149,8 +149,9 @@ const (
 	PodType     = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD)      // 10
 	PodNodeType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_NODE) // 14
 
-	PodServiceType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_SERVICE) // 12
-	PodClusterType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_CLUSTER) // 103
+	PodServiceType    = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_SERVICE)    // 12
+	PodClusterType    = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_CLUSTER)    // 103
+	CustomServiceType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_CUSTOM_SERVICE) // 104
 
 	ProcessType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_PROCESS) // 120
 
@@ -172,9 +173,11 @@ func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID, subnetID uint32, l3Devi
 	return subnetID, IpType
 }
 
-func GetAutoService(serviceID, podGroupID, gpID, podClusterID, l3DeviceID, subnetID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
-	if serviceID > 0 {
-		return serviceID, PodServiceType
+func GetAutoService(customServiceID, podServiceID, podGroupID, gpID, podClusterID, l3DeviceID, subnetID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
+	if customServiceID > 0 {
+		return customServiceID, CustomServiceType
+	} else if podServiceID > 0 {
+		return podServiceID, PodServiceType
 	} else if podGroupID > 0 {
 		return podGroupID, podGroupType
 	} else if gpID > 0 {

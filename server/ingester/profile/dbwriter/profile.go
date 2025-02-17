@@ -28,6 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/libs/nativetag"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -205,6 +206,10 @@ func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType strin
 	}
 }
 
+func (p *InProcessProfile) NativeTagVersion() uint32 {
+	return nativetag.GetTableNativeTagsVersion(p.OrgId, nativetag.PROFILE)
+}
+
 func (p *InProcessProfile) OrgID() uint16 {
 	return p.OrgId
 }
@@ -371,7 +376,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		podGroupType = info.PodGroupType
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
-		p.ServiceID = platformData.QueryService(p.OrgId, p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
+		p.ServiceID = platformData.QueryPodService(p.OrgId, p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
 	}
 
 	// fix up when all resource match failed
@@ -380,7 +385,8 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 	}
 
 	p.AutoInstanceID, p.AutoInstanceType = basecommon.GetAutoInstance(p.PodID, p.GPID, p.PodNodeID, p.L3DeviceID, uint32(p.SubnetID), p.L3DeviceType, p.L3EpcID)
-	p.AutoServiceID, p.AutoServiceType = basecommon.GetAutoService(p.ServiceID, p.PodGroupID, p.GPID, uint32(p.PodClusterID), p.L3DeviceID, uint32(p.SubnetID), p.L3DeviceType, podGroupType, p.L3EpcID)
+	customServiceID := platformData.QueryCustomService(p.OrgId, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, 0)
+	p.AutoServiceID, p.AutoServiceType = basecommon.GetAutoService(customServiceID, p.ServiceID, p.PodGroupID, p.GPID, uint32(p.PodClusterID), p.L3DeviceID, uint32(p.SubnetID), p.L3DeviceType, podGroupType, p.L3EpcID)
 
 }
 
