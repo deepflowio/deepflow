@@ -17,6 +17,8 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
@@ -28,7 +30,7 @@ func AdminPermissionVerificationMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userType, _ := ctx.Get(common.HEADER_KEY_X_USER_TYPE)
 		if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
-			response.JSON(ctx, response.SetStatus(httpcommon.NO_PERMISSIONS), response.SetDescription("only super admin and admin can operate"))
+			response.JSON(ctx, response.SetOptStatus(httpcommon.NO_PERMISSIONS), response.SetError(fmt.Errorf("only super admin and admin can operate")))
 			ctx.Abort()
 		}
 		ctx.Next()

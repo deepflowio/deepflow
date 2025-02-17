@@ -57,7 +57,7 @@ func createMailServer(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&mailCreate, binding.JSON)
 	if err != nil {
-		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 		return
 	}
 
@@ -72,7 +72,7 @@ func updateMailServer(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&mailServerUpdate, binding.JSON)
 	if err != nil {
-		response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 		return
 	}
 

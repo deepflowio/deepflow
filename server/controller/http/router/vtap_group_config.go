@@ -81,7 +81,7 @@ func updateVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		vTapGroupConfig := &agent_config.AgentGroupConfig{}
 		if err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON); err != nil {
-			response.JSON(c, response.SetStatus(common.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(common.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		data, err := service.NewVTapGroupConfig(common.GetUserInfo(c), cfg).

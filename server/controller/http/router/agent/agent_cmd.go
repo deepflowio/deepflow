@@ -94,21 +94,21 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			c.Abort()
 			return
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			c.Abort()
 			return
 		}
 		var agent *metadbmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			c.Abort()
 			return
 		}
@@ -120,7 +120,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			v, err := strconv.Atoi(timesStr)
 			if err != nil {
 				log.Error(err, db.LogPrefixORGID)
-				response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+				response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 				return
 			}
 			forwardTimes = v
@@ -132,7 +132,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			c.Abort()
 			return
 		}
@@ -171,7 +171,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			c.Abort()
 			return
 		}
@@ -191,7 +191,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		var agent *metadbmodel.VTap
@@ -257,7 +257,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		req := service.RemoteExecReq{}
 		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		// Profile commands and probe commands are available to everyone.
@@ -266,7 +266,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			_, ok1 := profileCommandMap[req.CMD]
 			_, ok2 := probeCommandMap[req.CMD]
 			if !(ok1 || ok2) {
-				response.JSON(c, response.SetStatus(httpcommon.NO_PERMISSIONS), response.SetDescription(fmt.Sprintf("only super admin and admin can operate command(%s)", req.CMD)))
+				response.JSON(c, response.SetOptStatus(httpcommon.NO_PERMISSIONS), response.SetError(fmt.Errorf("only super admin and admin can operate command(%s)", req.CMD)))
 				return
 			}
 		}
@@ -287,12 +287,12 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		content, err := service.RunAgentCMD(a.cfg.AgentCommandTimeout, orgID.(int), agentID, &agentReq, req.CMD)
 		if err != nil {
-			response.JSON(c, response.SetData(content), response.SetStatus(httpcommon.SERVER_ERROR), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetData(content), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			return
 		}
 
