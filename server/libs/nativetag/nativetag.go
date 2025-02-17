@@ -91,7 +91,7 @@ func ToNativeTagTable(db, table string) (NativeTagTable, error) {
 type NativeTagType uint8
 
 const (
-	NATIVE_TAG_STRING NativeTagType = iota
+	NATIVE_TAG_STRING NativeTagType = iota + 1
 	NATIVE_TAG_INT64
 	NATIVE_TAG_FLOAT64
 )
@@ -120,7 +120,7 @@ func (t NativeTagType) IndexString() string {
 type NativeTagOP uint8
 
 const (
-	NATIVE_TAG_ADD NativeTagOP = iota
+	NATIVE_TAG_ADD NativeTagOP = iota + 1
 	NATIVE_TAG_DELETE
 )
 
@@ -209,7 +209,10 @@ func UpdateNativeTag(op NativeTagOP, orgId uint16, nativeTag *NativeTag) {
 
 	oldNativeTag := NativeTags[orgId][tableId]
 	if oldNativeTag == nil {
-		oldNativeTag = &NativeTag{}
+		oldNativeTag = &NativeTag{
+			Db:    nativeTag.Db,
+			Table: nativeTag.Table,
+		}
 	}
 
 	if op == NATIVE_TAG_ADD {
