@@ -86,7 +86,7 @@ func (v *VtapGroup) createVtapGroup() gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapGroupCreate, binding.JSON)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 		if vtapGroupCreate.TeamID == 0 {
@@ -106,7 +106,7 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 
 		err = c.ShouldBindBodyWith(&vtapGroupUpdate, binding.JSON)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_PARAMETERS), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
 
@@ -114,7 +114,7 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		// 避免struct会有默认值，这里转为map作为函数入参
 		patchMap := map[string]interface{}{}
 		if err := c.ShouldBindBodyWith(&patchMap, binding.JSON); err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.SERVER_ERROR), response.SetError(err))
+			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			return
 		}
 
