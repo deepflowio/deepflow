@@ -1,0 +1,16 @@
+basePath: /api/v1
+host: deepflow-server:30417
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is the API for the DeepFlow Controller.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: DeepFlow Controller API
+  version: "1.0"
+paths: {}
+swagger: "2.0"
