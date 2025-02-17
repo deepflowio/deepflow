@@ -27,6 +27,7 @@ import (
 
 	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	configs "github.com/deepflowio/deepflow/server/controller/config/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -102,6 +103,7 @@ type ControllerConfig struct {
 	TagRecorderCfg tagrecorder.TagRecorderConfig `yaml:"tagrecorder"`
 	PrometheusCfg  prometheus.Config             `yaml:"prometheus"`
 	HTTPCfg        http.Config                   `yaml:"http"`
+	SwaggerCfg     configs.Swagger               `yaml:"swagger"`
 }
 
 type Config struct {
