@@ -17,25 +17,23 @@
 package event
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-type Domain struct {
-	SubDomain
+type WholeDomain struct {
+	WholeSubDomain // TODO 依赖反转
 }
 
-func NewDomain(domainLcuuid string, toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Domain {
-	return &Domain{
-		SubDomain{
-			domainLcuuid,
-			"",
-			newEventManagerBase(
-				"",
-				toolDS,
-				eq,
-			),
-			newTool(toolDS),
+func NewWholeDomain(q *queue.OverwriteQueue) *WholeDomain {
+	mng := &WholeDomain{
+		WholeSubDomain{
+			newManagerComponent(common.RESOURCE_TYPE_SUB_DOMAIN_EN, q),
+			newChangedSubscriberComponent(pubsub.PubSubTypeWholeDomain),
+			newTool(),
 		},
 	}
+	mng.SetSubscriberSelf(mng)
+	return mng
 }

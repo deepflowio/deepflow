@@ -17,36 +17,33 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type NATGateway struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 }
 
-func NewNATGateway(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *NATGateway {
+func NewNATGateway(q *queue.OverwriteQueue) *NATGateway {
 	mng := &NATGateway{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY,
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (n *NATGateway) ProduceByAdd(items []*metadbmodel.NATGateway) {
-	for _, item := range items {
+func (n *NATGateway) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.NATGateway) {
 		var opts []eventapi.TagFieldOption
-		info, err := n.ToolDataSet.GetNATGatewayInfoByID(item.ID)
+		info, err := md.GetToolDataSet().GetNATGatewayInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -61,7 +58,7 @@ func (n *NATGateway) ProduceByAdd(items []*metadbmodel.NATGateway) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		n.createAndEnqueue(
+		n.createAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -72,24 +69,8 @@ func (n *NATGateway) ProduceByAdd(items []*metadbmodel.NATGateway) {
 	}
 }
 
-func (n *NATGateway) ProduceByUpdate(cloudItem *cloudmodel.NATGateway, diffBase *diffbase.NATGateway) {
-}
-
-func (n *NATGateway) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
-		id, ok := n.ToolDataSet.GetNATGatewayIDByLcuuid(lcuuid)
-		if ok {
-			var err error
-			name, err = n.ToolDataSet.GetNATGatewayNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(n.resourceType, lcuuid), err, n.metadata.LogPrefixes)
-			}
-		} else {
-			log.Error(nameByIDNotFound(n.resourceType, id))
-		}
-
-		n.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
+func (n *NATGateway) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.NATGateway) {
+		n.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, n.deviceType, item.ID)
 	}
 }

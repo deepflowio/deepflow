@@ -55,6 +55,10 @@ func (m *Metadata) Copy() *Metadata {
 	}
 }
 
+func (m *Metadata) GetDB() *metadb.DB {
+	return m.DB
+}
+
 func (m *Metadata) GetORGID() int {
 	return m.ORGID
 }
@@ -65,6 +69,14 @@ func (m *Metadata) GetTeamID() int {
 	} else {
 		return m.Domain.TeamID
 	}
+}
+
+func (m *Metadata) GetDomainInfo() *DomainInfo {
+	return m.Domain
+}
+
+func (m *Metadata) GetSubDomainInfo() *SubDomainInfo {
+	return m.SubDomain
 }
 
 func (m *Metadata) SetDomain(domain metadbmodel.Domain) {

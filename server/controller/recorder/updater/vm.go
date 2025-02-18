@@ -220,5 +220,9 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 
+	if len(mapInfo) > 0 {
+		structInfo.Name.SetNew(cloudItem.Name) // TODO better
+	}
+
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

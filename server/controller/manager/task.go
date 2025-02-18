@@ -53,7 +53,7 @@ type Task struct {
 	subDomainRefreshSignals cmap.ConcurrentMap[string, *queue.OverwriteQueue] // key: subDomainLcuuid
 }
 
-func NewTask(orgID int, domain metadbmodel.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
+func NewTask(orgID int, domain metadbmodel.Domain, cfg config.TaskConfig, ctx context.Context) *Task {
 	tCtx, tCancel := context.WithCancel(ctx)
 	t := &Task{
 		tCtx:           tCtx,
@@ -68,7 +68,7 @@ func NewTask(orgID int, domain metadbmodel.Domain, cfg config.TaskConfig, ctx co
 		log.Errorf("domain: %s %s, failed to create cloud task", domain.Name, domain.Lcuuid, t.LogPrefixORGID)
 		return nil
 	}
-	rcd := recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, orgID, domain.Lcuuid)
+	rcd := recorder.NewRecorder(tCtx, cfg.RecorderCfg, orgID, domain.Lcuuid)
 	if rcd == nil {
 		log.Errorf("domain: %s %s, failed to create recorder", domain.Name, domain.Lcuuid, t.LogPrefixORGID)
 		return nil

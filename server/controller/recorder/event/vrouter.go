@@ -17,36 +17,33 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type VRouter struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 }
 
-func NewVRouter(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VRouter {
+func NewVRouter(q *queue.OverwriteQueue) *VRouter {
 	mng := &VRouter{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_VROUTER,
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (r *VRouter) ProduceByAdd(items []*metadbmodel.VRouter) {
-	for _, item := range items {
+func (r *VRouter) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.VRouter) {
 		var opts []eventapi.TagFieldOption
-		info, err := r.ToolDataSet.GetVRouterInfoByID(item.ID)
+		info, err := md.GetToolDataSet().GetVRouterInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -56,7 +53,7 @@ func (r *VRouter) ProduceByAdd(items []*metadbmodel.VRouter) {
 		}
 
 		if item.GWLaunchServer != "" {
-			hostID, ok := r.ToolDataSet.GetHostIDByIP(item.GWLaunchServer)
+			hostID, ok := md.GetToolDataSet().GetHostIDByIP(item.GWLaunchServer)
 			if !ok {
 				log.Error(idByIPNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, item.GWLaunchServer))
 			} else {
@@ -72,7 +69,7 @@ func (r *VRouter) ProduceByAdd(items []*metadbmodel.VRouter) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndEnqueue(
+		r.createAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -83,24 +80,8 @@ func (r *VRouter) ProduceByAdd(items []*metadbmodel.VRouter) {
 	}
 }
 
-func (r *VRouter) ProduceByUpdate(cloudItem *cloudmodel.VRouter, diffBase *diffbase.VRouter) {
-}
-
-func (r *VRouter) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
-		id, ok := r.ToolDataSet.GetVRouterIDByLcuuid(lcuuid)
-		if !ok {
-			log.Error(nameByIDNotFound(r.resourceType, id))
-		} else {
-			var err error
-			name, err = r.ToolDataSet.GetVRouterNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err, r.metadata.LogPrefixes)
-			}
-		}
-
-		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+func (r *VRouter) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.VRouter) {
+		r.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, r.deviceType, item.ID)
 	}
 }

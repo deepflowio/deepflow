@@ -21,35 +21,28 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodService struct {
-	cache         *cache.Cache
-	eventProducer *event.PodService
+	cache *cache.Cache
 }
 
-func NewPodService(c *cache.Cache, eq *queue.OverwriteQueue) *PodService {
+func NewPodService(c *cache.Cache) *PodService {
 	listener := &PodService{
-		cache:         c,
-		eventProducer: event.NewPodService(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (ps *PodService) OnUpdaterAdded(addedDBItems []*metadbmodel.PodService) {
-	ps.eventProducer.ProduceByAdd(addedDBItems)
 	ps.cache.AddPodServices(addedDBItems)
 }
 
 func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
-	ps.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	ps.cache.UpdatePodService(cloudItem)
 }
 
 func (ps *PodService) OnUpdaterDeleted(lcuuids []string) {
-	ps.eventProducer.ProduceByDelete(lcuuids)
 	ps.cache.DeletePodServices(lcuuids)
 }
