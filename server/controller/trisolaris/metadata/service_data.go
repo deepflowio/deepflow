@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -145,6 +146,40 @@ func getProtocol(protocol string) trident.ServiceProtocol {
 		return protocol
 	}
 	return trident.ServiceProtocol_ANY
+}
+
+func customServiceToProto(ordID int, customService *models.CustomService) *trident.ServiceInfo {
+	serviceType := trident.ServiceType_CUSTOM_SERVICE
+	item := &trident.ServiceInfo{
+		EpcId: proto.Uint32(uint32(customService.VPCID)),
+		Type:  &serviceType,
+		Id:    proto.Uint32(uint32(customService.ID)),
+	}
+	if customService.Type == CUSTOM_SERVICE_TYPE_IP {
+		item.Ips = strings.Split(customService.Resource, ",")
+	} else {
+		ipPorts := strings.Split(customService.Resource, ",")
+		ips := []string{}
+		ports := []uint32{}
+		for _, ipPort := range ipPorts {
+			ipPort = strings.TrimSpace(ipPort)
+			ipPortSlice := strings.Split(ipPort, ":")
+			if len(ipPortSlice) != 2 {
+				log.Warningf("[ORDID-%d] invalid ip port format: %s", ordID, ipPort)
+				continue
+			}
+			ips = append(ips, ipPortSlice[0])
+			port, err := strconv.Atoi(ipPortSlice[1])
+			if err != nil {
+				log.Warningf("[ORDID-%d] invalid port format: %s", ordID, ipPortSlice[1])
+				continue
+			}
+			ports = append(ports, uint32(port))
+		}
+		item.Ips = ips
+		item.ServerPorts = ports
+	}
+	return item
 }
 
 func serviceToProto(
@@ -341,6 +376,12 @@ func (s *ServiceDataOP) generateService() {
 		)
 		services = append(services, service)
 	}
+
+	for _, customService := range dbDataCache.GetCustomServices() {
+		service := customServiceToProto(s.GetORGID(), customService)
+		services = append(services, service)
+	}
+
 	s.services = services
 	log.Debugf(s.Logf("service have %d", len(s.services)))
 }
