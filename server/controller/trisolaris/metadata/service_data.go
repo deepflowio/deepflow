@@ -147,6 +147,21 @@ func getProtocol(protocol string) trident.ServiceProtocol {
 	return trident.ServiceProtocol_ANY
 }
 
+func customServiceToProto(
+	customService *models.CustomService) *trident.ServiceInfo {
+	item := &trident.ServiceInfo{
+		EpcId: proto.Uint32(uint32(customService.VPCID)),
+		Type:  &trident.ServiceType_CUSTOM_SERVICE,
+		Id:    proto.Uint32(uint32(customService.ID)),
+	}
+	if customService.Type == CUSTOM_SERVICE_TYPE_IP {
+		item.Ips = []string{customService.Resource}
+	} else {
+		item.ServerPorts = []uint32{customService.Resource}
+	}
+	return item
+}
+
 func serviceToProto(
 	vpcID int, ips []string, protocol trident.ServiceProtocol, serverPorts []uint32,
 	serviceType trident.ServiceType, serviceID int) *trident.ServiceInfo {
@@ -341,6 +356,12 @@ func (s *ServiceDataOP) generateService() {
 		)
 		services = append(services, service)
 	}
+
+	for _, customService := range dbDataCache.GetCustomServices() {
+		service := customServiceToProto(customService)
+		services = append(services, service)
+	}
+
 	s.services = services
 	log.Debugf(s.Logf("service have %d", len(s.services)))
 }

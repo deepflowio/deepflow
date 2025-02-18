@@ -75,6 +75,7 @@ type DBDataCache struct {
 	cens                    []*models.CEN
 	processes               []*models.Process
 	vips                    []*models.VIP
+	customServices          []*models.CustomService
 
 	podNSs     []*models.PodNamespace
 	vtaps      []*models.VTap
@@ -288,6 +289,10 @@ func (d *DBDataCache) GetChDevicesIDTypeAndName() []*models.ChDevice {
 
 func (d *DBDataCache) GetVIPs() []*models.VIP {
 	return d.vips
+}
+
+func (d *DBDataCache) GetCustomServices() []*models.CustomService {
+	return d.customServices
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -636,6 +641,13 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	vips, err := dbmgr.DBMgr[models.VIP](db).Gets()
 	if err == nil {
 		d.vips = vips
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	customServices, err := dbmgr.DBMgr[models.CustomService](db).Gets()
+	if err == nil {
+		d.customServices = customServices
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
