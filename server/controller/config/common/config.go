@@ -14,11 +14,22 @@
  * limitations under the License.
  */
 
-package schema
+package common
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
+type Swagger struct {
+	Enabled bool `default:"false" yaml:"enabled"`
+}
 
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.0.1.9"
-)
+// TODO use this
+type FPermit struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fpermit" yaml:"host"`
+	Port    int    `default:"20823" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
+type IngesterApi struct {
+	Port     int `default:"20106" yaml:"port"`
+	NodePort int `default:"30106" yaml:"node-port"`
+	Timeout  int `default:"60" yaml:"timeout"`
+}

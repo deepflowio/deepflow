@@ -24,6 +24,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -62,6 +64,11 @@ func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
 	g.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	// set custom middleware
 	g.Use(HandleORGIDMiddleware())
+
+	appender.SetSwaggerConfig(cfg)
+	if cfg.SwaggerCfg.Enabled {
+		g.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 	s.engine = g
 	return s
 }
@@ -98,6 +105,10 @@ func (s *Server) RegisterRouters() {
 		i.RegisterTo(s.engine)
 	}
 	trouter.RegisterTo(s.engine)
+
+	for _, route := range s.engine.Routes() {
+		log.Infof(" TODO method: %s, path: %s", route.Method, route.Path)
+	}
 }
 
 func (s *Server) appendRegistrant() []registrant.Registrant {
