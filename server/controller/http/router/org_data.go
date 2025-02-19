@@ -17,6 +17,7 @@
 package router
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -55,7 +56,7 @@ func (d *ORGData) Create(c *gin.Context) {
 	var body model.ORGDataCreate
 	err = c.ShouldBindBodyWith(&body, binding.JSON)
 	if err != nil {
-		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
+		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 		return
 	}
 
@@ -66,7 +67,7 @@ func (d *ORGData) Create(c *gin.Context) {
 func (d *ORGData) Delete(c *gin.Context) {
 	orgID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
+		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 		return
 	}
 	err = service.DeleteORGData(orgID, d.metadbCfg)
@@ -76,14 +77,14 @@ func (d *ORGData) Delete(c *gin.Context) {
 func (d *ORGData) DeleteNonRealTime(c *gin.Context) {
 	orgIDs, ok := c.GetQueryArray("org_id")
 	if !ok {
-		response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription("org_id is required"))
+		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_POST_DATA), response.SetError(fmt.Errorf("org_id is required")))
 		return
 	}
 	ints := make([]int, 0, len(orgIDs))
 	for _, id := range orgIDs {
 		i, err := strconv.Atoi(id)
 		if err != nil {
-			response.JSON(c, response.SetStatus(httpcommon.INVALID_POST_DATA), response.SetDescription(err.Error()))
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 			return
 		}
 		ints = append(ints, i)

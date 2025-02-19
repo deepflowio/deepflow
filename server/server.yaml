@@ -75,6 +75,9 @@ controller:
   # 2 (K8s Cluster in local AZs)
   pod-cluster-internal-ip-to-ingester: 0
 
+  swagger:
+    enabled: false
+
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600

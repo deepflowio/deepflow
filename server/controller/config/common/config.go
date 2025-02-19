@@ -14,26 +14,22 @@
  * limitations under the License.
  */
 
-package main
+package common
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/controller"
-)
+type Swagger struct {
+	Enabled bool `default:"false" yaml:"enabled"`
+}
 
-// @title DeepFlow Controller API
-// @version 1.0
-// @description This is the API for the DeepFlow Controller.
-// @termsOfService http://swagger.io/terms/
+// TODO use this
+type FPermit struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fpermit" yaml:"host"`
+	Port    int    `default:"20823" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
 
-// @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host deepflow-server:30417
-// @BasePath /api/v1
-func main() {
-	controller.Start(nil, "", "", nil)
+type IngesterApi struct {
+	Port     int `default:"20106" yaml:"port"`
+	NodePort int `default:"30106" yaml:"node-port"`
+	Timeout  int `default:"60" yaml:"timeout"`
 }

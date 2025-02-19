@@ -51,6 +51,8 @@ import (
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/cache"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/upgrade"
+
+	_ "github.com/deepflowio/deepflow/server/controller/docs"
 )
 
 var log = logging.MustGetLogger("controller")

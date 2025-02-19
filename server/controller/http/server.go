@@ -20,12 +20,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/docs"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/http/appender"
 	"github.com/deepflowio/deepflow/server/controller/http/common/registrant"
@@ -52,6 +57,8 @@ type Server struct {
 }
 
 func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
+	// generateSwaggerDocs()
+
 	s := &Server{controllerConfig: cfg}
 
 	ginLogFile, _ := os.OpenFile(logFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
@@ -62,6 +69,12 @@ func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
 	g.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	// set custom middleware
 	g.Use(HandleORGIDMiddleware())
+
+	docs.SwaggerInfo.Host = common.GetNodeIP() + ":" + strconv.Itoa(cfg.ListenNodePort)
+	log.Infof(" TODO docs.SwaggerInfo.Host: %s", docs.SwaggerInfo.Host)
+	if cfg.SwaggerCfg.Enabled {
+		g.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 	s.engine = g
 	return s
 }
@@ -98,6 +111,10 @@ func (s *Server) RegisterRouters() {
 		i.RegisterTo(s.engine)
 	}
 	trouter.RegisterTo(s.engine)
+
+	for _, route := range s.engine.Routes() {
+		log.Infof(" TODO method: %s, path: %s", route.Method, route.Path)
+	}
 }
 
 func (s *Server) appendRegistrant() []registrant.Registrant {
