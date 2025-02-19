@@ -113,6 +113,9 @@ type DataSet struct {
 
 	podLcuuidToID map[string]int
 	podIDToLcuuid map[int]string
+
+	vtapIDToType           map[int]int
+	vtapIDToLaunchServerID map[int]int
 }
 
 func NewDataSet(md *rcommon.Metadata) *DataSet {
@@ -194,6 +197,9 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 
 		podLcuuidToID: make(map[string]int),
 		podIDToLcuuid: make(map[int]string),
+
+		vtapIDToType:           make(map[int]int),
+		vtapIDToLaunchServerID: make(map[int]int),
 	}
 }
 
@@ -1008,6 +1014,16 @@ func (t *DataSet) DeletePod(lcuuid string) {
 	delete(t.podLcuuidToID, lcuuid)
 	delete(t.podIDToLcuuid, id)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid), t.metadata.LogPrefixes)
+}
+
+func (t *DataSet) RefreshVTaps(v []*metadbmodel.VTap) {
+	t.vtapIDToType = make(map[int]int)
+	t.vtapIDToLaunchServerID = make(map[int]int)
+	for _, item := range v {
+		t.vtapIDToType[item.ID] = item.Type
+		t.vtapIDToLaunchServerID[item.ID] = item.LaunchServerID
+	}
+	log.Infof("refreshed %s count: %d", ctrlrcommon.RESOURCE_TYPE_VTAP_EN, len(v))
 }
 
 func (t *DataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
@@ -2466,13 +2482,6 @@ func (t *DataSet) GetPodIDByContainerIDWithoutLog(containerID string) (int, bool
 	if exists {
 		return podID, true
 	}
-
-	var pod *metadbmodel.Pod
-	result := t.metadata.DB.Where("container_ids like ?", "%"+containerID+"%").Find(&pod)
-	if result.RowsAffected == 1 {
-		t.AddPod(pod)
-		return t.containerIDToPodID[containerID], true
-	}
 	return 0, false
 }
 
@@ -2482,14 +2491,8 @@ func (t *DataSet) GetProcessDeviceTypeAndID(containerID string, vtapID uint32) (
 		deviceType = common.VIF_DEVICE_TYPE_POD
 		deviceID = podID
 	} else {
-		var vtap *metadbmodel.VTap
-		if err := t.metadata.DB.Where("id = ?", vtapID).First(&vtap).Error; err != nil { // TODO @weiqiang 放入缓存
-			log.Error(err, t.metadata.LogPrefixes)
-		}
-		if vtap != nil {
-			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtap.Type]
-			deviceID = vtap.LaunchServerID
-		}
+		deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[t.vtapIDToType[int(vtapID)]]
+		deviceID = t.vtapIDToLaunchServerID[int(vtapID)]
 	}
 	return
 }

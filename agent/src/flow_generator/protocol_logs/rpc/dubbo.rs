@@ -775,12 +775,214 @@ mod kryo {
     }
 }
 
+mod fastjson2 {
+    use nom::FindSubstring;
+
+    use super::DubboInfo;
+    use crate::config::handler::{L7LogDynamicConfig, TraceType};
+    use crate::utils::bytes::read_u32_be;
+
+    const ASCII_HEADER_SIZE: usize = 4;
+
+    const BC_STR_ASCII_HEADER_SIZE: usize = 1;
+    const BC_STR_ASCII: i8 = 121; // 0x79
+
+    const BC_INT32_MAX_SIZE: usize = 5;
+    const BC_INT32_NUM_MIN: i8 = -16; // 0xf0
+    const BC_INT32_NUM_MAX: i8 = 47; // 0x2f
+
+    const BC_INT32_BYTE_MIN: i8 = 48; // 0x30
+    const BC_INT32_BYTE_ZERO: i8 = 56; // 0x38
+    const BC_INT32_BYTE_MAX: i8 = 63; // 0x3f
+
+    const BC_INT32_SHORT_MIN: i8 = 64; // 0x40
+    const BC_INT32_SHORT_ZERO: i8 = 68; // 0x44
+    const BC_INT32_SHORT_MAX: i8 = 71; // 0x47
+
+    const BC_INT32: i8 = 72; // 0x48
+    const BC_INT32_MAX: u32 = 1024 * 1024 * 256;
+
+    fn decode_int32(payload: &[u8], start: usize) -> Option<(u32, usize)> {
+        if start + BC_INT32_MAX_SIZE >= payload.len() {
+            return None;
+        }
+
+        let payload = &payload[start..];
+        let n = payload[0] as i8;
+        let mut offset = 1;
+        if (BC_INT32_NUM_MIN..=BC_INT32_NUM_MAX).contains(&n) {
+            return Some((n as u32, offset));
+        }
+
+        if (BC_INT32_BYTE_MIN..=BC_INT32_BYTE_MAX).contains(&n) {
+            let m = payload[offset] as u32 & 0xFF;
+            offset += 1;
+            return Some(((((n - BC_INT32_BYTE_ZERO) as u32) << 8) + m, offset));
+        }
+
+        if (BC_INT32_SHORT_MIN..=BC_INT32_SHORT_MAX).contains(&n) {
+            let first = (((n - BC_INT32_SHORT_ZERO) as i32) << 16) as u32;
+            let second = ((payload[offset] & 0xFF) as u32) << 8;
+            let third = (payload[offset + 1] & 0xFF) as u32;
+            offset += 2;
+            return Some((first + second + third, offset));
+        }
+
+        if n == BC_INT32 {
+            let length = read_u32_be(&payload[offset..]);
+            offset += 4;
+            if length > BC_INT32_MAX {
+                return None;
+            }
+            return Some((length, offset));
+        }
+
+        None
+    }
+
+    fn decode_object_ascii_string(payload: &[u8]) -> Option<(String, usize)> {
+        if BC_STR_ASCII_HEADER_SIZE >= payload.len() {
+            return None;
+        }
+        if payload[0] != BC_STR_ASCII as u8 {
+            return None;
+        }
+
+        let mut offset = BC_STR_ASCII_HEADER_SIZE;
+        let Some((length, n)) = decode_int32(payload, offset) else {
+            return None;
+        };
+
+        offset += n;
+
+        let payload = &payload[offset..];
+        let length = ((length + 1) as usize).min(payload.len());
+
+        offset += length;
+
+        let mut s = String::new();
+        for i in 0..length {
+            s.push(payload[i] as char);
+        }
+
+        Some((s, offset))
+    }
+
+    fn decode_ascii_string(payload: &[u8], start: usize) -> Option<(String, usize)> {
+        if start + ASCII_HEADER_SIZE >= payload.len() {
+            return None;
+        }
+        let length = read_u32_be(&payload[start..]) as usize;
+        let start = start + ASCII_HEADER_SIZE;
+        if start + length >= payload.len() {
+            return None;
+        }
+        let mut s = String::new();
+        for i in start..(length + start) {
+            s.push(payload[i] as char);
+        }
+        return Some((s, length + ASCII_HEADER_SIZE));
+    }
+
+    fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
+        let tag = match trace_type {
+            TraceType::Sw3 | TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
+            _ => return None,
+        };
+        if tag.len() <= 1 {
+            return None;
+        }
+
+        let mut start = 0;
+        while start < payload.len() {
+            let Some(index) = (&payload[start..]).find_substring(tag) else {
+                break;
+            };
+
+            start += index + tag.len();
+            if start >= payload.len() {
+                break;
+            }
+
+            if let Some(s) = decode_object_ascii_string(&payload[start..]) {
+                return Some(s.0);
+            }
+        }
+        return None;
+    }
+
+    fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
+        if let Some(trace_id) = lookup_str(payload, trace_type) {
+            info.set_trace_id(trace_id, trace_type);
+        }
+    }
+
+    fn decode_span_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
+        if let Some(span_id) = lookup_str(payload, trace_type) {
+            info.set_span_id(span_id, trace_type);
+        }
+    }
+
+    pub fn get_req_body_info(config: &L7LogDynamicConfig, payload: &[u8], info: &mut DubboInfo) {
+        let mut offset = 0;
+        let Some(version) = decode_ascii_string(payload, offset) else {
+            return;
+        };
+        info.dubbo_version = version.0;
+        offset += version.1;
+
+        let Some(service_name) = decode_ascii_string(payload, offset) else {
+            return;
+        };
+        info.service_name = service_name.0;
+        offset += service_name.1;
+
+        let Some(service_version) = decode_ascii_string(payload, offset) else {
+            return;
+        };
+        info.service_version = service_version.0;
+        offset += service_version.1;
+
+        let Some(method_name) = decode_ascii_string(payload, offset) else {
+            return;
+        };
+        info.method_name = method_name.0;
+        offset += method_name.1;
+
+        if config.trace_types.is_empty() || offset >= payload.len() {
+            return;
+        }
+
+        for trace_type in config.trace_types.iter() {
+            if trace_type.as_str().len() > u8::MAX as usize {
+                continue;
+            }
+
+            decode_trace_id(&payload[offset..], &trace_type, info);
+            if info.trace_id.len() != 0 {
+                break;
+            }
+        }
+        for span_type in config.span_types.iter() {
+            if span_type.as_str().len() > u8::MAX as usize {
+                continue;
+            }
+
+            decode_span_id(&payload[offset..], &span_type, info);
+            if info.span_id.len() != 0 {
+                break;
+            }
+        }
+    }
+}
+
 impl DubboLog {
     fn decode_body(config: &L7LogDynamicConfig, payload: &[u8], info: &mut DubboInfo) {
         match info.serial_id {
             HESSIAN2_SERIALIZATION_ID => hessian2::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION2_ID => kryo::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION_ID => kryo::get_req_body_info(config, payload, info),
+            FASTJSON2_SERIALIZATION_ID => fastjson2::get_req_body_info(config, payload, info),
             _ => {}
         }
     }
@@ -920,6 +1122,7 @@ impl DubboHeader {
 mod tests {
     use std::cell::RefCell;
     use std::path::Path;
+    use std::time::Duration;
     use std::{fs, rc::Rc};
 
     use super::*;
@@ -1000,6 +1203,106 @@ mod tests {
             output.push_str(&format!("{:?} is_dubbo: {}\n", info, is_dubbo));
         }
         output
+    }
+
+    #[test]
+    fn test_fastjson2() {
+        let packet = [
+            // header
+            0x00, 0x16, 0x3e, 0x35, 0x2c, 0x05, 0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0x08, 0x00,
+            0x45, 0x00, 0x0b, 0x48, 0x1e, 0xfe, 0x40, 0x00, 0x40, 0x06, 0x51, 0x1e, 0x64, 0x76,
+            0x3a, 0x08, 0x0a, 0x01, 0x17, 0x15, 0x01, 0xbb, 0x4f, 0x60, 0x9c, 0x06, 0xdf, 0x01,
+            0x71, 0xcc, 0xb3, 0x91, 0x50, 0x10, 0x00, 0x53, 0xca, 0xce, 0x00, 0x00,
+            // dubbo
+            0xdau8, 0xbb, 0xd7, 0x00, 0xca, 0x83, 0xd7, 0x74, 0x26, 0xdb, 0x38, 0xee, 0x00, 0x00,
+            0x02, 0xc7, 0x00, 0x00, 0x00, 0x06, 0x4e, 0x32, 0x2e, 0x30, 0x2e, 0x32, 0x00, 0x00,
+            0x00, 0x2d, 0x75, 0x63, 0x6f, 0x6d, 0x2e, 0x62, 0x79, 0x64, 0x2e, 0x63, 0x6c, 0x6f,
+            0x75, 0x64, 0x2e, 0x70, 0x75, 0x62, 0x2e, 0x75, 0x73, 0x65, 0x72, 0x63, 0x65, 0x6e,
+            0x74, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x65,
+            0x72, 0x76, 0x69, 0x63, 0x65, 0x00, 0x00, 0x00, 0x06, 0x4e, 0x30, 0x2e, 0x30, 0x2e,
+            0x30, 0x00, 0x00, 0x00, 0x14, 0x5c, 0x71, 0x75, 0x65, 0x72, 0x79, 0x55, 0x73, 0x65,
+            0x72, 0x49, 0x6e, 0x66, 0x6f, 0x44, 0x65, 0x74, 0x61, 0x69, 0x6c, 0x00, 0x00, 0x00,
+            0x11, 0x59, 0x4c, 0x6a, 0x61, 0x76, 0x61, 0x2f, 0x6c, 0x61, 0x6e, 0x67, 0x2f, 0x4c,
+            0x6f, 0x6e, 0x67, 0x3b, 0x00, 0x00, 0x00, 0x09, 0xbe, 0x01, 0x7d, 0x8c, 0x70, 0x2b,
+            0x02, 0x20, 0x00, 0x00, 0x00, 0x02, 0x44, 0xa6, 0x4d, 0x70, 0x61, 0x74, 0x68, 0x75,
+            0x63, 0x6f, 0x6d, 0x2e, 0x62, 0x79, 0x64, 0x2e, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x2e,
+            0x70, 0x75, 0x62, 0x2e, 0x75, 0x73, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x65, 0x72,
+            0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69,
+            0x63, 0x65, 0x5b, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x2e, 0x61, 0x70, 0x70, 0x6c,
+            0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x69, 0x70, 0x75, 0x62, 0x2d, 0x73, 0x65,
+            0x72, 0x76, 0x65, 0x72, 0x32, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x70, 0x72,
+            0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x2d, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x59, 0x64,
+            0x75, 0x62, 0x62, 0x6f, 0x41, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f,
+            0x6e, 0x69, 0x70, 0x75, 0x62, 0x2d, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x32, 0x73,
+            0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72,
+            0x2d, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x4e, 0x73, 0x77, 0x38, 0x2d, 0x78, 0x4c, 0x30,
+            0x2d, 0x20, 0x4c, 0x73, 0x77, 0x38, 0x79, 0x39, 0x35, 0x31, 0x2d, 0x4d, 0x54, 0x67,
+            0x35, 0x5a, 0x44, 0x4d, 0x34, 0x4d, 0x7a, 0x55, 0x30, 0x5a, 0x6d, 0x4d, 0x79, 0x4e,
+            0x44, 0x42, 0x6c, 0x59, 0x54, 0x67, 0x77, 0x4e, 0x47, 0x4d, 0x78, 0x4e, 0x54, 0x4d,
+            0x35, 0x4e, 0x57, 0x49, 0x79, 0x5a, 0x44, 0x56, 0x69, 0x59, 0x57, 0x59, 0x75, 0x4d,
+            0x54, 0x63, 0x31, 0x4c, 0x6a, 0x45, 0x33, 0x4d, 0x7a, 0x6b, 0x30, 0x4f, 0x54, 0x67,
+            0x7a, 0x4e, 0x54, 0x63, 0x30, 0x4e, 0x7a, 0x63, 0x33, 0x4d, 0x7a, 0x55, 0x7a, 0x2d,
+            0x4d, 0x54, 0x67, 0x35, 0x5a, 0x44, 0x4d, 0x34, 0x4d, 0x7a, 0x55, 0x30, 0x5a, 0x6d,
+            0x4d, 0x79, 0x4e, 0x44, 0x42, 0x6c, 0x59, 0x54, 0x67, 0x77, 0x4e, 0x47, 0x4d, 0x78,
+            0x4e, 0x54, 0x4d, 0x35, 0x4e, 0x57, 0x49, 0x79, 0x5a, 0x44, 0x56, 0x69, 0x59, 0x57,
+            0x59, 0x75, 0x4d, 0x6a, 0x4d, 0x34, 0x4c, 0x6a, 0x45, 0x33, 0x4d, 0x7a, 0x6d, 0x30,
+            0x4f, 0x54, 0x67, 0x7a, 0x4e, 0x54, 0x63, 0x30, 0x4e, 0x7a, 0x63, 0x32, 0x4e, 0x7a,
+            0x63, 0x79, 0x2d, 0x32, 0x2d, 0x55, 0x31, 0x56, 0x51, 0x52, 0x56, 0x49, 0x36, 0x4f,
+            0x6e, 0x42,
+        ];
+        let mut meta_packet = MetaPacket::empty();
+        let _ = meta_packet.update(
+            &packet[..],
+            true,
+            true,
+            Duration::from_secs(10),
+            packet.len(),
+        );
+        meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
+        let Some(payload) = meta_packet.get_l4_payload() else {
+            return;
+        };
+
+        let config = LogParserConfig {
+            l7_log_dynamic: L7LogDynamicConfig::new(
+                vec![],
+                vec![],
+                vec![TraceType::Sw8],
+                vec![TraceType::Sw8],
+                ExtraLogFields::default(),
+            ),
+            ..Default::default()
+        };
+        let mut dubbo = DubboLog::default();
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
+        let param = &mut ParseParam::new(
+            &meta_packet,
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        param.set_captured_byte(payload.len());
+        param.set_log_parse_config(&config);
+        let is_dubbo = dubbo.check_payload(payload, param);
+
+        let i = dubbo.parse_payload(payload, param);
+        let info = if let Ok(info) = i {
+            match info.unwrap_single() {
+                L7ProtocolInfo::DubboInfo(d) => d,
+                _ => unreachable!(),
+            }
+        } else {
+            DubboInfo::default()
+        };
+
+        assert_eq!(is_dubbo, true);
+        assert_eq!(
+            info.trace_id,
+            "189d38354fc240ea804c15395b2d5baf.175.17394983574777353"
+        );
     }
 
     #[test]
