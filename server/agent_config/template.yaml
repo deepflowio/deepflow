@@ -3967,6 +3967,9 @@ inputs:
     #     scrape kubernentes logs (capture DeepFlow Pod logs as example, if other Pod logs is required, update `extra_label_selector` add custom filters)
     #     {{ file: vector_k8s_logs.yaml }}
     #
+    #     use http_client or socket to dial a remote server for testing
+    #     {{ file: vector_dial.yaml }}
+    #
     #   ch: |-
     #     Vector 组件的具体配置，所有可用配置可在此链接中查找：[vector.dev](https://vector.dev/docs/reference/configuration)
     #     以下提供一份抓取 kubernetes 日志、宿主机指标及 kubernetes kubelet 指标的示例，并将这些数据发送到 DeepFlow-Agent。
@@ -3979,6 +3982,9 @@ inputs:
     #
     #     抓取 kubernetes 日志(以采集 DeepFlow Pod 日志为例，若需要采集其他 Pod 日志可修改 `extra_label_selector` 并加上具体条件)
     #     {{ file: vector_k8s_logs.yaml }}
+    #
+    #     使用 http_client 或者 socket 拨测一个远端服务
+    #     {{ file: vector_dial.yaml }}
     config:
 
 # type: section
