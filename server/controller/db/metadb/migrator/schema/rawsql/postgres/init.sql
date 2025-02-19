@@ -2774,3 +2774,21 @@ CREATE TABLE IF NOT EXISTS ch_user (
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_user;
+
+CREATE TABLE IF NOT EXISTS custom_service (
+    id                  SERIAL PRIMARY KEY,
+    name                VARCHAR(128) NOT NULL,
+    team_id             INTEGER DEFAULT 1,
+    epc_id              INTEGER DEFAULT 0,
+    type                INTEGER DEFAULT 0,
+    resource            TEXT DEFAULT '',
+    domain_id           INTEGER DEFAULT 0,
+    domain              CHAR(64) DEFAULT '',
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE custom_service;
+CREATE UNIQUE INDEX IF NOT EXISTS custom_service_name_idx ON custom_service(name);
+COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT';
+COMMENT ON COLUMN custom_service.domain IS 'reserved for backend';
