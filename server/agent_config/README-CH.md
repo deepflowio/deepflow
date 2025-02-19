@@ -5813,6 +5813,62 @@ config:
            uri: http://127.0.0.1:38086/api/v1/log
 ```
 
+使用 http_client 或者 socket 拨测一个远端服务
+```yaml
+config:
+  sources:
+    http_client_dial:
+      type: http_client
+      endpoint: http://$HOST/v1/health/
+      method: GET
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 5
+    socket_dial:
+      type: socket
+      address: $HOST:$PORT
+      mode: tcp
+      shutdown_timeout_secs: 30
+      socket_file_mode: 511
+    internal_metrics:
+      type: internal_metrics
+      scrape_interval_secs: 10
+      namespace: ${K8S_NAMESPACE_FOR_DEEPFLOW}
+  transforms:
+    internal_metrics_relabel:
+      type: remap
+      inputs:
+      - internal_metrics
+      source: |-
+        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+    internal_metrics_dispatch:
+      type: route
+      inputs:
+      - internal_metrics_relabel
+      route:
+        http_client_dial_metrics: '.tags.component_id == "http_client_dial"'
+        socket_dial: '.tags.component_id == "socket_dial"'
+    http_client_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.http_client_dial_metrics
+      condition: "match(string!(.name),r'http_client_.*')"
+    socket_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.socket_dial
+      condition: "match(string!(.name),r'connection_.*')"
+  sinks:
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - http_client_dial_metrics
+      - socket_dial_metrics
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
+
+```
+
 # 处理器 {#processors}
 
 ## Packet {#processors.packet}
