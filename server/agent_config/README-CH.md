@@ -5868,6 +5868,69 @@ config:
            uri: http://127.0.0.1:38086/api/v1/log
 ```
 
+使用 http_client 或者 socket 拨测一个远端服务
+```yaml
+config:
+  sources:
+    http_client_dial:
+      type: http_client
+      endpoint: http://$HOST:$PORT
+      method: GET
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 5
+    internal_metrics:
+      type: internal_metrics
+      scrape_interval_secs: 10
+      namespace: ${K8S_NAMESPACE_FOR_DEEPFLOW}
+    socket_dial_input:
+      type: demo_logs
+      interval: 10
+      format: shuffle
+      lines: [""]
+  transforms:
+    internal_metrics_relabel:
+      type: remap
+      inputs:
+      - internal_metrics
+      source: |-
+        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+    internal_metrics_dispatch:
+      type: route
+      inputs:
+      - internal_metrics_relabel
+      route:
+        http_client_dial_metrics: '.tags.component_id == "http_client_dial"'
+        socket_dial_metrics: '.tags.component_id == "socket_dial"'
+    http_client_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.http_client_dial_metrics
+      condition: "match(string!(.name),r'http_client_.*')"
+    socket_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.socket_dial_metrics
+      condition: "match(string!(.name),r'buffer.*')"
+  sinks:
+    socket_dial:
+      type: socket
+      inputs:
+      - socket_dial_input
+      address: $HOST:$PORT
+      mode: tcp
+      encoding:
+        codec: raw_message
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - http_client_dial_metrics
+      - socket_dial_metrics
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
+
+```
+
 # 处理器 {#processors}
 
 ## Packet {#processors.packet}
