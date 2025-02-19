@@ -294,20 +294,11 @@ enum {
 
 /*
  * eBPF utilizes perf event's periodic events to push all data residing in the kernel
- * cache. We have set this to push data from the kernel buffer every 10 milliseconds.
- * This periodic event is implemented using the kernel's high-resolution timer (hrtimer),
- * which triggers a timer interrupt when the specified time elapses. However, in practice,
- * this timer does not always trigger interrupts precisely every 10 milliseconds to execute
- * the eBPF program. This discrepancy occurs because timer interrupts may be masked off
- * during certain operations, such as when interrupts are disabled during locking operations.
- * Therefore, the timer may trigger interrupts after the expected time, resulting in latency
- * for periodic events.
+ * cache. We have set this to push data from the kernel buffer every 40 milliseconds(KICK_KERN_PERIOD).
  *
  * The system call phase will check the time delay of the push period, and if it exceeds this
- * threshold, the data will be pushed immediately. From the tests, the maximum delay is
- * approximately in the range of 30 to 60 milliseconds. Therefore, it is appropriate to set the
- * threshold for the system call phase check to 60 milliseconds.
+ * threshold, the data will be pushed immediately.
  */
-#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 60000000ULL // 60 milliseconds 
+#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 50000000ULL	// 50 milliseconds
 
 #endif /* DF_EBPF_CONFIG_H */
