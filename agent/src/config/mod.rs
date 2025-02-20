@@ -17,12 +17,12 @@
 mod config;
 pub mod handler;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub use config::ApiResources;
 pub use config::{
     AgentIdType, Config, ConfigError, DpdkSource, KubernetesPollerType, OracleConfig, PcapStream,
-    ProcessMatcher, PrometheusExtraLabels, UserConfig, K8S_CA_CRT_PATH,
+    PrometheusExtraLabels, UserConfig, K8S_CA_CRT_PATH,
 };
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use config::{ApiResources, ProcessMatcher};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use handler::FlowAccess;
 pub use handler::{DispatcherConfig, FlowConfig, ModuleConfig, NpbConfig};

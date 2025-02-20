@@ -347,6 +347,7 @@ impl DispatcherListener {
             Self::LocalPlus(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
             }
+            #[cfg(target_os = "linux")]
             Self::LocalMultins(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
             }
@@ -1374,10 +1375,9 @@ impl DispatcherBuilder {
 
 const L2_MAC_ADDR_OFFSET: usize = 12;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) fn set_cpu_affinity(options: &Mutex<Options>) {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     let cpu_set = options.lock().unwrap().cpu_set;
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     if cpu_set != CpuSet::new() {
         if let Err(e) = nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set) {
             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);

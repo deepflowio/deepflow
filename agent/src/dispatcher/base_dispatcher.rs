@@ -403,15 +403,13 @@ impl BaseDispatcher {
 
 #[cfg(target_os = "windows")]
 impl InternalState {
-    pub(super) fn check_and_update_bpf(&mut self, _: &mut RecvEngine) {
+    pub(super) fn check_and_update_bpf(&mut self, engine: &mut RecvEngine) {
         if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
             return;
         }
 
         let bpf_options = self.bpf_options.lock().unwrap();
-        if let Err(e) = self
-            .engine
-            .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
+        if let Err(e) = engine.set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
