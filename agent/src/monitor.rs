@@ -30,12 +30,11 @@ use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 #[cfg(target_os = "linux")]
-use crate::utils::environment::SocketInfo;
+use crate::utils::{cgroups, environment::SocketInfo};
 use crate::{
     config::handler::EnvironmentAccess,
     error::{Error, Result},
     utils::{
-        cgroups,
         process::{get_current_sys_memory_percentage, get_file_and_size_sum},
         stats::{
             self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
@@ -418,7 +417,7 @@ impl Monitor {
             let mut link_map_guard = link_map.lock().unwrap();
 
             #[cfg(target_os = "linux")]
-            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+            if let Err(e) = NsFile::Root.open_and_setns() {
                 warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                 warn!("setns error: {}", e);
                 return;
