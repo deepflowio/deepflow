@@ -33,7 +33,7 @@ func (a *Aws) getRegions() ([]string, error) {
 			regions = append(regions, regionName)
 		}
 		log.Debug("get regions complete", logger.NewORGPrefix(a.orgID))
-		return []string{}, nil
+		return regions, nil
 	}
 
 	awsClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(a.apiDefaultRegion), config.WithHTTPClient(a.httpClient))
