@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
@@ -143,6 +144,7 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 			return
 		}
 		compressed = snappy.Encode(nil, data)
+		c.Header("Content-Type", binding.MIMEPROTOBUF)
 		c.Writer.Write([]byte(compressed))
 	})
 }
