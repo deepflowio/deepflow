@@ -30,12 +30,11 @@ use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 #[cfg(target_os = "linux")]
-use crate::utils::environment::SocketInfo;
+use crate::utils::{cgroups, environment::SocketInfo};
 use crate::{
     config::handler::EnvironmentAccess,
     error::{Error, Result},
     utils::{
-        cgroups,
         process::{get_current_sys_memory_percentage, get_file_and_size_sum},
         stats::{
             self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
