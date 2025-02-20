@@ -28,6 +28,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -1043,6 +1044,28 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			})
 		}
 	}
+	// native tags
+	if config.ControllerCfg.DFWebService.Enabled {
+		getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, db, table)
+		resp, nativeErr := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, orgID))
+		if nativeErr != nil {
+			log.Errorf("request controller failed: %s, URL: %s", resp, getNativeUrl)
+		} else {
+			resultArray := resp.Get("DATA").MustArray()
+			for i := range resultArray {
+				externalTag := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
+				displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+				fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+				if fieldType != ckcommon.NATIVE_FIELD_TYPE_TAG {
+					continue
+				}
+				response.Values = append(response.Values, []interface{}{
+					externalTag, externalTag, externalTag, displayName, displayName, displayName, "string",
+					ckcommon.NATIVE_FIELD_CATEGORY, tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, table,
+				})
+			}
+		}
+	}
 	return
 }
 
@@ -1307,6 +1330,25 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQuer
 	// 外部字段是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "tag.") || strings.HasPrefix(tag, "attribute.") {
 		return GetExternalTagValues(db, table, sql)
+	} else {
+		// native tag
+		if config.ControllerCfg.DFWebService.Enabled {
+			getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, db, table)
+			resp, err := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, orgID))
+			if err != nil {
+				log.Errorf("request controller failed: %s, URL: %s", resp, getNativeUrl)
+			} else {
+				resultArray := resp.Get("DATA").MustArray()
+				for i := range resultArray {
+					name := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
+					fieldName := resp.Get("DATA").GetIndex(i).Get("FIELD_NAME").MustString()
+					if name == tag {
+						newSql := strings.ReplaceAll(sql, fmt.Sprintf(" %s ", tag), fmt.Sprintf(" %s ", fieldName))
+						return GetExternalTagValues(db, table, newSql)
+					}
+				}
+			}
+		}
 	}
 	if db == "ext_metrics" {
 		table = "ext_common"
@@ -1635,6 +1677,7 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 	}
 	tag = strings.TrimPrefix(tag, "tag.")
 	tag = strings.TrimPrefix(tag, "attribute.")
+
 	var sqlList []string
 	var whereSql string
 	var orderBy = "sum(count) DESC"

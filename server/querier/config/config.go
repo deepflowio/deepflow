@@ -101,7 +101,12 @@ type AutoCustomTags struct {
 }
 
 type ControllerConfig struct {
-	ListenPort int `default:"20417" yaml:"listen-port"`
+	ListenPort   int          `default:"20417" yaml:"listen-port"`
+	DFWebService DFWebService `yaml:"df-web-service"`
+}
+
+type DFWebService struct {
+	Enabled bool `default:"false" yaml:"enabled"`
 }
 
 func (c *Config) expendEnv() {

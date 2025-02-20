@@ -39,6 +39,12 @@ const TagServerEnPrefix = "Server"
 const TagClientEnPrefix = "Client"
 const LanguageEN = "en"
 
+const (
+	NATIVE_FIELD_TYPE_TAG    = 1
+	NATIVE_FIELD_TYPE_METRIC = 2
+	NATIVE_FIELD_CATEGORY    = "Custom"
+)
+
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
 	DB_NAME_FLOW_METRICS:    []string{"network", "network_map", "application", "application_map", "traffic_policy"},
