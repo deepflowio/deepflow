@@ -617,6 +617,7 @@ func TestGetSql(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	mockDatasources()
+	mockNativeFields()
 
 	for i, pcase := range parseSQL {
 		if len(pcase.output) == 0 {
@@ -699,6 +700,7 @@ func TestGetSql(t *testing.T) {
 func Load() error {
 	ServerCfg := config.DefaultConfig()
 	config.Cfg = &ServerCfg.QuerierConfig
+	config.ControllerCfg = &ServerCfg.ControllerConfig
 	dir := "../../db_descriptions"
 	dbDescriptions, err := common.LoadDbDescriptions(dir)
 	if err != nil {
@@ -725,6 +727,17 @@ func mockDatasources() {
 			return httpmock.NewStringResponse(200,
 				fmt.Sprintf(`{"DATA":[{"NAME":"%s","INTERVAL":%d}]}`,
 					name, convertNameToInterval(name)),
+			), nil
+		},
+	)
+}
+
+func mockNativeFields() {
+	httpmock.RegisterResponder(
+		"GET", "http://localhost:20417/v1/native-fields/",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(200,
+				`{"DATA":[]}`,
 			), nil
 		},
 	)

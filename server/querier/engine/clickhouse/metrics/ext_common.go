@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -32,12 +33,7 @@ var EXT_METRICS = map[string]*Metrics{}
 
 func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
-	var err error
 	if slices.Contains([]string{common.DB_NAME_APPLICATION_LOG, common.DB_NAME_EXT_METRICS, common.DB_NAME_DEEPFLOW_ADMIN, common.DB_NAME_DEEPFLOW_TENANT}, db) || (db == "flow_log" && table == "l7_flow_log") {
-		// Avoid UT failures
-		if config.Cfg == nil {
-			return nil, nil
-		}
 		externalChClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
@@ -77,6 +73,30 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
+
+		// native metrics
+		if config.ControllerCfg.DFWebService.Enabled {
+			getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, db, table)
+			resp, err := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, orgID))
+			if err != nil {
+				log.Errorf("request controller failed: %s, URL: %s", resp, getNativeUrl)
+			} else {
+				resultArray := resp.Get("DATA").MustArray()
+				for i := range resultArray {
+					nativeMetric := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
+					displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+					fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+					if fieldType != common.NATIVE_FIELD_TYPE_METRIC {
+						continue
+					}
+					lm := NewMetrics(
+						len(loadMetrics), nativeMetric, displayName, displayName, displayName, "", "", "", METRICS_TYPE_COUNTER,
+						common.NATIVE_FIELD_CATEGORY, []bool{true, true, true}, "", table, "", "", "", "", "",
+					)
+					loadMetrics[fmt.Sprintf("%s-%s", nativeMetric, table)] = lm
+				}
+			}
+		}
 	}
-	return loadMetrics, err
+	return loadMetrics, nil
 }

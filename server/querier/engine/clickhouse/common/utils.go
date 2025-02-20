@@ -120,13 +120,13 @@ func GetDatasources(db string, table string, orgID string) ([]string, error) {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
 		client := &http.Client{}
-		url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
-		reqest, err := http.NewRequest("GET", url, nil)
+		url := fmt.Sprintf("http://localhost:%d/v1/data-sources/?type=%s", config.ControllerCfg.ListenPort, tsdbType)
+		request, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return datasources, err
 		}
-		reqest.Header.Set("X-Org-Id", orgID)
-		response, err := client.Do(reqest)
+		request.Header.Set("X-Org-Id", orgID)
+		response, err := client.Do(request)
 		if err != nil {
 			return datasources, err
 		}
@@ -175,7 +175,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 		return 1, nil
 	}
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
+	url := fmt.Sprintf("http://localhost:%d/v1/data-sources/?type=%s", config.ControllerCfg.ListenPort, tsdbType)
 	if name != "" {
 		url += fmt.Sprintf("&name=%s", name)
 	}
