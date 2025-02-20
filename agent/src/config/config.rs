@@ -2344,8 +2344,8 @@ where
 {
     match u8::deserialize(deserializer)? {
         0 => Ok(agent::VlanMode::None),
-        1 => Ok(agent::VlanMode::Qinq),
-        2 => Ok(agent::VlanMode::Vlan),
+        1 => Ok(agent::VlanMode::Vlan),
+        2 => Ok(agent::VlanMode::Qinq),
         other => Err(de::Error::invalid_value(
             Unexpected::Unsigned(other as u64),
             &"0|1|2",
