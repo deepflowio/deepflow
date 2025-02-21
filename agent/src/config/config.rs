@@ -707,11 +707,21 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Dpdk {
     #[serde(deserialize_with = "to_dpdk_source")]
     pub source: DpdkSource,
+    pub reorder_cache_window_size: Duration,
+}
+
+impl Default for Dpdk {
+    fn default() -> Self {
+        Dpdk {
+            reorder_cache_window_size: Duration::from_millis(60),
+            source: DpdkSource::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
