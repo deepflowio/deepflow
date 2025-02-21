@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-use std::collections::HashSet;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 use std::str;
 use std::sync::Arc;
 
@@ -1459,6 +1460,34 @@ pub struct Httpv2Headers {
 }
 
 impl Httpv2Headers {
+    thread_local! {
+        static VALID_FLAGS_FOR_HTTP2_FRAME_TYPE: OnceCell<HashMap<u8, u8>> = OnceCell::new();
+    }
+
+    fn validate_flags(frame_type: u8, flags: u8) -> bool {
+        Self::VALID_FLAGS_FOR_HTTP2_FRAME_TYPE.with(|f| {
+            let valid_map = f.get_or_init(|| {
+                // Check https://datatracker.ietf.org/doc/html/rfc9113#name-frame-definitions for valid flags for each frame type
+                HashMap::from([
+                    (0x00, 0b00001001),
+                    (0x01, 0b00101101),
+                    (0x02, 0b00000000),
+                    (0x03, 0b00000000),
+                    (0x04, 0b00000001),
+                    (0x05, 0b00001100),
+                    (0x06, 0b00000001),
+                    (0x07, 0b00000000),
+                    (0x08, 0b00000000),
+                    (0x09, 0b00000100),
+                ])
+            });
+            match valid_map.get(&frame_type) {
+                None => false,
+                Some(vf) => (!vf) & flags == 0,
+            }
+        })
+    }
+
     const FLAGS_STREAM_END: u8 = 1;
     // HTTPv2帧头格式:https://tools.ietf.org/html/rfc7540#section-4.1
     // +-----------------------------------------------+
@@ -1476,13 +1505,18 @@ impl Httpv2Headers {
             return Err(Error::HttpHeaderParseFailed);
         }
 
+        let flags = payload[4];
+        if !Self::validate_flags(frame_type, flags) {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
         if payload[5] & 0x80 != 0 {
             return Err(Error::HttpHeaderParseFailed);
         }
 
         self.frame_length = read_u32_be(&payload) >> 8;
         self.frame_type = frame_type;
-        self.flags = payload[4];
+        self.flags = flags;
         self.stream_id = read_u32_be(&payload[5..]);
 
         Ok(())
@@ -1854,6 +1888,7 @@ mod tests {
             ("httpv2-stream-id.pcap", "httpv2-stream-id.result"),
             ("istio-tcp-frag.pcap", "istio-tcp-frag.result"),
             ("client-ip.pcap", "client-ip.result"),
+            ("grpc-segmented.pcap", "grpc-segmented.result"),
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
