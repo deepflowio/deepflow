@@ -3603,6 +3603,13 @@ fn build_dispatchers(
             #[cfg(target_os = "linux")]
             dpdk_ebpf_receiver,
             #[cfg(target_os = "linux")]
+            dpdk_ebpf_windows: user_config
+                .inputs
+                .cbpf
+                .special_network
+                .dpdk
+                .reorder_cache_window_size,
+            #[cfg(target_os = "linux")]
             fanout_enabled,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             promisc: user_config.inputs.cbpf.af_packet.tunning.promisc,
