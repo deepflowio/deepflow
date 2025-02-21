@@ -415,8 +415,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									nodeTypeStrSuffix := "dictGet('flow_tag.node_type_map', 'node_type', toUInt64(" + autoTypeSuffix + "))"
 									internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 									ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
-									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", tagAutoTypeSuffix, tagAutoIDSuffix)
+									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", tagAutoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, tagAutoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet('flow_tag.device_map', 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = autoTypeSuffix
@@ -569,8 +569,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									nodeTypeStrSuffix := "dictGet('flow_tag.node_type_map', 'node_type', toUInt64(" + autoTypeSuffix + "))"
 									internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 									ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
-									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", tagAutoTypeSuffix, tagAutoIDSuffix)
+									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", tagAutoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, tagAutoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 									tagNameSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet('flow_tag.device_map', 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 									tagIDSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagIDSelectFilterStr)
