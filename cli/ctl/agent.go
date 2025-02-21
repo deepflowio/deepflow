@@ -234,7 +234,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		fmt.Printf(string(dataYaml))
 	} else {
 		t := table.New()
-		t.SetHeader([]string{"ID", "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "GROUP", "EXCEPTIONS", "REVISION", "UPGRADE_REVISION"})
+		t.SetHeader([]string{"ID", "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "GROUP", "EXCEPTIONS", "REVISION", "UPGRADE_REVISION", "POD_CLUSTER"})
 
 		tableItems := [][]string{}
 		for i := range response.Get("DATA").MustArray() {
@@ -262,6 +262,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 				strings.Join(exceptionStrings, ","),
 				vtap.Get("REVISION").MustString(),
 				vtap.Get("UPGRADE_REVISION").MustString(),
+				vtap.Get("POD_CLUSTER_NAME").MustString(),
 			})
 		}
 		t.AppendBulk(tableItems)
