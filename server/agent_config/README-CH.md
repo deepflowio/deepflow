@@ -2150,7 +2150,7 @@ inputs:
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 

@@ -2199,7 +2199,7 @@ that network card traffic is not being collected
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
