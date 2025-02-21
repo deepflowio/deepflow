@@ -2773,6 +2773,35 @@ Currently, there are two ways to collect DPDK traffic, including:
 - pdump: See details https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
 - eBPF: Use eBPF Uprobe to obtain DPDK traffic
 
+##### reorder cache window size {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.special_network.dpdk.reorder_cache_window_size`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    special_network:
+      dpdk:
+        reorder_cache_window_size: 60ms
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['60ms', '100ms'] |
+
+**Description**:
+
+When dpdk.source is eBPF, the larger the time window will cause the agent to use more memory.
+
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
 ##### Enabled {#inputs.cbpf.special_network.libpcap.enabled}

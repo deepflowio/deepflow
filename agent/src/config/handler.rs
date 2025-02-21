@@ -2836,6 +2836,17 @@ impl ConfigHandler {
             special_network.dpdk.source = new_special_network.dpdk.source;
             restart_agent = !first_run;
         }
+        if special_network.dpdk.reorder_cache_window_size
+            != new_special_network.dpdk.reorder_cache_window_size
+        {
+            info!(
+                "Update inputs.cbpf.special_network.dpdk.reorder_cache_window_size from {:?} to {:?}.",
+                special_network.dpdk.reorder_cache_window_size, new_special_network.dpdk.reorder_cache_window_size
+            );
+            special_network.dpdk.reorder_cache_window_size =
+                new_special_network.dpdk.reorder_cache_window_size;
+            restart_agent = !first_run;
+        }
         if special_network.libpcap.enabled != new_special_network.libpcap.enabled {
             info!(
                 "Update inputs.cbpf.special_network.libpcap.enabled from {:?} to {:?}.",
