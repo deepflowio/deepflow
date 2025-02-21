@@ -602,6 +602,8 @@ pub struct Options {
     pub cpu_set: CpuSet,
     pub dpdk_ebpf_receiver: Option<Receiver<Box<packet::Packet<'static>>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub dpdk_ebpf_windows: Duration,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fanout_enabled: bool,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub promisc: bool,
@@ -1328,10 +1330,13 @@ impl DispatcherBuilder {
                         crate::utils::notify_exit(1);
                         return Err(Error::ConfigInvalid("Restart agent...".into()));
                     }
-                    info!("Dpdk init with: {:?}", options.dpdk_source);
+                    info!(
+                        "Dpdk init with: {:?} {:?}",
+                        options.dpdk_source, options.dpdk_ebpf_windows
+                    );
                     Ok(RecvEngine::DpdkFromEbpf(DpdkFromEbpf::new(
                         options.dpdk_ebpf_receiver.take().unwrap(),
-                        Duration::from_millis(100),
+                        options.dpdk_ebpf_windows,
                     )))
                 }
             }

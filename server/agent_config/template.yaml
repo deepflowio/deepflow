@@ -1880,6 +1880,21 @@ inputs:
         #     - pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
         #     - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
         source: None
+        # type: duration
+        # name:
+        #   en: reorder cache window size
+        #   ch: 乱序重排缓存时间窗口大小
+        # unit:
+        # range: [60ms, 100ms]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When dpdk.source is eBPF, the larger the time window will cause the agent to use more memory.
+        #   ch: |-
+        #     当 dpdk.source 为 eBPF 时该配置生效，时间窗口变大会导致 agent 占用更多的内存。
+        reorder_cache_window_size: 60ms
       # type: section
       # name: Libpcap
       # description:

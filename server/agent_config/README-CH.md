@@ -2712,6 +2712,35 @@ inputs:
 - pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
 - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
 
+##### 乱序重排缓存时间窗口大小 {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.cbpf.special_network.dpdk.reorder_cache_window_size`
+
+**默认值**:
+```yaml
+inputs:
+  cbpf:
+    special_network:
+      dpdk:
+        reorder_cache_window_size: 60ms
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['60ms', '100ms'] |
+
+**详细描述**:
+
+当 dpdk.source 为 eBPF 时该配置生效，时间窗口变大会导致 agent 占用更多的内存。
+
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
 ##### Enabled {#inputs.cbpf.special_network.libpcap.enabled}
