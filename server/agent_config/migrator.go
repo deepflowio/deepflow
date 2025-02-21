@@ -333,15 +333,23 @@ type Downgrader struct {
 	MigrationToolData
 }
 
-func (M *Downgrader) Downgrade(bytes []byte) ([]byte, error) {
+func (m *Downgrader) Downgrade(bytes []byte) ([]byte, error) {
 	data := make(map[string]interface{})
 	err := yaml.Unmarshal(bytes, &data)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to unmarshal yaml: %v to map", err)
 	}
+	m.copyMaxMillicpusToMaxCpus()
 	result := make(map[string]interface{})
-	M.higherToLower(data, "", result)
+	m.higherToLower(data, "", result)
 	return mapToYaml(result)
+}
+
+func (m *Downgrader) copyMaxMillicpusToMaxCpus() {
+	newKey := "global.limits.max_millicpus"
+	if _, ok := m.higherVerToLowerVerKeys[newKey]; ok {
+		m.higherVerToLowerVerKeys[newKey] = append(m.higherVerToLowerVerKeys[newKey], "max_cpus")
+	}
 }
 
 func (m *Downgrader) higherToLower(higherVerData interface{}, ancestor string, lowerVerData map[string]interface{}) {
