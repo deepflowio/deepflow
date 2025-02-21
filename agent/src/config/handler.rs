@@ -2646,6 +2646,25 @@ impl ConfigHandler {
                 callbacks.push(Self::switch_recv_engine);
             }
         }
+        if af_packet.inner_interface_capture_enabled
+            != new_af_packet.inner_interface_capture_enabled
+        {
+            info!(
+                "Update inputs.cbpf.af_packet.inner_interface_capture_enabled from {:?} to {:?}.",
+                af_packet.inner_interface_capture_enabled,
+                new_af_packet.inner_interface_capture_enabled
+            );
+            af_packet.inner_interface_capture_enabled =
+                new_af_packet.inner_interface_capture_enabled;
+            restart_agent = !first_run;
+        }
+        if af_packet.inner_interface_regex != new_af_packet.inner_interface_regex {
+            info!(
+                "Update inputs.cbpf.af_packet.inner_interface_regex from {:?} to {:?}.",
+                af_packet.inner_interface_regex, new_af_packet.inner_interface_regex
+            );
+            af_packet.inner_interface_regex = new_af_packet.inner_interface_regex.clone();
+        }
         if af_packet.src_interfaces != new_af_packet.src_interfaces {
             info!(
                 "Update inputs.cbpf.af_packet.src_interfaces from {:?} to {:?}.",
