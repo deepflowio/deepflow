@@ -1527,7 +1527,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: hot_update
+      # modification: agent_restart
       # ee_feature: false
       # description:
       #   en: |-
