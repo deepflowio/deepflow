@@ -2194,6 +2194,69 @@ Kube-OVN       [0-9a-f]+_h$
 When the `tap_interface_regex` is not configured, it indicates
 that network card traffic is not being collected
 
+#### Inner Net Namespace Capture Enabled {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_capture_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_capture_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to collect traffic in sub net namespaces.
+When enabled, agent will spawn recv engine threads to capture traffic in different namespaces,
+causing additional memory consumption for each namespace captured.
+The default setting of inputs.cbpf.af_packet.tunning.ring_blocks is 128,
+which means that the memory consumption will be 128 * 1MB for each namespace.
+For example, a node with 20 pods will require 20 * 128 * 1MB = 2.56GB for dispatcher.
+Make sure to estimate this memory consumption before enabling this feature.
+Enabling inputs.cbpf.af_packet.tunning.ring_blocks_enabled and change
+inputs.cbpf.af_packet.tunning.ring_blocks to reduce memory consumption.
+
+#### Inner Net Namespace Interface Regex {#inputs.cbpf.af_packet.inner_interface_regex}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.cbpf.af_packet.inner_interface_regex`
+
+**Default value**:
+```yaml
+inputs:
+  cbpf:
+    af_packet:
+      inner_interface_regex: ^eth\d+$
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+| Range | [0, 65535] |
+
+**Description**:
+
+Regular expression of NIC name for collecting traffic in sub net namespaces.
+
 #### Bond Interfaces {#inputs.cbpf.af_packet.bond_interfaces}
 
 **Tags**:
@@ -2941,11 +3004,16 @@ inputs:
 
 **Description**:
 
-In analyzer mode, raw packets will go through a queue before being processed.
+In certain modes, raw packets will go through a queue before being processed.
 To avoid memory allocation for each packet, a memory block of size
 raw_packet_buffer_block_size is allocated for multiple packets.
 Larger value will reduce memory allocation for raw packet, but will also
 delay memory free.
+This configuration is effective for the following dispatcher modes:
+- analyzer mode
+- local mode with inner_interface_capture_enabled = true
+- local mode with dispatcher_queue = true
+- mirror mode with dispatcher_queue = true
 
 #### Raw Packet Queue Size {#inputs.cbpf.tunning.raw_packet_queue_size}
 

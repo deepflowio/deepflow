@@ -653,6 +653,8 @@ pub struct BondInterface {
 #[serde(default)]
 pub struct AfPacket {
     pub interface_regex: String,
+    pub inner_interface_capture_enabled: bool,
+    pub inner_interface_regex: String,
     pub bond_interfaces: Vec<BondInterface>,
     pub extra_netns_regex: String,
     pub extra_bpf_filter: String,
@@ -668,6 +670,8 @@ impl Default for AfPacket {
         Self {
             interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"
                 .to_string(),
+            inner_interface_capture_enabled: false,
+            inner_interface_regex: r"^eth\d+$".to_string(),
             bond_interfaces: vec![],
             extra_netns_regex: "".to_string(),
             extra_bpf_filter: "".to_string(),

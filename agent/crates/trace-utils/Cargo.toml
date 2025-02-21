@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ahash = "0.8"
 btf-rs = "1.1"
+cfg-if = "1.0"
 gimli = "0.31"
 libc = "0.2"
 log = "0.4"
