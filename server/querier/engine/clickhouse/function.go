@@ -973,6 +973,11 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		if strings.HasPrefix(f.Args[0], "is_internet") {
 			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
 		}
+		// auto_custom_tag
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, f.Args[0]) {
+			m.AddGroup(&view.Group{Value: f.Alias})
+			m.AddGroup(&view.Group{Value: strings.ReplaceAll(f.Alias, "node_type", "icon_id")})
+		}
 
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:
