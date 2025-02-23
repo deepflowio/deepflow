@@ -161,7 +161,7 @@ impl DubboInfo {
         match trace_type {
             TraceType::Sw3 => {
                 // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
-                if self.trace_id.len() > 2 {
+                if !self.trace_id.is_empty() {
                     let segs: Vec<&str> = self.trace_id.split("|").collect();
                     if segs.len() > 7 {
                         self.trace_id = segs[7].to_string();
@@ -169,12 +169,21 @@ impl DubboInfo {
                 }
             }
             TraceType::Sw8 => {
-                if self.trace_id.len() > 2 {
-                    if let Some(index) = self.trace_id[2..].find("-") {
-                        self.trace_id = self.trace_id[2..2 + index].to_string();
+                // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+                if !self.trace_id.is_empty() {
+                    let segs: Vec<&str> = self.trace_id.split("-").collect();
+                    if segs.len() > 2 {
+                        self.trace_id = segs[1].to_string();
                     }
                 }
                 self.trace_id = decode_base64_to_string(&self.trace_id);
+            }
+            TraceType::CloudWise => {
+                if let Some(trace_id) =
+                    cloud_platform::cloudwise::decode_trace_id(self.trace_id.as_str())
+                {
+                    self.trace_id = trace_id.to_string();
+                }
             }
             _ => return,
         };
@@ -460,16 +469,17 @@ impl L7ProtocolParserInterface for DubboLog {
 }
 
 mod hessian2 {
-    use std::borrow::Cow;
+    use nom::FindSubstring;
 
-    use super::{DubboInfo, BODY_PARAM_MAX, BODY_PARAM_MIN, TRACE_ID_MAX_LEN};
+    use super::{DubboInfo, BODY_PARAM_MAX, BODY_PARAM_MIN};
     use crate::config::handler::{L7LogDynamicConfig, TraceType};
     use crate::flow_generator::protocol_logs::consts::*;
 
-    fn check_char_boundary(payload: &Cow<'_, str>, start: usize, end: usize) -> bool {
+    fn check_ascii(payload: &[u8], start: usize, end: usize) -> bool {
         let mut invalid = false;
+        let end = payload.len().min(end);
         for index in start..end {
-            if !payload.is_char_boundary(index) {
+            if !payload[index].is_ascii() {
                 invalid = true;
                 break;
             }
@@ -477,39 +487,65 @@ mod hessian2 {
         return invalid;
     }
 
-    fn decode_field(payload: &Cow<'_, str>, mut start: usize, end: usize) -> Option<String> {
-        if start >= payload.len() {
+    fn decode_field(bytes: &[u8], mut start: usize) -> Option<String> {
+        if start >= bytes.len() {
             return None;
         }
 
-        let bytes = payload.as_bytes();
         match bytes[start] {
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
-                if start + 2 >= payload.len() {
+                if start + 2 >= bytes.len() {
                     return None;
                 }
                 let field_len =
                     (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
                 start += 2;
-                if start + field_len < end {
-                    return Some(payload[start..start + field_len].to_string());
+
+                if check_ascii(bytes, start, start + field_len) {
+                    return None;
+                }
+
+                if start + field_len < bytes.len() {
+                    return Some(
+                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
+                    );
+                } else {
+                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
                 }
             }
             0..=STRING_DIRECT_MAX => {
                 let field_len = bytes[start] as usize;
                 start += 1;
-                if start + field_len < end {
-                    return Some(payload[start..start + field_len].to_string());
+
+                if check_ascii(&bytes, start, start + field_len) {
+                    return None;
+                }
+
+                if start + field_len < bytes.len() {
+                    return Some(
+                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
+                    );
+                } else {
+                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
                 }
             }
             b'S' => {
-                if start + 3 >= payload.len() {
+                if start + 3 >= bytes.len() {
                     return None;
                 }
                 let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
                 start += 3;
-                if start + field_len < end {
-                    return Some(payload[start..start + field_len].to_string());
+
+                if check_ascii(&bytes, start, start + field_len) {
+                    return None;
+                }
+
+                if start + field_len < bytes.len() {
+                    return Some(
+                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
+                    );
+                } else {
+                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
                 }
             }
             _ => {}
@@ -517,36 +553,29 @@ mod hessian2 {
         return None;
     }
 
-    fn lookup_str(payload: &Cow<'_, str>, trace_type: &TraceType) -> Option<String> {
+    fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
         let tag = match trace_type {
-            TraceType::Sw3 | TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
+            TraceType::Sw3 | TraceType::Sw8 | TraceType::CloudWise | TraceType::Customize(_) => {
+                trace_type.as_str()
+            }
             _ => return None,
         };
 
         let mut start = 0;
         while start < payload.len() {
-            if !payload.is_char_boundary(start) {
+            if !payload[start].is_ascii() {
                 break;
             }
-            let index = payload[start..].find(tag);
-            if index.is_none() {
+            let Some(index) = (&payload[start..]).find_substring(tag) else {
                 break;
-            }
-            let index = index.unwrap();
+            };
             // 注意这里tag长度不会超过256
-            if index == 0 || tag.len() != payload.as_bytes()[start + index - 1] as usize {
-                start += index + tag.len();
-                continue;
-            }
-            let last_index = payload
-                .len()
-                .min(TRACE_ID_MAX_LEN + start + index + tag.len());
-            if check_char_boundary(&payload, start + index, last_index) {
+            if index == 0 || tag.len() != payload[start + index - 1] as usize {
                 start += index + tag.len();
                 continue;
             }
 
-            if let Some(context) = decode_field(payload, start + index + tag.len(), last_index) {
+            if let Some(context) = decode_field(payload, start + index + tag.len()) {
                 return Some(context);
             }
             start += index + tag.len();
@@ -555,13 +584,13 @@ mod hessian2 {
     }
 
     // 注意 dubbo trace id 解析是区分大小写的
-    fn decode_trace_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
+    fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(trace_id) = lookup_str(payload, trace_type) {
             info.set_trace_id(trace_id, trace_type);
         }
     }
 
-    fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
+    fn decode_span_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(span_id) = lookup_str(payload, trace_type) {
             info.set_span_id(span_id, trace_type);
         }
@@ -631,13 +660,12 @@ mod hessian2 {
             return;
         }
 
-        let payload_str = String::from_utf8_lossy(&payload[para_index..]);
         for trace_type in config.trace_types.iter() {
             if trace_type.as_str().len() > u8::MAX as usize {
                 continue;
             }
 
-            decode_trace_id(&payload_str, &trace_type, info);
+            decode_trace_id(&payload[para_index..], &trace_type, info);
             if info.trace_id.len() != 0 {
                 break;
             }
@@ -647,7 +675,7 @@ mod hessian2 {
                 continue;
             }
 
-            decode_span_id(&payload_str, &span_type, info);
+            decode_span_id(&payload[para_index..], &span_type, info);
             if info.span_id.len() != 0 {
                 break;
             }
@@ -678,7 +706,9 @@ mod kryo {
 
     fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
         let tag = match trace_type {
-            TraceType::Sw3 | TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
+            TraceType::Sw3 | TraceType::Sw8 | TraceType::CloudWise | TraceType::Customize(_) => {
+                trace_type.as_str()
+            }
             _ => return None,
         };
         if tag.len() <= 1 {
@@ -886,7 +916,9 @@ mod fastjson2 {
 
     fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
         let tag = match trace_type {
-            TraceType::Sw3 | TraceType::Sw8 | TraceType::Customize(_) => trace_type.as_str(),
+            TraceType::Sw3 | TraceType::Sw8 | TraceType::CloudWise | TraceType::Customize(_) => {
+                trace_type.as_str()
+            }
             _ => return None,
         };
         if tag.len() <= 1 {
@@ -1303,6 +1335,103 @@ mod tests {
             info.trace_id,
             "189d38354fc240ea804c15395b2d5baf.175.17394983574777353"
         );
+    }
+
+    #[test]
+    fn test_cloud_wise() {
+        let packet = [
+            // header
+            0x00u8, 0x16, 0x3e, 0x35, 0x2c, 0x05, 0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0x08, 0x00,
+            0x45, 0x00, 0x0b, 0x48, 0x1e, 0xfe, 0x40, 0x00, 0x40, 0x06, 0x51, 0x1e, 0x64, 0x76,
+            0x3a, 0x08, 0x0a, 0x01, 0x17, 0x15, 0x01, 0xbb, 0x4f, 0x60, 0x9c, 0x06, 0xdf, 0x01,
+            0x71, 0xcc, 0xb3, 0x91, 0x50, 0x10, 0x00, 0x53, 0xca, 0xce, 0x00, 0x00,
+            // dubbo
+            0xda, 0xbb, 0xc2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x15, 0x25, 0x10, 0x00, 0x00,
+            0x03, 0xea, 0x05, 0x32, 0x2e, 0x30, 0x2e, 0x32, 0x30, 0x3d, 0x63, 0x6f, 0x6d, 0x2e,
+            0x62, 0x79, 0x64, 0x2e, 0x64, 0x69, 0x6c, 0x69, 0x6e, 0x6b, 0x2e, 0x64, 0x62, 0x2e,
+            0x76, 0x65, 0x68, 0x69, 0x63, 0x6c, 0x65, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x73, 0x65,
+            0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x41, 0x75, 0x74, 0x6f, 0x50, 0x69, 0x63, 0x4d,
+            0x6f, 0x64, 0x75, 0x6c, 0x65, 0x64, 0x44, 0x62, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
+            0x65, 0x05, 0x30, 0x2e, 0x30, 0x2e, 0x30, 0x09, 0x73, 0x65, 0x6c, 0x65, 0x63, 0x74,
+            0x41, 0x6c, 0x6c, 0x00, 0x48, 0x05, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x03, 0x36, 0x36,
+            0x36, 0x04, 0x70, 0x61, 0x74, 0x68, 0x30, 0x3d, 0x63, 0x6f, 0x6d, 0x2e, 0x62, 0x79,
+            0x64, 0x2e, 0x64, 0x69, 0x6c, 0x69, 0x6e, 0x6b, 0x2e, 0x64, 0x62, 0x2e, 0x76, 0x65,
+            0x68, 0x69, 0x63, 0x6c, 0x65, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x73, 0x65, 0x72, 0x76,
+            0x69, 0x63, 0x65, 0x2e, 0x41, 0x75, 0x74, 0x6f, 0x50, 0x69, 0x63, 0x4d, 0x6f, 0x64,
+            0x75, 0x6c, 0x65, 0x54, 0x44, 0x62, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12,
+            0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x2e, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61,
+            0x74, 0x69, 0x6f, 0x6e, 0x07, 0x76, 0x65, 0x68, 0x69, 0x63, 0x6c, 0x65, 0x09, 0x43,
+            0x4c, 0x4f, 0x55, 0x44, 0x57, 0x49, 0x53, 0x45, 0x30, 0xe8, 0x4a, 0x41, 0x56, 0x41,
+            0x3a, 0x30, 0x3a, 0x36, 0x39, 0x30, 0x34, 0x34, 0x32, 0x34, 0x36, 0x36, 0x36, 0x30,
+            0x35, 0x37, 0x34, 0x36, 0x39, 0x3a, 0x36, 0x38, 0x36, 0x35, 0x35, 0x30, 0x39, 0x35,
+            0x38, 0x38, 0x30, 0x38, 0x39, 0x38, 0x30, 0x32, 0x3a, 0x33, 0x33, 0x36, 0x33, 0x38,
+            0x33, 0x38, 0x35, 0x33, 0x33, 0x33, 0x31, 0x31, 0x38, 0x36, 0x36, 0x3a, 0x30, 0x30,
+            0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x2d, 0x33, 0x33, 0x32, 0x64, 0x2d, 0x33, 0x35,
+            0x31, 0x66, 0x2d, 0x66, 0x66, 0x66, 0x66, 0x2d, 0x66, 0x66, 0x66, 0x66, 0x38, 0x34,
+            0x61, 0x66, 0x62, 0x31, 0x62, 0x61, 0x3a, 0x37, 0x35, 0x30, 0x32, 0x36, 0x31, 0x32,
+            0x33, 0x32, 0x30, 0x31, 0x36, 0x33, 0x30, 0x35, 0x36, 0x3a, 0x30, 0x30, 0x30, 0x30,
+            0x30, 0x30, 0x30, 0x30, 0x2d, 0x33, 0x39, 0x64, 0x37, 0x2d, 0x63, 0x39, 0x62, 0x32,
+            0x2d, 0x66, 0x66, 0x66, 0x66, 0x2d, 0x66, 0x66, 0x66, 0x66, 0x39, 0x33, 0x63, 0x66,
+            0x33, 0x32, 0x65, 0x30, 0x3a, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x2d,
+            0x64, 0x66, 0x33, 0x61, 0x2d, 0x62, 0x66, 0x66, 0x66, 0x2d, 0x30, 0x30, 0x30, 0x30,
+            0x2d, 0x30, 0x30, 0x30, 0x30, 0x30, 0x31, 0x63, 0x34, 0x33, 0x65, 0x66, 0x34, 0x3a,
+            0x64, 0x69, 0x6c, 0x69, 0x6e, 0x6b, 0x61, 0x70, 0x70, 0x5f, 0x64, 0x69, 0x6c, 0x69,
+            0x6e, 0x6b, 0x61, 0x70, 0x70, 0x2d, 0x76, 0x65, 0x68, 0x69, 0x63, 0x6c, 0x65, 0x2d,
+            0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x2d, 0x74, 0x65, 0x73, 0x74, 0x3a, 0x2d,
+            0x31, 0x3a, 0x2d, 0x31, 0x0f, 0x73, 0x77, 0x38, 0x2d, 0x63, 0x6f, 0x72, 0x72, 0x65,
+            0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x00, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x66,
+            0x61, 0x63, 0x65,
+        ];
+        let mut meta_packet = MetaPacket::empty();
+        let _ = meta_packet.update(
+            &packet[..],
+            true,
+            true,
+            Duration::from_secs(10),
+            packet.len(),
+        );
+        meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
+        let Some(payload) = meta_packet.get_l4_payload() else {
+            return;
+        };
+
+        let config = LogParserConfig {
+            l7_log_dynamic: L7LogDynamicConfig::new(
+                vec![],
+                vec![],
+                vec![TraceType::CloudWise],
+                vec![],
+                ExtraLogFields::default(),
+            ),
+            ..Default::default()
+        };
+        let mut dubbo = DubboLog::default();
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
+        let param = &mut ParseParam::new(
+            &meta_packet,
+            log_cache.clone(),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        param.set_captured_byte(payload.len());
+        param.set_log_parse_config(&config);
+        let is_dubbo = dubbo.check_payload(payload, param);
+
+        let i = dubbo.parse_payload(payload, param);
+        let info = if let Ok(info) = i {
+            match info.unwrap_single() {
+                L7ProtocolInfo::DubboInfo(d) => d,
+                _ => unreachable!(),
+            }
+        } else {
+            DubboInfo::default()
+        };
+
+        assert_eq!(is_dubbo, true);
+        assert_eq!(info.trace_id, "00000000-332d-351f-ffff-ffff84afb1ba");
     }
 
     #[test]
