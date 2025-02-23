@@ -1176,6 +1176,7 @@ pub enum TraceType {
     TraceParent,
     NewRpcTraceContext,
     XTingyun(String),
+    CloudWise,
     Customize(String),
 }
 
@@ -1188,6 +1189,9 @@ const TRACE_TYPE_SW6: &str = "sw6";
 const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
 const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
+const TRACE_TYPE_CLOUD_WISE: &str = "cloudwise";
+
+const TRACE_TYPE_CLOUD_WISE_UPPER: &str = "CLOUDWISE";
 
 impl From<&str> for TraceType {
     // The parameter supports the following two formats:
@@ -1213,6 +1217,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             TRACE_TYPE_X_TINGYUN => TraceType::XTingyun(sub_tag),
+            TRACE_TYPE_CLOUD_WISE => TraceType::CloudWise,
             _ if tag.len() > 0 => TraceType::Customize(tag),
             _ => TraceType::Disabled,
         }
@@ -1233,6 +1238,7 @@ impl TraceType {
                 context.eq_ignore_ascii_case(SOFA_NEW_RPC_TRACE_CTX_KEY)
             }
             TraceType::XTingyun(_) => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
+            TraceType::CloudWise => context.eq_ignore_ascii_case(TRACE_TYPE_CLOUD_WISE),
             TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
             _ => false,
         }
@@ -1249,6 +1255,7 @@ impl TraceType {
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT,
             TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY,
             TraceType::XTingyun(_) => TRACE_TYPE_X_TINGYUN,
+            TraceType::CloudWise => TRACE_TYPE_CLOUD_WISE_UPPER,
             TraceType::Customize(tag) => &tag,
             _ => "",
         }
@@ -1341,6 +1348,10 @@ impl TraceType {
         cloud_platform::tingyun::decode_trace_id(value, sub_tag)
     }
 
+    fn decode_cloud_wise(value: &str) -> Option<&str> {
+        cloud_platform::cloudwise::decode_trace_id(value)
+    }
+
     fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
         let value = value.trim();
         match self {
@@ -1358,6 +1369,7 @@ impl TraceType {
                 decode_new_rpc_trace_context_with_type(value.as_bytes(), id_type)
             }
             TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag),
+            TraceType::CloudWise => Self::decode_cloud_wise(value).map(|s| s.into()),
         }
     }
 

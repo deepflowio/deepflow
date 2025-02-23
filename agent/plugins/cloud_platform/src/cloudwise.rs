@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Yunshan Networks
+ * Copyright (c) 2025 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,5 +14,10 @@
  * limitations under the License.
  */
 
-pub mod cloudwise;
-pub mod tingyun;
+//! Enterprise Edition Feature: cloudwise
+
+// CloudWise Trace format:
+// CLOUDWISE: JAVA:0:0:0:0:{trace-id}:0:0:0
+pub fn decode_trace_id(_: &str) -> Option<&str> {
+    None
+}
