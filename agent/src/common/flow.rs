@@ -710,6 +710,7 @@ pub struct FlowMetricsPeer {
     pub nat_real_port: u16,
     pub gpid: u32,
     pub nat_real_ip: IpAddr,
+    pub process_id: u32,
 }
 
 pub fn serialize_flow_metrics<S>(v: &[FlowMetricsPeer; 2], serializer: S) -> Result<S::Ok, S::Error>
@@ -824,6 +825,7 @@ impl Default for FlowMetricsPeer {
             is_local_ip: false,
 
             gpid: 0,
+            process_id: 0,
         }
     }
 }

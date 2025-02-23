@@ -1147,6 +1147,7 @@ impl FlowMap {
             flow.flow_metrics_peers[0].nat_source = meta_packet.lookup_key.src_nat_source;
             flow.flow_metrics_peers[0].nat_real_ip = meta_packet.lookup_key.src_nat_ip;
             flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.src_nat_port;
+            flow.flow_metrics_peers[0].process_id = meta_packet.process_id;
         } else {
             flow.flow_metrics_peers[0].nat_source = TapPort::NAT_SOURCE_NONE;
             flow.flow_metrics_peers[0].nat_real_ip = flow.flow_key.ip_src;
@@ -1156,6 +1157,7 @@ impl FlowMap {
             flow.flow_metrics_peers[1].nat_source = meta_packet.lookup_key.dst_nat_source;
             flow.flow_metrics_peers[1].nat_real_ip = meta_packet.lookup_key.dst_nat_ip;
             flow.flow_metrics_peers[1].nat_real_port = meta_packet.lookup_key.dst_nat_port;
+            flow.flow_metrics_peers[1].process_id = meta_packet.process_id;
         } else {
             flow.flow_metrics_peers[1].nat_source = TapPort::NAT_SOURCE_NONE;
             flow.flow_metrics_peers[1].nat_real_ip = flow.flow_key.ip_dst;
@@ -1233,6 +1235,7 @@ impl FlowMap {
                     last: lookup_key.timestamp.into(),
                     tcp_flags: flags,
                     total_tcp_flags: flags,
+                    process_id: meta_packet.process_id,
                     ..Default::default()
                 },
                 FlowMetricsPeer::default(),
@@ -1441,6 +1444,29 @@ impl FlowMap {
         node
     }
 
+    fn update_meta_packet(node: &FlowNode, meta_packet: &mut MetaPacket) {
+        match node.tagged_flow.flow.flow_key.tap_port.get_nat_source() {
+            TapPort::NAT_SOURCE_TOA
+                if meta_packet.lookup_key.direction == PacketDirection::ClientToServer
+                    && meta_packet.lookup_key.src_nat_port == 0 =>
+            {
+                let metric = &node.tagged_flow.flow.flow_metrics_peers
+                    [PacketDirection::ClientToServer as usize];
+                meta_packet.lookup_key.src_nat_ip = metric.nat_real_ip;
+                meta_packet.lookup_key.src_nat_port = metric.nat_real_port;
+                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
+            }
+            TapPort::NAT_SOURCE_TOT if meta_packet.process_id == 0 => {
+                let metric = &node.tagged_flow.flow.flow_metrics_peers
+                    [meta_packet.lookup_key.direction as usize];
+                meta_packet.process_id = metric.process_id;
+                meta_packet.lookup_key.src_nat_ip = metric.nat_real_ip;
+                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOT;
+            }
+            _ => {}
+        }
+    }
+
     // suppress warning under windows
     #[allow(unused_variables)]
     fn update_flow(&mut self, config: &Config, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
@@ -1458,6 +1484,8 @@ impl FlowMap {
             flow.flow_stat_time = pkt_timestamp.round_to(STATISTICAL_INTERVAL.into());
         }
 
+        Self::update_meta_packet(&node, meta_packet);
+
         if !node.policy_in_tick[meta_packet.lookup_key.direction as usize] {
             node.policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
             #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1467,16 +1495,7 @@ impl FlowMap {
             };
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
-            if node.tagged_flow.flow.flow_key.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA
-                && meta_packet.lookup_key.direction == PacketDirection::ClientToServer
-                && meta_packet.lookup_key.src_nat_port == 0
-            {
-                let metric = &node.tagged_flow.flow.flow_metrics_peers
-                    [PacketDirection::ClientToServer as usize];
-                meta_packet.lookup_key.src_nat_ip = metric.nat_real_ip;
-                meta_packet.lookup_key.src_nat_port = metric.nat_real_port;
-                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
-            }
+
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
             // Currently, only virtual traffic's tap_side is counted
@@ -1525,6 +1544,10 @@ impl FlowMap {
                 meta_packet.lookup_key.src_nat_ip;
             flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_port =
                 meta_packet.lookup_key.src_nat_port;
+            if meta_packet.process_id > 0 {
+                flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].process_id =
+                    meta_packet.process_id;
+            }
         }
         if meta_packet.lookup_key.dst_nat_source != TapPort::NAT_SOURCE_NONE
             && meta_packet.lookup_key.dst_nat_source
@@ -1559,6 +1582,9 @@ impl FlowMap {
         flow_metrics_peer.l4_byte_count += meta_packet.l4_payload_len() as u64;
         flow_metrics_peer.total_byte_count += meta_packet.packet_len as u64;
         flow_metrics_peer.last = pkt_timestamp.into();
+        if meta_packet.process_id > 0 {
+            flow_metrics_peer.process_id = meta_packet.process_id;
+        }
         if flow_metrics_peer.first.is_zero() {
             flow_metrics_peer.first = pkt_timestamp.into();
         }
