@@ -41,6 +41,10 @@ func GetDB(orgID int) (*DB, error) {
 	return GetDBs().NewDBIfNotExists(orgID)
 }
 
+func RemoveDB(orgID int) {
+	GetDBs().Delete(orgID)
+}
+
 func GetConfig() config.MySqlConfig {
 	return GetDBs().GetConfig()
 }
@@ -196,15 +200,6 @@ func (c *DBs) check(db *DB) error {
 		return nil
 	}
 	return edition.CheckDBVersion(db.DB, db.Config)
-}
-
-func (c *DBs) DoOnAllDBs(execFunc func(db *DB) error) error {
-	for _, db := range dbs.orgIDToDB {
-		if err := execFunc(db); err != nil {
-			return fmt.Errorf("org(id:%d, name:%s) %s", db.ORGID, db.Name, err.Error())
-		}
-	}
-	return nil
 }
 
 type DBNameLogPrefix struct {

@@ -64,7 +64,7 @@ type TagRecorder struct {
 
 func (c *TagRecorder) Check() {
 	go func() {
-		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+		if err := mysql.DoOnAllDBs(func(db *mysql.DB) error {
 			t := time.Now()
 			log.Infof("database=%s tagrecorder health check data run", db.Name, db.LogPrefixORGID)
 			tagrecorder.GetTeamInfo(db)

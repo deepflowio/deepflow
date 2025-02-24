@@ -56,7 +56,7 @@ func (v *VTapCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				mysql.DoOnAllDBs(func(db *mysql.DB) error {
 					// check launch_server resource if exist
 					v.launchServerCheck(db)
 					// check vtap type
