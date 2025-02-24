@@ -199,7 +199,7 @@ func IsExportField(tag *config.StructTags, exportFieldCategoryBits uint64, expor
 	}
 
 	for _, name := range exportFieldNames {
-		if name == tag.Name {
+		if name == tag.Name || name == tag.MapName {
 			return true
 		}
 	}
