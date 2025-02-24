@@ -29,6 +29,10 @@ type SpanWithTraceIDBlock struct {
 	ColEncodedSpan proto.ColStr
 }
 
+func (n *SpanWithTraceID) NativeTagVersion() uint32 {
+	return 0
+}
+
 func (b *SpanWithTraceIDBlock) Reset() {
 	b.ColTime.Reset()
 	b.ColTraceId.Reset()

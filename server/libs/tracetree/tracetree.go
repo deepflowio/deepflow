@@ -97,6 +97,10 @@ func (t *TraceTree) OrgID() uint16 {
 	return t.OrgId
 }
 
+func (t *TraceTree) NativeTagVersion() uint32 {
+	return 0
+}
+
 func TraceTreeColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
