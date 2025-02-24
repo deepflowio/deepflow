@@ -1238,11 +1238,10 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
-			} else if e.DB == chCommon.DB_NAME_DEEPFLOW_ADMIN {
-				table = "deepflow_server"
-			} else if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT {
-				table = "deepflow_collector"
-			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
+			} else if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS}, e.DB) {
+				table = chCommon.DB_TABLE_MAP[e.DB][0]
+			}
+			if e.DB == chCommon.DB_NAME_PROMETHEUS {
 				whereStmt := Where{}
 				metricIDFilter, err := GetMetricIDFilter(e)
 				if err != nil {
@@ -1251,7 +1250,6 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				filter := view.Filters{Expr: metricIDFilter}
 				whereStmt.filter = &filter
 				e.Statements = append(e.Statements, &whereStmt)
-				table = "samples"
 			}
 			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource, e.ORGID)
 			if err != nil {
