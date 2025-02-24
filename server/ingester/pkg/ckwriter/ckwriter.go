@@ -552,7 +552,7 @@ func (c *Cache) Add(item CKItem) error {
 	if IsNil(c.columnBlock) ||
 		(c.size == 0 && c.ItemVersion != item.NativeTagVersion()) {
 		c.columnBlock = item.NewColumnBlock()
-		log.Info("orgId %d (%s) update item version from %d to %d", c.orgID, c.prepare, c.ItemVersion, item.NativeTagVersion())
+		log.Infof("orgId %d (%s) update item version from %d to %d", c.orgID, c.prepare, c.ItemVersion, item.NativeTagVersion())
 		c.ItemVersion = item.NativeTagVersion()
 	}
 	item.AppendToColumnBlock(c.columnBlock)
