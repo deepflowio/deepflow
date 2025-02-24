@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package schema
+package appender
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
-
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.0.1.9"
+import (
+	"github.com/deepflowio/deepflow/server/controller/config"
 )
+
+func SetSwaggerConfig(cfg *config.ControllerConfig) {}

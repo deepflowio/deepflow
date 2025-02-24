@@ -44,15 +44,8 @@ func SetPage(p Page) ResponseSetter {
 	}
 }
 
-// SetDescription sets the description in the response.
-func SetDescription(description string) ResponseSetter {
-	return func(resp *Response) {
-		resp.Description = description
-	}
-}
-
-// SetStatus sets the status in the response.
-func SetStatus(status string) ResponseSetter {
+// SetOptStatus sets the status in the response.
+func SetOptStatus(status string) ResponseSetter {
 	return func(resp *Response) {
 		resp.OptStatus = status
 	}
@@ -65,26 +58,26 @@ func SetData(data interface{}) ResponseSetter {
 	}
 }
 
-// SetHttpStatus sets the http status in the response.
-func SetHttpStatus(httpStatus int) ResponseSetter {
+// SetHTTPStatus sets the http status in the response.
+func SetHTTPStatus(httpStatus int) ResponseSetter {
 	return func(resp *Response) {
 		resp.HttpStatus = httpStatus
 	}
 }
 
 type Response struct {
-	rawPageResponse
+	RawPageResponse
 
 	err        error `json:"-"` // Error is not serializ`ed
 	HttpStatus int   `json:"-"` // httpStatus is not serialized
 }
 
-type rawPageResponse struct {
-	rawResponse
+type RawPageResponse struct {
+	RawResponse
 	Page Page `json:"PAGE"`
 }
 
-type rawResponse struct {
+type RawResponse struct {
 	OptStatus   string      `json:"OPT_STATUS"`
 	Description string      `json:"DESCRIPTION"`
 	Data        interface{} `json:"DATA"`
@@ -106,10 +99,13 @@ func (r *Response) Format() {
 			r.OptStatus = t.Status
 			r.Description = t.Message
 		default:
-			r.OptStatus = httpcommon.FAIL
+			if r.OptStatus == "" {
+				r.OptStatus = httpcommon.FAIL
+			}
 			r.Description = r.err.Error()
 		}
-	} else {
+	}
+	if r.OptStatus == "" {
 		r.OptStatus = httpcommon.SUCCESS
 	}
 	if r.HttpStatus == 0 {
@@ -119,13 +115,13 @@ func (r *Response) Format() {
 
 func (r Response) JSON() interface{} {
 	if r.Page.IsValid() {
-		return r.rawPageResponse
+		return r.RawPageResponse
 	}
-	return r.rawResponse
+	return r.RawResponse
 }
 
-// String returns the string representation of the response when Data is a byte slice.
-func (r Response) JsonString() string {
+// JSONString returns the string representation of the response when Data is a byte slice.
+func (r Response) JSONString() string {
 	if r.Page.IsValid() {
 		return fmt.Sprintf(`{"OPT_STATUS":"%s","DESCRIPTION":"%s","DATA":%s,"PAGE":%s}`, r.OptStatus, r.Description, string(r.Data.([]byte)), string(r.Page.Bytes()))
 	} else {
@@ -133,9 +129,9 @@ func (r Response) JsonString() string {
 	}
 }
 
-// Bytes returns the byte slice representation of the response when Data is a byte slice.
+// JSONBytes returns the byte slice representation of the response when Data is a byte slice.
 func (r Response) JSONBytes() []byte {
-	return []byte(r.JsonString())
+	return []byte(r.JSONString())
 }
 
 func (r Response) CSVBytes() []byte {

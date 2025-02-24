@@ -995,3 +995,19 @@ func (p Pod) GetDomainLcuuid() string {
 func (p Pod) GetSubDomainLcuuid() string {
 	return p.SubDomain
 }
+
+type CustomService struct {
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	Name         string `gorm:"column:name;type:varchar(128);default:''" json:"NAME" mapstructure:"NAME"`
+	Type         int    `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"`
+	Resource     string `gorm:"column:resource;type:text;default:''" json:"RESOURCE" mapstructure:"RESOURCE"`
+	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;default:0" json:"DOMAIN_ID" mapstructure:"DOMAIN_ID"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	TeamID       int    `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID" mapstructure:"TEAM_ID"`
+}
+
+func (CustomService) TableName() string {
+	return "custom_service"
+}
