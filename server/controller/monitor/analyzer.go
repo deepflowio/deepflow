@@ -82,7 +82,7 @@ func (c *AnalyzerCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				if err := mysql.DoOnAllDBs(func(db *mysql.DB) error {
 					// 数据节点健康检查
 					c.healthCheck(db)
 					// 检查没有分配数据节点的采集器，并进行分配

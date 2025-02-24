@@ -65,7 +65,7 @@ func (v *VTapLicenseAllocation) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+				if err := mysql.DoOnAllDBs(func(db *mysql.DB) error {
 					v.allocLicense(db)
 					return nil
 				}); err != nil {
