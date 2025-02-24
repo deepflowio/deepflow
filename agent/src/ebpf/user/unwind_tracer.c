@@ -295,12 +295,12 @@ void unwind_tracer_drop() {
 }
 
 void unwind_process_exec(int pid) {
-    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
-    if (tracer == NULL) {
+    if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
 
-    if (tracer->state != TRACER_RUNNING) {
+    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
+    if (tracer == NULL || tracer->state != TRACER_RUNNING) {
         return;
     }
 
@@ -309,7 +309,7 @@ void unwind_process_exec(int pid) {
 
 // Process events in the queue
 void unwind_events_handle(void) {
-    if (!dwarf_available()) {
+    if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
 
@@ -342,7 +342,7 @@ void unwind_events_handle(void) {
         }
 
         remove_event(&proc_events, event);
-        free(event);
+	process_event_free(event);
 
     } while (true);
     pthread_mutex_unlock(&g_python_unwind_table_lock);
@@ -351,7 +351,7 @@ void unwind_events_handle(void) {
 
 // Process exit, reclaim resources
 void unwind_process_exit(int pid) {
-    if (!dwarf_available()) {
+    if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
 
@@ -367,7 +367,7 @@ void unwind_process_exit(int pid) {
         e = container_of(p, struct process_create_event, list);
         if (e->pid == pid) {
             list_head_del(&e->list);
-            free(e);
+            process_event_free(e);
         }
     }
     pthread_mutex_unlock(&proc_events.m);
