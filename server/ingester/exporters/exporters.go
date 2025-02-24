@@ -189,7 +189,12 @@ func IsExportField(tag *config.StructTags, exportFieldCategoryBits uint64, expor
 		return false
 	}
 
-	if tag.CategoryBit&exportFieldCategoryBits != 0 || tag.SubCategoryBit&exportFieldCategoryBits != 0 {
+	// for category_k8s_label
+	if config.K8S_LABEL&exportFieldCategoryBits != 0 {
+		return true
+	}
+	// for category_tag, category_metrics
+	if tag.CategoryBit&exportFieldCategoryBits != 0 && tag.SubCategoryBit&exportFieldCategoryBits != 0 {
 		return true
 	}
 
