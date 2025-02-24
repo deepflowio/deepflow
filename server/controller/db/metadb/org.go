@@ -216,3 +216,22 @@ func getTagNameFromTag(tag, prefix string) string {
 func GetColumnNameFromTag(tag string) string {
 	return getTagNameFromTag(tag, "column:")
 }
+
+func DoOnAllDBs(execFunc func(*DB) error) error {
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return err
+	}
+	for _, orgID := range orgIDs {
+		db, err := GetDB(orgID)
+		if err != nil {
+			log.Errorf("failed to get db info: %v", err, db.LogPrefixORGID, db.LogPrefixName)
+			continue
+		}
+		if err := execFunc(db); err != nil {
+			log.Errorf("failed to execute function: %v", err, db.LogPrefixORGID, db.LogPrefixName)
+			return err
+		}
+	}
+	return nil
+}
