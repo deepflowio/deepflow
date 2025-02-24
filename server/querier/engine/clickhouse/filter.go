@@ -1384,8 +1384,12 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 
 		}
 		var isIntEnum = true
+		enumTable := table
+		if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS, chCommon.DB_NAME_EXT_METRICS}, db) {
+			enumTable = chCommon.DB_TABLE_MAP[db][0]
+		}
 		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
-			DB: db, Table: table, TagName: tagEnum,
+			DB: db, Table: enumTable, TagName: tagEnum,
 		}]
 		if !ok {
 			return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tagName, db, table))
