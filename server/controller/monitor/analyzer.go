@@ -82,7 +82,7 @@ func (c *AnalyzerCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
+				if err := metadb.DoOnAllDBs(func(db *metadb.DB) error {
 					// 数据节点健康检查
 					c.healthCheck(db)
 					// 检查没有分配数据节点的采集器，并进行分配
