@@ -56,7 +56,7 @@ func (v *VTapCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
+				metadb.DoOnAllDBs(func(db *metadb.DB) error {
 					// check launch_server resource if exist
 					v.launchServerCheck(db)
 					// check vtap type

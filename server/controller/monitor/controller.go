@@ -87,7 +87,7 @@ func (c *ControllerCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
+				if err := metadb.DoOnAllDBs(func(db *metadb.DB) error {
 					// 控制器健康检查
 					c.healthCheck(db)
 					// 检查没有分配控制器的采集器，并进行分配

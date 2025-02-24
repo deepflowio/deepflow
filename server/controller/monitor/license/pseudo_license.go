@@ -65,7 +65,7 @@ func (v *VTapLicenseAllocation) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := metadb.GetDBs().DoOnAllDBs(func(db *metadb.DB) error {
+				if err := metadb.DoOnAllDBs(func(db *metadb.DB) error {
 					v.allocLicense(db)
 					return nil
 				}); err != nil {
