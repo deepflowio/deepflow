@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -33,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
+	querierConfig "github.com/deepflowio/deepflow/server/querier/config"
 )
 
 var (
@@ -141,11 +144,11 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 	if err := yaml.Unmarshal(domainKeyToInfoYamlBytes, &domainKeyToInfoNode); err != nil {
 		return nil, err
 	}
-	// TODO get from ck
-	l7Protocols := []string{
-		"HTTP", "HTTP2", "Dubbo", "gRPC", "SOFARPC", "FastCGI", "bRPC", "Tars", "Some/IP", "MySQL", "PostgreSQL",
-		"Oracle", "Redis", "MongoDB", "Memcached", "Kafka", "MQTT", "AMQP", "OpenWire", "NATS", "Pulsar", "ping", "ZMTP",
-		"RocketMQ", "DNS", "TLS", "Custom"}
+
+	l7Protocols, err := a.getL7ProtocolsFromCK(dbInfo)
+	if err != nil {
+		return nil, err
+	}
 	l7ProtocolsYamlBytes, err := yaml.Marshal(l7Protocols)
 	if err != nil {
 		return nil, err
@@ -168,6 +171,39 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 		"processors.request_log.filters.tag_filters_comment.enum_options":                              l7ProtocolsNode.Content[0],
 	}
 	return agentconf.ConvertTemplateYAMLToJSON(dynamicOptions)
+}
+
+func (a *AgentGroupConfig) getL7ProtocolsFromCK(db *metadb.DB) ([]string, error) {
+	reqBody := url.Values{
+		"db":  {"flow_log"},
+		"sql": {"show tag l7_protocol values from l7_flow_log"},
+	}
+	url := fmt.Sprintf("http://%s:%d/v1/query", common.GetPodIP(), querierConfig.Cfg.ListenPort)
+	resp, err := common.CURLForm(
+		http.MethodPost,
+		url,
+		reqBody,
+		common.WithORGHeader(strconv.Itoa(db.GetORGID())),
+	)
+	if err != nil {
+		log.Errorf("failed to get l7 protocols from ck: %v", err, db.LogPrefixORGID)
+		return nil, err
+	}
+	result := resp.Get("result")
+	var displayNameIdx int
+	cols := result.Get("columns").MustArray()
+	for i, col := range cols {
+		if col == "display_name" {
+			displayNameIdx = i
+		}
+	}
+
+	l7Protocols := make([]string, 0)
+	for i := range resp.Get("result").Get("values").MustArray() {
+		value := resp.Get("result").Get("values").GetIndex(i)
+		l7Protocols = append(l7Protocols, value.GetIndex(displayNameIdx).MustString())
+	}
+	return l7Protocols, nil
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfig(groupLcuuid string, dataType int) ([]byte, error) {
