@@ -305,6 +305,9 @@ controller:
     # 采集器是否自动注册
     vtap-auto-register: True
 
+    # agent 升级所用镜像缓存的过期时间，单位：分钟
+    image_expire: 5
+
     default-tap-mode:
 
     # whether to register domain automatically

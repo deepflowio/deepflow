@@ -130,6 +130,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/orcaman/concurrent-map/v2 v2.0.1
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pyroscope-io/pyroscope v0.37.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0

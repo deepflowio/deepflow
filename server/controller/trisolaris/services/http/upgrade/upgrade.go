@@ -135,7 +135,7 @@ func CancelUpgrade(c *gin.Context) {
 
 	// if upgrade is completed, should return error message
 	if vTapCache.GetExpectedRevision() == "" || vTapCache.GetExpectedRevision() == vTapCache.GetRevision() {
-		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, vtap(%s, %s) upgrade is completed, unable to cancel", orgIDInt, key)))
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, vtap(%s, %s) upgrade is completed, unable to cancel", orgIDInt, vtap.Name, key)))
 		return
 	}
 
