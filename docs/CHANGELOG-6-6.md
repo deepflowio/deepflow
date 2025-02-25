@@ -9,6 +9,13 @@
 #### New Feature
 
 #### Bug Fix
+* fix: agent build ci [#9191](https://github.com/deepflowio/deepflow/pull/9191) by [jiumos](https://github.com/jiumos)
+* fix: agent - eBPF Profile Set podid for Total processes [#9184](https://github.com/deepflowio/deepflow/pull/9184) by [yinjiping](https://github.com/yinjiping)
+* fix: enum filter error when db is prometheus [#9183](https://github.com/deepflowio/deepflow/pull/9183) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: updates agent group config protocol [#9180](https://github.com/deepflowio/deepflow/pull/9180) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: refine condition logic for  in the #9174 [#9179](https://github.com/deepflowio/deepflow/pull/9179) by [lzf575](https://github.com/lzf575)
+* fix: false positive grpc when tcp segmented [#9177](https://github.com/deepflowio/deepflow/pull/9177) by [rvql](https://github.com/rvql)
+* fix: icon_id error when resource_gl grouping [#9158](https://github.com/deepflowio/deepflow/pull/9158) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
