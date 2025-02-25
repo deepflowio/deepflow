@@ -1139,6 +1139,44 @@ impl<'a> MetaPacket<'a> {
             }
         }
     }
+
+    pub fn set_vip_info(&mut self, client_real_ip: IpAddr, server_real_ip: IpAddr) {
+        if !client_real_ip.is_unspecified() {
+            match self.lookup_key.direction {
+                PacketDirection::ClientToServer
+                    if TapPort::NAT_SOURCE_VIP > self.lookup_key.src_nat_source =>
+                {
+                    self.lookup_key.src_nat_ip = client_real_ip;
+                    self.lookup_key.src_nat_source = TapPort::NAT_SOURCE_VIP;
+                }
+                PacketDirection::ServerToClient
+                    if TapPort::NAT_SOURCE_VIP > self.lookup_key.dst_nat_source =>
+                {
+                    self.lookup_key.dst_nat_ip = client_real_ip;
+                    self.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
+                }
+                _ => {}
+            }
+        }
+
+        if !server_real_ip.is_unspecified() {
+            match self.lookup_key.direction {
+                PacketDirection::ClientToServer
+                    if TapPort::NAT_SOURCE_VIP > self.lookup_key.dst_nat_source =>
+                {
+                    self.lookup_key.dst_nat_ip = server_real_ip;
+                    self.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
+                }
+                PacketDirection::ServerToClient
+                    if TapPort::NAT_SOURCE_VIP > self.lookup_key.src_nat_source =>
+                {
+                    self.lookup_key.src_nat_ip = server_real_ip;
+                    self.lookup_key.src_nat_source = TapPort::NAT_SOURCE_VIP;
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 impl<'a> Iterator for MetaPacket<'a> {
