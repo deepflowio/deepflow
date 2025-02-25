@@ -275,6 +275,9 @@ controller:
     # 采集器是否自动注册
     vtap-auto-register: True
 
+    # agent upgrade image cache time，unit: second
+    image_expire: 300
+
     default-tap-mode:
 
     # whether to register domain automatically

@@ -53,13 +53,13 @@ func NewRefreshOP(db *gorm.DB, nodeIP string) *RefreshOP {
 var urlFormat = "http://%s:%d/v1/caches/?"
 
 // orgid equal to 0 means refreshing all organization data
-func RefreshCache(orgID int, dataTypes []common.DataChanged) {
+func RefreshCache(orgID int, dataTypes []common.DataChanged, otherParams ...string) {
 	if refreshOP != nil {
-		go refreshOP.refreshCache(orgID, dataTypes)
+		go refreshOP.refreshCache(orgID, dataTypes, otherParams...)
 	}
 }
 
-func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
+func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged, otherParams ...string) {
 	localControllerIPs := r.localRefreshIPs
 	remoteControllerIPs := r.remoteRefreshIPs
 	if len(dataTypes) == 0 || (len(localControllerIPs) == 0 && len(remoteControllerIPs) == 0) {
@@ -70,6 +70,9 @@ func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
 	params.Add("org_id", strconv.Itoa(orgID))
 	for _, dataType := range dataTypes {
 		params.Add("type", string(dataType))
+	}
+	if len(otherParams) > 0 {
+		params.Add("image_name", fmt.Sprintf("%d-%s", orgID, otherParams[0]))
 	}
 	paramsEncode := params.Encode()
 	for _, controllerIP := range localControllerIPs {

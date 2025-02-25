@@ -28,6 +28,7 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 const (
@@ -64,6 +65,10 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.Vtap
 		Updates(vtapRepoCreate).Error; err != nil {
 		return nil, err
 	}
+
+	// refresh all server delete image cache
+	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_IMAGE}, vtapRepoCreate.Name)
+
 	vtapRepoes, _ := GetVtapRepo(orgID, map[string]interface{}{"name": vtapRepoCreate.Name})
 	return &vtapRepoes[0], nil
 }

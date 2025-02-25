@@ -78,6 +78,8 @@ func PutCache(c *gin.Context) {
 				trisolaris.PutFlowACL(orgID)
 			case DATA_CHANGED_GROUP, DATA_CHANGED_SERVICE:
 				trisolaris.PutGroup(orgID)
+			case DATA_CHANGED_IMAGE:
+				trisolaris.DeleteImageCache(c.DefaultQuery("image_name", ""))
 			}
 		}
 	}

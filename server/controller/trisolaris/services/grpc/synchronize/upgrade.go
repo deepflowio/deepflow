@@ -66,6 +66,11 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 		return nil, fmt.Errorf("get db vtapRepo(name=%s) failed, %s", upgradePackage, err)
 	}
 
+	cacheKey := fmt.Sprintf("%d-%s", orgID, upgradePackage)
+	imageCace, found := trisolaris.GetImageCache(cacheKey)
+	if found {
+		return imageCace.(*UpgradeData), nil
+	}
 	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](db.DB).GetFromName(upgradePackage)
 	if err != nil {
 		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, %s", upgradePackage, err)
@@ -81,14 +86,16 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
 	cipherStr := md5.Sum(content)
 	md5Sum := fmt.Sprintf("%x", cipherStr)
-	return &UpgradeData{
+	upgradeData := &UpgradeData{
 		content:  content,
 		totalLen: totalLen,
 		pktCount: pktCount,
 		md5Sum:   md5Sum,
 		step:     step,
 		k8sImage: vtapRrepo.K8sImage,
-	}, err
+	}
+	trisolaris.SetImageCache(cacheKey, upgradeData)
+	return upgradeData, nil
 }
 
 func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServer) error {
