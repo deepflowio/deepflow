@@ -32,12 +32,7 @@ var EXT_METRICS = map[string]*Metrics{}
 
 func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
-	var err error
-	if slices.Contains([]string{common.DB_NAME_APPLICATION_LOG, common.DB_NAME_EXT_METRICS, common.DB_NAME_DEEPFLOW_ADMIN, common.DB_NAME_DEEPFLOW_TENANT}, db) || (db == "flow_log" && table == "l7_flow_log") {
-		// Avoid UT failures
-		if config.Cfg == nil {
-			return nil, nil
-		}
+	if slices.Contains([]string{common.DB_NAME_DEEPFLOW_ADMIN, common.DB_NAME_DEEPFLOW_TENANT, common.DB_NAME_APPLICATION_LOG, common.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{common.TABLE_NAME_L7_FLOW_LOG}, table) {
 		externalChClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
@@ -77,6 +72,12 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
+		lm := NewMetrics(
+			len(loadMetrics), "metrics",
+			"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
+			"metrics", []bool{true, true, true}, "", table, "", "", "", "",
+		)
+		loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
 	}
-	return loadMetrics, err
+	return loadMetrics, nil
 }

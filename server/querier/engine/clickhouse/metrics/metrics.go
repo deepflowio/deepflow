@@ -240,7 +240,8 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 		)
 		return metric, true
 	}
-	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
+	// dynamic metrics
+	if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG}, table) {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -251,7 +252,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 					field, field, field, "", "", "", METRICS_TYPE_COUNTER,
 					"metrics", []bool{true, true, true}, "", table, "", "", "", "",
 				)
-				newAllMetrics[field] = metric
+				return metric, true
 			} else if fieldSplit[0] == "tag" {
 				fieldName := strings.Replace(field, "tag.", "", 1)
 				metric := NewMetrics(
@@ -259,7 +260,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 					field, field, field, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
 					"Tag", []bool{true, true, true}, "", table, "", "", "", "",
 				)
-				newAllMetrics[field] = metric
+				return metric, true
 			}
 		}
 	}
@@ -359,62 +360,16 @@ func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 	return map[string]*Metrics{}
 }
 
-func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
-	var err error
-	switch db {
-	case "flow_log":
-		switch table {
-		case "l7_flow_log":
-			metrics := make(map[string]*Metrics)
-			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-			for k, v := range exts {
-				if _, ok := metrics[k]; !ok {
-					metrics[k] = v
-				}
-			}
-			metrics["metrics"] = NewMetrics(
-				len(metrics), "metrics",
-				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
-			)
-			return metrics, err
-		}
-	case ckcommon.DB_NAME_APPLICATION_LOG:
-		switch table {
-		case "log":
-			metrics := make(map[string]*Metrics)
-			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-			for k, v := range exts {
-				if _, ok := metrics[k]; !ok {
-					metrics[k] = v
-				}
-			}
-			metrics["metrics"] = NewMetrics(
-				len(metrics), "metrics",
-				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table, "", "", "", "",
-			)
-			return metrics, err
-		}
-	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
-		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-	}
-	return nil, err
-}
-
 func GetMetricsDescriptionsByDBTable(db, table string, allMetrics map[string]*Metrics) []interface{} {
 	/* columns := []interface{}{
 		 "name", "is_agg", "display_name", "display_name_zh", "display_name_en", "unit", "unit_zh", "unit_en", "type", "category", "operators", "permissions", "table", "description", "description_zh", "description_en"
 	 } */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
-			field = metrics.DisplayName
-		} else if db == ckcommon.DB_NAME_PROMETHEUS {
+		// dynamic metrics
+		if (slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG}, table)) && strings.Contains(field, "-") {
 			index := strings.LastIndex(field, "-")
-			if index != -1 {
-				field = field[:index]
-			}
+			field = field[:index]
 		}
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.DisplayNameZH, metrics.DisplayNameEN, metrics.Unit, metrics.UnitZH, metrics.UnitEN, metrics.Type,
@@ -436,7 +391,7 @@ func FormatMetricsToResult(db, table, where, queryCacheTTL, orgID string, useQue
 	staticMetricsValues := GetMetricsDescriptionsByDBTable(db, table, staticMetrics)
 	values = append(values, staticMetricsValues...)
 	// dynamic
-	dynamicMetrics, err := GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
+	dynamicMetrics, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	if err != nil {
 		return allMetrics, values, err
 	}
