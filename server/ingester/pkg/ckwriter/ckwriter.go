@@ -489,6 +489,7 @@ type Cache struct {
 }
 
 func (c *Cache) Release() {
+	c.size = 0
 	c.columnBlock = nil
 	c.protoInput = nil
 }
