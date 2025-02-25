@@ -640,6 +640,7 @@ const (
 	DATA_CHANGED_GROUP         DataChanged = "group"
 	DATA_CHANGED_TAP_TYPE      DataChanged = "tap_type"
 	DATA_CHANGED_SERVICE       DataChanged = "service"
+	DATA_CHANGED_IMAGE         DataChanged = "image"
 )
 
 const (
