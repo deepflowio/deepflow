@@ -17,36 +17,33 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type DHCPPort struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 }
 
-func NewDHCPPort(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *DHCPPort {
+func NewDHCPPort(q *queue.OverwriteQueue) *DHCPPort {
 	mng := &DHCPPort{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT,
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *DHCPPort) ProduceByAdd(items []*metadbmodel.DHCPPort) {
-	for _, item := range items {
+func (p *DHCPPort) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.DHCPPort) {
 		var opts []eventapi.TagFieldOption
-		info, err := p.ToolDataSet.GetDHCPPortInfoByID(item.ID) // TODO use method in common
+		info, err := md.GetToolDataSet().GetDHCPPortInfoByID(item.ID) // TODO use method in common
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -61,7 +58,7 @@ func (p *DHCPPort) ProduceByAdd(items []*metadbmodel.DHCPPort) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		p.createAndEnqueue(
+		p.createAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -72,24 +69,8 @@ func (p *DHCPPort) ProduceByAdd(items []*metadbmodel.DHCPPort) {
 	}
 }
 
-func (p *DHCPPort) ProduceByUpdate(cloudItem *cloudmodel.DHCPPort, diffBase *diffbase.DHCPPort) {
-}
-
-func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
-		id, ok := p.ToolDataSet.GetDHCPPortIDByLcuuid(lcuuid)
-		if ok {
-			var err error
-			name, err = p.ToolDataSet.GetDHCPPortNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err, p.metadata.LogPrefixes)
-			}
-		} else {
-			log.Error(nameByIDNotFound(p.resourceType, id))
-		}
-
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+func (p *DHCPPort) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.DHCPPort) {
+		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
 	}
 }

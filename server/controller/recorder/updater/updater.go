@@ -127,8 +127,11 @@ func newUpdaterBase[
 		u.metadata.GetORGID(),
 		message.MetadataTeamID(u.metadata.GetTeamID()),
 		message.MetadataDomainID(u.metadata.Domain.ID),
+		message.MetadataDomainLcuuid(u.metadata.Domain.Lcuuid),
 		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
+		message.MetadataSubDomainLcuuid(u.metadata.SubDomain.Lcuuid),
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
+		message.MetadataToolDataSet(cache.ToolDataSet),
 	)
 
 	// log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
@@ -250,6 +253,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 		msgData.SetFields(structInfo)
 		msgData.SetDiffBase(diffBase)
 		msgData.SetCloudItem(cloudItem)
+		msgData.SetNewMySQLItem(dbItem)
 		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
 		u.Changed = true
 	}

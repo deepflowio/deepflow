@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/stretchr/testify/assert"
 )
@@ -92,7 +93,7 @@ func TestVM_ProduceByAdd(t *testing.T) {
 			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByAdd(tt.args.items)
 
-			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.ManagerComponent.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 			assert.Equal(t, tt.wantVPCID, e.VPCID)
@@ -155,14 +156,14 @@ func TestVM_ProduceByDelete(t *testing.T) {
 			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByDelete(tt.args.lcuuids)
 
-			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.ManagerComponent.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
 	}
 }
 
-func TestVM_ProduceByUpdate(t *testing.T) {
+func TestVM_OnResourceUpdated(md *message.Metadata, t *testing.T) {
 	type args struct {
 		cloudItem *cloudmodel.VM
 		diffBase  *diffbase.VM
@@ -263,9 +264,9 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 			}
 			tt.prepare(tt.cache)
 			tt.v = NewVM(tt.cache.ToolDataSet, NewEventQueue())
-			tt.v.ProduceByUpdate(tt.args.cloudItem, tt.args.diffBase)
+			tt.v.OnResourceUpdated(md*message.Metadata, tt.args.cloudItem, tt.args.diffBase)
 
-			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.ManagerComponent.Queue.Get().(*eventapi.ResourceEvent)
 			tt.assertion(t, e)
 		})
 	}

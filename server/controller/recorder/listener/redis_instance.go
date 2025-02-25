@@ -21,25 +21,20 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type RedisInstance struct {
-	cache         *cache.Cache
-	eventProducer *event.RedisInstance
+	cache *cache.Cache
 }
 
-func NewRedisInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RedisInstance {
+func NewRedisInstance(c *cache.Cache) *RedisInstance {
 	listener := &RedisInstance{
-		cache:         c,
-		eventProducer: event.NewRedisInstance(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (ri *RedisInstance) OnUpdaterAdded(addedDBItems []*metadbmodel.RedisInstance) {
-	ri.eventProducer.ProduceByAdd(addedDBItems)
 	ri.cache.AddRedisInstances(addedDBItems)
 }
 
@@ -49,6 +44,5 @@ func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, d
 }
 
 func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string) {
-	ri.eventProducer.ProduceByDelete(lcuuids)
 	ri.cache.DeleteRedisInstances(lcuuids)
 }

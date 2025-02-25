@@ -102,20 +102,20 @@ type MySQLData[MT constraint.MySQLModel] struct {
 	old *MT
 }
 
-func (m *MySQLData[MT]) GetNewMySQL() *MT {
+func (m *MySQLData[MT]) GetNewMySQLItem() interface{} {
 	return m.new
 }
 
-func (m *MySQLData[MT]) SetNewMySQL(new *MT) {
-	m.new = new
+func (m *MySQLData[MT]) SetNewMySQLItem(new interface{}) {
+	m.new = new.(*MT)
 }
 
-func (m *MySQLData[MT]) GetOldMySQL() *MT {
+func (m *MySQLData[MT]) GetOldMySQLItem() interface{} {
 	return m.old
 }
 
-func (m *MySQLData[MT]) SetOldMySQL(old *MT) {
-	m.old = old
+func (m *MySQLData[MT]) SetOldMySQLItem(old interface{}) {
+	m.old = old.(*MT)
 }
 
 type DiffBase[DT constraint.DiffBase] struct {
