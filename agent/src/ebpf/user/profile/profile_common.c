@@ -728,7 +728,9 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 						   stack_trace_msg_hash_t *
 						   msg_hash,
 						   char *process_name,
-						   struct stack_trace_key_t *v)
+						   struct stack_trace_key_t *v,
+						   u64 ns_id,
+						   const char *container_id)
 {
 	stack_trace_msg_kv_t kv;
 	set_msg_kvp_by_comm(&kv, v, (void *)0);
@@ -770,7 +772,7 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 		return;
 	}
 	memset(msg, 0, len);
-	set_stack_trace_msg(ctx, msg, v, false, 0, 0, process_name, NULL);
+	set_stack_trace_msg(ctx, msg, v, false, 0, ns_id, process_name, container_id);
 	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
 	msg->data_len = strlen((char *)msg->data);
 	kv.msg_ptr = pointer_to_uword(msg);
@@ -932,7 +934,12 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 */
 		if (matched && !ctx->only_matched_data)
 			update_matched_process_in_total(ctx, msg_hash,
-							process_name, v);
+							process_name, v,
+							netns_id,
+							info_p
+							? ((struct symbolizer_proc_info
+							    *)info_p)->container_id :
+							NULL);
 
 	      skip_proc_find:
 		if (stack_trace_msg_hash_search
