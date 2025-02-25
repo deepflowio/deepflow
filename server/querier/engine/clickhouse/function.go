@@ -244,8 +244,12 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 		tagEnum := strings.TrimSuffix(field, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDes, getTagOK := tag.GetTag(field, db, table, "enum")
+		enumTable := table
+		if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS, chCommon.DB_NAME_EXT_METRICS}, db) {
+			enumTable = chCommon.DB_TABLE_MAP[db][0]
+		}
 		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
-			DB: db, Table: table, TagName: field,
+			DB: db, Table: enumTable, TagName: field,
 		}]
 		if getTagOK {
 			nameColumn := ""
@@ -973,6 +977,11 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		if strings.HasPrefix(f.Args[0], "is_internet") {
 			m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
 		}
+		// auto_custom_tag
+		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, f.Args[0]) {
+			m.AddGroup(&view.Group{Value: f.Alias})
+			m.AddGroup(&view.Group{Value: strings.ReplaceAll(f.Alias, "node_type", "icon_id")})
+		}
 
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:
@@ -1012,8 +1021,12 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDes, getTagOK := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		enumTable := f.Table
+		if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS, chCommon.DB_NAME_EXT_METRICS}, f.DB) {
+			enumTable = chCommon.DB_TABLE_MAP[f.DB][0]
+		}
 		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
-			DB: f.DB, Table: f.Table, TagName: f.Args[0],
+			DB: f.DB, Table: enumTable, TagName: f.Args[0],
 		}]
 		language := f.Engine.Language
 		nameColumn := ""

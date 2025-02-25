@@ -1350,14 +1350,8 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQuer
 			}
 		}
 	}
-	if db == "ext_metrics" {
-		table = "ext_common"
-	} else if db == ckcommon.DB_NAME_DEEPFLOW_ADMIN {
-		table = "deepflow_server"
-	} else if db == ckcommon.DB_NAME_DEEPFLOW_TENANT {
-		table = "deepflow_collector"
-	} else if db == ckcommon.DB_NAME_PROMETHEUS {
-		table = "samples"
+	if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_EXT_METRICS}, db) {
+		table = ckcommon.DB_TABLE_MAP[db][0]
 	}
 	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
 		DB: db, Table: table, TagName: tag,
