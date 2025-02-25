@@ -620,6 +620,6 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 			break
 		}
 	}
-	log.Infof("exit agent push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
+	log.Infof("exit agent(%s-%s) push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
 	return err
 }
