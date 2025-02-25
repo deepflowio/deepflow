@@ -1129,6 +1129,39 @@ impl FlowMap {
         config.l4_performance_enabled
     }
 
+    fn update_nat_info(flow: &mut Flow, meta_packet: &mut MetaPacket) {
+        if meta_packet.lookup_key.src_nat_source != TapPort::NAT_SOURCE_NONE
+            && meta_packet.lookup_key.src_nat_source
+                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source
+        {
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source =
+                meta_packet.lookup_key.src_nat_source;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_ip =
+                meta_packet.lookup_key.src_nat_ip;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_port =
+                meta_packet.lookup_key.src_nat_port;
+        }
+
+        if meta_packet.lookup_key.dst_nat_source != TapPort::NAT_SOURCE_NONE
+            && meta_packet.lookup_key.dst_nat_source
+                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                    .nat_source
+        {
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_source = meta_packet.lookup_key.dst_nat_source;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_real_ip = meta_packet.lookup_key.dst_nat_ip;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_real_port = meta_packet.lookup_key.dst_nat_port;
+        }
+
+        let nat_source = meta_packet.lookup_key.get_nat_source();
+        meta_packet.tap_port.set_nat_source(nat_source);
+        if nat_source > flow.flow_key.tap_port.get_nat_source() {
+            flow.flow_key.tap_port.set_nat_source(nat_source);
+        }
+    }
+
     fn init_nat_info(flow: &mut Flow, meta_packet: &MetaPacket) {
         if meta_packet.lookup_key.src_nat_source != TapPort::NAT_SOURCE_NONE {
             flow.flow_metrics_peers[0].nat_source = meta_packet.lookup_key.src_nat_source;
@@ -1483,35 +1516,8 @@ impl FlowMap {
             flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize].gpid =
                 meta_packet.gpid_1;
         }
-        if meta_packet.lookup_key.src_nat_source != TapPort::NAT_SOURCE_NONE
-            && meta_packet.lookup_key.src_nat_source
-                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source
-        {
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source =
-                meta_packet.lookup_key.src_nat_source;
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_ip =
-                meta_packet.lookup_key.src_nat_ip;
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_port =
-                meta_packet.lookup_key.src_nat_port;
-        }
-        if meta_packet.lookup_key.dst_nat_source != TapPort::NAT_SOURCE_NONE
-            && meta_packet.lookup_key.dst_nat_source
-                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
-                    .nat_source
-        {
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
-                .nat_source = meta_packet.lookup_key.dst_nat_source;
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
-                .nat_real_ip = meta_packet.lookup_key.dst_nat_ip;
-            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
-                .nat_real_port = meta_packet.lookup_key.dst_nat_port;
-        }
 
-        let nat_source = meta_packet.lookup_key.get_nat_source();
-        meta_packet.tap_port.set_nat_source(nat_source);
-        if nat_source > flow.flow_key.tap_port.get_nat_source() {
-            flow.flow_key.tap_port.set_nat_source(nat_source);
-        }
+        Self::update_nat_info(flow, meta_packet);
 
         // The ebpf data has no l3 and l4 information, so it can be returned directly
         if flow.signal_source == SignalSource::EBPF {
@@ -2326,12 +2332,6 @@ impl FlowMap {
             peer_src.is_vip = src_info.is_vip;
             peer_src.is_local_mac = src_info.is_local_mac;
             peer_src.is_local_ip = src_info.is_local_ip;
-            if !src_info.real_ip.is_unspecified()
-                && TapPort::NAT_SOURCE_VIP > meta_packet.lookup_key.dst_nat_source
-            {
-                meta_packet.lookup_key.src_nat_ip = src_info.real_ip;
-                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_VIP;
-            }
 
             let dst_info = ep.dst_info();
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
@@ -2346,12 +2346,9 @@ impl FlowMap {
             peer_dst.is_vip = dst_info.is_vip;
             peer_dst.is_local_mac = dst_info.is_local_mac;
             peer_dst.is_local_ip = dst_info.is_local_ip;
-            if !dst_info.real_ip.is_unspecified()
-                && TapPort::NAT_SOURCE_VIP > meta_packet.lookup_key.dst_nat_source
-            {
-                meta_packet.lookup_key.dst_nat_ip = dst_info.real_ip;
-                meta_packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
-            }
+
+            meta_packet.set_vip_info(src_info.real_ip, dst_info.real_ip);
+
             // When there is a change in l2end or l3end, the tap side needs to be recalculated
             if reset_tap_side {
                 node.tagged_flow.flow.tap_side = TapSide::Rest;
