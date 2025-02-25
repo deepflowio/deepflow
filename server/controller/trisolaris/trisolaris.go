@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/trident"
@@ -62,6 +63,7 @@ type TrisolarisManager struct {
 	defaultDB       *gorm.DB
 	startTime       int64
 	orgIDData       *trident.OrgIDsResponse
+	imageCache      *cache.Cache
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -276,6 +278,30 @@ func PutGroup(orgID int) {
 	}
 }
 
+func SetImageCache(key string, value any) {
+	if trisolarisManager == nil {
+		return
+	}
+	log.Warningf("image cache set (%s)", key)
+	trisolarisManager.imageCache.SetDefault(key, value)
+}
+
+func GetImageCache(key string) (any, bool) {
+	if trisolarisManager == nil {
+		return nil, false
+	}
+	log.Debugf("image cache get (%s)", key)
+	return trisolarisManager.imageCache.Get(key)
+}
+
+func DeleteImageCache(key string) {
+	if trisolarisManager == nil {
+		return
+	}
+	log.Debugf("image cache delete (%s)", key)
+	trisolarisManager.imageCache.Delete(key)
+}
+
 func getStartTime() int64 {
 	startTime := int64(0)
 	for {
@@ -349,6 +375,7 @@ func NewTrisolarisManager(cfg *config.Config, db *gorm.DB) *TrisolarisManager {
 			config:          cfg,
 			defaultDB:       db,
 			orgIDData:       &trident.OrgIDsResponse{},
+			imageCache:      cache.New(time.Duration(cfg.ImageExpire)*time.Second, 10*time.Minute),
 
 			ctx:    ctx,
 			cancel: cancel,

@@ -50,6 +50,7 @@ type Config struct {
 	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
 	GPIDRefreshInterval            int  `default:"9" yaml:"gpid-refresh-interval"`
+	ImageExpire                    int  `default:"300" yaml:"image_expire"` // unit: second
 	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
 	DomainAutoRegister             bool `default:"true" yaml:"domain-auto-register"`
 	DefaultTapMode                 int  `yaml:"default-tap-mode"`
