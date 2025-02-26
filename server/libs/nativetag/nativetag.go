@@ -226,7 +226,7 @@ func UpdateNativeTag(op NativeTagOP, orgId uint16, nativeTag *NativeTag) {
 	log.Infof("after %s orgid %d, table %s, native tag: %+v", op, orgId, tableId.Table(), oldNativeTag)
 }
 
-func CKAddNativeTag(isByConity bool, conn *sql.DB, orgId uint16, nativeTag *NativeTag) error {
+func CKAddNativeTag(isByConity, ignoreColumnExisted bool, conn *sql.DB, orgId uint16, nativeTag *NativeTag) error {
 	tableId, err := ToNativeTagTable(nativeTag.Db, nativeTag.Table)
 	if err != nil {
 		log.Error(err)
@@ -256,7 +256,7 @@ func CKAddNativeTag(isByConity bool, conn *sql.DB, orgId uint16, nativeTag *Nati
 			_, err := conn.Exec(sql)
 			if err != nil {
 				// if it has already been added, you need to skip the error
-				if strings.Contains(err.Error(), "column with this name already exists") {
+				if strings.Contains(err.Error(), "column with this name already exists") && ignoreColumnExisted {
 					log.Infof("db: %s, table: %s error: %s", tableId.Database(), tableId.Table(), err)
 					continue
 				}
