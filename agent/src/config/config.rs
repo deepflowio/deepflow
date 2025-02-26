@@ -1541,7 +1541,7 @@ impl Default for ApplicationProtocolInference {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TagFilterOperator {
-    pub name: String,
+    pub field_name: String,
     pub operator: String,
     pub value: String,
 }
@@ -2963,24 +2963,6 @@ pub struct L7ProtocolAdvancedFeatures {
     pub obfuscate_enabled_protocols: Vec<String>,
     pub extra_log_fields: ExtraLogFields,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-#[serde(default, rename_all = "kebab-case")]
-pub struct L7LogBlacklist {
-    pub field_name: String,
-    pub operator: String,
-    pub value: String,
-}
-
-impl From<&TagFilterOperator> for L7LogBlacklist {
-    fn from(o: &TagFilterOperator) -> Self {
-        Self {
-            field_name: o.name.to_string(),
-            operator: o.operator.to_string(),
-            value: o.value.to_string(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
