@@ -1351,7 +1351,7 @@ func (i *Issu) Start() error {
 			if nativeTag == nil {
 				continue
 			}
-			if e := nativetag.CKAddNativeTag(i.cfg.CKDB.Type == ckdb.CKDBTypeByconity, connect, ckdb.DEFAULT_ORG_ID, nativeTag); e != nil {
+			if e := nativetag.CKAddNativeTag(i.cfg.CKDB.Type == ckdb.CKDBTypeByconity, true, connect, ckdb.DEFAULT_ORG_ID, nativeTag); e != nil {
 				log.Error(err)
 			}
 		}
@@ -1405,7 +1405,7 @@ func (i *Issu) Start() error {
 						if nativeTag == nil {
 							continue
 						}
-						if e := nativetag.CKAddNativeTag(i.cfg.CKDB.Type == ckdb.CKDBTypeByconity, connect, orgId, nativeTag); e != nil {
+						if e := nativetag.CKAddNativeTag(i.cfg.CKDB.Type == ckdb.CKDBTypeByconity, true, connect, orgId, nativeTag); e != nil {
 							log.Error(err)
 						}
 					}
