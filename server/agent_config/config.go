@@ -16,13 +16,22 @@
 
 package agent_config
 
-import _ "embed"
+import (
+	"embed"
+	"regexp"
+)
 
 //go:embed example.yaml
 var YamlAgentGroupConfig []byte
 
 //go:embed template.yaml
 var YamlAgentGroupConfigTemplate []byte
+
+//go:embed vector_host_metrics.yaml vector_k8s_logs.yaml vector_k8s_metrics.yaml
+var YamlEmbeddedSubTemplate embed.FS
+
+// regex match: (indent)#(indent){{ file: xxx.yaml }}
+var YamlSubTemplateRegex = regexp.MustCompile(`([\s#]*){{\s(file):\s(.*)\.(.*)\s}}`)
 
 type AgentGroupConfig struct {
 	VTapGroupID                       *string       `json:"VTAP_GROUP_ID" yaml:"vtap_group_id,omitempty"`

@@ -1347,6 +1347,21 @@ impl Default for Integration {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct Vector {
+    pub enabled: bool,
+    pub config: serde_yaml::Value,
+}
+
+impl Default for Vector {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config: serde_yaml::Value::Null,
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Inputs {
@@ -1355,6 +1370,7 @@ pub struct Inputs {
     pub ebpf: Ebpf,
     pub resources: Resources,
     pub integration: Integration,
+    pub vector: Vector,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]

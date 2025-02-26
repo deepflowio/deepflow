@@ -422,6 +422,15 @@ func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []
 			i = f.ignoreSubelementComments(i)
 			continue
 		}
+		if YamlSubTemplateRegex.MatchString(f.lines[i]) {
+			sublines := strings.Split(YamlSubTemplateRegex.ReplaceAllStringFunc(f.lines[i], ReplaceTemplateSyntax(true)), "\n")
+			sublinesBuilder := strings.Builder{}
+			for _, line := range sublines {
+				sublinesBuilder.WriteString("\n")
+				sublinesBuilder.WriteString(f.indentLine(f.uncommentLine(line), 1))
+			}
+			f.lines[i] = sublinesBuilder.String()
+		}
 		commentlines = append(commentlines, f.indentLine(f.uncommentLine(f.lines[i]), 1))
 	}
 
@@ -719,4 +728,45 @@ func (f *DataFomatter) isIntValue(comment map[string]interface{}) bool {
 		return comment["type"] == "int"
 	}
 	return false
+}
+
+func ReplaceTemplateSyntax(addNewLine bool) func(string) string {
+	return func(str string) string {
+		subMatchers := YamlSubTemplateRegex.FindStringSubmatch(str)
+		if len(subMatchers) < 5 {
+			return str
+		}
+		indent := subMatchers[1]
+		replaceType := subMatchers[2]
+		subType := subMatchers[4]
+		subName := subMatchers[3] + "." + subType
+		if replaceType == "file" {
+			fileContent, err := YamlEmbeddedSubTemplate.ReadFile(subName)
+			if err != nil {
+				return str
+			}
+			lines := strings.Split(string(fileContent), "\n")
+			var builder strings.Builder
+			if addNewLine {
+				builder.WriteString("\n")
+			}
+			builder.WriteString(indent)
+			builder.WriteString("```")
+			builder.WriteString(subType)
+			for _, line := range lines {
+				if addNewLine {
+					builder.WriteString("\n")
+				}
+				builder.WriteString(indent)
+				builder.WriteString(line)
+			}
+			if addNewLine {
+				builder.WriteString("\n")
+			}
+			builder.WriteString(indent)
+			builder.WriteString("```")
+			return builder.String()
+		}
+		return str
+	}
 }

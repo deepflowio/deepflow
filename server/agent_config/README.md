@@ -5754,6 +5754,381 @@ inputs:
 | ---- | ---------------------------- |
 | Type | bool |
 
+## Vector {#inputs.vector}
+
+### Vector Component Disabled {#inputs.vector.enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.vector.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  vector:
+    enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+The switcher control for Vector component running.
+
+### Vector Component Config {#inputs.vector.config}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.vector.config`
+
+**Default value**:
+```yaml
+inputs:
+  vector:
+    config: null
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+The detail config for Vector Component, all availble config keys could be found in [vector.dev](https://vector.dev/docs/reference/configuration)
+Here's an example for how to capture kubernetes logs、host metrics in virtual machine and kubelet metrics in kubernetes. It'll send to DeepFlow-Agent as output.
+
+scrape host metrics:
+```yaml
+config:
+  sources:
+    host_metrics:
+      type: host_metrics
+      scrape_interval_secs: 10
+      namespace: node
+  transforms:
+    host_metrics_relabel:
+      type: remap
+      inputs:
+      - host_metrics
+      source: |
+        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+        .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+        # map to prometheus metric name
+        metrics_map = {
+          "boot_time": "boot_time_seconds",
+          "memory_active_bytes": "memory_Active_bytes",
+          "memory_available_bytes": "memory_MemAvailable_bytes",
+          "memory_buffers_bytes": "memory_Buffers_bytes",
+          "memory_cached_bytes": "memory_Cached_bytes",
+          "memory_free_bytes": "memory_MemFree_bytes",
+          "memory_swap_free_bytes": "memory_SwapFree_bytes",
+          "memory_swap_total_bytes": "memory_SwapTotal_bytes",
+          "memory_swap_used_bytes": "memory_SwapCached_bytes",
+          "memory_total_bytes": "memory_MemTotal_bytes",
+          "network_transmit_packets_drop_total": "network_transmit_drop_total",
+          "uptime": "uname_info",
+          "filesystem_total_bytes": "filesystem_size_bytes",
+        }
+        metric_name = get!(value: metrics_map, path: [.name])
+        if !is_null(metric_name) {
+          .name = metric_name
+        }
+        if .tags.collector == "filesystem" {
+          .tags.fstype = .tags.filesystem
+          del(.tags.filesystem)
+        }
+  sinks:
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - host_metrics_relabel
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
+```
+
+scrape kubernetes metrics
+```yaml
+config:
+  secret:
+    kube_token:
+      type: directory
+      path: /var/run/secrets/kubernetes.io/serviceaccount
+  sources:
+    cadvisor_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
+      auth:
+        strategy: bearer
+        token: SECRET[kube_token.token]
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+      tls:
+        verify_certificate: false
+    kubelet_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+      auth:
+        strategy: bearer
+        token: SECRET[kube_token.token]
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+      tls:
+        verify_certificate: false
+    kube_state_metrics:
+      type: prometheus_scrape
+      endpoints:
+      - http://opensource-kube-state-metrics:8080/metrics
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 10
+      honor_labels: true
+      instance_tag: instance
+      endpoint_tag: metrics_endpoint
+  transforms:
+    cadvisor_relabel_filter:
+      type: filter
+      inputs:
+      - cadvisor_metrics
+      condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+    kubelet_relabel_filter:
+      type: filter
+      inputs:
+      - kubelet_metrics
+      condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
+    kube_state_relabel_filter:
+      type: filter
+      inputs:
+      - kube_state_metrics
+      condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
+    common_relabel_config:
+      type: remap
+      inputs:
+      - cadvisor_relabel_filter
+      - kubelet_relabel_filter
+      - kube_state_relabel_filter
+      source: |
+        if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
+        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
+        }
+    sinks:
+      prometheus_remote_write:
+        type: prometheus_remote_write
+        inputs:
+        - common_relabel_config
+        endpoint: http://127.0.0.1:38086/api/v1/prometheus
+        healthcheck:
+          enabled: false
+```
+
+scrape kubernentes logs (capture DeepFlow Pod logs as example, if other Pod logs is required, update `extra_label_selector` add custom filters)
+```yaml
+config:
+ data_dir: /vector-log-checkpoint
+ sources:
+   kubernetes_logs:
+     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+     type: kubernetes_logs
+     namespace_annotation_fields:
+       namespace_labels: ""
+     node_annotation_fields:
+       node_labels: ""
+     pod_annotation_fields:
+       pod_annotations: ""
+       pod_labels: ""
+     extra_label_selector: "app=deepflow,component!=front-end"
+   kubernetes_logs_frontend:
+     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+     type: kubernetes_logs
+     namespace_annotation_fields:
+       namespace_labels: ""
+     node_annotation_fields:
+       node_labels: ""
+     pod_annotation_fields:
+       pod_annotations: ""
+       pod_labels: ""
+     extra_label_selector: "app=deepflow,component=front-end"
+ transforms:
+   multiline_kubernetes_logs:
+     type: reduce
+     inputs:
+       - kubernetes_logs
+     group_by:
+       - file
+       - stream
+     merge_strategies:
+       message: concat_newline
+     starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
+     expire_after_ms: 2000
+     flush_period_ms: 500
+   flush_kubernetes_logs:
+    type: remap
+    inputs:
+      - multiline_kubernetes_logs
+    source: |-
+        .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
+   remap_kubernetes_logs:
+     type: remap
+     inputs:
+     - flush_kubernetes_logs
+     - kubernetes_logs_frontend
+     source: |-
+         # try to parse json
+         if is_string(.message) && is_json(string!(.message)) {
+             tags = parse_json(.message) ?? {}
+             ._df_log_type = tags._df_log_type
+             .org_id = to_int(tags.org_id) ?? 0
+             .user_id = to_int(tags.user_id) ?? 0
+             .message = tags.message || tags.msg # extract from tags.message
+             del(tags._df_log_type)
+             del(tags.org_id)
+             del(tags.user_id)
+             del(tags.message)
+             del(tags.msg)
+             .json = tags
+         }
+         if !exists(.level) {
+            if exists(.json) {
+               .level = to_string!(.json.level)
+               del(.json.level)
+            } else {
+              # match log level
+              # allow DEBU/ERRO
+              # INFO|INFOMATION|INFORMATION|WARN|WARNING|DEBUG|ERROR|TRACE|FATAL|CRITICAL
+              # (?i) ignore case, but require `[]` or linux color code surround
+              level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
+              if !exists(level_tags.level) {
+                 # for logs like ' INFO ' surround by whitespace, to avoid level match error, require uppercase strictly
+                 level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
+              }
+              if exists(level_tags.level) {
+                 level_tags.level = upcase(string!(level_tags.level))
+                 if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
+                     level_tags.level = "INFO"
+                 }
+                 if level_tags.level == "WARNING" {
+                     level_tags.level = "WARN"
+                 }
+                 if level_tags.level == "DEBU" {
+                     level_tags.level = "DEBUG"
+                 }
+                 if level_tags.level == "ERRO" {
+                     level_tags.level = "ERROR"
+                 }
+                 if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
+                     level_tags.level = "FATAL"
+                 }
+                 .level = level_tags.level
+              }
+            }
+         }
+         if !exists(._df_log_type) {
+             ._df_log_type = "system"
+         }
+         if !exists(.app_service) {
+             .app_service = .kubernetes.container_name
+         }
+ sinks:
+   http:
+     type: http
+     inputs: [remap_kubernetes_logs]
+     uri: http://127.0.0.1:38086/api/v1/log
+     encoding:
+       codec: json
+       sinks:
+         http:
+           encoding:
+             codec: json
+           inputs:
+           - tag_kubernetes_logs
+           type: http
+           uri: http://127.0.0.1:38086/api/v1/log
+```
+
+use http_client or socket to dial a remote server for testing
+```yaml
+config:
+  sources:
+    http_client_dial:
+      type: http_client
+      endpoint: http://$HOST:$PORT
+      method: GET
+      scrape_interval_secs: 10
+      scrape_timeout_secs: 5
+    internal_metrics:
+      type: internal_metrics
+      scrape_interval_secs: 10
+      namespace: ${K8S_NAMESPACE_FOR_DEEPFLOW}
+    socket_dial_input:
+      type: demo_logs
+      interval: 10
+      format: shuffle
+      lines: [""]
+  transforms:
+    internal_metrics_relabel:
+      type: remap
+      inputs:
+      - internal_metrics
+      source: |-
+        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+    internal_metrics_dispatch:
+      type: route
+      inputs:
+      - internal_metrics_relabel
+      route:
+        http_client_dial_metrics: '.tags.component_id == "http_client_dial"'
+        socket_dial_metrics: '.tags.component_id == "socket_dial"'
+    http_client_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.http_client_dial_metrics
+      condition: "match(string!(.name),r'http_client_.*')"
+    socket_dial_metrics:
+      type: filter
+      inputs:
+      - internal_metrics_dispatch.socket_dial_metrics
+      condition: "match(string!(.name),r'buffer.*')"
+  sinks:
+    socket_dial:
+      type: socket
+      inputs:
+      - socket_dial_input
+      address: $HOST:$PORT
+      mode: tcp
+      encoding:
+        codec: raw_message
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - http_client_dial_metrics
+      - socket_dial_metrics
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
+
+```
+
 # Processors {#processors}
 
 ## Packet {#processors.packet}
