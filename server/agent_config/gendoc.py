@@ -15,6 +15,7 @@
 import yaml
 import sys
 import re
+import os
 import traceback
 
 i18n = {
@@ -149,7 +150,15 @@ def generate_doc_for_yaml_item(key, yaml_value, parsed_comment, lang, wf):
             description_i18n = get_string_by_lang(i18n.get('Description'),
                                                   lang)
             print(f"**{description_i18n}**:\n", file=wf)
+            # replace {{ file: ... }} with file 
+            desc = re.sub(r'{{\s(file):\s(.*)\.(.*)\s}}', replace_template_syntax,
+                          desc)
             print(f"{desc}\n", file=wf)
+
+
+def replace_template_syntax(m):
+    if m.group(1) == "file":
+        return f"```{m.group(3)}\n{open(m.group(2) + '.' + m.group(3), 'r').read()}\n```"
 
 
 def load_comment_as_yaml(key, comment):
