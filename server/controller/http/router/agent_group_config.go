@@ -57,7 +57,8 @@ func (cgc *AgentGroupConfig) RegisterTo(e *gin.Engine) {
 }
 
 func getYAMLAgentGroupConfigTmpl(c *gin.Context) {
-	response.JSON(c, response.SetData(string(agent_config.YamlAgentGroupConfigTemplate)))
+	agent_group_config := agent_config.YamlSubTemplateRegex.ReplaceAllStringFunc(string(agent_config.YamlAgentGroupConfigTemplate), agent_config.ReplaceTemplateSyntax(false))
+	response.JSON(c, response.SetData(string(agent_group_config)))
 }
 
 func getJsonAgentGroupConfigTmpl(cfg *config.ControllerConfig) gin.HandlerFunc {
