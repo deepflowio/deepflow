@@ -234,6 +234,11 @@ func CKAddNativeTag(isByConity, ignoreColumnExisted bool, conn *sql.DB, orgId ui
 	}
 
 	for i, columnName := range nativeTag.ColumnNames {
+		if IndexOf(ckdb.ColumnNames, columnName) > 0 {
+			err := fmt.Errorf("'%s' is a reserved word and is not allowed as a native tag name.", columnName)
+			log.Error(err)
+			return err
+		}
 		tableGlobal := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s",
 			ckdb.OrgDatabasePrefix(orgId)+tableId.Database(), tableId.Table(), columnName, nativeTag.ColumnTypes[i])
 		tableLocal := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s",

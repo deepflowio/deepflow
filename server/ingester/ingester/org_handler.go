@@ -122,7 +122,7 @@ func (o *OrgHandler) addNativeTag(orgId uint16, nativeTag *nativetag.NativeTag) 
 	}
 	defer conns.Close()
 	for _, conn := range conns {
-		err := nativetag.CKAddNativeTag(o.cfg.CKDB.Type == ckdb.CKDBTypeByconity, false, conn, orgId, nativeTag)
+		err := nativetag.CKAddNativeTag(o.cfg.CKDB.Type == ckdb.CKDBTypeByconity, true, conn, orgId, nativeTag)
 		if err != nil {
 			log.Error(err)
 			return err
