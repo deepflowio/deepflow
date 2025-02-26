@@ -188,13 +188,19 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 				} else {
 					updateInfo, ok := b.updaterDG.generateUpdateInfo(oldDBItem, newDBItem)
 					if ok {
-						b.dbOperator.update(oldDBItem, updateInfo, key, db)
+						err := b.dbOperator.update(oldDBItem, updateInfo, key, db)
+						if err != nil {
+							log.Errorf("failed to update %s: %s", b.resourceTypeName, err, db.LogPrefixORGID)
+						}
 						isUpdate = true
 					}
 				}
 			}
 			if len(itemsToAdd) > 0 {
-				b.dbOperator.batchPage(keysToAdd, itemsToAdd, b.dbOperator.add, db) // 1是个占位符
+				err := b.dbOperator.batchPage(keysToAdd, itemsToAdd, b.dbOperator.add, db) // 1是个占位符
+				if err != nil {
+					log.Errorf("failed to add %s: %s", b.resourceTypeName, err, db.LogPrefixORGID)
+				}
 			}
 
 			for key, oldDBItem := range oldKeyToDBItem {
@@ -205,7 +211,10 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 				}
 			}
 			if len(itemsToDelete) > 0 {
-				b.dbOperator.batchPage(keysToDelete, itemsToDelete, b.dbOperator.delete, db) // 1是个占位符
+				err := b.dbOperator.batchPage(keysToDelete, itemsToDelete, b.dbOperator.delete, db) // 1是个占位符
+				if err != nil {
+					log.Errorf("failed to delete %s: %s", b.resourceTypeName, err, db.LogPrefixORGID)
+				}
 			}
 
 			if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 && !isUpdate {
