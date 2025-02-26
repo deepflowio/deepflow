@@ -58,9 +58,13 @@ func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]m
 	for _, prometheusLabel := range prometheusLabels {
 		labelName := prometheusLabel.Name
 		if slices.Contains(appLabelSlice, labelName) {
-			labelNameID := labelNameIDMap[labelName]
+			labelNameID, nameOK := labelNameIDMap[labelName]
 			labelValue := prometheusLabel.Value
-			labelValueID := valueNameIDMap[labelValue]
+			labelValueID, valueOK := valueNameIDMap[labelValue]
+			if !nameOK || !valueOK {
+				log.Warningf("label name or value not found in db, labelName: %s, labelValue: %s", labelName, labelValue)
+				continue
+			}
 			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = metadbmodel.ChAPPLabel{
 				LabelNameID:  labelNameID,
 				LabelValue:   labelValue,
