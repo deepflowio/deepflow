@@ -892,13 +892,13 @@ impl BlacklistTrie {
     }
 
     pub fn insert(&mut self, rule: &TagFilterOperator) {
-        let mut node = match rule.name.to_ascii_lowercase().as_str() {
+        let mut node = match rule.field_name.to_ascii_lowercase().as_str() {
             Self::ENDPOINT => &mut self.endpoint,
             Self::REQUEST_TYPE => &mut self.request_type,
             Self::REQUEST_DOMAIN => &mut self.request_domain,
             Self::REQUEST_RESOURCE => &mut self.request_resource,
             _ => {
-                warn!("Unsupported field_name: {}, only supports endpoint, request_type, request_domain, request_resource.", rule.name.as_str());
+                warn!("Unsupported field_name: {}, only supports endpoint, request_type, request_domain, request_resource.", rule.field_name.as_str());
                 return;
             }
         };

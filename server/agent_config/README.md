@@ -6908,7 +6908,7 @@ processors:
     filters:
       tag_filters:
         HTTP:
-          - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+          - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
             operator: equal               # equal, prefix
             value: somevalue
         HTTP2: []
@@ -6958,7 +6958,7 @@ processors:
     filters:
       tag_filters:
         HTTP:
-          - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+          - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
             operator: equal               # equal, prefix
             value: somevalue
 ```
@@ -7525,8 +7525,8 @@ processors:
     tag_extraction:
       custom_fields:
         HTTP:
-        - field-name: "user-agent"
-        - field-name: "cookie"
+        - field_name: "user-agent"
+        - field_name: "cookie"
 ```
 
 Attention: use `HTTP2` for `gRPC` Protocol.
