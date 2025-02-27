@@ -17,15 +17,14 @@
 package agentsynchronize
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/spf13/viper"
+	kyaml "github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/v2"
 	context "golang.org/x/net/context"
-	yaml "gopkg.in/yaml.v3"
 
 	api "github.com/deepflowio/deepflow/message/agent"
 	. "github.com/deepflowio/deepflow/server/controller/common"
@@ -59,42 +58,37 @@ func NewAgentEvent() *AgentEvent {
 	return &AgentEvent{}
 }
 
-func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) *viper.Viper {
+func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) *koanf.Koanf {
 	userConfig := c.GetUserConfig()
-	viperConfig := viper.New()
-	viperConfig.SetConfigType("yaml")
-	if err := viperConfig.ReadConfig(bytes.NewBufferString(userConfig)); err != nil {
-		log.Errorf("viper read agent(%d) config yaml error: %v", c.GetVTapID(), err)
-	}
 
 	configTSDBIP := gAgentInfo.GetConfigTSDBIP()
 	if configTSDBIP != "" {
-		viperConfig.Set(CONFIG_KEY_INGESTER_IP, configTSDBIP)
+		userConfig.Set(CONFIG_KEY_INGESTER_IP, configTSDBIP)
 	}
 
-	natIPEnabled := viperConfig.GetBool("global.communication.request_via_nat_ip")
+	natIPEnabled := userConfig.Bool("global.communication.request_via_nat_ip")
 	if trisolaris.GetAllAgentConnectToNatIP() || natIPEnabled == true {
-		viperConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, trisolaris.GetORGNodeInfo(orgID).GetControllerNatIP(c.GetControllerIP()))
-		viperConfig.Set(CONFIG_KEY_INGESTER_IP, trisolaris.GetORGNodeInfo(orgID).GetTSDBNatIP(c.GetTSDBIP()))
+		userConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, trisolaris.GetORGNodeInfo(orgID).GetControllerNatIP(c.GetControllerIP()))
+		userConfig.Set(CONFIG_KEY_INGESTER_IP, trisolaris.GetORGNodeInfo(orgID).GetTSDBNatIP(c.GetTSDBIP()))
 	}
 
 	if isPodVTap(c.GetVTapType()) && gAgentInfo.IsTheSameCluster(clusterID) {
-		viperConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, trisolaris.GetORGNodeInfo(orgID).GetControllerPodIP(c.GetControllerIP()))
-		viperConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_PORT, trisolaris.GetGrpcPort())
+		userConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, trisolaris.GetORGNodeInfo(orgID).GetControllerPodIP(c.GetControllerIP()))
+		userConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_PORT, trisolaris.GetGrpcPort())
 
-		viperConfig.Set(CONFIG_KEY_INGESTER_IP, trisolaris.GetORGNodeInfo(orgID).GetTSDBPodIP(c.GetTSDBIP()))
-		viperConfig.Set(CONFIG_KEY_INGESTER_PORT, trisolaris.GetIngesterPort())
+		userConfig.Set(CONFIG_KEY_INGESTER_IP, trisolaris.GetORGNodeInfo(orgID).GetTSDBPodIP(c.GetTSDBIP()))
+		userConfig.Set(CONFIG_KEY_INGESTER_PORT, trisolaris.GetIngesterPort())
 	}
-	if viperConfig.GetString(CONFIG_KEY_PROXY_CONTROLLER_IP) == "" {
+	if userConfig.String(CONFIG_KEY_PROXY_CONTROLLER_IP) == "" {
 		log.Errorf("agent(%s) has no proxy_controller_ip, "+
 			"Please check whether the agent allocs controller IP or If nat-ip is enabled, whether the controller is configured with nat-ip", c.GetCtrlIP())
 	}
 
 	if c.GetVTapEnabled() == 0 {
-		viperConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, false)
+		userConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, false)
 	}
 
-	return viperConfig
+	return userConfig
 }
 
 func (e *AgentEvent) generateDynamicConfig(clusterID string, c *vtap.VTapCache) *api.DynamicConfig {
@@ -319,7 +313,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		}
 	}
 	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
-	if userConfig.GetString(CONFIG_KEY_INGESTER_IP) == "" {
+	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
 			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
@@ -329,7 +323,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.formateViperConfigToString(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}
@@ -343,7 +337,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
-		UserConfig:          proto.String(e.formateViperConfigToString(userConfig)),
+		UserConfig:          proto.String(e.marshalUserConfig(userConfig)),
 		DynamicConfig:       dynamicConfig,
 		PlatformData:        platformData,
 		Groups:              groups,
@@ -366,21 +360,17 @@ func (e *AgentEvent) generateNoAgentCacheDynamicConfig() *api.DynamicConfig {
 	}
 }
 
-func (e *AgentEvent) generateNoAgentCacheUserViperConfig(groupID string, orgID int) *viper.Viper {
+func (e *AgentEvent) generateNoAgentCacheUserConfig(groupID string, orgID int) *koanf.Koanf {
 	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
-	v := viper.New()
-	v.SetConfigType("yaml")
 	if vtapConfig == nil {
-		return v
+		log.Warningf("not found vtap group short id (%s) config", groupID, logger.NewORGPrefix(orgID))
+		return koanf.New(".")
 	}
-	if err := v.ReadConfig(bytes.NewBufferString(vtapConfig.GetUserConfig())); err != nil {
-		log.Error(err)
-	}
-	return v
+	return vtapConfig.GetUserConfig()
 }
 
-func (e *AgentEvent) formateViperConfigToString(userConfig *viper.Viper) string {
-	b, err := yaml.Marshal(userConfig.AllSettings())
+func (e *AgentEvent) marshalUserConfig(userConfig *koanf.Koanf) string {
+	b, err := userConfig.Marshal(kyaml.Parser())
 	if err != nil {
 		log.Error(err)
 		return ""
@@ -397,7 +387,7 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 	k8sForceWatch := in.GetKubernetesForceWatch()
 	k8sWatchPoilcy := in.GetKubernetesWatchPolicy()
 	dynamicConfigInfo := e.generateNoAgentCacheDynamicConfig()
-	viperConfig := e.generateNoAgentCacheUserViperConfig(in.GetAgentGroupIdRequest(), orgID)
+	userConfig := e.generateNoAgentCacheUserConfig(in.GetAgentGroupIdRequest(), orgID)
 	gAgentInfo := trisolaris.GetORGVTapInfo(orgID)
 	if clusterID != "" {
 		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(VTAP_TYPE_POD_VM)
@@ -413,7 +403,7 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.formateViperConfigToString(viperConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
 			DynamicConfig: dynamicConfigInfo,
 		}
 	}
@@ -421,19 +411,19 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 	agentTypeForUnknowAgent := gAgentInfo.GetTridentTypeForUnknowVTap()
 	if agentTypeForUnknowAgent != 0 {
 		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(agentTypeForUnknowAgent)
-		viperConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, true)
+		userConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, true)
 
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
 			DynamicConfig: dynamicConfigInfo,
-			UserConfig:    proto.String(e.formateViperConfigToString(viperConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
 		}
 	}
 
 	return &api.SyncResponse{
 		Status:        &STATUS_SUCCESS,
 		DynamicConfig: dynamicConfigInfo,
-		UserConfig:    proto.String(e.formateViperConfigToString(viperConfig)),
+		UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
 	}
 }
 
@@ -556,7 +546,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	}
 
 	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
-	if userConfig.GetString(CONFIG_KEY_INGESTER_IP) == "" {
+	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
 			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", vtapCache.GetCtrlIP())
@@ -566,7 +556,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.formateViperConfigToString(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}
@@ -580,7 +570,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
 		DynamicConfig:       dynamicConfig,
-		UserConfig:          proto.String(e.formateViperConfigToString(userConfig)),
+		UserConfig:          proto.String(e.marshalUserConfig(userConfig)),
 		PlatformData:        platformData,
 		SkipInterface:       skipInterface,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
