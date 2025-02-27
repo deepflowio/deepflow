@@ -302,7 +302,7 @@ func (e *VTapEvent) GetFailedResponse(in *api.SyncRequest, gVTapInfo *vtap.VTapI
 }
 
 func (e *VTapEvent) CheckVersion(version string) bool {
-	for _, checkVersion := range []string{"B_LC_RELEASE_v6_4", "B_LC_RELEASE_v6_3", "B_LC_RELEASE_v6_2"} {
+	for _, checkVersion := range []string{"B_LC_RELEASE_v6_4", "B_LC_RELEASE_v6_3", "B_LC_RELEASE_v6_2", "B_LC_RELEASE_v6_1"} {
 		if strings.Contains(version, checkVersion) {
 			return true
 		}
