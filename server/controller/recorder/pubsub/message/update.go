@@ -755,3 +755,12 @@ type ProcessUpdate struct {
 	DiffBase[*diffbase.Process]
 	MySQLData[mysqlmodel.Process]
 }
+
+type CustomServiceFieldsUpdate struct {
+	Key
+	Name fieldDetail[string]
+}
+type CustomServiceUpdate struct {
+	Fields[CustomServiceFieldsUpdate]
+	MySQLData[mysqlmodel.CustomService]
+}

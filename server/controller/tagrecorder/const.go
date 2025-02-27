@@ -54,6 +54,7 @@ const (
 	RESOURCE_TYPE_POD_INGRESS       = "pod_ingress"
 	RESOURCE_TYPE_SERVICE           = "service"
 	RESOURCE_TYPE_GPROCESS          = "gprocess"
+	RESOURCE_TYPE_CUSTOM_SERVICE    = "custom_service"
 )
 
 const (
@@ -189,11 +190,12 @@ const (
 )
 
 const (
-	CH_DEVICE_TYPE_IP        = 64000
-	CH_DEVICE_TYPE_INTERNET  = 63999
-	CH_DEVICE_TYPE_GPROCESS  = 120
-	CH_DEVICE_TYPE_POD_GROUP = 101
-	CH_DEVICE_TYPE_SERVICE   = 102
+	CH_DEVICE_TYPE_IP             = 64000
+	CH_DEVICE_TYPE_INTERNET       = 63999
+	CH_DEVICE_TYPE_GPROCESS       = 120
+	CH_DEVICE_TYPE_POD_GROUP      = 101
+	CH_DEVICE_TYPE_SERVICE        = 102
+	CH_DEVICE_TYPE_CUSTOM_SERVICE = 104
 
 	CH_VTAP_PORT_TYPE_TAP_MAC = 1
 	CH_VTAP_PORT_TYPE_MAC     = 2
@@ -916,27 +918,28 @@ const (
 )
 
 var DBNodeTypeToResourceType = map[string]string{
-	"region":      RESOURCE_TYPE_REGION,
-	"az":          RESOURCE_TYPE_AZ,
-	"host":        RESOURCE_TYPE_HOST,
-	"l3_epc":      RESOURCE_TYPE_VPC,
-	"subnet":      RESOURCE_TYPE_VL2,
-	"vm":          RESOURCE_TYPE_VM,
-	"router":      RESOURCE_TYPE_VGW,
-	"dhcp_port":   RESOURCE_TYPE_DHCP_PORT,
-	"nat_gateway": RESOURCE_TYPE_NAT_GATEWAY,
-	"lb":          RESOURCE_TYPE_LB,
-	"redis":       RESOURCE_TYPE_REDIS,
-	"rds":         RESOURCE_TYPE_RDS,
-	"pod_cluster": RESOURCE_TYPE_POD_CLUSTER,
-	"pod_node":    RESOURCE_TYPE_POD_NODE,
-	"pod_ns":      RESOURCE_TYPE_POD_NAMESPACE,
-	"pod_group":   RESOURCE_TYPE_POD_GROUP,
-	"pod_service": RESOURCE_TYPE_POD_SERVICE,
-	"pod":         RESOURCE_TYPE_POD,
-	"ip":          RESOURCE_TYPE_IP,
-	"internet":    RESOURCE_TYPE_INTERNET,
-	"gprocess":    RESOURCE_TYPE_GPROCESS,
+	"region":         RESOURCE_TYPE_REGION,
+	"az":             RESOURCE_TYPE_AZ,
+	"host":           RESOURCE_TYPE_HOST,
+	"l3_epc":         RESOURCE_TYPE_VPC,
+	"subnet":         RESOURCE_TYPE_VL2,
+	"vm":             RESOURCE_TYPE_VM,
+	"router":         RESOURCE_TYPE_VGW,
+	"dhcp_port":      RESOURCE_TYPE_DHCP_PORT,
+	"nat_gateway":    RESOURCE_TYPE_NAT_GATEWAY,
+	"lb":             RESOURCE_TYPE_LB,
+	"redis":          RESOURCE_TYPE_REDIS,
+	"rds":            RESOURCE_TYPE_RDS,
+	"pod_cluster":    RESOURCE_TYPE_POD_CLUSTER,
+	"pod_node":       RESOURCE_TYPE_POD_NODE,
+	"pod_ns":         RESOURCE_TYPE_POD_NAMESPACE,
+	"pod_group":      RESOURCE_TYPE_POD_GROUP,
+	"pod_service":    RESOURCE_TYPE_POD_SERVICE,
+	"pod":            RESOURCE_TYPE_POD,
+	"ip":             RESOURCE_TYPE_IP,
+	"internet":       RESOURCE_TYPE_INTERNET,
+	"gprocess":       RESOURCE_TYPE_GPROCESS,
+	"custom_service": RESOURCE_TYPE_CUSTOM_SERVICE,
 }
 
 var CREATE_SQL_MAP = map[string]string{
@@ -1039,6 +1042,7 @@ var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
 	common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER: RESOURCE_TYPE_POD_GROUP,
 	common.VIF_DEVICE_TYPE_POD_GROUP_CLONESET:              RESOURCE_TYPE_POD_GROUP,
 	common.VIF_DEVICE_TYPE_IP:                              RESOURCE_TYPE_IP,
+	common.VIF_DEVICE_TYPE_CUSTOM_SERVICE:                  RESOURCE_TYPE_CUSTOM_SERVICE,
 }
 
 var RESOURCE_POD_GROUP_TYPE_MAP = map[int]int{

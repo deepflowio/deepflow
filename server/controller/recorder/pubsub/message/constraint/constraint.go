@@ -37,7 +37,7 @@ type Add interface {
 		message.PodNodeAdd | message.VMPodNodeConnectionAdd | message.PodNamespaceAdd | message.PodIngressAdd |
 		message.PodIngressRuleAdd | message.PodIngressRuleBackendAdd | message.PodServiceAdd |
 		message.PodServicePortAdd | message.PodGroupAdd | message.PodGroupPortAdd | message.PodReplicaSetAdd |
-		message.PodAdd | message.ProcessAdd | message.VIPAdd
+		message.PodAdd | message.ProcessAdd | message.VIPAdd | message.CustomServiceAdd
 }
 
 type UpdatePtr[T Update] interface {
@@ -62,7 +62,7 @@ type Update interface {
 		message.PodNodeUpdate | message.VMPodNodeConnectionUpdate | message.PodNamespaceUpdate | message.PodIngressUpdate |
 		message.PodIngressRuleUpdate | message.PodIngressRuleBackendUpdate | message.PodServiceUpdate |
 		message.PodServicePortUpdate | message.PodGroupUpdate | message.PodGroupPortUpdate | message.PodReplicaSetUpdate |
-		message.PodUpdate | message.ProcessUpdate | message.VIPUpdate
+		message.PodUpdate | message.ProcessUpdate | message.VIPUpdate | message.CustomServiceUpdate
 }
 
 type FieldsUpdatePtr[T FieldsUpdate] interface {
@@ -85,7 +85,7 @@ type FieldsUpdate interface {
 		message.PodNodeFieldsUpdate | message.VMPodNodeConnectionFieldsUpdate | message.PodNamespaceFieldsUpdate | message.PodIngressFieldsUpdate |
 		message.PodIngressRuleFieldsUpdate | message.PodIngressRuleBackendFieldsUpdate | message.PodServiceFieldsUpdate |
 		message.PodServicePortFieldsUpdate | message.PodGroupFieldsUpdate | message.PodGroupPortFieldsUpdate | message.PodReplicaSetFieldsUpdate |
-		message.PodFieldsUpdate | message.ProcessFieldsUpdate | message.VIPFieldsUpdate
+		message.PodFieldsUpdate | message.ProcessFieldsUpdate | message.VIPFieldsUpdate | message.CustomServiceFieldsUpdate
 }
 
 type DeletePtr[T Delete] interface {
@@ -107,5 +107,5 @@ type Delete interface {
 		message.PodNodeDelete | message.VMPodNodeConnectionDelete | message.PodNamespaceDelete | message.PodIngressDelete |
 		message.PodIngressRuleDelete | message.PodIngressRuleBackendDelete | message.PodServiceDelete |
 		message.PodServicePortDelete | message.PodGroupDelete | message.PodGroupPortDelete | message.PodReplicaSetDelete |
-		message.PodDelete | message.ProcessDelete | message.VIPDelete
+		message.PodDelete | message.ProcessDelete | message.VIPDelete | message.CustomServiceDelete
 }
