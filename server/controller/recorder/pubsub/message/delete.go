@@ -249,3 +249,8 @@ type ProcessDelete struct {
 	Lcuuids
 	MySQLItems[metadbmodel.Process]
 }
+
+type CustomServiceDelete struct {
+	Lcuuids
+	MySQLItems[metadbmodel.CustomService]
+}
