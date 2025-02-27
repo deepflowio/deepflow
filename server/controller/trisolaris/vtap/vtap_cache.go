@@ -17,7 +17,6 @@
 package vtap
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
 	"sort"
@@ -29,8 +28,10 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
+	kyaml "github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/rawbytes"
+	"github.com/knadh/koanf/v2"
 	"github.com/mohae/deepcopy"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/agent"
@@ -56,16 +57,11 @@ type VTapConfig struct {
 	ConvertedWasmPlugins         []string
 	ConvertedSoPlugins           []string
 	PluginNewUpdateTime          uint32
-	UserConfig                   *viper.Viper
+	UserConfig                   *koanf.Koanf
 }
 
-func (f *VTapConfig) GetUserConfig() string {
-	b, err := yaml.Marshal(f.UserConfig.AllSettings())
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-	return string(b)
+func (f *VTapConfig) GetUserConfig() *koanf.Koanf {
+	return f.UserConfig.Copy()
 }
 
 func (f *VTapConfig) convertData() {
@@ -137,24 +133,24 @@ func (f *VTapConfig) modifyUserConfig(c *VTapCache) {
 		log.Error("vtap configure is nil")
 		return
 	}
-	if !f.UserConfig.IsSet(CONFIG_KEY_PROXY_CONTROLLER_IP) {
+	if !f.UserConfig.Exists(CONFIG_KEY_PROXY_CONTROLLER_IP) {
 		f.UserConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, c.GetControllerIP())
 	}
-	if !f.UserConfig.IsSet(CONFIG_KEY_INGESTER_IP) {
+	if !f.UserConfig.Exists(CONFIG_KEY_INGESTER_IP) {
 		f.UserConfig.Set(CONFIG_KEY_INGESTER_IP, c.GetTSDBIP())
 	}
-	domainFilters := f.UserConfig.GetIntSlice(CONFIG_KEY_DOMAIN_FILTER)
+	domainFilters := f.UserConfig.Strings(CONFIG_KEY_DOMAIN_FILTER)
 	if len(domainFilters) > 0 {
-		sort.Ints(domainFilters)
+		sort.Strings(domainFilters)
 		f.UserConfig.Set(CONFIG_KEY_DOMAIN_FILTER, domainFilters)
 	}
 }
 
-func (f *VTapConfig) getDomainFilters() []int {
+func (f *VTapConfig) getDomainFilters() []string {
 	if f.UserConfig == nil {
 		return nil
 	}
-	return f.UserConfig.GetIntSlice(CONFIG_KEY_DOMAIN_FILTER)
+	return f.UserConfig.Strings(CONFIG_KEY_DOMAIN_FILTER)
 }
 
 func (f *VTapConfig) getPodClusterInternalIP() bool {
@@ -162,7 +158,7 @@ func (f *VTapConfig) getPodClusterInternalIP() bool {
 		return true
 	}
 
-	return f.UserConfig.GetBool("inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster")
+	return f.UserConfig.Bool("inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster")
 }
 
 func (f *VTapConfig) modifyConfig(v *VTapInfo) {
@@ -186,12 +182,11 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 func NewVTapConfig(config *agent_config.AgentGroupConfigModel, agentConfigYaml string) *VTapConfig {
 	vTapConfig := &VTapConfig{}
 	vTapConfig.AgentGroupConfigModel = *config
-	v := viper.New()
-	v.SetConfigType("yaml")
-	if err := v.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider([]byte(agentConfigYaml)), kyaml.Parser()); err != nil {
 		log.Error(err)
 	}
-	vTapConfig.UserConfig = v
+	vTapConfig.UserConfig = k
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -739,12 +734,11 @@ func (c *VTapCache) GetConfigSyncInterval() int {
 	return *config.SyncInterval
 }
 
-func (c *VTapCache) GetUserConfig() string {
+func (c *VTapCache) GetUserConfig() *koanf.Koanf {
 	config := c.GetVTapConfig()
 	if config == nil {
-		return ""
+		return koanf.New(".")
 	}
-
 	return config.GetUserConfig()
 }
 
@@ -1194,23 +1188,16 @@ func (c *VTapCache) initVTapConfig() {
 	realConfig := VTapConfig{}
 	vtapGroupLcuuid := c.GetVTapGroupLcuuid()
 
-	var agentConfigYaml string
 	if config, ok := v.vtapGroupLcuuidToConfiguration[vtapGroupLcuuid]; ok {
-		agentConfigYaml = config.GetUserConfig()
 		realConfig = deepcopy.Copy(*config).(VTapConfig)
+		realConfig.UserConfig = config.GetUserConfig()
 	} else {
 		if v.realDefaultConfig != nil {
 			realConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
+			realConfig.UserConfig = koanf.New(".")
 		}
-	}
 
-	// viper object include map, not support deepcopy
-	viperConfig := viper.New()
-	viperConfig.SetConfigType("yaml")
-	if err := viperConfig.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
-		log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", vtapGroupLcuuid, err))
 	}
-	realConfig.UserConfig = viperConfig
 
 	c.modifyVTapConfigByLicense(&realConfig)
 	realConfig.modifyConfig(v)
@@ -1222,16 +1209,17 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	v := c.vTapInfo
 	newConfig := VTapConfig{}
 
-	var agentConfigYaml string
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
-		agentConfigYaml = config.GetUserConfig()
 		newConfig = deepcopy.Copy(*config).(VTapConfig)
+		newConfig.UserConfig = config.GetUserConfig()
 	} else {
 		if v.realDefaultConfig != nil {
 			newConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
+			newConfig.UserConfig = koanf.New(".")
 		}
 	}
+
 	oldConfig := c.GetVTapConfig()
 	if oldConfig != nil {
 		// 采集器配置发生变化 重新生成平台数据
@@ -1239,14 +1227,6 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 			v.setVTapChangedForPD()
 		}
 	}
-
-	// viper object include map, not support deepcopy
-	viperConfig := viper.New()
-	viperConfig.SetConfigType("yaml")
-	if err := viperConfig.ReadConfig(bytes.NewBufferString(agentConfigYaml)); err != nil {
-		log.Errorf(v.Logf("viper read agent group (%s) config yaml error: %v", c.GetVTapGroupLcuuid(), err))
-	}
-	newConfig.UserConfig = viperConfig
 
 	c.modifyVTapConfigByLicense(&newConfig)
 	newConfig.modifyConfig(v)
