@@ -46,7 +46,7 @@ type MySQLModel interface {
 		mysqlmodel.PodNode | mysqlmodel.VMPodNodeConnection | mysqlmodel.PodNamespace | mysqlmodel.PodIngress |
 		mysqlmodel.PodIngressRule | mysqlmodel.PodIngressRuleBackend | mysqlmodel.PodService |
 		mysqlmodel.PodServicePort | mysqlmodel.PodGroup | mysqlmodel.PodGroupPort | mysqlmodel.PodReplicaSet |
-		mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VIP
+		mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VIP | mysqlmodel.CustomService
 
 	GetID() int
 }

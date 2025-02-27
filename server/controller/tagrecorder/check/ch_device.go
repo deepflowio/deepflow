@@ -98,6 +98,10 @@ func (d *ChDevice) generateNewData() (map[DeviceKey]mysqlmodel.ChDevice, bool) {
 	if !ok {
 		return nil, false
 	}
+	ok = d.generateCustomServiceData(keyToItem)
+	if !ok {
+		return nil, false
+	}
 	d.generateIPData(keyToItem)
 	d.generateInternetData(keyToItem)
 	return keyToItem, true
@@ -722,6 +726,29 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysqlmodel.ChDevi
 				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
+		}
+	}
+	return true
+}
+
+func (d *ChDevice) generateCustomServiceData(keyToItem map[DeviceKey]mysqlmodel.ChDevice) bool {
+	customServices, err := query.FindInBatches[mysqlmodel.CustomService](d.db.Unscoped())
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
+		return false
+	}
+	for _, customService := range customServices {
+		key := DeviceKey{
+			DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+			DeviceID:   customService.ID,
+		}
+		keyToItem[key] = mysqlmodel.ChDevice{
+			DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+			DeviceID:   customService.ID,
+			Name:       customService.Name,
+			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_CUSTOM_SERVICE}],
+			TeamID:     tagrecorder.DomainToTeamID[customService.Domain],
+			DomainID:   tagrecorder.DomainToDomainID[customService.Domain],
 		}
 	}
 	return true
