@@ -63,6 +63,10 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 				continue
 			}
 			nIP := nodeIPitem.Get("address").MustString()
+			if nIP == "" {
+				log.Warningf("invalid node internal address (%s)", nIP)
+				continue
+			}
 			nodeIPs = append(nodeIPs, nIP)
 		}
 		if len(nodeIPs) == 0 {

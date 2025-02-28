@@ -66,6 +66,8 @@ func TidyIPString(ipsString []string) (v4Prefix, v6Prefix []netaddr.IPPrefix, er
 				ipS = ipS + "/32"
 			case strings.Contains(ipS, ":"):
 				ipS = ipS + "/128"
+			default:
+				continue
 			}
 		}
 		ipPrefix, prefixErr := netaddr.ParseIPPrefix(ipS)
