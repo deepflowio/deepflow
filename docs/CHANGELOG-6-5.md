@@ -7,6 +7,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Fix TCP DNS client request loss [#9220](https://github.com/deepflowio/deepflow/pull/9220) by [yinjiping](https://github.com/yinjiping)
+* fix: the wrong real ip [#9215](https://github.com/deepflowio/deepflow/pull/9215) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +59,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: verify node internal address [#9211](https://github.com/deepflowio/deepflow/pull/9211) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF Add a Musl flag option [#9022](https://github.com/deepflowio/deepflow/pull/9022) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add an extended directory [#9019](https://github.com/deepflowio/deepflow/pull/9019) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add compilation for extension files [#9015](https://github.com/deepflowio/deepflow/pull/9015) by [yinjiping](https://github.com/yinjiping)
