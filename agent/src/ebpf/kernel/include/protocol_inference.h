@@ -1210,11 +1210,32 @@ static __inline enum message_type infer_dns_message(const char *buf,
 
 	bool update_tcp_dns_prev_count = false;
 	struct dns_header *dns = (struct dns_header *)buf;
+	
+	/*
+	 * Note that TCP DNS adds two length bytes at the beginning of the protocol,
+	 * whereas UDP DNS does not. We need to handle this properly to ensure that
+	 * these two length bytes are not sent to the upper layer.  
+	 *
+	 * When receiving data, the client does not first receive two bytes but instead
+	 * receives everything at once; whereas the server receives two bytes (length) first
+	 * and then receives the remaining bytes.
+	 */
 	if (conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 		if (__bpf_ntohs(dns->id) + 2 == count) {
 			dns = (void *)dns + 2;
 		} else {
-			update_tcp_dns_prev_count = true;
+			/*
+			 * When the client sends a request, it combines both 'A' and 'AAAA'
+			 * type queries into a single request to the CoreDNS server. The first
+			 * two bytes represent the length, but this length only includes the
+			 * 'A' query, not the combined length of both the 'A' and 'AAAA' queries
+			 * (the total size is referred to as "count" here). As a result, the
+			 * length check may miss this case.
+			 */
+			if (conn_info->direction == T_EGRESS)
+				dns = (void *)dns + 2;
+			else
+				update_tcp_dns_prev_count = true;
 		}
 	}
 
