@@ -132,6 +132,7 @@ func newUpdaterBase[
 		message.MetadataSubDomainLcuuid(u.metadata.SubDomain.Lcuuid),
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 		message.MetadataToolDataSet(cache.ToolDataSet),
+		message.MetadataDB(cache.GetMetadata().GetDB()),
 	)
 
 	// log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
