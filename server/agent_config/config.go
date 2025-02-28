@@ -27,7 +27,7 @@ var YamlAgentGroupConfig []byte
 //go:embed template.yaml
 var YamlAgentGroupConfigTemplate []byte
 
-//go:embed vector_host_metrics.yaml vector_k8s_logs.yaml vector_k8s_metrics.yaml
+//go:embed vector_host_metrics.yaml vector_k8s_logs.yaml vector_k8s_metrics.yaml vector_dial.yaml
 var YamlEmbeddedSubTemplate embed.FS
 
 // regex match: (indent)#(indent){{ file: xxx.yaml }}
