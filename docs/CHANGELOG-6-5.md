@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Fix TCP DNS client request loss [#9220](https://github.com/deepflowio/deepflow/pull/9220) by [yinjiping](https://github.com/yinjiping)
+* fix: the wrong real ip [#9215](https://github.com/deepflowio/deepflow/pull/9215) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: wan type cidr may not be tagged [#8813](https://github.com/deepflowio/deepflow/pull/8813) by [lzf575](https://github.com/lzf575)
 * fix: the throttler cannot write all data to the queue at once [#8793](https://github.com/deepflowio/deepflow/pull/8793) by [lzf575](https://github.com/lzf575)
 * fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -172,6 +174,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: verify node internal address [#9211](https://github.com/deepflowio/deepflow/pull/9211) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF Add a Musl flag option [#9022](https://github.com/deepflowio/deepflow/pull/9022) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add an extended directory [#9019](https://github.com/deepflowio/deepflow/pull/9019) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add compilation for extension files [#9015](https://github.com/deepflowio/deepflow/pull/9015) by [yinjiping](https://github.com/yinjiping)
