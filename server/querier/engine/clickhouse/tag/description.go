@@ -1055,13 +1055,14 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			for i := range resultArray {
 				externalTag := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
 				displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+				description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 				fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
 				if fieldType != ckcommon.NATIVE_FIELD_TYPE_TAG {
 					continue
 				}
 				response.Values = append(response.Values, []interface{}{
 					externalTag, externalTag, externalTag, displayName, displayName, displayName, "string",
-					ckcommon.NATIVE_FIELD_CATEGORY, tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, notSupportOperator, table,
+					ckcommon.NATIVE_FIELD_CATEGORY_CUSTOM_TAG, tagTypeToOperators["string"], []bool{true, true, true}, description, description, description, "", false, notSupportOperator, table,
 				})
 			}
 		}
