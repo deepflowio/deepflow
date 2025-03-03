@@ -76,3 +76,7 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### OTHER
+* refact: The pid log is changed to info [#9226](https://github.com/deepflowio/deepflow/pull/9226) by [yuanchaoa](https://github.com/yuanchaoa)
