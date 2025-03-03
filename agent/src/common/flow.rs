@@ -18,9 +18,7 @@ use std::{
     fmt::{self, Display},
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    process,
     sync::Arc,
-    thread,
     time::Duration,
 };
 
@@ -1571,8 +1569,7 @@ fn get_direction(
             _ => {
                 // 采集器类型不正确，不应该发生
                 error!("invalid agent type, deepflow-agent restart...");
-                thread::sleep(Duration::from_secs(1));
-                process::exit(1)
+                crate::utils::notify_exit(1);
             }
         }
         (Direction::None, Direction::None)
