@@ -130,9 +130,11 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 	s := &ServiceTable{
-		epcIDIPv6Table:    make(map[EpcIDIPv6Key]uint32),
-		podClusterIDTable: make(map[uint64]uint32),
-		podGroupIDTable:   make(map[uint64]uint32),
+		epcIDIPv6Table:         make(map[EpcIDIPv6Key]uint32),
+		podClusterIDTable:      make(map[uint64]uint32),
+		podGroupIDTable:        make(map[uint64]uint32),
+		customServiceIpv4Table: make(map[uint64]uint32),
+		customServiceIpv6Table: make(map[EpcIDIPv6Key]uint32),
 	}
 	for i := range s.epcIDIPv4Table {
 		s.epcIDIPv4Table[i] = make(map[uint64]uint32)
