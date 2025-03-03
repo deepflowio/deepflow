@@ -1060,7 +1060,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
 					return errors.New(errStr)
-				} else if sqlparser.String(colName) == "tags" || sqlparser.String(colName) == "metrics" || sqlparser.String(colName) == "attributes" || sqlparser.String(colName) == "packet_batch" {
+				} else if sqlparser.String(colName) == "tag" || sqlparser.String(colName) == "metrics" || sqlparser.String(colName) == "attribute" || sqlparser.String(colName) == "packet_batch" {
 					if as != "" {
 						errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
 						return errors.New(errStr)

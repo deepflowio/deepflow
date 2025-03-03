@@ -250,7 +250,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				metric := NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, field, field, "", "", "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table, "", "", "", "", "",
+					ckcommon.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
 				)
 				return metric, true
 			} else if fieldSplit[0] == "tag" {
@@ -274,20 +274,21 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 					for i := range resultArray {
 						nativeMetric := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
 						displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+						description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 						fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
 						if nativeMetric == field {
 							if fieldType == ckcommon.NATIVE_FIELD_TYPE_METRIC {
 								metric := NewMetrics(
 									0, field,
 									displayName, displayName, displayName, "", "", "", METRICS_TYPE_COUNTER,
-									ckcommon.NATIVE_FIELD_CATEGORY, []bool{true, true, true}, "", table, "", "", "", "", "",
+									ckcommon.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
 								)
 								return metric, true
 							} else {
 								metric := NewMetrics(
 									0, field,
 									displayName, displayName, displayName, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-									ckcommon.NATIVE_FIELD_CATEGORY, []bool{true, true, true}, "", table, "", "", "", "", "",
+									ckcommon.NATIVE_FIELD_CATEGORY_CUSTOM_TAG, []bool{true, true, true}, "", table, "", "", "", "", "",
 								)
 								return metric, true
 							}
