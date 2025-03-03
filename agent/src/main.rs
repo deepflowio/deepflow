@@ -79,7 +79,10 @@ struct Opts {
 #[cfg(unix)]
 fn wait_on_signals() {
     let mut signals = Signals::new(TERM_SIGNALS).unwrap();
-    signals.forever().next();
+    log::info!(
+        "The Process exits due to signal {:?}.",
+        signals.forever().next()
+    );
     signals.handle().close();
 }
 

@@ -4743,7 +4743,6 @@ impl ConfigHandler {
                     != candidate_config.get_flow_capacity(candidate_config.dispatcher.max_memory)
             {
                 restart_dispatcher = true;
-                info!("max_memory change, restart dispatcher");
             }
 
             debug!(
