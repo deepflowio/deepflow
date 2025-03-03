@@ -26,7 +26,7 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
-use log::{debug, error};
+use log::{debug, error, info};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
@@ -165,7 +165,10 @@ impl TryFrom<&Process> for ProcessData {
             let z = stat.starttime().unwrap_or_default();
             (stat.ppid as u64, Duration::from_secs(z.timestamp() as u64))
         } else {
-            error!("pid {} get stat fail", proc.pid);
+            info!(
+                "The pid {} get stat failed, maybe the process has exited",
+                proc.pid
+            );
             (0, Duration::ZERO)
         };
 

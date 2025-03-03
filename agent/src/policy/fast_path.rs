@@ -20,8 +20,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
-use std::thread;
-use std::time::Duration;
 
 use ipnet::{IpNet, Ipv4Net};
 use log::warn;
@@ -220,8 +218,8 @@ impl FastPath {
                     "IpAddr({:?} and {:?}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
                     ip_src, ip_dst,
                 );
-                thread::sleep(Duration::from_secs(1));
-                std::process::exit(-1);
+                crate::utils::notify_exit(1);
+                return (0, 0);
             }
         }
     }
