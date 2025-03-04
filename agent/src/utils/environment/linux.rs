@@ -250,7 +250,7 @@ pub async fn get_current_k8s_image() -> Option<String> {
     let daemonsets = get_k8s_daemonsets().await.ok()?;
 
     let Ok(daemonset) = daemonsets.get(DAEMONSET_NAME).await else {
-        warn!("failed to get daemonsets");
+        warn!("failed to get agent image name from daemonset: {DAEMONSET_NAME}");
         return None;
     };
 
