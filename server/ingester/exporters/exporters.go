@@ -193,8 +193,8 @@ func IsExportField(tag *config.StructTags, exportFieldCategoryBits uint64, expor
 	if config.K8S_LABEL&exportFieldCategoryBits != 0 {
 		return true
 	}
-	// for category_tag, category_metrics
-	if tag.CategoryBit&exportFieldCategoryBits != 0 && tag.SubCategoryBit&exportFieldCategoryBits != 0 {
+	// for category_tag, category_metrics. If tag.SubCategoryBit does not exist, SubCategory matching is always successful.
+	if tag.CategoryBit&exportFieldCategoryBits != 0 && (tag.SubCategoryBit == config.UNKNOWN_CATEGORY || tag.SubCategoryBit&exportFieldCategoryBits != 0) {
 		return true
 	}
 
