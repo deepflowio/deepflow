@@ -76,7 +76,7 @@ controller:
   pod-cluster-internal-ip-to-ingester: 0
 
   swagger:
-    enabled: false
+    enabled: true
 
   http:
     # resource api redis cache refresh interval, unit:s

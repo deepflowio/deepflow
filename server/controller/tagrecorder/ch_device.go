@@ -1023,7 +1023,7 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *met
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChCustomServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.CustomServiceFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
-
+	log.Infof("TODO fieldsUpdate.Name: %#v", fieldsUpdate.Name, db.LogPrefixORGID)
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}

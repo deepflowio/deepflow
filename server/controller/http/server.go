@@ -105,10 +105,6 @@ func (s *Server) RegisterRouters() {
 		i.RegisterTo(s.engine)
 	}
 	trouter.RegisterTo(s.engine)
-
-	for _, route := range s.engine.Routes() {
-		log.Infof(" TODO method: %s, path: %s", route.Method, route.Path)
-	}
 }
 
 func (s *Server) appendRegistrant() []registrant.Registrant {
