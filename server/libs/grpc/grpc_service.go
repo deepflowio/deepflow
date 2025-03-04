@@ -120,12 +120,20 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 		if len(s.customServiceIpv6Table) == 0 {
 			return 0
 		}
-		return s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, serverPort)]
+		serviceID := s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, serverPort)]
+		if serviceID > 0 || serverPort == 0 {
+			return serviceID
+		}
+		return s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, 0)]
 	}
 	if len(s.customServiceIpv4Table) == 0 {
 		return 0
 	}
-	return s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, serverPort)]
+	serviceID := s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, serverPort)]
+	if serviceID > 0 || serverPort == 0 {
+		return serviceID
+	}
+	return s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, 0)]
 }
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
