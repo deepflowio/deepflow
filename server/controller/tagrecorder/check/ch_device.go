@@ -743,7 +743,7 @@ func (d *ChDevice) generateCustomServiceData(keyToItem map[DeviceKey]metadbmodel
 			DeviceID:   customService.ID,
 		}
 		keyToItem[key] = metadbmodel.ChDevice{
-			DeviceType: CH_DEVICE_TYPE_GPROCESS,
+			DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
 			DeviceID:   customService.ID,
 			Name:       customService.Name,
 			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_CUSTOM_SERVICE}],
