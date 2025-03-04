@@ -43,9 +43,10 @@ const TagClientEnPrefix = "Client"
 const LanguageEN = "en"
 
 const (
-	NATIVE_FIELD_TYPE_TAG    = 1
-	NATIVE_FIELD_TYPE_METRIC = 2
-	NATIVE_FIELD_CATEGORY    = "Custom"
+	NATIVE_FIELD_TYPE_TAG            = 1
+	NATIVE_FIELD_TYPE_METRIC         = 2
+	NATIVE_FIELD_CATEGORY_CUSTOM_TAG = "Custom Tag"
+	NATIVE_FIELD_CATEGORY_METRICS    = "metrics"
 )
 
 var DB_TABLE_MAP = map[string][]string{

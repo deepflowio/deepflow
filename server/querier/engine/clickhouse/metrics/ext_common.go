@@ -69,14 +69,14 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			metricName := fmt.Sprintf("metrics.%s", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, metricName, metricName, "", "", "", METRICS_TYPE_COUNTER,
-				"metrics", []bool{true, true, true}, "", tableName, "", "", "", "", "",
+				common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", tableName, "", "", "", "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
 		lm := NewMetrics(
 			len(loadMetrics), "metrics",
 			"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-			"metrics", []bool{true, true, true}, "", table, "", "", "", "", "",
+			common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
 		)
 		loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
 
@@ -91,13 +91,14 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 				for i := range resultArray {
 					nativeMetric := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
 					displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+					description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 					fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
 					if fieldType != common.NATIVE_FIELD_TYPE_METRIC {
 						continue
 					}
 					lm := NewMetrics(
 						len(loadMetrics), nativeMetric, displayName, displayName, displayName, "", "", "", METRICS_TYPE_COUNTER,
-						common.NATIVE_FIELD_CATEGORY, []bool{true, true, true}, "", table, "", "", "", "", "",
+						common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
 					)
 					loadMetrics[fmt.Sprintf("%s-%s", nativeMetric, table)] = lm
 				}
