@@ -163,15 +163,15 @@ func customServiceToProto(ordID int, customService *models.CustomService) *tride
 		ports := []uint32{}
 		for _, ipPort := range ipPorts {
 			ipPort = strings.TrimSpace(ipPort)
-			ipPortSlice := strings.Split(ipPort, ":")
-			if len(ipPortSlice) != 2 {
+			separatorIndex := strings.LastIndex(ipPort, ":")
+			if separatorIndex == -1 {
 				log.Warningf("[ORDID-%d] invalid ip port format: %s", ordID, ipPort)
 				continue
 			}
-			ips = append(ips, ipPortSlice[0])
-			port, err := strconv.Atoi(ipPortSlice[1])
+			ips = append(ips, ipPort[:separatorIndex])
+			port, err := strconv.Atoi(ipPort[separatorIndex+1:])
 			if err != nil {
-				log.Warningf("[ORDID-%d] invalid port format: %s", ordID, ipPortSlice[1])
+				log.Warningf("[ORDID-%d] invalid port format: %s", ordID, ipPort[separatorIndex+1:])
 				continue
 			}
 			ports = append(ports, uint32(port))
