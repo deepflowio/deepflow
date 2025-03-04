@@ -17,7 +17,7 @@
 package common
 
 type Swagger struct {
-	Enabled bool `default:"false" yaml:"enabled"`
+	Enabled bool `default:"true" yaml:"enabled"`
 }
 
 // TODO use this
