@@ -5757,7 +5757,7 @@ inputs:
 
 ## Vector {#inputs.vector}
 
-### Vector Component Disabled {#inputs.vector.enabled}
+### Vector Component Enabled {#inputs.vector.enabled}
 
 **Tags**:
 
@@ -6908,7 +6908,7 @@ processors:
     filters:
       tag_filters:
         HTTP:
-          - name: request_resource        # endpoint, request_type, request_domain, request_resource
+          - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
             operator: equal               # equal, prefix
             value: somevalue
         HTTP2: []
@@ -6958,7 +6958,7 @@ processors:
     filters:
       tag_filters:
         HTTP:
-          - name: request_resource        # endpoint, request_type, request_domain, request_resource
+          - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
             operator: equal               # equal, prefix
             value: somevalue
 ```
@@ -6971,7 +6971,7 @@ Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview
 
 <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
 
-###### Field Name {#processors.request_log.filters.tag_filters.HTTP.name}
+###### Field Name {#processors.request_log.filters.tag_filters.HTTP.field_name}
 
 **Tags**:
 
@@ -6979,7 +6979,7 @@ Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview
 
 **FQCN**:
 
-`processors.request_log.filters.tag_filters.HTTP.name`
+`processors.request_log.filters.tag_filters.HTTP.field_name`
 
 Upgrade from old version: `static_config.l7-log-blacklist.$protocol.field-name`
 
@@ -6990,7 +6990,7 @@ processors:
     filters:
       tag_filters:
         HTTP:
-        - name: ''
+        - field_name: ''
 ```
 
 **Enum options**:
