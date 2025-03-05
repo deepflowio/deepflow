@@ -5756,7 +5756,7 @@ inputs:
 
 ## Vector {#inputs.vector}
 
-### Vector Component Disabled {#inputs.vector.enabled}
+### Vector Component Enabled {#inputs.vector.enabled}
 
 **Tags**:
 
