@@ -209,6 +209,10 @@ func (v *View) trans() {
 				} else {
 					metricTag.Value = node.Value
 				}
+				// if !strings.HasPrefix(node.Value, "auto_instance_ip") && !strings.HasPrefix(node.Value, "auto_service_ip") {
+				// 	tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
+				// }
+				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
 				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
 				tagsAliasInner = append(tagsAliasInner, metricTag.Value)
 			} else if node.Flag == NODE_FLAG_METRICS_INNER {
