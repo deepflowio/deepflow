@@ -305,5 +305,4 @@ func (t *SelectTag) Format(m *view.Model) {
 			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 		}
 	}
-
 }
