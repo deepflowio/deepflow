@@ -235,23 +235,26 @@ func (s *ServiceTable) addCustomService(svc *trident.ServiceInfo) {
 	epcId := int32(svc.GetEpcId())
 	serviceId := svc.GetId()
 
+	ips := svc.GetIps()
+	if len(ips) == 0 {
+		return
+	}
 	ports := svc.GetServerPorts()
-	for i, ip := range svc.GetIps() {
-		port := uint16(0)
-		if i < len(ports) {
-			port = uint16(ports[i])
-		}
-		netIp := net.ParseIP(ip)
+	if len(ports) == 0 {
+		ports = []uint32{0}
+	}
+	for _, port := range ports {
+		netIp := net.ParseIP(ips[0])
 		if netIp == nil {
 			continue
 		}
 		ipv4 := netIp.To4()
 		if ipv4 != nil {
 			ipv4U32 := utils.IpToUint32(ipv4)
-			key := genEpcIDIPv4Key(epcId, ipv4U32, port)
+			key := genEpcIDIPv4Key(epcId, ipv4U32, uint16(port))
 			s.customServiceIpv4Table[key] = serviceId
 		} else {
-			key := genEpcIDIPv6Key(epcId, netIp, 0, port)
+			key := genEpcIDIPv6Key(epcId, netIp, 0, uint16(port))
 			s.customServiceIpv6Table[key] = serviceId
 		}
 	}
@@ -336,7 +339,7 @@ func (s *ServiceTable) String() string {
 	}
 
 	if len(s.customServiceIpv4Table) > 0 {
-		sb.WriteString("\ncustom service\n")
+		sb.WriteString("\nipv4 custom service\n")
 		sb.WriteString("5  epcID   ipv4            port            serviceID\n")
 		sb.WriteString("----------------------------------------------------\n")
 	}
@@ -354,6 +357,7 @@ func (s *ServiceTable) String() string {
 	}
 
 	if len(s.customServiceIpv6Table) > 0 {
+		sb.WriteString("\nipv6 custom service\n")
 		sb.WriteString("\n6  epcID   ipv6            port            serviceID\n")
 		sb.WriteString("------------------------------------------------------\n")
 	}
