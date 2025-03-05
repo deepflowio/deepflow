@@ -21,12 +21,12 @@ import (
 	"strconv"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	. "github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
@@ -35,6 +35,20 @@ type ServiceRawData struct {
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
 	podGroupIDToPodServiceID      map[int]int
 	lbIDToVPCID                   map[int]int
+	customServiceIDToIPs          map[int]mapset.Set[string]
+	customServiceIPKeyToPorts     map[customServiceIPKey]mapset.Set[uint32]
+}
+
+type customServiceIPKey struct {
+	vpcID int
+	ip    string
+}
+
+func newCustomServiceIPKey(vpcID int, ip string) customServiceIPKey {
+	return customServiceIPKey{
+		vpcID: vpcID,
+		ip:    ip,
+	}
 }
 
 func newServiceRawData() *ServiceRawData {
@@ -62,7 +76,8 @@ func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
 	}
 }
 
-func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
+func (r *ServiceRawData) ConvertDBData(md *MetaData) {
+	dbDataCache := md.GetDBDataCache()
 	for _, psp := range dbDataCache.GetPodServicePorts() {
 		if _, ok := r.podServiceIDToPodServicePorts[psp.PodServiceID]; ok {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = append(
@@ -116,6 +131,70 @@ func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
 		podGroupIDToPodServiceID[groupId] = minID
 	}
 	r.podGroupIDToPodServiceID = podGroupIDToPodServiceID
+
+	// VPC 范围内合并自定义服务：
+	// 1. 去重 ip，ip 绑定第一个遍历到的服务
+	// 2. 合并 ip 的端口，如果存在相同 ip 中的某个没有端口，那么端口全部丢弃
+	customServiceIDToIPs := make(map[int]mapset.Set[string])
+	customServiceIPKeyToPorts := make(map[customServiceIPKey]mapset.Set[uint32])
+	for _, cs := range dbDataCache.GetCustomServices() {
+		var ips []string
+		var ports []uint32
+		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
+			ips = strings.Split(cs.Resource, ",")
+		} else {
+			ipPorts := strings.Split(cs.Resource, ",")
+			for _, ipPort := range ipPorts {
+				ipPort = strings.TrimSpace(ipPort)
+				separatorIndex := strings.LastIndex(ipPort, ":")
+				if separatorIndex == -1 {
+					log.Warningf("[ORG-%s] invalid ip port format: %s", md.ORGID, ipPort)
+					continue
+				}
+				port, err := strconv.Atoi(ipPort[separatorIndex+1:])
+				if err != nil {
+					log.Warningf("[ORG-%s] invalid port format: %s", md.ORGID, ipPort[separatorIndex+1:])
+					continue
+				}
+				ips = append(ips, ipPort[:separatorIndex])
+				ports = append(ports, uint32(port))
+			}
+		}
+
+		for i, ip := range ips {
+			ipKey := newCustomServiceIPKey(cs.VPCID, ip)
+			if existedPorts, ok := customServiceIPKeyToPorts[ipKey]; ok {
+				// 该 ip 已经存在，那么 ip 不会跟本服务绑定
+				// 已存在的 ip 没有端口，那么直接跳过
+				if existedPorts.Cardinality() == 0 {
+					continue
+				}
+				// 已存在的 ip 有端口，该 ip 没有端口，清空端口
+				if len(ports) == 0 {
+					customServiceIPKeyToPorts[ipKey] = mapset.NewSet[uint32]()
+					continue
+				}
+				// 已存在的 ip 有端口，该 ip 有端口，合并端口
+				customServiceIPKeyToPorts[ipKey].Add(ports[i])
+			} else {
+				// 该 ip 不存在，则 ip 会跟本服务绑定
+				if _, ok := customServiceIDToIPs[cs.ID]; ok {
+					customServiceIDToIPs[cs.ID].Add(ip)
+				} else {
+					customServiceIDToIPs[cs.ID] = mapset.NewSet[string](ip)
+				}
+				customServiceIPKeyToPorts[ipKey] = mapset.NewSet[uint32]()
+				// 该 ip 没有端口，那么跳过
+				if len(ports) == 0 {
+					continue
+				}
+				// 该 ip 有端口
+				customServiceIPKeyToPorts[ipKey].Add(ports[i])
+			}
+		}
+	}
+	r.customServiceIDToIPs = customServiceIDToIPs
+	r.customServiceIPKeyToPorts = customServiceIPKeyToPorts
 }
 
 func (s *ServiceDataOP) updateServiceRawData(serviceRawData *ServiceRawData) {
@@ -146,40 +225,6 @@ func getProtocol(protocol string) trident.ServiceProtocol {
 		return protocol
 	}
 	return trident.ServiceProtocol_ANY
-}
-
-func customServiceToProto(ordID int, customService *models.CustomService) *trident.ServiceInfo {
-	serviceType := trident.ServiceType_CUSTOM_SERVICE
-	item := &trident.ServiceInfo{
-		EpcId: proto.Uint32(uint32(customService.VPCID)),
-		Type:  &serviceType,
-		Id:    proto.Uint32(uint32(customService.ID)),
-	}
-	if customService.Type == CUSTOM_SERVICE_TYPE_IP {
-		item.Ips = strings.Split(customService.Resource, ",")
-	} else {
-		ipPorts := strings.Split(customService.Resource, ",")
-		ips := []string{}
-		ports := []uint32{}
-		for _, ipPort := range ipPorts {
-			ipPort = strings.TrimSpace(ipPort)
-			separatorIndex := strings.LastIndex(ipPort, ":")
-			if separatorIndex == -1 {
-				log.Warningf("[ORDID-%d] invalid ip port format: %s", ordID, ipPort)
-				continue
-			}
-			ips = append(ips, ipPort[:separatorIndex])
-			port, err := strconv.Atoi(ipPort[separatorIndex+1:])
-			if err != nil {
-				log.Warningf("[ORDID-%d] invalid port format: %s", ordID, ipPort[separatorIndex+1:])
-				continue
-			}
-			ports = append(ports, uint32(port))
-		}
-		item.Ips = ips
-		item.ServerPorts = ports
-	}
-	return item
 }
 
 func serviceToProto(
@@ -377,9 +422,22 @@ func (s *ServiceDataOP) generateService() {
 		services = append(services, service)
 	}
 
+	serviceTypeCustomService := trident.ServiceType_CUSTOM_SERVICE
 	for _, customService := range dbDataCache.GetCustomServices() {
-		service := customServiceToProto(s.GetORGID(), customService)
-		services = append(services, service)
+		ips, ok := s.serviceRawData.customServiceIDToIPs[customService.ID]
+		if !ok {
+			continue
+		}
+		for ip := range ips.Iter() {
+			service := &trident.ServiceInfo{
+				Type:        &serviceTypeCustomService,
+				Id:          proto.Uint32(uint32(customService.ID)),
+				EpcId:       proto.Uint32(uint32(customService.VPCID)),
+				Ips:         []string{ip},
+				ServerPorts: s.serviceRawData.customServiceIPKeyToPorts[newCustomServiceIPKey(customService.VPCID, ip)].ToSlice(),
+			}
+			services = append(services, service)
+		}
 	}
 
 	s.services = services
@@ -392,7 +450,7 @@ func (s *ServiceDataOP) GetServiceData() []*trident.ServiceInfo {
 
 func (s *ServiceDataOP) generateRawData() {
 	serviceRawData := newServiceRawData()
-	serviceRawData.ConvertDBData(s.metaData.GetDBDataCache())
+	serviceRawData.ConvertDBData(s.metaData)
 	s.updateServiceRawData(serviceRawData)
 }
 
