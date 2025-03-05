@@ -427,11 +427,11 @@ message ServiceInfo {
     optional uint32 pod_cluster_id = 3 [default = 0];  // Availabel when type == POD_SERVICE_NODE
     optional uint32 pod_group_id = 4 [default = 0];    // Availabel when type == POD_SERVICE_POD_GROUP
     optional uint32 epc_id = 5 [default = 0];          // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE]
+    // when type == CUSTOM_SERVICE, the length of `ips` can only be 1
     repeated string ips = 6;                           // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE], list of IP addresses
     // 7: reserve for cidrs
     // 8: reserve for ip-ranges
     optional ServiceProtocol protocol = 9 [default = ANY];
-    // when type == CUSTOM_SERVICE, the length of `server_ports` is 0 or the length == len(`ips`)
     repeated uint32 server_ports = 10;                // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE], list of IP addresses
 }
 
