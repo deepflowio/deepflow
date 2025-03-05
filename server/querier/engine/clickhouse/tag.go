@@ -304,6 +304,8 @@ func (t *SelectTag) Format(m *view.Model) {
 		if t.Value == "packet_batch" {
 			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 		}
+		if strings.Contains(t.Value, "auto_instance") || strings.Contains(t.Value, "auto_service") {
+			m.AddCallback(t.Value, RemoveAutoIPColumns([]interface{}{}))
+		}
 	}
-
 }

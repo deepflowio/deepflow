@@ -265,3 +265,24 @@ func ColumnNameSwap(args []interface{}) func(result *common.Result) error {
 		return nil
 	}
 }
+
+func RemoveAutoIPColumns(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newColumns := []interface{}{}
+		newValues := [][]interface{}{}
+
+		for i, column := range result.Columns {
+			if !strings.HasPrefix(column.(string), "auto_instance_ip") && !strings.HasPrefix(column.(string), "auto_service_ip") {
+				newColumns = append(newColumns, column)
+				newValues = append(newValues, result.Values[i].([]interface{}))
+			}
+		}
+
+		result.Columns = newColumns
+		result.Values = make([]interface{}, len(newValues))
+		for i, v := range newValues {
+			result.Values[i] = v
+		}
+		return nil
+	}
+}
