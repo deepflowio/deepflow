@@ -3944,8 +3944,8 @@ inputs:
   vector:
     # type: bool
     # name:
-    #   en: Vector Component Disabled
-    #   ch: 禁用 Vector 组件
+    #   en: Vector Component Enabled
+    #   ch: 启用 Vector 组件
     # unit:
     # range: []
     # enum_options: []

@@ -5598,7 +5598,7 @@ inputs:
 
 ## vector {#inputs.vector}
 
-### 禁用 Vector 组件 {#inputs.vector.enabled}
+### 启用 Vector 组件 {#inputs.vector.enabled}
 
 **标签**:
 
