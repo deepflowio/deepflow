@@ -661,7 +661,8 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	customServices, err := dbmgr.DBMgr[models.CustomService](db).Gets()
+	var customServices []*models.CustomService
+	err = db.Order("id").Find(&customServices).Error
 	if err == nil {
 		d.customServices = customServices
 	} else {
