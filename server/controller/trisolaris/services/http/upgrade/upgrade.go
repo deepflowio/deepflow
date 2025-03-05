@@ -26,6 +26,7 @@ import (
 	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -101,6 +102,7 @@ func Upgrade(c *gin.Context) {
 		return
 	}
 	vTapCache.UpdateUpgradeInfo(expectedRevision, upgradeInfo.ImageName)
+	refresh.RefreshCache(orgIDInt, []DataChanged{DATA_CHANGED_VTAP})
 	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", vtap.Name, key, expectedRevision, upgradeInfo.ImageName)
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
@@ -141,6 +143,7 @@ func CancelUpgrade(c *gin.Context) {
 
 	// cancel upgrade
 	vTapCache.UpdateUpgradeInfo("", "")
+	refresh.RefreshCache(orgIDInt, []DataChanged{DATA_CHANGED_VTAP})
 	log.Infof("vtap(%s, %s) upgrade is canceled", vtap.Name, key)
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
