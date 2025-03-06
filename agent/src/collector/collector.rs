@@ -515,7 +515,7 @@ impl Stash {
                     is_active_host,
                     config,
                     None,
-                    acc_flow.l7_protocol,
+                    L7Protocol::Unknown,
                 );
                 self.fill_single_l4_stats(tagger, flow_meter);
             }
@@ -527,7 +527,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
-                acc_flow.l7_protocol,
+                L7Protocol::Unknown,
             );
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
@@ -550,7 +550,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
-                acc_flow.l7_protocol,
+                L7Protocol::Unknown,
             );
             self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
         }
