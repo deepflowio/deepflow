@@ -267,6 +267,7 @@ type DataSource struct {
 	BaseDataSourceDisplayName string `json:"BASE_DATA_SOURCE_NAME"`
 	IntervalTime              int    `json:"INTERVAL"`
 	RetentionTime             int    `json:"RETENTION_TIME"`
+	QueryTime                 int    `json:"QUERY_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR"`
 	UnSummableMetricsOperator string `json:"UNSUMMABLE_METRICS_OPERATOR"`
 	IsDefault                 bool   `json:"IS_DEFAULT"`
@@ -280,12 +281,14 @@ type DataSourceCreate struct {
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID" binding:"required"`
 	IntervalTime              int    `json:"INTERVAL" binding:"required"`
 	RetentionTime             int    `json:"RETENTION_TIME" binding:"required,min=1"`
+	QueryTime                 int    `json:"QUERY_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR" binding:"required,oneof=Sum Max Min"`
 	UnSummableMetricsOperator string `json:"UNSUMMABLE_METRICS_OPERATOR" binding:"required,oneof=Avg Max Min"`
 }
 
 type DataSourceUpdate struct {
 	RetentionTime *int    `json:"RETENTION_TIME"`
+	QueryTime     *int    `json:"QUERY_TIME"`
 	DisplayName   *string `json:"DISPLAY_NAME"`
 }
 
