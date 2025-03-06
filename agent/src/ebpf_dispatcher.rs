@@ -305,7 +305,7 @@ struct EbpfDispatcher {
     collector_config: CollectorAccess,
 
     config: EbpfAccess,
-    output: DebugSender<Box<AppProto>>, // Send AppProtos to the AppProtoLogsParser
+    output: DebugSender<AppProto>, // Send AppProtos to the AppProtoLogsParser
     l7_stats_output: DebugSender<BatchedBox<L7Stats>>, // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
@@ -883,7 +883,7 @@ impl EbpfCollector {
             .collect::<HashSet<String>>();
         for (protocol, port_range) in &config.l7_protocol_ports {
             all_proto_map.remove(&protocol.to_lowercase());
-            let l7_protocol = L7Protocol::from(protocol.clone());
+            let l7_protocol = L7Protocol::from(protocol);
             let ports = CString::new(port_range.as_str()).unwrap();
             if ebpf::set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
                 warn!(
@@ -896,7 +896,7 @@ impl EbpfCollector {
         // if not config the port range, default is parse in all port
         let all_port = "1-65535".to_string();
         for protocol in all_proto_map.iter() {
-            let l7_protocol = L7Protocol::from(protocol.clone());
+            let l7_protocol = L7Protocol::from(protocol);
             let ports = CString::new(all_port.as_str()).unwrap();
             if ebpf::set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
                 warn!(
@@ -1186,7 +1186,7 @@ impl EbpfCollector {
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         dpdk_sender: DebugSender<Box<packet::Packet<'static>>>,
-        output: DebugSender<Box<AppProto>>,
+        output: DebugSender<AppProto>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,

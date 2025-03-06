@@ -46,7 +46,10 @@ use crate::{
     common::DEFAULT_LOG_FILE, metric::document::TapSide, rpc::Session, trident::RunningMode,
 };
 
-use public::{bitmap::Bitmap, proto::agent, utils::bitmap::parse_u16_range_list_to_bitmap};
+use public::{
+    bitmap::Bitmap, l7_protocol::L7Protocol, proto::agent,
+    utils::bitmap::parse_u16_range_list_to_bitmap,
+};
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -546,7 +549,7 @@ pub struct SymbolTable {
 pub struct Proc {
     pub enabled: bool,
     pub proc_dir_path: String,
-    #[serde(with = "humantime_serde")]
+    #[serde(deserialize_with = "deser_humantime_with_zero")]
     pub sync_interval: Duration,
     #[serde(with = "humantime_serde")]
     pub min_lifetime: Duration,
@@ -744,6 +747,7 @@ where
 pub struct Dpdk {
     #[serde(deserialize_with = "to_dpdk_source")]
     pub source: DpdkSource,
+    #[serde(with = "humantime_serde")]
     pub reorder_cache_window_size: Duration,
 }
 
@@ -1642,21 +1646,36 @@ impl Default for Filters {
                 ("DNS".to_string(), vec![]),
                 ("TLS".to_string(), vec![]),
                 ("PING".to_string(), vec![]),
+                ("Custom".to_string(), vec![]),
             ]),
             unconcerned_dns_nxdomain_response_suffixes: Default::default(),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SessionTimeout {
+    #[serde(deserialize_with = "deser_l7_protocol")]
+    pub protocol: L7Protocol,
+    #[serde(with = "humantime_serde")]
+    pub timeout: Duration,
+}
+
+impl SessionTimeout {
+    pub const DEFAULT: Duration = Duration::from_secs(120);
+    pub const DNS_DEFAULT: Duration = Duration::from_secs(15);
+    pub const TLS_DEFAULT: Duration = Duration::from_secs(15);
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Timeouts {
     #[serde(with = "humantime_serde")]
     pub tcp_request_timeout: Duration,
     #[serde(with = "humantime_serde")]
     pub udp_request_timeout: Duration,
-    #[serde(with = "humantime_serde")]
-    pub session_aggregate_window_duration: Duration,
+    pub session_aggregate: Vec<SessionTimeout>,
 }
 
 impl Default for Timeouts {
@@ -1664,7 +1683,7 @@ impl Default for Timeouts {
         Self {
             tcp_request_timeout: Duration::from_secs(1800),
             udp_request_timeout: Duration::from_secs(150),
-            session_aggregate_window_duration: Duration::from_secs(120),
+            session_aggregate: vec![],
         }
     }
 }
@@ -1754,7 +1773,7 @@ impl Default for RequestLogTagExtraction {
 #[serde(default)]
 pub struct RequestLogTunning {
     pub payload_truncation: u32,
-    pub session_aggregate_slot_capacity: usize,
+    pub session_aggregate_max_entries: usize,
     pub consistent_timestamp_in_l7_metrics: bool,
 }
 
@@ -1762,7 +1781,7 @@ impl Default for RequestLogTunning {
     fn default() -> Self {
         Self {
             payload_truncation: 1024,
-            session_aggregate_slot_capacity: 1024,
+            session_aggregate_max_entries: 16384,
             consistent_timestamp_in_l7_metrics: false,
         }
     }
@@ -2045,7 +2064,7 @@ impl Default for Tunning {
         Self {
             cpu_affinity: vec![],
             process_scheduling_priority: 0,
-            idle_memory_trimming: false,
+            idle_memory_trimming: true,
             page_cache_reclaim_percentage: 100,
             resource_monitoring_interval: Duration::from_secs(10),
         }
@@ -3202,6 +3221,14 @@ fn resolve_domain(addr: &str) -> Option<String> {
     }
 }
 
+fn deser_l7_protocol<'de, D>(deserializer: D) -> Result<L7Protocol, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(L7Protocol::from(s))
+}
+
 fn deser_u32_with_mega_unit<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
@@ -3221,6 +3248,24 @@ where
     D: Deserializer<'de>,
 {
     Ok(usize::deserialize(deserializer)? << 20)
+}
+
+// `humantime` will not parse "0" as Duration::ZERO
+// If "0" is a valid option for a duration field, use this deserializer
+//     #[serde(deserialize_with = "deser_humantime_with_zero")]
+// instead of
+//     #[serde(with = "humantime_serde")]
+fn deser_humantime_with_zero<'de: 'a, 'a, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v = <&'a str>::deserialize(deserializer)?;
+    if v == "0" {
+        Ok(Duration::ZERO)
+    } else {
+        humantime::parse_duration(v)
+            .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(v), &"a duration"))
+    }
 }
 
 #[cfg(test)]
@@ -3278,7 +3323,14 @@ log_backhaul_enabled: false
         let parsed_config: UserConfig = serde_yaml::from_str(&yaml_content)
             .expect("Failed to parse template.yaml to UserConfig");
 
-        assert_eq!(parsed_config, UserConfig::default());
+        let defaults = UserConfig::default();
+        assert_eq!(parsed_config.global, defaults.global);
+        assert_eq!(parsed_config.inputs, defaults.inputs);
+        assert_eq!(parsed_config.outputs, defaults.outputs);
+        assert_eq!(parsed_config.processors, defaults.processors);
+        assert_eq!(parsed_config.plugins, defaults.plugins);
+        assert_eq!(parsed_config.dev, defaults.dev);
+        assert_eq!(parsed_config, defaults);
     }
 
     #[test]
@@ -3333,9 +3385,28 @@ process_matcher:
 enabled: true
 "#;
         let proc: Proc = serde_yaml::from_str(default_matcher_yaml).unwrap();
-        assert_eq!(
-            proc.process_matcher.get(0),
-            Some(&ProcessMatcher::default())
-        );
+        assert_eq!(proc.process_matcher, Proc::default().process_matcher);
+    }
+
+    #[test]
+    fn parse_timeouts_by_applications() {
+        let yaml = r#"
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: HTTP
+        timeout: 150s
+      - protocol: gRPC
+        timeout: 130s
+"#;
+        let cfg: UserConfig = serde_yaml::from_str(yaml).unwrap();
+        let apps = &cfg.processors.request_log.timeouts.session_aggregate;
+
+        assert_eq!(apps.len(), 2);
+        assert_eq!(apps[0].protocol, L7Protocol::Http1);
+        assert_eq!(apps[0].timeout, Duration::from_secs(150));
+        assert_eq!(apps[1].protocol, L7Protocol::Grpc);
+        assert_eq!(apps[1].timeout, Duration::from_secs(130));
     }
 }

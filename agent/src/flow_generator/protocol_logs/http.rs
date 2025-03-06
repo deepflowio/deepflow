@@ -1811,7 +1811,12 @@ mod tests {
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
-            l7_log_session_aggr_timeout: Duration::from_secs(10),
+            l7_log_session_aggr_timeout: [
+                (L7Protocol::Http1, Duration::from_secs(10)),
+                (L7Protocol::Http2, Duration::from_secs(10)),
+                (L7Protocol::Grpc, Duration::from_secs(10)),
+            ]
+            .into(),
             l7_log_dynamic: config.clone(),
             ..Default::default()
         };
