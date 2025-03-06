@@ -993,6 +993,7 @@ dependencies = [
  "hpack",
  "http 0.2.9",
  "http2",
+ "humantime",
  "humantime-serde",
  "hyper 0.14.26",
  "integration_skywalking",
@@ -3182,6 +3183,7 @@ dependencies = [
 name = "public"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "arc-swap",
  "bincode 2.0.0-rc.3",
  "bitflags 1.3.2",

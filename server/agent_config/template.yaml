@@ -4538,6 +4538,7 @@ processors:
         RocketMQ: 1-65535
         DNS: 53,5353
         TLS: 443,6443
+        PING: 1-65535
         Custom: 1-65535 # plugins
       # type: dict
       # name:
@@ -4681,6 +4682,7 @@ processors:
         RocketMQ: []
         DNS: []
         TLS: []
+        PING: []
         Custom: []
       # type: string
       # name:
@@ -4767,7 +4769,88 @@ processors:
       #   ch: |-
       #     应用调用日志请求、响应合并的时间窗口，超出该时间窗口的响应将不与请求合并，而是单独生成一条调用日志。
       # upgrade_from: static_config.l7-log-session-aggr-timeout
+      # deprecated: true
       session_aggregate_window_duration: 120s
+      # type: dict
+      # name:
+      #   en: Application Session Aggregate Timeouts
+      #   ch: 应用会话合并超时设置
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the aggregation timeout for each application.
+      #     The default values is 15s for DNS and TLS, 120s for others.
+      #
+      #     Example:
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         timeouts:
+      #           session_aggregate:
+      #           - protocol: DNS
+      #             timeout: 15s
+      #           - protocol: HTTP2
+      #             timeout: 120s
+      #     ```
+      #
+      #   ch: |-
+      #     设置每个应用的超时时间。
+      #     DNS 和 TLS 默认 15s，其他协议默认 120s。
+      #
+      #     示例:
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         timeouts:
+      #           session_aggregate:
+      #           - protocol: DNS
+      #             timeout: 15s
+      #           - protocol: HTTP2
+      #             timeout: 120s
+      #     ```
+      #
+      # upgrade_from:
+      # ---
+      # type: string
+      # name:
+      #   en: Protocol
+      #   ch: 协议
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Protocol Name for timeout setting.
+      #   ch: |-
+      #     用于设置超时时间的协议名称。
+      # upgrade_from:
+      # ---
+      # protocol: ""
+      # ---
+      # type: duration
+      # name:
+      #   en: Timeout
+      #   ch: 超时时间
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the timeout for the application.
+      #   ch: |-
+      #     设置应用的超时时间。
+      # upgrade_from:
+      # ---
+      # timeout: 0
+      session_aggregate: []
     # type: section
     # name:
     #   en: Tag Extraction
@@ -5136,8 +5219,26 @@ processors:
       #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
       #       用于记录达到 LRU 容量限制并触发淘汰的次数。
       # upgrade_from: static_config.l7-log-session-slot-capacity
+      # deprecated: true
       session_aggregate_slot_capacity: 1024
-
+      # type: int
+      # name:
+      #   en: Session Aggregate Max Entries
+      #   ch: 会话聚合最大条目数
+      # unit:
+      # range: [16384, 10000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The maximum number of l7_flow_log entries cached for merging into a session.
+      #     If the total number of l7_flow_log entries exceeds this configuration,
+      #     the oldest entry will be sent without merging, setting its response status to `Unknown`.
+      #   ch: |-
+      #     会话聚合最大条目数。
+      #     如果 l7_flow_log 条目总数超过该配置，最老的条目将被丢弃，并设置其 response 状态为 `Unknown`。
+      session_aggregate_max_entries: 16384
       # type: bool
       # name:
       #   en: Consistent Timestamp in L7 Metrics

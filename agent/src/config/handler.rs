@@ -43,13 +43,13 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::ProcessorsFlowLogTunning;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, TagFilterOperator, UserConfig,
+        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
+        SessionTimeout, TagFilterOperator, UserConfig,
     },
     ConfigError, KubernetesPollerType,
 };
@@ -983,8 +983,9 @@ impl From<&Vec<String>> for DnsNxdomainTrie {
 #[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
-    pub l7_log_session_aggr_timeout: Duration,
-    pub l7_log_session_slot_capacity: usize,
+    pub l7_log_session_aggr_max_entries: usize,
+    pub l7_log_session_aggr_max_timeout: Duration,
+    pub l7_log_session_aggr_timeout: HashMap<L7Protocol, Duration>,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub http_endpoint_disabled: bool,
@@ -1000,8 +1001,9 @@ impl Default for LogParserConfig {
     fn default() -> Self {
         Self {
             l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::ZERO,
-            l7_log_session_slot_capacity: 1024,
+            l7_log_session_aggr_max_entries: 16384,
+            l7_log_session_aggr_max_timeout: SessionTimeout::DEFAULT,
+            l7_log_session_aggr_timeout: HashMap::new(),
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
             http_endpoint_disabled: false,
@@ -1023,12 +1025,16 @@ impl fmt::Debug for LogParserConfig {
                 &self.l7_log_collect_nps_threshold,
             )
             .field(
-                "l7_log_session_aggr_timeout",
-                &self.l7_log_session_aggr_timeout,
+                "l7_log_session_aggr_max_entries",
+                &self.l7_log_session_aggr_max_entries,
             )
             .field(
-                "l7_log_session_slot_capacity",
-                &self.l7_log_session_slot_capacity,
+                "l7_log_session_aggr_max_timeout",
+                &self.l7_log_session_aggr_max_timeout,
+            )
+            .field(
+                "l7_log_session_aggr_timeout",
+                &self.l7_log_session_aggr_timeout,
             )
             .field("l7_log_dynamic", &self.l7_log_dynamic)
             .field(
@@ -1097,7 +1103,6 @@ pub struct EbpfConfig {
     pub epc_id: u32,
     pub l7_log_packet_size: usize,
     // 静态配置
-    pub l7_log_session_timeout: Duration,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
     pub l7_log_tap_types: [bool; 256],
@@ -1122,7 +1127,6 @@ impl fmt::Debug for EbpfConfig {
             .field("agent_id", &self.agent_id)
             .field("epc_id", &self.epc_id)
             .field("l7_log_packet_size", &self.l7_log_packet_size)
-            .field("l7_log_session_timeout", &self.l7_log_session_timeout)
             .field(
                 "l7_protocol_inference_max_fail_count",
                 &self.l7_protocol_inference_max_fail_count,
@@ -1859,16 +1863,28 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             flow: (&conf).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l7_throttle,
+                l7_log_session_aggr_max_timeout: conf
+                    .processors
+                    .request_log
+                    .timeouts
+                    .session_aggregate
+                    .iter()
+                    .map(|app| app.timeout)
+                    .max()
+                    .unwrap_or(Duration::ZERO),
                 l7_log_session_aggr_timeout: conf
                     .processors
                     .request_log
                     .timeouts
-                    .session_aggregate_window_duration,
-                l7_log_session_slot_capacity: conf
+                    .session_aggregate
+                    .iter()
+                    .map(|app| (app.protocol.clone(), app.timeout))
+                    .collect(),
+                l7_log_session_aggr_max_entries: conf
                     .processors
                     .request_log
                     .tunning
-                    .session_aggregate_slot_capacity,
+                    .session_aggregate_max_entries,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.processors
                         .request_log
@@ -1955,7 +1971,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 l7_log_blacklist_trie: {
                     let mut blacklist_trie = HashMap::new();
                     for (k, v) in conf.processors.request_log.filters.tag_filters.iter() {
-                        let l7_protocol = L7Protocol::from(k.to_string());
+                        let l7_protocol = L7Protocol::from(k);
                         if l7_protocol == L7Protocol::Unknown {
                             warn!("Unsupported l7_protocol: {:?}", k);
                             continue;
@@ -2012,11 +2028,6 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_id: conf.global.common.agent_id as u16,
                 epc_id: conf.global.common.vpc_id,
-                l7_log_session_timeout: conf
-                    .processors
-                    .request_log
-                    .timeouts
-                    .session_aggregate_window_duration,
                 l7_log_packet_size: CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
                 l7_log_tap_types: generate_tap_types_array(
@@ -4638,14 +4649,12 @@ impl ConfigHandler {
             timeouts.udp_request_timeout = new_timeouts.udp_request_timeout;
             restart_agent = !first_run;
         }
-        if timeouts.session_aggregate_window_duration
-            != new_timeouts.session_aggregate_window_duration
-        {
-            info!("Update processors.request_log.timeouts.session_aggregate_window_duration from {:?} to {:?}.",
-            timeouts.session_aggregate_window_duration, new_timeouts.session_aggregate_window_duration);
-            timeouts.session_aggregate_window_duration =
-                new_timeouts.session_aggregate_window_duration;
-            restart_agent = !first_run;
+        if timeouts.session_aggregate != new_timeouts.session_aggregate {
+            info!(
+                "Update processors.request_log.timeouts.session_aggregate from {:?} to {:?}.",
+                timeouts.session_aggregate, new_timeouts.session_aggregate
+            );
+            timeouts.session_aggregate = new_timeouts.session_aggregate.clone();
         }
 
         let tag_extraction = &mut request_log.tag_extraction;
@@ -4698,11 +4707,10 @@ impl ConfigHandler {
             );
             tunning.payload_truncation = new_tunning.payload_truncation;
         }
-        if tunning.session_aggregate_slot_capacity != new_tunning.session_aggregate_slot_capacity {
-            info!("Update processors.request_log.tunning.session_aggregate_slot_capacity from {:?} to {:?}.",
-                tunning.session_aggregate_slot_capacity, new_tunning.session_aggregate_slot_capacity);
-            tunning.session_aggregate_slot_capacity = new_tunning.session_aggregate_slot_capacity;
-            restart_agent = !first_run;
+        if tunning.session_aggregate_max_entries != new_tunning.session_aggregate_max_entries {
+            info!("Update processors.request_log.tunning.session_aggregate_max_entries from {:?} to {:?}.",
+                tunning.session_aggregate_max_entries, new_tunning.session_aggregate_max_entries);
+            tunning.session_aggregate_max_entries = new_tunning.session_aggregate_max_entries;
         }
 
         let vector = &mut config.inputs.vector;

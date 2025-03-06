@@ -6821,6 +6821,7 @@ processors:
         NATS: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
+        PING: 1-65535
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
@@ -6893,6 +6894,7 @@ processors:
         NATS: []
         OpenWire: []
         Oracle: []
+        PING: []
         PostgreSQL: []
         Pulsar: []
         Redis: []
@@ -7201,6 +7203,7 @@ must greater than session aggregate SLOT_TIME (const 10s) and less than 300 on u
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7225,6 +7228,102 @@ processors:
 **Description**:
 
 l7_flow_log aggregate window.
+
+#### Application Session Aggregate Timeouts {#processors.request_log.timeouts.session_aggregate}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Set the aggregation timeout for each application.
+The default values is 15s for DNS and TLS, 120s for others.
+
+Example:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: DNS
+        timeout: 15s
+      - protocol: HTTP2
+        timeout: 120s
+```
+
+##### Protocol {#processors.request_log.timeouts.session_aggregate.protocol}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.protocol`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Protocol Name for timeout setting.
+
+##### Timeout {#processors.request_log.timeouts.session_aggregate.timeout}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.timeout`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - timeout: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+
+**Description**:
+
+Set the timeout for the application.
 
 ### Tag Extraction {#processors.request_log.tag_extraction}
 
@@ -7707,6 +7806,7 @@ NOTE: For eBPF data, the largest valid value is 16384.
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7749,6 +7849,36 @@ The following metrics can be used as reference data for adjusting this configura
 - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
   Used to record the number of times eviction is triggered due to reaching the
   LRU capacity limit.
+
+#### Session Aggregate Max Entries {#processors.request_log.tunning.session_aggregate_max_entries}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tunning.session_aggregate_max_entries`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tunning:
+      session_aggregate_max_entries: 16384
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [16384, 10000000] |
+
+**Description**:
+
+The maximum number of l7_flow_log entries cached for merging into a session.
+If the total number of l7_flow_log entries exceeds this configuration,
+the oldest entry will be sent without merging, setting its response status to `Unknown`.
 
 #### Consistent Timestamp in L7 Metrics {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
 

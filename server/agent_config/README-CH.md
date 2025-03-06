@@ -6649,6 +6649,7 @@ processors:
         NATS: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
+        PING: 1-65535
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
@@ -6721,6 +6722,7 @@ processors:
         NATS: []
         OpenWire: []
         Oracle: []
+        PING: []
         PostgreSQL: []
         Pulsar: []
         Redis: []
@@ -7005,6 +7007,7 @@ deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7029,6 +7032,102 @@ processors:
 **详细描述**:
 
 应用调用日志请求、响应合并的时间窗口，超出该时间窗口的响应将不与请求合并，而是单独生成一条调用日志。
+
+#### 应用会话合并超时设置 {#processors.request_log.timeouts.session_aggregate}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+设置每个应用的超时时间。
+DNS 和 TLS 默认 15s，其他协议默认 120s。
+
+示例:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: DNS
+        timeout: 15s
+      - protocol: HTTP2
+        timeout: 120s
+```
+
+##### 协议 {#processors.request_log.timeouts.session_aggregate.protocol}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.protocol`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+用于设置超时时间的协议名称。
+
+##### 超时时间 {#processors.request_log.timeouts.session_aggregate.timeout}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.timeout`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - timeout: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+
+**详细描述**:
+
+设置应用的超时时间。
 
 ### 标签提取 {#processors.request_log.tag_extraction}
 
@@ -7500,6 +7599,7 @@ processors:
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7535,6 +7635,35 @@ LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目
   用于记录当前时刻所有时间槽中缓存的 request_resource 字段占用的总内存，单位为字节。
 - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
   用于记录达到 LRU 容量限制并触发淘汰的次数。
+
+#### 会话聚合最大条目数 {#processors.request_log.tunning.session_aggregate_max_entries}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tunning.session_aggregate_max_entries`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tunning:
+      session_aggregate_max_entries: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [16384, 10000000] |
+
+**详细描述**:
+
+会话聚合最大条目数。
+如果 l7_flow_log 条目总数超过该配置，最老的条目将被丢弃，并设置其 response 状态为 `Unknown`。
 
 #### 应用指标时间一致性开关 {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
 
