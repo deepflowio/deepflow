@@ -75,7 +75,7 @@ use crate::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, UserConfig,
     },
-    flow_generator::{protocol_logs::PseudoAppProto, LogMessageType},
+    flow_generator::LogMessageType,
     metric::document::TapSide,
     plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
@@ -179,10 +179,10 @@ pub struct FlowMap {
     l7_stats_allocator: Allocator<L7Stats>,
     output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    out_log_queue: DebugSender<Box<AppProto>>,
+    out_log_queue: DebugSender<AppProto>,
     output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
     l7_stats_buffer: Vec<BatchedBox<L7Stats>>,
-    protolog_buffer: Vec<Box<AppProto>>,
+    protolog_buffer: Vec<AppProto>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
@@ -217,7 +217,7 @@ impl FlowMap {
         output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
-        app_proto_log_queue: DebugSender<Box<AppProto>>,
+        app_proto_log_queue: DebugSender<AppProto>,
         ntp_diff: Arc<AtomicI64>,
         config: &FlowConfig,
         packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -909,7 +909,7 @@ impl FlowMap {
             if node.residual_request == 0 {
                 node.timeout = flow_config.flow_timeout.opening;
             } else {
-                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+                node.timeout = config.log_parser.l7_log_session_aggr_max_timeout.into();
             }
         }
 
@@ -1770,7 +1770,7 @@ impl FlowMap {
                 node.timeout = DEFAULT_SOCKET_CLOSE_TIMEOUT;
             } else {
                 // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+                node.timeout = config.log_parser.l7_log_session_aggr_max_timeout.into();
             }
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true);
@@ -2133,18 +2133,14 @@ impl FlowMap {
                 let l7_protocol = l.l7_protocol_enum.get_l7_protocol();
                 // If this protocol has session_id, the AppProto in SessionAggregator cannot be found based on flow_id alone.
                 if !l7_protocol.has_session_id() {
-                    let app_proto = PseudoAppProto::new(
-                        PseudoAppProto::session_key(
-                            node.tagged_flow.flow.flow_id,
-                            node.last_cap_seq,
-                            node.tagged_flow.flow.signal_source,
-                            l7_protocol,
-                        ),
-                        node.recent_time,
-                        node.tagged_flow.flow.tap_side,
+                    let session_key = MetaAppProto::session_key(
+                        node.tagged_flow.flow.flow_id,
+                        node.last_cap_seq,
+                        node.tagged_flow.flow.signal_source,
+                        l7_protocol,
                     );
                     self.protolog_buffer
-                        .push(Box::new(AppProto::PseudoAppProto(app_proto)));
+                        .push(AppProto::SocketClosed(session_key));
                     if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
                         self.flush_app_protolog();
                     }
@@ -2175,7 +2171,7 @@ impl FlowMap {
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
             {
                 self.protolog_buffer
-                    .push(Box::new(AppProto::MetaAppProto(app_proto)));
+                    .push(AppProto::MetaAppProto(Box::new(app_proto)));
                 if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
                     self.flush_app_protolog();
                 }

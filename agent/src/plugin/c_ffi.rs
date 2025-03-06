@@ -272,14 +272,8 @@ impl TryFrom<ParseInfo> for CustomInfo {
                 (
                     CustomInfoRequest::default(),
                     CustomInfoResp {
-                        status: match L7ResponseStatus::try_from(resp.status)
-                            .map_err(|e| e.to_string())?
-                        {
-                            L7ResponseStatus::Ok => L7ResponseStatus::Ok,
-                            L7ResponseStatus::NotExist => L7ResponseStatus::NotExist,
-                            L7ResponseStatus::ServerError => L7ResponseStatus::ServerError,
-                            L7ResponseStatus::ClientError => L7ResponseStatus::ClientError,
-                        },
+                        status: L7ResponseStatus::try_from(resp.status)
+                            .map_err(|e| e.to_string())?,
                         code: Some(resp.code),
                         exception: c_str_to_string(&resp.exception).unwrap_or_default(),
                         result: c_str_to_string(&resp.result).unwrap_or_default(),

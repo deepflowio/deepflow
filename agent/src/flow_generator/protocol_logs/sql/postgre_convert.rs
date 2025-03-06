@@ -566,6 +566,6 @@ pub(super) fn get_code_desc(code: &str) -> (&'static str, L7ResponseStatus) {
         "XX001" => ("data_corrupted", L7ResponseStatus::ServerError),
         "XX002" => ("index_corrupted", L7ResponseStatus::ServerError),
         // default
-        _ => ("", L7ResponseStatus::NotExist),
+        _ => ("", L7ResponseStatus::Unknown),
     }
 }

@@ -246,9 +246,10 @@ impl CustomInfo {
                 let status = buf[off];
                 match status {
                     0 => info.resp.status = L7ResponseStatus::Ok,
-                    2 => info.resp.status = L7ResponseStatus::NotExist,
+                    2 => info.resp.status = L7ResponseStatus::Timeout,
                     3 => info.resp.status = L7ResponseStatus::ServerError,
                     4 => info.resp.status = L7ResponseStatus::ClientError,
+                    5 => info.resp.status = L7ResponseStatus::Unknown,
                     _ => {
                         return Err(Error::WasmSerializeFail(
                             "recv unexpected status ".to_string(),
@@ -445,9 +446,10 @@ impl CustomInfo {
                 info.resp = CustomInfoResp {
                     status: match r.status.and_then(pb::AppRespStatus::from_i32) {
                         Some(pb::AppRespStatus::RespOk) => L7ResponseStatus::Ok,
-                        Some(pb::AppRespStatus::RespTimeout) => L7ResponseStatus::NotExist,
+                        Some(pb::AppRespStatus::RespTimeout) => L7ResponseStatus::Timeout,
                         Some(pb::AppRespStatus::RespServerError) => L7ResponseStatus::ServerError,
                         Some(pb::AppRespStatus::RespClientError) => L7ResponseStatus::ClientError,
+                        Some(pb::AppRespStatus::RespUnknown) => L7ResponseStatus::Unknown,
                         _ => {
                             return Err(Error::WasmSerializeFail(
                                 "unexpected resp status".to_string(),

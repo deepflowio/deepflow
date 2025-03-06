@@ -377,7 +377,7 @@ fn fill_l7_stats(
     };
     let mut l4_protocol = L4Protocol::Tcp;
     let mut l7_protocol = L7Protocol::Unknown;
-    let mut status = L7ResponseStatus::NotExist;
+    let mut status = L7ResponseStatus::Timeout;
     let mut is_http2 = false;
     let (mut l2_end_0, mut l2_end_1) = (false, false);
 
@@ -422,16 +422,14 @@ fn fill_l7_stats(
             // }
             "http.scheme" | "db.system" | "rpc.system" | "messaging.system"
             | "messaging.protocol" => {
-                if let Some(value) = attr.value.clone() {
-                    if let Some(StringValue(val)) = value.value {
-                        l7_protocol = L7Protocol::from(val);
-                    }
+                if let Some(StringValue(val)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                    l7_protocol = L7Protocol::from(val);
                 }
             }
             // Format as above, "net.peer.ip": "0.0.0.0"
             "net.peer.ip" => {
-                if let Some(value) = attr.value.clone() {
-                    if let Some(StringValue(val)) = value.value {
+                if let Some(value) = attr.value.as_ref() {
+                    if let Some(StringValue(val)) = value.value.as_ref() {
                         if let Ok(ip_addr) = val.parse::<IpAddr>() {
                             let ip_addr = get_ip(ip_addr);
                             if flow.tap_side == TapSide::ClientApp {
@@ -445,24 +443,24 @@ fn fill_l7_stats(
             }
             // Format as above, "net.transport": "ip_tcp"
             "net.transport" => {
-                if let Some(value) = attr.value.clone() {
-                    if let Some(StringValue(val)) = value.value {
+                if let Some(value) = attr.value.as_ref() {
+                    if let Some(StringValue(val)) = value.value.as_ref() {
                         l4_protocol = L4Protocol::from(val);
                     }
                 }
             }
             // Format as above, "http.status_code": 200
             "http.status_code" => {
-                if let Some(value) = attr.value.clone() {
-                    if let Some(IntValue(val)) = value.value {
-                        status = http_code_to_response_status(val);
+                if let Some(value) = attr.value.as_ref() {
+                    if let Some(IntValue(val)) = value.value.as_ref() {
+                        status = http_code_to_response_status(*val);
                     }
                 }
             }
             // Format as above, "http.flavor": "1.1"
             "http.flavor" => {
-                if let Some(value) = attr.value.clone() {
-                    if let Some(StringValue(val)) = value.value {
+                if let Some(value) = attr.value.as_ref() {
+                    if let Some(StringValue(val)) = value.value.as_ref() {
                         if val == "2.0" {
                             is_http2 = true;
                         }
@@ -491,11 +489,11 @@ fn fill_l7_stats(
 
     // According to https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
     // Unset = 0, Ok = 1, Error = 2
-    if status == L7ResponseStatus::NotExist && span.status.is_some() {
+    if status == L7ResponseStatus::Timeout && span.status.is_some() {
         status = match span.status.as_ref().unwrap().code {
             1 => L7ResponseStatus::Ok,
             2 => L7ResponseStatus::ServerError,
-            _ => L7ResponseStatus::NotExist,
+            _ => L7ResponseStatus::Timeout,
         }
     }
 

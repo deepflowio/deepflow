@@ -35,7 +35,7 @@ pub use mq::{
     OpenWireLog, PulsarInfo, PulsarLog, ZmtpInfo, ZmtpLog,
 };
 use num_enum::TryFromPrimitive;
-pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator};
+pub use parser::{AppProto, MetaAppProto, SessionAggregator};
 pub use ping::{PingInfo, PingLog};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
@@ -76,19 +76,15 @@ use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
 
-#[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
+#[derive(Serialize, Debug, Default, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok = 0,
-    NotExist = 2,
+    Timeout = 2,
     ServerError = 3,
     ClientError = 4,
-}
-
-impl Default for L7ResponseStatus {
-    fn default() -> Self {
-        L7ResponseStatus::Ok
-    }
+    #[default]
+    Unknown = 5,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
@@ -386,17 +382,23 @@ impl AppProtoLogsBaseInfo {
 }
 
 #[derive(Debug)]
-pub struct BoxAppProtoLogsData(pub Box<MetaAppProto>);
+pub struct BoxAppProtoLogsData {
+    pub data: Box<MetaAppProto>,
+    pub override_resp_status: Option<L7ResponseStatus>,
+}
 
 impl Sendable for BoxAppProtoLogsData {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
-            base: Some(self.0.base_info.into()),
-            direction_score: self.0.direction_score as u32,
+            base: Some(self.data.base_info.into()),
+            direction_score: self.data.direction_score as u32,
             ..Default::default()
         };
 
-        let log: L7ProtocolSendLog = self.0.l7_info.into();
+        let mut log: L7ProtocolSendLog = self.data.l7_info.into();
+        if let Some(status) = self.override_resp_status {
+            log.resp.status = status;
+        }
         log.fill_app_proto_log(&mut pb_proto_logs_data);
         pb_proto_logs_data
             .encode(buf)
@@ -412,7 +414,7 @@ impl Sendable for BoxAppProtoLogsData {
     }
 
     fn to_kv_string(&self, kv_string: &mut String) {
-        let json = serde_json::to_string(&(*self.0)).unwrap();
+        let json = serde_json::to_string(&(*self.data)).unwrap();
         kv_string.push_str(&json);
         kv_string.push('\n');
     }
@@ -516,8 +518,9 @@ mod tests {
     #[test]
     fn validate_l7_response_status_as_uint() {
         assert_eq!(L7ResponseStatus::Ok as u32, 0);
-        assert_eq!(L7ResponseStatus::NotExist as u32, 2);
+        assert_eq!(L7ResponseStatus::Timeout as u32, 2);
         assert_eq!(L7ResponseStatus::ServerError as u32, 3);
         assert_eq!(L7ResponseStatus::ClientError as u32, 4);
+        assert_eq!(L7ResponseStatus::Unknown as u32, 5);
     }
 }

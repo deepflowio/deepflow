@@ -26,8 +26,10 @@ pub const DEFAULT_TLS_PORT: u16 = 443;
     Clone,
     Copy,
     PartialEq,
-    Hash,
     Eq,
+    PartialOrd,
+    Ord,
+    Hash,
     FromPrimitive,
     IntoPrimitive,
     num_enum::Default,
@@ -100,9 +102,9 @@ impl L7Protocol {
 
 // Translate the string value of l7_protocol into a L7Protocol enumeration value used by OTEL.
 impl From<String> for L7Protocol {
-    fn from(l7_protocol_str: String) -> Self {
-        let l7_protocol_str = l7_protocol_str.to_lowercase();
-        match l7_protocol_str.as_str() {
+    fn from(mut s: String) -> Self {
+        s.make_ascii_lowercase();
+        match s.as_str() {
             "http" | "https" => Self::Http1,
             "http2" => Self::Http2,
             "dubbo" => Self::Dubbo,
@@ -131,6 +133,18 @@ impl From<String> for L7Protocol {
             "some/ip" | "someip" => Self::SomeIp,
             _ => Self::Unknown,
         }
+    }
+}
+
+// separate impl for &str and &String because `From<AsRef<str>>` conflict with FromPrimitive trait
+impl From<&str> for L7Protocol {
+    fn from(s: &str) -> Self {
+        s.to_lowercase().into()
+    }
+}
+impl From<&String> for L7Protocol {
+    fn from(s: &String) -> Self {
+        s.to_lowercase().into()
     }
 }
 

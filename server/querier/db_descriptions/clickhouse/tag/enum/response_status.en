@@ -3,3 +3,4 @@
 2       , Timeout         ,
 3       , Server Error    ,
 4       , Client Error    ,
+5       , Unknown         ,
