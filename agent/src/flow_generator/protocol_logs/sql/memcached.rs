@@ -324,7 +324,7 @@ impl From<MemcachedInfo> for L7ProtocolSendLog {
             log.resp = L7Response {
                 result: f.result,
                 status: match resp {
-                    Response::NotFound => L7ResponseStatus::NotExist,
+                    Response::NotFound => L7ResponseStatus::Unknown,
                     Response::ServerError => L7ResponseStatus::ServerError,
                     Response::Error | Response::ClientError => L7ResponseStatus::ClientError,
                     _ => L7ResponseStatus::Ok,

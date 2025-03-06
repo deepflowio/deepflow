@@ -109,7 +109,7 @@ pub(super) struct InternalState {
 
     pub(super) flow_output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
     pub(super) l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    pub(super) log_output_queue: DebugSender<Box<AppProto>>,
+    pub(super) log_output_queue: DebugSender<AppProto>,
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
