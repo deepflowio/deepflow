@@ -46,7 +46,10 @@ use crate::{
     common::DEFAULT_LOG_FILE, metric::document::TapSide, rpc::Session, trident::RunningMode,
 };
 
-use public::{bitmap::Bitmap, proto::agent, utils::bitmap::parse_u16_range_list_to_bitmap};
+use public::{
+    bitmap::Bitmap, l7_protocol::L7Protocol, proto::agent,
+    utils::bitmap::parse_u16_range_list_to_bitmap,
+};
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -1618,15 +1621,29 @@ impl Default for Filters {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ApplicationTimeout {
+    #[serde(deserialize_with = "deser_l7_protocol")]
+    pub protocol: L7Protocol,
+    #[serde(with = "humantime_serde")]
+    pub timeout: Duration,
+}
+
+impl ApplicationTimeout {
+    pub const DEFAULT: Duration = Duration::from_secs(120);
+    pub const DNS_DEFAULT: Duration = Duration::from_secs(15);
+    pub const TLS_DEFAULT: Duration = Duration::from_secs(15);
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Timeouts {
     #[serde(with = "humantime_serde")]
     pub tcp_request_timeout: Duration,
     #[serde(with = "humantime_serde")]
     pub udp_request_timeout: Duration,
-    #[serde(with = "humantime_serde")]
-    pub session_aggregate_window_duration: Duration,
+    pub applications: Vec<ApplicationTimeout>,
 }
 
 impl Default for Timeouts {
@@ -1634,7 +1651,7 @@ impl Default for Timeouts {
         Self {
             tcp_request_timeout: Duration::from_secs(1800),
             udp_request_timeout: Duration::from_secs(150),
-            session_aggregate_window_duration: Duration::from_secs(120),
+            applications: vec![],
         }
     }
 }
@@ -1724,7 +1741,7 @@ impl Default for RequestLogTagExtraction {
 #[serde(default)]
 pub struct RequestLogTunning {
     pub payload_truncation: u32,
-    pub session_aggregate_slot_capacity: usize,
+    pub session_aggregate_max_entries: usize,
     pub consistent_timestamp_in_l7_metrics: bool,
 }
 
@@ -1732,7 +1749,7 @@ impl Default for RequestLogTunning {
     fn default() -> Self {
         Self {
             payload_truncation: 1024,
-            session_aggregate_slot_capacity: 1024,
+            session_aggregate_max_entries: 16384,
             consistent_timestamp_in_l7_metrics: false,
         }
     }
@@ -3180,6 +3197,14 @@ fn resolve_domain(addr: &str) -> Option<String> {
     }
 }
 
+fn deser_l7_protocol<'de, D>(deserializer: D) -> Result<L7Protocol, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(L7Protocol::from(s))
+}
+
 fn deser_u32_with_mega_unit<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
@@ -3315,5 +3340,27 @@ enabled: true
             proc.process_matcher.get(0),
             Some(&ProcessMatcher::default())
         );
+    }
+
+    #[test]
+    fn parse_timeouts_by_applications() {
+        let yaml = r#"
+processors:
+  request_log:
+    timeouts:
+      applications:
+      - protocol: HTTP
+        timeout: 150s
+      - protocol: gRPC
+        timeout: 130s
+"#;
+        let cfg: UserConfig = serde_yaml::from_str(yaml).unwrap();
+        let apps = &cfg.processors.request_log.timeouts.applications;
+
+        assert_eq!(apps.len(), 2);
+        assert_eq!(apps[0].protocol, L7Protocol::Http1);
+        assert_eq!(apps[0].timeout, Duration::from_secs(150));
+        assert_eq!(apps[1].protocol, L7Protocol::Grpc);
+        assert_eq!(apps[1].timeout, Duration::from_secs(130));
     }
 }

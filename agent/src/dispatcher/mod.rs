@@ -731,7 +731,7 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: Option<DebugSender<BatchedBox<L7Stats>>>,
-    log_output_queue: Option<DebugSender<Box<AppProto>>>,
+    log_output_queue: Option<DebugSender<AppProto>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
@@ -836,7 +836,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn log_output_queue(mut self, v: DebugSender<Box<AppProto>>) -> Self {
+    pub fn log_output_queue(mut self, v: DebugSender<AppProto>) -> Self {
         self.log_output_queue = Some(v);
         self
     }
