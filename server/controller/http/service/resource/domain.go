@@ -188,8 +188,26 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 		)
 	}
 
+	clusterIDToValue := map[string]string{}
+	var k8sClusters []metadbmodel.KubernetesCluster
+	if err = orgDB.Find(&k8sClusters).Error; err != nil {
+		return response, err
+	}
+	for _, k8sCluster := range k8sClusters {
+		clusterIDToValue[k8sCluster.ClusterID] = k8sCluster.Value
+	}
+
+	var vtaps []metadbmodel.VTap
+	if err = orgDB.Find(&vtaps).Error; err != nil {
+		return response, err
+	}
+	valueToVtap := map[string]metadbmodel.VTap{}
+	for _, vtap := range vtaps {
+		valueToVtap[fmt.Sprintf("%s-%s", vtap.CtrlIP, vtap.CtrlMac)] = vtap
+	}
+
 	domainToVMCount = make(map[string]int)
-	vmCounts, err := UnscopedSelectGroupByFind[metadbmodel.VM, ResourceCount](
+	vmCounts, _ := UnscopedSelectGroupByFind[metadbmodel.VM, ResourceCount](
 		orgDB, []string{"domain", "count(id) as count"}, "domain",
 	)
 	for _, item := range vmCounts {
@@ -197,7 +215,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 	}
 
 	domainToPodCount = make(map[string]int)
-	podCounts, err := UnscopedSelectGroupByFind[metadbmodel.Pod, ResourceCount](
+	podCounts, _ := UnscopedSelectGroupByFind[metadbmodel.Pod, ResourceCount](
 		orgDB, []string{"domain", "count(id) as count"}, "domain",
 	)
 	for _, item := range podCounts {
@@ -257,17 +275,14 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 				domainResp.PodClusters = subDomains
 			}
 		} else {
-			var k8sCluster metadbmodel.KubernetesCluster
-			if err = orgDB.Where("cluster_id = ?", domain.ClusterID).First(&k8sCluster).Error; err == nil {
-				v := strings.Split(k8sCluster.Value, "-")
-				if len(v) == 2 {
-					var vtap metadbmodel.VTap
-					if err = orgDB.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
-						domainResp.VTapName = vtap.Name
-						domainResp.VTapCtrlIP = vtap.CtrlIP
-						domainResp.VTapCtrlMAC = vtap.CtrlMac
-						domainResp.Config["vtap_id"] = vtap.Name
-					}
+			if clusterValue, ok := clusterIDToValue[domain.ClusterID]; ok {
+				if vtap, ok := valueToVtap[clusterValue]; ok {
+					domainResp.VTapName = vtap.Name
+					domainResp.VTapCtrlIP = vtap.CtrlIP
+					domainResp.VTapCtrlMAC = vtap.CtrlMac
+					domainResp.Config["vtap_id"] = vtap.Name
+				} else {
+					domainResp.VTapName = clusterValue
 				}
 			}
 		}
