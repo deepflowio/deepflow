@@ -984,3 +984,57 @@ func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
 }
+
+type ChCustomServiceDevice struct {
+	SubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, metadbmodel.CustomService, metadbmodel.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomServiceDevice {
+	mng := &ChCustomServiceDevice{
+		newSubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, metadbmodel.CustomService, metadbmodel.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_CUSTOM_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.CustomService) (keys []DeviceKey, targets []metadbmodel.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_CUSTOM_SERVICE,
+	}]
+	sourceName := source.Name
+	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+		DeviceID: source.ID})
+	targets = append(targets, metadbmodel.ChDevice{
+		DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChCustomServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.CustomServiceFieldsUpdate, db *metadb.DB) {
+	updateInfo := make(map[string]interface{})
+	log.Infof("TODO fieldsUpdate.Name: %#v", fieldsUpdate.Name, db.LogPrefixORGID)
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem metadbmodel.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_CUSTOM_SERVICE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChCustomServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+}

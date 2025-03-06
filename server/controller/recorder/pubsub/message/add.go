@@ -183,3 +183,7 @@ type PodAdd struct {
 type ProcessAdd struct {
 	MySQLItems[metadbmodel.Process]
 }
+
+type CustomServiceAdd struct {
+	MySQLItems[metadbmodel.CustomService]
+}
