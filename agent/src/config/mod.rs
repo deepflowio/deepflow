@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-mod config;
+pub mod config;
 pub mod handler;
 
 pub use config::{

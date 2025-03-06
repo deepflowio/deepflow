@@ -53,6 +53,7 @@ hostname = "0.3.1"
 hpack = { git = "https://github.com/deepflowio/hpack-rs/" }
 http = "0.2.5"
 http2 = { path = "plugins/http2" }
+humantime = "2.1"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 integration_skywalking = { path = "plugins/integration_skywalking" }
