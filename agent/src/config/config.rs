@@ -559,16 +559,46 @@ impl Default for Proc {
             socket_info_sync_interval: Duration::from_secs(0),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
-            process_matcher: vec![ProcessMatcher {
-                match_regex: Regex::new("deepflow-.*").unwrap(),
-                only_in_container: false,
-                enabled_features: vec![
-                    "ebpf.profile.on_cpu".to_string(),
-                    "ebpf.profile.off_cpu".to_string(),
-                    "proc.gprocess_info".to_string(),
-                ],
-                ..Default::default()
-            }],
+            process_matcher: vec![
+                ProcessMatcher {
+                    match_regex: Regex::new(r"([\s\S]*)java( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)")
+                        .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$4".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(r"([\s\S]*)python(\S)*( +-\S+)* +(\S*/)*([^ /]+)")
+                        .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$5".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new("^deepflow-").unwrap(),
+                    only_in_container: false,
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(".*").unwrap(),
+                    enabled_features: vec!["proc.gprocess_info".to_string()],
+                    ..Default::default()
+                },
+            ],
             symbol_table: SymbolTable::default(),
         }
     }
