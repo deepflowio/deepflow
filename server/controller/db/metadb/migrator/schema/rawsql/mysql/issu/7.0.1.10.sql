@@ -37,7 +37,7 @@ BEGIN
     -- 动态生成并执行 UPDATE 语句
     SET @update_sql = CONCAT(
         'UPDATE data_source ',
-        'SET query_time = 3600 ',
+        'SET query_time = 360 ',
         'WHERE data_table_collection = "', tableName, '"'
     );
 
