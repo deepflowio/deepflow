@@ -242,9 +242,10 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                 let status = buf[off];
                 match status {
                     0 => info.resp.status = L7ResponseStatus::Ok,
-                    2 => info.resp.status = L7ResponseStatus::NotExist,
+                    2 => info.resp.status = L7ResponseStatus::Timeout,
                     3 => info.resp.status = L7ResponseStatus::ServerError,
                     4 => info.resp.status = L7ResponseStatus::ClientError,
+                    5 => info.resp.status = L7ResponseStatus::Unknown,
                     _ => {
                         return Err(Error::WasmSerializeFail(
                             "recv unexpected status ".to_string(),
