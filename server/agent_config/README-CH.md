@@ -1596,10 +1596,26 @@ inputs:
     process_matcher:
     - enabled_features:
       - ebpf.profile.on_cpu
-      - ebpf.profile.off_cpu
       - proc.gprocess_info
-      match_regex: deepflow-.*
+      match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
+      match_type: cmdline_with_args
       only_in_container: false
+      rewrite_name: $3
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: \bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $4
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: ^deepflow-
+      only_in_container: false
+    - enabled_features:
+      - proc.gprocess_info
+      match_regex: .*
 ```
 
 **模式**:
@@ -1609,22 +1625,21 @@ inputs:
 
 **详细描述**:
 
-Will traverse over the entire array, so the previous ones will be matched first.
-when match_type is parent_process_name, will recursive to match parent proc name,
-and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
-and windows style environment variable, for example: `$1-py-script-%HOSTNAME%` will
-replace regexp capture group 1 and HOSTNAME env var. If proc not match any regexp
-will be accepted (essentially will auto append `- match_regex: .*` at the end).
+匹配器将自上而下地遍历匹配规则，所以较前的规则将会被优先匹配。
+当 match_type 为 parent_process_name 时，匹配器将会递归地查找父进程名且忽略 rewrite_name 选项。
+rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的环境变量。
+例如：`$1-py-script-%HOSTNAME%` 中的 $1 将会替换正则表达式捕获到的第一组内容，并替换 HOSTNAME 环境变量。
 
-Configuration Item:
-- match_regex: The regexp use for match the process, default value is `.*`
-- match_type: regexp match field, default value is `process_name`, options are
+配置键：
+- match_regex: 用于匹配进程的表达式，缺省值为 `""`。
+- match_type: 被用于正则表达式匹配的对象，缺省值为 `process_name`，可选项为：
   [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-- ignore: Whether to ignore when regex match, default value is `false`
-- rewrite_name: The name will replace the process name or cmd use regexp replace.
-  Default value `""` means no replacement.
+- ignore: 是否要忽略正则匹配，缺省值为 `false`
+- rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
+- enabled_features: 可用于进程匹配器的 feature，可选项为：
+  [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
 
-Example:
+示例:
 ```yaml
 inputs:
   proc:
@@ -1647,8 +1662,8 @@ inputs:
     - match_regex: .*sleep.*
       match_type: process_name
       ignore: true
-    - match_regex: .+ # match after concatenating a tag key and value pair using colon,
-                      # i.e., an regex `app:.+` can match all processes has a `app` tag
+    - match_regex: .+ # 可使用冒号连接需要匹配的 tag key 与 value
+                      # i.e.: `app:.+` 表示匹配所有具有 `app` tag 的进程
       match_type: tag
 ```
 

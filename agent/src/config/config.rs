@@ -408,7 +408,11 @@ impl ProcessMatcher {
         let mut match_replace_fn = |reg: &Regex, ignored: bool, s: &String, replace: &String| {
             if reg.is_match(s.as_str()) {
                 if !ignored && !replace.is_empty() {
-                    process_data.name = reg.replace_all(s.as_str(), replace).to_string();
+                    // get match sub string for replace
+                    if let Some(m) = reg.find(s.as_str()) {
+                        process_data.name =
+                            reg.replace_all(&s[m.start()..m.end()], replace).to_string();
+                    }
                 }
                 true
             } else {
@@ -559,16 +563,44 @@ impl Default for Proc {
             sync_interval: Duration::from_secs(10),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
-            process_matcher: vec![ProcessMatcher {
-                match_regex: Regex::new("deepflow-.*").unwrap(),
-                only_in_container: false,
-                enabled_features: vec![
-                    "ebpf.profile.on_cpu".to_string(),
-                    "ebpf.profile.off_cpu".to_string(),
-                    "proc.gprocess_info".to_string(),
-                ],
-                ..Default::default()
-            }],
+            process_matcher: vec![
+                ProcessMatcher {
+                    match_regex: Regex::new(r"\bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)").unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$3".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(r"\bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)").unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$4".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new("^deepflow-").unwrap(),
+                    only_in_container: false,
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(".*").unwrap(),
+                    enabled_features: vec!["proc.gprocess_info".to_string()],
+                    ..Default::default()
+                },
+            ],
             symbol_table: SymbolTable::default(),
         }
     }
