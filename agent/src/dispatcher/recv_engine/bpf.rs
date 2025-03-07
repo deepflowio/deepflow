@@ -726,7 +726,7 @@ impl Builder {
         // 不采集和TSDB通信的流量
         bpf_builder.appends(&mut self.skip_ipv4_tsdb());
         // 不采集分发流量
-        if self.skip_npb_bpf {
+        if !self.skip_npb_bpf {
             bpf_builder.appends(&mut self.skip_ipv4_npb());
         }
 
@@ -739,7 +739,7 @@ impl Builder {
         // 不采集和TSDB通信的流量
         bpf_builder.appends(&mut self.skip_ipv6_tsdb());
         // 不采集分发流量
-        if self.skip_npb_bpf {
+        if !self.skip_npb_bpf {
             bpf_builder.appends(&mut self.skip_ipv6_npb());
         }
 
@@ -784,7 +784,7 @@ impl Builder {
             ip_version, self.analyzer_source_ip, self.analyzer_port
         ));
 
-        if self.skip_npb_bpf {
+        if !self.skip_npb_bpf {
             // 不采集分发的VXLAN流量
             conditions.push(format!(
                 "not (udp and dst port {} and udp[8:1]={:#x})",
@@ -827,7 +827,7 @@ mod tests {
             proxy_controller_port: 7788,
             analyzer_port: 8899,
             analyzer_source_ip: "1.2.3.4".parse::<IpAddr>().unwrap(),
-            skip_npb_bpf: true,
+            skip_npb_bpf: false,
         };
 
         let syntax = builder.build_pcap_syntax();
@@ -917,7 +917,7 @@ mod tests {
             analyzer_source_ip: "9999:aaaa:bbbb:cccc:dddd:eeee:ffff:0000"
                 .parse::<IpAddr>()
                 .unwrap(),
-            skip_npb_bpf: true,
+            skip_npb_bpf: false,
         };
 
         let syntax = builder.build_pcap_syntax();

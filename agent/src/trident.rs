@@ -3010,6 +3010,7 @@ fn build_dispatchers(
             cpu_set: dispatcher_config.cpu_set,
             #[cfg(target_os = "linux")]
             fanout_enabled,
+            skip_npb_bpf: yaml_config.skip_npb_bpf,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
