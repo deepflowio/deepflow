@@ -1613,10 +1613,26 @@ inputs:
     process_matcher:
     - enabled_features:
       - ebpf.profile.on_cpu
-      - ebpf.profile.off_cpu
       - proc.gprocess_info
-      match_regex: deepflow-.*
+      match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
+      match_type: cmdline_with_args
       only_in_container: false
+      rewrite_name: $3
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: \bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $4
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: ^deepflow-
+      only_in_container: false
+    - enabled_features:
+      - proc.gprocess_info
+      match_regex: .*
 ```
 
 **Schema**:
@@ -1630,16 +1646,17 @@ Will traverse over the entire array, so the previous ones will be matched first.
 when match_type is parent_process_name, will recursive to match parent proc name,
 and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
 and windows style environment variable, for example: `$1-py-script-%HOSTNAME%` will
-replace regexp capture group 1 and HOSTNAME env var. If proc not match any regexp
-will be accepted (essentially will auto append `- match_regex: .*` at the end).
+replace regexp capture group 1 and HOSTNAME env var.
 
 Configuration Item:
-- match_regex: The regexp use for match the process, default value is `.*`
+- match_regex: The regexp use for match the process, default value is `""`
 - match_type: regexp match field, default value is `process_name`, options are
   [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
 - ignore: Whether to ignore when regex match, default value is `false`
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
+- enabled_features: the features can be used for process matcher, options:
+  [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
 
 Example:
 ```yaml
