@@ -51,9 +51,9 @@ func GetMultiTag(stmts []Statement, name string) []Statement {
 				}
 				ip4WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 1, %s, NULL), NULL)", resourceTypeSuffix, ip4Suffix)
 				ip6WithValue := fmt.Sprintf("if(%s IN (0, 255), if(is_ipv4 = 0, %s, NULL), NULL)", resourceTypeSuffix, ip6Suffix)
-				stmts = append(stmts, &SelectTag{Value: ip4Alias, Withs: []view.Node{&view.With{Value: ip4WithValue, Alias: ip4Alias}}})
-				stmts = append(stmts, &SelectTag{Value: ip6Alias, Withs: []view.Node{&view.With{Value: ip6WithValue, Alias: ip6Alias}}})
-				stmts = append(stmts, &SelectTag{Value: resourceTypeSuffix})
+				// stmts = append(stmts, &SelectTag{Value: ip4Alias, Withs: []view.Node{&view.With{Value: ip4WithValue, Alias: ip4Alias}}})
+				// stmts = append(stmts, &SelectTag{Value: ip6Alias, Withs: []view.Node{&view.With{Value: ip6WithValue, Alias: ip6Alias}}})
+				stmts = append(stmts, &SelectTag{Value: resourceTypeSuffix, Withs: []view.Node{&view.With{Value: ip4WithValue, Alias: ip4Alias}, &view.With{Value: ip6WithValue, Alias: ip6Alias}}})
 			}
 		}
 		// device
@@ -304,6 +304,8 @@ func (t *SelectTag) Format(m *view.Model) {
 		if t.Value == "packet_batch" {
 			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 		}
+		// if strings.Contains(t.Value, "auto_instance") || strings.Contains(t.Value, "auto_service") {
+		// 	m.AddCallback(t.Value, RemoveAutoIPColumns([]interface{}{}))
+		// }
 	}
-
 }
