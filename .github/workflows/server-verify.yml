@@ -1,10 +1,9 @@
 name: verify server
 
 on: 
-  pull_request:
-    paths:
-      - 'server/**'
-      - 'message/**'
+  push:
+    branches:
+      - '*'
 
 jobs:
   verify_server:
@@ -23,9 +22,9 @@ jobs:
           go-version: 1.21.x
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
-          version: '3.6.1'
+          version: '3.7.0'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Install dependencies
