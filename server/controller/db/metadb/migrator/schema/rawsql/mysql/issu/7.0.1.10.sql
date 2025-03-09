@@ -24,7 +24,7 @@ BEGIN
     END IF;
 END;
 
-CALL AddColumnIfNotExists('data_source', 'query_time', "INTEGER NOT NULL COMMENT 'uint: minute'", 'retention_time');
+CALL AddColumnIfNotExists('data_source', 'query_time', "INTEGER DEFAULT 0 COMMENT 'uint: minute'", 'retention_time');
 
 DROP PROCEDURE AddColumnIfNotExists;
 

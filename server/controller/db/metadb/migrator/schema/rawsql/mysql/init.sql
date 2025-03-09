@@ -2109,7 +2109,7 @@ CREATE TABLE IF NOT EXISTS data_source (
     base_data_source_id         INTEGER,
     `interval_time`             INTEGER NOT NULL COMMENT 'uint: s',
     retention_time              INTEGER NOT NULL COMMENT 'uint: hour',
-    query_time                  INTEGER NOT NULL COMMENT 'uint: minute',
+    query_time                  INTEGER DEFAULT 0 COMMENT 'uint: minute',
     summable_metrics_operator   CHAR(64),
     unsummable_metrics_operator CHAR(64),
     updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
