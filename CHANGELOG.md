@@ -276,6 +276,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add default process_matcher rules [#9278](https://github.com/deepflowio/deepflow/pull/9278) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Get the remote IP and port of the DNS [#9275](https://github.com/deepflowio/deepflow/pull/9275) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add a Musl flag option (#9022) [#9024](https://github.com/deepflowio/deepflow/pull/9024) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9021](https://github.com/deepflowio/deepflow/pull/9021) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9013](https://github.com/deepflowio/deepflow/pull/9013) by [yinjiping](https://github.com/yinjiping)
