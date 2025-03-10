@@ -198,6 +198,25 @@ static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 	return (sk_info != NULL && sk_info->uid != 0);
 }
 
+
+static __inline void extract_network_address_info(struct data_args_t *args, void *ptr)
+{
+	if (args == NULL || ptr == NULL)
+		return;
+
+	struct sockaddr_in addr = { 0 };
+	bpf_probe_read_user(&addr, sizeof(addr), ptr);
+	args->port = __bpf_ntohs(addr.sin_port);
+	if (args->port > 0 && addr.sin_family == AF_INET) {
+		*(__u32 *) args->addr =  __bpf_ntohl(addr.sin_addr.s_addr);
+	} else if (args->port > 0 && addr.sin_family == AF_INET6) {
+		struct sockaddr_in6 addr = { 0 };
+		bpf_probe_read_user(&addr, sizeof(addr), ptr);
+		bpf_probe_read_kernel(&args->addr[0], 16,
+				      &addr.sin6_addr.s6_addr[0]);
+	}
+}
+
 /* *INDENT-OFF* */
 static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk,
 						struct socket_info_s *socket_info_ptr)
@@ -1982,32 +2001,17 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	    socket_info_map__lookup(&conn_key);
 	write_args.tcp_seq =
 	    get_tcp_write_seq(sockfd, &write_args.sk, socket_info_ptr);
-	if (write_args.tcp_seq == 0) {
+
+	void *ptr = NULL;
 #ifndef LINUX_VER_KFUNC
-		struct syscall_sendto_enter_ctx *sendto_ctx =
-		    (struct syscall_sendto_enter_ctx *)ctx;
-		struct sockaddr_in addr = { 0 };
-		bpf_probe_read_user(&addr, sizeof(addr), sendto_ctx->addr);
+	struct syscall_sendto_enter_ctx *sendto_ctx =
+	    (struct syscall_sendto_enter_ctx *)ctx;
+	ptr = sendto_ctx->addr;
 #else
-		struct sockaddr_in addr = { 0 };
-		bpf_probe_read_user(&addr, sizeof(addr), u_addr);
+	ptr = u_addr;
 #endif
-		write_args.port = __bpf_ntohs(addr.sin_port);
-		if (write_args.port > 0 && addr.sin_family == AF_INET) {
-			*(__u32 *) write_args.addr =
-			    __bpf_ntohl(addr.sin_addr.s_addr);
-		} else if (write_args.port > 0 && addr.sin_family == AF_INET6) {
-			struct sockaddr_in6 addr = { 0 };
-#ifndef LINUX_VER_KFUNC
-			bpf_probe_read_user(&addr, sizeof(addr),
-					    sendto_ctx->addr);
-#else
-			bpf_probe_read_user(&addr, sizeof(addr), u_addr);
-#endif
-			bpf_probe_read_kernel(&write_args.addr[0], 16,
-					      &addr.sin6_addr.s6_addr[0]);
-		}
-	}
+	if (ptr)
+		extract_network_address_info(&write_args, ptr);
 
 	active_write_args_map__update(&id, &write_args);
 
@@ -2135,6 +2139,7 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 		    socket_info_map__lookup(&conn_key);
 		write_args.tcp_seq =
 		    get_tcp_write_seq(sockfd, &write_args.sk, socket_info_ptr);
+		write_args.ipaddr_ptr = (void *)msghdr->msg_name;
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2156,6 +2161,19 @@ KRETFUNC_PROG(__sys_sendmsg, int sockfd, const struct msghdr * msg, int flags,
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
+		/*
+		 * For the `sendmsg()/recvmsg()` system interfaces, the remote
+		 * IP address and port may be specified through the parameter
+		 * `struct user_msghdr __user *msg` and may not be recorded in
+		 * the kernel `sock` structure (as is common in the UDP protocol).
+		 * We extract the values from the system call parameters to obtain
+		 * this data and populate the network tuple.
+		 */
+		if (write_args->ipaddr_ptr) {
+			void *ptr = write_args->ipaddr_ptr;
+			write_args->ipaddr_ptr = NULL;
+			extract_network_address_info(write_args, ptr);
+		}
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
 					  write_args, bytes_count);
 		active_write_args_map__delete(&id);
@@ -2269,6 +2287,7 @@ KFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 		    socket_info_map__lookup(&conn_key);
 		read_args.tcp_seq =
 		    get_tcp_read_seq(sockfd, &read_args.sk, socket_info_ptr);
+		read_args.ipaddr_ptr = (void *)msghdr->msg_name;
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2290,6 +2309,12 @@ KRETFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
+		// Extract the remote address carried by `recvmsg()`.
+		if (read_args->ipaddr_ptr) {
+			void *ptr = read_args->ipaddr_ptr;
+			read_args->ipaddr_ptr = NULL;
+			extract_network_address_info(read_args, ptr);
+		}
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
 					  read_args, bytes_count);
 		active_read_args_map__delete(&id);
