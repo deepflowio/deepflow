@@ -296,7 +296,16 @@ struct data_args_t {
 	};
 	// Scenario for using sendto() with a specified address
 	__u16 port;
-	__u8 addr[16];
+	union {
+		__u8 addr[16];
+
+		/*
+		 * Used to record the parameters of `sendmsg()/recvmsg()`, 
+		 * where `msghdr->msg_name` stores the IP address information
+		 * in UDP communication.
+		 */
+		void *ipaddr_ptr;
+	};
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
