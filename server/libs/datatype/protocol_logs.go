@@ -63,6 +63,7 @@ const (
 	STATUS_TIMEOUT
 	STATUS_SERVER_ERROR
 	STATUS_CLIENT_ERROR
+	STATUS_UNKNOWN
 )
 
 func (t LogMessageStatus) String() string {
@@ -71,12 +72,14 @@ func (t LogMessageStatus) String() string {
 		return "Success"
 	case STATUS_ERROR:
 		return "Error"
+	case STATUS_TIMEOUT:
+		return "Timeout"
 	case STATUS_SERVER_ERROR:
 		return "Server Error"
 	case STATUS_CLIENT_ERROR:
 		return "Client Error"
 	default:
-		return "Timeout"
+		return "Unknown"
 	}
 }
 
