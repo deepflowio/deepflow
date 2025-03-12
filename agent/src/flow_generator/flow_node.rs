@@ -315,11 +315,12 @@ impl FlowNode {
             && ((is_tt_hyper_v(trident_type) && meta_packet.tunnel.unwrap().tier < 2)
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::TencentGre
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::Ipip);
+        let is_from_gateway = meta_packet.tap_port.is_from(TapPort::FROM_GATEWAY_MAC);
 
         // return value stands different match type, defined by MAC_MATCH_*
         // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
         let is_from_isp = meta_packet.lookup_key.tap_type != TapType::Cloud;
-        if is_from_isp || ignore_mac || ignore_tor_mac {
+        if is_from_isp || ignore_mac || ignore_tor_mac || is_from_gateway {
             return MatchMac::None;
         }
 
