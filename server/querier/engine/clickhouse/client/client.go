@@ -221,7 +221,6 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			log.Error("Execute Callback %v Error: %v", callback, err)
 		}
 	}
-	log.Debugf("sql: %s, query_uuid: %s", sqlstr, c.Debug.QueryUUID)
 	log.Infof("query_uuid: %s. query api statistics: %d rows, %d columns, %d bytes, cost %f ms", c.Debug.QueryUUID, resRows, resColumns, resSize, float64(queryTime.Milliseconds()))
 	return result, nil
 }

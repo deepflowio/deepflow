@@ -25,7 +25,6 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	ckcommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -115,7 +114,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
+func GetAggMetrics(field, db, table, orgID string, nativeField map[string]*Metrics) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == COUNT_METRICS_NAME {
 		return &Metrics{
@@ -128,7 +127,7 @@ func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			Table:       table,
 		}, true
 	}
-	return GetMetrics(field, db, table, orgID)
+	return GetMetrics(field, db, table, orgID, nativeField)
 }
 
 func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]*Metrics, db, table, orgID string) error {
@@ -224,7 +223,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 	return nil
 }
 
-func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
+func GetMetrics(field, db, table, orgID string, nativeField map[string]*Metrics) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
 	// flow_tag database has no metrics
@@ -264,36 +263,10 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 			}
 		} else {
 			// native metrics
-			if config.ControllerCfg.DFWebService.Enabled {
-				getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, db, table)
-				resp, err := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, orgID))
-				if err != nil {
-					log.Errorf("request controller failed: %s, URL: %s", resp, getNativeUrl)
-				} else {
-					resultArray := resp.Get("DATA").MustArray()
-					for i := range resultArray {
-						nativeMetric := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
-						displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
-						description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
-						fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
-						if nativeMetric == field {
-							if fieldType == ckcommon.NATIVE_FIELD_TYPE_METRIC {
-								metric := NewMetrics(
-									0, field,
-									displayName, displayName, displayName, "", "", "", METRICS_TYPE_COUNTER,
-									ckcommon.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
-								)
-								return metric, true
-							} else {
-								metric := NewMetrics(
-									0, field,
-									displayName, displayName, displayName, "", "", "", METRICS_TYPE_NAME_MAP["tag"],
-									ckcommon.NATIVE_FIELD_CATEGORY_CUSTOM_TAG, []bool{true, true, true}, "", table, "", "", "", "", "",
-								)
-								return metric, true
-							}
-						}
-					}
+			if nativeField != nil {
+				metric, ok := nativeField[field]
+				if ok {
+					return metric, true
 				}
 			}
 		}
