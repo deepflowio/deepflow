@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	_ "net"
 	"net/http"
 	"os"
@@ -107,7 +107,7 @@ func parseResponse(req *http.Request, cfg *HTTPConf) (*simplejson.Json, error) {
 	}
 
 	defer resp.Body.Close()
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", req.URL, err))
 	}
@@ -180,7 +180,7 @@ func CURLResponseRawJson(method string, url string, opts ...HTTPOption) (*simple
 	}
 
 	defer resp.Body.Close()
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", url, err))
 	}
