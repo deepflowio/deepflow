@@ -287,7 +287,7 @@ const _HEADER_SIZE: usize = 16;
 
 const _EXCEPTION_OFFSET: usize = 20;
 const _COLLECTION_NAME_OFFSET: usize = 20;
-const _QUERY_DOC_OFFSET: usize = _COLLECTION_NAME_OFFSET + 8; // 8 is sizeof(Number to skip + Number to Reture)
+const _QUERY_DOC_OFFSET: usize = _COLLECTION_NAME_OFFSET + 8; // 8 is sizeof(Number to skip + Number to Return)
 const _MSG_DOC_SECTION_OFFSET: usize = _HEADER_SIZE + 4; // 4 is sizeof(Message Flags)
 
 impl MongoDBLog {

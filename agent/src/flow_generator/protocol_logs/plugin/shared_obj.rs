@@ -64,8 +64,8 @@ impl L7ProtocolParserInterface for SoLog {
             /*
                 call the func from so, correctness depends on plugin implementation.
 
-                there is impossible to verify the plugin implemention correctness, so plugin maybe do some UB,
-                for eaxmple, modify the payload (due to the payload is not copy but pass the ptr to ctx directly and should
+                there is impossible to verify the plugin implementation correctness, so plugin maybe do some UB,
+                for example, modify the payload (due to the payload is not copy but pass the ptr to ctx directly and should
                 not be modify, modify the payload is UB).
 
                 the plugin correctness depend on the implementation of the developer
