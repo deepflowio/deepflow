@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -300,7 +299,7 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 }
 
 func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
-	yamlFile, err := ioutil.ReadFile(updateFilename)
+	yamlFile, err := os.ReadFile(updateFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return

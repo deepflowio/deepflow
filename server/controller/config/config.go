@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -121,7 +120,7 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Load(path string) {
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Error("Read config file error:", err, path)
 		os.Exit(1)

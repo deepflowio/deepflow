@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"slices"
@@ -100,7 +100,7 @@ func IPFilterStringToHex(ip string) string {
 
 func ParseResponse(response *http.Response) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err == nil {
 		err = json.Unmarshal(body, &result)
 	}
