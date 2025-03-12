@@ -49,6 +49,7 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		DNSEnable:           c.DNSEnable,
 		HTTPTimeout:         c.HTTPTimeout,
 		DebugEnabled:        c.DebugEnabled,
+		AliyunRegionName:    c.AliyunRegionName,
 		AWSRegionName:       c.AWSRegionName,
 		CustomTagLenMax:     c.CustomTagLenMax,
 		ProcessNameLenMax:   c.ProcessNameLenMax,
