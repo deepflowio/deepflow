@@ -93,7 +93,7 @@ fn set_build_info() -> Result<()> {
 //   - generated bpf bytecode files (socket_trace_*.c / perf_profiler_*.c)
 //   - java agent so files and jattach bin
 // - Header files
-// - `src/ebpf/mod.rs` (to exlude rust sources in `samples` folder)
+// - `src/ebpf/mod.rs` (to exclude rust sources in `samples` folder)
 // - Makefiles
 fn set_libtrace_rerun_files() -> Result<()> {
     fn watched(path: &Path) -> bool {
