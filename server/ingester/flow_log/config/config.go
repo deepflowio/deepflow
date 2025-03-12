@@ -17,7 +17,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 
 	logging "github.com/op/go-logging"
@@ -103,7 +102,7 @@ func Load(base *config.Config, path string) *Config {
 		log.Info("no config file, use defaults")
 		return &config.FlowLog
 	}
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Warning("Read config file error:", err)
 		config.FlowLog.Validate()

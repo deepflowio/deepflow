@@ -17,14 +17,13 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
-	"strings"
 )
 
 var log = logging.MustGetLogger("profile")
@@ -71,7 +70,7 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) Load(path string) {
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Error("Read config file error:", err, path)
 		os.Exit(1)

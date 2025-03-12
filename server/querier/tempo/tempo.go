@@ -21,6 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -37,12 +43,6 @@ import (
 	"github.com/google/uuid"
 
 	//"github.com/k0kubun/pp"
-	"io/ioutil"
-	"math/rand"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	logging "github.com/op/go-logging"
 )
@@ -275,7 +275,7 @@ func FindTraceByTraceID(args *common.TempoParams) (req *tempopb.Trace, err error
 
 func ParseResponse(response *http.Response) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err == nil {
 		err = json.Unmarshal(body, &result)
 	}

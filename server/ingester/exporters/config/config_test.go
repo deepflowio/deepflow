@@ -17,7 +17,7 @@
 package config
 
 import (
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -34,7 +34,7 @@ type ingesterConfig struct {
 
 func TestConfig(t *testing.T) {
 	ingesterCfg := baseConfig{}
-	configBytes, _ := ioutil.ReadFile("./config_test.yaml")
+	configBytes, _ := os.ReadFile("./config_test.yaml")
 	err := yaml.Unmarshal(configBytes, &ingesterCfg)
 	if err != nil {
 		t.Fatalf("yaml unmarshal failed: %v", err)
