@@ -1297,7 +1297,7 @@ impl FlowMap {
 
         // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
-        self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        self.init_endpoint_and_policy_data(&mut node, meta_packet);
 
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
@@ -2302,6 +2302,65 @@ impl FlowMap {
         }
     }
 
+    fn update_flow_metrics_peers(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+        let Some(ep) = node.endpoint_data_cache.as_ref() else {
+            return;
+        };
+
+        let src_info = ep.src_info();
+        let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
+        let mut reset_tap_side =
+            peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
+        peer_src.is_device = src_info.is_device;
+        peer_src.is_vip_interface = src_info.is_vip_interface;
+        peer_src.is_l2_end = src_info.l2_end;
+        peer_src.is_l3_end = src_info.l3_end;
+        peer_src.l3_epc_id = src_info.l3_epc_id;
+        peer_src.is_vip = src_info.is_vip;
+        peer_src.is_local_mac = src_info.is_local_mac;
+        peer_src.is_local_ip = src_info.is_local_ip;
+
+        let dst_info = ep.dst_info();
+        let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
+        reset_tap_side = reset_tap_side
+            || peer_dst.is_l2_end != dst_info.l2_end
+            || peer_dst.is_l3_end != dst_info.l3_end;
+        peer_dst.is_device = dst_info.is_device;
+        peer_dst.is_vip_interface = dst_info.is_vip_interface;
+        peer_dst.is_l2_end = dst_info.l2_end;
+        peer_dst.is_l3_end = dst_info.l3_end;
+        peer_dst.l3_epc_id = dst_info.l3_epc_id;
+        peer_dst.is_vip = dst_info.is_vip;
+        peer_dst.is_local_mac = dst_info.is_local_mac;
+        peer_dst.is_local_ip = dst_info.is_local_ip;
+
+        meta_packet.set_vip_info(src_info.real_ip, dst_info.real_ip);
+
+        // When there is a change in l2end or l3end, the tap side needs to be recalculated
+        if reset_tap_side {
+            node.tagged_flow.flow.tap_side = TapSide::Rest;
+        }
+    }
+
+    // Before this function is called, the MAC address and IP address recorded in the flow node are
+    // the same as the first packet. Therefore, the endpoints and policies here must be the same as
+    // those of Packet.
+    fn init_endpoint_and_policy_data(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+        if let Some(data) = meta_packet.endpoint_data.as_ref() {
+            node.endpoint_data_cache = Some(data.clone());
+            Self::update_flow_metrics_peers(node, meta_packet);
+        }
+
+        // init policy data
+        if let Some(policy_data) = meta_packet.policy_data.as_ref() {
+            node.policy_data_cache[PacketDirection::ClientToServer as usize] =
+                Some(policy_data.clone());
+        }
+        node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
+    }
+
+    // When this function is called, the direction of MAC, IP, etc. recorded in the flow node is c2s,
+    // and the endpoints and policies need to be corrected according to the direction in packet.
     fn update_endpoint_and_policy_data(
         &mut self,
         node: &mut FlowNode,
@@ -2319,41 +2378,7 @@ impl FlowMap {
             }
         }
 
-        if let Some(ep) = node.endpoint_data_cache.as_ref() {
-            let src_info = ep.src_info();
-            let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
-            let mut reset_tap_side =
-                peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
-            peer_src.is_device = src_info.is_device;
-            peer_src.is_vip_interface = src_info.is_vip_interface;
-            peer_src.is_l2_end = src_info.l2_end;
-            peer_src.is_l3_end = src_info.l3_end;
-            peer_src.l3_epc_id = src_info.l3_epc_id;
-            peer_src.is_vip = src_info.is_vip;
-            peer_src.is_local_mac = src_info.is_local_mac;
-            peer_src.is_local_ip = src_info.is_local_ip;
-
-            let dst_info = ep.dst_info();
-            let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
-            reset_tap_side = reset_tap_side
-                || peer_dst.is_l2_end != dst_info.l2_end
-                || peer_dst.is_l3_end != dst_info.l3_end;
-            peer_dst.is_device = dst_info.is_device;
-            peer_dst.is_vip_interface = dst_info.is_vip_interface;
-            peer_dst.is_l2_end = dst_info.l2_end;
-            peer_dst.is_l3_end = dst_info.l3_end;
-            peer_dst.l3_epc_id = dst_info.l3_epc_id;
-            peer_dst.is_vip = dst_info.is_vip;
-            peer_dst.is_local_mac = dst_info.is_local_mac;
-            peer_dst.is_local_ip = dst_info.is_local_ip;
-
-            meta_packet.set_vip_info(src_info.real_ip, dst_info.real_ip);
-
-            // When there is a change in l2end or l3end, the tap side needs to be recalculated
-            if reset_tap_side {
-                node.tagged_flow.flow.tap_side = TapSide::Rest;
-            }
-        }
+        Self::update_flow_metrics_peers(node, meta_packet);
 
         // update policy data
         if let Some(policy_data) = meta_packet.policy_data.as_ref() {
