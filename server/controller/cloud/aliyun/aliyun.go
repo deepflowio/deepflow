@@ -88,12 +88,11 @@ func NewAliyun(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig
 		teamID: domain.TeamID,
 		uuid:   domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
-		uuidGenerate: domain.DisplayName,
-		regionLcuuid: regionLcuuid,
-		secretID:     secretID,
-		secretKey:    decryptSecretKey,
-		// TODO: 后期需要修改为从配置文件读取
-		regionName:     "cn-beijing",
+		uuidGenerate:   domain.DisplayName,
+		regionLcuuid:   regionLcuuid,
+		secretID:       secretID,
+		secretKey:      decryptSecretKey,
+		regionName:     cfg.AliyunRegionName,
 		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
 		httpTimeout:    cfg.HTTPTimeout,
 
