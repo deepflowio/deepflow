@@ -104,6 +104,7 @@ func (s *AgentService) GenesisSync(ctx context.Context, in *api.GenesisSyncReque
 		statsd.AddGrpcCostStatsd(statsd.GenesisSync, int(time.Now().Sub(startTime).Milliseconds()))
 	}()
 
+	time.Sleep(300 * time.Second)
 	return genesis.GenesisService.Synchronizer.GenesisSync(ctx, in)
 }
 
