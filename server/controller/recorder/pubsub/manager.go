@@ -101,7 +101,7 @@ type Manager struct {
 func (m *Manager) Subscribe(pubSubType string, topic int, subscriber interface{}) error {
 	ps, ok := m.TypeToPubSub[pubSubType]
 	if !ok {
-		log.Errorf("pubsub type not found: %d", pubSubType)
+		log.Errorf("pubsub type not found: %s", pubSubType)
 		return errors.New("pubsub type not found")
 	}
 	ps.Subscribe(topic, subscriber)
