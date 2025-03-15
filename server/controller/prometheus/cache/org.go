@@ -19,11 +19,11 @@ package cache
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"golang.org/x/exp/slices"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"

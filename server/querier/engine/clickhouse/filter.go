@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/Knetic/govaluate"
 	"github.com/deepflowio/deepflow/server/libs/utils"
