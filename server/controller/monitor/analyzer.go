@@ -246,6 +246,11 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 	ipMap, err := getIPMap(common.HOST_TYPE_ANALYZER)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	if len(ipMap) == 0 {
+		log.Info("no analyzer in DB, do nothing")
+		return
 	}
 
 	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
