@@ -19,11 +19,10 @@ package service
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	logging "github.com/op/go-logging"
 

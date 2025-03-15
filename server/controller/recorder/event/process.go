@@ -18,10 +18,10 @@ package event
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"

@@ -19,11 +19,11 @@ package vtap
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
