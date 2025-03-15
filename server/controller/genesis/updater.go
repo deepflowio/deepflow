@@ -888,7 +888,7 @@ func (v *GenesisSyncRpcUpdater) run() {
 			if info.vtapID != 0 {
 				peerInfo, ok := v.genesisSyncDataByPeer[info.vtapID]
 				if ok {
-					v.storage.Renew(peerInfo)
+					v.storage.Renew(info.vtapID, info.storageRefresh, peerInfo)
 				}
 			}
 		} else if info.msgType == genesiscommon.TYPE_UPDATE {

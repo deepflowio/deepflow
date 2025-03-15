@@ -275,6 +275,8 @@ controller:
 
     # 数据持久化检测间隔，单位：秒
     data_persistence_interval: 60
+    # 采集器消息心跳时长，单位：秒
+    agent_heart_beat: 60
 
     # 采集器同步KVM时，配置的采集器IP所上报的内容会被解析
     host_ips:

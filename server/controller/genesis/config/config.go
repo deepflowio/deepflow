@@ -19,6 +19,7 @@ package config
 type GenesisConfig struct {
 	AgingTime               float64  `default:"86400" yaml:"aging_time"`
 	VinterfaceAgingTime     float64  `default:"300" yaml:"vinterface_aging_time"`
+	AgentHeartBeat          float64  `default:"60" yaml:"agent_heart_beat"`
 	HostIPs                 []string `yaml:"host_ips"`
 	LocalIPRanges           []string `yaml:"local_ip_ranges"`
 	ExcludeIPRanges         []string `yaml:"exclude_ip_ranges"`

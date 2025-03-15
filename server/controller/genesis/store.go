@@ -52,7 +52,7 @@ func NewSyncStorage(cfg config.GenesisConfig, sChan chan GenesisSyncData, ctx co
 	}
 }
 
-func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
+func (s *SyncStorage) Renew(vtapID uint32, refresh bool, data GenesisSyncDataOperation) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -85,6 +85,14 @@ func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
 	}
 	if data.Processes != nil {
 		s.genesisSyncInfo.Processes.Renew(data.Processes.Fetch(), now)
+	}
+	if !refresh {
+		return
+	}
+	nodeIP := os.Getenv(common.NODE_IP_KEY)
+	err := mysql.Db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, nodeIP).Update("node_ip", nodeIP).Error
+	if err != nil {
+		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, nodeIP, err)
 	}
 }
 
