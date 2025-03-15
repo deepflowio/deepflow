@@ -20,9 +20,8 @@ import (
 	"bufio"
 	"io/ioutil"
 	"os"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 )
 
 func IsValueInSliceString(value string, list []string) bool {
