@@ -78,7 +78,7 @@ pub struct KafkaInfo {
     pub offset: i64,
     pub group_id: String,
 
-    // reponse
+    // response
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: Option<u32>,
     #[serde(rename = "response_status")]
