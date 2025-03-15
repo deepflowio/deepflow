@@ -64,14 +64,18 @@ func getIPMap(hostType string) (map[string]bool, error) {
 	switch hostType {
 	case common.HOST_TYPE_CONTROLLER:
 		var controllers []mysqlmodel.Controller
-		mysql.DefaultDB.Find(&controllers)
+		if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+			return nil, err
+		}
 		res = make(map[string]bool, len(controllers))
 		for _, controller := range controllers {
 			res[controller.IP] = true
 		}
 	case common.HOST_TYPE_ANALYZER:
 		var analyzers []mysqlmodel.Analyzer
-		mysql.DefaultDB.Find(&analyzers)
+		if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
+			return nil, err
+		}
 		res = make(map[string]bool, len(analyzers))
 		for _, analyzer := range analyzers {
 			res[analyzer.IP] = true
