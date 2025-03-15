@@ -18,8 +18,7 @@ package clickhouse
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"

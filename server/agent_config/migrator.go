@@ -18,10 +18,10 @@ package agent_config
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/baidubce/bce-sdk-go/util/log"
-	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 )
 

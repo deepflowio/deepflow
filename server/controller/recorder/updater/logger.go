@@ -19,8 +19,7 @@ package updater
 import (
 	"fmt"
 	"reflect"
-
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"

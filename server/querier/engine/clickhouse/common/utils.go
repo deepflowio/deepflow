@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
-	"golang.org/x/exp/slices"
 )
 
 var log = logging.MustGetLogger("common")
