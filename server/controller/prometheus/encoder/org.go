@@ -19,10 +19,9 @@ package encoder
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"

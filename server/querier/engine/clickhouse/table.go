@@ -18,8 +18,7 @@ package clickhouse
 
 import (
 	"context"
-
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
