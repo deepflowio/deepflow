@@ -31,13 +31,14 @@ import (
 )
 
 type VIFRPCMessage struct {
-	orgID        int
-	msgType      int
-	teamID       uint32
-	vtapID       uint32
-	peer         string
-	k8sClusterID string
-	message      *trident.GenesisSyncRequest
+	orgID          int
+	msgType        int
+	teamID         uint32
+	vtapID         uint32
+	peer           string
+	k8sClusterID   string
+	storageRefresh bool
+	message        *trident.GenesisSyncRequest
 }
 
 type K8SRPCMessage struct {
