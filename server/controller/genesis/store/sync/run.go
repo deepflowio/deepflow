@@ -423,7 +423,7 @@ func (g *GenesisSync) Start() {
 				if info.VtapID != 0 {
 					peerInfo, ok := genesisSyncDataByVtap[vtap]
 					if ok {
-						vStorage.Renew(info.ORGID, peerInfo)
+						vStorage.Renew(info.ORGID, info.VtapID, info.StorageRefresh, peerInfo)
 					}
 				}
 			} else if info.MessageType == common.TYPE_UPDATE {
