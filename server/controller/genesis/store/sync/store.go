@@ -57,7 +57,7 @@ func NewSyncStorage(ctx context.Context, cfg config.GenesisConfig, sChan chan co
 	}
 }
 
-func (s *SyncStorage) Renew(orgID int, data common.GenesisSyncDataResponse) {
+func (s *SyncStorage) Renew(orgID int, vtapID uint32, refresh bool, data common.GenesisSyncDataResponse) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -72,6 +72,20 @@ func (s *SyncStorage) Renew(orgID int, data common.GenesisSyncDataResponse) {
 	s.genesisSyncInfo.IPlastseens.Renew(orgID, now, data.IPLastSeens)
 	s.genesisSyncInfo.Vinterfaces.Renew(orgID, now, data.Vinterfaces)
 	s.genesisSyncInfo.Processes.Renew(orgID, now, data.Processes)
+
+	if !refresh {
+		return
+	}
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		return
+	}
+	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
+	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, nodeIP).Update("node_ip", nodeIP).Error
+	if err != nil {
+		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, nodeIP, err, logger.NewORGPrefix(orgID))
+	}
 }
 
 func (s *SyncStorage) Update(orgID int, vtapID uint32, data common.GenesisSyncDataResponse) {
