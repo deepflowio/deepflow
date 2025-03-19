@@ -115,7 +115,7 @@ end
     bpf_tracer_init --> bpf_tracer_init-3(3.3 new thread - ctrl_main)
     bpf_tracer_init --> bpf_tracer_init-4(3.4 register kick_kern)
 
-    running_socket_tracer --> running_socket_tracer-1(4.1 check_kernel_version)-.- running_socket_tracer-1-i([Support linux 4.14+])
+    running_socket_tracer --> running_socket_tracer-1(4.1 check_kernel_version)-.- running_socket_tracer-1-i([Support linux 4.12+])
     running_socket_tracer --> running_socket_tracer-2(4.2 socket_tracer_set_probes)
     running_socket_tracer-2 --> running_socket_tracer-2-1(4.2.1 Set kprobe,uprobe for attach/detach)
     running_socket_tracer-2 --> running_socket_tracer-2-2(4.2.2 collect_go_uprobe_syms_from_procfs)

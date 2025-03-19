@@ -2140,7 +2140,7 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 
 static int check_dependencies(void)
 {
-	if (check_kernel_version(4, 14) != 0) {
+	if (check_kernel_version(4, 12) != 0) {
 		return -1;
 	}
 
