@@ -718,7 +718,7 @@ bool is_go_process(int pid)
 static inline bool golang_kern_check(void)
 {
 	return ((k_version == KERNEL_VERSION(3, 10, 0))
-		|| (k_version >= KERNEL_VERSION(4, 14, 0)));
+		|| (k_version >= KERNEL_VERSION(4, 12, 0)));
 }
 
 static inline bool golang_process_check(int pid)
@@ -753,7 +753,7 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 
 	if (!golang_kern_check()) {
 		ebpf_warning
-		    ("Uprobe golang requires Linux version 4.14+ or linux 3.10.0\n");
+		    ("Uprobe golang requires Linux version 4.12+ or linux 3.10.0\n");
 		return ETR_OK;
 	}
 
