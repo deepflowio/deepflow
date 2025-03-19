@@ -58,8 +58,11 @@ func NewAgentEvent() *AgentEvent {
 	return &AgentEvent{}
 }
 
-func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) *koanf.Koanf {
+func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) (*koanf.Koanf, string) {
 	userConfig := c.GetUserConfig()
+	userConfigComment := c.GetUserConfigComment()
+	log.Info("##############")
+	log.Info(userConfigComment)
 
 	configTSDBIP := gAgentInfo.GetConfigTSDBIP()
 	if configTSDBIP != "" {
@@ -88,7 +91,7 @@ func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAg
 		userConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, false)
 	}
 
-	return userConfig
+	return userConfig, strings.Join(userConfigComment, "\n")
 }
 
 func (e *AgentEvent) generateDynamicConfig(clusterID string, c *vtap.VTapCache) *api.DynamicConfig {
@@ -312,7 +315,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 			dynamicConfig.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
-	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	userConfig, userConfigComment := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
 	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
@@ -323,7 +326,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig) + "\n" + userConfigComment),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}
@@ -337,7 +340,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
-		UserConfig:          proto.String(e.marshalUserConfig(userConfig)),
+		UserConfig:          proto.String(e.marshalUserConfig(userConfig) + "\n" + userConfigComment),
 		DynamicConfig:       dynamicConfig,
 		PlatformData:        platformData,
 		Groups:              groups,
@@ -545,7 +548,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		}
 	}
 
-	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	userConfig, userConfigComment := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
 	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
@@ -556,7 +559,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig) + "\n" + userConfigComment),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}

@@ -57,6 +57,7 @@ type VTapConfig struct {
 	ConvertedSoPlugins           []string
 	PluginNewUpdateTime          uint32
 	UserConfig                   *koanf.Koanf
+	UserConfigComment            []string
 }
 
 func (f *VTapConfig) GetConfigTapMode() int {
@@ -68,6 +69,10 @@ func (f *VTapConfig) GetConfigTapMode() int {
 
 func (f *VTapConfig) GetUserConfig() *koanf.Koanf {
 	return f.UserConfig.Copy()
+}
+
+func (f *VTapConfig) GetUserConfigComment() []string {
+	return f.UserConfigComment
 }
 
 func (f *VTapConfig) convertData() {
@@ -176,6 +181,7 @@ func NewVTapConfig(agentConfigYaml string) *VTapConfig {
 		log.Error(err)
 	}
 	vTapConfig.UserConfig = k
+	vTapConfig.UserConfigComment = []string{}
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -235,8 +241,9 @@ type VTapCache struct {
 	regionID         int
 	domain           *string
 
-	// vtap group config
+	// agent group config
 	config *atomic.Value //*VTapConfig
+
 	// Container cluster domain where the vtap is located
 	podDomains []string
 
@@ -457,6 +464,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		log.Error("vtap configure is nil")
 		return
 	}
+
 	if c.EnabledCallMonitoring() == false && c.EnabledNetworkMonitoring() == false {
 		configure.UserConfig.Set("outputs.flow_metrics.filters.apm_metrics", false)
 		configure.UserConfig.Set("outputs.flow_log.filters.l7_capture_network_types", []int{-1})
@@ -494,6 +502,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	if c.EnabledLogMonitoring() == false {
 		configure.UserConfig.Set("inputs.integration.feature_control.log_integration_disabled", true)
 	}
+	configure.UserConfigComment = append(configure.UserConfigComment, "# set inputs.integration.feature_control.metric_integration_disabled = true by license controller")
 }
 
 func (c *VTapCache) EnabledCallMonitoring() bool {
@@ -648,6 +657,14 @@ func (c *VTapCache) GetUserConfig() *koanf.Koanf {
 		return koanf.New(".")
 	}
 	return config.GetUserConfig()
+}
+
+func (c *VTapCache) GetUserConfigComment() []string {
+	config := c.GetVTapConfig()
+	if config == nil {
+		return []string{}
+	}
+	return config.GetUserConfigComment()
 }
 
 func (c *VTapCache) updateVTapHost(host string) {
