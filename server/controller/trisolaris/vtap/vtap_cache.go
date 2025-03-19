@@ -57,6 +57,7 @@ type VTapConfig struct {
 	ConvertedSoPlugins           []string
 	PluginNewUpdateTime          uint32
 	UserConfig                   *koanf.Koanf
+	UserConfigComment            []string
 }
 
 func (f *VTapConfig) GetConfigTapMode() int {
@@ -68,6 +69,10 @@ func (f *VTapConfig) GetConfigTapMode() int {
 
 func (f *VTapConfig) GetUserConfig() *koanf.Koanf {
 	return f.UserConfig.Copy()
+}
+
+func (f *VTapConfig) GetUserConfigComment() []string {
+	return f.UserConfigComment
 }
 
 func (f *VTapConfig) convertData() {
@@ -176,6 +181,7 @@ func NewVTapConfig(agentConfigYaml string) *VTapConfig {
 		log.Error(err)
 	}
 	vTapConfig.UserConfig = k
+	vTapConfig.UserConfigComment = []string{}
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -235,8 +241,9 @@ type VTapCache struct {
 	regionID         int
 	domain           *string
 
-	// vtap group config
+	// agent group config
 	config *atomic.Value //*VTapConfig
+
 	// Container cluster domain where the vtap is located
 	podDomains []string
 
@@ -457,42 +464,102 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		log.Error("vtap configure is nil")
 		return
 	}
+
 	if c.EnabledCallMonitoring() == false && c.EnabledNetworkMonitoring() == false {
 		configure.UserConfig.Set("outputs.flow_metrics.filters.apm_metrics", false)
 		configure.UserConfig.Set("outputs.flow_log.filters.l7_capture_network_types", []int{-1})
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set outputs.flow_metrics.filters.apm_metrics = false by license controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set outputs.flow_log.filters.l7_capture_network_types = [-1] by license controller",
+		)
 	}
 
 	if c.EnabledNetworkMonitoring() == false {
 		configure.UserConfig.Set("outputs.flow_metrics.filters.npm_metrics", false)
 		configure.UserConfig.Set("outputs.flow_log.filters.l4_capture_network_types", []int{-1})
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set outputs.flow_metrics.filters.npm_metrics = false by license controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set outputs.flow_log.filters.l4_capture_network_types = [-1] by license controller",
+		)
 	}
 
 	if c.EnabledNetworkMonitoring() == true && c.EnabledCallMonitoring() == false {
 		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", NetWorkL7ProtocolEnabled)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			fmt.Sprintf(
+				"# set processors.request_log.application_protocol_inference.enabled_protocols = %v false by license controller",
+				NetWorkL7ProtocolEnabled,
+			),
+		)
 	} else if c.EnabledNetworkMonitoring() == false && c.EnabledCallMonitoring() == false {
 		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", []string{})
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set processors.request_log.application_protocol_inference.enabled_protocols = [] by license controller",
+		)
 	}
 
 	if c.EnabledCallMonitoring() == false {
 		configure.UserConfig.Set("inputs.ebpf.disabled", true)
 		configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", 0)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.ebpf.disabled = true by license controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.ebpf.file.io_event.collect_mode = 0 by license controller",
+		)
 	}
 
 	if c.EnabledFunctionMonitoring() == false {
 		configure.UserConfig.Set("inputs.ebpf.profile.on_cpu.disabled", true)
 		configure.UserConfig.Set("inputs.ebpf.profile.off_cpu.disabled", true)
 		configure.UserConfig.Set("inputs.integration.feature_control.profile_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.ebpf.profile.on_cpu.disabled = true by license controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.ebpf.profile.off_cpu.disabled = true by license controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.integration.feature_control.profile_integration_disabled = true by license controller",
+		)
 	}
 
 	if c.EnabledApplicationMonitoring() == false {
 		configure.UserConfig.Set("inputs.integration.feature_control.trace_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.integration.feature_control.trace_integration_disabled = true by license controller",
+		)
 	}
 
 	if c.EnabledIndicatorMonitoring() == false {
 		configure.UserConfig.Set("inputs.integration.feature_control.metric_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.integration.feature_control.metric_integration_disabled = true by license controller",
+		)
 	}
 	if c.EnabledLogMonitoring() == false {
 		configure.UserConfig.Set("inputs.integration.feature_control.log_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# set inputs.integration.feature_control.log_integration_disabled = true by license controller",
+		)
 	}
 }
 
@@ -648,6 +715,14 @@ func (c *VTapCache) GetUserConfig() *koanf.Koanf {
 		return koanf.New(".")
 	}
 	return config.GetUserConfig()
+}
+
+func (c *VTapCache) GetUserConfigComment() []string {
+	config := c.GetVTapConfig()
+	if config == nil {
+		return []string{}
+	}
+	return config.GetUserConfigComment()
 }
 
 func (c *VTapCache) updateVTapHost(host string) {
