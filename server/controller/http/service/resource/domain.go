@@ -786,6 +786,7 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 			Name:         subDomain.Name,
 			DisplayName:  subDomain.DisplayName,
 			ClusterID:    subDomain.ClusterID,
+			Enabled:      subDomain.Enabled,
 			State:        subDomain.State,
 			ErrorMsg:     subDomain.ErrorMsg,
 			CreateMethod: subDomain.CreateMethod,
@@ -911,6 +912,11 @@ func UpdateSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 	if ok {
 		dbUpdateMap["team_id"] = teamID
 		resourceUp["team_id"] = teamID
+	}
+
+	// 禁用/启用
+	if uEnabled, ok := subDomainUpdate["ENABLED"]; ok {
+		dbUpdateMap["enabled"] = uEnabled
 	}
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {

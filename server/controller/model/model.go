@@ -367,6 +367,7 @@ type SubDomain struct {
 	Name         string                 `json:"NAME"`
 	DisplayName  string                 `json:"DISPLAY_NAME"`
 	ClusterID    string                 `json:"CLUSTER_ID"`
+	Enabled      int                    `json:"ENABLED"`
 	State        int                    `json:"STATE"`
 	ErrorMsg     string                 `json:"ERROR_MSG"`
 	VPCName      string                 `json:"EPC_NAME"`

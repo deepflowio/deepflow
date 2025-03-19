@@ -475,7 +475,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomains.Add(lcuuid)
 		}
 
-		c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subDomains)
+		c.db.DB.Where("enabled = ? AND domain = ?", common.DOMAIN_ENABLED_TRUE, c.basicInfo.Lcuuid).Find(&subDomains)
 		lcuuidToSubDomain := make(map[string]*metadbmodel.SubDomain)
 		for index, subDomain := range subDomains {
 			lcuuidToSubDomain[subDomain.Lcuuid] = &subDomains[index]
