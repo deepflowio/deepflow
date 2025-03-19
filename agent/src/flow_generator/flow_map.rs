@@ -1264,9 +1264,6 @@ impl FlowMap {
         tagged_flow.flow = flow;
 
         // FlowMap信息
-        let mut policy_in_tick = [false; 2];
-        policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
-
         let mut node = self
             .flow_node_pool
             .get()
@@ -1277,7 +1274,7 @@ impl FlowMap {
         node.recent_time = lookup_key.timestamp;
         node.timeout = Timestamp::ZERO;
         node.packet_in_tick = true;
-        node.policy_in_tick = policy_in_tick;
+        node.policy_in_tick = [true, false];
         node.flow_state = FlowState::Raw;
         node.meta_flow_log = None;
         node.next_tcp_seq0 = 0;
