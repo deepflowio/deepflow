@@ -323,7 +323,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}
@@ -337,7 +337,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
-		UserConfig:          proto.String(e.marshalUserConfig(userConfig)),
+		UserConfig:          proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 		DynamicConfig:       dynamicConfig,
 		PlatformData:        platformData,
 		Groups:              groups,
@@ -369,13 +369,18 @@ func (e *AgentEvent) generateNoAgentCacheUserConfig(groupID string, orgID int) *
 	return vtapConfig.GetUserConfig()
 }
 
-func (e *AgentEvent) marshalUserConfig(userConfig *koanf.Koanf) string {
+func (e *AgentEvent) marshalUserConfig(userConfig *koanf.Koanf, c *vtap.VTapCache) string {
 	b, err := userConfig.Marshal(kyaml.Parser())
 	if err != nil {
 		log.Error(err)
 		return ""
 	}
-	return string(b)
+
+	userConfigComment := []string{}
+	if c != nil {
+		userConfigComment = c.GetUserConfigComment()
+	}
+	return string(b) + strings.Join(userConfigComment, "\n")
 }
 
 func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncResponse {
@@ -403,7 +408,7 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig, nil)),
 			DynamicConfig: dynamicConfigInfo,
 		}
 	}
@@ -416,14 +421,14 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
 			DynamicConfig: dynamicConfigInfo,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig, nil)),
 		}
 	}
 
 	return &api.SyncResponse{
 		Status:        &STATUS_SUCCESS,
 		DynamicConfig: dynamicConfigInfo,
-		UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+		UserConfig:    proto.String(e.marshalUserConfig(userConfig, nil)),
 	}
 }
 
@@ -556,7 +561,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	if vtapCache.GetVTapEnabled() == 0 {
 		return &api.SyncResponse{
 			Status:        &STATUS_SUCCESS,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig)),
+			UserConfig:    proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 			DynamicConfig: dynamicConfig,
 		}, nil
 	}
@@ -570,7 +575,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
 		DynamicConfig:       dynamicConfig,
-		UserConfig:          proto.String(e.marshalUserConfig(userConfig)),
+		UserConfig:          proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 		PlatformData:        platformData,
 		SkipInterface:       skipInterface,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
