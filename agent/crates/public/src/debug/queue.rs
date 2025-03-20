@@ -114,8 +114,9 @@ impl QueueDebugger {
     }
 
     pub fn turn_off_all_queue(&self) -> QueueMessage {
+        let mut qg = self.queues.lock().unwrap();
         let mut threads = self.threads.lock().unwrap();
-        self.queues.lock().unwrap().retain(|name, ctx| {
+        qg.retain(|name, ctx| {
             if !ctx.receiver.terminated() {
                 ctx.enabled.store(false, Ordering::SeqCst);
                 // release queue item
