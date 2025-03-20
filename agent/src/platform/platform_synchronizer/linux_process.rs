@@ -26,7 +26,7 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
-use log::{debug, error, info};
+use log::{debug, info};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
@@ -238,7 +238,7 @@ pub(super) fn get_all_pid_process_map(proc_root: &str) -> PidProcMap {
     if let Ok(procs) = procfs::process::all_processes_with_root(proc_root) {
         for proc in procs {
             if let Err(err) = proc {
-                error!("get process fail: {}", err);
+                info!("get process fail: {}", err);
                 continue;
             }
             let proc = proc.unwrap();
@@ -293,7 +293,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
     let mut tags_map = match get_os_app_tag_by_exec(user, cmd) {
         Ok(tags) => tags,
         Err(err) => {
-            error!(
+            info!(
                 "get process tags by execute cmd `{}` with user {} fail: {}",
                 cmd.join(" "),
                 user,
@@ -314,7 +314,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
         }
 
         match process_data.get_root_inode(proc_root) {
-            Err(e) => error!("pid {} get root inode fail: {}", process_data.pid, e),
+            Err(e) => info!("pid {} get root inode fail: {}", process_data.pid, e),
             Ok(inode) => {
                 if let Some(pwd) = pwd_info.get(&inode) {
                     process_data.set_username(&pwd);
@@ -426,7 +426,7 @@ fn tag_child_along_parent(
 
     if let Some(parent_idx) = pid_map.get(&ppid) {
         if child_idx == *parent_idx {
-            error!("pid: {} child pid equal to parent pid", ppid);
+            info!("pid: {} child pid equal to parent pid", ppid);
             return;
         }
 
