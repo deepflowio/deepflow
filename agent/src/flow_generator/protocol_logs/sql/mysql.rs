@@ -356,6 +356,7 @@ pub struct MysqlLog {
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
     parameter_counter: u32,
     has_request: bool,
+    has_login: bool,
 
     last_is_on_blacklist: bool,
 }
@@ -827,14 +828,25 @@ impl MysqlLog {
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => {
+            LogMessageType::Request if header.number == 0 => {
                 msg_type = self.request(config, &payload[offset..], info)?;
                 if msg_type == LogMessageType::Request {
                     self.has_request = true;
+                    self.has_login = false;
                 }
             }
-            LogMessageType::Session if direction == PacketDirection::ClientToServer => {
+            LogMessageType::Request
+                if direction == PacketDirection::ClientToServer && header.number == 1 =>
+            {
                 self.login(&payload[offset..], info)?;
+                self.has_login = true;
+            }
+            LogMessageType::Response
+                if self.has_login && header.response_code == MYSQL_RESPONSE_CODE_OK
+                    || header.response_code == MYSQL_RESPONSE_CODE_ERR =>
+            {
+                self.response(&payload[offset..], info)?;
+                self.has_login = false;
             }
             LogMessageType::Response if self.has_request => {
                 self.response(&payload[offset..], info)?;
@@ -856,6 +868,7 @@ impl MysqlLog {
 pub struct MysqlHeader {
     length: u32,
     number: u8,
+    response_code: u8,
 }
 
 impl MysqlHeader {
@@ -892,6 +905,7 @@ impl MysqlHeader {
             {
                 self.length = len;
                 self.number = payload[offset + NUMBER_OFFSET];
+                self.response_code = response_code;
                 return Some(offset + HEADER_LEN);
             }
             offset += HEADER_LEN + len as usize;
@@ -927,8 +941,7 @@ impl MysqlHeader {
                 }
             }
             PacketDirection::ServerToClient => Some(LogMessageType::Response),
-            PacketDirection::ClientToServer if self.number == 0 => Some(LogMessageType::Request),
-            PacketDirection::ClientToServer if self.number == 1 => Some(LogMessageType::Session),
+            PacketDirection::ClientToServer if self.number <= 1 => Some(LogMessageType::Request),
             _ => None,
         }
     }
@@ -1146,6 +1159,7 @@ mod tests {
             ("mysql-table-destroy.pcap", "mysql-table-destroy.result"),
             ("mysql-table-alter.pcap", "mysql-table-alter.result"),
             ("mysql-database.pcap", "mysql-database.result"),
+            ("mysql-login-error.pcap", "mysql-login-error.result"),
         ];
 
         for item in files.iter() {
@@ -1172,13 +1186,13 @@ mod tests {
                 "mysql.pcap",
                 L7PerfStats {
                     request_count: 7,
-                    response_count: 5,
+                    response_count: 6,
                     err_client_count: 0,
                     err_server_count: 0,
                     err_timeout: 0,
-                    rrt_count: 5,
-                    rrt_sum: 373,
-                    rrt_max: 123,
+                    rrt_count: 6,
+                    rrt_sum: 598,
+                    rrt_max: 225,
                     ..Default::default()
                 },
             ),
@@ -1186,12 +1200,12 @@ mod tests {
                 "mysql-error.pcap",
                 L7PerfStats {
                     request_count: 5,
-                    response_count: 3,
+                    response_count: 4,
                     err_client_count: 0,
                     err_server_count: 1,
                     err_timeout: 0,
-                    rrt_count: 3,
-                    rrt_sum: 226,
+                    rrt_count: 4,
+                    rrt_sum: 292,
                     rrt_max: 146,
                     ..Default::default()
                 },
