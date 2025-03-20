@@ -1592,9 +1592,14 @@ impl Synchronizer {
         status: Arc<RwLock<Status>>,
     ) {
         while let Ok(new_agent_id) = agent_id_rx.recv().await {
-            *agent_id.write() = new_agent_id;
-            status.write().proxy_ip = None;
-            status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
+            {
+                *agent_id.write() = new_agent_id;
+            }
+            {
+                let mut sg = status.write();
+                sg.proxy_ip = None;
+                sg.proxy_port = DEFAULT_CONTROLLER_PORT;
+            }
         }
     }
 
