@@ -155,10 +155,9 @@ impl RpcDebugger {
             return Err(Error::NotFound(String::from("cidrs data in preparation")));
         }
 
-        self.status.write().get_platform_data(&resp);
-        let mut res = self
-            .status
-            .read()
+        let mut sg = self.status.write();
+        sg.get_platform_data(&resp);
+        let mut res = sg
             .cidrs
             .iter()
             .map(|c| RpcMessage::Cidr(Some(format!("{:?}", c))))
@@ -181,21 +180,18 @@ impl RpcDebugger {
             )));
         }
 
-        self.status.write().get_platform_data(&resp);
-        let mut res = {
-            let status_guard = self.status.read();
-            status_guard
-                .interfaces
-                .iter()
-                .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p))))
-                .chain(
-                    status_guard
-                        .peers
-                        .iter()
-                        .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p)))),
-                )
-                .collect::<Vec<_>>()
-        };
+        let mut sg = self.status.write();
+        sg.get_platform_data(&resp);
+        let mut res = sg
+            .interfaces
+            .iter()
+            .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p))))
+            .chain(
+                sg.peers
+                    .iter()
+                    .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p)))),
+            )
+            .collect::<Vec<_>>();
 
         res.push(RpcMessage::Fin);
         Ok(res)
@@ -214,10 +210,9 @@ impl RpcDebugger {
             )));
         }
 
-        self.status.write().get_ip_groups(&resp);
-        let mut res = self
-            .status
-            .read()
+        let mut sg = self.status.write();
+        sg.get_ip_groups(&resp);
+        let mut res = sg
             .ip_groups
             .iter()
             .map(|g| RpcMessage::Groups(Some(format!("{:?}", g))))
@@ -240,10 +235,9 @@ impl RpcDebugger {
             )));
         }
 
-        self.status.write().get_flow_acls(&resp);
-        let mut res = self
-            .status
-            .read()
+        let mut sg = self.status.write();
+        sg.get_flow_acls(&resp);
+        let mut res = sg
             .acls
             .iter()
             .map(|a| RpcMessage::Acls(Some(format!("{:?}", a))))

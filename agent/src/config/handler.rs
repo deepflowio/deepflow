@@ -3655,7 +3655,7 @@ impl ConfigHandler {
         if common.kubernetes_api_enabled != new_common.kubernetes_api_enabled {
             info!(
                 "Update global.common.kubernetes_api_enabled from {:?} to {:?}.",
-                common.enabled, new_common.enabled
+                common.kubernetes_api_enabled, new_common.kubernetes_api_enabled
             );
             common.kubernetes_api_enabled = new_common.kubernetes_api_enabled;
         }
