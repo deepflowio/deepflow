@@ -41,7 +41,7 @@ use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
 use integration_vector::vector_component::VectorComponent;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use num_enum::{FromPrimitive, IntoPrimitive};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
@@ -207,6 +207,8 @@ impl AgentState {
 
     pub fn enable(&self) {
         if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
             return;
         }
         let mut sg = self.state.lock().unwrap();
@@ -221,6 +223,8 @@ impl AgentState {
 
     pub fn disable(&self) {
         if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
             return;
         }
         let mut sg = self.state.lock().unwrap();
@@ -235,6 +239,8 @@ impl AgentState {
 
     pub fn melt_down(&self) {
         if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
             return;
         }
         let mut sg = self.state.lock().unwrap();
@@ -249,6 +255,8 @@ impl AgentState {
 
     pub fn recover(&self) {
         if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
             return;
         }
         let mut sg = self.state.lock().unwrap();
@@ -268,11 +276,13 @@ impl AgentState {
         }
         let sg = self.state.lock().unwrap();
         self.notifier.notify_one();
-        info!("Agent terminate with state: {:?}", sg);
+        info!("Agent terminate with state: {:?}", State::from(sg.0));
     }
 
     pub fn update_config(&self, config: ChangedConfig) {
         if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
             return;
         }
         let mut sg = self.state.lock().unwrap();
@@ -569,27 +579,37 @@ impl Trident {
             RunningMode::Managed => None,
             RunningMode::Standalone => Some(config_path.as_ref().to_path_buf()),
         };
-        let handle = Some(thread::spawn(move || {
-            if let Err(e) = Self::run(
-                state_thread,
-                ctrl_ip,
-                ctrl_mac,
-                config_handler,
-                version_info,
-                stats_collector,
-                exception_handler,
-                config_path,
-                sidecar_mode,
-                cgroups_disabled,
-                ntp_diff,
-            ) {
-                warn!(
-                    "Launching deepflow-agent failed: {}, deepflow-agent restart...",
-                    e
-                );
+        let main_loop = thread::Builder::new()
+            .name("main-loop".to_owned())
+            .spawn(move || {
+                if let Err(e) = Self::run(
+                    state_thread,
+                    ctrl_ip,
+                    ctrl_mac,
+                    config_handler,
+                    version_info,
+                    stats_collector,
+                    exception_handler,
+                    config_path,
+                    sidecar_mode,
+                    cgroups_disabled,
+                    ntp_diff,
+                ) {
+                    error!(
+                        "Launching deepflow-agent failed: {}, deepflow-agent restart...",
+                        e
+                    );
+                    crate::utils::notify_exit(1);
+                }
+            });
+        let handle = match main_loop {
+            Ok(h) => Some(h),
+            Err(e) => {
+                error!("Failed to create main-loop thread: {}", e);
                 crate::utils::notify_exit(1);
+                None
             }
-        }));
+        };
 
         Ok(Trident {
             state,
@@ -862,13 +882,14 @@ impl Trident {
             platform_synchronizer.start();
         }
 
-        let mut state_guard = state.state.lock().unwrap();
         let mut components: Option<Components> = None;
         let mut first_run = true;
         let mut config_initialized = false;
 
         loop {
+            let mut state_guard = state.state.lock().unwrap();
             if state.terminated.load(Ordering::Relaxed) {
+                mem::drop(state_guard);
                 if let Some(mut c) = components {
                     c.stop();
                     guard.stop();
@@ -889,9 +910,10 @@ impl Trident {
                 return Ok(());
             }
 
+            state_guard = state.notifier.wait(state_guard).unwrap();
             match State::from(state_guard.0) {
                 State::Running if state_guard.1.is_none() => {
-                    state_guard = state.notifier.wait(state_guard).unwrap();
+                    mem::drop(state_guard);
                     #[cfg(target_os = "linux")]
                     if config_handler
                         .candidate_config
@@ -908,10 +930,12 @@ impl Trident {
                     continue;
                 }
                 State::Disabled => {
+                    let new_config = state_guard.1.take();
+                    mem::drop(state_guard);
                     if let Some(ref mut c) = components {
                         c.stop();
                     }
-                    if let Some(cfg) = state_guard.1.take() {
+                    if let Some(cfg) = new_config {
                         let agent_id = synchronizer.agent_id.read().clone();
                         let callbacks = config_handler.on_config(
                             cfg.user_config,
@@ -960,7 +984,6 @@ impl Trident {
                             config_initialized = true;
                         }
                     }
-                    state_guard = state.notifier.wait(state_guard).unwrap();
                     continue;
                 }
                 _ => (),
@@ -1136,8 +1159,6 @@ impl Trident {
                 guard.start();
                 config_initialized = true;
             }
-
-            state_guard = state.state.lock().unwrap();
         }
     }
 
