@@ -528,6 +528,9 @@ impl<T: Sendable> UniformSender<T> {
         };
 
         if conn.reconnect || conn.tcp_stream.is_none() {
+            if !self.running.load(Ordering::Relaxed) {
+                return;
+            }
             if let Some(t) = conn.tcp_stream.take() {
                 if let Err(e) = t.shutdown(Shutdown::Both) {
                     debug!("{} sender tcp stream shutdown failed {}", self.name, e);
