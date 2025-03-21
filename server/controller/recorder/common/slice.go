@@ -17,11 +17,10 @@
 package common
 
 import (
+	"cmp"
+	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
 )
 
 func IntSliceToString(s []int) string {
@@ -49,7 +48,7 @@ func StringToIntSlice(str string) []int {
 	return s
 }
 
-func ElementsSame[T constraints.Ordered](s1, s2 []T) bool {
+func ElementsSame[T cmp.Ordered](s1, s2 []T) bool {
 	slices.Sort(s1)
 	slices.Sort(s2)
 	return slices.Equal(s1, s2)

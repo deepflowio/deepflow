@@ -19,10 +19,9 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/querier/common"

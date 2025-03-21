@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,7 +30,6 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
-	"golang.org/x/exp/slices"
 
 	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -692,7 +691,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 								for autoTagKey, _ := range autoTagMap {
 									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
-								sort.Strings(autoTagSlice)
+								slices.Sort(autoTagSlice)
 								for _, autoTagKey := range autoTagSlice {
 									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
 								}
@@ -710,7 +709,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 								for autoTagKey, _ := range autoTagMap {
 									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
-								sort.Strings(autoTagSlice)
+								slices.Sort(autoTagSlice)
 								for _, autoTagKey := range autoTagSlice {
 									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
 								}

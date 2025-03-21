@@ -19,10 +19,8 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -95,7 +93,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			for autoTagKey, _ := range autoTagMap {
 				autoTagSlice = append(autoTagSlice, autoTagKey)
 			}
-			sort.Strings(autoTagSlice)
+			slices.Sort(autoTagSlice)
 			for _, autoTagKey := range autoTagSlice {
 				stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})
 			}
@@ -126,7 +124,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			for autoTagKey, _ := range autoTagMap {
 				autoTagSlice = append(autoTagSlice, autoTagKey)
 			}
-			sort.Strings(autoTagSlice)
+			slices.Sort(autoTagSlice)
 			for _, autoTagKey := range autoTagSlice {
 				if autoTagMap[autoTagKey] != "" {
 					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})
@@ -179,7 +177,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			for autoTagKey, _ := range autoTagMap {
 				autoTagSlice = append(autoTagSlice, autoTagKey)
 			}
-			sort.Strings(autoTagSlice)
+			slices.Sort(autoTagSlice)
 			for _, autoTagKey := range autoTagSlice {
 				if autoTagMap[autoTagKey] != "" {
 					stmts = append(stmts, &SelectTag{Value: autoTagMap[autoTagKey], Alias: "`" + autoTagKey + "`"})

@@ -23,7 +23,7 @@ import (
 	"net"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +33,6 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/xwb1989/sqlparser"
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -732,7 +731,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			}
 			promJsonMap[promTagJson] = filterTagMap
 			// IMPORTANT: tags needed to be sorted, it will be compare both in cache and seriesIndexMap
-			sort.Strings(promTagStrList)
+			slices.Sort(promTagStrList)
 			for i := 0; i < len(promTagStrList); i++ {
 				promTagWriter.WriteString(promTagStrList[i])
 				promTagWriter.WriteByte(':')
