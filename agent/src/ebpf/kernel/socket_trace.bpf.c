@@ -1850,14 +1850,20 @@ static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 /***********************************************************
  * BPF syscall probe/tracepoint/kfunc function entry-points
  ***********************************************************/
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(ksys_write) (struct pt_regs *ctx) {
+	int fd = (int)PT_REGS_PARM1(ctx);
+	char *buf = (char *)PT_REGS_PARM2(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(enter_write) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_write) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
 #else
 // ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
 KFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf, size_t count)
 {
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	struct data_args_t write_args = {};
@@ -1875,15 +1881,20 @@ KFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf, size_t count)
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(ksys_write) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_write/format
-TP_SYSCALL_PROG(exit_write) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_write) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf,
 	      size_t count, ssize_t ret)
 {
 	ssize_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -1899,15 +1910,21 @@ KRETFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(ksys_read) (struct pt_regs *ctx) {
+	int fd = (unsigned int)PT_REGS_PARM1(ctx);
+	char *buf = (char *)PT_REGS_PARM2(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // ssize_t read(int fd, void *buf, size_t count);
-TP_SYSCALL_PROG(enter_read) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_read) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
 #else
 // ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 KFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count)
 {
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Stash arguments.
@@ -1926,9 +1943,13 @@ KFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count)
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(ksys_read) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
-TP_SYSCALL_PROG(exit_read) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_read) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 // ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
@@ -1936,6 +1957,7 @@ KRETFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count,
 	      ssize_t ret)
 {
 	size_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -1973,8 +1995,13 @@ KRETFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count,
  * As a result, we cannot obtain the tuple information. Therefore, when entering these
  * types of system calls, we need to save this information beforehand.
  */
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(__sys_sendto) (struct pt_regs *ctx) {
+	int sockfd = (int)PT_REGS_PARM1(ctx);
+	char *buf = (char *)PT_REGS_PARM2(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
 #else
@@ -1985,6 +2012,7 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 {
 	int sockfd = fd;
 	char *buf = (char *)buff;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 
@@ -2018,9 +2046,14 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_sendto) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#ifdef SUPPORTS_KPROBE_ONLY
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendto/format
-TP_SYSCALL_PROG(exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendto) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
@@ -2028,6 +2061,7 @@ KRETFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	      int ret)
 {
 	ssize_t bytes_count = (int)ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2042,10 +2076,17 @@ KRETFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(__sys_recvfrom) (struct pt_regs *ctx) {
+	if ((int)PT_REGS_PARM4(ctx) & MSG_PEEK)
+		return 0;
+	int sockfd = (int)PT_REGS_PARM1(ctx);
+	char *buf = (char *)PT_REGS_PARM2(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                struct sockaddr *src_addr, socklen_t *addrlen);
-TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	// If flags contains MSG_PEEK, it is returned directly.
 	// ref : https://linux.die.net/man/2/recvfrom
 	if (ctx->flags & MSG_PEEK)
@@ -2064,6 +2105,7 @@ KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	int sockfd = fd;
 	char *buf = (char *)ubuf;
 #endif
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Stash arguments.
 	struct data_args_t read_args = {};
@@ -2081,9 +2123,13 @@ KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_recvfrom) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvfrom/format
-TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
@@ -2091,6 +2137,7 @@ KRETFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	      int __user * addr_len, int ret)
 {
 	ssize_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2105,9 +2152,9 @@ KRETFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	return 0;
 }
 
-#ifndef LINUX_VER_KFUNC
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
 // ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
-KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
+KPROG(__sys_sendmsg) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct user_msghdr *msghdr_ptr =
 	    (struct user_msghdr *)PT_REGS_PARM2(ctx);
@@ -2146,15 +2193,20 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_sendmsg) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmsg/format
-TP_SYSCALL_PROG(exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmsg) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_sendmsg, int sockfd, const struct msghdr * msg, int flags,
 	      bool forbid_cmsg_compat, long ret)
 {
 	ssize_t bytes_count = (ssize_t) ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2182,10 +2234,10 @@ KRETFUNC_PROG(__sys_sendmsg, int sockfd, const struct msghdr * msg, int flags,
 	return 0;
 }
 
-#ifndef LINUX_VER_KFUNC
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
 // int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 //              int flags);
-KPROG(__sys_sendmmsg) (struct pt_regs * ctx) {
+KPROG(__sys_sendmmsg) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct mmsghdr *msgvec_ptr = (struct mmsghdr *)PT_REGS_PARM2(ctx);
 	unsigned int vlen = (unsigned int)PT_REGS_PARM3(ctx);
@@ -2223,9 +2275,13 @@ KFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_sendmmsg)(struct pt_regs *ctx) {
+	int num_msgs = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmmsg/format
-TP_SYSCALL_PROG(exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	int num_msgs = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
@@ -2233,6 +2289,7 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 	      int ret)
 {
 	int num_msgs = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2253,8 +2310,9 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 // long __sys_recvmsg(int fd, struct user_msghdr __user *msg, unsigned int flags,
 //                 bool forbid_cmsg_compat)
 // ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-#ifndef LINUX_VER_KFUNC
-KPROG(__sys_recvmsg) (struct pt_regs * ctx) {
+
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
+KPROG(__sys_recvmsg) (struct pt_regs *ctx) {
 	int flags = (int)PT_REGS_PARM3(ctx);
 	if (flags & MSG_PEEK)
 		return 0;
@@ -2294,15 +2352,20 @@ KFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_recvmsg) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmsg/format
-TP_SYSCALL_PROG(exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmsg) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 	      unsigned int flags, bool forbid_cmsg_compat, long ret)
 {
 	ssize_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2327,8 +2390,8 @@ KRETFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 //                   unsigned int vlen, unsigned int flags,
 //                   struct __kernel_timespec __user *timeout,
 //                   struct old_timespec32 __user *timeout32)
-#ifndef LINUX_VER_KFUNC
-KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
+KPROG(__sys_recvmmsg) (struct pt_regs *ctx) {
 	int flags = (int)PT_REGS_PARM4(ctx);
 	if (flags & MSG_PEEK)
 		return 0;
@@ -2381,9 +2444,13 @@ KFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_recvmmsg) (struct pt_regs *ctx) {
+	int num_msgs = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmmsg/format
-TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	int num_msgs = ctx->ret;
 #else
 KRETFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
@@ -2392,6 +2459,7 @@ KRETFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 	      struct old_timespec32 __user * timeout32, int ret)
 {
 	int num_msgs = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2411,11 +2479,11 @@ KRETFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 //static ssize_t do_writev(unsigned long fd, const struct iovec __user *vec,
 //                       unsigned long vlen, rwf_t flags)
 // ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
-#ifndef LINUX_VER_KFUNC
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
 #ifdef LINUX_VER_3_10_0
-KPROG(sys_writev) (struct pt_regs * ctx) {
+KPROG(sys_writev) (struct pt_regs *ctx) {
 #else
-KPROG(do_writev) (struct pt_regs * ctx) {
+KPROG(do_writev) (struct pt_regs *ctx) {
 #endif
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
@@ -2445,15 +2513,20 @@ KFUNC_PROG(do_writev, unsigned long fd, const struct iovec __user * vec,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(do_writev) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_writev/format
-TP_SYSCALL_PROG(exit_writev) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_writev) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(do_writev, unsigned long fd, const struct iovec __user * vec,
 	      unsigned long vlen, rwf_t flags, ssize_t ret)
 {
 	ssize_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
@@ -2471,11 +2544,11 @@ KRETFUNC_PROG(do_writev, unsigned long fd, const struct iovec __user * vec,
 // ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 //static ssize_t do_readv(unsigned long fd, const struct iovec __user *vec,
 //                        unsigned long vlen, rwf_t flags)
-#ifndef LINUX_VER_KFUNC
+#if defined(SUPPORTS_KPROBE_ONLY) || !defined(LINUX_VER_KFUNC)
 #ifdef LINUX_VER_3_10_0
-KPROG(sys_readv) (struct pt_regs * ctx) {
+KPROG(sys_readv) (struct pt_regs *ctx) {
 #else
-KPROG(do_readv) (struct pt_regs * ctx) {
+KPROG(do_readv) (struct pt_regs *ctx) {
 #endif
 	int fd = (int)PT_REGS_PARM1(ctx);
 	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
@@ -2505,15 +2578,20 @@ KFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 	return 0;
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(do_readv) (struct pt_regs *ctx) {
+	ssize_t bytes_count = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_readv/format
-TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
 #else
 KRETFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 	      unsigned long vlen, rwf_t flags, ssize_t ret)
 {
 	ssize_t bytes_count = ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
@@ -2581,9 +2659,17 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 #endif
 }
 
+#ifdef SUPPORTS_KPROBE_ONLY
+#if defined(__x86_64__)
+KPROG(__x64_sys_close) (struct pt_regs *ctx) {
+#else
+KPROG(__arm64_sys_close) (struct pt_regs *ctx) {
+#endif
+	int fd = (int)PT_REGS_PARM1(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
 #else
 #if defined(__x86_64__)
@@ -2596,9 +2682,10 @@ KFUNC_PROG(__x64_sys_close, const struct pt_regs *regs)
 //    unsigned int fd = regs->regs[0];
 KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 {
-#endif
+#endif /* defined(__x86_64__) */
 	int fd = (int)PT_REGS_PARM1(regs);
-#endif
+#endif /* LINUX_VER_KFUNC */
+#endif /* SUPPORTS_KPROBE_ONLY */
 	//Ignore stdin, stdout and stderr
 	if (fd <= 2)
 		return 0;
@@ -2629,13 +2716,18 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 
 //int __sys_socket(int family, int type, int protocol)
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(__sys_socket) (struct pt_regs *ctx) {
+	__u64 fd = (__u64) PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	__u64 fd = (__u64) ctx->ret;
 #else
 KRETFUNC_PROG(__sys_socket, int family, int type, int protocol, int ret)
 {
 	__u64 fd = (__u64) ret;
+#endif
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	char comm[TASK_COMM_LEN];
@@ -2679,8 +2771,16 @@ KRETFUNC_PROG(__sys_socket, int family, int type, int protocol, int ret)
  * Since the system calls `accept4` and `accept` both invoke `__sys_accept4()`, the
  * `kfunc` type should directly use `__sys_accept4()`.
  */
+#ifdef SUPPORTS_KPROBE_ONLY
+#if defined(__x86_64__)
+KRETPROG(__x64_sys_accept) (struct pt_regs *ctx) {
+#else
+KRETPROG(__arm64_sys_accept) (struct pt_regs *ctx) {
+#endif
+	int sockfd = PT_REGS_RC(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(exit_accept) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_accept) (struct syscall_comm_exit_ctx *ctx) {
 	int sockfd = ctx->ret;
 #else
 //int __sys_accept4(int fd, struct sockaddr __user *upeer_sockaddr,
@@ -2690,6 +2790,7 @@ KRETFUNC_PROG(__sys_accept4, int fd, struct sockaddr __user * upeer_sockaddr,
 {
 	int sockfd = ret;
 #endif
+#endif
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) sockfd);
@@ -2699,8 +2800,17 @@ KRETFUNC_PROG(__sys_accept4, int fd, struct sockaddr __user * upeer_sockaddr,
 }
 
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
+#ifdef SUPPORTS_KPROBE_ONLY
+#if defined(__x86_64__)
+KRETPROG(__x64_sys_accept4) (struct pt_regs *ctx) {
+#else
+KRETPROG(__arm64_sys_accept4) (struct pt_regs *ctx) {
+#endif
+	int sockfd = PT_REGS_RC(ctx);
+#else
+TP_SYSCALL_PROG(exit_accept4) (struct syscall_comm_exit_ctx *ctx) {
 	int sockfd = ctx->ret;
+#endif
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) sockfd);
@@ -2710,8 +2820,12 @@ TP_SYSCALL_PROG(exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 }
 #endif
 
+#ifdef SUPPORTS_KPROBE_ONLY
+KPROG(__sys_connect) (struct pt_regs *ctx) {
+	int sockfd = (int)PT_REGS_PARM1(ctx);
+#else
 #ifndef LINUX_VER_KFUNC
-TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx *ctx) {
 	int sockfd = ctx->fd;
 #else
 // int __sys_connect(int fd, struct sockaddr __user *uservaddr, int addrlen)
@@ -2719,6 +2833,7 @@ KFUNC_PROG(__sys_connect, int fd, struct sockaddr __user * uservaddr,
 	   int addrlen)
 {
 	int sockfd = (int)fd;
+#endif
 #endif
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -3419,7 +3534,15 @@ static __inline int push_socket_data(struct syscall_comm_enter_ctx *ctx)
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
 // Here, the tracepoint is used to periodically send the data residing in the cache but not
 // yet transmitted to the user-level receiving program for processing.
-TP_SYSCALL_PROG(enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
+#ifdef SUPPORTS_KPROBE_ONLY
+#if defined(__x86_64__)
+KPROG(__x64_sys_getppid) (struct pt_regs *ctx) {
+#else
+KPROG(__arm64_sys_getppid) (struct pt_regs *ctx) {
+#endif
+#else
+TP_SYSCALL_PROG(enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
+#endif
 	// Only pre-specified Pid is allowed to trigger.
 	if (!check_pid_validity())
 		return 0;
