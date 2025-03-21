@@ -46,6 +46,7 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: mysql support login response [#9333](https://github.com/deepflowio/deepflow/pull/9333) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
