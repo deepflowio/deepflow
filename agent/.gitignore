@@ -6,7 +6,7 @@
 !src/integration/mod.rs
 src/proto/*.rs
 src/proto/integration/*.rs
-src/plugin/wasm/wasm_plugin.rs
+# src/plugin/wasm/wasm_plugin.rs
 src/flow_generator/protocol_logs/mq/pulsar.proto.rs
 
 src/ebpf/data

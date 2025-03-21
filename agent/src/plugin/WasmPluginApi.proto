@@ -1,6 +1,64 @@
 syntax = "proto3";
 
 package wasm_plugin;
+option go_package = ".;pb";
+
+message AppRequest {
+    optional string version = 1;
+    optional string type = 2;
+    optional string domain = 3;
+    optional string resource = 4;
+    optional string endpoint = 5;
+}
+
+enum AppRespStatus {
+    RESP_OK = 0;
+    RESP_TIMEOUT = 2;
+    RESP_SERVER_ERROR = 3;
+    RESP_CLIENT_ERROR = 4;
+    RESP_UNKNOWN = 5;
+}
+
+message AppResponse {
+    optional AppRespStatus status = 1;
+    optional int32 code = 2;
+    optional string exception = 3;
+    optional string result = 4;
+}
+
+message AppTrace {
+    optional string trace_id = 1;
+    optional string span_id = 2;
+    optional string parent_span_id = 3;
+    optional string x_request_id = 4;
+    optional string http_proxy_client = 5;
+}
+
+message KeyVal {
+    string key = 1;
+    string val = 2;
+}
+
+message AppInfo {
+    optional uint32 req_len = 1;
+    optional uint32 resp_len = 2;
+
+    optional uint32 request_id = 3;
+
+    oneof info {
+        AppRequest req = 10;
+        AppResponse resp = 11;
+    }
+    AppTrace trace = 12;
+    optional string protocol_str = 13;
+
+    // a null `is_end` means no need for protocol merge
+    optional bool is_end = 21;
+
+    repeated KeyVal attributes = 31;
+
+    optional uint32 biz_type = 32;
+}
 
 message NatsMessage {
     string subject = 1;
