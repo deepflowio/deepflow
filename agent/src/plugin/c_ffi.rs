@@ -261,6 +261,7 @@ impl TryFrom<ParseInfo> for CustomInfo {
                         domain: c_str_to_string(&req.domain).unwrap_or_default(),
                         resource: c_str_to_string(&req.resource).unwrap_or_default(),
                         endpoint: c_str_to_string(&req.endpoint).unwrap_or_default(),
+                        ..Default::default()
                     },
                     CustomInfoResp::default(),
                 )
@@ -309,6 +310,7 @@ impl TryFrom<ParseInfo> for CustomInfo {
                 trace_id: c_str_to_string(&v.trace.trace_id),
                 span_id: c_str_to_string(&v.trace.span_id),
                 parent_span_id: c_str_to_string(&v.trace.parent_span_id),
+                ..Default::default()
             },
             attributes: read_attr(&v.attributes, v.attr_len),
             ..Default::default()
