@@ -45,16 +45,17 @@ type FlowLogTTL struct {
 }
 
 type Config struct {
-	Base              *config.Config
-	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
-	Throttle          int                   `yaml:"throttle"`
-	ThrottleBucket    int                   `yaml:"throttle-bucket"`
-	L4Throttle        int                   `yaml:"l4-throttle"`
-	L7Throttle        int                   `yaml:"l7-throttle"`
-	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
-	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
-	TraceTreeEnabled  *bool                 `yaml:"flow-log-trace-tree-enabled"`
+	Base                *config.Config
+	CKWriterConfig      config.CKWriterConfig `yaml:"flowlog-ck-writer"`
+	Throttle            int                   `yaml:"throttle"`
+	ThrottleBucket      int                   `yaml:"throttle-bucket"`
+	L4Throttle          int                   `yaml:"l4-throttle"`
+	L7Throttle          int                   `yaml:"l7-throttle"`
+	FlowLogTTL          FlowLogTTL            `yaml:"flow-log-ttl-hour"`
+	DecoderQueueCount   int                   `yaml:"flow-log-decoder-queue-count"`
+	DecoderQueueSize    int                   `yaml:"flow-log-decoder-queue-size"`
+	TraceTreeEnabled    *bool                 `yaml:"flow-log-trace-tree-enabled"`
+	IgnoreLivenessProbe bool                  `yaml:"flow-log-ignore-liveness-probe"`
 }
 
 type FlowLogConfig struct {

@@ -512,6 +512,10 @@ ingester:
   ## whether to store trace tree information
   #flow-log-trace-tree-enabled: false
 
+  ## whether to ignore storing liveness probes
+  ## the flow of liveness probes is that the client sends Syn, the server replies SynAck, and finally the client sends AckRst
+  #flow-log-ignore-liveness-probe: false
+
   ## resource event data write config
   #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量

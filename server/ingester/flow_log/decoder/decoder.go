@@ -70,6 +70,7 @@ type Counter struct {
 	ErrorCount       int64 `statsd:"err-count"`
 	Count            int64 `statsd:"count"`
 	DropCount        int64 `statsd:"drop-count"`
+	IgnoreCount      int64 `statsd:"ignore-count"`
 
 	TotalTime int64 `statsd:"total-time"`
 	AvgTime   int64 `statsd:"avg-time"`
@@ -298,6 +299,19 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
+	if d.cfg.IgnoreLivenessProbe {
+		// LivenessProbe flow is send packet Syn, receive packet SynAck, then send packet AckRst
+		if flow.Flow != nil && flow.Flow.MetricsPeerSrc != nil &&
+			flow.Flow.MetricsPeerDst != nil &&
+			flow.Flow.MetricsPeerSrc.PacketCount == 2 &&
+			flow.Flow.MetricsPeerDst.PacketCount == 1 &&
+			flow.Flow.MetricsPeerSrc.TcpFlags == 22 &&
+			flow.Flow.MetricsPeerDst.TcpFlags == 18 {
+			d.counter.IgnoreCount++
+			return
+		}
+	}
+
 	d.counter.Count++
 	l := log_data.TaggedFlowToL4FlowLog(d.orgId, d.teamId, flow, d.platformData)
 
