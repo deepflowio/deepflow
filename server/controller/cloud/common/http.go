@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -70,7 +70,7 @@ func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.
 	}
 	defer resp.Body.Close()
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = newErr(url, fmt.Sprintf("read failed: %s", err.Error()))
 		log.Errorf(err.Error())
@@ -111,7 +111,7 @@ func RequestPost(url string, timeout time.Duration, body map[string]interface{})
 		return
 	}
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = newErr(url, fmt.Sprintf("read failed: %s", err.Error()))
 		log.Errorf(err.Error())

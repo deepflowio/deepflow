@@ -19,7 +19,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -484,7 +483,7 @@ func (c *Config) GetCKDBColdStorages() map[string]*ckdb.ColdStorage {
 }
 
 func Load(path string) *Config {
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	config := BaseConfig{
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",

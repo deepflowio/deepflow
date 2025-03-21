@@ -18,7 +18,7 @@ package common
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -64,7 +64,7 @@ type ExportersConfig struct {
 }
 
 func ExportersEnabled(configPath string) bool {
-	configBytes, err := ioutil.ReadFile(configPath)
+	configBytes, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Error("Read config file error:", err)
 		return false
