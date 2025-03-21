@@ -43,6 +43,8 @@ else ifeq ($(LINUX_VER_KFUNC),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_KFUNC
 else ifeq ($(LINUX_VER_RT),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_RT
+else ifeq ($(LINUX_VER_KPROBE),1)
+	EXTRA_EBPF_CLAGS = -DSUPPORTS_KPROBE_ONLY
 endif
 
 FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LLC) -march=bpf -filetype=obj -mcpu=v2 -o $@ ${@:.elf=.ll}
