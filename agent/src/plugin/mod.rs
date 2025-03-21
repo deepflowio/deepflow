@@ -20,6 +20,7 @@ pub mod c_ffi;
 pub mod shared_obj;
 pub mod wasm;
 
+use prost::Message;
 use public::{bytes::read_u32_be, counter::Countable, l7_protocol::L7Protocol};
 use serde::Serialize;
 
@@ -37,10 +38,11 @@ use crate::{
     },
 };
 
-use self::wasm::read_wasm_str;
+use self::wasm::{read_wasm_str, wasm_plugin as pb};
 
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct CustomInfoRequest {
+    pub version: String,
     pub req_type: String,
     pub domain: String,
     pub resource: String,
@@ -60,10 +62,14 @@ pub struct CustomInfoTrace {
     pub trace_id: Option<String>,
     pub span_id: Option<String>,
     pub parent_span_id: Option<String>,
+    pub x_request_id_0: Option<String>,
+    pub x_request_id_1: Option<String>,
+    pub http_proxy_client: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct CustomInfo {
+    // fields populated by crate::flow_generator::protocol_logs::plugin::wasm::WasmLog
     #[serde(skip)]
     pub(super) proto: u8,
     pub(super) proto_str: String,
@@ -71,10 +77,12 @@ pub struct CustomInfo {
     #[serde(skip)]
     pub(super) rrt: u64,
 
-    pub req_len: Option<u32>,
-    pub resp_len: Option<u32>,
     pub captured_request_byte: u32,
     pub captured_response_byte: u32,
+
+    // all the following fields are populated by data from wasm plugin
+    pub req_len: Option<u32>,
+    pub resp_len: Option<u32>,
 
     pub request_id: Option<u32>,
 
@@ -94,7 +102,7 @@ pub struct CustomInfo {
     pub biz_type: u8,
 }
 
-impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
+impl CustomInfo {
     /*
         req len:        4 bytes: | 1 bit: is nil? | 31bit length |
 
@@ -167,11 +175,7 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
 
         biz type: 1 byte
     */
-
-    type Error = Error;
-
-    fn try_from(f: (&[u8], PacketDirection)) -> std::result::Result<Self, Self::Error> {
-        let (buf, dir) = f;
+    fn from_legacy_protocol(buf: &[u8], dir: PacketDirection) -> Result<Self, Error> {
         let mut off = 0;
         let mut info = Self::default();
         if buf.len() < 9 {
@@ -391,6 +395,110 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
 
         Ok(info)
     }
+
+    fn from_protobuf(buf: &[u8], dir: PacketDirection) -> Result<Self, Error> {
+        let pb_info = match pb::AppInfo::decode(buf) {
+            Ok(info) => info,
+            Err(e) => {
+                return Err(Error::WasmSerializeFail(format!(
+                    "decode protobuf failed: {e:?}"
+                )))
+            }
+        };
+
+        let mut info = Self {
+            req_len: pb_info.req_len,
+            resp_len: pb_info.resp_len,
+            request_id: pb_info.request_id,
+            proto_str: pb_info.protocol_str.unwrap_or_default(),
+            need_protocol_merge: pb_info.is_end.is_some(),
+            is_req_end: match pb_info.is_end {
+                Some(true) => dir == PacketDirection::ClientToServer,
+                _ => false,
+            },
+            is_resp_end: match pb_info.is_end {
+                Some(true) => dir == PacketDirection::ServerToClient,
+                _ => false,
+            },
+            attributes: pb_info
+                .attributes
+                .into_iter()
+                .map(|k| KeyVal {
+                    key: k.key,
+                    val: k.val,
+                })
+                .collect(),
+            biz_type: pb_info.biz_type.unwrap_or_default() as u8,
+            ..Default::default()
+        };
+        match pb_info.info {
+            Some(pb::app_info::Info::Req(r)) => {
+                info.req = CustomInfoRequest {
+                    version: r.version.unwrap_or_default(),
+                    req_type: r.r#type.unwrap_or_default(),
+                    domain: r.domain.unwrap_or_default(),
+                    resource: r.resource.unwrap_or_default(),
+                    endpoint: r.endpoint.unwrap_or_default(),
+                };
+            }
+            Some(pb::app_info::Info::Resp(r)) => {
+                info.resp = CustomInfoResp {
+                    status: match r.status.and_then(pb::AppRespStatus::from_i32) {
+                        Some(pb::AppRespStatus::RespOk) => L7ResponseStatus::Ok,
+                        Some(pb::AppRespStatus::RespTimeout) => L7ResponseStatus::NotExist,
+                        Some(pb::AppRespStatus::RespServerError) => L7ResponseStatus::ServerError,
+                        Some(pb::AppRespStatus::RespClientError) => L7ResponseStatus::ClientError,
+                        _ => {
+                            return Err(Error::WasmSerializeFail(
+                                "unexpected resp status".to_string(),
+                            ))
+                        }
+                    },
+                    code: r.code,
+                    result: r.result.unwrap_or_default(),
+                    exception: r.exception.unwrap_or_default(),
+                };
+            }
+            _ => (),
+        }
+        if let Some(t) = pb_info.trace {
+            info.trace = CustomInfoTrace {
+                trace_id: t.trace_id,
+                span_id: t.span_id,
+                parent_span_id: t.parent_span_id,
+                http_proxy_client: t.http_proxy_client,
+                ..Default::default()
+            };
+            match dir {
+                PacketDirection::ClientToServer => {
+                    info.trace.x_request_id_0 = t.x_request_id;
+                }
+                PacketDirection::ServerToClient => {
+                    info.trace.x_request_id_1 = t.x_request_id;
+                }
+            }
+        }
+        Ok(info)
+    }
+}
+
+impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
+    type Error = Error;
+
+    fn try_from(f: (&[u8], PacketDirection)) -> std::result::Result<Self, Self::Error> {
+        let (buf, dir) = f;
+
+        // the legacy protocol starts with
+        //     req len:        4 bytes: | 1 bit: is nil? | 31bit length |
+        //
+        // so in the legacy protocol, the first byte will not have the first bit as 0 and other bits as 1
+        // we put a magic `PB` in front to represent protobuf serialized data
+        if buf.len() >= 2 && &buf[..2] == b"PB" {
+            Self::from_protobuf(&buf[2..], dir)
+        } else {
+            Self::from_legacy_protocol(buf, dir)
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for CustomInfo {
@@ -401,6 +509,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> crate::flow_generator::Result<()> {
         if let L7ProtocolInfo::CustomInfo(w) = other {
             // req merge
+            swap_if!(self.req, version, is_empty, w.req);
             swap_if!(self.req, req_type, is_empty, w.req);
             swap_if!(self.req, domain, is_empty, w.req);
             swap_if!(self.req, resource, is_empty, w.req);
@@ -440,6 +549,9 @@ impl L7ProtocolInfoInterface for CustomInfo {
             swap_if!(self.trace, trace_id, is_none, w.trace);
             swap_if!(self.trace, span_id, is_none, w.trace);
             swap_if!(self.trace, parent_span_id, is_none, w.trace);
+            swap_if!(self.trace, x_request_id_0, is_none, w.trace);
+            swap_if!(self.trace, x_request_id_1, is_none, w.trace);
+            swap_if!(self.trace, http_proxy_client, is_none, w.trace);
             self.attributes.append(&mut w.attributes);
         }
         Ok(())
@@ -510,6 +622,8 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 request_id: w.request_id,
                 attributes: Some(w.attributes),
                 protocol_str: Some(w.proto_str),
+                x_request_id_0: w.trace.x_request_id_0,
+                x_request_id_1: w.trace.x_request_id_1,
                 ..Default::default()
             }),
             ..Default::default()
