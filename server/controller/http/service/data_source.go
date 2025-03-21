@@ -143,7 +143,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 			case "traffic_policy":
 				collection = "flow_metrics.traffic_policy"
 			default:
-				return nil, fmt.Errorf("not support type(%s)", t)
+				collection = t.(string)
 			}
 			if dataSource.DataTableCollection != collection {
 				continue
@@ -172,6 +172,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 			BaseDataSourceID:          dataSource.BaseDataSourceID,
 			Interval:                  dataSource.Interval,
 			RetentionTime:             dataSource.RetentionTime,
+			QueryTime:                 dataSource.QueryTime,
 			SummableMetricsOperator:   dataSource.SummableMetricsOperator,
 			UnSummableMetricsOperator: dataSource.UnSummableMetricsOperator,
 			UpdatedAt:                 dataSource.UpdatedAt.Format(common.GO_BIRTHDAY),
@@ -292,6 +293,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 	dataSource.BaseDataSourceID = dataSourceCreate.BaseDataSourceID
 	dataSource.Interval = dataSourceCreate.Interval
 	dataSource.RetentionTime = dataSourceCreate.RetentionTime
+	dataSource.QueryTime = dataSourceCreate.QueryTime
 	dataSource.SummableMetricsOperator = dataSourceCreate.SummableMetricsOperator
 	dataSource.UnSummableMetricsOperator = dataSourceCreate.UnSummableMetricsOperator
 	if err := db.Create(&dataSource).Error; err != nil {
@@ -385,8 +387,14 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 			return model.DataSource{}, err
 		}
 	}
-	// only update display nmae
-	if dataSourceUpdate.DisplayName != nil && dataSourceUpdate.RetentionTime == nil {
+	if dataSourceUpdate.QueryTime != nil {
+		if err := db.Model(&dataSource).
+			Updates(map[string]interface{}{"query_time": *dataSourceUpdate.QueryTime}).Error; err != nil {
+			return model.DataSource{}, err
+		}
+	}
+	// if not update retention_time, only update db
+	if dataSourceUpdate.RetentionTime == nil {
 		response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 		return response[0], nil
 	}

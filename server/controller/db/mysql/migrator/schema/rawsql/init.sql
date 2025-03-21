@@ -2114,6 +2114,7 @@ CREATE TABLE IF NOT EXISTS data_source (
     base_data_source_id         INTEGER,
     `interval`                  INTEGER NOT NULL COMMENT 'uint: s',
     retention_time              INTEGER NOT NULL COMMENT 'uint: hour',
+    query_time                  INTEGER DEFAULT 0 COMMENT 'uint: minute',
     summable_metrics_operator   CHAR(64),
     unsummable_metrics_operator CHAR(64),
     updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -2128,8 +2129,8 @@ set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (2, '网络-指标（分钟级）', 'flow_metrics.network*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, query_time, lcuuid)
+                 VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3*24, 6*60, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (7, '应用-指标（秒级）', 'flow_metrics.application*', 1, 1*24, @lcuuid);
@@ -2137,8 +2138,8 @@ set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (8, '应用-指标（分钟级）', 'flow_metrics.application*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, query_time, lcuuid)
+                 VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3*24, 6*60, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (10, '网络-TCP 时序数据', 'flow_log.l4_packet', 0, 3*24, @lcuuid);
@@ -2170,8 +2171,8 @@ set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (20, '日志-日志数据', 'application_log.log', 1, 30*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, query_time, lcuuid)
+                 VALUES (20, '日志-日志数据', 'application_log.log', 1, 30*24, 6*60, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (21, '网络-指标（小时级）', 'flow_metrics.network*', 2, 3600, 30*24, 'Sum', 'Avg', @lcuuid);
