@@ -219,6 +219,7 @@ fn set_linkage() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn compile_wasm_plugin_proto() -> Result<()> {
     tonic_build::configure()
         .build_server(false)
@@ -276,7 +277,7 @@ fn make_brpc_proto() -> Result<()> {
 
 fn main() -> Result<()> {
     set_build_info()?;
-    compile_wasm_plugin_proto()?;
+    // compile_wasm_plugin_proto()?;
     make_pulsar_proto()?;
     make_brpc_proto()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
