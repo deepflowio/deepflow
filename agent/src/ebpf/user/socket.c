@@ -47,6 +47,7 @@
 #include "socket_trace_bpf_kylin.c"
 #include "socket_trace_bpf_kfunc.c"
 #include "socket_trace_bpf_rt.c"
+#include "socket_trace_bpf_kprobe.c"
 
 static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
@@ -371,11 +372,82 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	}
 }
 
+static inline void __config_kprobe(struct tracer_probes_conf *tps,
+				   const char *name_1,
+				   const char *name_2,
+				   const char *syscall_name)
+{
+	/*
+	 * In Linux 4.17+, use sys_write, sys_read, sys_sendto, sys_recvfrom;
+	 * otherwise, use ksys_write, ksys_read, __sys_sendto, __sys_recvfrom
+	 * 
+	 */
+	if (kallsyms_lookup_name(name_1))
+		probes_set_symbol(tps, name_1);
+	else if (kallsyms_lookup_name(name_2))
+		probes_set_symbol(tps, name_2);
+	else
+		ebpf_warning("Missing system call '%s()'\n",
+			     syscall_name);
+}
+
+static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
+{
+	__config_kprobe(tps, "ksys_write", "sys_write", "write");
+	__config_kprobe(tps, "ksys_read", "sys_read", "read");
+	__config_kprobe(tps, "__sys_sendto", "sys_sendto", "sendto");
+	__config_kprobe(tps, "__sys_recvfrom", "sys_recvfrom", "recvfrom");
+	probes_set_symbol(tps, "__sys_sendmsg");
+	probes_set_symbol(tps, "__sys_sendmmsg");
+	probes_set_symbol(tps, "__sys_recvmsg");
+	probes_set_symbol(tps, "__sys_recvmmsg");
+
+	if (k_version == KERNEL_VERSION(3, 10, 0)) {
+		/*
+		 * The Linux 3.10 kernel interface for Redhat7 and
+		 * Centos7 is sys_writev() and sys_readv()
+		 */
+		probes_set_symbol(tps, "sys_writev");
+		probes_set_symbol(tps, "sys_readv");
+	} else {
+		probes_set_symbol(tps, "do_writev");
+		probes_set_symbol(tps, "do_readv");
+	}
+
+	/*
+	 * Different CPU architectures have variations in system calls.
+	 * It is necessary to confirm whether a specific system call exists.
+	 * You can check https://arm64.syscall.sh/ for reference.
+	 */
+	if (kallsyms_lookup_name("sys_fork"))
+		probes_set_exit_symbol(tps, "sys_fork");
+
+	if (kallsyms_lookup_name("sys_clone"))
+		probes_set_exit_symbol(tps, "sys_clone");
+
+#if defined(__x86_64__)
+	probes_set_enter_symbol(tps, "__x64_sys_getppid");
+#else
+	if (kallsyms_lookup_name("__arm64_sys_getppid"))
+		probes_set_enter_symbol(tps, "__arm64_sys_getppid");
+	else
+		probes_set_enter_symbol(tps, "sys_getppid");
+#endif
+
+	probes_set_exit_symbol(tps, "__sys_accept4");
+	probes_set_enter_symbol(tps, "__close_fd");
+	probes_set_exit_symbol(tps, "__sys_socket");
+	probes_set_enter_symbol(tps, "__sys_connect");
+	probes_set_exit_symbol(tps, "do_execveat");
+	probes_set_exit_symbol(tps, "do_execve");
+}
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	if (g_k_type == K_TYPE_KFUNC)
 		config_probes_for_kfunc(tps);
+	else if (g_k_type == K_TYPE_KPROBE)
+		config_probes_for_kprobe(tps);
 	else
 		config_probes_for_kprobe_and_tracepoint(tps);
 }
@@ -2055,9 +2127,11 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 			   MAP_PROGS_JMP_TP_NAME,
 			   PROG_OUTPUT_DATA_NAME_FOR_TP,
 			   PROG_OUTPUT_DATA_TP_IDX);
-	insert_prog_to_map(tracer,
-			   MAP_PROGS_JMP_TP_NAME,
-			   PROG_IO_EVENT_NAME_FOR_TP, PROG_IO_EVENT_TP_IDX);
+	if (g_k_type != K_TYPE_KPROBE)
+		insert_prog_to_map(tracer,
+				   MAP_PROGS_JMP_TP_NAME,
+				   PROG_IO_EVENT_NAME_FOR_TP,
+				   PROG_IO_EVENT_TP_IDX);
 
 	// jmp for kprobe/uprobe
 	insert_prog_to_map(tracer,
@@ -2071,6 +2145,11 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 			   MAP_PROGS_JMP_KP_NAME,
 			   PROG_OUTPUT_DATA_NAME_FOR_KP,
 			   PROG_OUTPUT_DATA_KP_IDX);
+	if (g_k_type == K_TYPE_KPROBE)
+		insert_prog_to_map(tracer,
+				   MAP_PROGS_JMP_KP_NAME,
+				   PROG_IO_EVENT_NAME_FOR_KP,
+				   PROG_IO_EVENT_KP_IDX);
 }
 
 /*
@@ -2251,27 +2330,20 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 	return ETR_OK;
 }
 
-static int check_dependencies(void)
+static bool has_ftrace_syscalls(void)
 {
-	if (check_kernel_version(4, 12) != 0) {
-		return -1;
+	if (access(FTRACE_SYSCALLS_PATH, F_OK) != 0) {
+		ebpf_info("Directory %s does not exist.\n",
+			  FTRACE_SYSCALLS_PATH);
+		return false;
 	}
 
-	if (access(FTRACE_SYSCALLS_PATH, F_OK) != 0) {
-		ebpf_warning("Directory %s does not exist. deepflow-agent "
-			     "relies on the kernel compilation option "
-			     "'CONFIG_FTRACE_SYSCALLS'. Please ensure that "
-			     "this kernel compilation option is enabled (when "
-			     "enabled, it will display CONFIG_FTRACE_SYSCALLS=y). "
-			     "Generally, you can check the Linux kernel compilation"
-			     " options through the file `/boot/config-<current running"
-			     " Linux kernel version>`. If the compilation option is "
-			     "enabled but the `%s`"
-			     " directory is still missing, it may be due to a missing "
-			     "mount. Please manually execute the command `mount -t tracefs"
-			     " nodev /sys/kernel/debug/tracing` on the node to attempt to "
-			     "resolve the issue.\n", FTRACE_SYSCALLS_PATH,
-			     FTRACE_SYSCALLS_PATH);
+	return true;
+}
+
+static int check_dependencies(void)
+{
+	if (check_kernel_version(4, 14) != 0) {
 		return -1;
 	}
 
@@ -2289,7 +2361,12 @@ static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	if (is_rt_kernel()) {
+	if (!has_ftrace_syscalls()) {
+		g_k_type = K_TYPE_KPROBE;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kprobe");
+		bpf_bin_buffer = (void *)socket_trace_kprobe_ebpf_data;
+		buffer_sz = sizeof(socket_trace_kprobe_ebpf_data);
+	} else if (is_rt_kernel()) {
 		g_k_type = K_TYPE_RT;
 		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-rt");
 		bpf_bin_buffer = (void *)socket_trace_rt_ebpf_data;
@@ -3453,3 +3530,7 @@ void enable_kprobe_feature(void)
 	ebpf_info("Kprobe feature has been enabled.\n");
 }
 
+bool is_pure_kprobe_ebpf(void)
+{
+	return g_k_type == K_TYPE_KPROBE;
+}

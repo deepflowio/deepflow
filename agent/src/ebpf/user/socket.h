@@ -51,6 +51,7 @@ enum linux_kernel_type {
 	K_TYPE_VER_3_10,
 	K_TYPE_KFUNC,
 	K_TYPE_RT,
+	K_TYPE_KPROBE,
 };
 
 enum probes_act_type {
@@ -430,4 +431,5 @@ void disable_kprobe_feature(void);
  * for monitoring and tracing specific points in the kernel.
  */
 void enable_kprobe_feature(void);
+bool is_pure_kprobe_ebpf(void);
 #endif /* DF_USER_SOCKET_H */
