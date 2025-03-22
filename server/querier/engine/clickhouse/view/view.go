@@ -209,10 +209,7 @@ func (v *View) trans() {
 				} else {
 					metricTag.Value = node.Value
 				}
-				// remove auto ip tag
-				if !strings.HasPrefix(node.Value, "auto_instance_ip") && !strings.HasPrefix(node.Value, "auto_service_ip") {
-					tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
-				}
+				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
 				tagsAliasInner = append(tagsAliasInner, metricTag.Value)
 			} else if node.Flag == NODE_FLAG_METRICS_INNER {
 				metricsLevelInner = append(metricsLevelInner, tag)
@@ -284,16 +281,8 @@ func (v *View) trans() {
 	if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		// 计算层不拆层
 		// 里层tag+外层metric
-		// remove auto ip tag
-		newTagsInner := []Node{}
-		for _, tagInner := range tagsLevelInner {
-			node, ok := tagInner.(*Tag)
-			if ok && !strings.HasPrefix(node.Value, "auto_instance_ip") && !strings.HasPrefix(node.Value, "auto_service_ip") {
-				newTagsInner = append(newTagsInner, tagInner)
-			}
-		}
 		sv := SubView{
-			Tags:       &Tags{tags: append(newTagsInner, metricsLevelMetrics...)},
+			Tags:       &Tags{tags: append(tagsLevelInner, metricsLevelMetrics...)},
 			Groups:     v.Model.Groups,
 			From:       v.Model.From,
 			Filters:    v.Model.Filters,
