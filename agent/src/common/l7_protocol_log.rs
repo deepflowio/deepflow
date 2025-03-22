@@ -241,7 +241,7 @@ impl L7ParseResult {
     pub fn unwrap_single(self) -> L7ProtocolInfo {
         match self {
             L7ParseResult::Single(s) => s,
-            L7ParseResult::Multi(_) => panic!("parse result is mutli but unwrap single"),
+            L7ParseResult::Multi(_) => panic!("parse result is multi but unwrap single"),
             L7ParseResult::None => panic!("parse result is none but unwrap single"),
         }
     }
