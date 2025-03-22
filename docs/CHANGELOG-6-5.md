@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: trisolaris connect mysql failed [#9341](https://github.com/deepflowio/deepflow/pull/9341) by [askyrie](https://github.com/askyrie)
 * fix: wan type cidr may not be tagged [#8813](https://github.com/deepflowio/deepflow/pull/8813) by [lzf575](https://github.com/lzf575)
 * fix: the throttler cannot write all data to the queue at once [#8793](https://github.com/deepflowio/deepflow/pull/8793) by [lzf575](https://github.com/lzf575)
 * fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
