@@ -36,6 +36,7 @@ import (
 func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {
 	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(k.orgID))
 	hostIPToNodeIPs := map[string][]string{}
+	hostIPToNodeLcuuid := map[string]string{}
 	deviceUUIDToPodLcuuid := map[string]string{}
 	vinterfaceLcuuids := mapset.NewSet()
 	subnetLcuuidToCIDR := map[string]netaddr.IPPrefix{}
@@ -76,14 +77,21 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		if deviceType == "docker-host" || deviceType == "kvm-host" {
 			nIPs := []string{}
 			IPSlice := strings.Split(vItem.IPs, ",")
+			hostIP := vItem.HostIP
+
 			for _, j := range IPSlice {
 				if j == "" {
 					continue
 				}
 				vIP := strings.Split(j, "/")[0]
 				nIPs = append(nIPs, vIP)
+
+				// 生成 hostIPToNodeLcuuid，便于挂载没有IP的node vinterface
+				if nodeLcuuid, ok := k.nodeIPToLcuuid[vIP]; ok {
+					hostIPToNodeLcuuid[hostIP] = nodeLcuuid
+				}
 			}
-			hostIP := vItem.HostIP
+
 			_, ok := hostIPToNodeIPs[hostIP]
 			if ok {
 				hostIPToNodeIPs[hostIP] = append(hostIPToNodeIPs[hostIP], nIPs...)
@@ -425,7 +433,32 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 		}
 		if len(nodeIPSlice) == 0 {
-			log.Infof("vinterface,ip (%s) node not found", nMAC, logger.NewORGPrefix(k.orgID))
+			// 对于没有IP的node网卡，如果名称符合PortNameRegex，则进行网卡挂载
+			if k.PortNameRegex == "" || !portNameRegex.MatchString(nName) {
+				log.Infof("vinterface,ip vinterface name (%s) not match", nName, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nMAC)
+			nodeLcuuid, ok := hostIPToNodeLcuuid[hostIP]
+			if !ok {
+				log.Infof("vinterface,ip host ip (%s) not found node", hostIP, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			vinterface := model.VInterface{
+				Lcuuid:        vinterfaceLcuuid,
+				Type:          common.VIF_TYPE_WAN,
+				Mac:           nMAC,
+				NetnsID:       vItem.NetnsID,
+				VTapID:        vItem.VtapID,
+				DeviceLcuuid:  nodeLcuuid,
+				DeviceType:    common.VIF_DEVICE_TYPE_POD_NODE,
+				NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
+				VPCLcuuid:     k.VPCUUID,
+				RegionLcuuid:  k.RegionUUID,
+			}
+			nodeVInterfaces = append(nodeVInterfaces, vinterface)
+			nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
+			// 对于没有IP的网卡，无须处理IP信息
 			continue
 		}
 
