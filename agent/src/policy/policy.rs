@@ -42,6 +42,7 @@ use crate::common::policy::{
 use crate::common::MetaPacket;
 use crate::common::TapPort;
 use crate::common::{FlowAclListener, FlowAclListenerId};
+use crate::utils::environment::{is_tt_pod, is_tt_workload};
 use npb_pcap_policy::PolicyData;
 use public::proto::agent::{AgentType, RoleType};
 use public::queue::Sender;
@@ -645,7 +646,10 @@ impl FlowAclListener for PolicySetter {
         cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
     ) -> Result<(), String> {
-        self.update_local_epc(local_epc);
+        self.update_local_epc(
+            local_epc,
+            is_tt_pod(agent_type) || is_tt_workload(agent_type),
+        );
         self.update_interfaces(agent_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
@@ -672,8 +676,10 @@ impl PolicySetter {
         unsafe { &mut *self.policy }
     }
 
-    pub fn update_local_epc(&mut self, local_epc: i32) {
-        self.policy().labeler.update_local_epc(local_epc);
+    pub fn update_local_epc(&mut self, local_epc: i32, running_in_single_epc: bool) {
+        self.policy()
+            .labeler
+            .update_local_epc(local_epc, running_in_single_epc);
     }
 
     pub fn update_interfaces(&mut self, agent_type: AgentType, ifaces: &Vec<Arc<PlatformData>>) {
