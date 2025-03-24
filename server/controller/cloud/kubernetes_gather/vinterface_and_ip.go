@@ -429,6 +429,32 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			continue
 		}
 
+		// 对于没有IP的网卡，如果名称符合PortNameRegex，则进行网卡挂载
+		if vItem.IPs == "" && k.PortNameRegex != "" && portNameRegex.MatchString(nName) {
+			vinterfaceLcuuid := common.GetUUIDByOrgID(k.orgID, k.UuidGenerate+nMAC)
+			nodeLcuuid, ok := hostIPToNodeLcuuid[hostIP]
+			if !ok {
+				log.Infof("vinterface,ip (%s) node not found", nMAC, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			vinterface := model.VInterface{
+				Lcuuid:        vinterfaceLcuuid,
+				Type:          common.VIF_TYPE_WAN,
+				Mac:           nMAC,
+				NetnsID:       vItem.NetnsID,
+				VTapID:        vItem.VtapID,
+				DeviceLcuuid:  nodeLcuuid,
+				DeviceType:    common.VIF_DEVICE_TYPE_POD_NODE,
+				NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
+				VPCLcuuid:     k.VPCUUID,
+				RegionLcuuid:  k.RegionUUID,
+			}
+			nodeVInterfaces = append(nodeVInterfaces, vinterface)
+			nodeVinterfaceLcuuids.Add(vinterfaceLcuuid)
+			// 对于没有IP的网卡，无须处理IP信息
+			continue
+		}
+
 		nodeIP := nodeIPSlice[0]
 		IPs := strings.Split(vItem.IPs, ",")
 		for _, ipString := range IPs {
