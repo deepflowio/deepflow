@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -69,15 +70,6 @@ func isPodVTap(vtapType int) bool {
 
 type UpgradeEvent struct{}
 
-type UpgradeData struct {
-	content  []byte
-	totalLen uint64
-	pktCount uint32
-	md5Sum   string
-	step     uint64
-	k8sImage string
-}
-
 func NewUpgradeEvent() *UpgradeEvent {
 	return &UpgradeEvent{}
 }
@@ -93,7 +85,7 @@ func sendFailed(in api.Synchronizer_UpgradeServer) error {
 	return err
 }
 
-func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision string, orgID int) (*UpgradeData, error) {
+func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision string, orgID int) (*common.UpgradeData, error) {
 	if upgradePackage == "" {
 		return nil, fmt.Errorf("image(%s) file does not exist", upgradePackage)
 	}
@@ -104,7 +96,7 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 	cacheKey := fmt.Sprintf("%d-%s", orgID, upgradePackage)
 	imageCace, found := trisolaris.GetImageCache(cacheKey)
 	if found {
-		return imageCace.(*UpgradeData), nil
+		return imageCace.(*common.UpgradeData), nil
 	}
 	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](db.DB).GetFromName(upgradePackage)
 	if err != nil {
@@ -121,13 +113,13 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
 	cipherStr := md5.Sum(content)
 	md5Sum := fmt.Sprintf("%x", cipherStr)
-	upgradeData := &UpgradeData{
-		content:  content,
-		totalLen: totalLen,
-		pktCount: pktCount,
-		md5Sum:   md5Sum,
-		step:     step,
-		k8sImage: vtapRrepo.K8sImage,
+	upgradeData := &common.UpgradeData{
+		Content:  content,
+		TotalLen: totalLen,
+		PktCount: pktCount,
+		Md5Sum:   md5Sum,
+		Step:     step,
+		K8sImage: vtapRrepo.K8sImage,
 	}
 	trisolaris.SetImageCache(cacheKey, upgradeData)
 	return upgradeData, nil
@@ -157,24 +149,24 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 	if isPodVTap(vtapCache.GetVTapType()) {
 		response := &api.UpgradeResponse{
 			Status:   &STATUS_SUCCESS,
-			K8SImage: proto.String(upgradeData.k8sImage),
+			K8SImage: proto.String(upgradeData.K8sImage),
 		}
 		err = in.Send(response)
 		if err != nil {
 			log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 		}
 	} else {
-		for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {
-			end := start + upgradeData.step
-			if end > upgradeData.totalLen {
-				end = upgradeData.totalLen
+		for start := uint64(0); start < upgradeData.TotalLen; start += upgradeData.Step {
+			end := start + upgradeData.Step
+			if end > upgradeData.TotalLen {
+				end = upgradeData.TotalLen
 			}
 			response := &api.UpgradeResponse{
 				Status:   &STATUS_SUCCESS,
-				Content:  upgradeData.content[start:end],
-				Md5:      proto.String(upgradeData.md5Sum),
-				PktCount: proto.Uint32(upgradeData.pktCount),
-				TotalLen: proto.Uint64(upgradeData.totalLen),
+				Content:  upgradeData.Content[start:end],
+				Md5:      proto.String(upgradeData.Md5Sum),
+				PktCount: proto.Uint32(upgradeData.PktCount),
+				TotalLen: proto.Uint64(upgradeData.TotalLen),
 			}
 			err = in.Send(response)
 			if err != nil {
