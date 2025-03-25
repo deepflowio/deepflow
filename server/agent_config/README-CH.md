@@ -8245,7 +8245,7 @@ outputs:
 当使用 RAW_UDP 发送数据时，可以开启该特性以提升数据发送的性能。注意：（1）该特性需要
 Linux Kernel >= 3.14；（2）特性开启后，发送的数据包无法被 tcpdump 捕获。
 
-### Multiple Sockets To Ingester {#outputs.socket.multiple_sockets_to_ingester}
+### 使用多个 Ingester Socket {#outputs.socket.multiple_sockets_to_ingester}
 
 **标签**:
 
