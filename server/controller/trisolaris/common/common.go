@@ -137,3 +137,12 @@ var (
 	AGENT_KWP_WATCH_ONLY     = agent.KubernetesWatchPolicy_KWP_WATCH_ONLY
 	AGENT_KWP_WATCH_DISABLED = agent.KubernetesWatchPolicy_KWP_WATCH_DISABLED
 )
+
+type UpgradeData struct {
+	Content  []byte
+	TotalLen uint64
+	PktCount uint32
+	Md5Sum   string
+	Step     uint64
+	K8sImage string
+}
