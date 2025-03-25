@@ -5584,7 +5584,9 @@ outputs:
     # upgrade_from: static_config.enable-qos-bypass
     raw_udp_qos_bypass: false
     # type: bool
-    # name: Multiple Sockets To Ingester
+    # name:
+    #   en: Multiple Sockets To Ingester
+    #   ch: 使用多个 Ingester Socket
     # unit:
     # range: []
     # enum_options: []
