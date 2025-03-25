@@ -138,7 +138,10 @@ func NewGenesisSyncRpcUpdater(cfg config.GenesisConfig) *GenesisSyncRpcUpdater {
 }
 
 func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(orgID int, teamID, vtapID uint32, peer, deviceType string, message *agent.GenesisSyncRequest) []model.GenesisVinterface {
-	isContainer := deviceType == common.DEVICE_TYPE_DOCKER_HOST
+	var isContainer bool
+	if deviceType == common.DEVICE_TYPE_DOCKER_HOST {
+		isContainer = true
+	}
 	epoch := time.Now()
 	k8sClusterID := message.GetKubernetesClusterId()
 	VIFs := []model.GenesisVinterface{}
@@ -188,6 +191,11 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(orgID int, teamID, vtapID ui
 				Mac:     item.MAC,
 				TapName: item.Name,
 				TapMac:  item.MAC,
+			}
+			// ignore interfaces without ip for container nodes
+			// but keep these for kvm hosts
+			if isContainer && len(item.IPs) == 0 {
+				continue
 			}
 			ipSlice := []string{}
 			for _, ip := range item.IPs {
