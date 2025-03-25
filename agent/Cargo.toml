@@ -82,11 +82,6 @@ prost.workspace = true
 public = { path = "crates/public" }
 rand = "0.8.5"
 regex.workspace = true
-reqwest = { version = "0.11", default-features = false, features = [
-    "blocking",
-    "json",
-    "rustls-tls",
-] }
 ring = "0.16.20"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }
