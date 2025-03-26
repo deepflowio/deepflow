@@ -78,6 +78,9 @@ func GetAgentCMDManagerWithoutLock(key string) *CMDManager {
 func AddToCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 	agentCMDMutex.Lock()
 	defer agentCMDMutex.Unlock()
+	for key, _ := range agentCMDManager {
+		log.Info(key)
+	}
 	if _, ok := agentCMDManager[key]; ok {
 		return agentCMDManager[key]
 	}

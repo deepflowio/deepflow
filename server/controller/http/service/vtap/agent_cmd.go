@@ -111,6 +111,11 @@ func RemoveAllFromCMDManager(key string) {
 		return
 	}
 
+	time.Sleep(10 * time.Second)
+	for key, _ := range agentCMDManager {
+		log.Info(key)
+	}
+
 	for requestID, cmdResp := range manager.requestIDToResp {
 		errMessage := fmt.Sprintf("agent(key: %s) disconnected from the server", key)
 		AppendErrorMessage(key, requestID, &errMessage)
