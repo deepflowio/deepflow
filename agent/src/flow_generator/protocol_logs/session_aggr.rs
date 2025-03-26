@@ -15,6 +15,7 @@
  */
 
 use std::{
+    collections::VecDeque,
     fmt,
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
@@ -464,7 +465,10 @@ struct SessionQueue {
     window_start: Timestamp,
     max_timelines: usize,
     max_entries: usize,
-    entries: ChronoMap<Timestamp, u64, Box<MetaAppProto>>,
+    // The VecDeque buffers only requests or responses, and will contain at least one item.
+    // If the incoming item is the same as the items in the VecDeque, it will be appended into the VecDeque if there were space.
+    // Otherwise, the first item in the VecDeque will be removed and try to merge with the incoming item.
+    entries: ChronoMap<Timestamp, u64, VecDeque<Box<MetaAppProto>>>,
 
     counter: Arc<SessionAggrCounter>,
 
@@ -509,15 +513,143 @@ impl SessionQueue {
         .into()
     }
 
+    // returns true if the entries needs moving to another time
+    fn merge_request(
+        counter: &SessionAggrCounter,
+        config: &LogParserConfig,
+        sender: &mut BufferSender,
+        buffered: &mut VecDeque<Box<MetaAppProto>>,
+        mut req: Box<MetaAppProto>,
+    ) -> bool {
+        assert_eq!(req.base_info.head.msg_type, LogMessageType::Request);
+        assert!(!buffered.is_empty());
+
+        let front = buffered.front().unwrap();
+        // if the items in buffer are requests, append the incoming item to the buffer if it's not full
+        // when the buffer is full, send the incoming item directly because buffer items are more like to match later responses in order
+        if front.base_info.head.msg_type == LogMessageType::Request {
+            if buffered.len() >= config.l7_log_session_aggr_buffer_size {
+                sender.send(req, None);
+            } else {
+                counter.cached.fetch_add(1, Ordering::Relaxed);
+                counter.cached_request_resource.fetch_add(
+                    req.l7_info.get_request_resource_length() as u64,
+                    Ordering::Relaxed,
+                );
+                buffered.push_back(req);
+            }
+            return false;
+        }
+
+        // if the first response in buffer is before the incoming item, send all buffered items and cache the incoming
+        if front.base_info.start_time <= req.base_info.start_time {
+            counter
+                .cached
+                .fetch_sub(buffered.len() as u64, Ordering::Relaxed);
+            let mut total_size = 0;
+            for resp in buffered.drain(..) {
+                total_size += resp.l7_info.get_request_resource_length();
+                sender.send(resp, None);
+            }
+            counter
+                .cached_request_resource
+                .fetch_sub(total_size as u64, Ordering::Relaxed);
+
+            counter.cached.fetch_add(1, Ordering::Relaxed);
+            counter.cached_request_resource.fetch_add(
+                req.l7_info.get_request_resource_length() as u64,
+                Ordering::Relaxed,
+            );
+            buffered.push_back(req);
+            return true;
+        }
+
+        // merge the first response with the incoming and send the merged
+        let mut resp = buffered.pop_front().unwrap();
+        counter.cached.fetch_sub(1, Ordering::Relaxed);
+        counter.cached_request_resource.fetch_sub(
+            resp.l7_info.get_request_resource_length() as u64,
+            Ordering::Relaxed,
+        );
+
+        if req.session_merge(&mut resp).is_ok() {
+            counter.merge.fetch_add(1, Ordering::Relaxed);
+            sender.send(req, None);
+        } else {
+            sender.send(req, None);
+            sender.send(resp, None);
+        }
+
+        true
+    }
+
+    // returns true if the entries needs moving to another time
+    fn merge_response(
+        counter: &SessionAggrCounter,
+        config: &LogParserConfig,
+        sender: &mut BufferSender,
+        buffered: &mut VecDeque<Box<MetaAppProto>>,
+        mut resp: Box<MetaAppProto>,
+    ) -> bool {
+        assert_eq!(resp.base_info.head.msg_type, LogMessageType::Response);
+        assert!(!buffered.is_empty());
+
+        let front = buffered.front().unwrap();
+        // if the items in buffer are responses, append the incoming item to the buffer if it's not full
+        // when the buffer is full, send the incoming item directly because buffer items are more like to match later requests in order
+        if front.base_info.head.msg_type == LogMessageType::Response {
+            if buffered.len() >= config.l7_log_session_aggr_buffer_size {
+                sender.send(resp, None);
+            } else {
+                counter.cached.fetch_add(1, Ordering::Relaxed);
+                counter.cached_request_resource.fetch_add(
+                    resp.l7_info.get_request_resource_length() as u64,
+                    Ordering::Relaxed,
+                );
+                buffered.push_back(resp);
+            }
+            return false;
+        }
+
+        // if the first request in buffer is later than the incoming item, send the incoming item directly
+        if front.base_info.start_time >= resp.base_info.start_time {
+            sender.send(resp, None);
+            return false;
+        }
+
+        // merge the first request with the incoming and send the merged
+        let mut req = buffered.pop_front().unwrap();
+        counter.cached.fetch_sub(1, Ordering::Relaxed);
+        counter.cached_request_resource.fetch_sub(
+            req.l7_info.get_request_resource_length() as u64,
+            Ordering::Relaxed,
+        );
+
+        if req.session_merge(&mut resp).is_ok() {
+            counter.merge.fetch_add(1, Ordering::Relaxed);
+            sender.send(req, None);
+        } else {
+            sender.send(req, None);
+            sender.send(resp, None);
+        }
+
+        true
+    }
+
     fn aggregate_session_and_send(&mut self, config: &LogParserConfig, item: AppProto) {
         if let AppProto::SocketClosed(s) = item {
             if let Some(p) = self.entries.remove(&s) {
-                self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                self.counter.cached_request_resource.fetch_sub(
-                    p.l7_info.get_request_resource_length() as u64,
-                    Ordering::Relaxed,
-                );
-                self.bs.send(p, None);
+                self.counter
+                    .cached
+                    .fetch_sub(p.len() as u64, Ordering::Relaxed);
+                let mut res_len = 0;
+                for log in p {
+                    res_len += log.l7_info.get_request_resource_length();
+                    self.bs.send(log, None);
+                }
+                self.counter
+                    .cached_request_resource
+                    .fetch_sub(res_len as u64, Ordering::Relaxed);
             }
             self.counter.receive.fetch_add(1, Ordering::Relaxed);
             return;
@@ -558,8 +690,10 @@ impl SessionQueue {
 
         let timeout_time = item.base_info.start_time + Self::get_timeout(config, &item);
         let key = item.calc_key();
-        if let Some(v) = self.entries.get_mut(&key) {
+        if let Some(vs) = self.entries.get_mut(&key) {
             if item.need_protocol_merge() {
+                // the Vec will contain one and only one item in this situation
+                let v = vs.front_mut().unwrap();
                 let _ = v.session_merge(&mut item);
                 if v.l7_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -567,61 +701,30 @@ impl SessionQueue {
                         v.l7_info.get_request_resource_length() as u64,
                         Ordering::Relaxed,
                     );
-                    self.bs.send(self.entries.remove(&key).unwrap(), None);
+                    self.bs.send(
+                        self.entries.remove(&key).unwrap().pop_front().unwrap(),
+                        None,
+                    );
                 }
             } else {
-                match item.base_info.head.msg_type {
-                    // normal order, but if can not merge, send req and resp directly.
-                    LogMessageType::Response
-                        if v.is_request() && item.base_info.start_time > v.base_info.start_time =>
-                    {
-                        if let Err(_) = v.session_merge(&mut item) {
-                            self.bs.send(item, None);
-                        }
-                        self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                        self.counter.cached_request_resource.fetch_sub(
-                            v.l7_info.get_request_resource_length() as u64,
-                            Ordering::Relaxed,
-                        );
-                        self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        self.bs.send(self.entries.remove(&key).unwrap(), None);
+                let time_update = match item.base_info.head.msg_type {
+                    LogMessageType::Request => {
+                        Self::merge_request(&self.counter, config, &mut self.bs, vs, item)
                     }
-                    // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
-                    LogMessageType::Request
-                        if v.is_response()
-                            && v.base_info.start_time > item.base_info.start_time =>
-                    {
-                        // if can not merge, send req and resp directly.
-                        self.counter.cached_request_resource.fetch_sub(
-                            v.l7_info.get_request_resource_length() as u64,
-                            Ordering::Relaxed,
-                        );
-                        let mut v = self.entries.remove(&key).unwrap();
-                        if let Err(_) = item.session_merge(&mut v) {
-                            self.bs.send(v, None);
-                        }
-                        self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                        self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        self.bs.send(item, None);
+                    LogMessageType::Response => {
+                        Self::merge_response(&self.counter, config, &mut self.bs, vs, item)
                     }
-                    // if entry and item cannot merge, send the early one and cache the other
                     _ => {
-                        if v.base_info.start_time > item.base_info.start_time {
-                            self.bs.send(item, None);
-                        } else {
-                            // swap out old item and send
-                            self.counter.cached_request_resource.fetch_sub(
-                                v.l7_info.get_request_resource_length() as u64,
-                                Ordering::Relaxed,
-                            );
-                            self.bs.send(self.entries.remove(&key).unwrap(), None);
-                            self.counter.cached_request_resource.fetch_add(
-                                item.l7_info.get_request_resource_length() as u64,
-                                Ordering::Relaxed,
-                            );
-                            self.entries.insert(timeout_time, key, item);
-                        }
+                        self.bs.send(item, None);
+                        false
                     }
+                };
+                if vs.is_empty() {
+                    self.entries.remove(&key);
+                } else if time_update {
+                    let front = vs.front().unwrap();
+                    let new_timeout = front.base_info.start_time + Self::get_timeout(config, front);
+                    self.entries.move_to_time(&key, new_timeout);
                 }
             }
             return;
@@ -638,26 +741,36 @@ impl SessionQueue {
 
         if self.entries.len() >= self.max_entries {
             self.counter.over_limit.fetch_add(1, Ordering::Relaxed);
-            if let Some(v) = self.entries.remove_oldest() {
-                self.counter.cached_request_resource.fetch_sub(
-                    v.l7_info.get_request_resource_length() as u64,
-                    Ordering::Relaxed,
-                );
-                self.bs.send(v, None);
+            if let Some(vs) = self.entries.remove_oldest() {
+                self.counter
+                    .cached
+                    .fetch_sub(vs.len() as u64, Ordering::Relaxed);
+                let mut total_size = 0;
+                for v in vs {
+                    total_size += v.l7_info.get_request_resource_length();
+                    self.bs.send(v, None);
+                }
+                self.counter
+                    .cached_request_resource
+                    .fetch_sub(total_size as u64, Ordering::Relaxed);
             }
             return;
         }
 
+        self.counter.cached.fetch_add(1, Ordering::Relaxed);
         self.counter.cached_request_resource.fetch_add(
             item.l7_info.get_request_resource_length() as u64,
             Ordering::Relaxed,
         );
-        self.entries.insert(timeout_time, key, item);
+        self.entries
+            .insert(timeout_time, key, VecDeque::from([item]));
     }
 
     fn flush(&mut self) {
-        for item in self.entries.drain(..) {
-            self.bs.send(item, None);
+        for items in self.entries.drain(..) {
+            for item in items {
+                self.bs.send(item, None);
+            }
         }
         self.bs.flush();
         self.counter.cached.store(0, Ordering::Relaxed);
@@ -668,10 +781,19 @@ impl SessionQueue {
         self.entries.shrink_to(self.max_entries, self.max_timelines);
     }
 
-    fn flush_till(&mut self, time: Timestamp) {
-        self.entries.forward_time(time, |item| {
-            self.bs.send(item.clone(), Some(L7ResponseStatus::Timeout));
-            None
+    fn flush_till(&mut self, config: &LogParserConfig, time: Timestamp) {
+        self.entries.forward_time(time, |items| {
+            items.retain(|item| {
+                if item.base_info.start_time <= time {
+                    self.bs.send(item.clone(), Some(L7ResponseStatus::Timeout));
+                    false
+                } else {
+                    true
+                }
+            });
+            items
+                .get(0)
+                .map(|item| item.base_info.start_time + Self::get_timeout(config, item))
         });
         // update timestamp
         self.window_start = time;
@@ -770,7 +892,7 @@ impl SessionAggregator {
                             }
                         }
                     };
-                    session_queue.flush_till(flush_timestamp);
+                    session_queue.flush_till(&config, flush_timestamp);
                     if config.l7_log_session_aggr_max_timeout.as_secs() as usize
                         != session_queue.max_timelines
                     {

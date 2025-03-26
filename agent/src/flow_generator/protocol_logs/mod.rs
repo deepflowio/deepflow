@@ -19,11 +19,11 @@ pub(crate) mod dns;
 pub(crate) mod fastcgi;
 pub(crate) mod http;
 pub(crate) mod mq;
-mod parser;
 pub mod pb_adapter;
 pub(crate) mod ping;
 pub(crate) mod plugin;
 pub(crate) mod rpc;
+mod session_aggr;
 pub(crate) mod sql;
 pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
@@ -34,12 +34,12 @@ pub use mq::{
     OpenWireLog, PulsarInfo, PulsarLog, RocketmqInfo, RocketmqLog, ZmtpInfo, ZmtpLog,
 };
 use num_enum::TryFromPrimitive;
-pub use parser::{AppProto, MetaAppProto, SessionAggregator};
 pub use ping::{PingInfo, PingLog};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
     SofaRpcLog, TarsInfo, TarsLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
+pub use session_aggr::{AppProto, MetaAppProto, SessionAggregator};
 pub use sql::{
     MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, PostgreInfo,
     PostgresqlLog, RedisInfo, RedisLog,

@@ -986,6 +986,7 @@ pub struct LogParserConfig {
     pub l7_log_session_aggr_max_entries: usize,
     pub l7_log_session_aggr_max_timeout: Duration,
     pub l7_log_session_aggr_timeout: HashMap<L7Protocol, Duration>,
+    pub l7_log_session_aggr_buffer_size: usize,
     pub l7_log_dynamic: L7LogDynamicConfig,
     pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub http_endpoint_disabled: bool,
@@ -1004,6 +1005,7 @@ impl Default for LogParserConfig {
             l7_log_session_aggr_max_entries: 16384,
             l7_log_session_aggr_max_timeout: SessionTimeout::DEFAULT,
             l7_log_session_aggr_timeout: HashMap::new(),
+            l7_log_session_aggr_buffer_size: 4,
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
             http_endpoint_disabled: false,
@@ -1035,6 +1037,10 @@ impl fmt::Debug for LogParserConfig {
             .field(
                 "l7_log_session_aggr_timeout",
                 &self.l7_log_session_aggr_timeout,
+            )
+            .field(
+                "l7_log_session_aggr_buffer_size",
+                &self.l7_log_session_aggr_buffer_size,
             )
             .field("l7_log_dynamic", &self.l7_log_dynamic)
             .field(
@@ -1885,6 +1891,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .request_log
                     .tunning
                     .session_aggregate_max_entries,
+                l7_log_session_aggr_buffer_size: 4, // TODO: fix this value
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     conf.processors
                         .request_log
