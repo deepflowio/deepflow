@@ -81,7 +81,7 @@ Upgrade from old version: `log_threshold`
 ```yaml
 global:
   limits:
-    max_log_backhaul_rate: 300
+    max_log_backhaul_rate: 36000
 ```
 
 **Schema**:
@@ -89,7 +89,7 @@ global:
 | ---- | ---------------------------- |
 | Type | int |
 | Unit | Lines/Hour |
-| Range | [0, 10000] |
+| Range | [0, 1000000] |
 
 **Description**:
 
@@ -1046,6 +1046,37 @@ global:
 **Description**:
 
 gRPC socket buffer size.
+
+### Max Throughput To Ingester {#global.communication.max_throughput_to_ingester}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.communication.max_throughput_to_ingester`
+
+**Default value**:
+```yaml
+global:
+  communication:
+    max_throughput_to_ingester: 100
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Mbps |
+| Range | [0, 10000] |
+
+**Description**:
+
+The maximum allowed flow rate for sending observability data to the server-side Ingester module.
+When this rate limit is exceeded, the data will be actively discarded,
+and the agent will be marked as abnormal and trigger an alarm.
+Setting it to 0 means no speed limit.
 
 ### Request via NAT IP Address {#global.communication.request_via_nat_ip}
 
