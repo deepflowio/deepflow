@@ -730,11 +730,13 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	__u32 len;
-	__u8 seq, com;
+	__u8 seq, com, point_1, point_2;
 
 	len = *((__u32 *) buf) & 0x00ffffff;
 	seq = buf[3];
 	com = buf[4];
+	point_1 = buf[6];
+	point_2 = buf[8];
 
 	if (conn_info->prev_count == 4) {
 		len = *(__u32 *) conn_info->prev_buf & 0x00ffffff;
@@ -742,6 +744,8 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 			seq = conn_info->prev_buf[3];
 			count += 4;
 			com = buf[0];
+			point_1 = buf[2];
+			point_2 = buf[4];
 		}
 	}
 
@@ -750,8 +754,17 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 	bool is_mysqld = is_current_comm("mysqld");
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		if (seq == 0 || seq == 1)
+		/*
+		 * Ensure the authentication response packet is captured
+		 * and distinguish it based on the 5th byte (Payload start):  
+		 *
+		 * - **Authentication Success (OK Packet):** `0x00`  
+		 * - **Authentication Failure (ERR Packet):** `0xFF`  
+		 * - **Authentication Switch Request (Auth Switch Request):** `0xFE`
+		 */
+		if (seq <= 1 || (seq == 2 && (com == 0x0 || com == 0xFF || com == 0xFE)))
 			goto out;
+
 		return MSG_UNKNOWN;
 	}
 
@@ -783,6 +796,28 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	// 请求长度判断来提高推断准确率。
 	if (len > 10000) {
 		return MSG_UNKNOWN;
+	}
+
+	/*
+	 * After establishing a connection, the MySQL server sends a handshake packet.
+	 * The process is as follows:  
+	 * - **Server > Client (Handshake Packet)**  
+	 *   The server sends this handshake packet, which includes the MySQL version,
+	 *   thread ID, authentication method, and other information.  
+	 * - **Client > Server (Login Request Packet)**  
+	 *   The client computes the encrypted password based on `auth-plugin-data` and
+	 *   sends it back to the server for verification.  
+	 * - **Server > Client (Login Success or Failure)**  
+	 *   The server verifies the client's identity and returns either an **OK Packet** or an **ERR Packet**.
+	 *
+	 * The handshake packet sent by the server is used for identification.
+	 * 0x0A indicates the current mainstream protocol version (MySQL 4.1+).
+	 * e.g.: 4A(J) 00 00 00 0A 35(5) 2E(.) 37(7) 2E(.) 31(1) 38(8) 00
+	 * **35 2E 37 2E 31 38 00 ASCII decoding results in 5.7.18 (MySQL 5.7.18).**
+	 * If the data contains a version string in the format x.x.x, it is highly likely to be MySQL.
+	 */
+	if (com == 0x0A && point_1 == 0x2e && point_2 == 0x2e) {
+		return MSG_REQUEST;
 	}
 
 	if (com != kComConnect && com != kComQuery &&
