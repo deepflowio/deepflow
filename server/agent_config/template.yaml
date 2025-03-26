@@ -51,7 +51,7 @@ global:
     #   en: Maximum Log Backhaul Rate
     #   ch: 日志每小时回传上限
     # unit: Lines/Hour
-    # range: [0, 10000]
+    # range: [0, 1000000]
     # enum_options: []
     # modification: hot_update
     # ee_feature: false
@@ -61,7 +61,7 @@ global:
     #   ch: |-
     #     用于 deepflow-agent 控制自身运行日志的每小时回传数量，设置为 0 表示不设限制。
     # upgrade_from: log_threshold
-    max_log_backhaul_rate: 300
+    max_log_backhaul_rate: 36000
     # type: int
     # name:
     #   en: Maximum Local Log File Size
@@ -699,6 +699,26 @@ global:
     #     设置 deepflow-agent 的 gRPC socket 缓冲区大小。
     # upgrade_from: static_config.grpc-buffer-size
     grpc_buffer_size: 5
+    # type: int
+    # name:
+    #   en: Max Throughput To Ingester
+    #   ch: 发送到 Ingester 的最大流量
+    # unit: Mbps
+    # range: [0, 10000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The maximum allowed flow rate for sending observability data to the server-side Ingester module.
+    #     When this rate limit is exceeded, the data will be actively discarded,
+    #     and the agent will be marked as abnormal and trigger an alarm.
+    #     Setting it to 0 means no speed limit.
+    #   ch: |-
+    #     向 Server 端 Ingester 模块发送可观测性数据的最大允许流量,
+    #     超过此限速时数据将会主动丢弃、且采集器会标记为异常状态并触发告警。
+    #     配置为 0 表示不限速。
+    max_throughput_to_ingester: 100
     # type: bool
     # name:
     #   en: Request via NAT IP Address

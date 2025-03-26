@@ -35,7 +35,8 @@ impl ExceptionHandler {
         | Exception::ControllerSocketError as u64
         | Exception::AnalyzerSocketError as u64
         | Exception::IntegrationSocketError as u64
-        | Exception::NpbSocketError as u64;
+        | Exception::NpbSocketError as u64
+        | Exception::DataBpsThresholdExceeded as u64;
 
     pub fn set(&self, e: Exception) {
         self.0.fetch_or(e as u64, Ordering::SeqCst);
