@@ -252,6 +252,7 @@ func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
 		fmt.Println(err)
 		return
 	}
+	fmt.Printf("revision: %s\n", response.GetRevision())
 	for _, cmd := range cmds {
 		cmd(response)
 	}
