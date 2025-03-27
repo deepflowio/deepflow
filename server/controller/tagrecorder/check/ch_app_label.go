@@ -17,7 +17,7 @@
 package tagrecorder
 
 import (
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"

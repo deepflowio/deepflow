@@ -18,11 +18,10 @@ package cleaner
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"

@@ -18,11 +18,9 @@ package common
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 )
 
 func IsValueInSliceString(value string, list []string) bool {
@@ -44,7 +42,7 @@ func LoadDbDescriptions(dir string) (map[string]interface{}, error) {
 }
 
 func readDir(dir string, desMap map[string]interface{}) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		// TODO
 		return err

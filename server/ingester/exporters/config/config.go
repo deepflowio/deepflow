@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"reflect"
@@ -742,7 +741,7 @@ func Load(base *config.Config, path string) *Config {
 		log.Info("no config file, use defaults")
 		return &config.Exporters
 	}
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Warning("Read config file error:", err)
 		config.Exporters.Validate()
