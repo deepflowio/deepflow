@@ -659,7 +659,7 @@ impl ReceiverManager {
                 }
 
                 // if a net namespace cannot be reached from all process namespace,
-                // that is, not accessbile from any /proc/$pid/ns/net files,
+                // that is, not accessible from any /proc/$pid/ns/net files,
                 // its packet receiver will be terminated
                 //
                 // notice that agent still have access to the net namespace,

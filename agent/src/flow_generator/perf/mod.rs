@@ -377,7 +377,7 @@ impl FlowLog {
                 if parser.check_payload(cut_payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocol_enum();
 
-                    // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+                    // redis can not determine direction by RESP protocol when packet is from ebpf, special treatment
                     if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
                         let host = packet.get_redis_server_addr();
                         let server_ip = host.0;
