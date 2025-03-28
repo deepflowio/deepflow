@@ -39,6 +39,9 @@ use public::{l7_protocol::L7Protocol, utils::net::parse_ip_slice};
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
+    #[serde(skip)]
+    headers_offset: Option<u32>,
+
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub trans_id: u16,
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
@@ -74,6 +77,10 @@ pub struct DnsInfo {
 impl L7ProtocolInfoInterface for DnsInfo {
     fn session_id(&self) -> Option<u32> {
         Some(self.trans_id as u32)
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.headers_offset.unwrap_or_default()
     }
 
     fn merge_log(
@@ -217,38 +224,49 @@ impl L7ProtocolParserInterface for DnsLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        let mut info = DnsInfo::default();
-        self.parse(payload, &mut info, param).is_ok()
-            && info.msg_type == LogMessageType::Request
-            && !info.query_name.is_empty()
+        let Ok(infos) = self.parse(payload, param, true) else {
+            return false;
+        };
+
+        !infos.is_empty()
+            && infos[0].msg_type == LogMessageType::Request
+            && !infos[0].query_name.is_empty()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        let mut info = DnsInfo::default();
-        self.parse(payload, &mut info, param)?;
-        info.is_tls = param.is_tls();
-        if let Some(config) = param.parse_config {
-            info.set_is_on_blacklist(config);
-        }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            if info.msg_type == LogMessageType::Response {
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
-                if info.status == L7ResponseStatus::ClientError {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                } else if info.status == L7ResponseStatus::ServerError {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-            } else {
-                self.perf_stats.as_mut().map(|p| p.inc_req());
+        let mut infos = self.parse(payload, param, false)?;
+
+        for info in &mut infos {
+            info.is_tls = param.is_tls();
+            if let Some(config) = param.parse_config {
+                info.set_is_on_blacklist(config);
             }
-            info.cal_rrt(param).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
+            if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                if info.msg_type == LogMessageType::Response {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.status == L7ResponseStatus::ClientError {
+                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                    } else if info.status == L7ResponseStatus::ServerError {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                    }
+                } else {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                info.cal_rrt(param).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                });
+            }
+            self.last_is_on_blacklist = info.is_on_blacklist;
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
+
         if param.parse_log {
-            Ok(L7ParseResult::Single(L7ProtocolInfo::DnsInfo(info)))
+            Ok(L7ParseResult::Multi(
+                infos
+                    .drain(..)
+                    .map(|i| L7ProtocolInfo::DnsInfo(i))
+                    .collect(),
+            ))
         } else {
             Ok(L7ParseResult::None)
         }
@@ -537,28 +555,93 @@ impl DnsLog {
         Ok(())
     }
 
-    fn parse(&mut self, payload: &[u8], info: &mut DnsInfo, param: &ParseParam) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], param: &ParseParam, check: bool) -> Result<Vec<DnsInfo>> {
         let proto = param.l4_protocol;
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         match proto {
-            IpProtocol::UDP => self.decode_payload(payload, param, info),
+            IpProtocol::UDP => {
+                let mut info = DnsInfo::default();
+                self.decode_payload(payload, param, &mut info)?;
+                Ok(vec![info])
+            }
             IpProtocol::TCP => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
-                let size = read_u16_be(payload) as usize;
-                if size != payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
-                    self.decode_payload(payload, param, info)
+                if param.is_from_ebpf() {
+                    let mut info = DnsInfo::default();
+                    let size = read_u16_be(payload) as usize;
+                    if size != payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
+                        // Offset for TCP DNS:
+                        // Example:
+                        //                 0            2               ...
+                        //                 |____________|_______________|__
+                        // DNS Request:    | Length     | UDP DNS Header
+                        //
+                        // eBPF Data: tcp seq is 0 and payload is tcp.payload[2..]
+                        self.decode_payload(payload, param, &mut info)?
+                    } else {
+                        // Offset for TCP DNS:
+                        // Example:
+                        //                 0            2               ...
+                        //                 |____________|_______________|__
+                        // DNS Request:    | Length     | UDP DNS Header
+                        //
+                        // eBPF Data: tcp seq is 0 and payload is tcp.payload
+                        self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..], param, &mut info)
+                            .or_else(|_| {
+                                self.reset();
+                                // Offset for TCP DNS:
+                                // Example:
+                                //                 0            2               ...
+                                //                 |____________|_______________|__
+                                // DNS Request:    | Length     | UDP DNS Header
+                                //
+                                // eBPF Data: tcp seq is 0 and payload is tcp.payload[2..]
+                                self.decode_payload(payload, param, &mut info)
+                            })?
+                    }
+                    Ok(vec![info])
                 } else {
-                    self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..], param, info)
-                        .or_else(|_| {
-                            self.reset();
-                            self.decode_payload(payload, param, info)
-                        })
+                    let mut offset = 0;
+                    let mut infos = vec![];
+                    while offset < payload.len() {
+                        if offset + DNS_TCP_PAYLOAD_OFFSET >= payload.len() {
+                            break;
+                        }
+                        let size = read_u16_be(&payload[offset..]) as usize;
+                        let mut info = DnsInfo::default();
+                        if offset + size > payload.len() {
+                            break;
+                        }
+                        if self
+                            .decode_payload(
+                                &payload[offset + DNS_TCP_PAYLOAD_OFFSET..],
+                                param,
+                                &mut info,
+                            )
+                            .is_err()
+                        {
+                            break;
+                        }
+                        info.headers_offset = Some(offset as u32);
+                        offset += size + DNS_TCP_PAYLOAD_OFFSET;
+                        infos.push(info);
+
+                        if check {
+                            break;
+                        }
+                    }
+
+                    if infos.is_empty() {
+                        return Err(Error::DNSLogParseFailed("dns parse failed".to_string()));
+                    }
+
+                    Ok(infos)
                 }
             }
             _ => {
@@ -622,11 +705,13 @@ mod tests {
             dns.reset();
             let info = dns.parse_payload(payload, param);
             if let Ok(info) = info {
-                match info.unwrap_single() {
-                    L7ProtocolInfo::DnsInfo(i) => {
-                        output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
+                for i in info.unwrap_multi() {
+                    match i {
+                        L7ProtocolInfo::DnsInfo(i) => {
+                            output.push_str(&format!("{:?} is_dns: {}\n", i, is_dns));
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
             } else {
                 output.push_str(&format!("{:?} is_dns: {}\n", DnsInfo::default(), is_dns));
@@ -638,6 +723,7 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("dns-tcp-multi.pcap", "dns-tcp-multi.result"),
             ("dns.pcap", "dns.result"),
             ("a-and-ns.pcap", "a-and-ns.result"),
         ];
@@ -661,20 +747,36 @@ mod tests {
 
     #[test]
     fn check_perf() {
-        let expected = vec![(
-            "dns.pcap",
-            L7PerfStats {
-                request_count: 2,
-                response_count: 2,
-                err_client_count: 1,
-                err_server_count: 0,
-                err_timeout: 0,
-                rrt_count: 2,
-                rrt_sum: 181558,
-                rrt_max: 176754,
-                ..Default::default()
-            },
-        )];
+        let expected = vec![
+            (
+                "dns.pcap",
+                L7PerfStats {
+                    request_count: 2,
+                    response_count: 2,
+                    err_client_count: 1,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 2,
+                    rrt_sum: 181558,
+                    rrt_max: 176754,
+                    ..Default::default()
+                },
+            ),
+            (
+                "dns-tcp-multi.pcap",
+                L7PerfStats {
+                    request_count: 2,
+                    response_count: 2,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 2,
+                    rrt_sum: 649,
+                    rrt_max: 355,
+                    ..Default::default()
+                },
+            ),
+        ];
 
         for item in expected.iter() {
             assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
@@ -697,8 +799,11 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
+            let Some(payload) = packet.get_l4_payload() else {
+                continue;
+            };
             let _ = dns.parse_payload(
-                packet.get_l4_payload().unwrap(),
+                payload,
                 &ParseParam::new(
                     &*packet,
                     rrt_cache.clone(),
