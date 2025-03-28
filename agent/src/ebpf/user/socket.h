@@ -49,6 +49,7 @@ enum linux_kernel_type {
 	K_TYPE_VER_3_10,
 	K_TYPE_KFUNC,
 	K_TYPE_RT,
+	K_TYPE_KPROBE,
 };
 
 enum probes_act_type {
