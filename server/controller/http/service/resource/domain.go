@@ -287,6 +287,16 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 			}
 		}
 
+		// exceptions
+		exceptions := domain.Exceptions
+		bitNum := 0
+		for ; exceptions > 0; exceptions /= 2 {
+			if exceptions%2 != 0 {
+				domainResp.Exceptions = append(domainResp.Exceptions, 1<<bitNum)
+			}
+			bitNum += 1
+		}
+
 		response = append(response, domainResp)
 	}
 	return response, nil
@@ -823,6 +833,16 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 			log.Error(err)
 		}
 		subDomainResp.DomainName = domain.Name
+
+		// exceptions
+		exceptions := subDomain.Exceptions
+		bitNum := 0
+		for ; exceptions > 0; exceptions /= 2 {
+			if exceptions%2 != 0 {
+				subDomainResp.Exceptions = append(subDomainResp.Exceptions, 1<<bitNum)
+			}
+			bitNum += 1
+		}
 
 		response = append(response, &subDomainResp)
 	}
