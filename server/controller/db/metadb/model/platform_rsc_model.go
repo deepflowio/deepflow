@@ -114,7 +114,8 @@ type Domain struct {
 	Config       string     `gorm:"column:config;type:text" json:"CONFIG" mapstructure:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG" mapstructure:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED" mapstructure:"ENABLED"` // 0.false 1.true
-	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception
+	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception 4.warning 5.no_license
+	Exceptions   int64      `gorm:"column:exceptions;type:int unsigned;default:0" json:"EXCEPTIONS"`
 	ControllerIP string     `gorm:"column:controller_ip;type:char(64)" json:"CONTROLLER_IP" mapstructure:"CONTROLLER_IP"`
 }
 
@@ -134,7 +135,8 @@ type SubDomain struct {
 	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG" mapstructure:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG" mapstructure:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED" mapstructure:"ENABLED"` // 0.false 1.true
-	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception
+	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception 4.warning 5.no_license
+	Exceptions   int64      `gorm:"column:exceptions;type:int unsigned;default:0" json:"EXCEPTIONS"`
 }
 
 type Region struct {
