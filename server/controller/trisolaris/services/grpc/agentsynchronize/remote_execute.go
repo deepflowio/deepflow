@@ -154,6 +154,11 @@ func (e *AgentEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) 
 		return err
 	}
 	for {
+		if manager == nil {
+			err := fmt.Errorf("agent(key: %s) remote exec map not found", key)
+			log.Error(err)
+			return err
+		}
 		select {
 		case <-ctx.Done():
 			log.Infof("context done, agent(key: %s), context err: %v", key, ctx.Err())

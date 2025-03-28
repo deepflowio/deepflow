@@ -84,9 +84,8 @@ func AddToCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 
 	log.Infof("add agent(key:%s) to cmd manager", key)
 	agentCMDManager[key] = &CMDManager{
-		requestID: requestID,
-		ExecCH:    make(chan *grpcapi.RemoteExecRequest, 1),
-
+		requestID:       requestID,
+		ExecCH:          make(chan *grpcapi.RemoteExecRequest, 1),
 		requestIDToResp: make(map[uint64]*CMDResp),
 	}
 	return agentCMDManager[key]
@@ -107,7 +106,7 @@ func RemoveAllFromCMDManager(key string) {
 	defer agentCMDMutex.Unlock()
 	manager, ok := agentCMDManager[key]
 	if !ok {
-		log.Error("can not find agent command manager(key: %s)", key)
+		log.Errorf("can not find agent command manager(key: %s)", key)
 		return
 	}
 
