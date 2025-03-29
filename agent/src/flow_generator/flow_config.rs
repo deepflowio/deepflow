@@ -26,6 +26,7 @@ pub const TIMEOUT_OTHERS: Timestamp = Timestamp::from_secs(5);
 pub const TIMEOUT_ESTABLISHED: Timestamp = Timestamp::from_secs(300);
 pub const TIMEOUT_CLOSING: Timestamp = Timestamp::from_secs(35);
 pub const TIMEOUT_OPENING_RST: Timestamp = Timestamp::from_secs(1);
+pub const TIMEOUT_ICMP: Timestamp = Timestamp::from_secs(5);
 
 pub struct TcpTimeout {
     pub established: Timestamp,
@@ -55,6 +56,7 @@ pub struct FlowTimeout {
     pub closed_fin: Timestamp,
     pub single_direction: Timestamp,
     pub opening_rst: Timestamp,
+    pub icmp_timeout: Timestamp,
 
     pub min: Timestamp,
     pub max: Timestamp, // time window
@@ -71,6 +73,8 @@ impl From<TcpTimeout> for FlowTimeout {
             closed_fin: Timestamp::from_secs(2),
             single_direction: t.others,
             opening_rst: t.opening_rst,
+            icmp_timeout: TIMEOUT_ICMP,
+
             min: Timestamp::from_secs(0),
             max: Timestamp::from_secs(0),
         };

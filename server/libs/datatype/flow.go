@@ -69,6 +69,7 @@ const (
 	CloseTypeClientEstablishReset  // 18: 建连-客户端其他重置
 	CloseTypeServerEstablishReset  // 19: 建连-服务端其他重置
 	CloseTypeTCPFinClientRst       // 20: 正常结束-客户端重置
+	CloseTypeIcmpTimeout           // 21: TODO
 	MaxCloseType
 )
 
@@ -80,7 +81,7 @@ func (t CloseType) IsClientError() bool {
 
 func (t CloseType) IsServerError() bool {
 	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
-		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat ||
+		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat || t == CloseTypeIcmpTimeout ||
 		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
 }
 
