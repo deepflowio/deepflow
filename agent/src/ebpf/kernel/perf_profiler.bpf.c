@@ -68,9 +68,30 @@ MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES)
  * switching between buffer a and buffer b.
  */
 MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT)
+
+MAP_PERARRAY(profiler_inter_map, __u32, __u64, 1)
+
 PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data *ctx)
 {
 	__u32 count_idx;
+
+	count_idx = MAX_DELAY;
+        __u64 *max_delay_ptr = profiler_state_map__lookup(&count_idx);
+	if (max_delay_ptr == NULL)
+		return 0;
+
+        count_idx = 0;
+        __u64 *last_interrupt_time = profiler_inter_map__lookup(&count_idx);
+        if (last_interrupt_time == NULL)
+                return 0;
+
+        __u64 curr_time = bpf_ktime_get_ns()/1000000UL;
+        __u64 diff = curr_time - *last_interrupt_time;
+        *last_interrupt_time = curr_time;
+        if (diff < *max_delay_ptr) {
+                return 0;
+        }
+
 
 	count_idx = TRANSFER_CNT_IDX;
 	__u64 *transfer_count_ptr = profiler_state_map__lookup(&count_idx);
@@ -99,12 +120,14 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data *ctx)
 	if (transfer_count_ptr == NULL || sample_count_a_ptr == NULL ||
 	    sample_count_b_ptr == NULL || drop_count_ptr == NULL ||
 	    iter_count_ptr == NULL || error_count_ptr == NULL ||
-	    output_count_ptr == NULL || enable_ptr == NULL) {
+	    output_count_ptr == NULL || enable_ptr == NULL ||
+	    max_delay_ptr == NULL) {
 		count_idx = ERROR_IDX;
 		__u64 err_val = 1;
 		profiler_state_map__update(&count_idx, &err_val);
 		return 0;
 	}
+
 
 	if (unlikely(*enable_ptr == 0))
 		return 0;
@@ -117,12 +140,13 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data *ctx)
 	/*
 	 * CPU idle stacks will not be collected. 
 	 */
-	if (key.tgid == key.pid && key.pid == 0)
-		return 0;
+	//if (key.tgid == key.pid && key.pid == 0)
+	//	return 0;
 
 	key.cpu = bpf_get_smp_processor_id();
 	bpf_get_current_comm(&key.comm, sizeof(key.comm));
 	key.timestamp = bpf_ktime_get_ns();
+	key.duration_ns = diff;
 
 	/*
 	 * Note:
