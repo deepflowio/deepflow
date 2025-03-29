@@ -1341,7 +1341,7 @@ func (e *CHEngine) TransDerivativeGroupBy(groups sqlparser.GroupBy) error {
 		colName, ok := group.(*sqlparser.ColName)
 		if ok {
 			groupTag := sqlparser.String(colName)
-			if !strings.Contains(groupTag, "time") && !strings.Contains(groupTag, "node_type") && !strings.Contains(groupTag, "icon_id") {
+			if !strings.Contains(groupTag, "time") {
 				groupSlice = append(groupSlice, groupTag)
 			}
 		}
