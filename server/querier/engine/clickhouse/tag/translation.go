@@ -370,8 +370,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			nodeTypeStrSuffix := "dictGet('flow_tag.node_type_map', 'node_type', toUInt64(" + autoTypeSuffix + "))"
 			internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 			ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-			autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", tagAutoTypeSuffix, tagAutoIDSuffix)
-			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", tagAutoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, tagAutoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+			autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			deviceTypeFilter := ""
 			if strings.HasPrefix(autoNameSuffix, "resource_gl0") || strings.HasPrefix(autoNameSuffix, "auto_instance") {
 				deviceTypeFilter = "devicetype not in (101,102)"
