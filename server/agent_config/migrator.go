@@ -612,11 +612,11 @@ type MigrationToolData struct {
 
 	domainData *DomainData
 
-	DataFomatter
+	DataFormatter
 }
 
 func NewMigrationToolData(domainData *DomainData) (MigrationToolData, error) {
-	lineFmt := NewLineFommatter(YamlAgentGroupConfigTemplate)
+	lineFmt := NewLineFormatter(YamlAgentGroupConfigTemplate)
 	formattedLines, err := lineFmt.Format()
 	if err != nil {
 		return MigrationToolData{}, err
@@ -630,7 +630,7 @@ func NewMigrationToolData(domainData *DomainData) (MigrationToolData, error) {
 
 		domainData: domainData,
 	}
-	err = p.DataFomatter.LoadYAMLData(formattedLines)
+	err = p.DataFormatter.LoadYAMLData(formattedLines)
 	if err != nil {
 		return p, err
 	}
@@ -643,7 +643,7 @@ func (p *MigrationToolData) SetDomainData(domainData *DomainData) {
 }
 
 func (p *MigrationToolData) Format() {
-	p.generateHigherKeyToLowerKeys(p.DataFomatter.mapData, "")
+	p.generateHigherKeyToLowerKeys(p.DataFormatter.mapData, "")
 	for higher, lowers := range p.higherVerToLowerVerKeys {
 		for _, lower := range lowers {
 			p.lowerVerToHigherVerKey[lower] = higher
