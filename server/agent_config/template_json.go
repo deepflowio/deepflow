@@ -27,10 +27,11 @@ import (
 
 const (
 	keyCommentSuffix = "_comment"
+	dictValueComment = "value_comments"
 
-	commentFlag           = "#"
-	subelementCommentFlag = "# ---"
-	todoFlag              = "TODO"
+	commentFlag          = "#"
+	dictValueCommentFlag = "# ---" // 字典值里每个字段的注释标记
+	todoFlag             = "TODO"
 
 	templateIndent = "  "
 )
@@ -40,7 +41,7 @@ func ConvertYAMLToJSON(yamlData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate key to comment error: %v", err)
 	}
-	dataFmt := NewDataFommatter()
+	dataFmt := NewDataFormatter()
 	err = dataFmt.LoadYAMLData(yamlData)
 	if err != nil {
 		return nil, fmt.Errorf("new data formatter error: %v", err)
@@ -54,9 +55,9 @@ func ValidateYAML(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("generate key to comment error: %v", err)
 	}
-	tmplFmt.DataFomatter.fmtMapValAndRefresh(KeyToComment, true)
+	tmplFmt.DataFormatter.fmtMapValAndRefresh(KeyToComment, true)
 
-	dataFmt := NewDataFommatter()
+	dataFmt := NewDataFormatter()
 	err = dataFmt.LoadYAMLData(yamlData)
 	if err != nil {
 		return fmt.Errorf("new data formatter error: %v", err)
@@ -66,7 +67,7 @@ func ValidateYAML(yamlData []byte) error {
 		return fmt.Errorf("convert value and refresh error: %v", err)
 	}
 
-	return validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFomatter.yamlNode)
+	return validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFormatter.yamlNode)
 }
 
 func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, error) {
@@ -75,9 +76,9 @@ func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, erro
 	if err != nil {
 		return nil, fmt.Errorf("generate key to comment error: %v", err)
 	}
-	tmplFmt.DataFomatter.fmtMapValAndRefresh(KeyToComment, true)
+	tmplFmt.DataFormatter.fmtMapValAndRefresh(KeyToComment, true)
 
-	dataFmt := NewDataFommatter()
+	dataFmt := NewDataFormatter()
 	dataFmt.setKeyToComment(KeyToComment)
 	err = dataFmt.LoadMapData(jsonData)
 	if err != nil {
@@ -88,7 +89,7 @@ func ConvertJSONToYAMLAndValidate(jsonData map[string]interface{}) ([]byte, erro
 		return nil, fmt.Errorf("convert value and refresh error: %v", err)
 	}
 
-	if err := validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFomatter.yamlNode); err != nil {
+	if err := validateNodeAgainstTemplate(dataFmt.yamlNode, tmplFmt.DataFormatter.yamlNode); err != nil {
 		return nil, err
 	}
 
@@ -171,13 +172,13 @@ func ConvertTemplateYAMLToJSON(d DynamicOptions) ([]byte, error) {
 type KeyToComment map[string]map[string]interface{}
 
 type TemplateFormatter struct {
-	lineFmt *LineFomatter
-	DataFomatter
+	lineFmt *LineFormatter
+	DataFormatter
 }
 
 func NewTemplateFormatter(data []byte) *TemplateFormatter {
 	return &TemplateFormatter{
-		lineFmt: NewLineFommatter(data),
+		lineFmt: NewLineFormatter(data),
 	}
 }
 
@@ -187,18 +188,18 @@ func (f *TemplateFormatter) mapToJSON(d DynamicOptions) ([]byte, error) {
 		return nil, fmt.Errorf("format template yaml lines error: %v", err)
 	}
 
-	err = f.DataFomatter.LoadYAMLData(formattedLines)
+	err = f.DataFormatter.LoadYAMLData(formattedLines)
 	if err != nil {
 		return nil, fmt.Errorf("LoadYAMLData data formatter error: %v", err)
 	}
 	keyToComment := make(KeyToComment)
 	f.generateKeyComment(f.mapData, "", keyToComment)
-	err = f.DataFomatter.fmtMapValAndRefresh(keyToComment, true)
+	err = f.DataFormatter.fmtMapValAndRefresh(keyToComment, true)
 	if err != nil {
 		return nil, fmt.Errorf("convert dict value to string error: %v", err)
 	}
 
-	formattedNode, err := f.fillingEnumOptions(f.DataFomatter.yamlNode, "", d)
+	formattedNode, err := f.fillingEnumOptions(f.DataFormatter.yamlNode, "", d)
 	if err != nil {
 		return nil, fmt.Errorf("filling enum options error: %v", err)
 	}
@@ -209,17 +210,17 @@ func (f *TemplateFormatter) mapToJSON(d DynamicOptions) ([]byte, error) {
 	return f.formatJson(formattedMap)
 }
 
-func (f *TemplateFormatter) fillingEnumOptions(node *yaml.Node, ancetors string, d DynamicOptions) (*yaml.Node, error) {
+func (f *TemplateFormatter) fillingEnumOptions(node *yaml.Node, ancestors string, d DynamicOptions) (*yaml.Node, error) {
 	switch node.Kind {
 	case yaml.DocumentNode:
-		return f.fillingEnumOptions(node.Content[0], ancetors, d)
+		return f.fillingEnumOptions(node.Content[0], ancestors, d)
 	case yaml.MappingNode:
 		for i := 0; i < len(node.Content); i += 2 {
-			newAncetors := node.Content[i].Value
-			if ancetors != "" {
-				newAncetors = ancetors + "." + newAncetors
+			newAncestors := node.Content[i].Value
+			if ancestors != "" {
+				newAncestors = ancestors + "." + newAncestors
 			}
-			value, err := f.fillingEnumOptions(node.Content[i+1], newAncetors, d)
+			value, err := f.fillingEnumOptions(node.Content[i+1], newAncestors, d)
 			if err != nil {
 				return nil, err
 			}
@@ -228,7 +229,7 @@ func (f *TemplateFormatter) fillingEnumOptions(node *yaml.Node, ancetors string,
 		return node, nil
 	case yaml.SequenceNode:
 		value := make([]*yaml.Node, 0)
-		if dynamicValue, ok := d[ancetors]; ok {
+		if dynamicValue, ok := d[ancestors]; ok {
 			for _, contentNode := range node.Content {
 				if contentNode.Kind == yaml.MappingNode {
 					for i := 0; i < len(contentNode.Content); i += 2 {
@@ -242,7 +243,7 @@ func (f *TemplateFormatter) fillingEnumOptions(node *yaml.Node, ancetors string,
 			value = append(value, dynamicValue.Content...)
 		} else {
 			for _, contentNode := range node.Content {
-				valueNode, err := f.fillingEnumOptions(contentNode, ancetors, d)
+				valueNode, err := f.fillingEnumOptions(contentNode, ancestors, d)
 				if err != nil {
 					return nil, err
 				}
@@ -331,14 +332,13 @@ func (f *TemplateFormatter) GenerateKeyToComment() (KeyToComment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("format template yaml lines error: %v", err)
 	}
-	err = f.DataFomatter.LoadYAMLData(formattedLines)
+	err = f.DataFormatter.LoadYAMLData(formattedLines)
 	if err != nil {
 		return nil, fmt.Errorf("LoadYAMLData data formatter error: %v", err)
 	}
 
 	keyToComment := make(KeyToComment)
 	f.generateKeyComment(f.mapData, "", keyToComment)
-	fmt.Printf("keyToComment: %#v\n", keyToComment)
 	return keyToComment, nil
 }
 
@@ -358,7 +358,7 @@ func (f *TemplateFormatter) generateKeyComment(data interface{}, ancestors strin
 	return data
 }
 
-// LineFomatter 将 template.yaml 文件中的注释转换为 yaml section。
+// LineFormatter 将 template.yaml 文件中的注释转换为 yaml section。
 // 文件中的多行注释每一行以 # 开头，是多行注释结束后数据字段 key 的说明：
 // 1. 添加与数据字段 key 同缩进的说明字段 key_comment。
 // 2. 将说明反注释后增加缩进，作为说明字段的值。
@@ -381,17 +381,17 @@ func (f *TemplateFormatter) generateKeyComment(data interface{}, ancestors strin
 //	    ch: 全局配置
 //	  description:
 //	global:
-type LineFomatter struct {
+type LineFormatter struct {
 	lines []string
 }
 
-func NewLineFommatter(bytes []byte) *LineFomatter {
-	return &LineFomatter{
+func NewLineFormatter(bytes []byte) *LineFormatter {
+	return &LineFormatter{
 		lines: strings.Split(string(bytes), "\n"),
 	}
 }
 
-func (f *LineFomatter) Format() ([]byte, error) {
+func (f *LineFormatter) Format() ([]byte, error) {
 	strippedLines := make([]string, 0)
 	for i := 0; i < len(f.lines); i++ {
 		if f.isCommentLine(f.lines[i]) {
@@ -408,7 +408,7 @@ func (f *LineFomatter) Format() ([]byte, error) {
 	return []byte(strings.Join(strippedLines, "\n")), nil
 }
 
-func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []string, err error) {
+func (f *LineFormatter) convCommentToSection(start int) (end int, commentLines []string, err error) {
 	i := start
 	for ; i < len(f.lines); i++ {
 		if !f.isCommentLine(f.lines[i]) {
@@ -418,37 +418,32 @@ func (f *LineFomatter) convCommentToSection(start int) (end int, commentlines []
 			i = f.ignoreTodoComments(i)
 			continue
 		}
-		if f.isSubelementCommentLine(f.lines[i]) {
-			i = f.ignoreSubelementComments(i)
+		if f.isDictValueCommentLine(f.lines[i]) {
+			i, commentLines, err = f.appendDictValueComments(i, commentLines)
+			if err != nil {
+				return 0, nil, err
+			}
 			continue
 		}
-		if YamlSubTemplateRegex.MatchString(f.lines[i]) {
-			sublines := strings.Split(YamlSubTemplateRegex.ReplaceAllStringFunc(f.lines[i], ReplaceTemplateSyntax(true)), "\n")
-			sublinesBuilder := strings.Builder{}
-			for _, line := range sublines {
-				sublinesBuilder.WriteString("\n")
-				sublinesBuilder.WriteString(f.indentLine(f.uncommentLine(line), 1))
-			}
-			f.lines[i] = sublinesBuilder.String()
-		}
-		commentlines = append(commentlines, f.indentLine(f.uncommentLine(f.lines[i]), 1))
+		f.replaceTemplateSyntax(i)
+		commentLines = append(commentLines, f.indentLine(f.uncommentLine(f.lines[i]), 1))
 	}
 
 	keyCommentLine, err := f.keyLineToKeyCommentLine(f.lines[i])
 	if err != nil {
 		return 0, nil, fmt.Errorf(err.Error()+" at line: %d", i)
 	}
-	return i - 1, append([]string{keyCommentLine}, commentlines...), nil
+	return i - 1, append([]string{keyCommentLine}, commentLines...), nil
 }
 
-func (f *LineFomatter) indentLine(line string, indentCount int) string {
+func (f *LineFormatter) indentLine(line string, indentCount int) string {
 	for i := 0; i < indentCount; i++ {
 		line = templateIndent + line
 	}
 	return line
 }
 
-func (f *LineFomatter) uncommentLine(line string) string {
+func (f *LineFormatter) uncommentLine(line string) string {
 	line = strings.Replace(line, commentFlag+" ", "", 1)
 	if f.isCommentLine(line) {
 		line = strings.Replace(line, commentFlag, "", 1)
@@ -456,19 +451,19 @@ func (f *LineFomatter) uncommentLine(line string) string {
 	return line
 }
 
-func (f *LineFomatter) isCommentLine(line string) bool {
+func (f *LineFormatter) isCommentLine(line string) bool {
 	return strings.HasPrefix(strings.TrimSpace(line), commentFlag)
 }
 
-func (f *LineFomatter) isSubelementCommentLine(line string) bool {
-	return strings.HasPrefix(strings.TrimSpace(line), subelementCommentFlag)
+func (f *LineFormatter) isDictValueCommentLine(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), dictValueCommentFlag)
 }
 
-func (f *LineFomatter) isTodoCommentLine(line string) bool {
+func (f *LineFormatter) isTodoCommentLine(line string) bool {
 	return (f.isCommentLine(line) && strings.Contains(line, todoFlag))
 }
 
-func (f *LineFomatter) keyLineToKeyCommentLine(line string) (string, error) {
+func (f *LineFormatter) keyLineToKeyCommentLine(line string) (string, error) {
 	parts := strings.SplitN(line, ":", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("failed to split key line: %s by \":\"", line)
@@ -478,8 +473,7 @@ func (f *LineFomatter) keyLineToKeyCommentLine(line string) (string, error) {
 	return keyCommentLine, nil
 }
 
-// TODO remove
-func (f *LineFomatter) ignoreSubelementComments(start int) (end int) {
+func (f *LineFormatter) ignoreDictValueComments(start int) (end int) {
 	j := start + 1
 	for ; j < len(f.lines); j++ {
 		if !f.isCommentLine(f.lines[j]) {
@@ -489,20 +483,28 @@ func (f *LineFomatter) ignoreSubelementComments(start int) (end int) {
 	return j - 1
 }
 
-func (f *LineFomatter) convSubelementCommentToSection(start int, result []string) (end int, lines []string, err error) {
+func (f *LineFormatter) appendDictValueComments(start int, result []string) (end int, appendedResult []string, err error) {
+	indentCount := 1
+	basePrefix := strings.SplitN(f.lines[start], commentFlag, 2)[0]
+	result = append(result, f.indentLine(basePrefix+dictValueComment+":", indentCount))
+	end, result, err = f.convDictValueCommentToSection(start, indentCount+1, result)
+	return end, result, err
+}
+
+func (f *LineFormatter) convDictValueCommentToSection(start int, indentCount int, result []string) (end int, appendedResult []string, err error) {
 	i := start
-	subeleCommentFlagLineNum := i
-	subeleCommentLines := make([]string, 0)
-	var subeleLineNum int
+	dictValCommentFlagLineNum := i
+	dictValCommentLines := make([]string, 0)
+	var dictValCommentKeyLineNum int
 	for ; i < len(f.lines); i++ {
 		if !f.isCommentLine(f.lines[i]) {
 			return i - 1, result, nil
 		}
-		if f.isSubelementCommentLine(f.lines[i]) {
-			if i == subeleCommentFlagLineNum {
+		if f.isDictValueCommentLine(f.lines[i]) {
+			if i == dictValCommentFlagLineNum {
 				continue
 			} else {
-				subeleLineNum = i + 1
+				dictValCommentKeyLineNum = i + 1
 				break
 			}
 		}
@@ -510,20 +512,20 @@ func (f *LineFomatter) convSubelementCommentToSection(start int, result []string
 			i = f.ignoreTodoComments(i)
 			continue
 		}
-		subeleCommentLines = append(subeleCommentLines, f.indentLine(f.uncommentLine(f.lines[i]), 2))
+		dictValCommentLines = append(dictValCommentLines, f.indentLine(f.uncommentLine(f.lines[i]), indentCount+1))
 	}
 
-	subeleKeyCommentLine, err := f.keyLineToKeyCommentLine(f.indentLine(f.uncommentLine(f.lines[subeleLineNum]), 1))
+	dictValCommentKey, err := f.keyLineToKeyCommentLine(f.indentLine(f.uncommentLine(f.lines[dictValCommentKeyLineNum]), indentCount))
 	if err != nil {
 		return 0, nil, fmt.Errorf(err.Error()+" at line: %d", i)
 	}
-	subeleCommentSection := append([]string{subeleKeyCommentLine}, subeleCommentLines...)
+	dictValCommentSection := append([]string{dictValCommentKey}, dictValCommentLines...)
 
-	result = append(result, subeleCommentSection...)
-	return f.convSubelementCommentToSection(subeleLineNum+1, result)
+	result = append(result, dictValCommentSection...)
+	return f.convDictValueCommentToSection(dictValCommentKeyLineNum+1, indentCount, result)
 }
 
-func (f *LineFomatter) ignoreTodoComments(start int) (end int) {
+func (f *LineFormatter) ignoreTodoComments(start int) (end int) {
 	j := start + 1
 	for ; j < len(f.lines); j++ {
 		if !f.isTodoCommentLine(f.lines[j]) {
@@ -533,9 +535,21 @@ func (f *LineFomatter) ignoreTodoComments(start int) (end int) {
 	return j - 1
 }
 
+func (f *LineFormatter) replaceTemplateSyntax(i int) {
+	if YamlSubTemplateRegex.MatchString(f.lines[i]) {
+		sublines := strings.Split(YamlSubTemplateRegex.ReplaceAllStringFunc(f.lines[i], ReplaceTemplateSyntax(true)), "\n")
+		sublinesBuilder := strings.Builder{}
+		for _, line := range sublines {
+			sublinesBuilder.WriteString("\n")
+			sublinesBuilder.WriteString(f.indentLine(f.uncommentLine(line), 1))
+		}
+		f.lines[i] = sublinesBuilder.String()
+	}
+}
+
 type DynamicOptions map[string]*yaml.Node
 
-type DataFomatter struct {
+type DataFormatter struct {
 	keyToComment KeyToComment
 
 	formattedYAMLData []byte // 与 template.yaml 文件格式一致的 yaml 数据
@@ -543,15 +557,15 @@ type DataFomatter struct {
 	yamlNode          *yaml.Node
 }
 
-func NewDataFommatter() *DataFomatter {
-	return &DataFomatter{}
+func NewDataFormatter() *DataFormatter {
+	return &DataFormatter{}
 }
 
-func (f *DataFomatter) setKeyToComment(keyToComment KeyToComment) {
+func (f *DataFormatter) setKeyToComment(keyToComment KeyToComment) {
 	f.keyToComment = keyToComment
 }
 
-func (f *DataFomatter) LoadMapData(data map[string]interface{}) error {
+func (f *DataFormatter) LoadMapData(data map[string]interface{}) error {
 	f.mapData = data
 	yamlData, err := f.mapToYAML()
 	if err != nil {
@@ -576,7 +590,7 @@ func (f *DataFomatter) LoadMapData(data map[string]interface{}) error {
 	return nil
 }
 
-func (f *DataFomatter) mapToYAML() ([]byte, error) {
+func (f *DataFormatter) mapToYAML() ([]byte, error) {
 	str, err := f.dictToString(f.mapData)
 	if err != nil {
 		return nil, fmt.Errorf("convert dict to string error: %v", err)
@@ -584,7 +598,7 @@ func (f *DataFomatter) mapToYAML() ([]byte, error) {
 	return []byte(str), nil
 }
 
-func (f *DataFomatter) LoadYAMLData(yamlData []byte) error {
+func (f *DataFormatter) LoadYAMLData(yamlData []byte) error {
 	var mapData map[string]interface{}
 	err := yaml.Unmarshal(yamlData, &mapData)
 	if err != nil {
@@ -600,7 +614,7 @@ func (f *DataFomatter) LoadYAMLData(yamlData []byte) error {
 	return nil
 }
 
-func (f *DataFomatter) mapToJSON(keyToComment KeyToComment) ([]byte, error) {
+func (f *DataFormatter) mapToJSON(keyToComment KeyToComment) ([]byte, error) {
 	err := f.fmtMapValAndRefresh(keyToComment, true)
 	if err != nil {
 		return nil, fmt.Errorf("convert value and refresh error: %v", err)
@@ -612,7 +626,7 @@ func (f *DataFomatter) mapToJSON(keyToComment KeyToComment) ([]byte, error) {
 	return bytes, nil
 }
 
-func (f *DataFomatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
+func (f *DataFormatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToStr bool) error {
 	err := f.fmtVal("", f.mapData, keyToComment, dictValToStr)
 	if err != nil {
 		return fmt.Errorf("convert dict value to string error: %v", err)
@@ -633,7 +647,7 @@ func (f *DataFomatter) fmtMapValAndRefresh(keyToComment KeyToComment, dictValToS
 	return nil
 }
 
-func (f *DataFomatter) fmtVal(ancestors string, data interface{}, keyToComment KeyToComment, dictValToStr bool) error {
+func (f *DataFormatter) fmtVal(ancestors string, data interface{}, keyToComment KeyToComment, dictValToStr bool) error {
 	switch data := data.(type) {
 	case map[string]interface{}:
 		for key, value := range data {
@@ -682,7 +696,7 @@ func (f *DataFomatter) fmtVal(ancestors string, data interface{}, keyToComment K
 	return nil
 }
 
-func (f *DataFomatter) formatJson(data interface{}) ([]byte, error) {
+func (f *DataFormatter) formatJson(data interface{}) ([]byte, error) {
 	indenttedJson, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal json error: %v", err)
@@ -693,7 +707,7 @@ func (f *DataFomatter) formatJson(data interface{}) ([]byte, error) {
 	return []byte(jsonStr), nil
 }
 
-func (f *DataFomatter) dictToString(data interface{}) (string, error) {
+func (f *DataFormatter) dictToString(data interface{}) (string, error) {
 	var buf strings.Builder
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -704,11 +718,11 @@ func (f *DataFomatter) dictToString(data interface{}) (string, error) {
 	return buf.String(), nil
 }
 
-func (f *DataFomatter) isKeyComment(key string) bool {
+func (f *DataFormatter) isKeyComment(key string) bool {
 	return strings.HasSuffix(key, keyCommentSuffix)
 }
 
-func (f *DataFomatter) appendAncestor(ancestor, key string) string {
+func (f *DataFormatter) appendAncestor(ancestor, key string) string {
 	key = strings.TrimSuffix(key, keyCommentSuffix)
 	if ancestor == "" {
 		return key
@@ -716,14 +730,14 @@ func (f *DataFomatter) appendAncestor(ancestor, key string) string {
 	return ancestor + "." + key
 }
 
-func (f *DataFomatter) isDictValue(comment map[string]interface{}) bool {
+func (f *DataFormatter) isDictValue(comment map[string]interface{}) bool {
 	if _, ok := comment["type"]; ok {
 		return comment["type"] == "dict"
 	}
 	return false
 }
 
-func (f *DataFomatter) isIntValue(comment map[string]interface{}) bool {
+func (f *DataFormatter) isIntValue(comment map[string]interface{}) bool {
 	if _, ok := comment["type"]; ok {
 		return comment["type"] == "int"
 	}
