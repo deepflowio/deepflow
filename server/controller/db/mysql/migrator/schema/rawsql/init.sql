@@ -1172,6 +1172,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at              DATETIME DEFAULT NULL,
+    alert_time              BIGINT UNSIGNED DEFAULT 0,
     contrast_type           TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1.abs 2.baseline',
     target_line_uid         TEXT,
     target_line_name        TEXT,
