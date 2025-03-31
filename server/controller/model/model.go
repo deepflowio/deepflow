@@ -320,6 +320,7 @@ type Domain struct {
 	Type           int                    `json:"TYPE"`
 	Enabled        int                    `json:"ENABLED"`
 	State          int                    `json:"STATE"`
+	Exceptions     []int64                `json:"EXCEPTIONS"`
 	ErrorMsg       string                 `json:"ERROR_MSG"`
 	ControllerIP   string                 `json:"CONTROLLER_IP"`
 	ControllerName string                 `json:"CONTROLLER_NAME"`
@@ -369,6 +370,7 @@ type SubDomain struct {
 	ClusterID    string                 `json:"CLUSTER_ID"`
 	Enabled      int                    `json:"ENABLED"`
 	State        int                    `json:"STATE"`
+	Exceptions   []int64                `json:"EXCEPTIONS"`
 	ErrorMsg     string                 `json:"ERROR_MSG"`
 	VPCName      string                 `json:"EPC_NAME"`
 	Domain       string                 `json:"DOMAIN"`
