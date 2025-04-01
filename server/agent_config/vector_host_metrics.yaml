@@ -12,7 +12,6 @@ config:
       source: |
         .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
         .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
-        # map to prometheus metric name
         metrics_map = {
           "boot_time": "boot_time_seconds",
           "memory_active_bytes": "memory_Active_bytes",
