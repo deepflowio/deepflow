@@ -48,13 +48,12 @@ config:
      - flush_kubernetes_logs
      - kubernetes_logs_frontend
      source: |-
-         # try to parse json
          if is_string(.message) && is_json(string!(.message)) {
              tags = parse_json(.message) ?? {}
              ._df_log_type = tags._df_log_type
              .org_id = to_int(tags.org_id) ?? 0
              .user_id = to_int(tags.user_id) ?? 0
-             .message = tags.message || tags.msg # extract from tags.message
+             .message = tags.message || tags.msg
              del(tags._df_log_type)
              del(tags.org_id)
              del(tags.user_id)
@@ -67,13 +66,8 @@ config:
                .level = to_string!(.json.level)
                del(.json.level)
             } else {
-              # match log level
-              # allow DEBU/ERRO
-              # INFO|INFOMATION|INFORMATION|WARN|WARNING|DEBUG|ERROR|TRACE|FATAL|CRITICAL
-              # (?i) ignore case, but require `[]` or linux color code surround
               level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
               if !exists(level_tags.level) {
-                 # for logs like ' INFO ' surround by whitespace, to avoid level match error, require uppercase strictly
                  level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
               }
               if exists(level_tags.level) {
