@@ -214,7 +214,8 @@ func (m *Manager) run(ctx context.Context) {
 			oldDomainLcuuids.Add(lcuuid)
 		}
 		db.Where(
-			"enabled = ? AND controller_ip = ?", common.DOMAIN_ENABLED_TRUE, controller.IP,
+			"enabled = ? AND controller_ip = ? AND state != ?",
+			common.DOMAIN_ENABLED_TRUE, controller.IP, common.RESOURCE_STATE_CODE_NO_LICENSE,
 		).Find(&domains)
 		lcuuidToDomain := make(map[string]metadbmodel.Domain)
 		for _, domain := range domains {
