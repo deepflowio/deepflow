@@ -5685,7 +5685,6 @@ config:
       source: |
         .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
         .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
-        # map to prometheus metric name
         metrics_map = {
           "boot_time": "boot_time_seconds",
           "memory_active_bytes": "memory_Active_bytes",
@@ -5717,6 +5716,7 @@ config:
       endpoint: http://127.0.0.1:38086/api/v1/prometheus
       healthcheck:
         enabled: false
+
 ```
 
 抓取 kubernetes 指标
@@ -5852,13 +5852,12 @@ config:
      - flush_kubernetes_logs
      - kubernetes_logs_frontend
      source: |-
-         # try to parse json
          if is_string(.message) && is_json(string!(.message)) {
              tags = parse_json(.message) ?? {}
              ._df_log_type = tags._df_log_type
              .org_id = to_int(tags.org_id) ?? 0
              .user_id = to_int(tags.user_id) ?? 0
-             .message = tags.message || tags.msg # extract from tags.message
+             .message = tags.message || tags.msg
              del(tags._df_log_type)
              del(tags.org_id)
              del(tags.user_id)
@@ -5871,13 +5870,8 @@ config:
                .level = to_string!(.json.level)
                del(.json.level)
             } else {
-              # match log level
-              # allow DEBU/ERRO
-              # INFO|INFOMATION|INFORMATION|WARN|WARNING|DEBUG|ERROR|TRACE|FATAL|CRITICAL
-              # (?i) ignore case, but require `[]` or linux color code surround
               level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
               if !exists(level_tags.level) {
-                 # for logs like ' INFO ' surround by whitespace, to avoid level match error, require uppercase strictly
                  level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
               }
               if exists(level_tags.level) {
@@ -5922,6 +5916,7 @@ config:
            - tag_kubernetes_logs
            type: http
            uri: http://127.0.0.1:38086/api/v1/log
+
 ```
 
 使用 http_client 或者 socket 拨测一个远端服务
