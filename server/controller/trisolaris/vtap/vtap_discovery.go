@@ -198,7 +198,7 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	// Voucher mode turns on group features
 	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
 		dbVTap.LicenseFunctions = r.groupLicenseFunctions
-		dbVTap.FollowGroupFeatures = VTAP_ALL_LICENSE_FUNCTIONS
+		dbVTap.FollowGroupFeatures = AGENT_ALL_LICENSE_FUNCTIONS
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.OnConflict{

@@ -17,6 +17,8 @@
 package synchronize
 
 import (
+	"fmt"
+
 	api "github.com/deepflowio/deepflow/message/agent"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -114,10 +116,13 @@ func (s *service) DebugAgentCache(ctx context.Context, in *api.AgentCacheRequest
 	if vtapCache == nil {
 		log.Infof("not found vtap(ctrl_ip: %s, ctrl_mac: %s, team_id: %s, org_id: %d) cache",
 			in.GetCtrlIp(), in.GetCtrlMac(), teamID, orgID)
-		return &api.AgentCacheResponse{}, nil
+		return &api.AgentCacheResponse{}, fmt.Errorf("not found agent (%s) cache", vtapCacheKey)
 	}
-	agentCacheDebug := NewAgentCacheDebug(vtapCache)
+	cacheBytes, err := NewAgentCacheDebug(vtapCache)
+	if err != nil {
+		return &api.AgentCacheResponse{}, err
+	}
 	return &api.AgentCacheResponse{
-		Content: agentCacheDebug.Marshal(),
+		Content: cacheBytes,
 	}, nil
 }
