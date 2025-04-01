@@ -37,7 +37,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	monitorconf "github.com/deepflowio/deepflow/server/controller/monitor/config"
-	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
@@ -486,21 +485,6 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (map[string][]st
 	}
 }
 
-func (a *Agent) checkLicenseType(vtap metadbmodel.VTap, licenseType int) (err error) {
-	// check current vtap if support wanted licenseType
-	supportedLicenseTypes := license.GetSupportedLicenseType(vtap.Type)
-	if len(supportedLicenseTypes) > 0 {
-		sort.Ints(supportedLicenseTypes)
-		index := sort.SearchInts(supportedLicenseTypes, licenseType)
-		if index >= len(supportedLicenseTypes) || supportedLicenseTypes[index] != licenseType {
-			return response.ServiceError(httpcommon.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
-		}
-	} else {
-		return response.ServiceError(httpcommon.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
-	}
-	return nil
-}
-
 func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
 	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
@@ -519,17 +503,6 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 	}
 
 	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
-
-	if _, ok := vtapUpdate["LICENSE_TYPE"]; ok {
-		dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
-		licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
-
-		// 检查是否可以修改
-		err := a.checkLicenseType(vtap, licenseType)
-		if err != nil {
-			return model.Vtap{}, err
-		}
-	}
 
 	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
 		licenseFunctionStrs := []string{}
@@ -566,13 +539,8 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 			if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 				_err = response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 			} else {
-				// 检查是否可以修改
-				licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
-				_err = a.checkLicenseType(vtap, licenseType)
 				if _err == nil {
 					// 更新vtap DB
-					dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
-
 					if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
 						licenseFunctionStrs := []string{}
 						for _, licenseFunction := range licenseFunctions {
