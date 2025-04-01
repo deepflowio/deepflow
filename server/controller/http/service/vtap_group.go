@@ -206,7 +206,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	vtapGroup.Name = vtapGroupCreate.Name
 	vtapGroup.TeamID = vtapGroupCreate.TeamID
 	vtapGroup.UserID = a.resourceAccess.UserInfo.ID
-	vtapGroup.LicenseFunctions = common.VTAP_ALL_LICENSE_FUNCTIONS
+	vtapGroup.LicenseFunctions = common.AGENT_ALL_LICENSE_FUNCTIONS
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&vtapGroup).Error; err != nil {
