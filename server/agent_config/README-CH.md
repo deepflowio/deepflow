@@ -1637,7 +1637,14 @@ rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的�
 - ignore: 是否要忽略正则匹配，缺省值为 `false`
 - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
 - enabled_features: 可用于进程匹配器的 feature，可选项为：
-  [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
+  - proc.gprocess_info（请注意同时开启 `inputs.proc.enabled`）
+  - proc.golang_symbol_table（请注意同时开启 `inputs.proc.symbol_table.golang_specific.enabled`）
+  - proc.socket_list（请注意同时配置 `inputs.proc.socket_info_sync_interval` 为非 0 的数字）
+  - ebpf.socket.uprobe.golang（请注意同时开启 `inputs.ebpf.socket.uprobe.golang.enabled`）
+  - ebpf.socket.uprobe.tls（请注意同时开启 `inputs.ebpf.socket.uprobe.tls.enabled`）
+  - ebpf.profile.on_cpu（请注意同时开启 `inputs.ebpf.profile.on_cpu.disabled`，即设置为 false）
+  - ebpf.profile.off_cpu（请注意同时开启 `inputs.ebpf.profile.off_cpu.disabled`，即设置为 false）
+  - ebpf.profile.memory（请注意同时开启 `inputs.ebpf.profile.memory.disabled`，即设置为 false）
 
 示例:
 ```yaml
