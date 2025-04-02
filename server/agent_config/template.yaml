@@ -1341,8 +1341,26 @@ inputs:
     # modification: agent_restart
     # ee_feature: false
     # description:
+    #   ch: |-
+    #     注意也需要同时开启相关特性的总开关：
+    #     - proc.gprocess_info（请注意同时开启 `inputs.proc.enabled`）
+    #     - proc.golang_symbol_table（请注意同时开启 `inputs.proc.symbol_table.golang_specific.enabled`）
+    #     - proc.socket_list（请注意同时配置 `inputs.proc.socket_info_sync_interval` 为非 0 的数字）
+    #     - ebpf.socket.uprobe.golang（请注意同时开启 `inputs.ebpf.socket.uprobe.golang.enabled`）
+    #     - ebpf.socket.uprobe.tls（请注意同时开启 `inputs.ebpf.socket.uprobe.tls.enabled`）
+    #     - ebpf.profile.on_cpu（请注意同时开启 `inputs.ebpf.profile.on_cpu.disabled`，即设置为 false）
+    #     - ebpf.profile.off_cpu（请注意同时开启 `inputs.ebpf.profile.off_cpu.disabled`，即设置为 false）
+    #     - ebpf.profile.memory（请注意同时开启 `inputs.ebpf.profile.memory.disabled`，即设置为 false）
     #   en: |-
-    #     Enabled feature list.
+    #     Also ensure the global configuration parameters for related features are enabled:
+    #     - proc.gprocess_info (Note: ensure `inputs.proc.enabled` is also enabled)
+    #     - proc.golang_symbol_table (Note: ensure `inputs.proc.symbol_table.golang_specific.enabled` is also enabled)
+    #     - proc.socket_list (Note: configure `inputs.proc.socket_info_sync_interval` to a non-zero number)
+    #     - ebpf.socket.uprobe.golang (Note: ensure `inputs.ebpf.socket.uprobe.golang.enabled` is also enabled)
+    #     - ebpf.socket.uprobe.tls (Note: ensure `inputs.ebpf.socket.uprobe.tls.enabled` is also enabled)
+    #     - ebpf.profile.on_cpu (Note: ensure `inputs.ebpf.profile.on_cpu.disabled` is enabled, i.e., set to false)
+    #     - ebpf.profile.off_cpu (Note: ensure `inputs.ebpf.profile.off_cpu.disabled` is enabled, i.e., set to false)
+    #     - ebpf.profile.memory (Note: ensure `inputs.ebpf.profile.memory.disabled` is enabled, i.e., set to false)
     # upgrade_from: static_config.ebpf.on-cpu-profile.regex, static_config.ebpf.off-cpu-profile.regex
     # ---
     # enabled_features: []
