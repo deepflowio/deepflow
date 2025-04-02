@@ -50,11 +50,17 @@ func (s *Tags) Append(t Node) {
 }
 
 func (s *Tags) WriteTo(buf *bytes.Buffer) {
-	for i, tag := range s.tags {
-		tag.WriteTo(buf)
-		if i < len(s.tags)-1 {
+	first := true
+	for _, tag := range s.tags {
+		node, ok := tag.(*Tag)
+		if ok && node.NoReturn {
+			continue
+		}
+		if !first {
 			buf.WriteString(", ")
 		}
+		tag.WriteTo(buf)
+		first = false
 	}
 }
 
@@ -69,10 +75,11 @@ func (s *Tags) GetWiths() []Node {
 }
 
 type Tag struct {
-	Value string
-	Alias string
-	Flag  int
-	Withs []Node
+	Value    string
+	Alias    string
+	Flag     int
+	Withs    []Node
+	NoReturn bool
 	NodeBase
 }
 
