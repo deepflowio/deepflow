@@ -1958,7 +1958,15 @@ inputs:
 
 **详细描述**:
 
-Enabled feature list.
+注意也需要同时开启相关特性的总开关：
+- proc.gprocess_info（请注意同时开启 `inputs.proc.enabled`）
+- proc.golang_symbol_table（请注意同时开启 `inputs.proc.symbol_table.golang_specific.enabled`）
+- proc.socket_list（请注意同时配置 `inputs.proc.socket_info_sync_interval` 为非 0 的数字）
+- ebpf.socket.uprobe.golang（请注意同时开启 `inputs.ebpf.socket.uprobe.golang.enabled`）
+- ebpf.socket.uprobe.tls（请注意同时开启 `inputs.ebpf.socket.uprobe.tls.enabled`）
+- ebpf.profile.on_cpu（请注意同时开启 `inputs.ebpf.profile.on_cpu.disabled`，即设置为 false）
+- ebpf.profile.off_cpu（请注意同时开启 `inputs.ebpf.profile.off_cpu.disabled`，即设置为 false）
+- ebpf.profile.memory（请注意同时开启 `inputs.ebpf.profile.memory.disabled`，即设置为 false）
 
 ### 符号表 {#inputs.proc.symbol_table}
 
