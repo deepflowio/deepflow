@@ -1655,7 +1655,14 @@ Configuration Item:
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
 - enabled_features: the features can be used for process matcher, options:
-  [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
+  - proc.gprocess_info (Note: ensure `inputs.proc.enabled` is also enabled)
+  - proc.golang_symbol_table (Note: ensure `inputs.proc.symbol_table.golang_specific.enabled` is also enabled)
+  - proc.socket_list (Note: configure `inputs.proc.socket_info_sync_interval` to a non-zero number)
+  - ebpf.socket.uprobe.golang (Note: ensure `inputs.ebpf.socket.uprobe.golang.enabled` is also enabled)
+  - ebpf.socket.uprobe.tls (Note: ensure `inputs.ebpf.socket.uprobe.tls.enabled` is also enabled)
+  - ebpf.profile.on_cpu (Note: ensure `inputs.ebpf.profile.on_cpu.disabled` is enabled, i.e., set to false)
+  - ebpf.profile.off_cpu (Note: ensure `inputs.ebpf.profile.off_cpu.disabled` is enabled, i.e., set to false)
+  - ebpf.profile.memory (Note: ensure `inputs.ebpf.profile.memory.disabled` is enabled, i.e., set to false)
 
 Example:
 ```yaml
