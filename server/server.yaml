@@ -78,6 +78,8 @@ controller:
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600
+    # whether enable redis cache when get resource api via page
+    resource_api_page_get_redis_enabled: false
     # additional domains
     additional_domains:
 
