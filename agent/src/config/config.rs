@@ -561,7 +561,7 @@ pub struct Proc {
 impl Default for Proc {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             proc_dir_path: "/proc".to_string(),
             socket_info_sync_interval: Duration::from_secs(0),
             min_lifetime: Duration::from_secs(3),
