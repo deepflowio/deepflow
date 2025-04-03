@@ -26,12 +26,12 @@ type PodCluster struct {
 }
 
 func NewPodCluster() *PodCluster {
-	operater := &PodCluster{
+	operator := &PodCluster{
 		newOperatorBase[*metadbmodel.PodCluster](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

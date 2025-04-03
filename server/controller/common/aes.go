@@ -25,8 +25,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -96,7 +96,7 @@ func GetEncryptKey(controllerIP, grpcServerPort, key string) (string, error) {
 	grpcServer := net.JoinHostPort(controllerIP, grpcServerPort)
 	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 	if err != nil {
-		log.Error("create grpc connection faild:" + err.Error())
+		log.Error("create grpc connection failed:" + err.Error())
 		return "", err
 	}
 	defer conn.Close()
@@ -114,7 +114,7 @@ func GetEncryptKey(controllerIP, grpcServerPort, key string) (string, error) {
 }
 
 func EncryptSecretKey(secretKey string) (string, error) {
-	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	caData, err := os.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return "", err
@@ -129,7 +129,7 @@ func EncryptSecretKey(secretKey string) (string, error) {
 }
 
 func DecryptSecretKey(secretKey string) (string, error) {
-	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	caData, err := os.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return "", err
@@ -144,7 +144,7 @@ func DecryptSecretKey(secretKey string) (string, error) {
 }
 
 func GetLocalClusterID() (string, error) {
-	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	caData, err := os.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return "", err
@@ -153,7 +153,7 @@ func GetLocalClusterID() (string, error) {
 }
 
 func getCAMD5() string {
-	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	caData, err := os.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return ""

@@ -109,7 +109,7 @@ pub(super) struct InternalState {
 
     pub(super) flow_output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
     pub(super) l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    pub(super) log_output_queue: DebugSender<Box<AppProto>>,
+    pub(super) log_output_queue: DebugSender<AppProto>,
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
@@ -859,7 +859,7 @@ impl BaseDispatcherListener {
 
     pub(super) fn on_vm_change(&self, keys: &[u64], vm_macs: &[MacAddr]) {
         assert_eq!(keys.len(), vm_macs.len());
-        // assert keys in assending order for bsearch
+        // assert keys in ascending order for bsearch
         assert!(keys.windows(2).all(|w| w[0] <= w[1]));
         let mut pipelines = self.pipelines.lock().unwrap();
 

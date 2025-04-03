@@ -145,7 +145,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		grpcServer := net.JoinHostPort(serverIP, g.config.GrpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.config.GrpcMaxMessageLength))
 		if err != nil {
-			msg := "create grpc connection faild:" + err.Error()
+			msg := "create grpc connection failed:" + err.Error()
 			log.Error(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
@@ -158,7 +158,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		}
 		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
-			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
+			msg := fmt.Sprintf("get genesis sharing sync failed (%s)", err.Error())
 			log.Warning(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
@@ -422,7 +422,7 @@ func (g *GenesisSync) Start() {
 				if info.VtapID != 0 {
 					peerInfo, ok := genesisSyncDataByVtap[vtap]
 					if ok {
-						vStorage.Renew(info.ORGID, peerInfo)
+						vStorage.Renew(info.ORGID, info.VtapID, info.StorageRefresh, peerInfo)
 					}
 				}
 			} else if info.MessageType == common.TYPE_UPDATE {

@@ -75,7 +75,7 @@ use crate::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, UserConfig,
     },
-    flow_generator::{protocol_logs::PseudoAppProto, LogMessageType},
+    flow_generator::LogMessageType,
     metric::document::TapSide,
     plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
@@ -179,10 +179,10 @@ pub struct FlowMap {
     l7_stats_allocator: Allocator<L7Stats>,
     output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
-    out_log_queue: DebugSender<Box<AppProto>>,
+    out_log_queue: DebugSender<AppProto>,
     output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
     l7_stats_buffer: Vec<BatchedBox<L7Stats>>,
-    protolog_buffer: Vec<Box<AppProto>>,
+    protolog_buffer: Vec<AppProto>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
@@ -217,7 +217,7 @@ impl FlowMap {
         output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
-        app_proto_log_queue: DebugSender<Box<AppProto>>,
+        app_proto_log_queue: DebugSender<AppProto>,
         ntp_diff: Arc<AtomicI64>,
         config: &FlowConfig,
         packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -909,7 +909,7 @@ impl FlowMap {
             if node.residual_request == 0 {
                 node.timeout = flow_config.flow_timeout.opening;
             } else {
-                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+                node.timeout = config.log_parser.l7_log_session_aggr_max_timeout.into();
             }
         }
 
@@ -1277,9 +1277,6 @@ impl FlowMap {
         tagged_flow.flow = flow;
 
         // FlowMap信息
-        let mut policy_in_tick = [false; 2];
-        policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
-
         let mut node = self
             .flow_node_pool
             .get()
@@ -1290,7 +1287,7 @@ impl FlowMap {
         node.recent_time = lookup_key.timestamp;
         node.timeout = Timestamp::ZERO;
         node.packet_in_tick = true;
-        node.policy_in_tick = policy_in_tick;
+        node.policy_in_tick = [true, false];
         node.flow_state = FlowState::Raw;
         node.meta_flow_log = None;
         node.next_tcp_seq0 = 0;
@@ -1321,7 +1318,7 @@ impl FlowMap {
 
         // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
-        self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        self.init_endpoint_and_policy_data(&mut node, meta_packet);
         node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
             && meta_packet.lookup_key.proto == IpProtocol::TCP)
             || node.contain_pcap_policy();
@@ -1773,7 +1770,7 @@ impl FlowMap {
                 node.timeout = DEFAULT_SOCKET_CLOSE_TIMEOUT;
             } else {
                 // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
+                node.timeout = config.log_parser.l7_log_session_aggr_max_timeout.into();
             }
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true);
@@ -2136,18 +2133,14 @@ impl FlowMap {
                 let l7_protocol = l.l7_protocol_enum.get_l7_protocol();
                 // If this protocol has session_id, the AppProto in SessionAggregator cannot be found based on flow_id alone.
                 if !l7_protocol.has_session_id() {
-                    let app_proto = PseudoAppProto::new(
-                        PseudoAppProto::session_key(
-                            node.tagged_flow.flow.flow_id,
-                            node.last_cap_seq,
-                            node.tagged_flow.flow.signal_source,
-                            l7_protocol,
-                        ),
-                        node.recent_time,
-                        node.tagged_flow.flow.tap_side,
+                    let session_key = MetaAppProto::session_key(
+                        node.tagged_flow.flow.flow_id,
+                        node.last_cap_seq,
+                        node.tagged_flow.flow.signal_source,
+                        l7_protocol,
                     );
                     self.protolog_buffer
-                        .push(Box::new(AppProto::PseudoAppProto(app_proto)));
+                        .push(AppProto::SocketClosed(session_key));
                     if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
                         self.flush_app_protolog();
                     }
@@ -2178,7 +2171,7 @@ impl FlowMap {
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
             {
                 self.protolog_buffer
-                    .push(Box::new(AppProto::MetaAppProto(app_proto)));
+                    .push(AppProto::MetaAppProto(Box::new(app_proto)));
                 if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
                     self.flush_app_protolog();
                 }
@@ -2394,6 +2387,65 @@ impl FlowMap {
         }
     }
 
+    fn update_flow_metrics_peers(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+        let Some(ep) = node.endpoint_data_cache.as_ref() else {
+            return;
+        };
+
+        let src_info = ep.src_info();
+        let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
+        let mut reset_tap_side =
+            peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
+        peer_src.is_device = src_info.is_device;
+        peer_src.is_vip_interface = src_info.is_vip_interface;
+        peer_src.is_l2_end = src_info.l2_end;
+        peer_src.is_l3_end = src_info.l3_end;
+        peer_src.l3_epc_id = src_info.l3_epc_id;
+        peer_src.is_vip = src_info.is_vip;
+        peer_src.is_local_mac = src_info.is_local_mac;
+        peer_src.is_local_ip = src_info.is_local_ip;
+
+        let dst_info = ep.dst_info();
+        let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
+        reset_tap_side = reset_tap_side
+            || peer_dst.is_l2_end != dst_info.l2_end
+            || peer_dst.is_l3_end != dst_info.l3_end;
+        peer_dst.is_device = dst_info.is_device;
+        peer_dst.is_vip_interface = dst_info.is_vip_interface;
+        peer_dst.is_l2_end = dst_info.l2_end;
+        peer_dst.is_l3_end = dst_info.l3_end;
+        peer_dst.l3_epc_id = dst_info.l3_epc_id;
+        peer_dst.is_vip = dst_info.is_vip;
+        peer_dst.is_local_mac = dst_info.is_local_mac;
+        peer_dst.is_local_ip = dst_info.is_local_ip;
+
+        meta_packet.set_vip_info(src_info.real_ip, dst_info.real_ip);
+
+        // When there is a change in l2end or l3end, the tap side needs to be recalculated
+        if reset_tap_side {
+            node.tagged_flow.flow.tap_side = TapSide::Rest;
+        }
+    }
+
+    // Before this function is called, the MAC address and IP address recorded in the flow node are
+    // the same as the first packet. Therefore, the endpoints and policies here must be the same as
+    // those of Packet.
+    fn init_endpoint_and_policy_data(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+        if let Some(data) = meta_packet.endpoint_data.as_ref() {
+            node.endpoint_data_cache = Some(data.clone());
+            Self::update_flow_metrics_peers(node, meta_packet);
+        }
+
+        // init policy data
+        if let Some(policy_data) = meta_packet.policy_data.as_ref() {
+            node.policy_data_cache[PacketDirection::ClientToServer as usize] =
+                Some(policy_data.clone());
+        }
+        node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
+    }
+
+    // When this function is called, the direction of MAC, IP, etc. recorded in the flow node is c2s,
+    // and the endpoints and policies need to be corrected according to the direction in packet.
     fn update_endpoint_and_policy_data(
         &mut self,
         node: &mut FlowNode,
@@ -2411,41 +2463,7 @@ impl FlowMap {
             }
         }
 
-        if let Some(ep) = node.endpoint_data_cache.as_ref() {
-            let src_info = ep.src_info();
-            let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
-            let mut reset_tap_side =
-                peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
-            peer_src.is_device = src_info.is_device;
-            peer_src.is_vip_interface = src_info.is_vip_interface;
-            peer_src.is_l2_end = src_info.l2_end;
-            peer_src.is_l3_end = src_info.l3_end;
-            peer_src.l3_epc_id = src_info.l3_epc_id;
-            peer_src.is_vip = src_info.is_vip;
-            peer_src.is_local_mac = src_info.is_local_mac;
-            peer_src.is_local_ip = src_info.is_local_ip;
-
-            let dst_info = ep.dst_info();
-            let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
-            reset_tap_side = reset_tap_side
-                || peer_dst.is_l2_end != dst_info.l2_end
-                || peer_dst.is_l3_end != dst_info.l3_end;
-            peer_dst.is_device = dst_info.is_device;
-            peer_dst.is_vip_interface = dst_info.is_vip_interface;
-            peer_dst.is_l2_end = dst_info.l2_end;
-            peer_dst.is_l3_end = dst_info.l3_end;
-            peer_dst.l3_epc_id = dst_info.l3_epc_id;
-            peer_dst.is_vip = dst_info.is_vip;
-            peer_dst.is_local_mac = dst_info.is_local_mac;
-            peer_dst.is_local_ip = dst_info.is_local_ip;
-
-            meta_packet.set_vip_info(src_info.real_ip, dst_info.real_ip);
-
-            // When there is a change in l2end or l3end, the tap side needs to be recalculated
-            if reset_tap_side {
-                node.tagged_flow.flow.tap_side = TapSide::Rest;
-            }
-        }
+        Self::update_flow_metrics_peers(node, meta_packet);
 
         // update policy data
         if let Some(policy_data) = meta_packet.policy_data.as_ref() {

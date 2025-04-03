@@ -26,12 +26,12 @@ type NATGateway struct {
 }
 
 func NewNATGateway() *NATGateway {
-	operater := &NATGateway{
+	operator := &NATGateway{
 		newOperatorBase[*metadbmodel.NATGateway](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

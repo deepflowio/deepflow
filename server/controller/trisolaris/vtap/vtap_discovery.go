@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -197,11 +198,17 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	// Voucher mode turns on group features
 	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
 		dbVTap.LicenseFunctions = r.groupLicenseFunctions
-		dbVTap.FollowGroupFeatures = VTAP_ALL_LICENSE_FUNCTIONS
+		dbVTap.FollowGroupFeatures = AGENT_ALL_LICENSE_FUNCTIONS
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(dbVTap).Error; err != nil {
-			log.Errorf(r.Logf("insert agent(%s) to DB faild, err: %s", r, err))
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "ctrl_ip"},
+				{Name: "ctrl_mac"},
+			},
+			DoNothing: true,
+		}).Create(dbVTap).Error; err != nil {
+			log.Errorf(r.Logf("insert agent(%s) to DB failed, err: %s", r, err))
 			errID := idmng.ReleaseIDs(r.GetORGID(), RESOURCE_TYPE_VTAP_EN, ids)
 			if errID != nil {
 				log.Error(r.Logf("Release ids=%v err: %s", ids, errID))

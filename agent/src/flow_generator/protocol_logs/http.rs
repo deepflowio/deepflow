@@ -66,6 +66,19 @@ impl Version {
     }
 }
 
+impl TryFrom<&str> for Version {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "1.0" => Ok(Self::V1_0),
+            "1.1" => Ok(Self::V1_1),
+            "2" => Ok(Self::V2),
+            _ => Err(Error::HttpHeaderParseFailed),
+        }
+    }
+}
+
 impl Serialize for Version {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -272,47 +285,66 @@ pub struct HttpInfo {
 }
 
 impl HttpInfo {
-    pub fn merge_custom_to_http(&mut self, custom: CustomInfo) {
-        // req rewrite
-        if !custom.req.domain.is_empty() {
-            self.host = custom.req.domain;
+    pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
+        if dir == PacketDirection::ClientToServer {
+            if let Ok(v) = Version::try_from(custom.req.version.as_str()) {
+                self.version = v;
+            }
+
+            if let Ok(m) = Method::try_from(custom.req.req_type.as_str()) {
+                self.method = m;
+            }
+
+            if !custom.req.domain.is_empty() {
+                self.host = custom.req.domain;
+            }
+
+            if !custom.req.resource.is_empty() {
+                self.path = custom.req.resource;
+            }
+
+            if let Some(id) = custom.request_id {
+                self.stream_id = Some(id);
+            }
+
+            if !custom.req.endpoint.is_empty() {
+                self.endpoint = Some(custom.req.endpoint)
+            }
         }
 
-        if !custom.req.req_type.is_empty() {
-            self.method = Method::try_from(custom.req.req_type.as_str()).unwrap_or_default();
-        }
+        if dir == PacketDirection::ServerToClient {
+            if let Some(code) = custom.resp.code {
+                self.status_code = code as u16;
+            }
 
-        if !custom.req.resource.is_empty() {
-            self.path = custom.req.resource;
-        }
+            if custom.resp.status != self.status {
+                self.status = custom.resp.status;
+            }
 
-        if !custom.req.endpoint.is_empty() {
-            self.endpoint = Some(custom.req.endpoint)
-        }
+            if !custom.resp.result.is_empty() {
+                self.custom_result = Some(custom.resp.result)
+            }
 
-        //req write
-        if let Some(code) = custom.resp.code {
-            self.status_code = code as u16;
-        }
-
-        if custom.resp.status != self.status {
-            self.status = custom.resp.status;
-        }
-
-        if !custom.resp.result.is_empty() {
-            self.custom_result = Some(custom.resp.result)
-        }
-
-        if !custom.resp.exception.is_empty() {
-            self.custom_exception = Some(custom.resp.exception)
+            if !custom.resp.exception.is_empty() {
+                self.custom_exception = Some(custom.resp.exception)
+            }
         }
 
         //trace info rewrite
-        if custom.trace.trace_id.is_some() {
-            self.trace_id = custom.trace.trace_id.unwrap();
+        if let Some(trace_id) = custom.trace.trace_id {
+            self.trace_id = trace_id;
         }
-        if custom.trace.span_id.is_some() {
-            self.span_id = custom.trace.span_id.unwrap();
+        if let Some(span_id) = custom.trace.span_id {
+            self.span_id = span_id;
+        }
+        if let Some(x_request_id_0) = custom.trace.x_request_id_0 {
+            self.x_request_id_0 = x_request_id_0;
+        }
+        if let Some(x_request_id_1) = custom.trace.x_request_id_1 {
+            self.x_request_id_1 = x_request_id_1;
+        }
+        if let Some(http_proxy_client) = custom.trace.http_proxy_client {
+            self.client_ip = Some(http_proxy_client);
         }
 
         // extend attribute
@@ -1446,7 +1478,7 @@ impl HttpLog {
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
         }
         .map(|custom| {
-            info.merge_custom_to_http(custom);
+            info.merge_custom_to_http(custom, param.direction);
         });
     }
 }
@@ -1779,7 +1811,12 @@ mod tests {
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
-            l7_log_session_aggr_timeout: Duration::from_secs(10),
+            l7_log_session_aggr_timeout: [
+                (L7Protocol::Http1, Duration::from_secs(10)),
+                (L7Protocol::Http2, Duration::from_secs(10)),
+                (L7Protocol::Grpc, Duration::from_secs(10)),
+            ]
+            .into(),
             l7_log_dynamic: config.clone(),
             ..Default::default()
         };

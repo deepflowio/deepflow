@@ -167,7 +167,7 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 			dst, err := exportItem.EncodeTo(exporters_cfg.PROTOCOL_OTLP, e.universalTagsManager, e.config)
 			if err != nil {
 				if e.counter.DropCounter == 0 {
-					log.Warningf("otlp exporter encode faild. err: %s", err)
+					log.Warningf("otlp exporter encode failed. err: %s", err)
 				}
 				e.counter.DropCounter++
 				exportItem.Release()
@@ -209,7 +209,7 @@ func (e *OtlpExporter) grpcExport(ctx context.Context, queueID int, req ptraceot
 	_, err := e.grpcExporters[queueID].Export(ctx, req)
 	if err != nil {
 		if e.counter.DropCounter == 0 {
-			log.Warningf("otlp exporter %d send grpc traces failed. faildCounter=%d, err: %s", e.index, e.grpcFailedCounters[queueID], err)
+			log.Warningf("otlp exporter %d send grpc traces failed. failedCounter=%d, err: %s", e.index, e.grpcFailedCounters[queueID], err)
 		}
 		e.counter.DropCounter++
 		e.grpcExporters[queueID] = nil

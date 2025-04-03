@@ -20,12 +20,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -2140,7 +2140,7 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 
 static int check_dependencies(void)
 {
-	if (check_kernel_version(4, 14) != 0) {
+	if (check_kernel_version(4, 12) != 0) {
 		return -1;
 	}
 
@@ -2173,7 +2173,7 @@ static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 	char sys_type_str[16];
 	memset(sys_type_str, 0, sizeof(sys_type_str));
 	if (fetch_system_type(sys_type_str, sizeof(sys_type_str) - 1) != ETR_OK) {
-		ebpf_warning("Fetch system type faild.\n");
+		ebpf_warning("Fetch system type failed.\n");
 	}
 
 	if (is_rt_kernel()) {

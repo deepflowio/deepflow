@@ -287,6 +287,16 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 			}
 		}
 
+		// exceptions
+		exceptions := domain.Exceptions
+		bitNum := 0
+		for ; exceptions > 0; exceptions /= 2 {
+			if exceptions%2 != 0 {
+				domainResp.Exceptions = append(domainResp.Exceptions, 1<<bitNum)
+			}
+			bitNum += 1
+		}
+
 		response = append(response, domainResp)
 	}
 	return response, nil
@@ -786,6 +796,7 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 			Name:         subDomain.Name,
 			DisplayName:  subDomain.DisplayName,
 			ClusterID:    subDomain.ClusterID,
+			Enabled:      subDomain.Enabled,
 			State:        subDomain.State,
 			ErrorMsg:     subDomain.ErrorMsg,
 			CreateMethod: subDomain.CreateMethod,
@@ -822,6 +833,16 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 			log.Error(err)
 		}
 		subDomainResp.DomainName = domain.Name
+
+		// exceptions
+		exceptions := subDomain.Exceptions
+		bitNum := 0
+		for ; exceptions > 0; exceptions /= 2 {
+			if exceptions%2 != 0 {
+				subDomainResp.Exceptions = append(subDomainResp.Exceptions, 1<<bitNum)
+			}
+			bitNum += 1
+		}
 
 		response = append(response, &subDomainResp)
 	}
@@ -911,6 +932,11 @@ func UpdateSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 	if ok {
 		dbUpdateMap["team_id"] = teamID
 		resourceUp["team_id"] = teamID
+	}
+
+	// 禁用/启用
+	if uEnabled, ok := subDomainUpdate["ENABLED"]; ok {
+		dbUpdateMap["enabled"] = uEnabled
 	}
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {

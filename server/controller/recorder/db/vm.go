@@ -27,14 +27,14 @@ type VM struct {
 }
 
 func NewVM() *VM {
-	operater := &VM{
+	operator := &VM{
 		newOperatorBase[*metadbmodel.VM](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }
 
 func (v *VM) DeleteBatch(lcuuids []string) ([]*metadbmodel.VM, bool) {

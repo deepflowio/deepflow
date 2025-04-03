@@ -108,7 +108,8 @@ const VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
 
 fn main() -> Result<()> {
     panic::set_hook(Box::new(|panic_info| {
-        error!("{:?}", panic_info.to_string());
+        error!("{panic_info}");
+        error!("{}", std::backtrace::Backtrace::force_capture());
     }));
     let opts = Opts::parse();
     if opts.version {

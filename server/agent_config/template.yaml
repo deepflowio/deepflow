@@ -950,12 +950,27 @@ inputs:
     # ee_feature: false
     # description:
     #   en: |-
-    #     Only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM.
+    #     After enabling this configuration, deepflow-agent will periodically report the process information
+    #     specified in `inputs.proc.process_matcher` to deepflow-server. After synchronizing process information,
+    #     all eBPF observability data will automatically inject the global process ID (gprocess_id) tag.
+    #
+    #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+    #     i.e., `proc.gprocess_info` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+    #
+    #     This configuration only applies to agents of `cloud server` types (CHOST_VM, CHOST_BM) and `container`
+    #     types (K8S_VM, K8S_BM). Use the command `deepflow-ctl agent list` to determine the specific agent
+    #     type in CLI environments.
     #   ch: |-
-    #     开启后 deepflow-agent 将获取操作系统的进程信息，并上报至 deepflow-server。该参数仅对
-    #     CHOST_VM, CHOST_BM, K8S_VM, K8S_BM 等运行环境的 agent 有效。
+    #     开启此配置后，deepflow-agent 会周期性将 `inputs.proc.process_matcher` 中指定的进程信息上报给 deepflow-server。
+    #     同步进程信息后，所有的 eBPF 观测数据都会自动注入`全局进程 ID`（`gprocess_id`）标签。
+    #
+    #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+    #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.gprocess_info`。
+    #
+    #     该参数仅对`云服务器`（CHOST_VM、CHOST_BM）和`容器`（K8S_VM、K8S_BM）类型的 agent 有效，
+    #     在命令行下使用 `deepflow-ctl agent list` 可确定 agent 的具体类型。
     # upgrade_from: static_config.os-proc-sync-enabled
-    enabled: false
+    enabled: true
     # type: string
     # name:
     #   en: Directory of /proc
@@ -983,11 +998,21 @@ inputs:
     # ee_feature: false
     # description:
     #   en: |-
-    #     The interval of socket info sync.
-    #     0 means disabled, do not configure a value less than 1s except for 0.
+    #     Synchronization interval for process Socket information.
+    #
+    #     0 means disabled, do not configure a value less than `1s` except for 0.
+    #
+    #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+    #     i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+    #     Additionally, ensure `inputs.proc.enabled` is configured to **true**.
     #   ch: |-
-    #     Socket 信息同步的周期。
-    #     0 表示不开启，除 0 外不要配置小于 1s 的值。
+    #     进程 Socket 信息的同步周期。
+    #
+    #     0 表示不开启，除 0 外不要配置小于 `1s` 的值。
+    #
+    #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+    #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
+    #     另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
     # upgrade_from: static_config.os-proc-socket-sync-interval
     socket_info_sync_interval: 0
     # type: duration
@@ -1091,6 +1116,8 @@ inputs:
     # ee_feature: false
     # description:
     #   ch: |-
+    #     用于指定为特定进程开启的高级功能列表。
+    #
     #     匹配器将自上而下地遍历匹配规则，所以较前的规则将会被优先匹配。
     #     当 match_type 为 parent_process_name 时，匹配器将会递归地查找父进程名且忽略 rewrite_name 选项。
     #     rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的环境变量。
@@ -1102,9 +1129,16 @@ inputs:
     #       [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
     #     - ignore: 是否要忽略正则匹配，缺省值为 `false`
     #     - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
-    #     - enabled_features: 可用于进程匹配器的 feature，可选项为：
-    #       [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
-    #     
+    #     - enabled_features: 为匹配到的进程开启的特性列表，可选项如下
+    #       - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
+    #       - proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
+    #       - proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
+    #       - ebpf.socket.uprobe.golang（注意确认 `inputs.ebpf.socket.uprobe.golang.enabled` 已配置为 **true**）
+    #       - ebpf.socket.uprobe.tls（注意确认 `inputs.ebpf.socket.uprobe.tls.enabled` 已配置为 **true**）
+    #       - ebpf.profile.on_cpu（注意确认 `inputs.ebpf.profile.on_cpu.disabled` 已配置为 **false**）
+    #       - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
+    #       - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
+    #
     #     示例:
     #     ```yaml
     #     inputs:
@@ -1133,6 +1167,8 @@ inputs:
     #           match_type: tag
     #     ```
     #   en: |-
+    #     List of advanced features enabled for specific processes.
+    #
     #     Will traverse over the entire array, so the previous ones will be matched first.
     #     when match_type is parent_process_name, will recursive to match parent proc name,
     #     and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
@@ -1146,8 +1182,15 @@ inputs:
     #     - ignore: Whether to ignore when regex match, default value is `false`
     #     - rewrite_name: The name will replace the process name or cmd use regexp replace.
     #       Default value `""` means no replacement.
-    #     - enabled_features: the features can be used for process matcher, options:
-    #       [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
+    #     - enabled_features: List of features enabled for matched processes. Available options:
+    #       - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
+    #       - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
+    #       - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
+    #       - ebpf.socket.uprobe.golang (Ensure `inputs.ebpf.socket.uprobe.golang.enabled` is configured to **true**)
+    #       - ebpf.socket.uprobe.tls (Ensure `inputs.ebpf.socket.uprobe.tls.enabled` is configured to **true**)
+    #       - ebpf.profile.on_cpu (Ensure `inputs.ebpf.profile.on_cpu.disabled` is configured to **false**)
+    #       - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
+    #       - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
     #
     #     Example:
     #     ```yaml
@@ -1327,8 +1370,26 @@ inputs:
     # modification: agent_restart
     # ee_feature: false
     # description:
+    #   ch: |-
+    #     注意也需要同时开启相关特性的总开关：
+    #     - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
+    #     - proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
+    #     - proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
+    #     - ebpf.socket.uprobe.golang（注意确认 `inputs.ebpf.socket.uprobe.golang.enabled` 已配置为 **true**）
+    #     - ebpf.socket.uprobe.tls（注意确认 `inputs.ebpf.socket.uprobe.tls.enabled` 已配置为 **true**）
+    #     - ebpf.profile.on_cpu（注意确认 `inputs.ebpf.profile.on_cpu.disabled` 已配置为 **false**）
+    #     - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
+    #     - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
     #   en: |-
-    #     Enabled feature list.
+    #     Also ensure the global configuration parameters for related features are enabled:
+    #     - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
+    #     - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
+    #     - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
+    #     - ebpf.socket.uprobe.golang (Ensure `inputs.ebpf.socket.uprobe.golang.enabled` is configured to **true**)
+    #     - ebpf.socket.uprobe.tls (Ensure `inputs.ebpf.socket.uprobe.tls.enabled` is configured to **true**)
+    #     - ebpf.profile.on_cpu (Ensure `inputs.ebpf.profile.on_cpu.disabled` is configured to **false**)
+    #     - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
+    #     - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
     # upgrade_from: static_config.ebpf.on-cpu-profile.regex, static_config.ebpf.off-cpu-profile.regex
     # ---
     # enabled_features: []
@@ -1378,12 +1439,9 @@ inputs:
         #     version >= 1.13 and < 1.18, when the standard symbol table is missing, the
         #     Golang-specific symbol table will be parsed to complete uprobe data collection.
         #     Note that enabling this feature may cause the eBPF initialization process to
-        #     take ten minutes. The `golang-symbol` configuration item depends on the `golang`
-        #     configuration item, the `golang-symbol` is a subset of the `golang` configuration item.
+        #     take ten minutes.
         #
         #     Example:
-        #     - Ensure that the regular expression matching for the 'golang' configuration
-        #       item is enabled, for example: `golang: .*`
         #     - You've encountered the following warning log:
         #       ```
         #       [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
@@ -1410,13 +1468,18 @@ inputs:
         #       entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
         #       ```
         #       The logs indicate that the Golang program has been successfully hooked.
+        #
+        #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+        #     i.e., `proc.golang_symbol_table` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
         #   ch: |-
+        #     是否开启 Golang 特有符号表的解析能力。
+        #
         #     如果 Golang（版本 >= 1.13 and < 1.18条件下）进程运行时裁切了标准符号
         #     表，开启此开关后 deepflow-agent 将解析生成 Golang-specific 符号表以
         #     完善 eBPF uprobe 数据，实现 Golang 程序的零侵扰调用链追踪。注意：开启
         #     该开关后，eBPF 程序初始化过程可能会持续 10 分钟以上的时间。
+        #
         #     配置方法：
-        #     - 在'golang'的参数中配置进程的正则表达式，比如：`golang: .*`
         #     - 如果在 deepflow-agent 的运行日志中发现如下 warning：
         #       ```
         #       [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
@@ -1429,16 +1492,20 @@ inputs:
         #         # ls -al /proc/1946/exe
         #         /proc/1946/exe -> /usr/local/bin/kube-controller-manager
         #         ```
-        #       - 检查目录下是否有符号表，如果结果中出现 "no symbols"，则说明符号表缺失，需要开启 Golang 程序符号表解析开关.
+        #       - 检查目录下是否有符号表：
         #         ```
         #         # nm /proc/1946/root/usr/local/bin/kube-controller-manager
         #         nm: /proc/1946/root/usr/local/bin/kube-controller-manager: no symbols
         #         ```
+        #     - 如果结果中出现 "no symbols"，则说明符号表缺失，需要开启 Golang 程序符号表解析开关.
         #     - deepflow-agent 启动阶段运行日志中出现类似下面的信息，说明 Golang 进程已经被成功 hook。
         #       ```
         #       [eBPF] INFO Uprobe [/proc/1946/root/usr/local/bin/kube-controller-manager] pid:1946 go1.16.0
         #       entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
         #       ```
+        #
+        #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+        #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.golang_symbol_table`。
         # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.golang-symbol
         enabled: false
       # type: section
@@ -2318,8 +2385,14 @@ inputs:
           #   en: |-
           #     Whether golang process enables HTTP2/HTTPS protocol data collection
           #     and auto-tracing. go auto-tracing also dependent go-tracing-timeout.
+          #
+          #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+          #     i.e., `ebpf.socket.uprobe.golang` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
           #   ch: |-
           #     Golang 程序 HTTP2/HTTPS 协议数据采集及零侵扰追踪特性的开启开关。
+          #
+          #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+          #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.golang`。
           # upgrade_from: static_config.ebpf.uprobe-golang-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.golang
           enabled: false
           # type: duration
@@ -2354,26 +2427,38 @@ inputs:
           # description:
           #   en: |-
           #     Whether the process that uses the openssl library to enable HTTPS protocol data collection.
+          #
           #     One can use the following method to determine whether an application process can use
           #     `Uprobe hook openssl library` to access encrypted data:
+          #     - Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
+          #       information about openssl. If it does, it indicates that this process is using the
+          #       openssl library.
           #
-          #     Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
-          #     information about openssl. If it does, it indicates that this process is using the
-          #     openssl library. After configuring the openssl options, deepflow-agent will retrieve process
-          #     information that matches the regular expression, hooking the corresponding encryption/decryption
-          #     interfaces of the openssl library.
-          #
-          #     In the logs, you will encounter a message similar to the following:
+          #     After enabled, deepflow-agent will retrieve process information that
+          #     matches the regular expression, hooking the corresponding encryption/decryption
+          #     interfaces of the openssl library. In the logs, you will encounter a message similar
+          #     to the following:
           #     ```
           #     [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
           #     ```
+          #
+          #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+          #     i.e., `ebpf.socket.uprobe.tls` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
           #   ch: |-
-          #     应用程序 openssl 采集开关，开启后 deepflow-agent 将获取进程信息并用 Uprobe  Hook 到 opessl 的
-          #     加密/解密接口，以采集 HTTPS 协议加密前、解密后的数据。
-          #     确定应用程序是否使用 openssl 的方法：
+          #     是否启用使用 openssl 库的进程以支持 HTTPS 协议数据采集。
+          #
+          #     可通过以下方式判断应用进程是否能够使用 `Uprobe hook openssl 库`来采集加密数据：
+          #     - 执行命令`cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
+          #       则说明该进程正在使用 openssl 库。
+          #
+          #     启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
+          #     在日志中您会看到类似如下信息：
           #     ```
-          #     `cat /proc/<PID>/maps | grep "libssl.so"`
+          #     [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
           #     ```
+          #
+          #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+          #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.tls`。
           # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
           enabled: false
         # type: section
@@ -2944,8 +3029,14 @@ inputs:
         # description:
         #   en: |-
         #     eBPF On-CPU profile switch.
+        #
+        #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+        #     i.e., `ebpf.profile.on_cpu` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
         #   ch: |-
         #     eBPF On-CPU profile 数据的采集开关。
+        #
+        #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+        #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.on_cpu`。
         # upgrade_from: static_config.ebpf.on-cpu-profile.disabled
         disabled: false
         # type: int
@@ -3001,8 +3092,14 @@ inputs:
         # description:
         #   en: |-
         #     eBPF Off-CPU profile switch.
+        #
+        #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+        #     i.e., `ebpf.profile.off_cpu` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
         #   ch: |-
         #     eBPF Off-CPU profile 数据的采集开关。
+        #
+        #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+        #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.off_cpu`。
         # upgrade_from: static_config.ebpf.off-cpu-profile.disabled
         disabled: true
         # type: bool
@@ -3069,8 +3166,14 @@ inputs:
         # description:
         #   en: |-
         #     eBPF memory profile switch.
+        #
+        #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+        #     i.e., `ebpf.profile.memory` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
         #   ch: |-
         #     eBPF memory profile 数据的采集开关。
+        #
+        #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+        #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.memory`。
         # upgrade_from: static_config.ebpf.memory-profile.disabled
         disabled: true
         # type: duration
@@ -4538,6 +4641,7 @@ processors:
         RocketMQ: 1-65535
         DNS: 53,5353
         TLS: 443,6443
+        PING: 1-65535
         Custom: 1-65535 # plugins
       # type: dict
       # name:
@@ -4681,6 +4785,7 @@ processors:
         RocketMQ: []
         DNS: []
         TLS: []
+        PING: []
         Custom: []
       # type: string
       # name:
@@ -4767,7 +4872,88 @@ processors:
       #   ch: |-
       #     应用调用日志请求、响应合并的时间窗口，超出该时间窗口的响应将不与请求合并，而是单独生成一条调用日志。
       # upgrade_from: static_config.l7-log-session-aggr-timeout
+      # deprecated: true
       session_aggregate_window_duration: 120s
+      # type: dict
+      # name:
+      #   en: Application Session Aggregate Timeouts
+      #   ch: 应用会话合并超时设置
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the aggregation timeout for each application.
+      #     The default values is 15s for DNS and TLS, 120s for others.
+      #
+      #     Example:
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         timeouts:
+      #           session_aggregate:
+      #           - protocol: DNS
+      #             timeout: 15s
+      #           - protocol: HTTP2
+      #             timeout: 120s
+      #     ```
+      #
+      #   ch: |-
+      #     设置每个应用的超时时间。
+      #     DNS 和 TLS 默认 15s，其他协议默认 120s。
+      #
+      #     示例:
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         timeouts:
+      #           session_aggregate:
+      #           - protocol: DNS
+      #             timeout: 15s
+      #           - protocol: HTTP2
+      #             timeout: 120s
+      #     ```
+      #
+      # upgrade_from:
+      # ---
+      # type: string
+      # name:
+      #   en: Protocol
+      #   ch: 协议
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Protocol Name for timeout setting.
+      #   ch: |-
+      #     用于设置超时时间的协议名称。
+      # upgrade_from:
+      # ---
+      # protocol: ""
+      # ---
+      # type: duration
+      # name:
+      #   en: Timeout
+      #   ch: 超时时间
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the timeout for the application.
+      #   ch: |-
+      #     设置应用的超时时间。
+      # upgrade_from:
+      # ---
+      # timeout: 0
+      session_aggregate: []
     # type: section
     # name:
     #   en: Tag Extraction
@@ -5136,8 +5322,26 @@ processors:
       #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
       #       用于记录达到 LRU 容量限制并触发淘汰的次数。
       # upgrade_from: static_config.l7-log-session-slot-capacity
+      # deprecated: true
       session_aggregate_slot_capacity: 1024
-
+      # type: int
+      # name:
+      #   en: Session Aggregate Max Entries
+      #   ch: 会话聚合最大条目数
+      # unit:
+      # range: [16384, 10000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The maximum number of l7_flow_log entries cached for merging into a session.
+      #     If the total number of l7_flow_log entries exceeds this configuration,
+      #     the oldest entry will be sent without merging, setting its response status to `Unknown`.
+      #   ch: |-
+      #     会话聚合最大条目数。
+      #     如果 l7_flow_log 条目总数超过该配置，最老的条目将被丢弃，并设置其 response 状态为 `Unknown`。
+      session_aggregate_max_entries: 16384
       # type: bool
       # name:
       #   en: Consistent Timestamp in L7 Metrics
@@ -5588,7 +5792,9 @@ outputs:
     # upgrade_from: static_config.enable-qos-bypass
     raw_udp_qos_bypass: false
     # type: bool
-    # name: Multiple Sockets To Ingester
+    # name:
+    #   en: Multiple Sockets To Ingester
+    #   ch: 使用多个 Ingester Socket
     # unit:
     # range: []
     # enum_options: []

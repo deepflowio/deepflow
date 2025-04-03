@@ -135,10 +135,12 @@ func (p *Policy) addFlowACL(flowACL *agent.FlowAcl, aclType int) {
 	}
 }
 
-var tnFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION,
-	VTAP_LICENSE_FUNCTION_NETWORK_MONITORING)
-var tFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION)
-var nFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_NETWORK_MONITORING)
+var tnFunction mapset.Set = mapset.NewSet(
+	AGENT_LICENSE_FUNCTION_NET_NPB, AGENT_LICENSE_FUNCTION_DEV_NET_NPB,
+	AGENT_LICENSE_FUNCTION_NET_NPMD, AGENT_LICENSE_FUNCTION_DEV_NET_NPMD,
+)
+var tFunction mapset.Set = mapset.NewSet(AGENT_LICENSE_FUNCTION_NET_NPB, AGENT_LICENSE_FUNCTION_DEV_NET_NPB)
+var nFunction mapset.Set = mapset.NewSet(AGENT_LICENSE_FUNCTION_NET_NPMD, AGENT_LICENSE_FUNCTION_DEV_NET_NPMD)
 
 func (p *Policy) getPolicyString(functions mapset.Set) []byte {
 	if functions.Cardinality() == 0 {

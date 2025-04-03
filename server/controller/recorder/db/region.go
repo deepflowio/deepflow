@@ -26,12 +26,12 @@ type Region struct {
 }
 
 func NewRegion() *Region {
-	operater := &Region{
+	operator := &Region{
 		newOperatorBase[*metadbmodel.Region](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

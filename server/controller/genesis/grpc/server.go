@@ -147,6 +147,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 	}
 	vtap := fmt.Sprintf("%d-%d", orgID, vtapID)
 
+	var refresh bool
 	var localVersion uint64 = 0
 	if vtapID == 0 {
 		log.Infof("genesis sync received message with vtap_id 0 from %s", remote, logger.NewORGPrefix(orgID))
@@ -160,9 +161,11 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 			} else {
 				agingTime = g.cfg.VinterfaceAgingTime
 			}
-			if now.Sub(lastTime).Seconds() >= agingTime {
+			timeSub := now.Sub(lastTime).Seconds()
+			if timeSub >= agingTime {
 				g.vtapToVersion.Store(vtap, uint64(0))
 			}
+			refresh = timeSub >= g.cfg.AgentHeartBeat*2
 		}
 		g.vtapToLastSeen.Store(vtap, now)
 		lVersion, ok := g.vtapToVersion.Load(vtap)
@@ -176,12 +179,13 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
 			common.VIFRPCMessage{
-				Peer:        remote,
-				VtapID:      vtapID,
-				ORGID:       orgID,
-				TeamID:      uint32(teamID),
-				MessageType: common.TYPE_RENEW,
-				Message:     request,
+				Peer:           remote,
+				VtapID:         vtapID,
+				ORGID:          orgID,
+				TeamID:         uint32(teamID),
+				MessageType:    common.TYPE_RENEW,
+				Message:        request,
+				StorageRefresh: refresh,
 			},
 		)
 		return &agent.GenesisSyncResponse{Version: &localVersion}, nil

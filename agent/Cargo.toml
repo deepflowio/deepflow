@@ -53,6 +53,7 @@ hostname = "0.3.1"
 hpack = { git = "https://github.com/deepflowio/hpack-rs/" }
 http = "0.2.5"
 http2 = { path = "plugins/http2" }
+humantime = "2.1"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 integration_skywalking = { path = "plugins/integration_skywalking" }
@@ -82,11 +83,6 @@ prost.workspace = true
 public = { path = "crates/public" }
 rand = "0.8.5"
 regex.workspace = true
-reqwest = { version = "0.11", default-features = false, features = [
-    "blocking",
-    "json",
-    "rustls-tls",
-] }
 ring = "0.16.20"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }

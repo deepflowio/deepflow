@@ -411,6 +411,8 @@ pub const FILTER_OFFSET: usize = 9;
 pub const FILTER_SIZE: usize = 23;
 pub const LOGIN_USERNAME_OFFSET: usize = 32;
 
+pub const LOGIN_RESPONSE_HEADER_SIZE: usize = 3;
+
 // int
 pub const INT_FLAGS_2: u8 = 0xfc;
 pub const INT_FLAGS_3: u8 = 0xfd;

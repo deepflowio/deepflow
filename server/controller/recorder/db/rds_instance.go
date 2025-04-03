@@ -26,12 +26,12 @@ type RDSInstance struct {
 }
 
 func NewRDSInstance() *RDSInstance {
-	operater := &RDSInstance{
+	operator := &RDSInstance{
 		newOperatorBase[*metadbmodel.RDSInstance](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

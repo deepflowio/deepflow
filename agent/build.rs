@@ -93,7 +93,7 @@ fn set_build_info() -> Result<()> {
 //   - generated bpf bytecode files (socket_trace_*.c / perf_profiler_*.c)
 //   - java agent so files and jattach bin
 // - Header files
-// - `src/ebpf/mod.rs` (to exlude rust sources in `samples` folder)
+// - `src/ebpf/mod.rs` (to exclude rust sources in `samples` folder)
 // - Makefiles
 fn set_libtrace_rerun_files() -> Result<()> {
     fn watched(path: &Path) -> bool {
@@ -219,6 +219,7 @@ fn set_linkage() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn compile_wasm_plugin_proto() -> Result<()> {
     tonic_build::configure()
         .build_server(false)
@@ -276,7 +277,15 @@ fn make_brpc_proto() -> Result<()> {
 
 fn main() -> Result<()> {
     set_build_info()?;
+    /*
+     * The protoc binary is too old (3.12) in rust-build image, which cannot handle optional fields in protobuf v3 correctly.
+     * And it's not easy to upgrade because of the EOL issue of Centos7.
+     * We are pushing the generated protobuf code to repo as a workaround.
+     *
+     * TODO: Fix this issue in the rust-build image.
+     *
     compile_wasm_plugin_proto()?;
+     */
     make_pulsar_proto()?;
     make_brpc_proto()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;

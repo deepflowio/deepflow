@@ -240,7 +240,13 @@ func agentCache(teamID, ctrlIP, ctrlMAC string, cmd *cobra.Command) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(string(response.GetContent()))
+	var str bytes.Buffer
+	err = json.Indent(&str, response.GetContent(), "", "    ")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(str.String())
 }
 
 func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
@@ -272,6 +278,7 @@ func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
 		fmt.Println(err)
 		return
 	}
+	fmt.Printf("revision: %s\n", response.GetRevision())
 	for _, cmd := range cmds {
 		cmd(response)
 	}
@@ -562,6 +569,7 @@ func AconfigData(response *agent.SyncResponse) {
 	config := response.GetUserConfig()
 	fmt.Println(config)
 	dynamicConfig := response.GetDynamicConfig()
+	fmt.Println("")
 	fmt.Println("DynamicConfig:")
 	fmt.Println(proto.MarshalTextString(dynamicConfig))
 }

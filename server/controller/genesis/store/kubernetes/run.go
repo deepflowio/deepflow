@@ -104,7 +104,7 @@ func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID string, s
 		grpcServer := net.JoinHostPort(serverIP, g.config.GrpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.config.GrpcMaxMessageLength))
 		if err != nil {
-			msg := "create grpc connection faild:" + err.Error()
+			msg := "create grpc connection failed:" + err.Error()
 			log.Error(msg, logger.NewORGPrefix(orgID))
 			return k8sResp, errors.New(msg)
 		}
@@ -130,7 +130,7 @@ func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID string, s
 		epochStr := ret.GetEpoch()
 		epoch, err := time.ParseInLocation(ccommon.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
-			log.Error("genesis api sharing k8s format timestr faild:"+err.Error(), logger.NewORGPrefix(orgID))
+			log.Error("genesis api sharing k8s format timestr failed:"+err.Error(), logger.NewORGPrefix(orgID))
 			return k8sResp, err
 		}
 		if !epoch.After(k8sInfo.Epoch) {

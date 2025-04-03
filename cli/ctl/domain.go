@@ -19,7 +19,6 @@ package ctl
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -193,7 +192,7 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 	}
 	formatStr, err := common.JsonFormat(respByte)
 	if err != nil {
-		fmt.Println("format json str faild: " + err.Error())
+		fmt.Println("format json str failed: " + err.Error())
 		return
 	}
 	fmt.Println(formatStr)
@@ -241,7 +240,7 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 		}
 		formatStr, err := common.JsonFormat(respByte)
 		if err != nil {
-			fmt.Println("format json str faild: " + err.Error())
+			fmt.Println("format json str failed: " + err.Error())
 			return
 		}
 		fmt.Println(formatStr)
@@ -279,7 +278,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 		}
 		formatStr, err := common.JsonFormat(respByte)
 		if err != nil {
-			fmt.Println("format json str faild: " + err.Error())
+			fmt.Println("format json str failed: " + err.Error())
 			return
 		}
 		fmt.Println(formatStr)
@@ -335,7 +334,7 @@ func formatBody(filename string) (map[string]interface{}, error) {
 			return upperBody, err
 		}
 	} else {
-		yamlFile, err := ioutil.ReadFile(filename)
+		yamlFile, err := os.ReadFile(filename)
 		if err != nil {
 			return upperBody, err
 		}

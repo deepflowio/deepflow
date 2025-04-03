@@ -143,7 +143,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 			case "traffic_policy":
 				collection = "flow_metrics.traffic_policy"
 			default:
-				return nil, fmt.Errorf("not support type(%s)", t)
+				collection = t.(string)
 			}
 			if dataSource.DataTableCollection != collection {
 				continue

@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -108,7 +107,7 @@ func GetAggFunc(name string, args []string, alias string, derivativeArgs []strin
 	if !ok {
 		return nil, 0, "", nil
 	}
-	metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
+	metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField)
 	if !ok {
 		return nil, 0, "", nil
 	}
@@ -231,7 +230,7 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	var metricStruct *metrics.Metrics
 	for i, field := range fields {
 		field = strings.Trim(field, "`")
-		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
@@ -334,7 +333,7 @@ func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statem
 	var metricStruct *metrics.Metrics
 	for _, field := range fields {
 		field = strings.Trim(field, "`")
-		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}

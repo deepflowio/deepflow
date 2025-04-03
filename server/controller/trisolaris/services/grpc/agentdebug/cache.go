@@ -17,31 +17,9 @@
 package synchronize
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
-type AgentCacheDebug struct {
-	RawData string `json:"DATA"`
-}
-
-func (a *AgentCacheDebug) Marshal() []byte {
-	if a == nil {
-		return nil
-	}
-	v, err := json.Marshal(*a)
-	if err != nil {
-		log.Error(err)
-		return nil
-	}
-
-	return v
-}
-
-func NewAgentCacheDebug(vtapCache *vtap.VTapCache) *AgentCacheDebug {
-	return &AgentCacheDebug{
-		RawData: fmt.Sprintf("%s", vtapCache),
-	}
+func NewAgentCacheDebug(vtapCache *vtap.VTapCache) ([]byte, error) {
+	return vtapCache.String()
 }
