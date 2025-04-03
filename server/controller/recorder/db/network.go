@@ -26,12 +26,12 @@ type Network struct {
 }
 
 func NewNetwork() *Network {
-	operater := &Network{
+	operator := &Network{
 		newOperatorBase[*metadbmodel.Network](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

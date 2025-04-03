@@ -26,12 +26,12 @@ type PodGroup struct {
 }
 
 func NewPodGroup() *PodGroup {
-	operater := &PodGroup{
+	operator := &PodGroup{
 		newOperatorBase[*metadbmodel.PodGroup](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

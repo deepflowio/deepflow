@@ -26,12 +26,12 @@ type Host struct {
 }
 
 func NewHost() *Host {
-	operater := &Host{
+	operator := &Host{
 		newOperatorBase[*metadbmodel.Host](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

@@ -483,7 +483,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						for _, c := range k.nodeNetworkLcuuidCIDRs.cidrs {
 							nCIDR, err := netaddr.ParseIPPrefix(c)
 							if err != nil {
-								log.Warningf("vinterface,ip node cidr (%s) parse faild", c, logger.NewORGPrefix(k.orgID))
+								log.Warningf("vinterface,ip node cidr (%s) parse failed", c, logger.NewORGPrefix(k.orgID))
 								continue
 							}
 							if nCIDR.IP().Is6() {
@@ -494,7 +494,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						for _, c := range k.nodeNetworkLcuuidCIDRs.cidrs {
 							nCIDR, err := netaddr.ParseIPPrefix(c)
 							if err != nil {
-								log.Warningf("vinterface,ip node cidr (%s) parse faild", c, logger.NewORGPrefix(k.orgID))
+								log.Warningf("vinterface,ip node cidr (%s) parse failed", c, logger.NewORGPrefix(k.orgID))
 								continue
 							}
 							if nCIDR.IP().Is4() {
