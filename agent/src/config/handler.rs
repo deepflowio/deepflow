@@ -996,6 +996,7 @@ pub struct LogParserConfig {
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
     pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
+    pub mysql_decompress_payload: bool,
 }
 
 impl Default for LogParserConfig {
@@ -1014,6 +1015,7 @@ impl Default for LogParserConfig {
             l7_log_blacklist_trie: HashMap::new(),
             unconcerned_dns_nxdomain_response_suffixes: vec![],
             unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
+            mysql_decompress_payload: true,
         }
     }
 }
@@ -1058,6 +1060,7 @@ impl fmt::Debug for LogParserConfig {
                 "unconcerned_dns_nxdomain_trie",
                 &self.unconcerned_dns_nxdomain_response_suffixes,
             )
+            .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .finish()
     }
 }
@@ -2005,6 +2008,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .filters
                         .unconcerned_dns_nxdomain_response_suffixes,
                 ),
+                mysql_decompress_payload: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .mysql
+                    .decompress_payload,
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
