@@ -22,6 +22,7 @@
 #include "symbol.h"
 #include "tracer.h"
 #include "load.h"
+#include "socket.h"
 
 extern bool *cpu_online;
 extern int sys_cpus_count;
@@ -248,9 +249,9 @@ int program__attach_kprobe(void *prog,
 	 * 3.10.0-957 version of the kernel. Therefore, we use the perf_event_open()
 	 * system call to perform attach/detach operations.
 	 */
-	//if (retprobe) {
-	//      maxactive = KRETPROBE_MAXACTIVE_MAX;
-	//}
+	if (retprobe && is_pure_kprobe_ebpf()) {
+		maxactive = KRETPROBE_MAXACTIVE_MAX;
+	}
 
 	return program__attach_probe((const struct ebpf_prog *)prog,
 				     retprobe, (const char *)ev_name, func_name,

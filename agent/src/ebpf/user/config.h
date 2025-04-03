@@ -46,6 +46,7 @@
 #define PROG_OUTPUT_DATA_NAME_FOR_KP	"df_KP_output_data"
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"df_TP_output_data"
 #define PROG_IO_EVENT_NAME_FOR_TP	"df_TP_io_event"
+#define PROG_IO_EVENT_NAME_FOR_KP       "df_KP_io_event"
 #define PROG_PROTO_INFER_FOR_KP		"df_KP_proto_infer_2"
 #define PROG_PROTO_INFER_FOR_TP		"df_TP_proto_infer_2"
 
@@ -84,6 +85,7 @@ enum {
 	PROG_PROTO_INFER_KP_IDX,
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
+	PROG_IO_EVENT_KP_IDX,
 	PROG_KP_NUM
 };
 

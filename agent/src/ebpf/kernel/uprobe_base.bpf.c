@@ -705,8 +705,7 @@ TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
 	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
 }
 
-// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
-TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
+static __inline int __process_exec(void *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -728,3 +727,19 @@ TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 
 	return 0;
 }
+
+#ifdef SUPPORTS_KPROBE_ONLY
+KRETPROG(do_execve) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+
+KRETPROG(do_execveat) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+#else
+// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
+TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
+{
+	return __process_exec((void *)ctx);
+}
+#endif
