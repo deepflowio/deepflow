@@ -33,7 +33,7 @@ pub trait Sendable: Debug + Send + 'static {
     fn to_kv_string(&self, _: &mut String) {}
 }
 
-#[derive(Debug, Clone, Copy, IntoPrimitive)]
+#[derive(Debug, Clone, Copy, IntoPrimitive, PartialEq)]
 #[repr(u8)]
 pub enum SendMessageType {
     Compress = 0,

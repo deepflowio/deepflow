@@ -337,6 +337,9 @@ impl<T: Sendable> UniformSenderThread<T> {
 
 lazy_static! {
     static ref GLOBAL_CONNECTION: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::new()));
+    static ref TOTAL_SENT_BYTES: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
+    static ref SENT_START_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
+    static ref LAST_LOGGING_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -599,6 +602,7 @@ impl<T: Sendable> UniformSender<T> {
                         self.counter
                             .tx_bytes
                             .fetch_add(buffer.len() as u64, Ordering::Relaxed);
+                        TOTAL_SENT_BYTES.fetch_add(buffer.len() as u64, Ordering::Relaxed);
                         break;
                     }
                 }
@@ -622,6 +626,39 @@ impl<T: Sendable> UniformSender<T> {
         }
     }
 
+    fn is_exceed_max_throughput(&mut self, max_throughput_mbps: u64) -> bool {
+        if max_throughput_mbps == 0 {
+            return false;
+        }
+        let max_throughput_bytes = max_throughput_mbps << 20 >> 3;
+        if TOTAL_SENT_BYTES.load(Ordering::Relaxed) > max_throughput_bytes {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap();
+
+            let used = now - Duration::from_nanos(SENT_START_DURATION.load(Ordering::Relaxed));
+            if used > Duration::from_secs(1) {
+                SENT_START_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
+                TOTAL_SENT_BYTES.store(0, Ordering::Relaxed);
+            } else {
+                // to prevent frequent log printing, print at least once every 5 seconds
+                if now - Duration::from_nanos(LAST_LOGGING_DURATION.load(Ordering::Relaxed))
+                    > Duration::from_secs(5)
+                {
+                    warn!(
+                        "{} sender dropping message, throughput execeed setting value 'max_throughput_to_ingester' {}Mbps",
+                        self.name, max_throughput_mbps
+                    );
+                    LAST_LOGGING_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
+                }
+                self.exception_handler
+                    .set(Exception::DataBpsThresholdExceeded);
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn check_or_register_counterable(&mut self, message_type: SendMessageType) {
         if self.stats_registered {
             return;
@@ -638,7 +675,9 @@ impl<T: Sendable> UniformSender<T> {
         let mut kv_string = String::with_capacity(2048);
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
-            let socket_type = self.config.load().collector_socket_type;
+            let config = self.config.load();
+            let socket_type = config.collector_socket_type;
+            let max_throughput_mpbs = config.max_throughput_to_ingester;
             match self.input.recv_all(
                 &mut batch,
                 Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)),
@@ -648,6 +687,13 @@ impl<T: Sendable> UniformSender<T> {
                     if start_cached.elapsed() >= Duration::from_secs(10) {
                         start_cached = Instant::now();
                         self.cached = false;
+                    }
+                    if self.is_exceed_max_throughput(max_throughput_mpbs) {
+                        self.counter
+                            .dropped
+                            .fetch_add(batch.len() as u64, Ordering::Relaxed);
+                        batch.clear();
+                        continue;
                     }
                     for send_item in batch.drain(..) {
                         if !self.running.load(Ordering::Relaxed) {
@@ -659,6 +705,7 @@ impl<T: Sendable> UniformSender<T> {
                             "{} sender send item {}: {:?}",
                             self.name, message_type, send_item
                         );
+
                         let result = match socket_type {
                             SocketType::File => self.handle_target_file(send_item, &mut kv_string),
                             _ => self.handle_target_server(send_item),

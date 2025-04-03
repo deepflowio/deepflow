@@ -193,6 +193,8 @@ var VTapExceptionChinese = map[int64]string{
 	1 << 17:                                "分发SOCKET错误",
 	1 << 18:                                "集成SOCKET错误",
 	1 << 19:                                "CGROUPS配置错误",
+	1 << 20:                                "系统负载超限触发熔断",
+	1 << 21:                                "数据流量达到限速",
 	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH:     "采集器授权个数不足",
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED:   "分配数据节点失败",
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED: "分配控制器失败",
