@@ -11,6 +11,7 @@ RUN --mount=target=/tmp-mount \
     --no-install-suggests  --no-install-recommends -y \
     tzdata \
     iproute2 \
+    strace \
     bridge-utils \
     busybox && \
     apt-get install --only-upgrade --no-install-suggests  --no-install-recommends -y libc6 libc-bin && \
