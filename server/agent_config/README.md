@@ -1417,7 +1417,7 @@ Upgrade from old version: `static_config.os-proc-sync-enabled`
 ```yaml
 inputs:
   proc:
-    enabled: false
+    enabled: true
 ```
 
 **Schema**:
@@ -1427,7 +1427,16 @@ inputs:
 
 **Description**:
 
-Only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM.
+After enabling this configuration, deepflow-agent will periodically report the process information
+specified in `inputs.proc.process_matcher` to deepflow-server. After synchronizing process information,
+all eBPF observability data will automatically inject the global process ID (gprocess_id) tag.
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `proc.gprocess_info` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+
+This configuration only applies to agents of `cloud server` types (CHOST_VM, CHOST_BM) and `container`
+types (K8S_VM, K8S_BM). Use the command `deepflow-ctl agent list` to determine the specific agent
+type in CLI environments.
 
 ### Directory of /proc {#inputs.proc.proc_dir_path}
 
@@ -1484,8 +1493,13 @@ inputs:
 
 **Description**:
 
-The interval of socket info sync.
-0 means disabled, do not configure a value less than 1s except for 0.
+Synchronization interval for process Socket information.
+
+0 means disabled, do not configure a value less than `1s` except for 0.
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
 ### Minimal Lifetime {#inputs.proc.min_lifetime}
 
@@ -1642,6 +1656,8 @@ inputs:
 
 **Description**:
 
+List of advanced features enabled for specific processes.
+
 Will traverse over the entire array, so the previous ones will be matched first.
 when match_type is parent_process_name, will recursive to match parent proc name,
 and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
@@ -1655,15 +1671,15 @@ Configuration Item:
 - ignore: Whether to ignore when regex match, default value is `false`
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
-- enabled_features: the features can be used for process matcher, options:
-  - proc.gprocess_info (Note: ensure `inputs.proc.enabled` is also enabled)
-  - proc.golang_symbol_table (Note: ensure `inputs.proc.symbol_table.golang_specific.enabled` is also enabled)
-  - proc.socket_list (Note: configure `inputs.proc.socket_info_sync_interval` to a non-zero number)
-  - ebpf.socket.uprobe.golang (Note: ensure `inputs.ebpf.socket.uprobe.golang.enabled` is also enabled)
-  - ebpf.socket.uprobe.tls (Note: ensure `inputs.ebpf.socket.uprobe.tls.enabled` is also enabled)
-  - ebpf.profile.on_cpu (Note: ensure `inputs.ebpf.profile.on_cpu.disabled` is enabled, i.e., set to false)
-  - ebpf.profile.off_cpu (Note: ensure `inputs.ebpf.profile.off_cpu.disabled` is enabled, i.e., set to false)
-  - ebpf.profile.memory (Note: ensure `inputs.ebpf.profile.memory.disabled` is enabled, i.e., set to false)
+- enabled_features: List of features enabled for matched processes. Available options:
+  - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
+  - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
+  - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
+  - ebpf.socket.uprobe.golang (Ensure `inputs.ebpf.socket.uprobe.golang.enabled` is configured to **true**)
+  - ebpf.socket.uprobe.tls (Ensure `inputs.ebpf.socket.uprobe.tls.enabled` is configured to **true**)
+  - ebpf.profile.on_cpu (Ensure `inputs.ebpf.profile.on_cpu.disabled` is configured to **false**)
+  - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
+  - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
 
 Example:
 ```yaml
@@ -1977,14 +1993,14 @@ inputs:
 **Description**:
 
 Also ensure the global configuration parameters for related features are enabled:
-- proc.gprocess_info (Note: ensure `inputs.proc.enabled` is also enabled)
-- proc.golang_symbol_table (Note: ensure `inputs.proc.symbol_table.golang_specific.enabled` is also enabled)
-- proc.socket_list (Note: configure `inputs.proc.socket_info_sync_interval` to a non-zero number)
-- ebpf.socket.uprobe.golang (Note: ensure `inputs.ebpf.socket.uprobe.golang.enabled` is also enabled)
-- ebpf.socket.uprobe.tls (Note: ensure `inputs.ebpf.socket.uprobe.tls.enabled` is also enabled)
-- ebpf.profile.on_cpu (Note: ensure `inputs.ebpf.profile.on_cpu.disabled` is enabled, i.e., set to false)
-- ebpf.profile.off_cpu (Note: ensure `inputs.ebpf.profile.off_cpu.disabled` is enabled, i.e., set to false)
-- ebpf.profile.memory (Note: ensure `inputs.ebpf.profile.memory.disabled` is enabled, i.e., set to false)
+- proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
+- proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
+- proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
+- ebpf.socket.uprobe.golang (Ensure `inputs.ebpf.socket.uprobe.golang.enabled` is configured to **true**)
+- ebpf.socket.uprobe.tls (Ensure `inputs.ebpf.socket.uprobe.tls.enabled` is configured to **true**)
+- ebpf.profile.on_cpu (Ensure `inputs.ebpf.profile.on_cpu.disabled` is configured to **false**)
+- ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
+- ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
 
 ### Symbol Table {#inputs.proc.symbol_table}
 
@@ -2025,12 +2041,9 @@ table. When this feature is enabled, for processes with Golang
 version >= 1.13 and < 1.18, when the standard symbol table is missing, the
 Golang-specific symbol table will be parsed to complete uprobe data collection.
 Note that enabling this feature may cause the eBPF initialization process to
-take ten minutes. The `golang-symbol` configuration item depends on the `golang`
-configuration item, the `golang-symbol` is a subset of the `golang` configuration item.
+take ten minutes.
 
 Example:
-- Ensure that the regular expression matching for the 'golang' configuration
-  item is enabled, for example: `golang: .*`
 - You've encountered the following warning log:
   ```
   [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
@@ -2057,6 +2070,9 @@ Example:
   entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
   ```
   The logs indicate that the Golang program has been successfully hooked.
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `proc.golang_symbol_table` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 
 #### Java {#inputs.proc.symbol_table.java}
 
@@ -3424,6 +3440,9 @@ inputs:
 Whether golang process enables HTTP2/HTTPS protocol data collection
 and auto-tracing. go auto-tracing also dependent go-tracing-timeout.
 
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `ebpf.socket.uprobe.golang` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+
 ###### Tracing Timeout {#inputs.ebpf.socket.uprobe.golang.tracing_timeout}
 
 **Tags**:
@@ -3490,19 +3509,23 @@ inputs:
 **Description**:
 
 Whether the process that uses the openssl library to enable HTTPS protocol data collection.
+
 One can use the following method to determine whether an application process can use
 `Uprobe hook openssl library` to access encrypted data:
+- Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
+  information about openssl. If it does, it indicates that this process is using the
+  openssl library.
 
-Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
-information about openssl. If it does, it indicates that this process is using the
-openssl library. After configuring the openssl options, deepflow-agent will retrieve process
-information that matches the regular expression, hooking the corresponding encryption/decryption
-interfaces of the openssl library.
-
-In the logs, you will encounter a message similar to the following:
+After enabled, deepflow-agent will retrieve process information that
+matches the regular expression, hooking the corresponding encryption/decryption
+interfaces of the openssl library. In the logs, you will encounter a message similar
+to the following:
 ```
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
 ```
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `ebpf.socket.uprobe.tls` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
@@ -4221,6 +4244,9 @@ inputs:
 
 eBPF On-CPU profile switch.
 
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `ebpf.profile.on_cpu` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+
 ##### Sampling Frequency {#inputs.ebpf.profile.on_cpu.sampling_frequency}
 
 **Tags**:
@@ -4319,6 +4345,9 @@ inputs:
 **Description**:
 
 eBPF Off-CPU profile switch.
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `ebpf.profile.off_cpu` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 
 ##### Aggregate by CPU {#inputs.ebpf.profile.off_cpu.aggregate_by_cpu}
 
@@ -4428,6 +4457,9 @@ inputs:
 **Description**:
 
 eBPF memory profile switch.
+
+Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+i.e., `ebpf.profile.memory` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 
 ##### Memory profile report interval {#inputs.ebpf.profile.memory.report_interval}
 
