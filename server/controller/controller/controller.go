@@ -109,7 +109,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	}
 
 	// 初始化Redis
-	if cfg.RedisCfg.Enabled && cfg.TrisolarisCfg.NodeType == "master" {
+	if cfg.RedisCfg.Enabled {
 		router.SetInitStageForHealthChecker("Redis init")
 
 		err := redis.Init(ctx, cfg.RedisCfg)
@@ -126,7 +126,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Genesis init")
 	// 启动genesis
-	g := genesis.NewGenesis(ctx, cfg)
+	g := genesis.NewGenesis(ctx, isMasterController, cfg)
 
 	// start tagrecorder before manager to prevent recorder from publishing message when tagrecorder is not ready
 	router.SetInitStageForHealthChecker("TagRecorder init")
