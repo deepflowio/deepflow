@@ -19,7 +19,7 @@ package decoder
 import (
 	"bytes"
 	"compress/zlib"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"time"
 
@@ -238,7 +238,7 @@ func decompressOpenTelemetry(compressed []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return ioutil.ReadAll(reader)
+	return io.ReadAll(reader)
 }
 
 func (d *Decoder) handleOpenTelemetry(decoder *codec.SimpleDecoder, pbTracesData *v1.TracesData, compressed bool) {

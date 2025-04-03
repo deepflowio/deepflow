@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,8 +30,8 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
-	"golang.org/x/exp/slices"
 
+	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -104,6 +104,7 @@ type CHEngine struct {
 	DerivativeGroupBy  []string
 	ORGID              string
 	Language           string
+	NativeField        map[string]*metrics.Metrics
 }
 
 func init() {
@@ -126,7 +127,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		e.ORGID = args.ORGID
 	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
-	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	debug_info := &client.DebugInfo{}
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
@@ -215,7 +215,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			usedEngine.View.NoPreWhere = usedEngine.NoPreWhere
 		}
 		chSql := usedEngine.ToSQLString()
-		log.Debug(chSql)
 		callbacks := usedEngine.View.GetCallbacks()
 		debug.Sql = chSql
 		if !isShow {
@@ -223,7 +222,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 				ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 			}
 		}
-		log.Debug(ColumnSchemaMap)
 		params := &client.QueryParams{
 			Sql:             chSql,
 			UseQueryCache:   args.UseQueryCache,
@@ -693,7 +691,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 								for autoTagKey, _ := range autoTagMap {
 									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
-								sort.Strings(autoTagSlice)
+								slices.Sort(autoTagSlice)
 								for _, autoTagKey := range autoTagSlice {
 									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
 								}
@@ -711,7 +709,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 								for autoTagKey, _ := range autoTagMap {
 									autoTagSlice = append(autoTagSlice, autoTagKey)
 								}
-								sort.Strings(autoTagSlice)
+								slices.Sort(autoTagSlice)
 								for _, autoTagKey := range autoTagSlice {
 									outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+autoTagKey+"`")
 								}
@@ -1232,6 +1230,38 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				table = strings.ReplaceAll(table, "vtap_acl", "traffic_policy")
 			}
 			e.Table = table
+			// native field
+			if config.ControllerCfg.DFWebService.Enabled && slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_APPLICATION_LOG, chCommon.DB_NAME_EXT_METRICS}, e.DB) || slices.Contains([]string{chCommon.TABLE_NAME_L7_FLOW_LOG, chCommon.TABLE_NAME_EVENT, chCommon.TABLE_NAME_PERF_EVENT}, e.Table) {
+				e.NativeField = map[string]*metrics.Metrics{}
+				getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, e.DB, e.Table)
+				resp, err := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, e.ORGID))
+				if err != nil {
+					log.Errorf("request controller failed: %s, URL: %s", resp, getNativeUrl)
+				} else {
+					resultArray := resp.Get("DATA").MustArray()
+					for i := range resultArray {
+						nativeMetric := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
+						displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
+						description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
+						fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+						if fieldType == chCommon.NATIVE_FIELD_TYPE_METRIC {
+							metric := metrics.NewMetrics(
+								0, nativeMetric,
+								displayName, displayName, displayName, "", "", "", metrics.METRICS_TYPE_COUNTER,
+								chCommon.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
+							)
+							e.NativeField[nativeMetric] = metric
+						} else {
+							metric := metrics.NewMetrics(
+								0, nativeMetric,
+								displayName, displayName, displayName, "", "", "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+								chCommon.NATIVE_FIELD_CATEGORY_CUSTOM_TAG, []bool{true, true, true}, "", table, "", "", "", "", "",
+							)
+							e.NativeField[nativeMetric] = metric
+						}
+					}
+				}
+			}
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
@@ -1705,7 +1735,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -1818,7 +1848,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID)
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField)
 			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 				whereTag = metricStruct.DBField
 			}

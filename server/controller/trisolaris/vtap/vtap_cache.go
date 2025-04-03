@@ -17,8 +17,9 @@
 package vtap
 
 import (
-	"fmt"
+	"encoding/json"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,6 +58,7 @@ type VTapConfig struct {
 	ConvertedSoPlugins           []string
 	PluginNewUpdateTime          uint32
 	UserConfig                   *koanf.Koanf
+	UserConfigComment            []string
 }
 
 func (f *VTapConfig) GetConfigTapMode() int {
@@ -68,6 +70,10 @@ func (f *VTapConfig) GetConfigTapMode() int {
 
 func (f *VTapConfig) GetUserConfig() *koanf.Koanf {
 	return f.UserConfig.Copy()
+}
+
+func (f *VTapConfig) GetUserConfigComment() []string {
+	return f.UserConfigComment
 }
 
 func (f *VTapConfig) convertData() {
@@ -176,6 +182,7 @@ func NewVTapConfig(agentConfigYaml string) *VTapConfig {
 		log.Error(err)
 	}
 	vTapConfig.UserConfig = k
+	vTapConfig.UserConfigComment = []string{}
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -220,13 +227,24 @@ type VTapCache struct {
 	licenseFunctionSet mapset.Set
 	//above db Data
 
-	enabledTrafficDistribution   atomicbool.Bool
-	enabledNetworkMonitoring     atomicbool.Bool
-	enabledCallMonitoring        atomicbool.Bool
-	enabledFunctionMonitoring    atomicbool.Bool
-	enabledApplicationMonitoring atomicbool.Bool
-	enabledIndicatorMonitoring   atomicbool.Bool
-	enabledLogMonitoring         atomicbool.Bool
+	enabledNetNpb       atomicbool.Bool
+	enabledNetNpmd      atomicbool.Bool
+	enabledNetDpdk      atomicbool.Bool
+	enabledTraceNet     atomicbool.Bool
+	enabledTraceSys     atomicbool.Bool
+	enabledTraceApp     atomicbool.Bool
+	enabledTraceIo      atomicbool.Bool
+	enabledTraceBiz     atomicbool.Bool
+	enabledProfileCpu   atomicbool.Bool
+	enabledProfileRam   atomicbool.Bool
+	enabledProfileInt   atomicbool.Bool
+	enabledLegacyMetric atomicbool.Bool
+	enabledLegacyLog    atomicbool.Bool
+	enabledLegacyProbe  atomicbool.Bool
+	enabledDevNetNpb    atomicbool.Bool
+	enabledDevNetNpmd   atomicbool.Bool
+	enabledDevTraceNet  atomicbool.Bool
+	enabledDevTraceBiz  atomicbool.Bool
 
 	cachedAt         time.Time
 	expectedRevision *string
@@ -235,8 +253,9 @@ type VTapCache struct {
 	regionID         int
 	domain           *string
 
-	// vtap group config
+	// agent group config
 	config *atomic.Value //*VTapConfig
+
 	// Container cluster domain where the vtap is located
 	podDomains []string
 
@@ -267,26 +286,60 @@ type VTapCache struct {
 	vTapInfo *VTapInfo
 }
 
-func (c *VTapCache) String() string {
-	return fmt.Sprintf(
-		"{id: %d, name: %s, rawHostname: %s, state: %d, enable: %d, vTapType: %d, "+
-			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
-			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
-			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, licenseType: %d, "+
-			"tapMode: %d, teamID: %d, organizeID: %d, licenseFunctionSet: %v, enabledTrafficDistribution: %v, "+
-			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
-			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
-			"podDomains: %v, pushVersionPlatformData: %d, pushVersionPolicy: %d, pushVersionGroups: %d, "+
-			"expectedRevision: %s, upgradePackage: %s, podClusterID: %d, VPCID: %d}",
-		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.state, c.enable, c.vTapType,
-		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
-		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
-		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.licenseType,
-		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet.ToSlice(), c.EnabledTrafficDistribution(),
-		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
-		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
-		c.podDomains, c.pushVersionPlatformData, c.pushVersionPolicy, c.pushVersionGroups,
-		c.GetExpectedRevision(), c.GetUpgradePackage(), c.podClusterID, c.VPCID)
+func (c *VTapCache) String() ([]byte, error) {
+	ret := map[string]interface{}{
+		"id":                      c.GetVTapID(),
+		"name":                    c.GetVTapHost(),
+		"rawHostname":             c.GetVTapRawHostname(),
+		"state":                   c.state,
+		"enable":                  c.enable,
+		"vTapType":                c.vTapType,
+		"ctrlIP":                  c.GetCtrlIP(),
+		"ctrlMac":                 c.GetCtrlMac(),
+		"tsdbIP":                  c.GetTSDBIP(),
+		"curTSDBIP":               c.GetCurTSDBIP(),
+		"controllerIP":            c.GetControllerIP(),
+		"curControllerIP":         c.GetCurControllerIP(),
+		"launchServer":            c.GetLaunchServer(),
+		"launchServerID":          c.GetLaunchServerID(),
+		"syncedControllerAt":      c.GetSyncedControllerAt(),
+		"syncedTSDBAt":            c.GetSyncedTSDBAt(),
+		"bootTime":                c.GetBootTime(),
+		"exceptions":              c.GetExceptions(),
+		"vTapGroupLcuuid":         c.GetVTapGroupLcuuid(),
+		"licenseType":             c.licenseType,
+		"tapMode":                 c.tapMode,
+		"teamID":                  c.teamID,
+		"organizeID":              c.organizeID,
+		"licenseFunctionSet":      c.licenseFunctionSet.ToSlice(),
+		"enabledNetNpb":           c.EnabledNetNpb(),
+		"enabledNetNpmd":          c.EnabledNetNpmd(),
+		"enabledNetDpdk":          c.EnabledNetDpdk(),
+		"enabledTraceNet":         c.EnabledTraceNet(),
+		"enabledTraceSys":         c.EnabledTraceSys(),
+		"enabledTraceApp":         c.EnabledTraceApp(),
+		"enabledTraceIo":          c.EnabledTraceIo(),
+		"enabledTraceBiz":         c.EnabledTraceBiz(),
+		"enabledProfileCpu":       c.EnabledProfileCpu(),
+		"enabledProfileRam":       c.EnabledProfileRam(),
+		"enabledProfileInt":       c.EnabledProfileInt(),
+		"enabledLegacyMetric":     c.EnabledLegacyMetric(),
+		"enabledLegacyLog":        c.EnabledLegacyLog(),
+		"enabledLegacyProbe":      c.EnabledLegacyProbe(),
+		"enabledDevNetNpb":        c.EnabledDevNetNpb(),
+		"enabledDevNetNpmd":       c.EnabledDevNetNpmd(),
+		"enabledDevTraceNet":      c.EnabledDevTraceNet(),
+		"enabledDevTraceBiz":      c.EnabledDevTraceBiz(),
+		"podDomains":              c.podDomains,
+		"pushVersionPlatformData": c.pushVersionPlatformData,
+		"pushVersionPolicy":       c.pushVersionPolicy,
+		"pushVersionGroups":       c.pushVersionGroups,
+		"expectedRevision":        c.GetExpectedRevision(),
+		"upgradePackage":          c.GetUpgradePackage(),
+		"podClusterID":            c.podClusterID,
+		"vpcID":                   c.VPCID,
+	}
+	return json.Marshal(ret)
 }
 
 func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
@@ -331,13 +384,24 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
-	vTapCache.enabledTrafficDistribution = atomicbool.NewBool(false)
-	vTapCache.enabledNetworkMonitoring = atomicbool.NewBool(false)
-	vTapCache.enabledCallMonitoring = atomicbool.NewBool(false)
-	vTapCache.enabledFunctionMonitoring = atomicbool.NewBool(false)
-	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
-	vTapCache.enabledIndicatorMonitoring = atomicbool.NewBool(false)
-	vTapCache.enabledLogMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledNetNpb = atomicbool.NewBool(false)
+	vTapCache.enabledNetNpmd = atomicbool.NewBool(false)
+	vTapCache.enabledNetDpdk = atomicbool.NewBool(false)
+	vTapCache.enabledTraceNet = atomicbool.NewBool(false)
+	vTapCache.enabledTraceSys = atomicbool.NewBool(false)
+	vTapCache.enabledTraceApp = atomicbool.NewBool(false)
+	vTapCache.enabledTraceIo = atomicbool.NewBool(false)
+	vTapCache.enabledTraceBiz = atomicbool.NewBool(false)
+	vTapCache.enabledProfileCpu = atomicbool.NewBool(false)
+	vTapCache.enabledProfileRam = atomicbool.NewBool(false)
+	vTapCache.enabledProfileInt = atomicbool.NewBool(false)
+	vTapCache.enabledLegacyMetric = atomicbool.NewBool(false)
+	vTapCache.enabledLegacyLog = atomicbool.NewBool(false)
+	vTapCache.enabledLegacyProbe = atomicbool.NewBool(false)
+	vTapCache.enabledDevNetNpb = atomicbool.NewBool(false)
+	vTapCache.enabledDevNetNpmd = atomicbool.NewBool(false)
+	vTapCache.enabledDevTraceNet = atomicbool.NewBool(false)
+	vTapCache.enabledDevTraceBiz = atomicbool.NewBool(false)
 
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
@@ -383,13 +447,24 @@ func ConvertStrToIntList(convertStr string) ([]int, error) {
 }
 
 func (c *VTapCache) unsetLicenseFunctionEnable() {
-	c.enabledCallMonitoring.Unset()
-	c.enabledNetworkMonitoring.Unset()
-	c.enabledTrafficDistribution.Unset()
-	c.enabledFunctionMonitoring.Unset()
-	c.enabledApplicationMonitoring.Unset()
-	c.enabledIndicatorMonitoring.Unset()
-	c.enabledLogMonitoring.Unset()
+	c.enabledNetNpb.Unset()
+	c.enabledNetNpmd.Unset()
+	c.enabledNetDpdk.Unset()
+	c.enabledTraceNet.Unset()
+	c.enabledTraceSys.Unset()
+	c.enabledTraceApp.Unset()
+	c.enabledTraceIo.Unset()
+	c.enabledTraceBiz.Unset()
+	c.enabledProfileCpu.Unset()
+	c.enabledProfileRam.Unset()
+	c.enabledProfileInt.Unset()
+	c.enabledLegacyMetric.Unset()
+	c.enabledLegacyLog.Unset()
+	c.enabledLegacyProbe.Unset()
+	c.enabledDevNetNpb.Unset()
+	c.enabledDevNetNpmd.Unset()
+	c.enabledDevTraceNet.Unset()
+	c.enabledDevTraceBiz.Unset()
 }
 
 func (c *VTapCache) convertLicenseFunctions() {
@@ -412,29 +487,59 @@ func (c *VTapCache) convertLicenseFunctions() {
 	}
 	c.licenseFunctionSet = functionSet
 
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_CALL_MONITORING) {
-		c.enabledCallMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPB) {
+		c.enabledNetNpb.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_DATABASE_MONITORING) {
-		c.enabledCallMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPMD) {
+		c.enabledNetNpmd.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_NETWORK_MONITORING) {
-		c.enabledNetworkMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_DPDK) {
+		c.enabledNetDpdk.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION) {
-		c.enabledTrafficDistribution.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_NET) {
+		c.enabledTraceNet.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING) {
-		c.enabledFunctionMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_SYS) {
+		c.enabledTraceSys.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
-		c.enabledApplicationMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_APP) {
+		c.enabledTraceApp.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_LOG_MONITORING) {
-		c.enabledLogMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_IO) {
+		c.enabledTraceIo.Set()
 	}
-	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING) {
-		c.enabledIndicatorMonitoring.Set()
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_BIZ) {
+		c.enabledTraceBiz.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_CPU) {
+		c.enabledProfileCpu.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_RAM) {
+		c.enabledProfileRam.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_INT) {
+		c.enabledProfileInt.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_METRIC) {
+		c.enabledLegacyMetric.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_LOG) {
+		c.enabledLegacyLog.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_PROBE) {
+		c.enabledLegacyProbe.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_NET_NPB) {
+		c.enabledDevNetNpb.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_NET_NPMD) {
+		c.enabledDevNetNpmd.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_TRACE_NET) {
+		c.enabledDevTraceNet.Set()
+	}
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_TRACE_BIZ) {
+		c.enabledDevTraceBiz.Set()
 	}
 }
 
@@ -457,71 +562,214 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		log.Error("vtap configure is nil")
 		return
 	}
-	if c.EnabledCallMonitoring() == false && c.EnabledNetworkMonitoring() == false {
-		configure.UserConfig.Set("outputs.flow_metrics.filters.apm_metrics", false)
-		configure.UserConfig.Set("outputs.flow_log.filters.l7_capture_network_types", []int{-1})
-	}
 
-	if c.EnabledNetworkMonitoring() == false {
+	if !c.EnabledNetNpmd() && !c.EnabledDevNetNpmd() {
 		configure.UserConfig.Set("outputs.flow_metrics.filters.npm_metrics", false)
 		configure.UserConfig.Set("outputs.flow_log.filters.l4_capture_network_types", []int{-1})
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# outputs.flow_metrics.filters.npm_metrics = false, set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# outputs.flow_log.filters.l4_capture_network_types = [-1], set by feature controller",
+		)
 	}
 
-	if c.EnabledNetworkMonitoring() == true && c.EnabledCallMonitoring() == false {
-		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", NetWorkL7ProtocolEnabled)
-	} else if c.EnabledNetworkMonitoring() == false && c.EnabledCallMonitoring() == false {
-		configure.UserConfig.Set("processors.request_log.application_protocol_inference.enabled_protocols", []string{})
+	if !c.EnabledNetDpdk() {
+		configure.UserConfig.Set("inputs.cbpf.special_network.dpdk.source", "None")
+		configure.UserConfig.Set("inputs.cbpf.special_network.vhost_user.vhost_socket_path", "")
+		configure.UserConfig.Set("inputs.ebpf.socket.uprobe.dpdk.command", "")
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.cbpf.special_network.dpdk.source = None, set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.cbpf.special_network.vhost_user.vhost_socket_path = '', set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.socket.uprobe.dpdk.command = '', set by feature controller",
+		)
 	}
 
-	if c.EnabledCallMonitoring() == false {
-		configure.UserConfig.Set("inputs.ebpf.disabled", true)
+	if !c.EnabledTraceNet() && !c.EnabledDevTraceNet() {
+		configure.UserConfig.Set("processors.request_log.filters.cbpf_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# processors.request_log.filters.cbpf_disabled = true, set by feature controller",
+		)
+	}
+
+	if !c.EnabledTraceSys() {
+		configure.UserConfig.Set("inputs.ebpf.socket.uprobe.golang.enabled", false)
+		configure.UserConfig.Set("inputs.ebpf.socket.uprobe.tls.enabled", false)
+		configure.UserConfig.Set("inputs.ebpf.socket.kprobe.disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.socket.uprobe.golang.enabled = false, set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.socket.uprobe.tls.enabled = false, set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.socket.kprobe.disabled = true, set by feature controller",
+		)
+	}
+
+	if !c.EnabledTraceApp() {
+		configure.UserConfig.Set("inputs.integration.feature_control.trace_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.integration.feature_control.trace_integration_disabled = true, set by feature controller",
+		)
+	}
+
+	if !c.EnabledTraceIo() {
 		configure.UserConfig.Set("inputs.ebpf.file.io_event.collect_mode", 0)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.file.io_event.collect_mode = 0, set by feature controller",
+		)
 	}
 
-	if c.EnabledFunctionMonitoring() == false {
+	if !c.EnabledTraceBiz() && !c.EnabledDevTraceBiz() {
+		configure.UserConfig.Set("processors.request_log.tag_extraction.custom_field_policies", []string{})
+		configure.UserConfig.Set("processors.request_log.application_protocol_inference.custom_protocols", []string{})
+		configure.UserConfig.Set("plugins", "None")
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# processors.request_log.tag_extraction.custom_field_policies = [], set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# processors.request_log.application_protocol_inference.custom_protocols = [], set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# plugins = None, set by feature controller",
+		)
+	}
+
+	if !c.EnabledProfileCpu() {
 		configure.UserConfig.Set("inputs.ebpf.profile.on_cpu.disabled", true)
 		configure.UserConfig.Set("inputs.ebpf.profile.off_cpu.disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.profile.on_cpu.disabled = true, set by feature controller",
+		)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.profile.off_cpu.disabled = true, set by feature controller",
+		)
+	}
+
+	if !c.EnabledProfileRam() {
+		configure.UserConfig.Set("inputs.ebpf.profile.memory.disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.ebpf.profile.memory.disabled = true, set by feature controller",
+		)
+	}
+
+	if !c.EnabledProfileInt() {
 		configure.UserConfig.Set("inputs.integration.feature_control.profile_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.integration.feature_control.profile_integration_disabled = true, set by feature controller",
+		)
 	}
 
-	if c.EnabledApplicationMonitoring() == false {
-		configure.UserConfig.Set("inputs.integration.feature_control.trace_integration_disabled", true)
-	}
-
-	if c.EnabledIndicatorMonitoring() == false {
+	if !c.EnabledLegacyMetric() {
 		configure.UserConfig.Set("inputs.integration.feature_control.metric_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.integration.feature_control.metric_integration_disabled = true, set by feature controller",
+		)
 	}
-	if c.EnabledLogMonitoring() == false {
+
+	if !c.EnabledLegacyLog() {
 		configure.UserConfig.Set("inputs.integration.feature_control.log_integration_disabled", true)
+		configure.UserConfigComment = append(
+			configure.UserConfigComment,
+			"# inputs.integration.feature_control.log_integration_disabled = true, set by feature controller",
+		)
 	}
 }
 
-func (c *VTapCache) EnabledCallMonitoring() bool {
-	return c.enabledCallMonitoring.IsSet()
+func (c *VTapCache) EnabledNetNpb() bool {
+	return c.enabledNetNpb.IsSet()
 }
 
-func (c *VTapCache) EnabledNetworkMonitoring() bool {
-	return c.enabledNetworkMonitoring.IsSet()
+func (c *VTapCache) EnabledNetNpmd() bool {
+	return c.enabledNetNpmd.IsSet()
 }
 
-func (c *VTapCache) EnabledTrafficDistribution() bool {
-	return c.enabledTrafficDistribution.IsSet()
+func (c *VTapCache) EnabledNetDpdk() bool {
+	return c.enabledNetDpdk.IsSet()
 }
 
-func (c *VTapCache) EnabledFunctionMonitoring() bool {
-	return c.enabledFunctionMonitoring.IsSet()
+func (c *VTapCache) EnabledTraceNet() bool {
+	return c.enabledTraceNet.IsSet()
 }
 
-func (c *VTapCache) EnabledApplicationMonitoring() bool {
-	return c.enabledApplicationMonitoring.IsSet()
+func (c *VTapCache) EnabledTraceSys() bool {
+	return c.enabledTraceSys.IsSet()
 }
 
-func (c *VTapCache) EnabledIndicatorMonitoring() bool {
-	return c.enabledIndicatorMonitoring.IsSet()
+func (c *VTapCache) EnabledTraceApp() bool {
+	return c.enabledTraceApp.IsSet()
 }
 
-func (c *VTapCache) EnabledLogMonitoring() bool {
-	return c.enabledLogMonitoring.IsSet()
+func (c *VTapCache) EnabledTraceIo() bool {
+	return c.enabledTraceIo.IsSet()
+}
+
+func (c *VTapCache) EnabledTraceBiz() bool {
+	return c.enabledTraceBiz.IsSet()
+}
+
+func (c *VTapCache) EnabledProfileCpu() bool {
+	return c.enabledProfileCpu.IsSet()
+}
+
+func (c *VTapCache) EnabledProfileRam() bool {
+	return c.enabledProfileRam.IsSet()
+}
+
+func (c *VTapCache) EnabledProfileInt() bool {
+	return c.enabledProfileInt.IsSet()
+}
+
+func (c *VTapCache) EnabledLegacyMetric() bool {
+	return c.enabledLegacyMetric.IsSet()
+}
+
+func (c *VTapCache) EnabledLegacyLog() bool {
+	return c.enabledLegacyLog.IsSet()
+}
+
+func (c *VTapCache) EnabledLegacyProbe() bool {
+	return c.enabledLegacyProbe.IsSet()
+}
+
+func (c *VTapCache) EnabledDevNetNpb() bool {
+	return c.enabledDevNetNpb.IsSet()
+}
+
+func (c *VTapCache) EnabledDevNetNpmd() bool {
+	return c.enabledDevNetNpmd.IsSet()
+}
+
+func (c *VTapCache) EnabledDevTraceNet() bool {
+	return c.enabledDevTraceNet.IsSet()
+}
+
+func (c *VTapCache) EnabledDevTraceBiz() bool {
+	return c.enabledDevTraceBiz.IsSet()
 }
 
 func (c *VTapCache) updateLicenseFunctions(licenseFunctions string) {
@@ -648,6 +896,14 @@ func (c *VTapCache) GetUserConfig() *koanf.Koanf {
 		return koanf.New(".")
 	}
 	return config.GetUserConfig()
+}
+
+func (c *VTapCache) GetUserConfigComment() []string {
+	config := c.GetVTapConfig()
+	if config == nil {
+		return []string{}
+	}
+	return config.GetUserConfigComment()
 }
 
 func (c *VTapCache) updateVTapHost(host string) {
@@ -1049,11 +1305,11 @@ func (c *VTapCache) modifyVTapCache() {
 	vTapType := c.GetVTapType()
 	if vTapType == VTAP_TYPE_POD_HOST || vTapType == VTAP_TYPE_POD_VM {
 		c.podClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
-		if ok == false {
+		if !ok {
 			log.Warningf(v.Logf("vtap(%s) not found podClusterID", c.GetVTapHost()))
 		}
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
-		if ok == false {
+		if !ok {
 			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_K8S_SIDECAR {
@@ -1064,18 +1320,18 @@ func (c *VTapCache) modifyVTapCache() {
 		}
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
-		if ok == false {
+		if !ok {
 			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_HYPER_V && v.hypervNetworkHostIds.Contains(c.GetLaunchServerID()) {
 		c.vTapType = VTAP_TYPE_HYPER_V_NETWORK
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
-		if ok == false {
+		if !ok {
 			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_KVM || vTapType == VTAP_TYPE_HYPER_V {
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
-		if ok == false {
+		if !ok {
 			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	}

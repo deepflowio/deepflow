@@ -19,9 +19,8 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -73,12 +72,14 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
-		lm := NewMetrics(
-			len(loadMetrics), "metrics",
-			"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-			common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
-		)
-		loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
+		if !slices.Contains([]string{common.TABLE_NAME_EVENT, common.TABLE_NAME_PERF_EVENT}, table) {
+			lm := NewMetrics(
+				len(loadMetrics), "metrics",
+				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
+				common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
+			)
+			loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
+		}
 
 		// native metrics
 		if config.ControllerCfg.DFWebService.Enabled {

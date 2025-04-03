@@ -1400,7 +1400,7 @@ Upgrade from old version: `static_config.os-proc-sync-enabled`
 ```yaml
 inputs:
   proc:
-    enabled: false
+    enabled: true
 ```
 
 **模式**:
@@ -1410,8 +1410,14 @@ inputs:
 
 **详细描述**:
 
-开启后 deepflow-agent 将获取操作系统的进程信息，并上报至 deepflow-server。该参数仅对
-CHOST_VM, CHOST_BM, K8S_VM, K8S_BM 等运行环境的 agent 有效。
+开启此配置后，deepflow-agent 会周期性将 `inputs.proc.process_matcher` 中指定的进程信息上报给 deepflow-server。
+同步进程信息后，所有的 eBPF 观测数据都会自动注入`全局进程 ID`（`gprocess_id`）标签。
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.gprocess_info`。
+
+该参数仅对`云服务器`（CHOST_VM、CHOST_BM）和`容器`（K8S_VM、K8S_BM）类型的 agent 有效，
+在命令行下使用 `deepflow-ctl agent list` 可确定 agent 的具体类型。
 
 ### /proc 目录 {#inputs.proc.proc_dir_path}
 
@@ -1468,8 +1474,13 @@ inputs:
 
 **详细描述**:
 
-Socket 信息同步的周期。
-0 表示不开启，除 0 外不要配置小于 1s 的值。
+进程 Socket 信息的同步周期。
+
+0 表示不开启，除 0 外不要配置小于 `1s` 的值。
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
+另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
 
 ### 最小活跃时间 {#inputs.proc.min_lifetime}
 
@@ -1626,6 +1637,8 @@ inputs:
 
 **详细描述**:
 
+用于指定为特定进程开启的高级功能列表。
+
 匹配器将自上而下地遍历匹配规则，所以较前的规则将会被优先匹配。
 当 match_type 为 parent_process_name 时，匹配器将会递归地查找父进程名且忽略 rewrite_name 选项。
 rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的环境变量。
@@ -1637,8 +1650,15 @@ rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的�
   [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
 - ignore: 是否要忽略正则匹配，缺省值为 `false`
 - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
-- enabled_features: 可用于进程匹配器的 feature，可选项为：
-  [proc.gprocess_info, proc.golang_symbol_table, proc.socket_lis, ebpf.socket.uprobe.golang, ebpf.socket.uprobe.tls, ebpf.profile.on_cpu, ebpf.profile.off_cpu, ebpf.profile.memory]
+- enabled_features: 为匹配到的进程开启的特性列表，可选项如下
+  - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
+  - proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
+  - proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
+  - ebpf.socket.uprobe.golang（注意确认 `inputs.ebpf.socket.uprobe.golang.enabled` 已配置为 **true**）
+  - ebpf.socket.uprobe.tls（注意确认 `inputs.ebpf.socket.uprobe.tls.enabled` 已配置为 **true**）
+  - ebpf.profile.on_cpu（注意确认 `inputs.ebpf.profile.on_cpu.disabled` 已配置为 **false**）
+  - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
+  - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
 
 示例:
 ```yaml
@@ -1951,7 +1971,15 @@ inputs:
 
 **详细描述**:
 
-Enabled feature list.
+注意也需要同时开启相关特性的总开关：
+- proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
+- proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
+- proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
+- ebpf.socket.uprobe.golang（注意确认 `inputs.ebpf.socket.uprobe.golang.enabled` 已配置为 **true**）
+- ebpf.socket.uprobe.tls（注意确认 `inputs.ebpf.socket.uprobe.tls.enabled` 已配置为 **true**）
+- ebpf.profile.on_cpu（注意确认 `inputs.ebpf.profile.on_cpu.disabled` 已配置为 **false**）
+- ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
+- ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
 
 ### 符号表 {#inputs.proc.symbol_table}
 
@@ -1985,12 +2013,14 @@ inputs:
 
 **详细描述**:
 
+是否开启 Golang 特有符号表的解析能力。
+
 如果 Golang（版本 >= 1.13 and < 1.18条件下）进程运行时裁切了标准符号
 表，开启此开关后 deepflow-agent 将解析生成 Golang-specific 符号表以
 完善 eBPF uprobe 数据，实现 Golang 程序的零侵扰调用链追踪。注意：开启
 该开关后，eBPF 程序初始化过程可能会持续 10 分钟以上的时间。
+
 配置方法：
-- 在'golang'的参数中配置进程的正则表达式，比如：`golang: .*`
 - 如果在 deepflow-agent 的运行日志中发现如下 warning：
   ```
   [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
@@ -2003,16 +2033,20 @@ inputs:
     # ls -al /proc/1946/exe
     /proc/1946/exe -> /usr/local/bin/kube-controller-manager
     ```
-  - 检查目录下是否有符号表，如果结果中出现 "no symbols"，则说明符号表缺失，需要开启 Golang 程序符号表解析开关.
+  - 检查目录下是否有符号表：
     ```
     # nm /proc/1946/root/usr/local/bin/kube-controller-manager
     nm: /proc/1946/root/usr/local/bin/kube-controller-manager: no symbols
     ```
+- 如果结果中出现 "no symbols"，则说明符号表缺失，需要开启 Golang 程序符号表解析开关.
 - deepflow-agent 启动阶段运行日志中出现类似下面的信息，说明 Golang 进程已经被成功 hook。
   ```
   [eBPF] INFO Uprobe [/proc/1946/root/usr/local/bin/kube-controller-manager] pid:1946 go1.16.0
   entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
   ```
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.golang_symbol_table`。
 
 #### Java {#inputs.proc.symbol_table.java}
 
@@ -3336,6 +3370,9 @@ inputs:
 
 Golang 程序 HTTP2/HTTPS 协议数据采集及零侵扰追踪特性的开启开关。
 
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.golang`。
+
 ###### 追踪超时时间 {#inputs.ebpf.socket.uprobe.golang.tracing_timeout}
 
 **标签**:
@@ -3399,12 +3436,20 @@ inputs:
 
 **详细描述**:
 
-应用程序 openssl 采集开关，开启后 deepflow-agent 将获取进程信息并用 Uprobe  Hook 到 opessl 的
-加密/解密接口，以采集 HTTPS 协议加密前、解密后的数据。
-确定应用程序是否使用 openssl 的方法：
+是否启用使用 openssl 库的进程以支持 HTTPS 协议数据采集。
+
+可通过以下方式判断应用进程是否能够使用 `Uprobe hook openssl 库`来采集加密数据：
+- 执行命令`cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
+  则说明该进程正在使用 openssl 库。
+
+启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
+在日志中您会看到类似如下信息：
 ```
-`cat /proc/<PID>/maps | grep "libssl.so"`
+[eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
 ```
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.tls`。
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
 
@@ -4084,6 +4129,9 @@ inputs:
 
 eBPF On-CPU profile 数据的采集开关。
 
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.on_cpu`。
+
 ##### 采样频率 {#inputs.ebpf.profile.on_cpu.sampling_frequency}
 
 **标签**:
@@ -4179,6 +4227,9 @@ inputs:
 **详细描述**:
 
 eBPF Off-CPU profile 数据的采集开关。
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.off_cpu`。
 
 ##### 按 CPU 聚合 {#inputs.ebpf.profile.off_cpu.aggregate_by_cpu}
 
@@ -4280,6 +4331,9 @@ inputs:
 **详细描述**:
 
 eBPF memory profile 数据的采集开关。
+
+注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.profile.memory`。
 
 ##### 内存剖析上报间隔 {#inputs.ebpf.profile.memory.report_interval}
 
@@ -5685,7 +5739,6 @@ config:
       source: |
         .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
         .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
-        # map to prometheus metric name
         metrics_map = {
           "boot_time": "boot_time_seconds",
           "memory_active_bytes": "memory_Active_bytes",
@@ -5717,6 +5770,7 @@ config:
       endpoint: http://127.0.0.1:38086/api/v1/prometheus
       healthcheck:
         enabled: false
+
 ```
 
 抓取 kubernetes 指标
@@ -5852,13 +5906,12 @@ config:
      - flush_kubernetes_logs
      - kubernetes_logs_frontend
      source: |-
-         # try to parse json
          if is_string(.message) && is_json(string!(.message)) {
              tags = parse_json(.message) ?? {}
              ._df_log_type = tags._df_log_type
              .org_id = to_int(tags.org_id) ?? 0
              .user_id = to_int(tags.user_id) ?? 0
-             .message = tags.message || tags.msg # extract from tags.message
+             .message = tags.message || tags.msg
              del(tags._df_log_type)
              del(tags.org_id)
              del(tags.user_id)
@@ -5871,13 +5924,8 @@ config:
                .level = to_string!(.json.level)
                del(.json.level)
             } else {
-              # match log level
-              # allow DEBU/ERRO
-              # INFO|INFOMATION|INFORMATION|WARN|WARNING|DEBUG|ERROR|TRACE|FATAL|CRITICAL
-              # (?i) ignore case, but require `[]` or linux color code surround
               level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
               if !exists(level_tags.level) {
-                 # for logs like ' INFO ' surround by whitespace, to avoid level match error, require uppercase strictly
                  level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
               }
               if exists(level_tags.level) {
@@ -5922,6 +5970,7 @@ config:
            - tag_kubernetes_logs
            type: http
            uri: http://127.0.0.1:38086/api/v1/log
+
 ```
 
 使用 http_client 或者 socket 拨测一个远端服务
@@ -6649,6 +6698,7 @@ processors:
         NATS: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
+        PING: 1-65535
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
@@ -6721,6 +6771,7 @@ processors:
         NATS: []
         OpenWire: []
         Oracle: []
+        PING: []
         PostgreSQL: []
         Pulsar: []
         Redis: []
@@ -7005,6 +7056,7 @@ deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7029,6 +7081,102 @@ processors:
 **详细描述**:
 
 应用调用日志请求、响应合并的时间窗口，超出该时间窗口的响应将不与请求合并，而是单独生成一条调用日志。
+
+#### 应用会话合并超时设置 {#processors.request_log.timeouts.session_aggregate}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+设置每个应用的超时时间。
+DNS 和 TLS 默认 15s，其他协议默认 120s。
+
+示例:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: DNS
+        timeout: 15s
+      - protocol: HTTP2
+        timeout: 120s
+```
+
+##### 协议 {#processors.request_log.timeouts.session_aggregate.protocol}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.protocol`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - protocol: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+用于设置超时时间的协议名称。
+
+##### 超时时间 {#processors.request_log.timeouts.session_aggregate.timeout}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.timeouts.session_aggregate.timeout`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    timeouts:
+      session_aggregate:
+      - timeout: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+
+**详细描述**:
+
+设置应用的超时时间。
 
 ### 标签提取 {#processors.request_log.tag_extraction}
 
@@ -7500,6 +7648,7 @@ processors:
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -7535,6 +7684,35 @@ LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目
   用于记录当前时刻所有时间槽中缓存的 request_resource 字段占用的总内存，单位为字节。
 - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
   用于记录达到 LRU 容量限制并触发淘汰的次数。
+
+#### 会话聚合最大条目数 {#processors.request_log.tunning.session_aggregate_max_entries}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tunning.session_aggregate_max_entries`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tunning:
+      session_aggregate_max_entries: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [16384, 10000000] |
+
+**详细描述**:
+
+会话聚合最大条目数。
+如果 l7_flow_log 条目总数超过该配置，最老的条目将被丢弃，并设置其 response 状态为 `Unknown`。
 
 #### 应用指标时间一致性开关 {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
 
@@ -8248,7 +8426,7 @@ outputs:
 当使用 RAW_UDP 发送数据时，可以开启该特性以提升数据发送的性能。注意：（1）该特性需要
 Linux Kernel >= 3.14；（2）特性开启后，发送的数据包无法被 tcpdump 捕获。
 
-### Multiple Sockets To Ingester {#outputs.socket.multiple_sockets_to_ingester}
+### 使用多个 Ingester Socket {#outputs.socket.multiple_sockets_to_ingester}
 
 **标签**:
 

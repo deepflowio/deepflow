@@ -15,6 +15,7 @@
  */
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::sync::atomic::AtomicBool;
 use std::sync::{
     atomic::{AtomicI32, Ordering},
     Arc, RwLock,
@@ -77,6 +78,7 @@ impl EpcNetIpKey {
 }
 
 pub struct Labeler {
+    running_in_single_epc: AtomicBool,
     local_epc: AtomicI32,
     // Interface表
     mac_table: RwLock<AHashMap<u64, Arc<PlatformData>>>,
@@ -97,6 +99,7 @@ pub struct Labeler {
 impl Default for Labeler {
     fn default() -> Self {
         Self {
+            running_in_single_epc: AtomicBool::new(false),
             local_epc: AtomicI32::new(EPC_INTERNET),
             mac_table: RwLock::new(AHashMap::new()),
             epc_ip_table: RwLock::new(AHashMap::new()),
@@ -116,8 +119,10 @@ fn is_unicast_mac(mac: u64) -> bool {
 }
 
 impl Labeler {
-    pub fn update_local_epc(&mut self, local_epc: i32) {
+    pub fn update_local_epc(&mut self, local_epc: i32, running_in_single_epc: bool) {
         self.local_epc.store(local_epc, Ordering::Relaxed);
+        self.running_in_single_epc
+            .store(running_in_single_epc, Ordering::Relaxed);
     }
 
     fn update_mac_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
@@ -529,6 +534,14 @@ impl Labeler {
             if l3_end || ip.is_unspecified() || ip.is_loopback() {
                 info.set_l3_data(&interface);
                 is_wan = interface.if_type == IfType::WAN;
+                return (info, is_wan);
+            }
+        } else if l2_end && self.running_in_single_epc.load(Ordering::Relaxed) {
+            info.l2_epc_id = self.local_epc.load(Ordering::Relaxed);
+            info.is_local_mac = true;
+            if l3_end || ip.is_unspecified() || ip.is_loopback() {
+                info.l3_epc_id = info.l2_epc_id;
+                info.is_local_ip = true;
                 return (info, is_wan);
             }
         }
@@ -1292,5 +1305,36 @@ mod tests {
         };
         labeler.get_vip(&key, false, false, &mut endpoints);
         assert_eq!(endpoints.dst_info.is_vip, true);
+    }
+
+    #[test]
+    fn test_local_epc() {
+        let mut labeler: Labeler = Default::default();
+
+        labeler.update_local_epc(10, true);
+
+        let mut key: LookupKey = LookupKey {
+            src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
+            src_ip: "192.168.10.100".parse().unwrap(),
+            dst_ip: "172.29.20.200".parse().unwrap(),
+            l2_end_0: true,
+            ..Default::default()
+        };
+        let endpoints = labeler.get_endpoint_data(&key);
+        assert_eq!(endpoints.src_info.l2_end, true);
+        assert_eq!(endpoints.src_info.is_local_mac, true);
+        assert_eq!(endpoints.src_info.l3_end, false);
+        assert_eq!(endpoints.src_info.is_local_ip, false);
+        assert_eq!(endpoints.src_info.l2_epc_id, 10);
+        assert_eq!(endpoints.src_info.l3_epc_id, 0);
+
+        key.l3_end_0 = true;
+        let endpoints = labeler.get_endpoint_data(&key);
+        assert_eq!(endpoints.src_info.l2_end, true);
+        assert_eq!(endpoints.src_info.is_local_mac, true);
+        assert_eq!(endpoints.src_info.l3_end, true);
+        assert_eq!(endpoints.src_info.is_local_ip, true);
+        assert_eq!(endpoints.src_info.l2_epc_id, 10);
+        assert_eq!(endpoints.src_info.l3_epc_id, 10);
     }
 }

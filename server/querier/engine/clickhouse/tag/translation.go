@@ -18,10 +18,9 @@ package tag
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 )
@@ -79,7 +78,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			resourceIDSuffix := resourceStr + "_id" + suffix
 			resourceNameSuffix := resourceStr + suffix
 			groupNotNullFilter := ""
-			if !slices.Contains[[]string, string]([]string{"region", "az", "subnet", "pod_cluster"}, resourceStr) {
+			if !slices.Contains[[]string, string]([]string{"region", "az", "subnet", "pod_cluster", "gprocess"}, resourceStr) {
 				groupNotNullFilter = resourceIDSuffix + "!=0"
 			}
 			tagResourceMap[resourceIDSuffix] = map[string]*Tag{

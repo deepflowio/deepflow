@@ -25,7 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestIgnoreSubelementComments(t *testing.T) {
+func TestIgnoreDictValueComments(t *testing.T) {
 	type args struct {
 		yamlData []byte
 		start    int
@@ -54,16 +54,16 @@ global:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parser := NewLineFommatter(tt.args.yamlData)
-			i := parser.ignoreSubelementComments(tt.args.start)
+			parser := NewLineFormatter(tt.args.yamlData)
+			i := parser.ignoreDictValueComments(tt.args.start)
 			if i != tt.want {
-				t.Errorf("ignoreSubelementComments() = %v, want %v", i, tt.want)
+				t.Errorf("ignoreDictValueComments() = %v, want %v", i, tt.want)
 			}
 		})
 	}
 }
 
-func TestConvSubelementCommentToSection(t *testing.T) {
+func TestConvDictValueCommentToSection(t *testing.T) {
 	type args struct {
 		yamlData []byte
 		start    int
@@ -116,27 +116,29 @@ func TestConvSubelementCommentToSection(t *testing.T) {
 				start: 4,
 			},
 			want: []string{
-				"        match_regex_comment:",
-				"          upgrade_from: static_config.os-proc-regex.match-regex",
-				"        rewrite_name_comment:",
-				"          type: string",
-				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
+				"          match_regex_comment:",
+				"            upgrade_from: static_config.os-proc-regex.match-regex",
+				"          rewrite_name_comment:",
+				"            type: string",
+				"            upgrade_from: static_config.os-proc-regex.rewrite-name",
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parser := NewLineFommatter(tt.args.yamlData)
+			parser := NewLineFormatter(tt.args.yamlData)
 			got := make([]string, 0)
-			_, got, err := parser.convSubelementCommentToSection(tt.args.start, got)
+			_, got, err := parser.convDictValueCommentToSection(tt.args.start, 1, got)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("convSubelementCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("convDictValueCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := 0; i < len(got); i++ {
+				fmt.Printf("got[%d]: %s\n", i, got[i])
+				fmt.Printf("want[%d]: %s\n", i, tt.want[i])
 				if got[i] != tt.want[i] {
-					t.Errorf("line %d convSubelementCommentToSection() = \"%v\", want \"%v\"", i, got[i], tt.want[i])
+					t.Errorf("line %d convDictValueCommentToSection() = \"%v\", want \"%v\"", i, got[i], tt.want[i])
 				}
 			}
 		})
@@ -168,7 +170,7 @@ global:`),
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parser := NewLineFommatter(tt.args.yamlData)
+			parser := NewLineFormatter(tt.args.yamlData)
 			i := parser.ignoreTodoComments(tt.args.start)
 			if i != tt.want {
 				t.Errorf("ignoreTodoComments() = %v, want %v", i, tt.want)
@@ -194,12 +196,8 @@ func TestConvCommentToSection(t *testing.T) {
 				yamlData: []byte(`# type: section
 # name:
 #   en: Global
-# ----
-# TODO: add more fields
 global:
   # type: section
-  # --
-  #
   limits:`),
 				start: 0,
 			},
@@ -217,14 +215,10 @@ global:
 				yamlData: []byte(`# type: section
 # name:
 #   en: Global
-# ----
-# TODO: add more fields
 global:
   # type: section
-  # ---
-  #
   limits:`),
-				start: 6,
+				start: 4,
 			},
 			want: []string{
 				"  limits_comment:",
@@ -255,18 +249,19 @@ global:
 			want: []string{
 				"      process_matcher_comment:",
 				"        type: dict",
-				"        match_regex_comment:",
-				"          upgrade_from: static_config.os-proc-regex.match-regex",
-				"        rewrite_name_comment:",
-				"          type: string",
-				"          upgrade_from: static_config.os-proc-regex.rewrite-name",
+				"        value_comment:",
+				"          match_regex_comment:",
+				"            upgrade_from: static_config.os-proc-regex.match-regex",
+				"          rewrite_name_comment:",
+				"            type: string",
+				"            upgrade_from: static_config.os-proc-regex.rewrite-name",
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parser := NewLineFommatter(tt.args.yamlData)
+			parser := NewLineFormatter(tt.args.yamlData)
 			_, detailCommentlines, err := parser.convCommentToSection(tt.args.start)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("convCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
@@ -313,7 +308,7 @@ func TestKeyLineToKeyCommentLine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parser := NewLineFommatter([]byte{})
+			parser := NewLineFormatter([]byte{})
 			got, err := parser.keyLineToKeyCommentLine(tt.args.line)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("keyLineToKeyCommentLine() error = \"%v\", wantErr \"%v\"", err, tt.wantErr)
@@ -356,7 +351,7 @@ global:
 				"  type: section",
 				"  name:",
 				"    en: Global",
-				"gloabl:",
+				"global:",
 				"  limits_comment:",
 				"    type: section",
 				"    description: |-",
@@ -374,18 +369,18 @@ global:
 		},
 	}
 	for _, tt := range tests {
-		if tt.name != "case02" {
-			continue
-		}
+		// if tt.name != "case02" {
+		// 	continue
+		// }
 		t.Run(tt.name, func(t *testing.T) {
-			fmt := NewLineFommatter(tt.args.yamlData)
-			lines, err := fmt.Format()
+			fmter := NewLineFormatter(tt.args.yamlData)
+			lines, err := fmter.Format()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("stripLines() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			os.Mkdir("test_tmp", 0755)
-			if err := os.WriteFile("test_tmp/stripped_lines.yaml", lines, os.ModePerm); err != nil {
+			if err := os.WriteFile(fmt.Sprintf("test_tmp/stripped_lines_%s.yaml", tt.name), lines, os.ModePerm); err != nil {
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})
@@ -693,7 +688,7 @@ outputs:
 	keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dataFmt := NewDataFommatter()
+			dataFmt := NewDataFormatter()
 			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}
@@ -789,7 +784,7 @@ outputs:
 		// 	continue
 		// }
 		t.Run(tt.name, func(t *testing.T) {
-			dataFmt := NewDataFommatter()
+			dataFmt := NewDataFormatter()
 			if tt.args.yamlData != nil {
 				if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 					t.Fatalf("Failed to init yaml data: %v", err)
@@ -857,7 +852,7 @@ outputs:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
-			dataFmt := NewDataFommatter()
+			dataFmt := NewDataFormatter()
 			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
 				t.Fatalf("Failed to init yaml data: %v", err)
 			}

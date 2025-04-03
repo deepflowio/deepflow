@@ -162,7 +162,7 @@ impl L7ProtocolParserInterface for PingLog {
                     proto: L7Protocol::Ping,
                     sequence: icmp_data.echo_id_seq as u16,
                     id: (icmp_data.echo_id_seq >> 16) as u16,
-                    status: L7ResponseStatus::NotExist,
+                    status: L7ResponseStatus::Timeout,
                     ..Default::default()
                 };
                 set_captured_byte!(info, param);

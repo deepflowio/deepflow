@@ -33,12 +33,20 @@ var log = logger.MustGetLogger("monitor.license")
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_A
 var VTAP_LICENSE_FUNCTIONS = []string{
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_NETWORK_MONITORING),
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_CALL_MONITORING),
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING),
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING),
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING),
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_LOG_MONITORING),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_NET_NPB),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_NET_NPMD),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_NET_DPDK),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_TRACE_NET),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_TRACE_SYS),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_TRACE_APP),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_TRACE_IO),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_TRACE_BIZ),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_PROFILE_CPU),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_PROFILE_RAM),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_PROFILE_INT),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_LEGACY_METRIC),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_LEGACY_LOG),
+	strconv.Itoa(common.AGENT_LICENSE_FUNCTION_LEGACY_PROBE),
 }
 
 type VTapLicenseAllocation struct {
@@ -90,7 +98,7 @@ func (v *VTapLicenseAllocation) Stop() {
 func (v *VTapLicenseAllocation) allocLicense(orgDB *metadb.DB) {
 	log.Info("alloc license starting", orgDB.LogPrefixORGID)
 
-	whereSQL := "license_type IS NULL OR license_functions != ?"
+	whereSQL := "license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
 	orgDB.Model(&metadbmodel.VTap{}).Where(whereSQL, licenseFunctions).Updates(
 		map[string]interface{}{
@@ -101,9 +109,6 @@ func (v *VTapLicenseAllocation) allocLicense(orgDB *metadb.DB) {
 	log.Info("alloc license complete", orgDB.LogPrefixORGID)
 }
 
-func GetSupportedLicenseType(vtapType int) []int {
-	if vtapType == common.VTAP_TYPE_DEDICATED {
-		return []int{}
-	}
-	return []int{common.VTAP_LICENSE_TYPE_A}
+func GetSupportedLicenseFunctions(vtapType int) []int {
+	return []int{}
 }

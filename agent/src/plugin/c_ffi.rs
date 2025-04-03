@@ -261,6 +261,7 @@ impl TryFrom<ParseInfo> for CustomInfo {
                         domain: c_str_to_string(&req.domain).unwrap_or_default(),
                         resource: c_str_to_string(&req.resource).unwrap_or_default(),
                         endpoint: c_str_to_string(&req.endpoint).unwrap_or_default(),
+                        ..Default::default()
                     },
                     CustomInfoResp::default(),
                 )
@@ -271,14 +272,8 @@ impl TryFrom<ParseInfo> for CustomInfo {
                 (
                     CustomInfoRequest::default(),
                     CustomInfoResp {
-                        status: match L7ResponseStatus::try_from(resp.status)
-                            .map_err(|e| e.to_string())?
-                        {
-                            L7ResponseStatus::Ok => L7ResponseStatus::Ok,
-                            L7ResponseStatus::NotExist => L7ResponseStatus::NotExist,
-                            L7ResponseStatus::ServerError => L7ResponseStatus::ServerError,
-                            L7ResponseStatus::ClientError => L7ResponseStatus::ClientError,
-                        },
+                        status: L7ResponseStatus::try_from(resp.status)
+                            .map_err(|e| e.to_string())?,
                         code: Some(resp.code),
                         exception: c_str_to_string(&resp.exception).unwrap_or_default(),
                         result: c_str_to_string(&resp.result).unwrap_or_default(),
@@ -315,6 +310,7 @@ impl TryFrom<ParseInfo> for CustomInfo {
                 trace_id: c_str_to_string(&v.trace.trace_id),
                 span_id: c_str_to_string(&v.trace.span_id),
                 parent_span_id: c_str_to_string(&v.trace.parent_span_id),
+                ..Default::default()
             },
             attributes: read_attr(&v.attributes, v.attr_len),
             ..Default::default()
