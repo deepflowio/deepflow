@@ -38,6 +38,7 @@
 #include "btf_core.h"
 #include "config.h"
 #include "perf_reader.h"
+#include "common_utils.h"
 #include "extended/extended.h"
 
 #include "socket_trace_bpf_common.c"
@@ -1719,12 +1720,44 @@ static void update_allow_reasm_protos_array(struct bpf_tracer *tracer)
 	}
 }
 
+static inline void print_ports_bitmap(struct kprobe_port_bitmap *bmap,
+                                      const char *list_name)
+{
+#define PORTS_STR_SZ 1024
+
+	int i, idx = 0, count = 0;
+	uint16_t *ports;
+	char ports_str[1024];
+
+	for (i = 0; i < PORT_NUM_MAX; i++) {
+		if (is_set_bitmap(bmap->bitmap, i))
+			count++;
+	}
+
+	ports = calloc(count, sizeof(uint16_t));
+	if (ports == NULL) {
+		ebpf_warning("Memory allocation failed.\n");
+		return;
+	}
+
+	for (i = 0; i < PORT_NUM_MAX; i++) {
+		if (is_set_bitmap(bmap->bitmap, i))
+			ports[idx++] = i;
+	}
+
+	format_port_ranges(ports, count, ports_str, sizeof(ports_str));
+	ebpf_info("%s %s\n", list_name, ports_str);
+	free(ports);
+}
+
 static void update_kprobe_port_bitmap(struct bpf_tracer *tracer)
 {
 	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0,
 			    &allow_port_bitmap);
+	print_ports_bitmap(&allow_port_bitmap, "Whitelist");
 	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1,
 			    &bypass_port_bitmap);
+	print_ports_bitmap(&bypass_port_bitmap, "Blacklist");
 }
 
 static void config_proto_ports_bitmap(struct bpf_tracer *tracer)
