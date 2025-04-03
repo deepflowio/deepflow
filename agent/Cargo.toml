@@ -40,12 +40,8 @@ elf = "0.4.0"
 enterprise-utils = { path = "crates/enterprise-utils", optional = true }
 enum_dispatch = "0.3.7"
 envmnt = "0.10.4"
-flate2 = "1.0.23"
-# the feature flag fixes the following problem:
-#
-#     [flexi_logger][ERRCODE::Time] flexi_logger works with UTC rather than with local time, caused by IndeterminateOffset
-#       See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#time
-flexi_logger = { version = "0.23.3", features = ["use_chrono_for_offset"] }
+flate2 = "1.0"
+flexi_logger = "0.29"
 futures = "~0.3"
 grpc = { path = "plugins/grpc" }
 hex = "0.4.3"

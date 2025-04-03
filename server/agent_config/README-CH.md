@@ -6709,6 +6709,39 @@ processors:
 在不同的 Oracle 版本中，ID 为 0x04 的响应会有不同的数据结构，如果环境中该响应数据的
 `影响行数`前有 1byte 的额外数据，请开启此开关。
 
+##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
+
+###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        mysql:
+          decompress_payload: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+部分 MySQL 数据包采用 LZ77 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
+设置为 false 以关闭解压，提升性能。
+参考：https://dev.mysql.com/doc/dev/mysql-server/8.4.3/page_protocol_basic_compression.html
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
