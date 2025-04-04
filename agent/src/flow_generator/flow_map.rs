@@ -3009,7 +3009,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, flush_timestamp + Duration::from_secs(10));
 
         if let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
-            assert_eq!(tagged_flow.flow.close_type, CloseType::Timeout);
+            assert_eq!(tagged_flow.flow.close_type, CloseType::Finish);
         }
 
         let mut packet1 = _new_meta_packet();
@@ -3021,7 +3021,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, flush_timestamp + Duration::from_secs(10));
 
         if let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
-            assert_eq!(tagged_flow.flow.close_type, CloseType::Timeout);
+            assert_eq!(tagged_flow.flow.close_type, CloseType::Finish);
         }
     }
 
