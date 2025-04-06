@@ -1727,7 +1727,8 @@ static inline void print_ports_bitmap(struct kprobe_port_bitmap *bmap,
 
 	int i, idx = 0, count = 0;
 	uint16_t *ports;
-	char ports_str[1024];
+	char ports_str[PORTS_STR_SZ];
+	memset(ports_str, 0, sizeof(ports_str));
 
 	for (i = 0; i < PORT_NUM_MAX; i++) {
 		if (is_set_bitmap(bmap->bitmap, i))
@@ -1746,6 +1747,8 @@ static inline void print_ports_bitmap(struct kprobe_port_bitmap *bmap,
 	}
 
 	format_port_ranges(ports, count, ports_str, sizeof(ports_str));
+	if (strlen(ports_str) == 0)
+		snprintf(ports_str, sizeof(ports_str), "is empty");
 	ebpf_info("%s %s\n", list_name, ports_str);
 	free(ports);
 }
