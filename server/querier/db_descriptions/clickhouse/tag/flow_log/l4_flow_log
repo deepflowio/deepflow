@@ -94,6 +94,7 @@ l7_protocol         , l7_protocol          , l7_protocol           , int_enum   
 request_domain      , request_domain       , request_domain        , string       ,                      , Application Layer    , 111           , 0               ,
 
 flow_id             , flow_id              , flow_id               , int          ,                      , Flow Info            , 111           , 0               ,
+aggregated_flow_ids , aggregated_flow_ids  , aggregated_flow_ids   , string       ,                      , Flow Info            , 111           , 0               ,
 start_time          , start_time           , start_time            , int          ,                      , Flow Info            , 111           , 0               ,
 end_time            , end_time             , end_time              , int          ,                      , Flow Info            , 111           , 0               ,
 close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111           , 0               ,

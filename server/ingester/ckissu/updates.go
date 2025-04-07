@@ -20,8 +20,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
-var AllColumnAdds = [][]*ColumnAdds{ColumnAdd64, ColumnAdd65, ColumnAdd66}
-var AllIndexAdds = [][]*IndexAdd{getIndexAdds(IndexAdd64), getIndexAdds(IndexAdd65)}
+var AllColumnAdds = [][]*ColumnAdds{ColumnAdd65, ColumnAdd66}
+var AllIndexAdds = [][]*IndexAdd{getIndexAdds(IndexAdd65)}
 var AllColumnMods = [][]*ColumnMod{}
 var AllColumnRenames = [][]*ColumnRename{getColumnRenames(ColumnRename65)}
 var AllColumnDrops = [][]*ColumnDrop{getColumnDrops(nil)}
@@ -374,5 +374,11 @@ var ColumnAdd66 = []*ColumnAdds{
 		Tables:      []string{"in_process", "in_process_local"},
 		ColumnNames: []string{"auto_instance_type", "auto_service_type"},
 		ColumnType:  ckdb.UInt8,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"aggregated_flow_ids"},
+		ColumnType:  ckdb.String,
 	},
 }
