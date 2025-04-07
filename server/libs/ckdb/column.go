@@ -102,6 +102,7 @@ const (
 	COLUMN_FIELD_VALUE                = "field_value"
 	COLUMN_FIELD_VALUE_TYPE           = "field_value_type"
 	COLUMN_FLOW_ID                    = "flow_id"
+	COLUMN_AGGREGATED_FLOW_IDS        = "aggregated_flow_ids"
 	COLUMN_FLOW_LOAD                  = "flow_load"
 	COLUMN_GPROCESS_ID                = "gprocess_id"
 	COLUMN_GPROCESS_ID_0              = "gprocess_id_0"
@@ -426,6 +427,7 @@ var ColumnNames = []string{
 	COLUMN_FIELD_VALUE,
 	COLUMN_FIELD_VALUE_TYPE,
 	COLUMN_FLOW_ID,
+	COLUMN_AGGREGATED_FLOW_IDS,
 	COLUMN_FLOW_LOAD,
 	COLUMN_GPROCESS_ID,
 	COLUMN_GPROCESS_ID_0,

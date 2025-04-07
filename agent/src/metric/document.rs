@@ -216,7 +216,7 @@ impl Direction {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, Hash)]
 #[repr(u8)]
 pub enum TapSide {
     Rest = 0,

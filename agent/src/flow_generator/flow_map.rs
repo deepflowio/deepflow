@@ -1247,6 +1247,7 @@ impl FlowMap {
             } else {
                 self.generate_flow_id(lookup_key.timestamp, self.id)
             },
+            aggregated_flow_ids: Vec::new(),
             start_time: lookup_key.timestamp.into(),
             flow_stat_time: lookup_key.timestamp.round_to(TIME_UNIT.into()),
             vlan: meta_packet.vlan,

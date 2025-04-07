@@ -857,6 +857,14 @@ impl FlowMetricsPeer {
             self.gpid = other.gpid;
         }
     }
+
+    pub fn heartbeat_sequential_merge(&mut self, other: &FlowMetricsPeer) {
+        let total_byte_count = self.total_byte_count;
+        let total_packet_count = self.total_packet_count;
+        self.sequential_merge(other);
+        self.total_byte_count += total_byte_count;
+        self.total_packet_count += total_packet_count;
+    }
 }
 
 impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
@@ -933,6 +941,14 @@ impl From<u8> for PacketDirection {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
+pub struct HeartbeatAggrKey {
+    tap_side: TapSide,
+    port_dst: u16,
+    ip_src: IpAddr,
+    ip_dst: IpAddr,
+}
+
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct Flow {
     #[serde(flatten)]
@@ -944,6 +960,7 @@ pub struct Flow {
     pub tunnel: TunnelField,
 
     pub flow_id: u64,
+    pub aggregated_flow_ids: Vec<u64>,
 
     /* TCP Seq */
     pub syn_seq: u32,
@@ -1018,8 +1035,22 @@ impl Flow {
     }
 
     pub fn sequential_merge(&mut self, other: &Flow) {
-        self.flow_metrics_peers[0].sequential_merge(&other.flow_metrics_peers[0]);
-        self.flow_metrics_peers[1].sequential_merge(&other.flow_metrics_peers[1]);
+        if self.flow_id != other.flow_id {
+            self.flow_metrics_peers[0].heartbeat_sequential_merge(&other.flow_metrics_peers[0]);
+            self.flow_metrics_peers[1].heartbeat_sequential_merge(&other.flow_metrics_peers[1]);
+            if !self.aggregated_flow_ids.contains(&other.flow_id) {
+                self.aggregated_flow_ids.push(other.flow_id);
+            }
+            if other.syn_seq != 0 {
+                self.syn_seq = other.syn_seq;
+            }
+            if other.synack_seq != 0 {
+                self.synack_seq = other.synack_seq;
+            }
+        } else {
+            self.flow_metrics_peers[0].sequential_merge(&other.flow_metrics_peers[0]);
+            self.flow_metrics_peers[1].sequential_merge(&other.flow_metrics_peers[1]);
+        }
 
         self.end_time = other.end_time;
         self.duration = other.duration;
@@ -1195,6 +1226,15 @@ impl Flow {
     pub fn hit_pcap_policy(&self) -> bool {
         self.acl_gids.len() > 0
     }
+
+    pub fn get_heartbeat_aggr_key(&self) -> HeartbeatAggrKey {
+        HeartbeatAggrKey {
+            tap_side: self.tap_side,
+            port_dst: self.flow_key.port_dst,
+            ip_src: self.flow_key.ip_src,
+            ip_dst: self.flow_key.ip_dst,
+        }
+    }
 }
 
 impl fmt::Display for Flow {
@@ -1236,6 +1276,7 @@ impl From<Flow> for flow_log::Flow {
                 }
             },
             flow_id: f.flow_id,
+            aggregated_flow_ids: f.aggregated_flow_ids.clone(),
             start_time: f.start_time.as_nanos() as u64,
             end_time: f.end_time.as_nanos() as u64,
             duration: f.duration.as_nanos() as u64,

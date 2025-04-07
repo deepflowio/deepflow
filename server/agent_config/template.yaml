@@ -6057,6 +6057,39 @@ outputs:
       l7_ignored_observation_points: []
     # type: section
     # name:
+    #   en: Aggregators
+    #   ch: 聚合器
+    # description:
+    aggregators:
+      # type: bool
+      # name:
+      #   en: Health Check Flow Log Aggregation
+      #   ch: 聚合健康检查流日志
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Agent will mark the following types of flows as `close_type = normal end-client reset`:
+      #     - Client sends SYN, server replies SYN-ACK, client sends RST
+      #     - Client sends SYN, server replies SYN-ACK, client sends ACK, client sends RST
+      #     This type of traffic is normal load balancer backend host inspection traffic and does not carry any meaningful application layer payload.
+      #
+      #     When this configuration item is set to true, Agent will reset the client port number of the flow log to 0 before aggregating the output,
+      #     thereby reducing bandwidth and storage overhead.
+      #   ch: |-
+      #     Agent 会将如下类型的流标记为 `close_type = 正常结束-客户端重置`：
+      #     - 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 RST
+      #     - 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 ACK，客户端发送 RST
+      #     此类流量是正常的负载均衡器后端主机检查检查流量，不会携带任何有意义的应用层载荷。
+      #
+      #     本配置项设置为 true 时，Agent 会将流日志的客户端端口号重置为 0 之后再聚合输出，
+      #     从而降低带宽和存储开销。
+      aggregate_health_check_l4_flow_log: true
+    # type: section
+    # name:
     #   en: Throttles
     #   ch: 限速器
     # description:

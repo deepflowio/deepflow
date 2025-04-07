@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+use std::cell::RefCell;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::rc::Rc;
 
 use prost::Message;
 use public::sender::{SendMessageType, Sendable};
@@ -79,12 +80,14 @@ impl fmt::Display for TaggedFlow {
 }
 
 #[derive(Debug)]
-pub struct BoxedTaggedFlow(pub Box<TaggedFlow>);
+pub struct RcedTaggedFlow(pub Rc<RefCell<TaggedFlow>>);
 
-impl Sendable for BoxedTaggedFlow {
+unsafe impl Send for RcedTaggedFlow {}
+
+impl Sendable for RcedTaggedFlow {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let pb_tagged_flow = flow_log::TaggedFlow {
-            flow: Some(self.0.flow.into()),
+            flow: Some(self.0.borrow().clone().flow.into()),
         };
         pb_tagged_flow
             .encode(buf)
@@ -170,7 +173,7 @@ mod tests {
         tflow.flow.is_active_service = true;
 
         let mut buf: Vec<u8> = vec![];
-        let boxflow = BoxedTaggedFlow(Box::new(tflow));
+        let boxflow = RcedTaggedFlow(Rc::new(RefCell::new(tflow)));
         let encoded_len = boxflow.encode(&mut buf).unwrap();
         let rlt: Result<flow_log::TaggedFlow, prost::DecodeError> =
             Message::decode(buf.as_slice().get(..encoded_len).unwrap());
