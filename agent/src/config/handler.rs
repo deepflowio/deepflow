@@ -135,6 +135,7 @@ pub struct CollectorConfig {
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
     pub l4_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
+    pub aggregate_health_check_l4_flow_log: bool,
     pub l7_metrics_enabled: bool,
     pub agent_type: AgentType,
     pub agent_id: u16,
@@ -177,6 +178,7 @@ impl fmt::Debug for CollectorConfig {
                     })
                     .collect::<Vec<_>>(),
             )
+            .field("aggregate_health_check_l4_flow_log", &self.aggregate_health_check_l4_flow_log)
             .field(
                 "l4_log_collect_nps_threshold",
                 &self.l4_log_collect_nps_threshold,
@@ -1776,6 +1778,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     }
                     tap_sides
                 },
+                aggregate_health_check_l4_flow_log: conf.outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log,
                 cloud_gateway_traffic: conf
                     .inputs
                     .cbpf
@@ -4134,6 +4137,15 @@ impl ConfigHandler {
             );
             filters.l7_ignored_observation_points =
                 new_filters.l7_ignored_observation_points.clone();
+        }
+        let aggregators = &mut flow_log.aggregators;
+        let new_aggregators = &mut new_flow_log.aggregators;
+        if aggregators.aggregate_health_check_l4_flow_log != new_aggregators.aggregate_health_check_l4_flow_log {
+            info!(
+                "Update outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log from {:?} to {:?}.",
+                aggregators.aggregate_health_check_l4_flow_log, new_aggregators.aggregate_health_check_l4_flow_log
+            );
+            aggregators.aggregate_health_check_l4_flow_log = new_aggregators.aggregate_health_check_l4_flow_log;
         }
 
         let throttles = &mut flow_log.throttles;

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -275,24 +277,27 @@ type FlowInfo struct {
 	CloseType    uint16 `json:"close_type" category:"$tag" sub:"flow_info" enumfile:"close_type"`
 	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l4_signal_source"`
 	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
-	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
-	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
-	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
-	L2End0       bool   `json:"l2_end_0" category:"$tag" sub:"capture_info"`
-	L2End1       bool   `json:"l2_end_1" category:"$tag" sub:"capture_info"`
-	L3End0       bool   `json:"l3_end_0" category:"$tag" sub:"capture_info"`
-	L3End1       bool   `json:"l3_end_1" category:"$tag" sub:"capture_info"`
-	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
-	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
-	Duration     uint64 `json:"duration" category:"$metrics" sub:"delay"`   // us
-	IsNewFlow    uint8  `json:"is_new_flow" category:"$tag" sub:"flow_info"`
-	Status       uint8  `json:"status" category:"$tag" sub:"flow_info" enumfile:"status"`
-	AclGids      []uint16
-	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
-	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
+
+	AggregatedFlowIDs string
+
+	TapType     uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource   uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType uint8  `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort     uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide     string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	VtapID      uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	L2End0      bool   `json:"l2_end_0" category:"$tag" sub:"capture_info"`
+	L2End1      bool   `json:"l2_end_1" category:"$tag" sub:"capture_info"`
+	L3End0      bool   `json:"l3_end_0" category:"$tag" sub:"capture_info"`
+	L3End1      bool   `json:"l3_end_1" category:"$tag" sub:"capture_info"`
+	StartTime   int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime     int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	Duration    uint64 `json:"duration" category:"$metrics" sub:"delay"`   // us
+	IsNewFlow   uint8  `json:"is_new_flow" category:"$tag" sub:"flow_info"`
+	Status      uint8  `json:"status" category:"$tag" sub:"flow_info" enumfile:"status"`
+	AclGids     []uint16
+	GPID0       uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1       uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
 
 	NatRealIP0   uint32 `json:"nat_real_ip_0" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
 	NatRealIP1   uint32 `json:"nat_real_ip_1" category:"$tag" sub:"capture_info" to_string:"IPv4String"`
@@ -309,6 +314,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
+	ckdb.NewColumn("aggregated_flow_ids", ckdb.String).SetIndex(ckdb.IndexTokenbf),
 	ckdb.NewColumn("capture_network_type_id", ckdb.UInt8),
 	ckdb.NewColumn("nat_source", ckdb.UInt8),
 	ckdb.NewColumn("capture_nic_type", ckdb.UInt8),
@@ -731,10 +737,28 @@ func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageSta
 	}
 }
 
+func Uint64SliceToString(nums []uint64) string {
+	if len(nums) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(nums) * 20) // each number has a maximum of 20 characters
+
+	for i, n := range nums {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.FormatUint(n, 10))
+	}
+
+	return b.String()
+}
+
 func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
 	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
+	i.AggregatedFlowIDs = Uint64SliceToString(f.AggregatedFlowIds)
 	i.TapType = uint8(f.FlowKey.TapType)
 	var natSource datatype.NATSource
 	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()

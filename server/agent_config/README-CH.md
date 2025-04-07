@@ -8678,6 +8678,41 @@ outputs:
 
 配置该参数后，deepflow-agent将不采集列表中观测点的应用调用日志。默认值`[]`表示所有观测点均采集。
 
+### 聚合器 {#outputs.flow_log.aggregators}
+
+#### 聚合健康检查流日志 {#outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log`
+
+**默认值**:
+```yaml
+outputs:
+  flow_log:
+    aggregators:
+      aggregate_health_check_l4_flow_log: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+Agent 会将如下类型的流标记为 `close_type = 正常结束-客户端重置`：
+- 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 RST
+- 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 ACK，客户端发送 RST
+此类流量是正常的负载均衡器后端主机检查检查流量，不会携带任何有意义的应用层载荷。
+
+本配置项设置为 true 时，Agent 会将流日志的客户端端口号重置为 0 之后再聚合输出，
+从而降低带宽和存储开销。
+
 ### 限速器 {#outputs.flow_log.throttles}
 
 #### 流日志限速器 {#outputs.flow_log.throttles.l4_throttle}

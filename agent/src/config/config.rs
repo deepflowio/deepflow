@@ -2324,6 +2324,20 @@ impl Default for FlowLogFilters {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowLogAggregators {
+    pub aggregate_health_check_l4_flow_log: bool,
+}
+
+impl Default for FlowLogAggregators {
+    fn default() -> Self {
+        Self {
+            aggregate_health_check_l4_flow_log: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Throttles {
@@ -2358,6 +2372,7 @@ impl Default for OutputsFlowLogTunning {
 #[serde(default)]
 pub struct OutputsFlowLog {
     pub filters: FlowLogFilters,
+    pub aggregators: FlowLogAggregators,
     pub throttles: Throttles,
     pub tunning: OutputsFlowLogTunning,
 }
