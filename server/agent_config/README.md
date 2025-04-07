@@ -8943,6 +8943,41 @@ outputs:
 Use the value of tap_side to control which l7_flow_log should be ignored for
 collection.
 
+### Aggregators {#outputs.flow_log.aggregators}
+
+#### Health Check Flow Log Aggregation {#outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log`
+
+**Default value**:
+```yaml
+outputs:
+  flow_log:
+    aggregators:
+      aggregate_health_check_l4_flow_log: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Agent will mark the following types of flows as `close_type = normal end-client reset`:
+- Client sends SYN, server replies SYN-ACK, client sends RST
+- Client sends SYN, server replies SYN-ACK, client sends ACK, client sends RST
+This type of traffic is normal load balancer backend host inspection traffic and does not carry any meaningful application layer payload.
+
+When this configuration item is set to true, Agent will reset the client port number of the flow log to 0 before aggregating the output,
+thereby reducing bandwidth and storage overhead.
+
 ### Throttles {#outputs.flow_log.throttles}
 
 #### L4 Throttle {#outputs.flow_log.throttles.l4_throttle}
