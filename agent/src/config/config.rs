@@ -163,7 +163,7 @@ impl Config {
                         return Err(ConfigError::YamlConfigInvalid(format!(
                             "invalid log path {}",
                             cfg.log_file
-                        )))
+                        )));
                     }
                 }
             }
@@ -181,9 +181,9 @@ impl Config {
             ),
             Err(e) => {
                 info!(
-                     "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
-                     K8S_CA_CRT_PATH, e
-                 );
+                    "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
+                    K8S_CA_CRT_PATH, e
+                );
                 return None;
             }
         };
@@ -212,7 +212,9 @@ impl Config {
                     match cluster_id_response.cluster_id {
                         Some(id) => {
                             if id.is_empty() {
-                                error!("call get_kubernetes_cluster_id return cluster_id is empty string");
+                                error!(
+                                    "call get_kubernetes_cluster_id return cluster_id is empty string"
+                                );
                                 tokio::time::sleep(MINUTE).await;
                                 continue;
                             }
@@ -2339,6 +2341,20 @@ impl Default for FlowLogFilters {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowLogAggregators {
+    pub aggregate_health_check_l4_flow_log: bool,
+}
+
+impl Default for FlowLogAggregators {
+    fn default() -> Self {
+        Self {
+            aggregate_health_check_l4_flow_log: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Throttles {
@@ -2373,6 +2389,7 @@ impl Default for OutputsFlowLogTunning {
 #[serde(default)]
 pub struct OutputsFlowLog {
     pub filters: FlowLogFilters,
+    pub aggregators: FlowLogAggregators,
     pub throttles: Throttles,
     pub tunning: OutputsFlowLogTunning,
 }

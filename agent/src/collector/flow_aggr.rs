@@ -34,14 +34,15 @@ use crate::collector::types::U16Set;
 use crate::common::Timestamp;
 use crate::common::{
     enums::CaptureNetworkType,
-    flow::CloseType,
+    flow::{CloseType, HeartbeatAggrKey, PacketDirection},
     tagged_flow::{BoxedTaggedFlow, TaggedFlow},
 };
-use crate::config::handler::CollectorAccess;
+use crate::config::handler::{CollectorAccess, CollectorConfig};
 use crate::rpc::get_timestamp;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use public::{
     buffer::BatchedBox,
+    chrono_map::ChronoMap,
     queue::{DebugSender, Error, Receiver},
 };
 
@@ -57,6 +58,8 @@ pub struct FlowAggrCounter {
     stash_total_len: AtomicU64,
     stash_total_capacity: AtomicU64,
     stash_shrinks: AtomicU64,
+    heartbeat_aggred: AtomicU64,
+    heartbeat_cached: AtomicU64,
 }
 
 pub struct FlowAggrThread {
@@ -107,21 +110,26 @@ impl FlowAggrThread {
             return;
         }
 
-        let mut flow_aggr = FlowAggr::new(
-            self.input.clone(),
-            self.output.clone(),
-            self.running.clone(),
-            self.config.clone(),
-            self.delay,
-            self.ntp_diff.clone(),
-            self.metrics.clone(),
-        );
+        let input = self.input.clone();
+        let output = self.output.clone();
+        let running = self.running.clone();
+        let config = self.config.clone();
+        let delay = self.delay;
+        let ntp_diff = self.ntp_diff.clone();
+        let metrics = self.metrics.clone();
+
         self.thread_handle = Some(
             thread::Builder::new()
                 .name("flow-aggr".to_owned())
-                .spawn(move || flow_aggr.run())
+                .spawn(move || {
+                    let mut flow_aggr =
+                        FlowAggr::new(input, output, running, config, delay, ntp_diff, metrics);
+
+                    flow_aggr.run()
+                })
                 .unwrap(),
         );
+
         info!("l4 flow aggr id: {} started", self.id);
     }
 
@@ -147,15 +155,17 @@ impl FlowAggrThread {
 
 pub struct FlowAggr {
     input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
-    output: ThrottlingQueue,
     slot_start_time: Duration,
     flow_stashs: VecDeque<HashMap<u64, Box<TaggedFlow>>>,
+    heartbeat_flow_stash: ChronoMap<Timestamp, HeartbeatAggrKey, Box<TaggedFlow>>,
+    heartbeat_buffer: Vec<Box<TaggedFlow>>,
     stash_init_capacity: usize,
     slot_count: usize,
 
     flush_timeout: Duration,
     last_flush_time: Duration,
     config: CollectorAccess,
+    sender: Sender,
 
     running: Arc<AtomicBool>,
 
@@ -184,8 +194,13 @@ impl FlowAggr {
         }
         Self {
             input,
-            output: ThrottlingQueue::new(output, config.clone()),
+            sender: Sender::new(output, ntp_diff.clone(), config.clone(), metrics.clone()),
             flow_stashs,
+            heartbeat_flow_stash: ChronoMap::with_capacity(
+                Self::MIN_STASH_CAPACITY_SECOND * slot_count,
+                slot_count,
+            ),
+            heartbeat_buffer: Vec::with_capacity(Self::MIN_STASH_CAPACITY_SECOND),
             stash_init_capacity: Self::MIN_STASH_CAPACITY_SECOND,
             slot_start_time: Duration::ZERO,
             flush_timeout: Duration::from_secs(slot_count as u64),
@@ -198,7 +213,7 @@ impl FlowAggr {
         }
     }
 
-    fn minute_merge(&mut self, f: Arc<BatchedBox<TaggedFlow>>) {
+    fn minute_merge(&mut self, config: &CollectorConfig, f: Arc<BatchedBox<TaggedFlow>>) {
         let f = f.as_ref();
         let flow_time = Timestamp::from_secs(f.flow.start_time_in_minute());
         if flow_time < self.slot_start_time {
@@ -212,7 +227,7 @@ impl FlowAggr {
         let mut time_slot = (flow_time - self.slot_start_time).as_secs() as usize;
         if time_slot >= self.slot_count {
             let flush_count = time_slot - self.slot_count + 1;
-            self.flush_slots(flush_count);
+            self.flush_slots(config, flush_count);
             time_slot = self.slot_count - 1;
         }
 
@@ -226,63 +241,44 @@ impl FlowAggr {
                 }
             }
             flow.sequential_merge(&f);
-            if flow.flow.close_type != CloseType::ForcedReport {
+
+            let close_type = flow.flow.close_type;
+            if config.aggregate_health_check_l4_flow_log && close_type == CloseType::TcpFinClientRst
+            {
+                if let Some(new_hb_flow) = flow_stash.remove(&flow_id) {
+                    let key = new_hb_flow.flow.get_heartbeat_aggr_key();
+                    if let Some(hb_flow) = self.heartbeat_flow_stash.get_mut(&key) {
+                        hb_flow.sequential_merge(&new_hb_flow);
+                        // if the flow is aggregated, the source port needs to be set to 0
+                        hb_flow.flow.flow_key.port_src = 0;
+                        hb_flow.flow.flow_metrics_peers[PacketDirection::ClientToServer as usize]
+                            .nat_real_port = 0;
+                        self.metrics
+                            .heartbeat_aggred
+                            .fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        self.heartbeat_flow_stash
+                            .insert(flow_time, key, new_hb_flow);
+                    }
+                }
+            } else if close_type != CloseType::ForcedReport {
                 if let Some(closed_flow) = flow_stash.remove(&flow_id) {
-                    self.send_flow(closed_flow);
+                    self.sender.send_flow(closed_flow);
                 }
             }
         } else {
-            if f.flow.close_type != CloseType::ForcedReport {
-                self.send_flow(Box::new(f.as_ref().clone()));
+            if config.aggregate_health_check_l4_flow_log
+                && f.flow.close_type == CloseType::TcpFinClientRst
+            {
+                self.heartbeat_flow_stash.insert(
+                    flow_time,
+                    f.flow.get_heartbeat_aggr_key(),
+                    Box::new(f.as_ref().clone()),
+                );
+            } else if f.flow.close_type != CloseType::ForcedReport {
+                self.sender.send_flow(Box::new(f.as_ref().clone()));
             } else {
                 flow_stash.insert(f.flow.flow_id, Box::new(f.as_ref().clone()));
-            }
-        }
-    }
-
-    fn send_flow(&mut self, mut f: Box<TaggedFlow>) {
-        // We use acl_gid to mark which flows are configured with PCAP storage policies.
-        // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
-        let mut acl_gids = U16Set::new();
-        for policy_data in f.tag.policy_data.iter() {
-            let Some(policy_data) = policy_data else {
-                continue;
-            };
-            if !policy_data.contain_pcap() {
-                continue;
-            }
-            for action in policy_data.npb_actions.iter() {
-                if action.tunnel_type() != NpbTunnelType::Pcap {
-                    continue;
-                }
-                for gid in action.acl_gids().iter() {
-                    acl_gids.add(*gid);
-                }
-            }
-        }
-        f.flow.acl_gids = Vec::from(acl_gids.list());
-
-        if !f.flow.is_new_flow {
-            f.flow.start_time = Timestamp::from_secs(f.flow.start_time_in_minute());
-        }
-
-        if f.flow.close_type == CloseType::ForcedReport {
-            // Align time to seconds
-            f.flow.end_time = Timestamp::from_secs(f.flow.start_time.as_secs() + SECONDS_IN_MINUTE);
-        }
-
-        self.metrics.out.fetch_add(1, Ordering::Relaxed);
-
-        let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-        self.output.flush_cache_with_throttling(&now);
-        self.output.flush_cache_without_throttling(&now);
-        if f.flow.hit_pcap_policy() {
-            self.output.send_without_throttling(f);
-        } else {
-            if !self.output.send_with_throttling(f) {
-                self.metrics
-                    .drop_in_throttle
-                    .fetch_add(1, Ordering::Relaxed);
             }
         }
     }
@@ -291,7 +287,7 @@ impl FlowAggr {
         let mut flow_stash = self.flow_stashs.pop_front().unwrap();
 
         for (_, flow) in flow_stash.drain() {
-            self.send_flow(flow);
+            self.sender.send_flow(flow);
         }
 
         let stash_cap = self.flow_stashs.capacity();
@@ -309,7 +305,7 @@ impl FlowAggr {
         self.slot_start_time += Duration::from_secs(1);
     }
 
-    fn flush_slots(&mut self, slot_count: usize) {
+    fn flush_slots(&mut self, config: &CollectorConfig, slot_count: usize) {
         for _ in 0..slot_count.min(self.slot_count) {
             self.flush_front_slot_and_rotate();
         }
@@ -322,6 +318,13 @@ impl FlowAggr {
                 self.slot_start_time, slot_count
             );
         }
+        if config.aggregate_health_check_l4_flow_log {
+            self.heartbeat_flow_stash
+                .forward_time(self.slot_start_time.into(), |item| {
+                    self.sender.send_flow(item.clone());
+                    None
+                });
+        }
     }
 
     fn calc_stash_counters(&self) {
@@ -331,6 +334,9 @@ impl FlowAggr {
         self.metrics
             .stash_total_capacity
             .store(self.flow_stashs.capacity() as u64, Ordering::Relaxed);
+        self.metrics
+            .heartbeat_cached
+            .store(self.heartbeat_flow_stash.len() as u64, Ordering::Relaxed);
     }
 
     fn run(&mut self) {
@@ -351,15 +357,15 @@ impl FlowAggr {
                                 [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
                             || tagged_flow.flow.need_to_store
                         {
-                            self.minute_merge(tagged_flow);
+                            self.minute_merge(&config, tagged_flow);
                         }
                     }
                     self.calc_stash_counters();
                 }
                 Err(Error::Timeout) => {
                     let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-                    self.output.flush_cache_with_throttling(&now);
-                    self.output.flush_cache_without_throttling(&now);
+                    self.sender.output.flush_cache_with_throttling(&now);
+                    self.sender.output.flush_cache_without_throttling(&now);
                     if now > self.last_flush_time + self.flush_timeout {
                         self.flush_front_slot_and_rotate();
                     }
@@ -406,7 +412,88 @@ impl RefCountable for FlowAggrCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(self.stash_shrinks.swap(0, Ordering::Relaxed)),
             ),
+            (
+                "heartbeat_aggred",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.heartbeat_aggred.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "heartbeat_cached",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.heartbeat_cached.load(Ordering::Relaxed)),
+            ),
         ]
+    }
+}
+
+struct Sender {
+    ntp_diff: Arc<AtomicI64>,
+    output: ThrottlingQueue,
+    config: CollectorAccess,
+    metrics: Arc<FlowAggrCounter>,
+}
+
+impl Sender {
+    pub fn new(
+        output: DebugSender<BoxedTaggedFlow>,
+        ntp_diff: Arc<AtomicI64>,
+        config: CollectorAccess,
+        metrics: Arc<FlowAggrCounter>,
+    ) -> Self {
+        Self {
+            output: ThrottlingQueue::new(output, config.clone()),
+            ntp_diff,
+            config,
+            metrics,
+        }
+    }
+
+    fn send_flow(&mut self, mut f: Box<TaggedFlow>) {
+        // We use acl_gid to mark which flows are configured with PCAP storage policies.
+        // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
+        let mut acl_gids = U16Set::new();
+        for policy_data in f.tag.policy_data.iter() {
+            let Some(policy_data) = policy_data else {
+                continue;
+            };
+            if !policy_data.contain_pcap() {
+                continue;
+            }
+            for action in policy_data.npb_actions.iter() {
+                if action.tunnel_type() != NpbTunnelType::Pcap {
+                    continue;
+                }
+                for gid in action.acl_gids().iter() {
+                    acl_gids.add(*gid);
+                }
+            }
+        }
+
+        f.flow.acl_gids = Vec::from(acl_gids.list());
+
+        if !f.flow.is_new_flow {
+            f.flow.start_time = Timestamp::from_secs(f.flow.start_time_in_minute());
+        }
+
+        if f.flow.close_type == CloseType::ForcedReport {
+            // Align time to seconds
+            f.flow.end_time = Timestamp::from_secs(f.flow.start_time.as_secs() + SECONDS_IN_MINUTE);
+        }
+
+        self.metrics.out.fetch_add(1, Ordering::Relaxed);
+
+        let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+        self.output.flush_cache_with_throttling(&now);
+        self.output.flush_cache_without_throttling(&now);
+        if f.flow.hit_pcap_policy() {
+            self.output.send_without_throttling(f);
+        } else {
+            if !self.output.send_with_throttling(f) {
+                self.metrics
+                    .drop_in_throttle
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
 }
 
