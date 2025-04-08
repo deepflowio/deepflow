@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: trisolaris db connection [#9432](https://github.com/deepflowio/deepflow/pull/9432) by [askyrie](https://github.com/askyrie)
+* fix: agent - eBPF recvmmsg() tracing switched to tracepoint type [#9431](https://github.com/deepflowio/deepflow/pull/9431) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
