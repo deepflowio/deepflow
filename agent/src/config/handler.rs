@@ -1396,9 +1396,9 @@ impl Default for TraceType {
 #[derive(Default, Clone)]
 pub struct L7LogDynamicConfig {
     // in lowercase
-    pub proxy_client: HashSet<String>,
+    pub proxy_client: Vec<String>,
     // in lowercase
-    pub x_request_id: HashSet<String>,
+    pub x_request_id: Vec<String>,
 
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
@@ -1445,26 +1445,36 @@ impl Eq for L7LogDynamicConfig {}
 
 impl L7LogDynamicConfig {
     pub fn new(
-        proxy_client: Vec<String>,
-        x_request_id: Vec<String>,
+        mut proxy_client: Vec<String>,
+        mut x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
     ) -> Self {
         let mut expected_headers_set = get_expected_headers();
+        let mut dup_checker = HashSet::new();
 
-        let mut proxy_client_set = HashSet::new();
-        for client in proxy_client.iter() {
-            let client = client.trim();
-            expected_headers_set.insert(client.as_bytes().to_vec());
-            proxy_client_set.insert(client.to_string());
-        }
-        let mut x_request_id_set = HashSet::new();
-        for t in x_request_id.iter() {
-            let t = t.trim();
-            expected_headers_set.insert(t.as_bytes().to_vec());
-            x_request_id_set.insert(t.to_string());
-        }
+        dup_checker.clear();
+        proxy_client.retain(|s| {
+            let s = s.trim();
+            if dup_checker.contains(s) {
+                return false;
+            }
+            dup_checker.insert(s.to_owned());
+            expected_headers_set.insert(s.as_bytes().to_vec());
+            true
+        });
+
+        dup_checker.clear();
+        x_request_id.retain(|s| {
+            let s = s.trim();
+            if dup_checker.contains(s) {
+                return false;
+            }
+            dup_checker.insert(s.to_owned());
+            expected_headers_set.insert(s.as_bytes().to_vec());
+            true
+        });
 
         let mut trace_set = HashSet::new();
         for t in trace_types.iter() {
@@ -1487,8 +1497,8 @@ impl L7LogDynamicConfig {
         }
 
         Self {
-            proxy_client: proxy_client_set,
-            x_request_id: x_request_id_set,
+            proxy_client,
+            x_request_id,
             trace_types,
             span_types,
             trace_set,
