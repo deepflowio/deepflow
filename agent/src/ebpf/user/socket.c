@@ -205,7 +205,6 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmsg");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmmsg");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmsg");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmmsg");
 	kfunc_set_sym_for_entry_and_exit(tps, "do_writev");
 	kfunc_set_sym_for_entry_and_exit(tps, "do_readv");
 #if defined(__x86_64__)
@@ -236,6 +235,13 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
 		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 
+	/*
+	 * On certain kernels, such as 5.15.0-127-generic and 5.10.134-18.al8.x86_64,
+	 * `recvmmsg()` probes of type `kprobe`/`kfunc` may not work properly. To address
+	 * this, we use the more stable `tracepoint`-based probe instead.
+	 */
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");	
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 	// process exit
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
@@ -250,7 +256,6 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	probes_set_enter_symbol(tps, "__sys_sendmsg");
 	probes_set_enter_symbol(tps, "__sys_sendmmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmmsg");
 
 	if (k_version == KERNEL_VERSION(3, 10, 0)) {
 		/*
@@ -290,6 +295,7 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
 
 	// exit tracepoints
 	/*
