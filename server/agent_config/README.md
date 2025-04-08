@@ -1152,6 +1152,22 @@ global:
 
 Log level of deepflow-agent.
 
+It is also possible to specify the log level for specific modules with advanced configuation in the following format:
+
+```
+<log_level_spec> ::= single_log_level_spec[{,single_log_level_spec}][/<text_filter>]
+<single_log_level_spec> ::= <path_to_module>|<log_level>|<path_to_module>=<log_level>
+<text_filter> ::= <regex>
+```
+
+For example:
+
+```
+log_level: info,deepflow_agent::rpc::session=debug
+```
+
+will set the log level to INFO for all modules and DEBUG for the rpc::session module.
+
 #### Log File {#global.self_monitoring.log.log_file}
 
 **Tags**:
