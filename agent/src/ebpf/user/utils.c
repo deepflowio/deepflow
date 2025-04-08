@@ -1661,3 +1661,48 @@ int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 	return ETR_OK;
 }
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
+
+
+static inline int compare(const void *a, const void *b)
+{
+	return (*(uint16_t *)a - *(uint16_t *)b);	// Compare two uint16_t values
+}
+
+void format_port_ranges(uint16_t *ports, size_t size, char *ret_str, int str_sz)
+{
+	if (size == 0)
+		return;		// Return immediately if there are no ports
+	
+	// Sort the ports array using qsort
+	qsort(ports, size, sizeof(uint16_t), compare);
+	
+	int bytes_cnt = 0;	// To keep track of how many bytes we've written to ret_str
+	bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, "Ports: ");
+	
+	size_t i = 0;
+	while (i < size) {
+		size_t start = i;
+		
+		// Find the end position of a consecutive range
+		while (i + 1 < size && ports[i] + 1 == ports[i + 1]) {
+			i++;
+		}
+		
+		// If start == i, it means it's a single number; otherwise, it's a range
+		if (start == i) {
+			bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt,
+						"%d", ports[start]);	// Print a single number
+		} else {
+			bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt,
+						"%d-%d", ports[start], ports[i]);	// Print the range
+		}
+		
+		// Print a comma if not the last range/number
+		if (i + 1 < size) {
+			bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, ", ");
+		}
+		
+		i++;
+	}
+}
+

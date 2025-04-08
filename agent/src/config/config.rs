@@ -561,7 +561,7 @@ pub struct Proc {
 impl Default for Proc {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             proc_dir_path: "/proc".to_string(),
             socket_info_sync_interval: Duration::from_secs(0),
             min_lifetime: Duration::from_secs(3),
@@ -1932,7 +1932,7 @@ impl Default for Limits {
         Self {
             max_millicpus: 1000,
             max_memory: 768 << 20,
-            max_log_backhaul_rate: 300,
+            max_log_backhaul_rate: 36000,
             max_local_log_file_size: 1000 << 20,
             local_log_retention: Duration::from_secs(300 * 24 * 3600),
             max_sockets: 1024,
@@ -2104,6 +2104,7 @@ pub struct Communication {
     pub ingester_port: u16,
     #[serde(deserialize_with = "deser_usize_with_mega_unit")]
     pub grpc_buffer_size: usize,
+    pub max_throughput_to_ingester: u64,
     pub request_via_nat_ip: bool,
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
@@ -2119,6 +2120,7 @@ impl Default for Communication {
             ingester_ip: "".to_string(),
             ingester_port: 30033,
             grpc_buffer_size: 5 << 20,
+            max_throughput_to_ingester: 100,
             request_via_nat_ip: false,
         }
     }

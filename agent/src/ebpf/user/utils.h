@@ -312,6 +312,22 @@ bool substring_starts_with(const char *haystack, const char *needle);
 char *get_timestamp_from_us(u64 microseconds);
 int find_pid_by_name(const char *process_name, int exclude_pid);
 u32 djb2_32bit(const char *str);
+
+/**
+ * @brief Format a list of ports into a string, showing ranges of consecutive ports.
+ * 
+ * This function takes an array of ports, sorts it, and formats it into a string
+ * where consecutive port numbers are grouped into ranges. Non-consecutive ports 
+ * are shown individually.
+ * 
+ * @param ports Pointer to an array of uint16_t port numbers.
+ * @param size The number of ports in the array.
+ * @param ret_str The buffer to store the formatted string.
+ * @param str_sz The size of the buffer.
+ * 
+ * @return None. The result is written to `ret_str`.
+ */
+void format_port_ranges(uint16_t *ports, size_t size, char *ret_str, int str_sz);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
