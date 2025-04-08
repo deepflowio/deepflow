@@ -2319,29 +2319,13 @@ KRETFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 	return 0;
 }
 
-//int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg,
-//                   unsigned int vlen, unsigned int flags,
-//                   struct __kernel_timespec __user *timeout,
-//                   struct old_timespec32 __user *timeout32)
-#ifndef LINUX_VER_KFUNC
-KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
-	int flags = (int)PT_REGS_PARM4(ctx);
+TP_SYSCALL_PROG(enter_recvmmsg) (struct syscall_comm_enter_ctx * ctx) {
+	int flags = ctx->flags;
 	if (flags & MSG_PEEK)
 		return 0;
-	int sockfd = (int)PT_REGS_PARM1(ctx);
-	struct mmsghdr *msgvec = (struct mmsghdr *)PT_REGS_PARM2(ctx);
-	unsigned int vlen = (unsigned int)PT_REGS_PARM3(ctx);
-#else
-KFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
-	   unsigned int vlen, unsigned int flags,
-	   struct __kernel_timespec __user * timeout,
-	   struct old_timespec32 __user * timeout32)
-{
-	if (flags & MSG_PEEK)
-		return 0;
-	int sockfd = fd;
-	struct mmsghdr *msgvec = mmsg;
-#endif
+	int sockfd = (int)ctx->fd;
+	struct mmsghdr *msgvec = (struct mmsghdr *)ctx->buf;
+	unsigned int vlen = (unsigned int)ctx->count;
 	__u64 id = bpf_get_current_pid_tgid();
 	if (msgvec != NULL && vlen >= 1) {
 		int offset;
@@ -2377,18 +2361,9 @@ KFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 	return 0;
 }
 
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmmsg/format
 TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	int num_msgs = ctx->ret;
-#else
-KRETFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
-	      unsigned int vlen, unsigned int flags,
-	      struct __kernel_timespec __user * timeout,
-	      struct old_timespec32 __user * timeout32, int ret)
-{
-	int num_msgs = ret;
-#endif
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
