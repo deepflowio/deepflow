@@ -31,12 +31,13 @@ use super::consts::{
     HTTP_STATUS_CLIENT_ERROR_MAX, HTTP_STATUS_CLIENT_ERROR_MIN, HTTP_STATUS_SERVER_ERROR_MAX,
     HTTP_STATUS_SERVER_ERROR_MIN,
 };
-use super::pb_adapter::{ExtendedInfo, TraceInfo};
-use super::{check_http_method, parse_v1_headers, AppProtoHead, LogMessageType};
 use super::{
-    pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-    L7ResponseStatus,
+    check_http_method, parse_v1_headers,
+    pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+    AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
 };
+
+const BASE_FIELD_PRIORITY: u8 = 0;
 
 const FCGI_RECORD_FIX_LEN: usize = 8;
 
@@ -80,14 +81,14 @@ pub struct FastCGIInfo {
     pub resp_content_length: Option<u32>,
 
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_id: PrioField<String>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub span_id: String,
+    pub span_id: PrioField<String>,
 
     #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id_0: String,
+    pub x_request_id_0: PrioField<String>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id_1: String,
+    pub x_request_id_1: PrioField<String>,
 
     captured_request_byte: u32,
     captured_response_byte: u32,
@@ -115,8 +116,8 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
             self.status = info.status;
             self.status_code = info.status_code;
             self.captured_response_byte = info.captured_response_byte;
-            super::swap_if!(self, trace_id, is_empty, info);
-            super::swap_if!(self, span_id, is_empty, info);
+            super::swap_if!(self, trace_id, is_default, info);
+            super::swap_if!(self, span_id, is_default, info);
             if info.is_on_blacklist {
                 self.is_on_blacklist = info.is_on_blacklist;
             }
@@ -217,6 +218,10 @@ impl FastCGIInfo {
             b"HTTP_USER_AGENT" => self.user_agent = Some(String::from_utf8_lossy(val).to_string()),
             b"DOCUMENT_URI" => self.endpoint = Some(String::from_utf8_lossy(val).to_string()),
             _ => {
+                let Some(config) = config else {
+                    return Ok(());
+                };
+
                 // value must be valid utf8 from here
                 let (Ok(key), Ok(val)) = (std::str::from_utf8(key), std::str::from_utf8(val))
                 else {
@@ -225,35 +230,50 @@ impl FastCGIInfo {
                 let lower_key = key.to_lowercase();
                 let key = lower_key.as_str();
 
-                config.map(|c| {
-                    if c.is_trace_id(key) {
-                        if let Some(trace_type) = c.trace_types.iter().find(|t| t.check(key)) {
-                            trace_type
-                                .decode_trace_id(val)
-                                .map(|id| self.trace_id = id.to_string());
+                if config.is_trace_id(key) {
+                    for (i, trace) in config.trace_types.iter().enumerate() {
+                        let prio = i as u8 + BASE_FIELD_PRIORITY;
+                        if self.trace_id.prio >= prio {
+                            break;
                         }
+                        if !trace.check(key) {
+                            continue;
+                        }
+                        trace
+                            .decode_trace_id(val)
+                            .map(|id| self.trace_id = PrioField::new(prio, id.to_string()));
                     }
-                });
+                }
 
-                config.map(|c| {
-                    if c.is_span_id(key) {
-                        if let Some(trace_type) = c.span_types.iter().find(|t| t.check(key)) {
-                            trace_type
-                                .decode_span_id(val)
-                                .map(|id| self.span_id = id.to_string());
+                if config.is_span_id(key) {
+                    for (i, span) in config.span_types.iter().enumerate() {
+                        let prio = i as u8 + BASE_FIELD_PRIORITY;
+                        if self.span_id.prio >= prio {
+                            break;
                         }
+                        if !span.check(key) {
+                            continue;
+                        }
+                        span.decode_span_id(val)
+                            .map(|id| self.span_id = PrioField::new(prio, id.to_string()));
                     }
-                });
+                }
 
-                config.map(|c| {
-                    if c.x_request_id.contains(key) {
-                        if direction == PacketDirection::ClientToServer {
-                            self.x_request_id_0 = val.to_owned();
-                        } else {
-                            self.x_request_id_1 = val.to_owned();
-                        }
+                let x_req_id = if direction == PacketDirection::ClientToServer {
+                    &mut self.x_request_id_0
+                } else {
+                    &mut self.x_request_id_1
+                };
+                for (i, req_id) in config.x_request_id.iter().enumerate() {
+                    let prio = i as u8 + BASE_FIELD_PRIORITY;
+                    if x_req_id.prio >= prio {
+                        break;
                     }
-                });
+                    if req_id == key {
+                        *x_req_id = PrioField::new(prio, val.to_owned());
+                        break;
+                    }
+                }
             }
         }
 
@@ -297,21 +317,21 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
             },
             version: Some(f.version.to_string()),
             trace_info: Some(TraceInfo {
-                trace_id: if f.trace_id.is_empty() {
+                trace_id: if f.trace_id.is_default() {
                     None
                 } else {
-                    Some(f.trace_id)
+                    Some(f.trace_id.into_inner())
                 },
-                span_id: if f.span_id.is_empty() {
+                span_id: if f.span_id.is_default() {
                     None
                 } else {
-                    Some(f.span_id)
+                    Some(f.span_id.into_inner())
                 },
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
-                x_request_id_0: Some(f.x_request_id_0),
-                x_request_id_1: Some(f.x_request_id_1),
+                x_request_id_0: Some(f.x_request_id_0.into_inner()),
+                x_request_id_1: Some(f.x_request_id_1.into_inner()),
                 request_id: Some(f.request_id),
                 ..Default::default()
             }),

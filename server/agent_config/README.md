@@ -7431,6 +7431,8 @@ processors:
 
 It is used to extract the real client IP field in the HTTP header,
 such as X-Forwarded-For, etc. Leave it empty to disable this feature.
+If multiple values are specified, the first match will be used.
+Fields rewritten by plugins have the highest priority.
 
 ##### X-Request-ID {#processors.request_log.tag_extraction.tracing_tag.x_request_id}
 
@@ -7465,6 +7467,8 @@ It is used to extract the fields in the HTTP header that are used
 to uniquely identify the same request before and after the gateway,
 such as X-Request-ID, etc. This feature can be turned off by setting
 it to empty.
+If multiple values are specified, the first match will be used.
+Fields rewritten by plugins have the highest priority.
 
 ##### APM TraceID {#processors.request_log.tag_extraction.tracing_tag.apm_trace_id}
 
@@ -7499,6 +7503,8 @@ processors:
 Used to extract the TraceID field in HTTP and RPC headers, supports filling
 in multiple values separated by commas. This feature can be turned off by
 setting it to empty.
+If multiple values are specified, the first match will be used.
+Fields rewritten by plugins have the highest priority.
 
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
@@ -7533,6 +7539,8 @@ processors:
 Used to extract the SpanID field in HTTP and RPC headers, supports filling
 in multiple values separated by commas. This feature can be turned off by
 setting it to empty.
+If multiple values are specified, the first match will be used.
+Fields rewritten by plugins have the highest priority.
 
 #### HTTP Endpoint {#processors.request_log.tag_extraction.http_endpoint}
 
