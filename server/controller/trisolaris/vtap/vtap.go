@@ -790,13 +790,15 @@ func (v *VTapInfo) updateVTapInfo() {
 	dbKeyToVTap := make(map[string]*mysql_model.VTap)
 	dbKeys := mapset.NewSet()
 	dbVTapIDs := mapset.NewSet()
-	if v.vtaps != nil {
-		for _, vTap := range v.vtaps {
-			key := GetKey(vTap)
-			dbKeyToVTap[key] = vTap
-			dbKeys.Add(key)
-			dbVTapIDs.Add(vTap.ID)
-		}
+	if v.vtaps == nil || len(v.vtaps) == 0 {
+		log.Warningf(v.Log("not found vtap data when update vtap info"))
+		return
+	}
+	for _, vTap := range v.vtaps {
+		key := GetKey(vTap)
+		dbKeyToVTap[key] = vTap
+		dbKeys.Add(key)
+		dbVTapIDs.Add(vTap.ID)
 	}
 	v.dbVTapIDs = dbVTapIDs
 	cacheKeys := v.vTapCaches.GetKeySet()
