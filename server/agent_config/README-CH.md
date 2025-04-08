@@ -1129,6 +1129,22 @@ global:
 
 deepflow-agent 运行日志输出等级。
 
+也可以通过高级配置指定特定模块的日志等级，格式如下：
+
+```
+<log_level_spec> ::= single_log_level_spec[{,single_log_level_spec}][/<text_filter>]
+<single_log_level_spec> ::= <path_to_module>|<log_level>|<path_to_module>=<log_level>
+<text_filter> ::= <regex>
+```
+
+例如：
+
+```
+log_level: info,deepflow_agent::rpc::session=debug
+```
+
+将设置所有模块的日志等级为 INFO，并将 rpc::session 模块的日志等级设置为 DEBUG。
+
 #### 日志文件 {#global.self_monitoring.log.log_file}
 
 **标签**:
