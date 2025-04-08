@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF recvmmsg() tracing switched to tracepoint type [#9434](https://github.com/deepflowio/deepflow/pull/9434) by [yinjiping](https://github.com/yinjiping)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
