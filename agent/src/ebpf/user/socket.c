@@ -130,7 +130,6 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__sys_sendmsg");
 	probes_set_enter_symbol(tps, "__sys_sendmmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmmsg");
 
 	if (k_version == KERNEL_VERSION(3, 10, 0)) {
 		/*
@@ -158,6 +157,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
 
 	// exit tracepoints
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
