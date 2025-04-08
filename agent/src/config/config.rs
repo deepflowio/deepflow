@@ -2127,8 +2127,7 @@ impl Default for Communication {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Log {
-    #[serde(deserialize_with = "to_log_level")]
-    pub log_level: log::Level,
+    pub log_level: String,
     pub log_file: String,
     pub log_backhaul_enabled: bool,
 }
@@ -2136,7 +2135,7 @@ pub struct Log {
 impl Default for Log {
     fn default() -> Self {
         Self {
-            log_level: log::Level::Info,
+            log_level: "info".to_string(),
             log_file: "/var/log/deepflow-agent/deepflow-agent.log".to_string(),
             log_backhaul_enabled: true,
         }
@@ -3152,24 +3151,6 @@ impl Default for TripleMapConfig {
     }
 }
 
-fn to_log_level<'de, D>(deserializer: D) -> Result<log::Level, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match String::deserialize(deserializer)?.to_lowercase().as_str() {
-        "error" => Ok(log::Level::Error),
-        "warn" | "warning" => Ok(log::Level::Warn),
-        "info" => Ok(log::Level::Info),
-        "debug" => Ok(log::Level::Debug),
-        "trace" => Ok(log::Level::Trace),
-        "" => Ok(log::Level::Info),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"trace|debug|info|warn|error",
-        )),
-    }
-}
-
 fn to_if_mac_source<'de, D>(deserializer: D) -> Result<agent::IfMacSource, D::Error>
 where
     D: Deserializer<'de>,
@@ -3283,29 +3264,6 @@ mod tests {
             .expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");
-    }
-
-    #[test]
-    fn parse_log_level() {
-        let yaml = r#"
-log_level: Info
-log_file: "/var/log/deepflow-agent/test.log"
-log_backhaul_enabled: true
-"#;
-        let log: Log = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(log.log_level, log::Level::Info);
-        assert_eq!(log.log_file, "/var/log/deepflow-agent/test.log");
-        assert!(log.log_backhaul_enabled);
-
-        let yaml_with_warn = r#"
-log_level: WARN
-log_file: "/tmp/agent.log"
-log_backhaul_enabled: false
-"#;
-        let log: Log = serde_yaml::from_str(yaml_with_warn).unwrap();
-        assert_eq!(log.log_level, log::Level::Warn);
-        assert_eq!(log.log_file, "/tmp/agent.log");
-        assert!(!log.log_backhaul_enabled);
     }
 
     #[test]
