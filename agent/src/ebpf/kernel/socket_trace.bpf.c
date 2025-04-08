@@ -1908,18 +1908,15 @@ TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-// int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
-//                 unsigned int flags, struct timespec *timeout)
-KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
-	int flags = (int)PT_REGS_PARM4(ctx);
+// /sys/kernel/debug/tracing/events/syscalls/sys_enter_recvmmsg/format
+TPPROG(sys_enter_recvmmsg) (struct syscall_comm_enter_ctx * ctx) {
+	int flags = ctx->flags;
 	if (flags & MSG_PEEK)
 		return 0;
-
+	int sockfd = (int)ctx->fd;
+	struct mmsghdr *msgvec = (struct mmsghdr *)ctx->buf;
+	unsigned int vlen = (unsigned int)ctx->count;
 	__u64 id = bpf_get_current_pid_tgid();
-	int sockfd = (int)PT_REGS_PARM1(ctx);
-	struct mmsghdr *msgvec = (struct mmsghdr *)PT_REGS_PARM2(ctx);
-	unsigned int vlen = (unsigned int)PT_REGS_PARM3(ctx);
-
 	if (msgvec != NULL && vlen >= 1) {
 		int offset;
 		// Stash arguments.
