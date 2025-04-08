@@ -500,7 +500,7 @@ impl ServiceTable {
         let mut need_reverse = false;
         match (flow_src_key, flow_dst_key) {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
-                // socket_role: 0:unkonwn 1:client(connect) 2:server(accept)
+                // socket_role: 0:unknown 1:client(connect) 2:server(accept)
                 // if socket_role > 0, indicating that socket was established by connect
                 // or accept, and we can determine the direction by l2_end_0 and l2_end_1
                 if socket_role == 1 && l2_end_0 {

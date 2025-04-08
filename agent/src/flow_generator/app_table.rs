@@ -407,7 +407,7 @@ impl AppTable {
         let is_c2s = packet.lookup_key.direction == PacketDirection::ClientToServer;
 
         let (ip, port);
-        // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+        // redis can not determine direction by RESP protocol when packet is from ebpf, special treatment
         if protocol.get_l7_protocol() == L7Protocol::Redis {
             (ip, port) = packet.get_redis_server_addr();
         } else {
@@ -415,7 +415,7 @@ impl AppTable {
         }
         // due to loopback may be in different protocol in container, add pid as key
         // FIXME: istio (or the similar proxy use DNAT on loopback addr and port to hijack traffic) will have different protocol in same port,
-        // save the protocol to apptable use loopback addr and port will lead to get incorrect protocol in those envrioment
+        // save the protocol to apptable use loopback addr and port will lead to get incorrect protocol in those environment
         let pid = if ip.is_loopback() {
             packet.process_id
         } else {

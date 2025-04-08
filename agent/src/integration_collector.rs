@@ -844,7 +844,9 @@ async fn handler(
         }
         (
             &Method::POST,
-            "/v3/segments" | "/skywalking.v3.TraceSegmentReportService/collectInSync",
+            "/v3/segments"
+            | "/skywalking.v3.TraceSegmentReportService/collectInSync"
+            | "/TraceSegmentReportService/collectInSync",
         ) => {
             if external_trace_integration_disabled {
                 return Ok(Response::builder().body(Body::empty()).unwrap());
@@ -862,7 +864,11 @@ async fn handler(
                     .await,
             )
         }
-        (&Method::POST, "/skywalking.v3.TraceSegmentReportService/collect") => {
+        (
+            &Method::POST,
+            "/skywalking.v3.TraceSegmentReportService/collect"
+            | "/TraceSegmentReportService/collect",
+        ) => {
             if external_trace_integration_disabled {
                 return Ok(Response::builder().body(Body::empty()).unwrap());
             }
