@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
 
 // prometheusReader's lifecycle is belong to each query through api
@@ -152,8 +153,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	}
 
 	if debug {
-		duration = extractQueryTimeFromQueryResponse(debugInfo)
-		sql = extractQuerySQLFromQueryResponse(debugInfo)
+		duration, sql = extractDebugInfoFromQueryResponse(debugInfo)
 
 		// inject query_time for current span
 		span.SetAttributes(attribute.Float64("query_time", duration))
@@ -198,20 +198,17 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 }
 
 // extract query_time from query debug(map[string]interface{}) infos
-func extractQueryTimeFromQueryResponse(debug map[string]interface{}) float64 {
-	if debug["query_time"] != nil {
-		query_time_str := strings.ReplaceAll(debug["query_time"].(string), "s", "")
-		query_time, _ := strconv.ParseFloat(query_time_str, 64)
-		return query_time
+func extractDebugInfoFromQueryResponse(debug map[string]interface{}) (float64, string) {
+	if debug["query_sqls"] != nil {
+		debug_info, ok := debug["query_sqls"].([]client.Debug)
+		if !ok || len(debug_info) == 0 {
+			return 0, ""
+		}
+		// xxxs to number
+		query_time, _ := strconv.ParseFloat(strings.ReplaceAll(debug_info[0].QueryTime, "s", ""), 64)
+		return query_time, debug_info[0].Sql
 	}
-	return 0
-}
-
-func extractQuerySQLFromQueryResponse(debug map[string]interface{}) string {
-	if debug["sql"] != nil {
-		return debug["sql"].(string)
-	}
-	return ""
+	return 0, ""
 }
 
 func queryDataExecute(ctx context.Context, querierSql string, db string, ds string, orgID string, debug bool) (*common.Result, string, float64, error) {
@@ -242,8 +239,7 @@ func queryDataExecute(ctx context.Context, querierSql string, db string, ds stri
 	ckEngine.Init()
 	result, debugInfo, err := ckEngine.ExecuteQuery(&args)
 	if debug && debugInfo != nil {
-		duration = extractQueryTimeFromQueryResponse(debugInfo)
-		sql = extractQuerySQLFromQueryResponse(debugInfo)
+		duration, sql = extractDebugInfoFromQueryResponse(debugInfo)
 
 		span.SetAttributes(attribute.Float64("duration", duration))
 		span.SetAttributes(attribute.String("querier_sql", querierSql))
