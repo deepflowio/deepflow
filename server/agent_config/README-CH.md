@@ -3659,6 +3659,34 @@ inputs:
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
+##### 禁用 kprobe {#inputs.ebpf.socket.kprobe.disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，kprobe 功能将被禁用。
+
 ##### 黑名单 {#inputs.ebpf.socket.kprobe.blacklist}
 
 ###### 端口号 {#inputs.ebpf.socket.kprobe.blacklist.ports}
@@ -7074,6 +7102,33 @@ processors:
 该特性用于忽略特定的 `Non-Existent Domain` 类型的 DNS 响应，比如 K8s Pod 解析外部域名时，会将
 待解析域名与 cluster 内的域名后缀做拼接并多次尝试解析，因而会产生多次的 `Non-Existent Domain`
 的响应结果，干扰数据分析。
+
+#### cBPF data disabled {#processors.request_log.filters.cbpf_disabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.filters.cbpf_disabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    filters:
+      cbpf_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+关闭后 deepflow-agent 将停止从 packet 数据生成调用日志。
 
 ### 超时设置 {#processors.request_log.timeouts}
 

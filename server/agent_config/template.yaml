@@ -2712,6 +2712,21 @@ inputs:
       # name: Kprobe
       # description:
       kprobe:
+        # type: bool
+        # name:
+        #   en: kprobe disabled
+        #   ch: 禁用 kprobe
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to true, kprobe will be disabled.
+        #   ch: |-
+        #     当设置为 true 时，kprobe 功能将被禁用。
+        disabled: false
         # type: section
         # name:
         #   en: Blacklist
@@ -4924,6 +4939,19 @@ processors:
       #     的响应结果，干扰数据分析。
       # upgrade_from: static_config.l7-protocol-advanced-features.unconcerned-dns-nxdomain-response-suffixes
       unconcerned_dns_nxdomain_response_suffixes: []
+      # type: bool
+      # name: cBPF data disabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When disabled, deepflow-agent will not generate request_log from packet data.
+      #   ch: |-
+      #     关闭后 deepflow-agent 将停止从 packet 数据生成调用日志。
+      cbpf_disabled: false
     # type: section
     # name:
     #   en: Timeouts

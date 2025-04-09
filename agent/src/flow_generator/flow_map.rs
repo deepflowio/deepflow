@@ -1125,11 +1125,21 @@ impl FlowMap {
         closed
     }
 
-    fn l7_metrics_enabled(config: &FlowConfig) -> bool {
+    fn l7_metrics_enabled(config: &FlowConfig, signal_source: &SignalSource) -> bool {
+        if signal_source == &SignalSource::Packet && !config.l7_metrics_enabled_for_packet {
+            return false;
+        }
         config.l7_metrics_enabled
     }
 
-    fn l7_log_parse_enabled(config: &FlowConfig, lookup_key: &LookupKey) -> bool {
+    fn l7_log_parse_enabled(
+        config: &FlowConfig,
+        signal_source: &SignalSource,
+        lookup_key: &LookupKey,
+    ) -> bool {
+        if signal_source == &SignalSource::Packet && !config.l7_metrics_enabled_for_packet {
+            return false;
+        }
         // parse tap_type any or tap_type in config
         config.app_proto_log_enabled
             && (lookup_key.proto == IpProtocol::TCP || lookup_key.proto == IpProtocol::UDP)
@@ -1433,8 +1443,13 @@ impl FlowMap {
 
         let l4_enabled = node.tagged_flow.flow.signal_source == SignalSource::Packet
             && Self::l4_metrics_enabled(flow_config);
-        let l7_enabled = Self::l7_metrics_enabled(flow_config)
-            || Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key);
+        let l7_enabled =
+            Self::l7_metrics_enabled(flow_config, &node.tagged_flow.flow.signal_source)
+                || Self::l7_log_parse_enabled(
+                    flow_config,
+                    &node.tagged_flow.flow.signal_source,
+                    &meta_packet.lookup_key,
+                );
         if l4_enabled || l7_enabled {
             node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats {
                 l7_failed_count,
@@ -1686,8 +1701,12 @@ impl FlowMap {
                         log_parser_config,
                         packet,
                         is_first_packet_direction,
-                        Self::l7_metrics_enabled(flow_config),
-                        Self::l7_log_parse_enabled(flow_config, &packet.lookup_key),
+                        Self::l7_metrics_enabled(flow_config, &node.tagged_flow.flow.signal_source),
+                        Self::l7_log_parse_enabled(
+                            flow_config,
+                            &node.tagged_flow.flow.signal_source,
+                            &packet.lookup_key,
+                        ),
                         &mut self.app_table,
                         local_epc,
                         remote_epc,
@@ -1698,8 +1717,12 @@ impl FlowMap {
                         flow_config,
                         log_parser_config,
                         packet,
-                        Self::l7_metrics_enabled(flow_config),
-                        Self::l7_log_parse_enabled(flow_config, &packet.lookup_key),
+                        Self::l7_metrics_enabled(flow_config, &node.tagged_flow.flow.signal_source),
+                        Self::l7_log_parse_enabled(
+                            flow_config,
+                            &node.tagged_flow.flow.signal_source,
+                            &packet.lookup_key,
+                        ),
                         &mut self.app_table,
                         local_epc,
                         remote_epc,
