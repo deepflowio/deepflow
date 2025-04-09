@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* fix: agent - eBPF Fix data loss in TCP FIN_WAIT2 state [#9452](https://github.com/deepflowio/deepflow/pull/9452) by [yinjiping](https://github.com/yinjiping)
+* fix: Fix tracing tag priority [#9450](https://github.com/deepflowio/deepflow/pull/9450) by [rvql](https://github.com/rvql)
+* fix: agent - eBPF Fix byte order of DNS IP address [#9443](https://github.com/deepflowio/deepflow/pull/9443) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +49,9 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: limiting the max throughput to Ingester [#9445](https://github.com/deepflowio/deepflow/pull/9445) by [lzf575](https://github.com/lzf575)
+* feat: tcp dns support multi-query [#9442](https://github.com/deepflowio/deepflow/pull/9442) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: Support priority of configured tracing tags [#9441](https://github.com/deepflowio/deepflow/pull/9441) by [rvql](https://github.com/rvql)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
