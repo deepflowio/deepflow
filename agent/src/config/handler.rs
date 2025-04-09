@@ -226,6 +226,7 @@ pub struct SenderConfig {
     pub npb_bps_threshold: u64,
     pub npb_socket_type: agent::SocketType,
     pub multiple_sockets_to_ingester: bool,
+    pub max_throughput_to_ingester: u64, // unit: Mbps
     pub collector_socket_type: agent::SocketType,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -1716,6 +1717,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .tx_throughput
                     .throughput_monitoring_interval,
                 multiple_sockets_to_ingester: conf.outputs.socket.multiple_sockets_to_ingester,
+                max_throughput_to_ingester: conf.global.communication.max_throughput_to_ingester,
                 collector_socket_type: conf.outputs.socket.data_socket_type,
                 standalone_data_file_size: conf.global.standalone_mode.max_data_file_size,
                 standalone_data_file_dir: conf.global.standalone_mode.data_file_dir.clone(),
@@ -3748,6 +3750,15 @@ impl ConfigHandler {
             );
             communication.grpc_buffer_size = new_communication.grpc_buffer_size;
             restart_agent = !first_run;
+        }
+        if communication.max_throughput_to_ingester != new_communication.max_throughput_to_ingester
+        {
+            info!(
+                "Update global.communication.max_throughput_to_ingester from {:?} to {:?}.",
+                communication.max_throughput_to_ingester,
+                new_communication.max_throughput_to_ingester
+            );
+            communication.max_throughput_to_ingester = new_communication.max_throughput_to_ingester;
         }
         if communication.ingester_ip != new_communication.ingester_ip {
             info!(

@@ -76,6 +76,7 @@ enum Exception {
     INTEGRATION_SOCKET_ERROR = 262144;
     CGROUPS_CONFIG_ERROR = 524288;
     SYSTEM_LOAD_CIRCUIT_BREAKER = 1048576;
+    DATA_BPS_THRESHOLD_EXCEEDED = 2097152;
     // 2^31及以下由 agent ，agent 最大可用异常是2^31，顺序从前往后
     // 2^32及以上由控制器使用，顺序从后往前
 }

@@ -81,7 +81,7 @@ Upgrade from old version: `log_threshold`
 ```yaml
 global:
   limits:
-    max_log_backhaul_rate: 300
+    max_log_backhaul_rate: 36000
 ```
 
 **模式**:
@@ -89,7 +89,7 @@ global:
 | ---- | ---------------------------- |
 | Type | int |
 | Unit | Lines/Hour |
-| Range | [0, 10000] |
+| Range | [0, 1000000] |
 
 **详细描述**:
 
@@ -1022,6 +1022,36 @@ global:
 **详细描述**:
 
 设置 deepflow-agent 的 gRPC socket 缓冲区大小。
+
+### 发送到 Ingester 的最大流量 {#global.communication.max_throughput_to_ingester}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.communication.max_throughput_to_ingester`
+
+**默认值**:
+```yaml
+global:
+  communication:
+    max_throughput_to_ingester: 100
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Mbps |
+| Range | [0, 10000] |
+
+**详细描述**:
+
+向 Server 端 Ingester 模块发送可观测性数据的最大允许流量,
+超过此限速时数据将会主动丢弃、且采集器会标记为异常状态并触发告警。
+配置为 0 表示不限速。
 
 ### 请求 NAT IP 地址 {#global.communication.request_via_nat_ip}
 
