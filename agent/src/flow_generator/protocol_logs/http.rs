@@ -1421,7 +1421,7 @@ impl HttpLog {
         if config.is_trace_id(key) {
             for (i, trace) in config.trace_types.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
-                if info.trace_id.prio >= prio {
+                if info.trace_id.prio <= prio {
                     break;
                 }
                 if !trace.check(key) {
@@ -1435,7 +1435,7 @@ impl HttpLog {
         if config.is_span_id(key) {
             for (i, span) in config.span_types.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
-                if info.span_id.prio >= prio {
+                if info.span_id.prio <= prio {
                     break;
                 }
                 if !span.check(key) {
@@ -1453,7 +1453,7 @@ impl HttpLog {
         };
         for (i, req_id) in config.x_request_id.iter().enumerate() {
             let prio = i as u8 + BASE_FIELD_PRIORITY;
-            if x_req_id.prio >= prio {
+            if x_req_id.prio <= prio {
                 break;
             }
             if req_id == key {
@@ -1466,7 +1466,7 @@ impl HttpLog {
             for (i, pc) in config.proxy_client.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
                 match info.client_ip.as_ref() {
-                    Some(p) if p.prio >= prio => break,
+                    Some(p) if p.prio <= prio => break,
                     _ => (),
                 }
                 if pc == key {
