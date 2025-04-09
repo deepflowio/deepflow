@@ -28,11 +28,11 @@ use arc_swap::{access::Map, ArcSwap};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use bytesize::ByteSize;
 use flexi_logger::{
-    writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
-    Naming,
+    writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LogSpecification,
+    LoggerHandle, Naming,
 };
 use http2::get_expected_headers;
-use log::{debug, error, info, warn, Level};
+use log::{debug, error, info, warn};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
     sched::{sched_setaffinity, CpuSet},
@@ -354,7 +354,7 @@ pub struct DispatcherConfig {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct LogConfig {
-    pub log_level: Level,
+    pub log_level: String,
     pub log_threshold: u32,
     pub log_retention: u32,
     pub rsyslog_enabled: bool,
@@ -2009,7 +2009,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 agent_mode: static_config.agent_mode,
             },
             log: LogConfig {
-                log_level: conf.global.self_monitoring.log.log_level,
+                log_level: conf.global.self_monitoring.log.log_level.clone(),
                 log_threshold: conf.global.limits.max_log_backhaul_rate,
                 log_retention: conf.global.limits.local_log_retention.as_secs() as u32,
                 rsyslog_enabled: {
@@ -2423,17 +2423,18 @@ impl ConfigHandler {
         }
     }
 
-    fn set_log_level(logger_handle: &mut Option<LoggerHandle>, log_level: &Level) -> bool {
-        match logger_handle.as_mut() {
-            Some(h) => match h.parse_and_push_temp_spec(log_level.as_str().to_lowercase()) {
-                Ok(_) => true,
-                Err(e) => {
-                    warn!("failed to set log_level: {}", e);
-                    false
-                }
-            },
-            None => {
-                warn!("logger_handle not set");
+    fn set_log_level(logger_handle: &Option<LoggerHandle>, log_level: &str) -> bool {
+        let Some(handle) = logger_handle.as_ref() else {
+            warn!("logger_handle not set");
+            return false;
+        };
+        match LogSpecification::parse(log_level) {
+            Ok(spec) => {
+                handle.set_new_spec(spec);
+                true
+            }
+            Err(e) => {
+                warn!("failed to set log_level: {}", e);
                 false
             }
         }
@@ -3961,9 +3962,9 @@ impl ConfigHandler {
                 log.log_level, new_log.log_level
             );
             if Self::set_log_level(logger_handle, &new_log.log_level) {
-                log.log_level = new_log.log_level;
+                log.log_level = new_log.log_level.clone();
             } else {
-                new_log.log_level = log.log_level;
+                new_log.log_level = log.log_level.clone();
             }
         }
         if self_monitoring.profile.enabled != new_self_monitoring.profile.enabled {
