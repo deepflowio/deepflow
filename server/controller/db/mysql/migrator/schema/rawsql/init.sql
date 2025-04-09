@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS process (
     name                TEXT,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
+    gid                 INTEGER NOT NULL,
     devicetype          INTEGER,
     deviceid            INTEGER,
     pod_node_id         INTEGER,
