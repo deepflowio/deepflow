@@ -208,7 +208,7 @@ static __inline void extract_network_address_info(struct data_args_t *args, void
 	bpf_probe_read_user(&addr, sizeof(addr), ptr);
 	args->port = __bpf_ntohs(addr.sin_port);
 	if (args->port > 0 && addr.sin_family == AF_INET) {
-		*(__u32 *) args->addr =  __bpf_ntohl(addr.sin_addr.s_addr);
+		*(__u32 *) args->addr =  addr.sin_addr.s_addr;
 	} else if (args->port > 0 && addr.sin_family == AF_INET6) {
 		struct sockaddr_in6 addr = { 0 };
 		bpf_probe_read_user(&addr, sizeof(addr), ptr);
