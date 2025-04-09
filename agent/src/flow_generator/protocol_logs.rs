@@ -484,13 +484,8 @@ fn decode_base64_to_string(value: &str) -> String {
 }
 
 macro_rules! swap_if {
-    ($this:expr, $field:ident, is_none, $other:expr) => {
-        if $this.$field.is_none() {
-            std::mem::swap(&mut $this.$field, &mut $other.$field);
-        }
-    };
-    ($this:expr, $field:ident, is_empty, $other:expr) => {
-        if $this.$field.is_empty() {
+    ($this:expr, $field:ident, $fn:ident, $other:expr) => {
+        if $this.$field.$fn() {
             std::mem::swap(&mut $this.$field, &mut $other.$field);
         }
     };
@@ -518,6 +513,72 @@ macro_rules! set_captured_byte {
 
 pub(crate) use set_captured_byte;
 pub(crate) use swap_if;
+
+pub struct PrioField<T> {
+    pub prio: u8,
+    pub field: T,
+}
+
+impl<T> PrioField<T> {
+    pub fn new(prio: u8, field: T) -> Self {
+        Self { prio, field }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.field
+    }
+}
+
+impl<T: Clone> Clone for PrioField<T> {
+    fn clone(&self) -> Self {
+        Self {
+            prio: self.prio,
+            field: self.field.clone(),
+        }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for PrioField<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PrioField {{ prio: {}, field: {:?} }}",
+            self.prio, self.field
+        )
+    }
+}
+
+impl<T: Default + PartialEq> PrioField<T> {
+    pub fn is_default(&self) -> bool {
+        self.field == T::default()
+    }
+}
+
+impl<T: Default> Default for PrioField<T> {
+    fn default() -> Self {
+        Self {
+            prio: u8::MAX,
+            field: T::default(),
+        }
+    }
+}
+
+impl<T: PartialEq> PartialEq for PrioField<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.prio == other.prio && self.field == other.field
+    }
+}
+
+impl<T: Eq> Eq for PrioField<T> {}
+
+impl<T: Serialize> Serialize for PrioField<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.field.serialize(serializer)
+    }
+}
 
 #[cfg(test)]
 mod tests {
