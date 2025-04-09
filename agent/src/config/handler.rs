@@ -468,6 +468,7 @@ pub struct FlowConfig {
     pub memory_pool_size: usize,
 
     pub l7_metrics_enabled: bool,
+    pub l7_metrics_enabled_for_packet: bool,
     pub app_proto_log_enabled: bool,
     pub l4_performance_enabled: bool,
     pub l7_log_packet_size: u32,
@@ -567,6 +568,7 @@ impl From<&UserConfig> for FlowConfig {
                 .idc_traffic_ignore_vlan,
             memory_pool_size: conf.processors.flow_log.tunning.memory_pool_size,
             l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
+            l7_metrics_enabled_for_packet: !conf.processors.request_log.filters.cbpf_disabled,
             app_proto_log_enabled: !conf
                 .outputs
                 .flow_log
@@ -724,6 +726,10 @@ impl fmt::Debug for FlowConfig {
             .field("ignore_tor_mac", &self.ignore_tor_mac)
             .field("ignore_l2_end", &self.ignore_l2_end)
             .field("l7_metrics_enabled", &self.l7_metrics_enabled)
+            .field(
+                "l7_metrics_enabled_for_packet",
+                &self.l7_metrics_enabled_for_packet,
+            )
             .field("app_proto_log_enabled", &self.app_proto_log_enabled)
             .field("l4_performance_enabled", &self.l4_performance_enabled)
             .field("l7_log_packet_size", &self.l7_log_packet_size)

@@ -3746,6 +3746,34 @@ Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
+##### kprobe disabled {#inputs.ebpf.socket.kprobe.disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, kprobe will be disabled.
+
 ##### Blacklist {#inputs.ebpf.socket.kprobe.blacklist}
 
 ###### Port Numbers {#inputs.ebpf.socket.kprobe.blacklist.ports}
@@ -7270,6 +7298,33 @@ it. All these attempts will receive an NXDOMAIN reply before it finally requests
 original domain name directly, and these errors may not be of concern to you. In such
 cases, you can configure their `response_result` suffix here, so that the corresponding
 `response_status` in the l7_flow_log is forcibly set to `Success`.
+
+#### cBPF data disabled {#processors.request_log.filters.cbpf_disabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.filters.cbpf_disabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    filters:
+      cbpf_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When disabled, deepflow-agent will not generate request_log from packet data.
 
 ### Timeouts {#processors.request_log.timeouts}
 

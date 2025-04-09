@@ -951,6 +951,7 @@ impl Default for EbpfSocketKprobePorts {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketKprobe {
+    pub disabled: bool,
     pub blacklist: EbpfSocketKprobePorts,
     pub whitelist: EbpfSocketKprobePorts,
 }
@@ -1612,6 +1613,7 @@ pub struct Filters {
     pub port_number_prefilters: HashMap<String, String>,
     pub tag_filters: HashMap<String, Vec<TagFilterOperator>>,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+    pub cbpf_disabled: bool,
 }
 
 impl Default for Filters {
@@ -1675,6 +1677,7 @@ impl Default for Filters {
                 ("Custom".to_string(), vec![]),
             ]),
             unconcerned_dns_nxdomain_response_suffixes: Default::default(),
+            cbpf_disabled: false,
         }
     }
 }

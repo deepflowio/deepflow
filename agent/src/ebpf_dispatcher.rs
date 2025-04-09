@@ -831,6 +831,14 @@ impl EbpfCollector {
             }
         }
 
+        if config.ebpf.socket.kprobe.disabled {
+            info!("ebpf kprobe disabled");
+            ebpf::disable_kprobe_feature();
+        } else {
+            info!("ebpf kprobe enabled");
+            ebpf::enable_kprobe_feature();
+        }
+
         let white_list = &config.ebpf.socket.kprobe.whitelist;
         if !white_list.ports.is_empty() {
             if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.ports, false) {
