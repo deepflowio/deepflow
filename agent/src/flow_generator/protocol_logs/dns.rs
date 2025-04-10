@@ -572,19 +572,15 @@ impl DnsLog {
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
-                if param.is_from_ebpf() {
+                let mut offset = 0;
+                let mut infos = vec![];
+                while offset < payload.len() {
+                    if offset + DNS_TCP_PAYLOAD_OFFSET >= payload.len() {
+                        break;
+                    }
+                    let size = read_u16_be(&payload[offset..]) as usize;
                     let mut info = DnsInfo::default();
-                    let size = read_u16_be(payload) as usize;
-                    if size != payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
-                        // Offset for TCP DNS:
-                        // Example:
-                        //                 0            2               ...
-                        //                 |____________|_______________|__
-                        // DNS Request:    | Length     | UDP DNS Header
-                        //
-                        // eBPF Data: tcp seq is 0 and payload is tcp.payload[2..]
-                        self.decode_payload(payload, param, &mut info)?
-                    } else {
+                    let ret = if size == payload[offset + DNS_TCP_PAYLOAD_OFFSET..].len() {
                         // Offset for TCP DNS:
                         // Example:
                         //                 0            2               ...
@@ -592,7 +588,34 @@ impl DnsLog {
                         // DNS Request:    | Length     | UDP DNS Header
                         //
                         // eBPF Data: tcp seq is 0 and payload is tcp.payload
-                        self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..], param, &mut info)
+                        self.decode_payload(
+                            &payload[offset + DNS_TCP_PAYLOAD_OFFSET..],
+                            param,
+                            &mut info,
+                        )
+                    } else {
+                        if offset + size > payload.len() {
+                            // Offset for TCP DNS:
+                            // Example:
+                            //                 0            2               ...
+                            //                 |____________|_______________|__
+                            // DNS Request:    | Length     | UDP DNS Header
+                            //
+                            // eBPF Data: tcp seq is 0 and payload is tcp.payload[2..]
+                            self.decode_payload(&payload[offset..], param, &mut info)
+                        } else {
+                            // Offset for TCP DNS:
+                            // Example:
+                            //                       0            2               ...
+                            //                       |____________|_______________|__
+                            // DNS Multi-Request:    | Length     | UDP DNS Header
+                            //
+                            // eBPF Data: tcp seq is 0 and payload is tcp.payload
+                            self.decode_payload(
+                                &payload[offset + DNS_TCP_PAYLOAD_OFFSET..],
+                                param,
+                                &mut info,
+                            )
                             .or_else(|_| {
                                 self.reset();
                                 // Offset for TCP DNS:
@@ -602,47 +625,29 @@ impl DnsLog {
                                 // DNS Request:    | Length     | UDP DNS Header
                                 //
                                 // eBPF Data: tcp seq is 0 and payload is tcp.payload[2..]
-                                self.decode_payload(payload, param, &mut info)
-                            })?
-                    }
-                    Ok(vec![info])
-                } else {
-                    let mut offset = 0;
-                    let mut infos = vec![];
-                    while offset < payload.len() {
-                        if offset + DNS_TCP_PAYLOAD_OFFSET >= payload.len() {
-                            break;
+                                self.decode_payload(&payload[offset..], param, &mut info)
+                            })
                         }
-                        let size = read_u16_be(&payload[offset..]) as usize;
-                        let mut info = DnsInfo::default();
-                        if offset + size > payload.len() {
-                            break;
-                        }
-                        if self
-                            .decode_payload(
-                                &payload[offset + DNS_TCP_PAYLOAD_OFFSET..],
-                                param,
-                                &mut info,
-                            )
-                            .is_err()
-                        {
-                            break;
-                        }
-                        info.headers_offset = Some(offset as u32);
-                        offset += size + DNS_TCP_PAYLOAD_OFFSET;
-                        infos.push(info);
+                    };
 
-                        if check {
-                            break;
-                        }
+                    if ret.is_err() {
+                        break;
                     }
 
-                    if infos.is_empty() {
-                        return Err(Error::DNSLogParseFailed("dns parse failed".to_string()));
-                    }
+                    info.headers_offset = Some(offset as u32);
+                    offset += size + DNS_TCP_PAYLOAD_OFFSET;
+                    infos.push(info);
 
-                    Ok(infos)
+                    if check {
+                        break;
+                    }
                 }
+
+                if infos.is_empty() {
+                    return Err(Error::DNSLogParseFailed("dns parse failed".to_string()));
+                }
+
+                Ok(infos)
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
