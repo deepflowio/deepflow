@@ -7259,6 +7259,7 @@ processors:
 
 配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
 的结果填充到应用调用日志的`http_proxy_client`字段中，作为调用链追踪的特征值。
+如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
 ##### X-Request-ID {#processors.request_log.tag_extraction.tracing_tag.x_request_id}
 
@@ -7291,6 +7292,7 @@ processors:
 
 配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
 的结果填充到应用调用日志的`x_request_id`字段中，作为调用链追踪的特征值。
+如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
 ##### APM TraceID {#processors.request_log.tag_extraction.tracing_tag.apm_trace_id}
 
@@ -7325,6 +7327,7 @@ processors:
 配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
 的结果填充到应用调用日志的`trace_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
 特征字段，中间用`,`分隔。
+如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
@@ -7359,6 +7362,7 @@ processors:
 配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
 的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
 特征字段，中间用`,`分隔。
+如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
 #### HTTP 端点 {#processors.request_log.tag_extraction.http_endpoint}
 

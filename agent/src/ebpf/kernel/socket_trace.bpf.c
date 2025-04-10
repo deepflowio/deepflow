@@ -208,7 +208,7 @@ static __inline void extract_network_address_info(struct data_args_t *args, void
 	bpf_probe_read_user(&addr, sizeof(addr), ptr);
 	args->port = __bpf_ntohs(addr.sin_port);
 	if (args->port > 0 && addr.sin_family == AF_INET) {
-		*(__u32 *) args->addr =  __bpf_ntohl(addr.sin_addr.s_addr);
+		*(__u32 *) args->addr =  addr.sin_addr.s_addr;
 	} else if (args->port > 0 && addr.sin_family == AF_INET6) {
 		struct sockaddr_in6 addr = { 0 };
 		bpf_probe_read_user(&addr, sizeof(addr), ptr);
@@ -650,9 +650,9 @@ static __inline int is_tcp_udp_data(void *sk,
 
 	/*
 	 * If the connection has not been established yet, and it is not in the
-	 * ESTABLISHED or CLOSE_WAIT state, exit.
+	 * ESTABLISHED, CLOSE_WAIT, or FIN_WAIT2 state, exit.
 	 */
-	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT | TCPF_FIN_WAIT2)) {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 

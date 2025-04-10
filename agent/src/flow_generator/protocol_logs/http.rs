@@ -24,12 +24,12 @@ use nom::{AsBytes, ParseTo};
 use public::l7_protocol::L7ProtocolChecker;
 use serde::Serialize;
 
-use super::pb_adapter::{
-    ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+use super::{
+    consts::*,
+    pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+    value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
 };
-use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
-use crate::plugin::CustomInfo;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -43,8 +43,12 @@ use crate::{
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{set_captured_byte, L7ProtoRawDataType},
+    plugin::CustomInfo,
     utils::bytes::{read_u32_be, read_u32_le},
 };
+
+const PLUGIN_FIELD_PRIORITY: u8 = 0;
+const BASE_FIELD_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -232,9 +236,9 @@ pub struct HttpInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub version: Version,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_id: PrioField<String>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub span_id: String,
+    pub span_id: PrioField<String>,
 
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub method: Method,
@@ -247,11 +251,11 @@ pub struct HttpInfo {
     #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
     pub referer: Option<String>,
     #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
-    pub client_ip: Option<String>,
+    pub client_ip: Option<PrioField<String>>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id_0: String,
+    pub x_request_id_0: PrioField<String>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id_1: String,
+    pub x_request_id_1: PrioField<String>,
 
     #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
     pub req_content_length: Option<u32>,
@@ -332,19 +336,19 @@ impl HttpInfo {
 
         //trace info rewrite
         if let Some(trace_id) = custom.trace.trace_id {
-            self.trace_id = trace_id;
+            self.trace_id = PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id);
         }
         if let Some(span_id) = custom.trace.span_id {
-            self.span_id = span_id;
+            self.span_id = PrioField::new(PLUGIN_FIELD_PRIORITY, span_id);
         }
         if let Some(x_request_id_0) = custom.trace.x_request_id_0 {
-            self.x_request_id_0 = x_request_id_0;
+            self.x_request_id_0 = PrioField::new(PLUGIN_FIELD_PRIORITY, x_request_id_0);
         }
         if let Some(x_request_id_1) = custom.trace.x_request_id_1 {
-            self.x_request_id_1 = x_request_id_1;
+            self.x_request_id_1 = PrioField::new(PLUGIN_FIELD_PRIORITY, x_request_id_1);
         }
         if let Some(http_proxy_client) = custom.trace.http_proxy_client {
-            self.client_ip = Some(http_proxy_client);
+            self.client_ip = Some(PrioField::new(PLUGIN_FIELD_PRIORITY, http_proxy_client));
         }
 
         // extend attribute
@@ -481,10 +485,10 @@ impl HttpInfo {
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
         }
-        super::swap_if!(self, trace_id, is_empty, other);
-        super::swap_if!(self, span_id, is_empty, other);
-        super::swap_if!(self, x_request_id_0, is_empty, other);
-        super::swap_if!(self, x_request_id_1, is_empty, other);
+        super::swap_if!(self, trace_id, is_default, other);
+        super::swap_if!(self, span_id, is_default, other);
+        super::swap_if!(self, x_request_id_0, is_default, other);
+        super::swap_if!(self, x_request_id_1, is_default, other);
         self.attributes.append(&mut other.attributes);
         Ok(())
     }
@@ -610,15 +614,15 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
-                span_id: Some(f.span_id),
+                trace_id: Some(f.trace_id.into_inner()),
+                span_id: Some(f.span_id.into_inner()),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
                 request_id: f.stream_id,
-                x_request_id_0: Some(f.x_request_id_0),
-                x_request_id_1: Some(f.x_request_id_1),
-                client_ip: f.client_ip,
+                x_request_id_0: Some(f.x_request_id_0.into_inner()),
+                x_request_id_1: Some(f.x_request_id_1.into_inner()),
+                client_ip: f.client_ip.map(|p| p.into_inner()),
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: f.service_name,
@@ -1415,28 +1419,61 @@ impl HttpLog {
         };
 
         if config.is_trace_id(key) {
-            if let Some(trace_type) = config.trace_types.iter().find(|t| t.check(key)) {
-                trace_type
+            for (i, trace) in config.trace_types.iter().enumerate() {
+                let prio = i as u8 + BASE_FIELD_PRIORITY;
+                if info.trace_id.prio <= prio {
+                    break;
+                }
+                if !trace.check(key) {
+                    continue;
+                }
+                trace
                     .decode_trace_id(val)
-                    .map(|id| info.trace_id = id.to_string());
+                    .map(|id| info.trace_id = PrioField::new(prio, id.to_string()));
             }
         }
         if config.is_span_id(key) {
-            if let Some(trace_type) = config.span_types.iter().find(|t| t.check(key)) {
-                trace_type
-                    .decode_span_id(val)
-                    .map(|id| info.span_id = id.to_string());
+            for (i, span) in config.span_types.iter().enumerate() {
+                let prio = i as u8 + BASE_FIELD_PRIORITY;
+                if info.span_id.prio <= prio {
+                    break;
+                }
+                if !span.check(key) {
+                    continue;
+                }
+                span.decode_span_id(val)
+                    .map(|id| info.span_id = PrioField::new(prio, id.to_string()));
             }
         }
-        if config.x_request_id.contains(key) {
-            if direction == PacketDirection::ClientToServer {
-                info.x_request_id_0 = val.to_owned();
-            } else {
-                info.x_request_id_1 = val.to_owned();
+
+        let x_req_id = if direction == PacketDirection::ClientToServer {
+            &mut info.x_request_id_0
+        } else {
+            &mut info.x_request_id_1
+        };
+        for (i, req_id) in config.x_request_id.iter().enumerate() {
+            let prio = i as u8 + BASE_FIELD_PRIORITY;
+            if x_req_id.prio <= prio {
+                break;
+            }
+            if req_id == key {
+                *x_req_id = PrioField::new(prio, val.to_owned());
+                break;
             }
         }
-        if direction == PacketDirection::ClientToServer && config.proxy_client.contains(key) {
-            info.client_ip = Some(val.to_owned());
+
+        if direction == PacketDirection::ClientToServer {
+            for (i, pc) in config.proxy_client.iter().enumerate() {
+                let prio = i as u8 + BASE_FIELD_PRIORITY;
+                match info.client_ip.as_ref() {
+                    Some(p) if p.prio <= prio => break,
+                    _ => (),
+                }
+                if pc == key {
+                    info.client_ip = Some(PrioField::new(prio, val.to_owned()));
+                    break;
+                }
+            }
         }
 
         fn process_attributes(
@@ -2291,5 +2328,94 @@ mod tests {
         let path = String::from("/api/v1/users/123?query=456");
         let expected_output = "/api/v1"; // prefixes match, but the keep_segments is 0, use the default value 2 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+    }
+
+    #[test]
+    fn header_priority() {
+        let mut parser = HttpLog::new_v1();
+        let mut info = HttpInfo::default();
+        let config = L7LogDynamicConfig::new(
+            vec!["X_Forwarded_For".into(), "Client".into()],
+            vec!["X_Request_ID".into(), "x-request-id".into()],
+            vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
+            vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
+            ExtraLogFields::default(),
+        );
+
+        // check field overwritten by higher priority field but not backwards
+        let _ = parser.on_header(
+            &config,
+            b"Client",
+            b"172.1.23.41",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.41");
+        let _ = parser.on_header(
+            &config,
+            b"X_Forwarded_For",
+            b"172.1.23.42",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
+        let _ = parser.on_header(
+            &config,
+            b"Client",
+            b"172.1.23.41",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
+
+        let _ = parser.on_header(
+            &config,
+            b"x-request-id",
+            b"123",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.x_request_id_0.field, "123");
+        let _ = parser.on_header(
+            &config,
+            b"X_Request_ID",
+            b"456",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.x_request_id_0.field, "456");
+        let _ = parser.on_header(
+            &config,
+            b"x-request-id",
+            b"123",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.x_request_id_0.field, "456");
+
+        let _ = parser.on_header(
+            &config,
+            b"traceparent",
+            b"00-trace-span-01",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        let _ = parser.on_header(
+            &config,
+            b"x-b3-traceid",
+            b"b3traceid",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.trace_id.field, "b3traceid");
+        let _ = parser.on_header(
+            &config,
+            b"traceparent",
+            b"00-trace-span-01",
+            PacketDirection::ClientToServer,
+            &mut info,
+        );
+        assert_eq!(info.trace_id.field, "b3traceid");
+        assert_eq!(info.span_id.field, "span");
     }
 }

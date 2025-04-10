@@ -5033,9 +5033,12 @@ processors:
         #   en: |-
         #     It is used to extract the real client IP field in the HTTP header,
         #     such as X-Forwarded-For, etc. Leave it empty to disable this feature.
+        #     If multiple values are specified, the first match will be used.
+        #     Fields rewritten by plugins have the highest priority.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`http_proxy_client`字段中，作为调用链追踪的特征值。
+        #     如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
         # upgrade_from: http_log_proxy_client
         http_real_client: [X_Forwarded_For]
         # type: string
@@ -5051,9 +5054,12 @@ processors:
         #     to uniquely identify the same request before and after the gateway,
         #     such as X-Request-ID, etc. This feature can be turned off by setting
         #     it to empty.
+        #     If multiple values are specified, the first match will be used.
+        #     Fields rewritten by plugins have the highest priority.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`x_request_id`字段中，作为调用链追踪的特征值。
+        #     如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
         # upgrade_from: http_log_x_request_id
         x_request_id: [X_Request_ID]
         # type: string
@@ -5068,10 +5074,13 @@ processors:
         #     Used to extract the TraceID field in HTTP and RPC headers, supports filling
         #     in multiple values separated by commas. This feature can be turned off by
         #     setting it to empty.
+        #     If multiple values are specified, the first match will be used.
+        #     Fields rewritten by plugins have the highest priority.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`trace_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
         #     特征字段，中间用`,`分隔。
+        #     如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
         # upgrade_from: http_log_trace_id
         apm_trace_id: [traceparent, sw8]
         # type: string
@@ -5086,10 +5095,13 @@ processors:
         #     Used to extract the SpanID field in HTTP and RPC headers, supports filling
         #     in multiple values separated by commas. This feature can be turned off by
         #     setting it to empty.
+        #     If multiple values are specified, the first match will be used.
+        #     Fields rewritten by plugins have the highest priority.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
         #     特征字段，中间用`,`分隔。
+        #     如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
         # upgrade_from: http_log_span_id
         apm_span_id: [traceparent, sw8]
       # type: section
