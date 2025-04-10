@@ -260,7 +260,7 @@ impl SessionPeer {
     }
 
     fn check_retrans(base: &SeqSegment, seg: &SeqSegment) -> bool {
-        seg.seq >= base.seq && base.seq + base.len >= seg.seq
+        seg.seq >= base.seq && base.seq + base.len > seg.seq
     }
 
     fn is_retrans_segment(
