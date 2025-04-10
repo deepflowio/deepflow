@@ -1418,6 +1418,12 @@ impl HttpLog {
             return Ok(());
         };
 
+        if key == "x-b3-traceid" || key == "traceparent" {
+            log::debug!("before: {key} = {val}");
+            log::debug!("trace_id = {:?}", info.trace_id);
+            log::debug!("span_id = {:?}", info.span_id);
+        }
+
         if config.is_trace_id(key) {
             for (i, trace) in config.trace_types.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
@@ -1444,6 +1450,12 @@ impl HttpLog {
                 span.decode_span_id(val)
                     .map(|id| info.span_id = PrioField::new(prio, id.to_string()));
             }
+        }
+
+        if key == "x-b3-traceid" || key == "traceparent" {
+            log::debug!("after: {key} = {val}");
+            log::debug!("trace_id = {:?}", info.trace_id);
+            log::debug!("span_id = {:?}", info.span_id);
         }
 
         let x_req_id = if direction == PacketDirection::ClientToServer {
