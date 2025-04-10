@@ -1106,9 +1106,18 @@ func (v *VTapInfo) updateCacheToDB() {
 		}
 
 		if cacheVTap.controllerSyncFlag.IsSet() {
+			cpuNum := cacheVTap.GetCPUNum()
+			if cacheVTap.GetVTapType() == VTAP_TYPE_ESXI {
+				vtapHost, err := dbmgr.DBMgr[mysql_model.Host](v.db).GetFromID(cacheVTap.GetLaunchServerID())
+				if err != nil {
+					log.Error(v.Logf("get db host failed, %s", err))
+				} else {
+					cpuNum = vtapHost.VCPUNum
+				}
+			}
+			dbVTap.CPUNum = cpuNum
 			dbVTap.Revision = cacheVTap.GetRevision()
 			dbVTap.BootTime = cacheVTap.GetBootTime()
-			dbVTap.CPUNum = cacheVTap.GetCPUNum()
 			dbVTap.MemorySize = cacheVTap.GetMemorySize()
 			dbVTap.Arch = cacheVTap.GetArch()
 			dbVTap.Os = cacheVTap.GetOs()
