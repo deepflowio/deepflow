@@ -534,9 +534,9 @@ static __inline int is_tcp_udp_data(void *sk,
 
 	/*
 	 * If the connection has not been established yet, and it is not in the
-	 * ESTABLISHED or CLOSE_WAIT state, exit.
+	 * ESTABLISHED, CLOSE_WAIT, or FIN_WAIT2 state, exit.
 	 */
-	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT | TCPF_FIN_WAIT2)) {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
