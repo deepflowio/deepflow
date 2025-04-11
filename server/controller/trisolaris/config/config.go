@@ -67,6 +67,7 @@ type Config struct {
 	IngesterAPI                    common.IngesterApi // data source
 	AllAgentConnectToNatIP         bool
 	NoIPOverlapping                bool
+	LogAgentConfig                 bool `default:"false" yaml:"log-agent-config"`
 }
 
 func (c *Config) Convert() {

@@ -224,12 +224,12 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d), "+
 		"(groups version %d -> %d), "+
-		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+		"NAME:%s  REVISION:%s  BOOT_TIME:%d AGENT_GROUP_ID:%s",
 		ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(),
 		versionPlatformData, in.GetVersionPlatformData(),
 		versionPolicy, in.GetVersionAcls(),
 		versionGroups, in.GetVersionGroups(),
-		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+		in.GetProcessName(), in.GetRevision(), in.GetBootTime(), in.GetAgentGroupIdRequest())
 
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
@@ -326,6 +326,15 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 			UserConfig:    proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 			DynamicConfig: dynamicConfig,
 		}, nil
+	}
+
+	if trisolaris.GetConfig().LogAgentConfig {
+		log.Infof(
+			"agent_group_lcuuid: %s, max_millicpus: %d, max_memory: %d",
+			vtapCache.GetVTapGroupLcuuid(),
+			userConfig.Int("global.limits.max_millicpus"),
+			userConfig.Int("global.limits.max_memory"),
+		)
 	}
 
 	localSegments := vtapCache.GetAgentLocalSegments()
@@ -564,6 +573,15 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 			UserConfig:    proto.String(e.marshalUserConfig(userConfig, vtapCache)),
 			DynamicConfig: dynamicConfig,
 		}, nil
+	}
+
+	if trisolaris.GetConfig().LogAgentConfig {
+		log.Infof(
+			"agent_group_lcuuid: %s, max_millicpus: %d, max_memory: %d",
+			vtapCache.GetVTapGroupLcuuid(),
+			userConfig.Int("global.limits.max_millicpus"),
+			userConfig.Int("global.limits.max_memory"),
+		)
 	}
 
 	localSegments := vtapCache.GetAgentLocalSegments()
