@@ -1539,10 +1539,25 @@ impl Default for OracleConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct MysqlConfig {
+    pub decompress_payload: bool,
+}
+
+impl Default for MysqlConfig {
+    fn default() -> Self {
+        Self {
+            decompress_payload: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
+    pub mysql: MysqlConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

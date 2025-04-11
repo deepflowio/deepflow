@@ -15,18 +15,23 @@
  */
 
 mod comment_parser;
+mod consts;
 
+use std::cell::Cell;
+use std::io::Read;
 use std::str;
 
+use flate2::bufread::ZlibDecoder;
 use log::{debug, trace};
 use serde::Serialize;
 
-use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
-use super::sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word};
-use super::sql_obfuscate::attempt_obfuscation;
-use super::ObfuscateCache;
+use super::{
+    sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word},
+    sql_obfuscate::attempt_obfuscation,
+    ObfuscateCache,
+};
 
-use crate::flow_generator::protocol_logs::set_captured_byte;
+use self::consts::*;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -38,8 +43,9 @@ use crate::{
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::{
         error::{Error, Result},
-        protocol_logs::pb_adapter::{
-            ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+        protocol_logs::{
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes,
@@ -214,7 +220,10 @@ impl MysqlInfo {
     ) -> Result<()> {
         let payload = mysql_string(payload);
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "invalid mysql query or stmt prepare".into(),
+            });
         };
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, str::from_utf8(payload)?);
@@ -347,6 +356,18 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
     }
 }
 
+thread_local! {
+    static DECODE_BUFFER: Cell<Option<Vec<u8>>> = Cell::new(None);
+}
+
+fn take_buffer() -> Vec<u8> {
+    DECODE_BUFFER.with(|c| c.take().unwrap_or_default())
+}
+
+fn give_buffer(buffer: Vec<u8>) {
+    DECODE_BUFFER.with(|c| c.replace(Some(buffer)));
+}
+
 #[derive(Default)]
 pub struct MysqlLog {
     pub protocol_version: u8,
@@ -354,7 +375,7 @@ pub struct MysqlLog {
     obfuscate_cache: Option<ObfuscateCache>,
 
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
-    parameter_counter: u32,
+    pc: ParameterCounter,
     has_request: bool,
     has_login: bool,
 
@@ -363,10 +384,15 @@ pub struct MysqlLog {
 
 impl L7ProtocolParserInterface for MysqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if !param.ebpf_type.is_raw_protocol() {
+        if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
             return false;
         }
-        Self::check(payload, param)
+
+        let mut decompress_buffer = take_buffer();
+        let ret = Self::check(param.parse_config, &mut decompress_buffer, payload);
+        give_buffer(decompress_buffer);
+
+        ret
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -376,13 +402,19 @@ impl L7ProtocolParserInterface for MysqlLog {
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        if self.parse(
+
+        let mut decompress_buffer = take_buffer();
+        let result = self.parse(
             param.parse_config,
+            &mut decompress_buffer,
             payload,
             param.l4_protocol,
             param.direction,
             &mut info,
-        )? {
+        );
+        give_buffer(decompress_buffer);
+
+        if result? {
             // ignore greeting
             return Ok(L7ParseResult::None);
         }
@@ -477,12 +509,15 @@ enum SqlState {
     ValuesPause,
 }
 
-impl MysqlLog {
-    fn reset_parameter_counter(&mut self) {
-        self.parameter_counter = 0;
+#[derive(Default)]
+struct ParameterCounter(u32);
+
+impl ParameterCounter {
+    fn reset(&mut self) {
+        self.0 = 0;
     }
 
-    fn set_parameter_counter(&mut self, sql: &[u8]) {
+    fn set(&mut self, sql: &[u8]) {
         let mut counter = 0;
         let mut state = SqlState::None;
         for byte in sql.iter() {
@@ -540,11 +575,11 @@ impl MysqlLog {
             }
         }
 
-        self.parameter_counter = counter;
+        self.0 = counter;
     }
 
-    fn get_parameters(&mut self, payload: &[u8], info: &mut MysqlInfo) {
-        if self.parameter_counter == 0 {
+    fn get(&mut self, payload: &[u8], info: &mut MysqlInfo) {
+        if self.0 == 0 {
             return;
         }
         let mut params = vec![];
@@ -556,7 +591,7 @@ impl MysqlLog {
                 break;
             }
         }
-        for _ in 0..self.parameter_counter as usize {
+        for _ in 0..self.0 as usize {
             if offset + PARAMETER_TYPE_LEN > payload.len() {
                 return;
             }
@@ -580,73 +615,97 @@ impl MysqlLog {
 
         info.context = context;
     }
+}
 
-    fn greeting(&mut self, payload: &[u8]) -> Result<()> {
+impl MysqlLog {
+    fn greeting(payload: &[u8], info: &mut MysqlInfo) -> Result<u8> {
         let mut remain = payload.len();
         if remain < PROTOCOL_VERSION_LEN {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "truncated mysql greeting".into(),
+            });
         }
-        self.protocol_version = payload[PROTOCOL_VERSION_OFFSET];
+        let protocol_version = payload[PROTOCOL_VERSION_OFFSET];
         remain -= PROTOCOL_VERSION_LEN;
         let server_version_pos = payload[SERVER_VERSION_OFFSET..]
             .iter()
             .position(|&x| x == SERVER_VERSION_EOF)
             .unwrap_or_default();
         if server_version_pos <= 0 {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "server version not found".into(),
+            });
         }
         remain -= server_version_pos as usize;
         if remain < THREAD_ID_LEN + 1 {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "truncated mysql greeting".into(),
+            });
         }
-        Ok(())
+        info.status = L7ResponseStatus::Ok;
+        Ok(protocol_version)
     }
 
     fn request(
-        &mut self,
         config: Option<&LogParserConfig>,
         payload: &[u8],
+        pc: &mut ParameterCounter,
         info: &mut MysqlInfo,
+        obfuscate_cache: &Option<ObfuscateCache>,
     ) -> Result<LogMessageType> {
         if payload.len() < COMMAND_LEN {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "truncated mysql request".into(),
+            });
         }
         info.command = payload[COMMAND_OFFSET];
         let mut msg_type = LogMessageType::Request;
         match info.command {
-            COM_QUIT | COM_STMT_CLOSE => msg_type = LogMessageType::Session,
+            COM_QUIT | COM_STMT_CLOSE => {
+                msg_type = LogMessageType::Session;
+                info.status = L7ResponseStatus::Ok;
+            }
             COM_FIELD_LIST | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY => {
                 info.request_string(
                     config,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
-                    &self.obfuscate_cache,
+                    obfuscate_cache,
                 )?;
             }
             COM_STMT_PREPARE => {
                 info.request_string(
                     config,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
-                    &self.obfuscate_cache,
+                    obfuscate_cache,
                 )?;
                 if let Some(config) = config {
                     if config
                         .obfuscate_enabled_protocols
                         .is_disabled(L7Protocol::MySQL)
                     {
-                        self.set_parameter_counter(info.context.as_bytes());
+                        pc.set(info.context.as_bytes());
                     }
                 }
             }
             COM_STMT_EXECUTE => {
                 info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
                 if payload.len() > EXECUTE_STATEMENT_PARAMS_OFFSET {
-                    self.get_parameters(&payload[EXECUTE_STATEMENT_PARAMS_OFFSET..], info);
+                    pc.get(&payload[EXECUTE_STATEMENT_PARAMS_OFFSET..], info);
                 }
-                self.reset_parameter_counter();
+                pc.reset();
             }
             COM_PING => {}
-            _ => return Err(Error::MysqlLogParseFailed),
+            _ => {
+                return Err(Error::L7LogParseFailed {
+                    proto: L7Protocol::MySQL,
+                    reason: format!("mysql request command not supported: {}", info.command).into(),
+                })
+            }
         }
         Ok(msg_type)
     }
@@ -672,7 +731,7 @@ impl MysqlLog {
         }
     }
 
-    fn set_status(&mut self, status_code: u16, info: &mut MysqlInfo) {
+    fn set_status(status_code: u16, info: &mut MysqlInfo) {
         if status_code != 0 {
             if status_code >= CLIENT_STATUS_CODE_MIN && status_code <= CLIENT_STATUS_CODE_MAX {
                 info.status = L7ResponseStatus::ClientError;
@@ -684,10 +743,13 @@ impl MysqlLog {
         }
     }
 
-    fn response(&mut self, payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
+    fn response(payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
         let mut remain = payload.len();
         if remain < RESPONSE_CODE_LEN {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "truncated mysql response".into(),
+            });
         }
         info.response_code = payload[RESPONSE_CODE_OFFSET];
         remain -= RESPONSE_CODE_LEN;
@@ -696,10 +758,13 @@ impl MysqlLog {
                 if remain > ERROR_CODE_LEN {
                     let code = bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..]);
                     if code < SERVER_STATUS_CODE_MIN || code > CLIENT_STATUS_CODE_MAX {
-                        return Err(Error::MysqlLogParseFailed);
+                        return Err(Error::L7LogParseFailed {
+                            proto: L7Protocol::MySQL,
+                            reason: format!("invalid mysql response error code: {code}").into(),
+                        });
                     }
                     info.error_code = Some(code as i32);
-                    self.set_status(code, info);
+                    Self::set_status(code, info);
                     remain -= ERROR_CODE_LEN;
                 }
                 let error_message_offset =
@@ -711,11 +776,15 @@ impl MysqlLog {
                 if error_message_offset < payload.len() {
                     let context = mysql_string(&payload[error_message_offset..]);
                     if !context.is_ascii() {
-                        return Err(Error::MysqlLogParseFailed);
+                        return Err(Error::L7LogParseFailed {
+                            proto: L7Protocol::MySQL,
+                            reason: "invalid mysql response error message".into(),
+                        });
                     }
                     info.error_message = String::from_utf8_lossy(context).into_owned();
                 }
             }
+            MYSQL_RESPONSE_CODE_EOF => info.status = L7ResponseStatus::Ok,
             MYSQL_RESPONSE_CODE_OK => {
                 info.status = L7ResponseStatus::Ok;
                 info.affected_rows =
@@ -746,28 +815,44 @@ impl MysqlLog {
         str::from_utf8(&payload[..n]).ok()
     }
 
-    fn login(&mut self, payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
+    fn login(payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
         if payload.len() < LOGIN_USERNAME_OFFSET {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "truncated mysql login".into(),
+            });
         }
         let client_capabilities_flags =
             bytes::read_u16_le(&payload[CLIENT_CAPABILITIES_FLAGS_OFFSET..]);
         if client_capabilities_flags & CLIENT_PROTOCOL_41 != CLIENT_PROTOCOL_41 {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: format!("invalid client capabilities flags: {client_capabilities_flags}")
+                    .into(),
+            });
         }
         if !payload[FILTER_OFFSET..FILTER_OFFSET + FILTER_SIZE]
             .iter()
             .all(|b| *b == 0)
         {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "invalid mysql login filter".into(),
+            });
         }
 
         let Some(context) = Self::string_null(&payload[LOGIN_USERNAME_OFFSET..]) else {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "invalid mysql login username".into(),
+            });
         };
 
         if !context.is_ascii() {
-            return Err(Error::MysqlLogParseFailed);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "invalid mysql login username".into(),
+            });
         }
 
         info.context = format!("Login username: {}", context);
@@ -776,30 +861,52 @@ impl MysqlLog {
         Ok(())
     }
 
-    fn check(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::TCP {
-            return false;
-        }
+    fn is_interested_response(code: u8) -> bool {
+        code == MYSQL_RESPONSE_CODE_OK
+            || code == MYSQL_RESPONSE_CODE_ERR
+            || code == MYSQL_RESPONSE_CODE_EOF
+    }
 
-        let mut header = MysqlHeader::default();
-        let Some(offset) = header.decode(payload, true) else {
-            return false;
+    fn check(
+        config: Option<&LogParserConfig>,
+        decompress_buffer: &mut Vec<u8>,
+        payload: &[u8],
+    ) -> bool {
+        let decompress = config
+            .map(|c| c.mysql_decompress_payload)
+            .unwrap_or(LogParserConfig::default().mysql_decompress_payload);
+
+        let mut parser = match PayloadParser::new(decompress, payload) {
+            Ok(parser) => parser,
+            Err(e) => {
+                debug!("create payload parser failed: {e}");
+                return false;
+            }
         };
 
-        if offset + header.length as usize > payload.len() {
-            return false;
-        }
-
-        let protocol_version_or_query_type = payload[offset];
-        match protocol_version_or_query_type {
-            COM_QUERY | COM_STMT_PREPARE if header.number == 0 => {
-                let context = mysql_string(&payload[offset + 1..]);
-                return context.is_ascii() && is_mysql(context);
+        let (header, payload) = match parser.next(decompress_buffer) {
+            Ok(Some(frame)) => frame,
+            Ok(None) => {
+                debug!("no payload found in mysql packet");
+                return false;
             }
-            _ if header.number != 0 => {
-                let mut mysql = MysqlLog::default();
+            Err(e) => {
+                debug!("parse mysql payload failed: {e}");
+                return false;
+            }
+        };
+
+        let Some(protocol_version_or_query_type) = payload.get(0) else {
+            return false;
+        };
+        match *protocol_version_or_query_type {
+            COM_QUERY | COM_STMT_PREPARE if header.seq_id == 0 => {
+                let context = mysql_string(&payload[1..]);
+                context.is_ascii() && is_mysql(context)
+            }
+            _ if header.seq_id != 0 => {
                 let mut log_info = MysqlInfo::default();
-                mysql.login(&payload[offset..], &mut log_info).is_ok()
+                MysqlLog::login(payload, &mut log_info).is_ok()
             }
             _ => false,
         }
@@ -809,6 +916,7 @@ impl MysqlLog {
     fn parse(
         &mut self,
         config: Option<&LogParserConfig>,
+        decompress_buffer: &mut Vec<u8>,
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
@@ -818,45 +926,96 @@ impl MysqlLog {
             return Err(Error::InvalidIpProtocol);
         }
 
-        let mut header = MysqlHeader::default();
-        let Some(offset) = header.decode(payload, direction == PacketDirection::ClientToServer)
-        else {
-            return Err(Error::MysqlLogParseFailed);
+        let decompress = config
+            .map(|c| c.mysql_decompress_payload)
+            .unwrap_or(LogParserConfig::default().mysql_decompress_payload);
+
+        let mut parser = PayloadParser::new(decompress, payload)?;
+        // interested packets:
+        // - the first packet in request
+        // - greetings packet in response
+        // - packet in response with response_code in [MYSQL_RESPONSE_CODE_OK, MYSQL_RESPONSE_CODE_ERR, MYSQL_RESPONSE_CODE_EOF]
+        let (header, payload) = if direction == PacketDirection::ClientToServer {
+            match parser.next(decompress_buffer)? {
+                Some(frame) => frame,
+                None => {
+                    return Err(Error::L7LogParseFailed {
+                        proto: L7Protocol::MySQL,
+                        reason: "no payload found in mysql packet".into(),
+                    })
+                }
+            }
+        } else {
+            loop {
+                match parser.next(decompress_buffer)? {
+                    Some((h, p)) => {
+                        if h.length == 0 {
+                            continue;
+                        }
+                        if p.is_empty() {
+                            return Err(Error::L7LogParseFailed {
+                                proto: L7Protocol::MySQL,
+                                reason: "empty payload found in mysql packet".into(),
+                            });
+                        }
+                        trace!("mysql response frame: {h:?} payload: {p:?}");
+                        // greeting (seq == 0) or OK/EOF/ERR
+                        if h.seq_id == 0 || Self::is_interested_response(p[RESPONSE_CODE_OFFSET]) {
+                            break (h, p);
+                        }
+                    }
+                    None => {
+                        return Err(Error::L7LogParseFailed {
+                            proto: L7Protocol::MySQL,
+                            reason: "no payload found in mysql packet".into(),
+                        })
+                    }
+                }
+            }
         };
         let mut msg_type = header
-            .check(direction, offset, payload)
-            .ok_or(Error::MysqlLogParseFailed)?;
+            .check(direction, payload)
+            .ok_or(Error::L7LogParseFailed {
+                proto: L7Protocol::MySQL,
+                reason: "mysql packet header check failed".into(),
+            })?;
 
         match msg_type {
-            LogMessageType::Request if header.number == 0 => {
-                msg_type = self.request(config, &payload[offset..], info)?;
+            LogMessageType::Request if header.seq_id == 0 => {
+                msg_type =
+                    Self::request(config, payload, &mut self.pc, info, &self.obfuscate_cache)?;
                 if msg_type == LogMessageType::Request {
                     self.has_request = true;
                     self.has_login = false;
                 }
             }
             LogMessageType::Request
-                if direction == PacketDirection::ClientToServer && header.number == 1 =>
+                if direction == PacketDirection::ClientToServer && header.seq_id == 1 =>
             {
-                self.login(&payload[offset..], info)?;
+                Self::login(payload, info)?;
                 self.has_login = true;
             }
             LogMessageType::Response
-                if self.has_login && header.response_code == MYSQL_RESPONSE_CODE_OK
-                    || header.response_code == MYSQL_RESPONSE_CODE_ERR =>
+                if self.has_login && payload[RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_OK
+                    || payload[RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_ERR =>
             {
-                self.response(&payload[offset..], info)?;
+                Self::response(payload, info)?;
                 self.has_login = false;
             }
             LogMessageType::Response if self.has_request => {
-                self.response(&payload[offset..], info)?;
+                Self::response(payload, info)?;
                 self.has_request = false;
             }
             LogMessageType::Other => {
-                self.greeting(&payload[offset..])?;
+                self.protocol_version = Self::greeting(payload, info)?;
                 return Ok(true);
             }
-            _ => return Err(Error::MysqlLogParseFailed),
+            _ => {
+                return Err(Error::L7LogParseFailed {
+                    proto: L7Protocol::MySQL,
+                    reason: format!("unsupported mysql packet: {header:?}").into(),
+                })
+            }
         };
         info.msg_type = msg_type;
 
@@ -864,69 +1023,120 @@ impl MysqlLog {
     }
 }
 
+// MySQL can have compressed payloads.
+// If mysql decompress payload is enabled, agent will try to decompress the payload before parsing.
+//
+// ref: https://dev.mysql.com/doc/dev/mysql-server/8.4.3/page_protocol_basic_compression.html
+struct PayloadParser<'a> {
+    payload: &'a [u8],
+    decoder: Option<ZlibDecoder<&'a [u8]>>,
+}
+
+impl<'a> PayloadParser<'a> {
+    fn new(decompress: bool, payload: &'a [u8]) -> Result<Self> {
+        let mut has_compress_header = false;
+        let mut compressed = false;
+        // check if the payload has a compressed header
+        if payload.len() >= COMPRESS_HEADER_LEN {
+            // the first 3 bytes in the payload is the total length of the packet except the header
+            // if payload.len() - total_len == 7, then it is a compressed packet
+            // treat the packet as uncompressed if it was truncated or segmented
+            let compressed_len = (bytes::read_u32_le(&payload[..]) & 0xffffff) as usize;
+            if compressed_len + COMPRESS_HEADER_LEN == payload.len() {
+                has_compress_header = true;
+                let uncompressed_len =
+                    bytes::read_u16_le(&payload[COMPRESS_HEADER_UNCOMPRESS_OFFSET..]) as usize
+                        | (payload[COMPRESS_HEADER_UNCOMPRESS_OFFSET + 2] as usize) << 16;
+                compressed = uncompressed_len != 0;
+            }
+        }
+        if compressed {
+            if !decompress {
+                Err(Error::L7LogParseFailed {
+                    proto: L7Protocol::MySQL,
+                    reason: "compressed payload but decompress is disabled".into(),
+                })
+            } else {
+                Ok(Self {
+                    payload,
+                    decoder: Some(ZlibDecoder::new(&payload[COMPRESS_HEADER_LEN..])),
+                })
+            }
+        } else {
+            Ok(Self {
+                payload: if has_compress_header {
+                    &payload[COMPRESS_HEADER_LEN..]
+                } else {
+                    payload
+                },
+                decoder: None,
+            })
+        }
+    }
+
+    fn next<'b, 'c>(&mut self, buffer: &'b mut Vec<u8>) -> Result<Option<(MysqlHeader, &'c [u8])>>
+    where
+        'a: 'c,
+        'b: 'c,
+    {
+        match self.decoder.as_mut() {
+            Some(decoder) => {
+                let mut hb = [0u8; HEADER_LEN];
+                if let Err(e) = decoder.read_exact(&mut hb) {
+                    return Err(Error::L7LogParseFailed {
+                        proto: L7Protocol::MySQL,
+                        reason: format!("read header failed: {e}").into(),
+                    });
+                }
+                let header = MysqlHeader::new(&hb);
+                buffer.clear();
+                buffer.resize(header.length as usize, 0);
+                if let Err(e) = decoder.read_exact(buffer) {
+                    return Err(Error::L7LogParseFailed {
+                        proto: L7Protocol::MySQL,
+                        reason: format!("read payload failed: {e}").into(),
+                    });
+                }
+                Ok(Some((header, &buffer[..])))
+            }
+            None => {
+                if self.payload.len() < HEADER_LEN {
+                    return Ok(None);
+                }
+                let header = MysqlHeader::new(&self.payload[..HEADER_LEN]);
+                let end_of_frame = self.payload.len().min(HEADER_LEN + header.length as usize);
+                let frame = &self.payload[HEADER_LEN..end_of_frame];
+                self.payload = &self.payload[end_of_frame..];
+                Ok(Some((header, frame)))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct MysqlHeader {
     length: u32,
-    number: u8,
-    response_code: u8,
+    seq_id: u8,
 }
 
 impl MysqlHeader {
-    pub fn decode(&mut self, payload: &[u8], is_not_response: bool) -> Option<usize> {
-        let mut offset: usize = 0;
-        while offset < payload.len() {
-            if payload[offset..].len() < HEADER_LEN {
-                return None;
-            }
-
-            if payload[offset..].len() > COMPRESS_HEADER_LEN + HEADER_LEN {
-                let compressed_len = bytes::read_u32_le(&payload[offset..]) & 0xffffff;
-                let uncompressed_len =
-                    bytes::read_u32_le(&payload[offset + COMPRESS_HEADER_UNCOMPRESS_OFFSET..])
-                        & 0xffffff;
-                let packet_len =
-                    bytes::read_u32_le(&payload[offset + COMPRESS_HEADER_LEN..]) & 0xffffff;
-                if uncompressed_len == 0 && compressed_len == packet_len + 4 {
-                    offset += COMPRESS_HEADER_LEN;
-                }
-            }
-
-            let len = bytes::read_u32_le(&payload[offset..]) & 0xffffff;
-            if offset + HEADER_LEN + RESPONSE_CODE_OFFSET >= payload.len() {
-                return None;
-            }
-
-            let response_code = payload[offset + HEADER_LEN + RESPONSE_CODE_OFFSET];
-            if response_code == MYSQL_RESPONSE_CODE_OK
-                || response_code == MYSQL_RESPONSE_CODE_ERR
-                || response_code == MYSQL_RESPONSE_CODE_EOF
-                || payload[offset + NUMBER_OFFSET] == 0
-                || is_not_response
-            {
-                self.length = len;
-                self.number = payload[offset + NUMBER_OFFSET];
-                self.response_code = response_code;
-                return Some(offset + HEADER_LEN);
-            }
-            offset += HEADER_LEN + len as usize;
+    pub fn new(payload: &[u8]) -> Self {
+        assert!(payload.len() >= HEADER_LEN);
+        let bytes_as_u32 = bytes::read_u32_le(&payload[..]);
+        Self {
+            length: bytes_as_u32 & 0xffffff,
+            seq_id: (bytes_as_u32 >> 24) as u8,
         }
-        None
     }
 
-    pub fn check(
-        &self,
-        direction: PacketDirection,
-        offset: usize,
-        payload: &[u8],
-    ) -> Option<LogMessageType> {
-        if offset >= payload.len() || self.length == 0 {
+    pub fn check(&self, direction: PacketDirection, payload: &[u8]) -> Option<LogMessageType> {
+        if self.length == 0 {
             return None;
         }
 
         match direction {
             // greeting
-            PacketDirection::ServerToClient if self.number == 0 => {
-                let payload = &payload[offset..];
+            PacketDirection::ServerToClient if self.seq_id == 0 => {
                 if payload.len() < PROTOCOL_VERSION_LEN {
                     return None;
                 }
@@ -941,7 +1151,7 @@ impl MysqlHeader {
                 }
             }
             PacketDirection::ServerToClient => Some(LogMessageType::Response),
-            PacketDirection::ClientToServer if self.number <= 1 => Some(LogMessageType::Request),
+            PacketDirection::ClientToServer if self.seq_id <= 1 => Some(LogMessageType::Request),
             _ => None,
         }
     }
@@ -1160,6 +1370,10 @@ mod tests {
             ("mysql-table-alter.pcap", "mysql-table-alter.result"),
             ("mysql-database.pcap", "mysql-database.result"),
             ("mysql-login-error.pcap", "mysql-login-error.result"),
+            (
+                "mysql-compressed-response.pcap",
+                "mysql-compressed-response.result",
+            ),
         ];
 
         for item in files.iter() {
@@ -1338,13 +1552,9 @@ mod tests {
             ("SELECT ` ? ` FROM ` ? ` WHERE domain =? AND content <> ?  BY ` ? `.` ? ` LIMIT ?", 1),
         ];
         for case in cases {
-            let mut log = MysqlLog::default();
-            log.set_parameter_counter(case.0.as_bytes());
-            assert_eq!(
-                log.parameter_counter, case.1,
-                "Cases {:?} error, actual is {}",
-                case, log.parameter_counter
-            );
+            let mut pc = ParameterCounter::default();
+            pc.set(case.0.as_bytes());
+            assert_eq!(pc.0, case.1, "Cases {:?} error, actual is {}", case, pc.0);
         }
     }
 

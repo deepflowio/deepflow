@@ -6875,6 +6875,39 @@ processors:
 Due to the response with data id 0x04 has different struct in
 different version, it may has one byte before row affect.
 
+##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
+
+###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        mysql:
+          decompress_payload: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Some MySQL packets have payload compressed with LZ77 algorithm. Enable this option to decompress payload on parsing.
+Set to false to disable decompression for better performance.
+ref: https://dev.mysql.com/doc/dev/mysql-server/8.4.3/page_protocol_basic_compression.html
+
 ### Filters {#processors.request_log.filters}
 
 #### Port Number Pre-filters {#processors.request_log.filters.port_number_prefilters}
