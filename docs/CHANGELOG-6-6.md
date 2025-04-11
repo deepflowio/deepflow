@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: node vm lcuuid duplicate [#9462](https://github.com/deepflowio/deepflow/pull/9462) by [askyrie](https://github.com/askyrie)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -74,5 +75,6 @@
 
 
 #### Refactoring
+* refactor: add some agent config log in push interface [#9469](https://github.com/deepflowio/deepflow/pull/9469) by [SongZhen0704](https://github.com/SongZhen0704)
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
