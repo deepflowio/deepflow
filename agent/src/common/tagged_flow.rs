@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+use std::cell::RefCell;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::rc::Rc;
 
 use prost::Message;
 use public::sender::{SendMessageType, Sendable};
@@ -79,12 +80,14 @@ impl fmt::Display for TaggedFlow {
 }
 
 #[derive(Debug)]
-pub struct BoxedTaggedFlow(pub Box<TaggedFlow>);
+pub struct BoxedTaggedFlow(pub Rc<RefCell<TaggedFlow>>);
+
+unsafe impl Send for BoxedTaggedFlow {}
 
 impl Sendable for BoxedTaggedFlow {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let pb_tagged_flow = flow_log::TaggedFlow {
-            flow: Some(self.0.flow.into()),
+            flow: Some(self.0.borrow().flow.clone().into()),
         };
         pb_tagged_flow
             .encode(buf)

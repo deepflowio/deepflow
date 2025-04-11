@@ -53,6 +53,8 @@ message Flow {
     uint32 direction_score = 25;
 
     string request_domain = 26;
+
+    repeated uint64 aggregated_flow_ids = 27;
 }
 
 message FlowKey {
