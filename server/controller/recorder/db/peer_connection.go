@@ -26,12 +26,12 @@ type PeerConnection struct {
 }
 
 func NewPeerConnection() *PeerConnection {
-	operater := &PeerConnection{
+	operator := &PeerConnection{
 		newOperatorBase[*metadbmodel.PeerConnection](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			true,
 			false,
 		),
 	}
-	return operater
+	return operator
 }

@@ -46,7 +46,7 @@ func timeAlign(startSeconds int64) int64 {
 
 func GetPromRequestQueryTime(q *prompb.Query) (int64, int64) {
 	// remind that we storage seconds for prometheus samples
-	// if the sample storage changes to milliseconds, it shoudld remove `/1000` here
+	// if the sample storage changes to milliseconds, it should remove `/1000` here
 	endTime := q.Hints.EndMs / 1000
 	// if endTime is not multiple of 1000, add 1 for endTime for data points outside end
 	if q.Hints.EndMs%1000 > 0 {

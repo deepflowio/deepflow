@@ -70,7 +70,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.Subnet, error) {
 				vpcLcuuid, tmpDefaultVxnetSubnets, tmpDefaultVxnetIDs,
 					tmpVxnetIdToSubnetLcuuid, err := q.getVMVPCLcuuid(regionId, regionLcuuid, vm)
 				if err != nil {
-					log.Infof("get vm (%s) vpc faild", vm.Get("instance_id").MustString(), logger.NewORGPrefix(q.orgID))
+					log.Infof("get vm (%s) vpc failed", vm.Get("instance_id").MustString(), logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				retDefaultVxnetSubnets = append(retDefaultVxnetSubnets, tmpDefaultVxnetSubnets...)

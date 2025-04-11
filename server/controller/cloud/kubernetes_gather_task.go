@@ -47,7 +47,7 @@ func NewKubernetesGatherTask(
 	ctx context.Context, db *metadb.DB, domain *metadbmodel.Domain, subDomain *metadbmodel.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
 	kubernetesGather := kubernetes_gather.NewKubernetesGather(db, domain, subDomain, cfg, isSubDomain)
 	if kubernetesGather == nil {
-		log.Errorf("kubernetes_gather task (%s) init faild", domain.Name, db.LogPrefixORGID)
+		log.Errorf("kubernetes_gather task (%s) init failed", domain.Name, db.LogPrefixORGID)
 		return nil
 	}
 	subDomainConfig := ""
