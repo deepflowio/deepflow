@@ -598,7 +598,8 @@ global:
 **Description**:
 
 CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-without being migrated to other processors. Invalid ID will be ignored. Example:
+without being migrated to other processors. Invalid ID will be ignored. Currently only
+works for dispatcher threads. Example:
 ```yaml
 global:
   tunning:
@@ -6681,7 +6682,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-max-fail-count`
 processors:
   request_log:
     application_protocol_inference:
-      inference_max_retries: 5
+      inference_max_retries: 128
 ```
 
 **Schema**:
@@ -6692,12 +6693,22 @@ processors:
 
 **Description**:
 
-deepflow-agent will mark the long live stream and application protocol for each
-<vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
-to be identified for many times (for multiple packets, Socket Data, Function Data),
-the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
-try (incurring significant computational overhead) until the duration exceeds
-l7-protocol-inference-ttl.
+The initialization decision of the Flow app protocol is taken from the hash table based on information
+such as IP, port, etc. If it cannot be determined that it is a specific application protocol, it will
+pass the rotation training check the specific application protocol by all application protocol methods,
+and record the application protocol through the hash table after the identification is successful. If
+the number of successful record failures is not recognized, If the number of failures is greater than
+inference_max_retries and the record does not time out (inference_result_ttl), the flow is marked with
+a skip The current time is recorded to last_fail, and the subsequent flow will not be parsed by the
+application protocol before the timeout. If it has been determined to be a specific application protocol,
+The flow is checked before parsing and the skip is removed if it has a skip tag and has timed out through
+last_fail and inference_result_ttl calculations Mark. After the first application protocol resolution is
+successful, use a hash table to record the application protocol, and if the resolution is not successful,
+the cumulative number of failures is recorded, and if the number of failures is greater than that
+inference_max_retries and the record does not time out (inference_result_ttl), the flow is marked with a
+skip mark and records that the current time has arrived last_fail, the subsequent flow will not be parsed
+before the application protocol expires. If the flow has been parsed successfully, the number of failures
+will not be recorded.
 
 #### Inference Result TTL {#processors.request_log.application_protocol_inference.inference_result_ttl}
 

@@ -588,7 +588,8 @@ global:
 
 **详细描述**:
 
-操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。举例：
+操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。当前仅对
+dispatcher 线程生效。举例：
 ```yaml
 global:
   tunning:
@@ -6521,7 +6522,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-max-fail-count`
 processors:
   request_log:
     application_protocol_inference:
-      inference_max_retries: 5
+      inference_max_retries: 128
 ```
 
 **模式**:
@@ -6532,10 +6533,14 @@ processors:
 
 **详细描述**:
 
-deepflow-agent 会周期性标记每一个 `<vpc, ip, protocol, port>` 四元组承载的应用协议类型，以加速
-后续数据的应用协议采集过程。如果一个时间周期内，连续多次尝试解析 Packet 数据、Socket 数据无法推断
-出该四元组承载的应用协议，agent 会将该四元组标记为 unknown 类型，并在本周期内暂停对后续数据的应用
-协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
+flow 应用协议的初始化判定会根据 IP、Port 等信息从哈希表中获取。若未能判定为具体应用协议时通过轮训
+所有应用协议方式检查具体的应用协议，识别成功后通过哈希表记录该应用协议；若未识别成功累计记录失败次数，
+若失败次数大于 inference_max_retries 并且记录未超时（inference_result_ttl），该 flow 会打上 skip 标记
+并记录当前时间到 last_fail，后续该流在未超时前不会再进行应用协议解析。若已经判定为具体的应用协议时，
+应用解析前会检查 flow 若有 skip 标记并且通过 last_fail 和 inference_result_ttl 计算已经超时会去掉 skip
+标记。后续第一次应用协议解析成功后使用哈希表记录应用协议，若从未解析成功累计记录失败次数，若失败次数大于
+inference_max_retries 并且记录未超时（inference_result_ttl），该 flow 会打上 skip 标记并记录当前时间到
+last_fail，后续该流在未超时前不会再进行应用协议解析；若该 flow 已经解析成功过解析失败不记录失败次数。
 
 #### 推断结果 TTL {#processors.request_log.application_protocol_inference.inference_result_ttl}
 
