@@ -232,6 +232,10 @@ impl FlowLog {
                 self.last_fail = None;
                 self.is_skip = false;
             }
+
+            if !self.is_success {
+                self.l7_protocol_log_parser = None
+            }
         }
     }
 
