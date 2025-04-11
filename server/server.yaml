@@ -325,6 +325,9 @@ controller:
     ## uint: s, default: 60
     #org-data-refresh-interval: 60
 
+    ## tmp config: whether to log agent cpu/memory
+    log-agent-config: False
+
   genesis:
     # 平台数据老化时间，单位：秒
     aging_time: 86400
