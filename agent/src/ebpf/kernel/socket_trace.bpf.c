@@ -1699,8 +1699,7 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 		bpf_probe_read_user(&addr, sizeof(addr), sendto_ctx->addr);
 		write_args.port = __bpf_ntohs(addr.sin_port);
 		if (write_args.port > 0 && addr.sin_family == AF_INET) {
-			*(__u32 *)write_args.addr =
-				__bpf_ntohl(addr.sin_addr.s_addr);
+			*(__u32 *)write_args.addr = addr.sin_addr.s_addr;
 		} else if (write_args.port > 0 &&
 			   addr.sin_family == AF_INET6) {
 			struct sockaddr_in6 addr = { 0 };
