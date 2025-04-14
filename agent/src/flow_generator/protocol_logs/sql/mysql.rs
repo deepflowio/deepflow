@@ -444,7 +444,8 @@ impl L7ProtocolParserInterface for MysqlLog {
                 }
                 _ => {}
             }
-            if info.msg_type != LogMessageType::Session {
+            if info.msg_type == LogMessageType::Request || info.msg_type == LogMessageType::Response
+            {
                 info.cal_rrt(param).map(|rrt| {
                     info.rrt = rrt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
