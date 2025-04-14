@@ -43,6 +43,6 @@ func (g *NATGateway) OnUpdaterUpdated(cloudItem *cloudmodel.NATGateway, diffBase
 	g.cache.UpdateNATGateway(cloudItem)
 }
 
-func (g *NATGateway) OnUpdaterDeleted(lcuuids []string) {
+func (g *NATGateway) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.NATGateway) {
 	g.cache.DeleteNATGateways(lcuuids)
 }

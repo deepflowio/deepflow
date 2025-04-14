@@ -34,12 +34,14 @@ type Network struct {
 		metadbmodel.Network,
 		*message.NetworkAdd,
 		message.NetworkAdd,
+		message.AddNoneAddition,
 		*message.NetworkUpdate,
 		message.NetworkUpdate,
 		*message.NetworkFieldsUpdate,
 		message.NetworkFieldsUpdate,
 		*message.NetworkDelete,
-		message.NetworkDelete]
+		message.NetworkDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
@@ -51,11 +53,14 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 			metadbmodel.Network,
 			*message.NetworkAdd,
 			message.NetworkAdd,
+			message.AddNoneAddition,
 			*message.NetworkUpdate,
 			message.NetworkUpdate,
 			*message.NetworkFieldsUpdate,
 			message.NetworkFieldsUpdate,
 			*message.NetworkDelete,
+			message.NetworkDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,

@@ -42,6 +42,6 @@ func (psp *PodServicePort) OnUpdaterUpdated(cloudItem *cloudmodel.PodServicePort
 	diffBase.Update(cloudItem)
 }
 
-func (psp *PodServicePort) OnUpdaterDeleted(lcuuids []string) {
+func (psp *PodServicePort) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodServicePort) {
 	psp.cache.DeletePodServicePorts(lcuuids)
 }

@@ -34,12 +34,14 @@ type RDSInstance struct {
 		metadbmodel.RDSInstance,
 		*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
+		message.AddNoneAddition,
 		*message.RDSInstanceUpdate,
 		message.RDSInstanceUpdate,
 		*message.RDSInstanceFieldsUpdate,
 		message.RDSInstanceFieldsUpdate,
 		*message.RDSInstanceDelete,
-		message.RDSInstanceDelete]
+		message.RDSInstanceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
@@ -51,11 +53,14 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 			metadbmodel.RDSInstance,
 			*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
+			message.AddNoneAddition,
 			*message.RDSInstanceUpdate,
 			message.RDSInstanceUpdate,
 			*message.RDSInstanceFieldsUpdate,
 			message.RDSInstanceFieldsUpdate,
 			*message.RDSInstanceDelete,
+			message.RDSInstanceDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,

@@ -42,6 +42,6 @@ func (r *Region) OnUpdaterUpdated(cloudItem *cloudmodel.Region, diffBase *diffba
 	diffBase.Update(cloudItem)
 }
 
-func (r *Region) OnUpdaterDeleted(lcuuids []string) {
+func (r *Region) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Region) {
 	r.cache.DeleteRegions(lcuuids)
 }

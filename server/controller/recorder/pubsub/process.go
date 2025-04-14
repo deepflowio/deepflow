@@ -25,12 +25,14 @@ type Process struct {
 	ResourcePubSubComponent[
 		*message.ProcessAdd,
 		message.ProcessAdd,
+		message.ProcessAddAddition,
 		*message.ProcessUpdate,
 		message.ProcessUpdate,
 		*message.ProcessFieldsUpdate,
 		message.ProcessFieldsUpdate,
 		*message.ProcessDelete,
-		message.ProcessDelete]
+		message.ProcessDelete,
+		message.ProcessDeleteAddition]
 }
 
 func NewProcess() *Process {
@@ -38,12 +40,14 @@ func NewProcess() *Process {
 		ResourcePubSubComponent[
 			*message.ProcessAdd,
 			message.ProcessAdd,
+			message.ProcessAddAddition,
 			*message.ProcessUpdate,
 			message.ProcessUpdate,
 			*message.ProcessFieldsUpdate,
 			message.ProcessFieldsUpdate,
 			*message.ProcessDelete,
 			message.ProcessDelete,
+			message.ProcessDeleteAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeProcess),
 			resourceType:    common.RESOURCE_TYPE_PROCESS_EN,

@@ -25,12 +25,14 @@ type PodReplicaSet struct {
 	ResourcePubSubComponent[
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
+		message.AddNoneAddition,
 		*message.PodReplicaSetUpdate,
 		message.PodReplicaSetUpdate,
 		*message.PodReplicaSetFieldsUpdate,
 		message.PodReplicaSetFieldsUpdate,
 		*message.PodReplicaSetDelete,
-		message.PodReplicaSetDelete]
+		message.PodReplicaSetDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodReplicaSet() *PodReplicaSet {
@@ -38,12 +40,14 @@ func NewPodReplicaSet() *PodReplicaSet {
 		ResourcePubSubComponent[
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
+			message.AddNoneAddition,
 			*message.PodReplicaSetUpdate,
 			message.PodReplicaSetUpdate,
 			*message.PodReplicaSetFieldsUpdate,
 			message.PodReplicaSetFieldsUpdate,
 			*message.PodReplicaSetDelete,
 			message.PodReplicaSetDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodReplicaSet),
 			resourceType:    common.RESOURCE_TYPE_POD_REPLICA_SET_EN,

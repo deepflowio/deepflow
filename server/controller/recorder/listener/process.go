@@ -42,6 +42,6 @@ func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *diff
 	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
-func (p *Process) OnUpdaterDeleted(lcuuids []string) {
-	p.cache.DeleteProcesses(lcuuids)
+func (p *Process) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Process) {
+	p.cache.DeleteProcesses(deletedDBItems)
 }

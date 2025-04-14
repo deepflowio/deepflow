@@ -25,12 +25,14 @@ type LB struct {
 	ResourcePubSubComponent[
 		*message.LBAdd,
 		message.LBAdd,
+		message.AddNoneAddition,
 		*message.LBUpdate,
 		message.LBUpdate,
 		*message.LBFieldsUpdate,
 		message.LBFieldsUpdate,
 		*message.LBDelete,
-		message.LBDelete]
+		message.LBDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLB() *LB {
@@ -38,12 +40,14 @@ func NewLB() *LB {
 		ResourcePubSubComponent[
 			*message.LBAdd,
 			message.LBAdd,
+			message.AddNoneAddition,
 			*message.LBUpdate,
 			message.LBUpdate,
 			*message.LBFieldsUpdate,
 			message.LBFieldsUpdate,
 			*message.LBDelete,
 			message.LBDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLB),
 			resourceType:    common.RESOURCE_TYPE_LB_EN,

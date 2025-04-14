@@ -25,12 +25,14 @@ type Region struct {
 	ResourcePubSubComponent[
 		*message.RegionAdd,
 		message.RegionAdd,
+		message.AddNoneAddition,
 		*message.RegionUpdate,
 		message.RegionUpdate,
 		*message.RegionFieldsUpdate,
 		message.RegionFieldsUpdate,
 		*message.RegionDelete,
-		message.RegionDelete]
+		message.RegionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRegion() *Region {
@@ -38,12 +40,14 @@ func NewRegion() *Region {
 		ResourcePubSubComponent[
 			*message.RegionAdd,
 			message.RegionAdd,
+			message.AddNoneAddition,
 			*message.RegionUpdate,
 			message.RegionUpdate,
 			*message.RegionFieldsUpdate,
 			message.RegionFieldsUpdate,
 			*message.RegionDelete,
 			message.RegionDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRegion),
 			resourceType:    common.RESOURCE_TYPE_REGION_EN,
