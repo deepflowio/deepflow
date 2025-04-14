@@ -35,12 +35,14 @@ type Subnet struct {
 		metadbmodel.Subnet,
 		*message.SubnetAdd,
 		message.SubnetAdd,
+		message.AddNoneAddition,
 		*message.SubnetUpdate,
 		message.SubnetUpdate,
 		*message.SubnetFieldsUpdate,
 		message.SubnetFieldsUpdate,
 		*message.SubnetDelete,
-		message.SubnetDelete]
+		message.SubnetDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
@@ -52,11 +54,14 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 			metadbmodel.Subnet,
 			*message.SubnetAdd,
 			message.SubnetAdd,
+			message.AddNoneAddition,
 			*message.SubnetUpdate,
 			message.SubnetUpdate,
 			*message.SubnetFieldsUpdate,
 			message.SubnetFieldsUpdate,
 			*message.SubnetDelete,
+			message.SubnetDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,

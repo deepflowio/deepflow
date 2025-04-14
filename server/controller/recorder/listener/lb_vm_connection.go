@@ -41,6 +41,6 @@ func (c *LBVMConnection) OnUpdaterAdded(addedDBItems []*metadbmodel.LBVMConnecti
 func (c *LBVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.LBVMConnection, diffBase *diffbase.LBVMConnection) {
 }
 
-func (c *LBVMConnection) OnUpdaterDeleted(lcuuids []string) {
+func (c *LBVMConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.LBVMConnection) {
 	c.cache.DeleteLBVMConnections(lcuuids)
 }

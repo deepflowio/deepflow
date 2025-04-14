@@ -41,6 +41,6 @@ func (v *VPC) OnUpdaterUpdated(cloudItem *cloudmodel.VPC, diffBase *diffbase.VPC
 	diffBase.Update(cloudItem)
 }
 
-func (v *VPC) OnUpdaterDeleted(lcuuids []string) {
+func (v *VPC) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.VPC) {
 	v.cache.DeleteVPCs(lcuuids)
 }

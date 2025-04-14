@@ -34,12 +34,14 @@ type PodGroupPort struct {
 		metadbmodel.PodGroupPort,
 		*message.PodGroupPortAdd,
 		message.PodGroupPortAdd,
+		message.AddNoneAddition,
 		*message.PodGroupPortUpdate,
 		message.PodGroupPortUpdate,
 		*message.PodGroupPortFieldsUpdate,
 		message.PodGroupPortFieldsUpdate,
 		*message.PodGroupPortDelete,
-		message.PodGroupPortDelete]
+		message.PodGroupPortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPort) *PodGroupPort {
@@ -51,11 +53,14 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 			metadbmodel.PodGroupPort,
 			*message.PodGroupPortAdd,
 			message.PodGroupPortAdd,
+			message.AddNoneAddition,
 			*message.PodGroupPortUpdate,
 			message.PodGroupPortUpdate,
 			*message.PodGroupPortFieldsUpdate,
 			message.PodGroupPortFieldsUpdate,
 			*message.PodGroupPortDelete,
+			message.PodGroupPortDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			wholeCache,

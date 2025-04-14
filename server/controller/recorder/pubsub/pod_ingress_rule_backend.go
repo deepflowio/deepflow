@@ -25,12 +25,14 @@ type PodIngressRuleBackend struct {
 	ResourcePubSubComponent[
 		*message.PodIngressRuleBackendAdd,
 		message.PodIngressRuleBackendAdd,
+		message.AddNoneAddition,
 		*message.PodIngressRuleBackendUpdate,
 		message.PodIngressRuleBackendUpdate,
 		*message.PodIngressRuleBackendFieldsUpdate,
 		message.PodIngressRuleBackendFieldsUpdate,
 		*message.PodIngressRuleBackendDelete,
-		message.PodIngressRuleBackendDelete]
+		message.PodIngressRuleBackendDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodIngressRuleBackend() *PodIngressRuleBackend {
@@ -38,12 +40,14 @@ func NewPodIngressRuleBackend() *PodIngressRuleBackend {
 		ResourcePubSubComponent[
 			*message.PodIngressRuleBackendAdd,
 			message.PodIngressRuleBackendAdd,
+			message.AddNoneAddition,
 			*message.PodIngressRuleBackendUpdate,
 			message.PodIngressRuleBackendUpdate,
 			*message.PodIngressRuleBackendFieldsUpdate,
 			message.PodIngressRuleBackendFieldsUpdate,
 			*message.PodIngressRuleBackendDelete,
 			message.PodIngressRuleBackendDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodIngressRuleBackend),
 			resourceType:    common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,

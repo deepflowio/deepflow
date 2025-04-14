@@ -42,6 +42,6 @@ func (i *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.LA
 	diffBase.Update(cloudItem)
 }
 
-func (i *LANIP) OnUpdaterDeleted(lcuuids []string) {
+func (i *LANIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.LANIP) {
 	i.cache.DeleteLANIPs(lcuuids)
 }
