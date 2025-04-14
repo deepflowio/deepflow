@@ -697,8 +697,8 @@ mod test {
     fn test_sofarpc_old() {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-old.pcap");
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let capture = Capture::load_pcap(pcap_file, None);
-        let mut p = capture.as_meta_packets();
+        let capture = Capture::load_pcap(pcap_file);
+        let mut p = capture.collect::<Vec<_>>();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
@@ -788,8 +788,8 @@ mod test {
     fn test_sofarpc_new() {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-new.pcap");
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let capture = Capture::load_pcap(pcap_file, None);
-        let mut p = capture.as_meta_packets();
+        let capture = Capture::load_pcap(pcap_file);
+        let mut p = capture.collect::<Vec<_>>();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();

@@ -1269,9 +1269,9 @@ mod tests {
 
     fn run(name: &str) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
-        let capture = Capture::load_pcap(pcap_file, Some(1400));
+        let capture = Capture::load_pcap(pcap_file);
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let mut packets = capture.as_meta_packets();
+        let mut packets = capture.collect::<Vec<_>>();
         if packets.is_empty() {
             return "".to_string();
         }
@@ -1354,6 +1354,7 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("a-testcase.pcap", "mysql-use.result"),
             ("mysql-use.pcap", "mysql-use.result"),
             ("mysql-exec.pcap", "mysql-exec.result"),
             ("mysql-statement-id.pcap", "mysql-statement-id.result"),
@@ -1449,8 +1450,8 @@ mod tests {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
         let mut mysql = MysqlLog::default();
 
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(1400));
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
+        let mut packets = capture.collect::<Vec<_>>();
 
         let first_src_mac = packets[0].lookup_key.src_mac;
         for packet in packets.iter_mut() {

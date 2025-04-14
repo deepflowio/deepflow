@@ -96,8 +96,8 @@ mod tests {
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 
     fn update_from_pcap<P: AsRef<Path>>(path: P, reverse_pkt: bool) -> (UdpPerf, String) {
-        let capture = Capture::load_pcap(path, None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(path);
+        let packets = capture.collect::<Vec<_>>();
         let mut flow_perf = UdpPerf::new();
         let mut result = String::from("");
 
