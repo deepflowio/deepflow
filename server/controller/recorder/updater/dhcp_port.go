@@ -34,12 +34,14 @@ type DHCPPort struct {
 		metadbmodel.DHCPPort,
 		*message.DHCPPortAdd,
 		message.DHCPPortAdd,
+		message.AddNoneAddition,
 		*message.DHCPPortUpdate,
 		message.DHCPPortUpdate,
 		*message.DHCPPortFieldsUpdate,
 		message.DHCPPortFieldsUpdate,
 		*message.DHCPPortDelete,
-		message.DHCPPortDelete]
+		message.DHCPPortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
@@ -51,11 +53,14 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 			metadbmodel.DHCPPort,
 			*message.DHCPPortAdd,
 			message.DHCPPortAdd,
+			message.AddNoneAddition,
 			*message.DHCPPortUpdate,
 			message.DHCPPortUpdate,
 			*message.DHCPPortFieldsUpdate,
 			message.DHCPPortFieldsUpdate,
 			*message.DHCPPortDelete,
+			message.DHCPPortDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,

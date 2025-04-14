@@ -25,12 +25,14 @@ type NATGateway struct {
 	ResourcePubSubComponent[
 		*message.NATGatewayAdd,
 		message.NATGatewayAdd,
+		message.AddNoneAddition,
 		*message.NATGatewayUpdate,
 		message.NATGatewayUpdate,
 		*message.NATGatewayFieldsUpdate,
 		message.NATGatewayFieldsUpdate,
 		*message.NATGatewayDelete,
-		message.NATGatewayDelete]
+		message.NATGatewayDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATGateway() *NATGateway {
@@ -38,12 +40,14 @@ func NewNATGateway() *NATGateway {
 		ResourcePubSubComponent[
 			*message.NATGatewayAdd,
 			message.NATGatewayAdd,
+			message.AddNoneAddition,
 			*message.NATGatewayUpdate,
 			message.NATGatewayUpdate,
 			*message.NATGatewayFieldsUpdate,
 			message.NATGatewayFieldsUpdate,
 			*message.NATGatewayDelete,
 			message.NATGatewayDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATGateway),
 			resourceType:    common.RESOURCE_TYPE_NAT_GATEWAY_EN,

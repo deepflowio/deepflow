@@ -25,12 +25,14 @@ type VM struct {
 	ResourcePubSubComponent[
 		*message.VMAdd,
 		message.VMAdd,
+		message.AddNoneAddition,
 		*message.VMUpdate,
 		message.VMUpdate,
 		*message.VMFieldsUpdate,
 		message.VMFieldsUpdate,
 		*message.VMDelete,
-		message.VMDelete]
+		message.VMDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVM() *VM {
@@ -38,12 +40,14 @@ func NewVM() *VM {
 		ResourcePubSubComponent[
 			*message.VMAdd,
 			message.VMAdd,
+			message.AddNoneAddition,
 			*message.VMUpdate,
 			message.VMUpdate,
 			*message.VMFieldsUpdate,
 			message.VMFieldsUpdate,
 			*message.VMDelete,
 			message.VMDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVM),
 			resourceType:    common.RESOURCE_TYPE_VM_EN,

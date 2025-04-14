@@ -42,6 +42,6 @@ func (c *CEN) OnUpdaterUpdated(cloudItem *cloudmodel.CEN, diffBase *diffbase.CEN
 	diffBase.Update(cloudItem)
 }
 
-func (c *CEN) OnUpdaterDeleted(lcuuids []string) {
+func (c *CEN) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.CEN) {
 	c.cache.DeleteCENs(lcuuids)
 }

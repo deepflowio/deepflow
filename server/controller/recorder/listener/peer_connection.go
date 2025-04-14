@@ -42,6 +42,6 @@ func (c *PeerConnection) OnUpdaterUpdated(cloudItem *cloudmodel.PeerConnection, 
 	diffBase.Update(cloudItem)
 }
 
-func (c *PeerConnection) OnUpdaterDeleted(lcuuids []string) {
+func (c *PeerConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PeerConnection) {
 	c.cache.DeletePeerConnections(lcuuids)
 }

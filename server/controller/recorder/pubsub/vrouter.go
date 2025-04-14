@@ -25,12 +25,14 @@ type VRouter struct {
 	ResourcePubSubComponent[
 		*message.VRouterAdd,
 		message.VRouterAdd,
+		message.AddNoneAddition,
 		*message.VRouterUpdate,
 		message.VRouterUpdate,
 		*message.VRouterFieldsUpdate,
 		message.VRouterFieldsUpdate,
 		*message.VRouterDelete,
-		message.VRouterDelete]
+		message.VRouterDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVRouter() *VRouter {
@@ -38,12 +40,14 @@ func NewVRouter() *VRouter {
 		ResourcePubSubComponent[
 			*message.VRouterAdd,
 			message.VRouterAdd,
+			message.AddNoneAddition,
 			*message.VRouterUpdate,
 			message.VRouterUpdate,
 			*message.VRouterFieldsUpdate,
 			message.VRouterFieldsUpdate,
 			*message.VRouterDelete,
 			message.VRouterDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVRouter),
 			resourceType:    common.RESOURCE_TYPE_VROUTER_EN,

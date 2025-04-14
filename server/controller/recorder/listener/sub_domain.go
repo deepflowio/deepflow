@@ -42,6 +42,6 @@ func (sd *SubDomain) OnUpdaterUpdated(cloudItem *cloudmodel.SubDomain, diffBase 
 	diffBase.Update(cloudItem)
 }
 
-func (sd *SubDomain) OnUpdaterDeleted(lcuuids []string) {
+func (sd *SubDomain) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.SubDomain) {
 	sd.cache.DeleteSubDomains(lcuuids)
 }

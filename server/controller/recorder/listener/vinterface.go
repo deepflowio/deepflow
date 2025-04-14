@@ -42,6 +42,6 @@ func (i *VInterface) OnUpdaterUpdated(cloudItem *cloudmodel.VInterface, diffBase
 	i.cache.UpdateVInterface(cloudItem)
 }
 
-func (i *VInterface) OnUpdaterDeleted(lcuuids []string) {
+func (i *VInterface) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.VInterface) {
 	i.cache.DeleteVInterfaces(lcuuids)
 }

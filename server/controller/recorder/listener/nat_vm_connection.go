@@ -41,6 +41,6 @@ func (c *NATVMConnection) OnUpdaterAdded(addedDBItems []*metadbmodel.NATVMConnec
 func (c *NATVMConnection) OnUpdaterUpdated(cloudItem *cloudmodel.NATVMConnection, diffBase *diffbase.NATVMConnection) {
 }
 
-func (c *NATVMConnection) OnUpdaterDeleted(lcuuids []string) {
+func (c *NATVMConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.NATVMConnection) {
 	c.cache.DeleteNATVMConnections(lcuuids)
 }

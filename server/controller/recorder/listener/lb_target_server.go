@@ -42,6 +42,6 @@ func (l *LBTargetServer) OnUpdaterUpdated(cloudItem *cloudmodel.LBTargetServer, 
 	diffBase.Update(cloudItem)
 }
 
-func (l *LBTargetServer) OnUpdaterDeleted(lcuuids []string) {
+func (l *LBTargetServer) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.LBTargetServer) {
 	l.cache.DeleteLBTargetServers(lcuuids)
 }

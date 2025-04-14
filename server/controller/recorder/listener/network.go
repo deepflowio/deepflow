@@ -43,6 +43,6 @@ func (n *Network) OnUpdaterUpdated(cloudItem *cloudmodel.Network, diffBase *diff
 	n.cache.UpdateNetwork(cloudItem)
 }
 
-func (n *Network) OnUpdaterDeleted(lcuuids []string) {
+func (n *Network) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Network) {
 	n.cache.DeleteNetworks(lcuuids)
 }

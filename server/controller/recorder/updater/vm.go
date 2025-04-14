@@ -39,12 +39,14 @@ type VM struct {
 		metadbmodel.VM,
 		*message.VMAdd,
 		message.VMAdd,
+		message.AddNoneAddition,
 		*message.VMUpdate,
 		message.VMUpdate,
 		*message.VMFieldsUpdate,
 		message.VMFieldsUpdate,
 		*message.VMDelete,
-		message.VMDelete]
+		message.VMDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
@@ -56,11 +58,14 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 			metadbmodel.VM,
 			*message.VMAdd,
 			message.VMAdd,
+			message.AddNoneAddition,
 			*message.VMUpdate,
 			message.VMUpdate,
 			*message.VMFieldsUpdate,
 			message.VMFieldsUpdate,
 			*message.VMDelete,
+			message.VMDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,

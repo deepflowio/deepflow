@@ -42,6 +42,6 @@ func (c *PodCluster) OnUpdaterUpdated(cloudItem *cloudmodel.PodCluster, diffBase
 	diffBase.Update(cloudItem)
 }
 
-func (c *PodCluster) OnUpdaterDeleted(lcuuids []string) {
+func (c *PodCluster) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodCluster) {
 	c.cache.DeletePodClusters(lcuuids)
 }

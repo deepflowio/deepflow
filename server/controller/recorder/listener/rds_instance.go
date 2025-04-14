@@ -43,6 +43,6 @@ func (r *RDSInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RDSInstance, diffBa
 	r.cache.UpdateRDSInstance(cloudItem)
 }
 
-func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string) {
+func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.RDSInstance) {
 	r.cache.DeleteRDSInstances(lcuuids)
 }

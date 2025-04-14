@@ -34,12 +34,14 @@ type PodReplicaSet struct {
 		metadbmodel.PodReplicaSet,
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
+		message.AddNoneAddition,
 		*message.PodReplicaSetUpdate,
 		message.PodReplicaSetUpdate,
 		*message.PodReplicaSetFieldsUpdate,
 		message.PodReplicaSetFieldsUpdate,
 		*message.PodReplicaSetDelete,
-		message.PodReplicaSetDelete]
+		message.PodReplicaSetDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplicaSet) *PodReplicaSet {
@@ -51,11 +53,14 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 			metadbmodel.PodReplicaSet,
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
+			message.AddNoneAddition,
 			*message.PodReplicaSetUpdate,
 			message.PodReplicaSetUpdate,
 			*message.PodReplicaSetFieldsUpdate,
 			message.PodReplicaSetFieldsUpdate,
 			*message.PodReplicaSetDelete,
+			message.PodReplicaSetDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			wholeCache,

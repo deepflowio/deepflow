@@ -37,12 +37,14 @@ type PodNamespace struct {
 		metadbmodel.PodNamespace,
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
+		message.AddNoneAddition,
 		*message.PodNamespaceUpdate,
 		message.PodNamespaceUpdate,
 		*message.PodNamespaceFieldsUpdate,
 		message.PodNamespaceFieldsUpdate,
 		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete]
+		message.PodNamespaceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespace) *PodNamespace {
@@ -54,11 +56,14 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 			metadbmodel.PodNamespace,
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
+			message.AddNoneAddition,
 			*message.PodNamespaceUpdate,
 			message.PodNamespaceUpdate,
 			*message.PodNamespaceFieldsUpdate,
 			message.PodNamespaceFieldsUpdate,
 			*message.PodNamespaceDelete,
+			message.PodNamespaceDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			wholeCache,

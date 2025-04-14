@@ -43,6 +43,6 @@ func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, d
 	ri.cache.UpdateRedisInstance(cloudItem)
 }
 
-func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string) {
+func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.RedisInstance) {
 	ri.cache.DeleteRedisInstances(lcuuids)
 }

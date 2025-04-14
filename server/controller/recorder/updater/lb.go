@@ -34,12 +34,14 @@ type LB struct {
 		metadbmodel.LB,
 		*message.LBAdd,
 		message.LBAdd,
+		message.AddNoneAddition,
 		*message.LBUpdate,
 		message.LBUpdate,
 		*message.LBFieldsUpdate,
 		message.LBFieldsUpdate,
 		*message.LBDelete,
-		message.LBDelete]
+		message.LBDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
@@ -51,11 +53,14 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 			metadbmodel.LB,
 			*message.LBAdd,
 			message.LBAdd,
+			message.AddNoneAddition,
 			*message.LBUpdate,
 			message.LBUpdate,
 			*message.LBFieldsUpdate,
 			message.LBFieldsUpdate,
 			*message.LBDelete,
+			message.LBDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,

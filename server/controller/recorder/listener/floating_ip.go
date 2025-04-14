@@ -42,6 +42,6 @@ func (f *FloatingIP) OnUpdaterUpdated(cloudItem *cloudmodel.FloatingIP, diffBase
 	diffBase.Update(cloudItem)
 }
 
-func (f *FloatingIP) OnUpdaterDeleted(lcuuids []string) {
+func (f *FloatingIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.FloatingIP) {
 	f.cache.DeleteFloatingIPs(lcuuids)
 }

@@ -43,6 +43,6 @@ func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBas
 	ps.cache.UpdatePodService(cloudItem)
 }
 
-func (ps *PodService) OnUpdaterDeleted(lcuuids []string) {
+func (ps *PodService) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodService) {
 	ps.cache.DeletePodServices(lcuuids)
 }

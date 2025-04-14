@@ -25,12 +25,14 @@ type LBVMConnection struct {
 	ResourcePubSubComponent[
 		*message.LBVMConnectionAdd,
 		message.LBVMConnectionAdd,
+		message.AddNoneAddition,
 		*message.LBVMConnectionUpdate,
 		message.LBVMConnectionUpdate,
 		*message.LBVMConnectionFieldsUpdate,
 		message.LBVMConnectionFieldsUpdate,
 		*message.LBVMConnectionDelete,
-		message.LBVMConnectionDelete]
+		message.LBVMConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBVMConnection() *LBVMConnection {
@@ -38,12 +40,14 @@ func NewLBVMConnection() *LBVMConnection {
 		ResourcePubSubComponent[
 			*message.LBVMConnectionAdd,
 			message.LBVMConnectionAdd,
+			message.AddNoneAddition,
 			*message.LBVMConnectionUpdate,
 			message.LBVMConnectionUpdate,
 			*message.LBVMConnectionFieldsUpdate,
 			message.LBVMConnectionFieldsUpdate,
 			*message.LBVMConnectionDelete,
 			message.LBVMConnectionDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBVMConnection),
 			resourceType:    common.RESOURCE_TYPE_LB_VM_CONNECTION_EN,

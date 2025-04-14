@@ -34,12 +34,14 @@ type LBVMConnection struct {
 		metadbmodel.LBVMConnection,
 		*message.LBVMConnectionAdd,
 		message.LBVMConnectionAdd,
+		message.AddNoneAddition,
 		*message.LBVMConnectionUpdate,
 		message.LBVMConnectionUpdate,
 		*message.LBVMConnectionFieldsUpdate,
 		message.LBVMConnectionFieldsUpdate,
 		*message.LBVMConnectionDelete,
-		message.LBVMConnectionDelete]
+		message.LBVMConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
@@ -51,11 +53,14 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 			metadbmodel.LBVMConnection,
 			*message.LBVMConnectionAdd,
 			message.LBVMConnectionAdd,
+			message.AddNoneAddition,
 			*message.LBVMConnectionUpdate,
 			message.LBVMConnectionUpdate,
 			*message.LBVMConnectionFieldsUpdate,
 			message.LBVMConnectionFieldsUpdate,
 			*message.LBVMConnectionDelete,
+			message.LBVMConnectionDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
