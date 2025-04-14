@@ -64,11 +64,10 @@ pub(super) fn bench(c: &mut Criterion) {
     });
     c.bench_function("parse_http_v1_log", |b| {
         b.iter_custom(|iters| {
-            let capture = Capture::load_pcap(
-                Path::new("./resources/test/flow_generator/http/httpv1.pcap"),
-                None,
-            );
-            let mut packets = capture.as_meta_packets();
+            let capture = Capture::load_pcap(Path::new(
+                "./resources/test/flow_generator/http/httpv1.pcap",
+            ));
+            let mut packets = capture.collect::<Vec<_>>();
             if packets.len() < 2 {
                 panic!("unable to load pcap file");
             }

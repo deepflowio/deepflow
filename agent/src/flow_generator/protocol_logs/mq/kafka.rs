@@ -1581,9 +1581,9 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/kafka";
 
     fn run(name: &str) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let mut packets = capture.as_meta_packets();
+        let mut packets = capture.collect::<Vec<_>>();
         if packets.is_empty() {
             return "".to_string();
         }
@@ -1706,8 +1706,8 @@ mod tests {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
         let mut kafka = KafkaLog::default();
 
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
+        let mut packets = capture.collect::<Vec<_>>();
 
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {

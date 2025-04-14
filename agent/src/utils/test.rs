@@ -14,58 +14,120 @@
  * limitations under the License.
  */
 
+use std::net::IpAddr;
 use std::path::Path;
 use std::time::Duration;
 
-use pcap::{self, PacketHeader};
+use pcap::{self, Linktype};
 
 use crate::common::meta_packet::MetaPacket;
 
-pub struct Capture(Vec<(PacketHeader, Vec<u8>)>);
+pub struct Capture {
+    cap: pcap::Capture<pcap::Offline>,
+    dl_type: Linktype,
+}
 
 impl Capture {
-    pub fn load_pcap<P: AsRef<Path>>(path: P, parse_len: Option<usize>) -> Self {
-        let parse_len = parse_len.unwrap_or(1500);
-        let mut packets = vec![];
-        let mut capture = pcap::Capture::from_file(path).unwrap();
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        while let Ok(packet) = capture.next() {
-            packets.push((
-                packet.header.clone(),
-                Vec::from(&packet.data[..packet.data.len().min(parse_len)]),
-            ));
-        }
-        #[cfg(target_os = "windows")]
-        while let Ok(packet) = capture.next_packet() {
-            packets.push((
-                packet.header.clone(),
-                Vec::from(&packet.data[..packet.data.len().min(parse_len)]),
-            ));
-        }
-        Self(packets)
+    pub fn load_pcap<P: AsRef<Path>>(path: P) -> Self {
+        let cap = pcap::Capture::from_file(path).unwrap();
+        let dl_type = cap.get_datalink();
+        Self { cap, dl_type }
     }
 
-    pub fn as_meta_packets(&self) -> Vec<MetaPacket<'_>> {
-        self.0
-            .iter()
-            .map(|(h, p)| {
+    fn build_meta_packet(dl_type: Linktype, packet: &pcap::Packet) -> Option<MetaPacket<'static>> {
+        match dl_type {
+            Linktype::ETHERNET => {
                 let mut meta = MetaPacket::empty();
                 meta.update(
-                    p.as_ref(),
+                    packet.data.to_vec(),
                     true,
                     true,
-                    Duration::new(h.ts.tv_sec as u64, h.ts.tv_usec as u32 * 1000),
+                    Duration::new(
+                        packet.header.ts.tv_sec as u64,
+                        packet.header.ts.tv_usec as u32 * 1000,
+                    ),
                     0,
                 )
                 .unwrap();
-                meta
-            })
-            .collect()
+                Some(meta)
+            }
+            Linktype::LINUX_SLL => {
+                let mut meta = MetaPacket::empty();
+                meta.update(
+                    // remove 2 bytes to fake ethernet header
+                    &packet.data[2..],
+                    true,
+                    true,
+                    Duration::new(
+                        packet.header.ts.tv_sec as u64,
+                        packet.header.ts.tv_usec as u32 * 1000,
+                    ),
+                    0,
+                )
+                .unwrap();
+
+                // fake mac with ip
+                let mut data = (&packet.data[2..]).to_vec();
+                (&mut data[0..12]).fill(0);
+                match meta.lookup_key.dst_ip {
+                    IpAddr::V4(ip) => {
+                        data[0..4].copy_from_slice(&ip.octets());
+                    }
+                    IpAddr::V6(ip) => {
+                        data[0..6].copy_from_slice(&ip.octets()[0..6]);
+                    }
+                }
+                match meta.lookup_key.src_ip {
+                    IpAddr::V4(ip) => {
+                        data[6..10].copy_from_slice(&ip.octets());
+                    }
+                    IpAddr::V6(ip) => {
+                        data[6..12].copy_from_slice(&ip.octets()[0..6]);
+                    }
+                }
+                let mut meta = MetaPacket::empty();
+                meta.update(
+                    data,
+                    true,
+                    true,
+                    Duration::new(
+                        packet.header.ts.tv_sec as u64,
+                        packet.header.ts.tv_usec as u32 * 1000,
+                    ),
+                    0,
+                )
+                .unwrap();
+                Some(meta)
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Iterator for Capture {
+    type Item = MetaPacket<'static>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        while let Ok(packet) = self.cap.next() {
+            if let Some(meta) = Self::build_meta_packet(self.dl_type, &packet) {
+                return Some(meta);
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        while let Ok(packet) = self.cap.next_packet() {
+            if let Some(meta) = self.build_meta_packet(&packet) {
+                return Some(meta);
+            }
+        }
+
+        None
     }
 }
 
 impl From<Capture> for Vec<Vec<u8>> {
     fn from(c: Capture) -> Self {
-        c.0.into_iter().map(|(_, p)| p).collect()
+        c.into_iter().map(|p| p.raw.unwrap().to_vec()).collect()
     }
 }

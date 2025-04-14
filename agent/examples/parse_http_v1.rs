@@ -32,12 +32,11 @@ fn main() {
         .parse()
         .unwrap_or(1024);
 
-    let capture = Capture::load_pcap(
-        Path::new("./resources/test/flow_generator/http/httpv1.pcap"),
-        None,
-    );
+    let capture = Capture::load_pcap(Path::new(
+        "./resources/test/flow_generator/http/httpv1.pcap",
+    ));
     let log_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
-    let mut packets = capture.as_meta_packets();
+    let mut packets = capture.collect::<Vec<_>>();
     if packets.len() < 2 {
         panic!("unable to load pcap file");
     }
