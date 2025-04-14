@@ -228,6 +228,11 @@ func (c *ControllerCheck) vtapControllerCheck() {
 	ipMap, err := getIPMap(common.HOST_TYPE_CONTROLLER)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	if len(ipMap) == 0 {
+		log.Info("no controller in DB, do nothing")
+		return
 	}
 
 	if err := mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {

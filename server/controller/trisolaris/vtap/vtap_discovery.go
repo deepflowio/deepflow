@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -178,7 +179,13 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	}
 	dbVTap.ID = ids[0]
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(dbVTap).Error; err != nil {
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "ctrl_ip"},
+				{Name: "ctrl_mac"},
+			},
+			DoNothing: true,
+		}).Create(dbVTap).Error; err != nil {
 			log.Errorf("insert agent(%s) to DB faild, err: %s", r, err)
 			errID := idmng.ReleaseIDs(RESOURCE_TYPE_VTAP_EN, ids)
 			if errID != nil {
