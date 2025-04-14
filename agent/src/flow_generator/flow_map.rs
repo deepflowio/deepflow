@@ -1983,11 +1983,15 @@ impl FlowMap {
             self.tagged_flow_allocator
                 .allocate_one_with(node.tagged_flow.clone()),
         );
+        let flow_id = tagged_flow.flow.flow_id;
+
         self.flush_l7_perf_stats(collect_stats, tagged_flow.clone());
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
+        self.perf_cache.borrow_mut().remove(&flow_id);
+
         self.flow_node_pool.put(node);
     }
 
