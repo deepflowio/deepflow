@@ -332,11 +332,53 @@ pub struct LogCache {
     pub multi_merge_info: Option<(bool, bool, bool)>,
 }
 
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct LogCacheKey(pub u128);
+
+impl LogCacheKey {
+    pub fn new(param: &ParseParam, session_id: Option<u32>) -> Self {
+        /*
+            if session id is some: flow id 64bit | 0 32bit | session id 32bit
+            if session id is none: flow id 64bit | packet_seq 64bit
+        */
+        let key = match session_id {
+            Some(sid) => ((param.flow_id as u128) << 64) | sid as u128,
+            None => {
+                ((param.flow_id as u128) << 64)
+                    | (if param.ebpf_type != EbpfType::None {
+                        // NOTE:
+                        //   In the request-log session aggregation process, for eBPF data, we require that requests and
+                        // responses have consecutive cap_seq to ensure the correctness of session aggregation. However,
+                        // when SR (Segmentation-Reassembly) is enabled, we combine multiple eBPF socket event events
+                        // before parsing the protocol. Therefore, in order to ensure that session aggregation can still
+                        // be performed correctly, we need to retain the cap_seq of the last request and the cap_seq of
+                        // the first response, so that the cap_seq of the request and response can still be consecutive.
+                        if param.direction == PacketDirection::ClientToServer {
+                            param.packet_end_seq + 1
+                        } else {
+                            param.packet_start_seq
+                        }
+                    } else {
+                        0
+                    }) as u128
+            }
+        };
+
+        Self(key)
+    }
+
+    fn flow_id(&self) -> u64 {
+        (self.0 >> 64) as u64
+    }
+}
+
 pub struct L7PerfCache {
     // lru cache previous rrt
-    pub rrt_cache: LruCache<u128, LogCache>,
+    pub rrt_cache: LruCache<LogCacheKey, LogCache>,
     // LruCache<flow_id, (in_cache_req, count)>
     pub timeout_cache: LruCache<u64, (usize, usize)>,
+    // LruCache<flow_id, LruCache<LogCacheKey, bool>>
+    pub flow_id_map: LruCache<u64, LruCache<LogCacheKey, bool>>,
     // time in microseconds
     pub last_log_time: u64,
 }
@@ -344,16 +386,19 @@ pub struct L7PerfCache {
 impl L7PerfCache {
     // 60 seconds
     const LOG_INTERVAL: u64 = 60_000_000;
+    // When the number of concurrent transactions exceeds this value, the RRT calculation error will occur.
+    const MAX_RRT_CACHE_PER_FLOW: usize = 128;
 
     pub fn new(cap: usize) -> Self {
         L7PerfCache {
             rrt_cache: LruCache::new(cap.try_into().unwrap()),
             timeout_cache: LruCache::new(cap.try_into().unwrap()),
+            flow_id_map: LruCache::new(cap.try_into().unwrap()),
             last_log_time: 0,
         }
     }
 
-    pub fn put(&mut self, key: u128, value: LogCache) -> Option<LogCache> {
+    pub fn put(&mut self, key: LogCacheKey, value: LogCache) -> Option<LogCache> {
         let now = value.time;
         if self.rrt_cache.len() >= usize::from(self.rrt_cache.cap())
             && self.last_log_time + Self::LOG_INTERVAL < now
@@ -361,7 +406,40 @@ impl L7PerfCache {
             self.last_log_time = now;
             debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
         }
+        if let Some((old, _)) = self
+            .flow_id_map
+            .get_or_insert_mut(key.flow_id(), || {
+                let mut cache = LruCache::new(Self::MAX_RRT_CACHE_PER_FLOW.try_into().unwrap());
+                cache.put(key.clone(), true);
+                cache
+            })
+            .push(key.clone(), true)
+        {
+            // Another cache entry is removed due to the lru's capacity.
+            if key != old {
+                self.rrt_cache.pop(&old);
+                if self.last_log_time + Self::LOG_INTERVAL < now {
+                    self.last_log_time = now;
+                    debug!(
+                        "The capacity({}) of the flow id table will be exceeded, flow id: {}",
+                        Self::MAX_RRT_CACHE_PER_FLOW,
+                        old.flow_id()
+                    );
+                }
+            }
+        }
         self.rrt_cache.put(key, value)
+    }
+
+    pub fn pop(&mut self, key: LogCacheKey) -> Option<LogCache> {
+        if let Some(cache) = self.flow_id_map.get_mut(&key.flow_id()) {
+            cache.pop(&key);
+
+            if cache.is_empty() {
+                self.flow_id_map.pop(&key.flow_id());
+            }
+        }
+        self.rrt_cache.pop(&key)
     }
 
     pub fn pop_timeout_count(&mut self, flow_id: &u64, flow_end: bool) -> usize {
@@ -371,6 +449,22 @@ impl L7PerfCache {
         } else {
             self.timeout_cache.put(*flow_id, (in_cache, 0));
             t
+        }
+    }
+
+    pub fn get_or_insert_mut(&mut self, flow_id: u64) -> &mut (usize, usize) {
+        self.timeout_cache.get_or_insert_mut(flow_id, || (0, 0))
+    }
+
+    pub fn remove(&mut self, flow_id: &u64) {
+        self.timeout_cache.pop(flow_id);
+
+        let Some(keys) = self.flow_id_map.pop(flow_id) else {
+            return;
+        };
+
+        for (key, _) in keys {
+            self.rrt_cache.pop(&key);
         }
     }
 }
