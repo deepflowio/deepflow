@@ -25,12 +25,14 @@ type PodNamespace struct {
 	ResourcePubSubComponent[
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
+		message.AddNoneAddition,
 		*message.PodNamespaceUpdate,
 		message.PodNamespaceUpdate,
 		*message.PodNamespaceFieldsUpdate,
 		message.PodNamespaceFieldsUpdate,
 		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete]
+		message.PodNamespaceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodNamespace() *PodNamespace {
@@ -38,12 +40,14 @@ func NewPodNamespace() *PodNamespace {
 		ResourcePubSubComponent[
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
+			message.AddNoneAddition,
 			*message.PodNamespaceUpdate,
 			message.PodNamespaceUpdate,
 			*message.PodNamespaceFieldsUpdate,
 			message.PodNamespaceFieldsUpdate,
 			*message.PodNamespaceDelete,
 			message.PodNamespaceDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodNamespace),
 			resourceType:    common.RESOURCE_TYPE_POD_NAMESPACE_EN,

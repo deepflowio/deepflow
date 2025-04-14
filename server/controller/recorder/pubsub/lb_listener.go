@@ -25,12 +25,14 @@ type LBListener struct {
 	ResourcePubSubComponent[
 		*message.LBListenerAdd,
 		message.LBListenerAdd,
+		message.AddNoneAddition,
 		*message.LBListenerUpdate,
 		message.LBListenerUpdate,
 		*message.LBListenerFieldsUpdate,
 		message.LBListenerFieldsUpdate,
 		*message.LBListenerDelete,
-		message.LBListenerDelete]
+		message.LBListenerDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBListener() *LBListener {
@@ -38,12 +40,14 @@ func NewLBListener() *LBListener {
 		ResourcePubSubComponent[
 			*message.LBListenerAdd,
 			message.LBListenerAdd,
+			message.AddNoneAddition,
 			*message.LBListenerUpdate,
 			message.LBListenerUpdate,
 			*message.LBListenerFieldsUpdate,
 			message.LBListenerFieldsUpdate,
 			*message.LBListenerDelete,
 			message.LBListenerDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBListener),
 			resourceType:    common.RESOURCE_TYPE_LB_LISTENER_EN,

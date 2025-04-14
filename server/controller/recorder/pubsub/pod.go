@@ -25,12 +25,14 @@ type Pod struct {
 	ResourcePubSubComponent[
 		*message.PodAdd,
 		message.PodAdd,
+		message.AddNoneAddition,
 		*message.PodUpdate,
 		message.PodUpdate,
 		*message.PodFieldsUpdate,
 		message.PodFieldsUpdate,
 		*message.PodDelete,
-		message.PodDelete]
+		message.PodDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPod() *Pod {
@@ -38,12 +40,14 @@ func NewPod() *Pod {
 		ResourcePubSubComponent[
 			*message.PodAdd,
 			message.PodAdd,
+			message.AddNoneAddition,
 			*message.PodUpdate,
 			message.PodUpdate,
 			*message.PodFieldsUpdate,
 			message.PodFieldsUpdate,
 			*message.PodDelete,
 			message.PodDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePod),
 			resourceType:    common.RESOURCE_TYPE_POD_EN,

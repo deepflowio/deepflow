@@ -42,6 +42,6 @@ func (i *PodIngress) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngress, diffBase
 	diffBase.Update(cloudItem)
 }
 
-func (i *PodIngress) OnUpdaterDeleted(lcuuids []string) {
+func (i *PodIngress) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodIngress) {
 	i.cache.DeletePodIngresses(lcuuids)
 }

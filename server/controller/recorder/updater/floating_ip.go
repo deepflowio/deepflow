@@ -35,12 +35,14 @@ type FloatingIP struct {
 		mysqlmodel.FloatingIP,
 		*message.FloatingIPAdd,
 		message.FloatingIPAdd,
+		message.AddNoneAddition,
 		*message.FloatingIPUpdate,
 		message.FloatingIPUpdate,
 		*message.FloatingIPFieldsUpdate,
 		message.FloatingIPFieldsUpdate,
 		*message.FloatingIPDelete,
-		message.FloatingIPDelete]
+		message.FloatingIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *FloatingIP {
@@ -52,11 +54,14 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 			mysqlmodel.FloatingIP,
 			*message.FloatingIPAdd,
 			message.FloatingIPAdd,
+			message.AddNoneAddition,
 			*message.FloatingIPUpdate,
 			message.FloatingIPUpdate,
 			*message.FloatingIPFieldsUpdate,
 			message.FloatingIPFieldsUpdate,
 			*message.FloatingIPDelete,
+			message.FloatingIPDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,

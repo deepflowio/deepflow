@@ -35,12 +35,14 @@ type VPC struct {
 		mysqlmodel.VPC,
 		*message.VPCAdd,
 		message.VPCAdd,
+		message.AddNoneAddition,
 		*message.VPCUpdate,
 		message.VPCUpdate,
 		*message.VPCFieldsUpdate,
 		message.VPCFieldsUpdate,
 		*message.VPCDelete,
-		message.VPCDelete]
+		message.VPCDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
@@ -52,11 +54,14 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			mysqlmodel.VPC,
 			*message.VPCAdd,
 			message.VPCAdd,
+			message.AddNoneAddition,
 			*message.VPCUpdate,
 			message.VPCUpdate,
 			*message.VPCFieldsUpdate,
 			message.VPCFieldsUpdate,
 			*message.VPCDelete,
+			message.VPCDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,

@@ -48,7 +48,7 @@ func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, d
 	ri.cache.UpdateRedisInstance(cloudItem)
 }
 
-func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string) {
+func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.RedisInstance) {
 	ri.eventProducer.ProduceByDelete(lcuuids)
 	ri.cache.DeleteRedisInstances(lcuuids)
 }

@@ -42,6 +42,6 @@ func (rt *RoutingTable) OnUpdaterUpdated(cloudItem *cloudmodel.RoutingTable, dif
 	diffBase.Update(cloudItem)
 }
 
-func (rt *RoutingTable) OnUpdaterDeleted(lcuuids []string) {
+func (rt *RoutingTable) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.RoutingTable) {
 	rt.cache.DeleteRoutingTables(lcuuids)
 }

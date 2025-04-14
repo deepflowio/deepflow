@@ -49,7 +49,7 @@ func (p *DHCPPort) OnUpdaterUpdated(cloudItem *cloudmodel.DHCPPort, diffBase *di
 	p.cache.UpdateDHCPPort(cloudItem)
 }
 
-func (p *DHCPPort) OnUpdaterDeleted(lcuuids []string) {
+func (p *DHCPPort) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.DHCPPort) {
 	p.eventProducer.ProduceByDelete(lcuuids)
 	p.cache.DeleteDHCPPorts(lcuuids)
 }

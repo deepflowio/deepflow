@@ -34,12 +34,14 @@ type LBListener struct {
 		mysqlmodel.LBListener,
 		*message.LBListenerAdd,
 		message.LBListenerAdd,
+		message.AddNoneAddition,
 		*message.LBListenerUpdate,
 		message.LBListenerUpdate,
 		*message.LBListenerFieldsUpdate,
 		message.LBListenerFieldsUpdate,
 		*message.LBListenerDelete,
-		message.LBListenerDelete]
+		message.LBListenerDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *LBListener {
@@ -51,11 +53,14 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 			mysqlmodel.LBListener,
 			*message.LBListenerAdd,
 			message.LBListenerAdd,
+			message.AddNoneAddition,
 			*message.LBListenerUpdate,
 			message.LBListenerUpdate,
 			*message.LBListenerFieldsUpdate,
 			message.LBListenerFieldsUpdate,
 			*message.LBListenerDelete,
+			message.LBListenerDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,

@@ -25,12 +25,14 @@ type FloatingIP struct {
 	ResourcePubSubComponent[
 		*message.FloatingIPAdd,
 		message.FloatingIPAdd,
+		message.AddNoneAddition,
 		*message.FloatingIPUpdate,
 		message.FloatingIPUpdate,
 		*message.FloatingIPFieldsUpdate,
 		message.FloatingIPFieldsUpdate,
 		*message.FloatingIPDelete,
-		message.FloatingIPDelete]
+		message.FloatingIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewFloatingIP() *FloatingIP {
@@ -38,12 +40,14 @@ func NewFloatingIP() *FloatingIP {
 		ResourcePubSubComponent[
 			*message.FloatingIPAdd,
 			message.FloatingIPAdd,
+			message.AddNoneAddition,
 			*message.FloatingIPUpdate,
 			message.FloatingIPUpdate,
 			*message.FloatingIPFieldsUpdate,
 			message.FloatingIPFieldsUpdate,
 			*message.FloatingIPDelete,
 			message.FloatingIPDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeFloatingIP),
 			resourceType:    common.RESOURCE_TYPE_FLOATING_IP_EN,

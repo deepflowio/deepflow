@@ -49,7 +49,7 @@ func (g *NATGateway) OnUpdaterUpdated(cloudItem *cloudmodel.NATGateway, diffBase
 	g.cache.UpdateNATGateway(cloudItem)
 }
 
-func (g *NATGateway) OnUpdaterDeleted(lcuuids []string) {
+func (g *NATGateway) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.NATGateway) {
 	g.eventProducer.ProduceByDelete(lcuuids)
 	g.cache.DeleteNATGateways(lcuuids)
 }

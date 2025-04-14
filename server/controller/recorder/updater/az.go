@@ -34,12 +34,14 @@ type AZ struct {
 		mysqlmodel.AZ,
 		*message.AZAdd,
 		message.AZAdd,
+		message.AddNoneAddition,
 		*message.AZUpdate,
 		message.AZUpdate,
 		*message.AZFieldsUpdate,
 		message.AZFieldsUpdate,
 		*message.AZDelete,
-		message.AZDelete]
+		message.AZDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
@@ -51,11 +53,14 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 			mysqlmodel.AZ,
 			*message.AZAdd,
 			message.AZAdd,
+			message.AddNoneAddition,
 			*message.AZUpdate,
 			message.AZUpdate,
 			*message.AZFieldsUpdate,
 			message.AZFieldsUpdate,
 			*message.AZDelete,
+			message.AZDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,

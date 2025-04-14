@@ -34,12 +34,14 @@ type PodCluster struct {
 		mysqlmodel.PodCluster,
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
+		message.AddNoneAddition,
 		*message.PodClusterUpdate,
 		message.PodClusterUpdate,
 		*message.PodClusterFieldsUpdate,
 		message.PodClusterFieldsUpdate,
 		*message.PodClusterDelete,
-		message.PodClusterDelete]
+		message.PodClusterDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *PodCluster {
@@ -51,11 +53,14 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 			mysqlmodel.PodCluster,
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
+			message.AddNoneAddition,
 			*message.PodClusterUpdate,
 			message.PodClusterUpdate,
 			*message.PodClusterFieldsUpdate,
 			message.PodClusterFieldsUpdate,
 			*message.PodClusterDelete,
+			message.PodClusterDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			wholeCache,

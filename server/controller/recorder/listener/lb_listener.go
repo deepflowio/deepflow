@@ -42,6 +42,6 @@ func (l *LBListener) OnUpdaterUpdated(cloudItem *cloudmodel.LBListener, diffBase
 	diffBase.Update(cloudItem)
 }
 
-func (l *LBListener) OnUpdaterDeleted(lcuuids []string) {
+func (l *LBListener) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.LBListener) {
 	l.cache.DeleteLBListeners(lcuuids)
 }

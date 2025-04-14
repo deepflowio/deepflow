@@ -42,6 +42,6 @@ func (p *PodGroup) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroup, diffBase *di
 	diffBase.Update(cloudItem)
 }
 
-func (p *PodGroup) OnUpdaterDeleted(lcuuids []string) {
+func (p *PodGroup) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroup) {
 	p.cache.DeletePodGroups(lcuuids)
 }

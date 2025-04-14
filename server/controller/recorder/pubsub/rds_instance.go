@@ -25,12 +25,14 @@ type RDSInstance struct {
 	ResourcePubSubComponent[
 		*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
+		message.AddNoneAddition,
 		*message.RDSInstanceUpdate,
 		message.RDSInstanceUpdate,
 		*message.RDSInstanceFieldsUpdate,
 		message.RDSInstanceFieldsUpdate,
 		*message.RDSInstanceDelete,
-		message.RDSInstanceDelete]
+		message.RDSInstanceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRDSInstance() *RDSInstance {
@@ -38,12 +40,14 @@ func NewRDSInstance() *RDSInstance {
 		ResourcePubSubComponent[
 			*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
+			message.AddNoneAddition,
 			*message.RDSInstanceUpdate,
 			message.RDSInstanceUpdate,
 			*message.RDSInstanceFieldsUpdate,
 			message.RDSInstanceFieldsUpdate,
 			*message.RDSInstanceDelete,
 			message.RDSInstanceDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRDSInstance),
 			resourceType:    common.RESOURCE_TYPE_RDS_INSTANCE_EN,

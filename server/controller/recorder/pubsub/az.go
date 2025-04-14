@@ -25,12 +25,14 @@ type AZ struct {
 	ResourcePubSubComponent[
 		*message.AZAdd,
 		message.AZAdd,
+		message.AddNoneAddition,
 		*message.AZUpdate,
 		message.AZUpdate,
 		*message.AZFieldsUpdate,
 		message.AZFieldsUpdate,
 		*message.AZDelete,
-		message.AZDelete]
+		message.AZDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewAZ() *AZ {
@@ -38,12 +40,14 @@ func NewAZ() *AZ {
 		ResourcePubSubComponent[
 			*message.AZAdd,
 			message.AZAdd,
+			message.AddNoneAddition,
 			*message.AZUpdate,
 			message.AZUpdate,
 			*message.AZFieldsUpdate,
 			message.AZFieldsUpdate,
 			*message.AZDelete,
 			message.AZDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeAZ),
 			resourceType:    common.RESOURCE_TYPE_AZ_EN,

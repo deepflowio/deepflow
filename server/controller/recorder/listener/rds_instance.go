@@ -48,7 +48,7 @@ func (r *RDSInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RDSInstance, diffBa
 	r.cache.UpdateRDSInstance(cloudItem)
 }
 
-func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string) {
+func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.RDSInstance) {
 	r.eventProducer.ProduceByDelete(lcuuids)
 	r.cache.DeleteRDSInstances(lcuuids)
 }

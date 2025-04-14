@@ -68,24 +68,28 @@ type DomainPubSub interface {
 }
 
 const (
-	TopicResourceChanged              = iota // subscribe to this topic to get notification of resource changed
-	TopicResourceBatchAddedMySQL             // subscribe to this topic to get MySQL model data of resource batch added
-	TopicResourceUpdatedFields               // subscribe to this topic to get message update model data of resource updated
-	TopicResourceUpdatedMessageUpdate        // subscribe to this topic to get message update model data of resource updated
-	TopicResourceBatchDeletedLcuuid          // subscribe to this topic to get lcuuids of resource batch deleted
-	TopicResourceBatchDeletedMySQL           // subscribe to this topic to get MySQL model data of resource batch deleted
+	TopicResourceChanged             = iota // subscribe to this topic to get notification of resource changed
+	TopicResourceBatchAddedMessage          // subscribe to this topic to get message add model data of resource batch added
+	TopicResourceBatchAddedMySQL            // subscribe to this topic to get MySQL model data of resource batch added
+	TopicResourceUpdatedFields              // subscribe to this topic to get message update model data of resource updated
+	TopicResourceUpdatedMessage             // subscribe to this topic to get message update model data of resource updated
+	TopicResourceBatchDeletedLcuuid         // subscribe to this topic to get lcuuids of resource batch deleted
+	TopicResourceBatchDeletedMySQL          // subscribe to this topic to get MySQL model data of resource batch deleted
+	TopicResourceBatchDeletedMessage        // subscribe to this topic to get message delete model data of resource batch deleted
 )
 
 // Pubsub interface for a specific resource
 type ResourcePubSub[
 	MAPT constraint.AddPtr[MAT],
 	MAT constraint.Add,
+	MAAT message.AddAddition,
 	MUPT constraint.UpdatePtr[MUT],
 	MUT constraint.Update,
 	MFUPT constraint.FieldsUpdatePtr[MFUT],
 	MFUT constraint.FieldsUpdate,
 	MDPT constraint.DeletePtr[MDT],
 	MDT constraint.Delete,
+	MDAT message.DeleteAddition,
 ] interface {
 	PubSub
 	PublishChange(*message.Metadata)             // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
@@ -97,18 +101,20 @@ type ResourcePubSub[
 type ResourcePubSubComponent[
 	MAPT constraint.AddPtr[MAT],
 	MAT constraint.Add,
+	MAAT message.AddAddition,
 	MUPT constraint.UpdatePtr[MUT],
 	MUT constraint.Update,
 	MFUPT constraint.FieldsUpdatePtr[MFUT],
 	MFUT constraint.FieldsUpdate,
 	MDPT constraint.DeletePtr[MDT],
 	MDT constraint.Delete,
+	MDAT message.DeleteAddition,
 ] struct {
 	resourceType string
 	PubSubComponent
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishChange(md *message.Metadata) {
+func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishChange(md *message.Metadata) {
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceChanged {
 			for _, sub := range subs {
@@ -118,7 +124,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
+func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
 	// TODO better log
 	log.Debugf("publish add %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
@@ -127,10 +133,15 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
 			}
 		}
+		if topic == TopicResourceBatchAddedMessage {
+			for _, sub := range subs {
+				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg)
+			}
+		}
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishUpdated(md *message.Metadata, msg MUPT) {
+func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishUpdated(md *message.Metadata, msg MUPT) {
 	log.Debugf("publish update %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceUpdatedFields {
@@ -138,7 +149,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg.GetFields().(MFUPT))
 			}
 		}
-		if topic == TopicResourceUpdatedMessageUpdate {
+		if topic == TopicResourceUpdatedMessage {
 			for _, sub := range subs {
 				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg)
 			}
@@ -146,7 +157,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT) {
+func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishBatchDeleted(md *message.Metadata, msg MDPT) {
 	log.Debugf("publish delete %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchDeletedLcuuid {
@@ -157,6 +168,11 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		if topic == TopicResourceBatchDeletedMySQL {
 			for _, sub := range subs {
 				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
+			}
+		}
+		if topic == TopicResourceBatchDeletedMessage {
+			for _, sub := range subs {
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg)
 			}
 		}
 	}

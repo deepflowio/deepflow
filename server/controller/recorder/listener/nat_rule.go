@@ -41,6 +41,6 @@ func (r *NATRule) OnUpdaterAdded(addedDBItems []*mysqlmodel.NATRule) {
 func (r *NATRule) OnUpdaterUpdated(cloudItem *cloudmodel.NATRule, diffBase *diffbase.NATRule) {
 }
 
-func (r *NATRule) OnUpdaterDeleted(lcuuids []string) {
+func (r *NATRule) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.NATRule) {
 	r.cache.DeleteNATRules(lcuuids)
 }
