@@ -38,12 +38,14 @@ type WANIP struct {
 		metadbmodel.WANIP,
 		*message.WANIPAdd,
 		message.WANIPAdd,
+		message.AddNoneAddition,
 		*message.WANIPUpdate,
 		message.WANIPUpdate,
 		*message.WANIPFieldsUpdate,
 		message.WANIPFieldsUpdate,
 		*message.WANIPDelete,
-		message.WANIPDelete]
+		message.WANIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
@@ -55,11 +57,14 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 			metadbmodel.WANIP,
 			*message.WANIPAdd,
 			message.WANIPAdd,
+			message.AddNoneAddition,
 			*message.WANIPUpdate,
 			message.WANIPUpdate,
 			*message.WANIPFieldsUpdate,
 			message.WANIPFieldsUpdate,
 			*message.WANIPDelete,
+			message.WANIPDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,

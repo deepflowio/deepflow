@@ -25,12 +25,14 @@ type PeerConnection struct {
 	ResourcePubSubComponent[
 		*message.PeerConnectionAdd,
 		message.PeerConnectionAdd,
+		message.AddNoneAddition,
 		*message.PeerConnectionUpdate,
 		message.PeerConnectionUpdate,
 		*message.PeerConnectionFieldsUpdate,
 		message.PeerConnectionFieldsUpdate,
 		*message.PeerConnectionDelete,
-		message.PeerConnectionDelete]
+		message.PeerConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPeerConnection() *PeerConnection {
@@ -38,12 +40,14 @@ func NewPeerConnection() *PeerConnection {
 		ResourcePubSubComponent[
 			*message.PeerConnectionAdd,
 			message.PeerConnectionAdd,
+			message.AddNoneAddition,
 			*message.PeerConnectionUpdate,
 			message.PeerConnectionUpdate,
 			*message.PeerConnectionFieldsUpdate,
 			message.PeerConnectionFieldsUpdate,
 			*message.PeerConnectionDelete,
 			message.PeerConnectionDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePeerConnection),
 			resourceType:    common.RESOURCE_TYPE_PEER_CONNECTION_EN,

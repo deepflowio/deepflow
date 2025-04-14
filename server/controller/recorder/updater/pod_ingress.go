@@ -34,12 +34,14 @@ type PodIngress struct {
 		metadbmodel.PodIngress,
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
+		message.AddNoneAddition,
 		*message.PodIngressUpdate,
 		message.PodIngressUpdate,
 		*message.PodIngressFieldsUpdate,
 		message.PodIngressFieldsUpdate,
 		*message.PodIngressDelete,
-		message.PodIngressDelete]
+		message.PodIngressDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *PodIngress {
@@ -51,11 +53,14 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 			metadbmodel.PodIngress,
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
+			message.AddNoneAddition,
 			*message.PodIngressUpdate,
 			message.PodIngressUpdate,
 			*message.PodIngressFieldsUpdate,
 			message.PodIngressFieldsUpdate,
 			*message.PodIngressDelete,
+			message.PodIngressDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			wholeCache,

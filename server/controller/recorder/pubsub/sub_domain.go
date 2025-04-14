@@ -37,12 +37,14 @@ type SubDomain struct {
 	ResourcePubSubComponent[
 		*message.SubDomainAdd,
 		message.SubDomainAdd,
+		message.AddNoneAddition,
 		*message.SubDomainUpdate,
 		message.SubDomainUpdate,
 		*message.SubDomainFieldsUpdate,
 		message.SubDomainFieldsUpdate,
 		*message.SubDomainDelete,
-		message.SubDomainDelete]
+		message.SubDomainDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewSubDomain() *SubDomain {
@@ -50,12 +52,14 @@ func NewSubDomain() *SubDomain {
 		ResourcePubSubComponent[
 			*message.SubDomainAdd,
 			message.SubDomainAdd,
+			message.AddNoneAddition,
 			*message.SubDomainUpdate,
 			message.SubDomainUpdate,
 			*message.SubDomainFieldsUpdate,
 			message.SubDomainFieldsUpdate,
 			*message.SubDomainDelete,
 			message.SubDomainDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeSubDomain),
 			resourceType:    common.RESOURCE_TYPE_SUB_DOMAIN_EN,

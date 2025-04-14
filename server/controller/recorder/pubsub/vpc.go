@@ -25,12 +25,14 @@ type VPC struct {
 	ResourcePubSubComponent[
 		*message.VPCAdd,
 		message.VPCAdd,
+		message.AddNoneAddition,
 		*message.VPCUpdate,
 		message.VPCUpdate,
 		*message.VPCFieldsUpdate,
 		message.VPCFieldsUpdate,
 		*message.VPCDelete,
-		message.VPCDelete]
+		message.VPCDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVPC() *VPC {
@@ -38,12 +40,14 @@ func NewVPC() *VPC {
 		ResourcePubSubComponent[
 			*message.VPCAdd,
 			message.VPCAdd,
+			message.AddNoneAddition,
 			*message.VPCUpdate,
 			message.VPCUpdate,
 			*message.VPCFieldsUpdate,
 			message.VPCFieldsUpdate,
 			*message.VPCDelete,
 			message.VPCDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVPC),
 			resourceType:    common.RESOURCE_TYPE_VPC_EN,

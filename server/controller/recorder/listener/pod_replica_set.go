@@ -42,6 +42,6 @@ func (prs *PodReplicaSet) OnUpdaterUpdated(cloudItem *cloudmodel.PodReplicaSet, 
 	diffBase.Update(cloudItem)
 }
 
-func (prs *PodReplicaSet) OnUpdaterDeleted(lcuuids []string) {
+func (prs *PodReplicaSet) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodReplicaSet) {
 	prs.cache.DeletePodReplicaSets(lcuuids)
 }

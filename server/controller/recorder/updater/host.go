@@ -34,12 +34,14 @@ type Host struct {
 		metadbmodel.Host,
 		*message.HostAdd,
 		message.HostAdd,
+		message.AddNoneAddition,
 		*message.HostUpdate,
 		message.HostUpdate,
 		*message.HostFieldsUpdate,
 		message.HostFieldsUpdate,
 		*message.HostDelete,
-		message.HostDelete]
+		message.HostDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
@@ -51,11 +53,14 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 			metadbmodel.Host,
 			*message.HostAdd,
 			message.HostAdd,
+			message.AddNoneAddition,
 			*message.HostUpdate,
 			message.HostUpdate,
 			*message.HostFieldsUpdate,
 			message.HostFieldsUpdate,
 			*message.HostDelete,
+			message.HostDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
