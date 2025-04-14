@@ -14,14 +14,34 @@
  * limitations under the License.
  */
 
-package listener
+package message
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
-)
+type AddAddition interface {
+	AddNoneAddition | ProcessAddAddition
+}
 
-type Listener[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase] interface {
-	OnUpdaterAdded(addedDBItems []*MT)
-	OnUpdaterUpdated(cloudItem *CT, diffBaseItem BT)
-	OnUpdaterDeleted(lcuuids []string, deletedDBItems []*MT)
+type DeleteAddition interface {
+	DeleteNoneAddition | ProcessDeleteAddition
+}
+
+type AddNoneAddition struct {
+	NoneAddition
+}
+
+type DeleteNoneAddition struct {
+	NoneAddition
+}
+
+type NoneAddition struct{}
+
+type addition[T AddAddition | DeleteAddition] struct {
+	data *T
+}
+
+func (a *addition[T]) GetAddition() interface{} {
+	return a.data
+}
+
+func (a *addition[T]) SetAddition(data interface{}) {
+	a.data = data.(*T)
 }

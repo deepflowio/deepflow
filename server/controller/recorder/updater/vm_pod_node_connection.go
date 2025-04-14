@@ -34,12 +34,14 @@ type VMPodNodeConnection struct {
 		mysqlmodel.VMPodNodeConnection,
 		*message.VMPodNodeConnectionAdd,
 		message.VMPodNodeConnectionAdd,
+		message.AddNoneAddition,
 		*message.VMPodNodeConnectionUpdate,
 		message.VMPodNodeConnectionUpdate,
 		*message.VMPodNodeConnectionFieldsUpdate,
 		message.VMPodNodeConnectionFieldsUpdate,
 		*message.VMPodNodeConnectionDelete,
-		message.VMPodNodeConnectionDelete]
+		message.VMPodNodeConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
@@ -51,11 +53,14 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 			mysqlmodel.VMPodNodeConnection,
 			*message.VMPodNodeConnectionAdd,
 			message.VMPodNodeConnectionAdd,
+			message.AddNoneAddition,
 			*message.VMPodNodeConnectionUpdate,
 			message.VMPodNodeConnectionUpdate,
 			*message.VMPodNodeConnectionFieldsUpdate,
 			message.VMPodNodeConnectionFieldsUpdate,
 			*message.VMPodNodeConnectionDelete,
+			message.VMPodNodeConnectionDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,

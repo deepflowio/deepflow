@@ -25,12 +25,14 @@ type VMPodNodeConnection struct {
 	ResourcePubSubComponent[
 		*message.VMPodNodeConnectionAdd,
 		message.VMPodNodeConnectionAdd,
+		message.AddNoneAddition,
 		*message.VMPodNodeConnectionUpdate,
 		message.VMPodNodeConnectionUpdate,
 		*message.VMPodNodeConnectionFieldsUpdate,
 		message.VMPodNodeConnectionFieldsUpdate,
 		*message.VMPodNodeConnectionDelete,
-		message.VMPodNodeConnectionDelete]
+		message.VMPodNodeConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVMPodNodeConnection() *VMPodNodeConnection {
@@ -38,12 +40,14 @@ func NewVMPodNodeConnection() *VMPodNodeConnection {
 		ResourcePubSubComponent[
 			*message.VMPodNodeConnectionAdd,
 			message.VMPodNodeConnectionAdd,
+			message.AddNoneAddition,
 			*message.VMPodNodeConnectionUpdate,
 			message.VMPodNodeConnectionUpdate,
 			*message.VMPodNodeConnectionFieldsUpdate,
 			message.VMPodNodeConnectionFieldsUpdate,
 			*message.VMPodNodeConnectionDelete,
 			message.VMPodNodeConnectionDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVMPodNodeConnection),
 			resourceType:    common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,

@@ -34,12 +34,14 @@ type RoutingTable struct {
 		mysqlmodel.RoutingTable,
 		*message.RoutingTableAdd,
 		message.RoutingTableAdd,
+		message.AddNoneAddition,
 		*message.RoutingTableUpdate,
 		message.RoutingTableUpdate,
 		*message.RoutingTableFieldsUpdate,
 		message.RoutingTableFieldsUpdate,
 		*message.RoutingTableDelete,
-		message.RoutingTableDelete]
+		message.RoutingTableDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
@@ -51,11 +53,14 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 			mysqlmodel.RoutingTable,
 			*message.RoutingTableAdd,
 			message.RoutingTableAdd,
+			message.AddNoneAddition,
 			*message.RoutingTableUpdate,
 			message.RoutingTableUpdate,
 			*message.RoutingTableFieldsUpdate,
 			message.RoutingTableFieldsUpdate,
 			*message.RoutingTableDelete,
+			message.RoutingTableDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,

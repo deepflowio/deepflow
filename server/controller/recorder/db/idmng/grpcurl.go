@@ -56,7 +56,7 @@ func GetIDs(orgID int, resourceType string, count int) (ids []int, err error) {
 	for _, uID := range resp.GetIds() {
 		ids = append(ids, int(uID))
 	}
-	log.Infof("%s get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids), logger.NewORGPrefix(orgID))
+	log.Infof("%s get ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids), logger.NewORGPrefix(orgID))
 	return
 }
 

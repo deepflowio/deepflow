@@ -42,6 +42,6 @@ func (n *PodNamespace) OnUpdaterUpdated(cloudItem *cloudmodel.PodNamespace, diff
 	diffBase.Update(cloudItem)
 }
 
-func (n *PodNamespace) OnUpdaterDeleted(lcuuids []string) {
+func (n *PodNamespace) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodNamespace) {
 	n.cache.DeletePodNamespaces(lcuuids)
 }

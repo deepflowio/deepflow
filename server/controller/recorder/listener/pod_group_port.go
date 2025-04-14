@@ -42,6 +42,6 @@ func (p *PodGroupPort) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroupPort, diff
 	diffBase.Update(cloudItem)
 }
 
-func (p *PodGroupPort) OnUpdaterDeleted(lcuuids []string) {
+func (p *PodGroupPort) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroupPort) {
 	p.cache.DeletePodGroupPorts(lcuuids)
 }

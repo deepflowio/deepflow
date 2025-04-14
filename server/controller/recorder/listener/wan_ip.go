@@ -48,7 +48,7 @@ func (i *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.WA
 	diffBase.Update(cloudItem)
 }
 
-func (i *WANIP) OnUpdaterDeleted(lcuuids []string) {
+func (i *WANIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.WANIP) {
 	i.eventProducer.ProduceByDelete(lcuuids)
 	i.cache.DeleteWANIPs(lcuuids)
 }

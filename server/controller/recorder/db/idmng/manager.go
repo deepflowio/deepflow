@@ -17,6 +17,7 @@
 package idmng
 
 import (
+	"fmt"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -71,6 +72,7 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       newIDPool[mysqlmodel.PodGroup](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[mysqlmodel.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysqlmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN:        newIDPool[mysqlmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysqlmodel.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
 
@@ -83,8 +85,10 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[mysqlmodel.ORG](
 			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
 		)
+		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN].(*IDPool[mysqlmodel.ORG]).resetKeyField("org_id")
 	}
 
+	mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN].(*IDPool[mysqlmodel.Process]).resetKeyField("gid")
 	return mng, nil
 }
 
@@ -130,24 +134,26 @@ type IDPoolUpdater interface {
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type IDPool[MT MySQLModel] struct {
-	mutex sync.RWMutex
+	mutex    sync.RWMutex
+	keyField string
 	AscIDAllocator
 }
 
 func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
 	p := &IDPool[MT]{
+		keyField:       "id",
 		AscIDAllocator: NewAscIDAllocator(org, resourceType, minID, max),
 	}
 	p.SetInUseIDsProvider(p)
 	return p
 }
 
+func (p *IDPool[MT]) resetKeyField(keyField string) {
+	p.keyField = keyField
+}
+
 func (p *IDPool[MT]) load() (mapset.Set[int], error) {
-	idField := "id"
-	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_ORG_EN {
-		idField = "org_id"
-	}
-	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select(idField))
+	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select(p.keyField))
 	if err != nil {
 		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err
@@ -162,7 +168,7 @@ func (p *IDPool[MT]) load() (mapset.Set[int], error) {
 
 func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 	var dbItems []*MT
-	err := p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err := p.org.DB.Unscoped().Where(fmt.Sprintf("%s IN ?", p.keyField), ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err

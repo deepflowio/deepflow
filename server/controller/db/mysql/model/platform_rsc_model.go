@@ -79,6 +79,7 @@ type Process struct {
 	GID            uint64    `gorm:"column:gid;type:int;not null;default:0" json:"GID" mapstructure:"GID"`
 	DeviceType     int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"RESOURCE_TYPE"`
 	DeviceID       int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"RESOURCE_ID"`
+	PodGroupID     int       `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
 	PodNodeID      int       `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	VMID           int       `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	VPCID          int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID" mapstructure:"EPC_ID"`

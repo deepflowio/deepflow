@@ -37,12 +37,14 @@ type Pod struct {
 		mysqlmodel.Pod,
 		*message.PodAdd,
 		message.PodAdd,
+		message.AddNoneAddition,
 		*message.PodUpdate,
 		message.PodUpdate,
 		*message.PodFieldsUpdate,
 		message.PodFieldsUpdate,
 		*message.PodDelete,
-		message.PodDelete]
+		message.PodDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
@@ -54,11 +56,14 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 			mysqlmodel.Pod,
 			*message.PodAdd,
 			message.PodAdd,
+			message.AddNoneAddition,
 			*message.PodUpdate,
 			message.PodUpdate,
 			*message.PodFieldsUpdate,
 			message.PodFieldsUpdate,
 			*message.PodDelete,
+			message.PodDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,

@@ -25,12 +25,14 @@ type PodIngress struct {
 	ResourcePubSubComponent[
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
+		message.AddNoneAddition,
 		*message.PodIngressUpdate,
 		message.PodIngressUpdate,
 		*message.PodIngressFieldsUpdate,
 		message.PodIngressFieldsUpdate,
 		*message.PodIngressDelete,
-		message.PodIngressDelete]
+		message.PodIngressDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodIngress() *PodIngress {
@@ -38,12 +40,14 @@ func NewPodIngress() *PodIngress {
 		ResourcePubSubComponent[
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
+			message.AddNoneAddition,
 			*message.PodIngressUpdate,
 			message.PodIngressUpdate,
 			*message.PodIngressFieldsUpdate,
 			message.PodIngressFieldsUpdate,
 			*message.PodIngressDelete,
 			message.PodIngressDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodIngress),
 			resourceType:    common.RESOURCE_TYPE_POD_INGRESS_EN,

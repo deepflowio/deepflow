@@ -25,12 +25,14 @@ type PodServicePort struct {
 	ResourcePubSubComponent[
 		*message.PodServicePortAdd,
 		message.PodServicePortAdd,
+		message.AddNoneAddition,
 		*message.PodServicePortUpdate,
 		message.PodServicePortUpdate,
 		*message.PodServicePortFieldsUpdate,
 		message.PodServicePortFieldsUpdate,
 		*message.PodServicePortDelete,
-		message.PodServicePortDelete]
+		message.PodServicePortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodServicePort() *PodServicePort {
@@ -38,12 +40,14 @@ func NewPodServicePort() *PodServicePort {
 		ResourcePubSubComponent[
 			*message.PodServicePortAdd,
 			message.PodServicePortAdd,
+			message.AddNoneAddition,
 			*message.PodServicePortUpdate,
 			message.PodServicePortUpdate,
 			*message.PodServicePortFieldsUpdate,
 			message.PodServicePortFieldsUpdate,
 			*message.PodServicePortDelete,
 			message.PodServicePortDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodServicePort),
 			resourceType:    common.RESOURCE_TYPE_POD_SERVICE_PORT_EN,

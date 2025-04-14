@@ -25,12 +25,14 @@ type VIP struct {
 	ResourcePubSubComponent[
 		*message.VIPAdd,
 		message.VIPAdd,
+		message.AddNoneAddition,
 		*message.VIPUpdate,
 		message.VIPUpdate,
 		*message.VIPFieldsUpdate,
 		message.VIPFieldsUpdate,
 		*message.VIPDelete,
-		message.VIPDelete]
+		message.VIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVIP() *VIP {
@@ -38,12 +40,14 @@ func NewVIP() *VIP {
 		ResourcePubSubComponent[
 			*message.VIPAdd,
 			message.VIPAdd,
+			message.AddNoneAddition,
 			*message.VIPUpdate,
 			message.VIPUpdate,
 			*message.VIPFieldsUpdate,
 			message.VIPFieldsUpdate,
 			*message.VIPDelete,
 			message.VIPDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVIP),
 			resourceType:    common.RESOURCE_TYPE_VIP_EN,

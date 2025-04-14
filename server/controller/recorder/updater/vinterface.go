@@ -38,12 +38,14 @@ type VInterface struct {
 		mysqlmodel.VInterface,
 		*message.VInterfaceAdd,
 		message.VInterfaceAdd,
+		message.AddNoneAddition,
 		*message.VInterfaceUpdate,
 		message.VInterfaceUpdate,
 		*message.VInterfaceFieldsUpdate,
 		message.VInterfaceFieldsUpdate,
 		*message.VInterfaceDelete,
-		message.VInterfaceDelete]
+		message.VInterfaceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
@@ -55,11 +57,14 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 			mysqlmodel.VInterface,
 			*message.VInterfaceAdd,
 			message.VInterfaceAdd,
+			message.AddNoneAddition,
 			*message.VInterfaceUpdate,
 			message.VInterfaceUpdate,
 			*message.VInterfaceFieldsUpdate,
 			message.VInterfaceFieldsUpdate,
 			*message.VInterfaceDelete,
+			message.VInterfaceDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,

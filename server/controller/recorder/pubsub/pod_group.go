@@ -25,12 +25,14 @@ type PodGroup struct {
 	ResourcePubSubComponent[
 		*message.PodGroupAdd,
 		message.PodGroupAdd,
+		message.AddNoneAddition,
 		*message.PodGroupUpdate,
 		message.PodGroupUpdate,
 		*message.PodGroupFieldsUpdate,
 		message.PodGroupFieldsUpdate,
 		*message.PodGroupDelete,
-		message.PodGroupDelete]
+		message.PodGroupDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodGroup() *PodGroup {
@@ -38,12 +40,14 @@ func NewPodGroup() *PodGroup {
 		ResourcePubSubComponent[
 			*message.PodGroupAdd,
 			message.PodGroupAdd,
+			message.AddNoneAddition,
 			*message.PodGroupUpdate,
 			message.PodGroupUpdate,
 			*message.PodGroupFieldsUpdate,
 			message.PodGroupFieldsUpdate,
 			*message.PodGroupDelete,
 			message.PodGroupDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodGroup),
 			resourceType:    common.RESOURCE_TYPE_POD_SERVICE_EN,

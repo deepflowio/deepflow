@@ -25,12 +25,14 @@ type LBTargetServer struct {
 	ResourcePubSubComponent[
 		*message.LBTargetServerAdd,
 		message.LBTargetServerAdd,
+		message.AddNoneAddition,
 		*message.LBTargetServerUpdate,
 		message.LBTargetServerUpdate,
 		*message.LBTargetServerFieldsUpdate,
 		message.LBTargetServerFieldsUpdate,
 		*message.LBTargetServerDelete,
-		message.LBTargetServerDelete]
+		message.LBTargetServerDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBTargetServer() *LBTargetServer {
@@ -38,12 +40,14 @@ func NewLBTargetServer() *LBTargetServer {
 		ResourcePubSubComponent[
 			*message.LBTargetServerAdd,
 			message.LBTargetServerAdd,
+			message.AddNoneAddition,
 			*message.LBTargetServerUpdate,
 			message.LBTargetServerUpdate,
 			*message.LBTargetServerFieldsUpdate,
 			message.LBTargetServerFieldsUpdate,
 			*message.LBTargetServerDelete,
 			message.LBTargetServerDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBTargetServer),
 			resourceType:    common.RESOURCE_TYPE_LB_TARGET_SERVER_EN,

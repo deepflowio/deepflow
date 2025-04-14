@@ -34,12 +34,14 @@ type PodServicePort struct {
 		mysqlmodel.PodServicePort,
 		*message.PodServicePortAdd,
 		message.PodServicePortAdd,
+		message.AddNoneAddition,
 		*message.PodServicePortUpdate,
 		message.PodServicePortUpdate,
 		*message.PodServicePortFieldsUpdate,
 		message.PodServicePortFieldsUpdate,
 		*message.PodServicePortDelete,
-		message.PodServicePortDelete]
+		message.PodServicePortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
@@ -51,11 +53,14 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 			mysqlmodel.PodServicePort,
 			*message.PodServicePortAdd,
 			message.PodServicePortAdd,
+			message.AddNoneAddition,
 			*message.PodServicePortUpdate,
 			message.PodServicePortUpdate,
 			*message.PodServicePortFieldsUpdate,
 			message.PodServicePortFieldsUpdate,
 			*message.PodServicePortDelete,
+			message.PodServicePortDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,

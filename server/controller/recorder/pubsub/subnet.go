@@ -25,12 +25,14 @@ type Subnet struct {
 	ResourcePubSubComponent[
 		*message.SubnetAdd,
 		message.SubnetAdd,
+		message.AddNoneAddition,
 		*message.SubnetUpdate,
 		message.SubnetUpdate,
 		*message.SubnetFieldsUpdate,
 		message.SubnetFieldsUpdate,
 		*message.SubnetDelete,
-		message.SubnetDelete]
+		message.SubnetDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewSubnet() *Subnet {
@@ -38,12 +40,14 @@ func NewSubnet() *Subnet {
 		ResourcePubSubComponent[
 			*message.SubnetAdd,
 			message.SubnetAdd,
+			message.AddNoneAddition,
 			*message.SubnetUpdate,
 			message.SubnetUpdate,
 			*message.SubnetFieldsUpdate,
 			message.SubnetFieldsUpdate,
 			*message.SubnetDelete,
 			message.SubnetDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeSubnet),
 			resourceType:    common.RESOURCE_TYPE_SUBNET_EN,

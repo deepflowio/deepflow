@@ -49,7 +49,7 @@ func (p *Pod) OnUpdaterUpdated(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod
 	p.cache.UpdatePod(cloudItem)
 }
 
-func (p *Pod) OnUpdaterDeleted(lcuuids []string) {
+func (p *Pod) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Pod) {
 	p.eventProducer.ProduceByDelete(lcuuids)
 	p.cache.DeletePods(lcuuids)
 }
