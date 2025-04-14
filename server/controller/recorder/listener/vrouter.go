@@ -49,7 +49,7 @@ func (r *VRouter) OnUpdaterUpdated(cloudItem *cloudmodel.VRouter, diffBase *diff
 	r.cache.UpdateVRouter(cloudItem)
 }
 
-func (r *VRouter) OnUpdaterDeleted(lcuuids []string) {
+func (r *VRouter) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VRouter) {
 	r.eventProducer.ProduceByDelete(lcuuids)
 	r.cache.DeleteVRouters(lcuuids)
 }

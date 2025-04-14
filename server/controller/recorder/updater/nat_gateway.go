@@ -34,12 +34,14 @@ type NATGateway struct {
 		mysqlmodel.NATGateway,
 		*message.NATGatewayAdd,
 		message.NATGatewayAdd,
+		message.AddNoneAddition,
 		*message.NATGatewayUpdate,
 		message.NATGatewayUpdate,
 		*message.NATGatewayFieldsUpdate,
 		message.NATGatewayFieldsUpdate,
 		*message.NATGatewayDelete,
-		message.NATGatewayDelete]
+		message.NATGatewayDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *NATGateway {
@@ -51,11 +53,14 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 			mysqlmodel.NATGateway,
 			*message.NATGatewayAdd,
 			message.NATGatewayAdd,
+			message.AddNoneAddition,
 			*message.NATGatewayUpdate,
 			message.NATGatewayUpdate,
 			*message.NATGatewayFieldsUpdate,
 			message.NATGatewayFieldsUpdate,
 			*message.NATGatewayDelete,
+			message.NATGatewayDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,

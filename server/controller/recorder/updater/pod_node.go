@@ -34,12 +34,14 @@ type PodNode struct {
 		mysqlmodel.PodNode,
 		*message.PodNodeAdd,
 		message.PodNodeAdd,
+		message.AddNoneAddition,
 		*message.PodNodeUpdate,
 		message.PodNodeUpdate,
 		*message.PodNodeFieldsUpdate,
 		message.PodNodeFieldsUpdate,
 		*message.PodNodeDelete,
-		message.PodNodeDelete]
+		message.PodNodeDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNode {
@@ -51,11 +53,14 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 			mysqlmodel.PodNode,
 			*message.PodNodeAdd,
 			message.PodNodeAdd,
+			message.AddNoneAddition,
 			*message.PodNodeUpdate,
 			message.PodNodeUpdate,
 			*message.PodNodeFieldsUpdate,
 			message.PodNodeFieldsUpdate,
 			*message.PodNodeDelete,
+			message.PodNodeDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			wholeCache,

@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS process (
     gid                 INTEGER NOT NULL,
     devicetype          INTEGER,
     deviceid            INTEGER,
+    pod_group_id        INTEGER,
     pod_node_id         INTEGER,
     vm_id               INTEGER,
     epc_id              INTEGER,

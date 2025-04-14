@@ -25,12 +25,14 @@ type VInterface struct {
 	ResourcePubSubComponent[
 		*message.VInterfaceAdd,
 		message.VInterfaceAdd,
+		message.AddNoneAddition,
 		*message.VInterfaceUpdate,
 		message.VInterfaceUpdate,
 		*message.VInterfaceFieldsUpdate,
 		message.VInterfaceFieldsUpdate,
 		*message.VInterfaceDelete,
-		message.VInterfaceDelete]
+		message.VInterfaceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVInterface() *VInterface {
@@ -38,12 +40,14 @@ func NewVInterface() *VInterface {
 		ResourcePubSubComponent[
 			*message.VInterfaceAdd,
 			message.VInterfaceAdd,
+			message.AddNoneAddition,
 			*message.VInterfaceUpdate,
 			message.VInterfaceUpdate,
 			*message.VInterfaceFieldsUpdate,
 			message.VInterfaceFieldsUpdate,
 			*message.VInterfaceDelete,
 			message.VInterfaceDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVInterface),
 			resourceType:    common.RESOURCE_TYPE_VINTERFACE_EN,

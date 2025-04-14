@@ -34,12 +34,14 @@ type Region struct {
 		mysqlmodel.Region,
 		*message.RegionAdd,
 		message.RegionAdd,
+		message.AddNoneAddition,
 		*message.RegionUpdate,
 		message.RegionUpdate,
 		*message.RegionFieldsUpdate,
 		message.RegionFieldsUpdate,
 		*message.RegionDelete,
-		message.RegionDelete]
+		message.RegionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
@@ -51,11 +53,14 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 			mysqlmodel.Region,
 			*message.RegionAdd,
 			message.RegionAdd,
+			message.AddNoneAddition,
 			*message.RegionUpdate,
 			message.RegionUpdate,
 			*message.RegionFieldsUpdate,
 			message.RegionFieldsUpdate,
 			*message.RegionDelete,
+			message.RegionDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			wholeCache,

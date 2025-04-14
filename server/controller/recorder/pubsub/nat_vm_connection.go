@@ -25,12 +25,14 @@ type NATVMConnection struct {
 	ResourcePubSubComponent[
 		*message.NATVMConnectionAdd,
 		message.NATVMConnectionAdd,
+		message.AddNoneAddition,
 		*message.NATVMConnectionUpdate,
 		message.NATVMConnectionUpdate,
 		*message.NATVMConnectionFieldsUpdate,
 		message.NATVMConnectionFieldsUpdate,
 		*message.NATVMConnectionDelete,
-		message.NATVMConnectionDelete]
+		message.NATVMConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATVMConnection() *NATVMConnection {
@@ -38,12 +40,14 @@ func NewNATVMConnection() *NATVMConnection {
 		ResourcePubSubComponent[
 			*message.NATVMConnectionAdd,
 			message.NATVMConnectionAdd,
+			message.AddNoneAddition,
 			*message.NATVMConnectionUpdate,
 			message.NATVMConnectionUpdate,
 			*message.NATVMConnectionFieldsUpdate,
 			message.NATVMConnectionFieldsUpdate,
 			*message.NATVMConnectionDelete,
 			message.NATVMConnectionDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATVMConnection),
 			resourceType:    common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,

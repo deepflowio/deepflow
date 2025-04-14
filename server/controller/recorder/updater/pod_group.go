@@ -34,12 +34,14 @@ type PodGroup struct {
 		mysqlmodel.PodGroup,
 		*message.PodGroupAdd,
 		message.PodGroupAdd,
+		message.AddNoneAddition,
 		*message.PodGroupUpdate,
 		message.PodGroupUpdate,
 		*message.PodGroupFieldsUpdate,
 		message.PodGroupFieldsUpdate,
 		*message.PodGroupDelete,
-		message.PodGroupDelete]
+		message.PodGroupDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodGroup {
@@ -51,11 +53,14 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 			mysqlmodel.PodGroup,
 			*message.PodGroupAdd,
 			message.PodGroupAdd,
+			message.AddNoneAddition,
 			*message.PodGroupUpdate,
 			message.PodGroupUpdate,
 			*message.PodGroupFieldsUpdate,
 			message.PodGroupFieldsUpdate,
 			*message.PodGroupDelete,
+			message.PodGroupDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			wholeCache,

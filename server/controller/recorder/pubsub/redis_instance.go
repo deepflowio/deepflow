@@ -25,12 +25,14 @@ type RedisInstance struct {
 	ResourcePubSubComponent[
 		*message.RedisInstanceAdd,
 		message.RedisInstanceAdd,
+		message.AddNoneAddition,
 		*message.RedisInstanceUpdate,
 		message.RedisInstanceUpdate,
 		*message.RedisInstanceFieldsUpdate,
 		message.RedisInstanceFieldsUpdate,
 		*message.RedisInstanceDelete,
-		message.RedisInstanceDelete]
+		message.RedisInstanceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRedisInstance() *RedisInstance {
@@ -38,12 +40,14 @@ func NewRedisInstance() *RedisInstance {
 		ResourcePubSubComponent[
 			*message.RedisInstanceAdd,
 			message.RedisInstanceAdd,
+			message.AddNoneAddition,
 			*message.RedisInstanceUpdate,
 			message.RedisInstanceUpdate,
 			*message.RedisInstanceFieldsUpdate,
 			message.RedisInstanceFieldsUpdate,
 			*message.RedisInstanceDelete,
 			message.RedisInstanceDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRedisInstance),
 			resourceType:    common.RESOURCE_TYPE_REDIS_INSTANCE_EN,

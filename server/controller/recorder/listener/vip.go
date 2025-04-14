@@ -42,6 +42,6 @@ func (p *VIP) OnUpdaterUpdated(cloudItem *cloudmodel.VIP, diffBase *diffbase.VIP
 	diffBase.Update(cloudItem)
 }
 
-func (p *VIP) OnUpdaterDeleted(lcuuids []string) {
+func (p *VIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VIP) {
 	p.cache.DeleteVIPs(lcuuids)
 }
