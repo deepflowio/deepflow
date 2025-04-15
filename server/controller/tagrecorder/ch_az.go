@@ -26,14 +26,34 @@ import (
 )
 
 type ChAZ struct {
-	SubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, metadbmodel.AZ, metadbmodel.ChAZ, IDKey]
+	SubscriberComponent[
+		*message.AZAdd,
+		message.AZAdd,
+		*message.AZFieldsUpdate,
+		message.AZFieldsUpdate,
+		*message.AZDelete,
+		message.AZDelete,
+		metadbmodel.AZ,
+		metadbmodel.ChAZ,
+		IDKey,
+	]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	mng := &ChAZ{
-		newSubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, metadbmodel.AZ, metadbmodel.ChAZ, IDKey](
+		newSubscriberComponent[
+			*message.AZAdd,
+			message.AZAdd,
+			*message.AZFieldsUpdate,
+			message.AZFieldsUpdate,
+			*message.AZDelete,
+			message.AZDelete,
+			metadbmodel.AZ,
+			metadbmodel.ChAZ,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_AZ_EN, RESOURCE_TYPE_CH_AZ,
 		),
 		domainLcuuidToIconID,

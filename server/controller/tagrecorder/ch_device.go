@@ -27,13 +27,33 @@ import (
 )
 
 type ChVMDevice struct {
-	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete,
+		metadbmodel.VM,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 	mng := &ChVMDevice{
-		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+			message.VMDelete,
+			metadbmodel.VM,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -107,13 +127,33 @@ func (c *ChVMDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, d
 }
 
 type ChHostDevice struct {
-	SubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, metadbmodel.Host, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.HostAdd,
+		message.HostAdd,
+		*message.HostFieldsUpdate,
+		message.HostFieldsUpdate,
+		*message.HostDelete,
+		message.HostDelete,
+		metadbmodel.Host,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 	mng := &ChHostDevice{
-		newSubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, metadbmodel.Host, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.HostAdd,
+			message.HostAdd,
+			*message.HostFieldsUpdate,
+			message.HostFieldsUpdate,
+			*message.HostDelete,
+			message.HostDelete,
+			metadbmodel.Host,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_HOST_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -188,13 +228,33 @@ func (c *ChHostDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice,
 }
 
 type ChVRouterDevice struct {
-	SubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, metadbmodel.VRouter, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.VRouterAdd,
+		message.VRouterAdd,
+		*message.VRouterFieldsUpdate,
+		message.VRouterFieldsUpdate,
+		*message.VRouterDelete,
+		message.VRouterDelete,
+		metadbmodel.VRouter,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 	mng := &ChVRouterDevice{
-		newSubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, metadbmodel.VRouter, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.VRouterAdd,
+			message.VRouterAdd,
+			*message.VRouterFieldsUpdate,
+			message.VRouterFieldsUpdate,
+			*message.VRouterDelete,
+			message.VRouterDelete,
+			metadbmodel.VRouter,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_VROUTER_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -251,13 +311,33 @@ func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 }
 
 type ChDHCPPortDevice struct {
-	SubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, metadbmodel.DHCPPort, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.DHCPPortAdd,
+		message.DHCPPortAdd,
+		*message.DHCPPortFieldsUpdate,
+		message.DHCPPortFieldsUpdate,
+		*message.DHCPPortDelete,
+		message.DHCPPortDelete,
+		metadbmodel.DHCPPort,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice {
 	mng := &ChDHCPPortDevice{
-		newSubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, metadbmodel.DHCPPort, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.DHCPPortAdd,
+			message.DHCPPortAdd,
+			*message.DHCPPortFieldsUpdate,
+			message.DHCPPortFieldsUpdate,
+			*message.DHCPPortDelete,
+			message.DHCPPortDelete,
+			metadbmodel.DHCPPort,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_DHCP_PORT_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -314,13 +394,33 @@ func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDev
 }
 
 type ChNATGatewayDevice struct {
-	SubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, metadbmodel.NATGateway, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.NATGatewayAdd,
+		message.NATGatewayAdd,
+		*message.NATGatewayFieldsUpdate,
+		message.NATGatewayFieldsUpdate,
+		*message.NATGatewayDelete,
+		message.NATGatewayDelete,
+		metadbmodel.NATGateway,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDevice {
 	mng := &ChNATGatewayDevice{
-		newSubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, metadbmodel.NATGateway, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.NATGatewayAdd,
+			message.NATGatewayAdd,
+			*message.NATGatewayFieldsUpdate,
+			message.NATGatewayFieldsUpdate,
+			*message.NATGatewayDelete,
+			message.NATGatewayDelete,
+			metadbmodel.NATGateway,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_NAT_GATEWAY_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -381,13 +481,33 @@ func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 }
 
 type ChLBDevice struct {
-	SubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, metadbmodel.LB, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.LBAdd,
+		message.LBAdd,
+		*message.LBFieldsUpdate,
+		message.LBFieldsUpdate,
+		*message.LBDelete,
+		message.LBDelete,
+		metadbmodel.LB,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 	mng := &ChLBDevice{
-		newSubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, metadbmodel.LB, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.LBAdd,
+			message.LBAdd,
+			*message.LBFieldsUpdate,
+			message.LBFieldsUpdate,
+			*message.LBDelete,
+			message.LBDelete,
+			metadbmodel.LB,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_LB_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -448,13 +568,31 @@ func (c *ChLBDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, d
 }
 
 type ChRDSInstanceDevice struct {
-	SubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, metadbmodel.RDSInstance, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.RDSInstanceAdd,
+		message.RDSInstanceAdd,
+		*message.RDSInstanceFieldsUpdate,
+		message.RDSInstanceFieldsUpdate,
+		*message.RDSInstanceDelete,
+		message.RDSInstanceDelete,
+		metadbmodel.RDSInstance,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstanceDevice {
 	mng := &ChRDSInstanceDevice{
-		newSubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, metadbmodel.RDSInstance, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.RDSInstanceAdd,
+			message.RDSInstanceAdd,
+			*message.RDSInstanceFieldsUpdate,
+			message.RDSInstanceFieldsUpdate,
+			*message.RDSInstanceDelete,
+			message.RDSInstanceDelete,
+			metadbmodel.RDSInstance,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_RDS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -515,13 +653,31 @@ func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.Ch
 }
 
 type ChRedisInstanceDevice struct {
-	SubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, metadbmodel.RedisInstance, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.RedisInstanceAdd,
+		message.RedisInstanceAdd,
+		*message.RedisInstanceFieldsUpdate,
+		message.RedisInstanceFieldsUpdate,
+		*message.RedisInstanceDelete,
+		message.RedisInstanceDelete,
+		metadbmodel.RedisInstance,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInstanceDevice {
 	mng := &ChRedisInstanceDevice{
-		newSubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, metadbmodel.RedisInstance, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.RedisInstanceAdd,
+			message.RedisInstanceAdd,
+			*message.RedisInstanceFieldsUpdate,
+			message.RedisInstanceFieldsUpdate,
+			*message.RedisInstanceDelete,
+			message.RedisInstanceDelete,
+			metadbmodel.RedisInstance,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_REDIS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -582,13 +738,31 @@ func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.
 }
 
 type ChPodServiceDevice struct {
-	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, metadbmodel.PodService, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete,
+		metadbmodel.PodService,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDevice {
 	mng := &ChPodServiceDevice{
-		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, metadbmodel.PodService, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
+			message.PodServiceDelete,
+			metadbmodel.PodService,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -659,13 +833,31 @@ func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 }
 
 type ChPodDevice struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		metadbmodel.Pod,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 	mng := &ChPodDevice{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			metadbmodel.Pod,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -723,13 +915,31 @@ func (c *ChPodDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, 
 }
 
 type ChPodGroupDevice struct {
-	SubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, metadbmodel.PodGroup, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodGroupAdd,
+		message.PodGroupAdd,
+		*message.PodGroupFieldsUpdate,
+		message.PodGroupFieldsUpdate,
+		*message.PodGroupDelete,
+		message.PodGroupDelete,
+		metadbmodel.PodGroup,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice {
 	mng := &ChPodGroupDevice{
-		newSubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, metadbmodel.PodGroup, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodGroupAdd,
+			message.PodGroupAdd,
+			*message.PodGroupFieldsUpdate,
+			message.PodGroupFieldsUpdate,
+			*message.PodGroupDelete,
+			message.PodGroupDelete,
+			metadbmodel.PodGroup,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_GROUP_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -788,13 +998,31 @@ func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDev
 }
 
 type ChPodNodeDevice struct {
-	SubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, metadbmodel.PodNode, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodNodeAdd,
+		message.PodNodeAdd,
+		*message.PodNodeFieldsUpdate,
+		message.PodNodeFieldsUpdate,
+		*message.PodNodeDelete,
+		message.PodNodeDelete,
+		metadbmodel.PodNode,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 	mng := &ChPodNodeDevice{
-		newSubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, metadbmodel.PodNode, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodNodeAdd,
+			message.PodNodeAdd,
+			*message.PodNodeFieldsUpdate,
+			message.PodNodeFieldsUpdate,
+			*message.PodNodeDelete,
+			message.PodNodeDelete,
+			metadbmodel.PodNode,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_NODE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -859,13 +1087,33 @@ func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 }
 
 type ChPodClusterDevice struct {
-	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.PodClusterAdd,
+		message.PodClusterAdd,
+		*message.PodClusterFieldsUpdate,
+		message.PodClusterFieldsUpdate,
+		*message.PodClusterDelete,
+		message.PodClusterDelete,
+		metadbmodel.PodCluster,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDevice {
 	mng := &ChPodClusterDevice{
-		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.PodClusterAdd,
+			message.PodClusterAdd,
+			*message.PodClusterFieldsUpdate,
+			message.PodClusterFieldsUpdate,
+			*message.PodClusterDelete,
+			message.PodClusterDelete,
+			metadbmodel.PodCluster,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_CLUSTER_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -922,13 +1170,33 @@ func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 }
 
 type ChProcessDevice struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete,
+		metadbmodel.Process,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 	mng := &ChProcessDevice{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
+			message.ProcessDelete,
+			metadbmodel.Process,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -986,13 +1254,33 @@ func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 }
 
 type ChCustomServiceDevice struct {
-	SubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, metadbmodel.CustomService, metadbmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.CustomServiceAdd,
+		message.CustomServiceAdd,
+		*message.CustomServiceFieldsUpdate,
+		message.CustomServiceFieldsUpdate,
+		*message.CustomServiceDelete,
+		message.CustomServiceDelete,
+		metadbmodel.CustomService,
+		metadbmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomServiceDevice {
 	mng := &ChCustomServiceDevice{
-		newSubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, metadbmodel.CustomService, metadbmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.CustomServiceAdd,
+			message.CustomServiceAdd,
+			*message.CustomServiceFieldsUpdate,
+			message.CustomServiceFieldsUpdate,
+			*message.CustomServiceDelete,
+			message.CustomServiceDelete,
+			metadbmodel.CustomService,
+			metadbmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_CUSTOM_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,

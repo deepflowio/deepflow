@@ -24,12 +24,32 @@ import (
 )
 
 type ChPodK8sAnnotations struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sAnnotations, K8sAnnotationsKey]
+	SubscriberComponent[
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sAnnotations,
+		K8sAnnotationsKey,
+	]
 }
 
 func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 	mng := &ChPodK8sAnnotations{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sAnnotations, K8sAnnotationsKey](
+		newSubscriberComponent[
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sAnnotations,
+			K8sAnnotationsKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
 		),
 	}
