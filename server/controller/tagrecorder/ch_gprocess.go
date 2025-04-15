@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"slices"
+
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -58,6 +60,8 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.hookers[hookerAddPage] = mng
+	mng.hookers[hookerDeletePage] = mng
 	return mng
 }
 
@@ -73,7 +77,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, metadbmodel.ChGProcess{
-		ID:          source.ID,
+		ID:          int(source.GID),
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
@@ -111,4 +115,27 @@ func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess,
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
+}
+
+func (c *ChGProcess) beforAddPage(dbData []*metadbmodel.Process, msg message.ProcessAdd) []*metadbmodel.Process {
+	idToNewGIDFlag := msg.GetAddition().(message.ProcessAddAddition).IDToTagRecorderNewGIDFlag
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		isNew, _ := idToNewGIDFlag[item.ID]
+		if isNew {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
+}
+
+func (c *ChGProcess) beforDeletePage(dbData []*metadbmodel.Process, msg message.ProcessDelete) []*metadbmodel.Process {
+	gids := msg.GetAddition().(message.ProcessDeleteAddition).DeletedGIDs
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		if slices.Contains(gids, item.GID) {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
 }
