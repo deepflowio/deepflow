@@ -51,10 +51,10 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
 		if err != nil {
 			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), process, p.db.LogPrefixORGID)
 		}
-
+		gid := int(process.GID)
 		if process.DeletedAt.Valid {
-			keyToItem[IDKey{ID: process.ID}] = mysqlmodel.ChGProcess{
-				ID:          process.ID,
+			keyToItem[IDKey{ID: gid}] = mysqlmodel.ChGProcess{
+				ID:          gid,
 				Name:        process.Name + " (deleted)",
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID:     process.VMID,
@@ -64,8 +64,8 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysqlmodel.ChGProcess, bool) {
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: process.ID}] = mysqlmodel.ChGProcess{
-				ID:          process.ID,
+			keyToItem[IDKey{ID: gid}] = mysqlmodel.ChGProcess{
+				ID:          gid,
 				Name:        process.Name,
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID:     process.VMID,
