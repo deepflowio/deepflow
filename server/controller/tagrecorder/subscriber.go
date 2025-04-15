@@ -151,25 +151,55 @@ type Subscriber interface {
 	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB)
 }
 
-type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
+type SubscriberDataGenerator[
+	MAPT msgconstraint.AddPtr[MAT],
+	MAT msgconstraint.Add,
+	MUPT msgconstraint.FieldsUpdatePtr[MUT],
+	MUT msgconstraint.FieldsUpdate,
+	MDPT msgconstraint.DeletePtr[MDT],
+	MDT msgconstraint.Delete,
+	MT constraint.MySQLModel,
+	CT MySQLChModel,
+	KT ChModelKey,
+] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT, *metadb.DB)
 	softDeletedTargetsUpdated([]CT, *metadb.DB)
 }
 
-type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
+type SubscriberComponent[
+	MAPT msgconstraint.AddPtr[MAT],
+	MAT msgconstraint.Add,
+	MUPT msgconstraint.FieldsUpdatePtr[MUT],
+	MUT msgconstraint.FieldsUpdate,
+	MDPT msgconstraint.DeletePtr[MDT],
+	MDT msgconstraint.Delete,
+	MT constraint.MySQLModel,
+	CT MySQLChModel,
+	KT ChModelKey,
+] struct {
 	cfg config.ControllerConfig
 
 	subResourceTypeName string // 订阅表资源类型，即源表资源类型
 	resourceTypeName    string // CH表资源类型
 	dbOperator          operator[CT, KT]
-	subscriberDG        SubscriberDataGenerator[MUPT, MUT, MT, CT, KT]
+	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
 }
 
-func newSubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey](
+func newSubscriberComponent[
+	MAPT msgconstraint.AddPtr[MAT],
+	MAT msgconstraint.Add,
+	MUPT msgconstraint.FieldsUpdatePtr[MUT],
+	MUT msgconstraint.FieldsUpdate,
+	MDPT msgconstraint.DeletePtr[MDT],
+	MDT msgconstraint.Delete,
+	MT constraint.MySQLModel,
+	CT MySQLChModel,
+	KT ChModelKey,
+](
 	sourceResourceTypeName, resourceTypeName string,
-) SubscriberComponent[MUPT, MUT, MT, CT, KT] {
-	s := SubscriberComponent[MUPT, MUT, MT, CT, KT]{
+) SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT] {
+	s := SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]{
 		subResourceTypeName: sourceResourceTypeName,
 		resourceTypeName:    resourceTypeName,
 	}
@@ -177,15 +207,15 @@ func newSubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgcons
 	return s
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) GetSubResourceType() string {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) GetSubResourceType() string {
 	return s.subResourceTypeName
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) initDBOperator() {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) initDBOperator() {
 	s.dbOperator = newOperator[CT, KT](s.resourceTypeName)
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
 	keys := []KT{}
 	targets := []CT{}
 	for _, item := range sources {
@@ -196,34 +226,37 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(md *mess
 	return keys, targets
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg config.ControllerConfig) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetConfig(cfg config.ControllerConfig) {
 	s.cfg = cfg
 	s.dbOperator.setConfig(cfg)
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetIconInfo(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetIconInfo(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
 
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMySQL, s)
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMessage, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMessage, s)
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
-	items := msg.([]*MT)
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
+	m := msg.(MAPT)
+	dbItems := m.GetMySQLItems().([]*MT)
+	// TODO @liuchao
+	// addition := m.GetAddition().(*MAAT)
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
-	keys, chItems := s.generateKeyTargets(md, items)
+	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
@@ -233,8 +266,11 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
-	items := msg.([]*MT)
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	m := msg.(MDPT)
+	items := m.GetMySQLItems().([]*MT)
+	// TODO @liuchao
+	// addition := m.GetAddition().(*MDAT)
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
@@ -250,7 +286,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 }
 
 // Delete resource by domain
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
 	var chModel CT
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
@@ -263,7 +299,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 }
 
 // Delete resource by sub domain
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
 	var chModel CT
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
@@ -276,7 +312,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 }
 
 // Update team_id of resource by sub domain
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
 	var chModel CT
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
@@ -288,7 +324,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md
 }
 
 // Update updated_at when resource is deleted
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB) {
 	var updateItems []MT
 	err := db.Unscoped().First(&updateItems).Error
 	if err == nil {
