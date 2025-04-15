@@ -29,6 +29,19 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
+const (
+	hookerAddPage = iota
+	hookerDeletePage
+)
+
+type addPageHooker[MT constraint.MySQLModel, MAT msgconstraint.Add, MAPT msgconstraint.AddPtr[MAT]] interface {
+	beforeAddPage([]*MT, MAPT) []*MT
+}
+
+type deletePageHooker[MT constraint.MySQLModel, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
+	beforeDeletePage([]*MT, MDPT) []*MT
+}
+
 var (
 	subscriberManagerOnce sync.Once
 	subscriberManager     *SubscriberManager
@@ -184,6 +197,7 @@ type SubscriberComponent[
 	resourceTypeName    string // CH表资源类型
 	dbOperator          operator[CT, KT]
 	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
+	hookers             map[int]interface{}
 }
 
 func newSubscriberComponent[
@@ -202,6 +216,7 @@ func newSubscriberComponent[
 	s := SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]{
 		subResourceTypeName: sourceResourceTypeName,
 		resourceTypeName:    resourceTypeName,
+		hookers:             make(map[int]interface{}),
 	}
 	s.initDBOperator()
 	return s
@@ -245,13 +260,17 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
 	dbItems := m.GetMySQLItems().([]*MT)
-	// TODO @liuchao
-	// addition := m.GetAddition().(*MAAT)
+
+	newItems := dbItems
+	if hooker, ok := s.hookers[hookerAddPage].(addPageHooker[MT, MAT, MAPT]); ok {
+		newItems = hooker.beforeAddPage(dbItems, m)
+	}
+
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
-	keys, chItems := s.generateKeyTargets(md, dbItems)
+	keys, chItems := s.generateKeyTargets(md, newItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
@@ -269,13 +288,17 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	m := msg.(MDPT)
 	items := m.GetMySQLItems().([]*MT)
-	// TODO @liuchao
-	// addition := m.GetAddition().(*MDAT)
+
+	newItems := items
+	if hooker, ok := s.hookers[hookerDeletePage].(deletePageHooker[MT, MDT, MDPT]); ok {
+		newItems = hooker.beforeDeletePage(items, m)
+	}
+
 	db, err := metadb.GetDB(md.ORGID)
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
-	keys, chItems := s.generateKeyTargets(md, items)
+	keys, chItems := s.generateKeyTargets(md, newItems)
 	if md.SoftDelete {
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
