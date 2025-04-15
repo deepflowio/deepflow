@@ -24,11 +24,11 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::LogParserConfig,
+    config::handler::{LogParserConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
             L7ResponseStatus, LogMessageType,
         },
@@ -42,8 +42,8 @@ pub struct RocketmqInfo {
     #[serde(skip)]
     is_tls: bool,
 
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id: u32,
+    #[serde(rename = "x_request_id", skip_serializing_if = "value_is_default")]
+    pub msg_key: String,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -97,9 +97,57 @@ pub struct RocketmqInfo {
     endpoint: Option<String>,
 }
 
+fn parse_trace_info_from_properties(
+    properties: &str,
+) -> (Option<String>, Option<String>, Option<String>) {
+    let mut msg_key = None;
+    let mut trace_id = None;
+    let mut span_id = None;
+
+    // use the STX control character (U+0002) as a delimiter
+    // to split different attribute pairs
+    for pair in properties.split(|c| c == '\u{2}') {
+        if pair.is_empty() {
+            continue;
+        }
+
+        // use the SOH control character (U+0001) as a delimiter
+        // to split the key and value of each attribute
+        let mut iter = pair.splitn(2, '\u{1}');
+        if let (Some(key), Some(value)) = (iter.next(), iter.next()) {
+            match key {
+                "KEY" | "UNIQ_KEY" => {
+                    msg_key = Some(value.to_string());
+                }
+                "traceparent" => {
+                    // OpenTelemetry W3C trace context format: 00-TRACEID-SPANID-01
+                    trace_id = TraceType::TraceParent
+                        .decode_trace_id(value)
+                        .map(|cow| cow.into_owned());
+                    span_id = TraceType::TraceParent
+                        .decode_span_id(value)
+                        .map(|cow| cow.into_owned());
+                }
+                "sw8" => {
+                    // SkyWalking format: 1-TRACEID-SEGMENTID-3-...
+                    trace_id = TraceType::Sw8
+                        .decode_trace_id(value)
+                        .map(|cow| cow.into_owned());
+                    span_id = TraceType::Sw8
+                        .decode_span_id(value)
+                        .map(|cow| cow.into_owned());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    (msg_key, trace_id, span_id)
+}
+
 impl L7ProtocolInfoInterface for RocketmqInfo {
     fn session_id(&self) -> Option<u32> {
-        Some(self.x_request_id)
+        Some(self.opaque)
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
@@ -198,9 +246,15 @@ impl From<RocketmqInfo> for L7ProtocolSendLog {
                 result: f.resp_body,
                 ..Default::default()
             },
+            trace_info: Some(TraceInfo {
+                trace_id: Some(f.trace_id),
+                span_id: Some(f.span_id),
+                ..Default::default()
+            }),
             ext_info: Some(ExtendedInfo {
                 request_id: Some(f.opaque),
-                x_request_id_0: Some(f.x_request_id.to_string()),
+                x_request_id_0: Some(f.msg_key.clone()),
+                x_request_id_1: Some(f.msg_key.clone()),
                 ..Default::default()
             }),
             flags,
@@ -367,8 +421,44 @@ impl RocketmqLog {
             };
             info.resp_body = body.body_data.body;
         }
-        info.x_request_id = info.opaque;
         info.endpoint = info.get_endpoint();
+
+        // extract trace info according to the message type
+        if info.msg_type == LogMessageType::Request {
+            // for request messages sent by the producer,
+            // try to retrieve properties field from ExtFields
+            if let Some(ext_fields) = &header.header_data.ext_fields {
+                // extract trace info from the properties field within ExtFields
+                if let Some(properties) = &ext_fields.properties {
+                    let (msg_key, trace_id, span_id) = parse_trace_info_from_properties(properties);
+                    if let Some(xid) = msg_key {
+                        info.msg_key = xid;
+                    }
+                    if let Some(tid) = trace_id {
+                        info.trace_id = tid;
+                    }
+                    if let Some(sid) = span_id {
+                        info.span_id = sid;
+                    }
+                }
+            }
+        }
+
+        // try to extract trace info from the properties field within bodyData
+        // regardless of the message type, so as to cover the messages received by the consumer
+        if let Some(properties) = &body.body_data.properties {
+            let (msg_key, trace_id, span_id) = parse_trace_info_from_properties(properties);
+            if info.msg_key.is_empty() && msg_key.is_some() {
+                info.msg_key = msg_key.unwrap();
+            }
+            if info.trace_id.is_empty() && trace_id.is_some() {
+                info.trace_id = trace_id.unwrap();
+            }
+            if info.span_id.is_empty() && span_id.is_some() {
+                info.span_id = span_id.unwrap();
+            }
+        }
+
         Ok(())
     }
 }
@@ -436,6 +526,12 @@ pub struct RocketmqHeaderExtFields {
         skip_serializing_if = "Option::is_none"
     )]
     queue_id: Option<String>,
+    #[serde(
+        rename = "properties",
+        alias = "i",
+        skip_serializing_if = "Option::is_none"
+    )]
+    properties: Option<String>,
     // TODO: add necessary keys according to request code
 }
 
@@ -574,9 +670,13 @@ impl RocketmqHeader {
                     ext_fields.queue_id = Some(String::from_utf8_lossy(value).into_owned());
                     flags |= 0b0100;
                 }
+                b"properties" | b"i" => {
+                    ext_fields.properties = Some(String::from_utf8_lossy(value).into_owned());
+                    flags |= 0b1000;
+                }
                 _ => (),
             }
-            if flags == 0b0111 {
+            if flags == 0b1111 {
                 break;
             }
         }
@@ -1539,6 +1639,8 @@ pub struct RocketmqBody {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct RocketmqBodyData {
     body: String,
+    #[serde(skip)]
+    pub properties: Option<String>,
 }
 
 impl RocketmqBody {
@@ -1604,6 +1706,22 @@ impl RocketmqBody {
         }
         self.body_data.body =
             String::from_utf8_lossy(&data[offset..(offset + length as usize)]).into_owned();
+        offset += length as usize;
+
+        let topic_length = data[offset];
+        offset += 1;
+        offset += topic_length as usize;
+
+        let properties_length = bytes::read_u16_be(&data[offset..(offset + 2)]);
+        offset += 2;
+        if properties_length > (data.len() - offset) as u16 {
+            return -1;
+        }
+        let properties =
+            String::from_utf8_lossy(&data[offset..(offset + properties_length as usize)])
+                .into_owned();
+        self.body_data.properties = Some(properties);
+
         data.len() as isize
     }
 }
@@ -1697,6 +1815,22 @@ mod tests {
             (
                 "rocketmq-update-consumer-offset.pcap",
                 "rocketmq-update-consumer-offset.result",
+            ),
+            (
+                "rocketmq-producer-otel.pcap",
+                "rocketmq-producer-otel.result",
+            ),
+            (
+                "rocketmq-producer-skywalking.pcap",
+                "rocketmq-producer-skywalking.result",
+            ),
+            (
+                "rocketmq-consumer-otel.pcap",
+                "rocketmq-consumer-otel.result",
+            ),
+            (
+                "rocketmq-consumer-skywalking.pcap",
+                "rocketmq-consumer-skywalking.result",
             ),
         ];
 
