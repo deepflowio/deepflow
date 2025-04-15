@@ -133,7 +133,7 @@ func getProcessMessageDeleteAddition(db *metadb.DB, dbItems interface{}, resourc
 	}
 	deletedGIDs := mapset.NewSet[uint32]()
 	for gid, count := range gidToCount {
-		if count == 0 {
+		if count <= 0 {
 			deletedGIDs.Add(gid)
 		}
 	}
