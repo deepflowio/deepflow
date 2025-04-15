@@ -49,58 +49,71 @@ impl Capture {
                     0,
                 )
                 .unwrap();
-                Some(meta)
+                return Some(meta);
             }
-            Linktype::LINUX_SLL => {
-                let mut meta = MetaPacket::empty();
-                meta.update(
-                    // remove 2 bytes to fake ethernet header
-                    &packet.data[2..],
-                    true,
-                    true,
-                    Duration::new(
-                        packet.header.ts.tv_sec as u64,
-                        packet.header.ts.tv_usec as u32 * 1000,
-                    ),
-                    0,
-                )
-                .unwrap();
+            _ => (),
+        }
 
-                // fake mac with ip
-                let mut data = (&packet.data[2..]).to_vec();
-                (&mut data[0..12]).fill(0);
-                match meta.lookup_key.dst_ip {
-                    IpAddr::V4(ip) => {
-                        data[0..4].copy_from_slice(&ip.octets());
-                    }
-                    IpAddr::V6(ip) => {
-                        data[0..6].copy_from_slice(&ip.octets()[0..6]);
-                    }
-                }
-                match meta.lookup_key.src_ip {
-                    IpAddr::V4(ip) => {
-                        data[6..10].copy_from_slice(&ip.octets());
-                    }
-                    IpAddr::V6(ip) => {
-                        data[6..12].copy_from_slice(&ip.octets()[0..6]);
-                    }
-                }
-                let mut meta = MetaPacket::empty();
-                meta.update(
-                    data,
-                    true,
-                    true,
-                    Duration::new(
-                        packet.header.ts.tv_sec as u64,
-                        packet.header.ts.tv_usec as u32 * 1000,
-                    ),
-                    0,
-                )
-                .unwrap();
-                Some(meta)
+        // change SLL header to look like ethernet header just before L3 header
+        let mut data = match dl_type {
+            // 2 bytes longer than ethernet header
+            Linktype::LINUX_SLL => (&packet.data[2..]).to_vec(),
+            Linktype::LINUX_SLL2 => {
+                // 6 bytes longer, and L3 type is in first 2 bytes
+                let mut data = (&packet.data[6..]).to_vec();
+                data[12..14].copy_from_slice(&packet.data[0..2]);
+                data
             }
             _ => unimplemented!(),
+        };
+
+        let mut meta = MetaPacket::empty();
+        meta.update(
+            &data[..],
+            true,
+            true,
+            Duration::new(
+                packet.header.ts.tv_sec as u64,
+                packet.header.ts.tv_usec as u32 * 1000,
+            ),
+            0,
+        )
+        .unwrap();
+
+        let src_ip = meta.lookup_key.src_ip;
+        let dst_ip = meta.lookup_key.dst_ip;
+        // fake mac with ip
+        (&mut data[0..12]).fill(0);
+        match dst_ip {
+            IpAddr::V4(ip) => {
+                data[0..4].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[0..6].copy_from_slice(&ip.octets()[0..6]);
+            }
         }
+        match src_ip {
+            IpAddr::V4(ip) => {
+                data[6..10].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[6..12].copy_from_slice(&ip.octets()[0..6]);
+            }
+        }
+
+        let mut meta = MetaPacket::empty();
+        meta.update(
+            data,
+            true,
+            true,
+            Duration::new(
+                packet.header.ts.tv_sec as u64,
+                packet.header.ts.tv_usec as u32 * 1000,
+            ),
+            0,
+        )
+        .unwrap();
+        Some(meta)
     }
 }
 
