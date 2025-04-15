@@ -26,13 +26,33 @@ import (
 )
 
 type ChVPC struct {
-	SubscriberComponent[*message.VPCFieldsUpdate, message.VPCFieldsUpdate, mysqlmodel.VPC, mysqlmodel.ChVPC, IDKey]
+	SubscriberComponent[
+		*message.VPCAdd,
+		message.VPCAdd,
+		*message.VPCFieldsUpdate,
+		message.VPCFieldsUpdate,
+		*message.VPCDelete,
+		message.VPCDelete,
+		mysqlmodel.VPC,
+		mysqlmodel.ChVPC,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	mng := &ChVPC{
-		newSubscriberComponent[*message.VPCFieldsUpdate, message.VPCFieldsUpdate, mysqlmodel.VPC, mysqlmodel.ChVPC, IDKey](
+		newSubscriberComponent[
+			*message.VPCAdd,
+			message.VPCAdd,
+			*message.VPCFieldsUpdate,
+			message.VPCFieldsUpdate,
+			*message.VPCDelete,
+			message.VPCDelete,
+			mysqlmodel.VPC,
+			mysqlmodel.ChVPC,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_VPC_EN, RESOURCE_TYPE_CH_VPC,
 		),
 		resourceTypeToIconID,

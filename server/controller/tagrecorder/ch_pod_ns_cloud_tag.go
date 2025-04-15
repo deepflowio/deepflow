@@ -24,12 +24,32 @@ import (
 )
 
 type ChPodNSCloudTag struct {
-	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, CloudTagKey]
+	SubscriberComponent[
+		*message.PodNamespaceAdd,
+		message.PodNamespaceAdd,
+		*message.PodNamespaceFieldsUpdate,
+		message.PodNamespaceFieldsUpdate,
+		*message.PodNamespaceDelete,
+		message.PodNamespaceDelete,
+		mysqlmodel.PodNamespace,
+		mysqlmodel.ChPodNSCloudTag,
+		CloudTagKey,
+	]
 }
 
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	mng := &ChPodNSCloudTag{
-		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, CloudTagKey](
+		newSubscriberComponent[
+			*message.PodNamespaceAdd,
+			message.PodNamespaceAdd,
+			*message.PodNamespaceFieldsUpdate,
+			message.PodNamespaceFieldsUpdate,
+			*message.PodNamespaceDelete,
+			message.PodNamespaceDelete,
+			mysqlmodel.PodNamespace,
+			mysqlmodel.ChPodNSCloudTag,
+			CloudTagKey,
+		](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
 		),
 	}

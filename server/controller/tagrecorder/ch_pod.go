@@ -26,13 +26,33 @@ import (
 )
 
 type ChPod struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPod, IDKey]
+	SubscriberComponent[
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		mysqlmodel.Pod,
+		mysqlmodel.ChPod,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 	mng := &ChPod{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPod, IDKey](
+		newSubscriberComponent[
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			mysqlmodel.Pod,
+			mysqlmodel.ChPod,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD,
 		),
 		resourceTypeToIconID,
