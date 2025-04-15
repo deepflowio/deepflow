@@ -24,12 +24,32 @@ import (
 )
 
 type ChOSAppTags struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTags, OSAPPTagsKey]
+	SubscriberComponent[
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete,
+		mysqlmodel.Process,
+		mysqlmodel.ChOSAppTags,
+		OSAPPTagsKey,
+	]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
 	mng := &ChOSAppTags{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTags, OSAPPTagsKey](
+		newSubscriberComponent[
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
+			message.ProcessDelete,
+			mysqlmodel.Process,
+			mysqlmodel.ChOSAppTags,
+			OSAPPTagsKey,
+		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
