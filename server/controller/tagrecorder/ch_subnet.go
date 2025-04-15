@@ -26,13 +26,33 @@ import (
 )
 
 type ChNetwork struct {
-	SubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysqlmodel.Network, mysqlmodel.ChNetwork, IDKey]
+	SubscriberComponent[
+		*message.NetworkAdd,
+		message.NetworkAdd,
+		*message.NetworkFieldsUpdate,
+		message.NetworkFieldsUpdate,
+		*message.NetworkDelete,
+		message.NetworkDelete,
+		mysqlmodel.Network,
+		mysqlmodel.ChNetwork,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	mng := &ChNetwork{
-		newSubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysqlmodel.Network, mysqlmodel.ChNetwork, IDKey](
+		newSubscriberComponent[
+			*message.NetworkAdd,
+			message.NetworkAdd,
+			*message.NetworkFieldsUpdate,
+			message.NetworkFieldsUpdate,
+			*message.NetworkDelete,
+			message.NetworkDelete,
+			mysqlmodel.Network,
+			mysqlmodel.ChNetwork,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_NETWORK_EN, RESOURCE_TYPE_CH_NETWORK,
 		),
 		resourceTypeToIconID,

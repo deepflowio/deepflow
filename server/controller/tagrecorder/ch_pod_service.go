@@ -26,12 +26,32 @@ import (
 )
 
 type ChPodService struct {
-	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodService, IDKey]
+	SubscriberComponent[
+		*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete,
+		mysqlmodel.PodService,
+		mysqlmodel.ChPodService,
+		IDKey,
+	]
 }
 
 func NewChPodService() *ChPodService {
 	mng := &ChPodService{
-		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodService, IDKey](
+		newSubscriberComponent[
+			*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
+			message.PodServiceDelete,
+			mysqlmodel.PodService,
+			mysqlmodel.ChPodService,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE,
 		),
 	}

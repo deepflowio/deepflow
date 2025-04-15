@@ -24,12 +24,32 @@ import (
 )
 
 type ChPodServiceK8sLabels struct {
-	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabels, K8sLabelsKey]
+	SubscriberComponent[
+		*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete,
+		mysqlmodel.PodService,
+		mysqlmodel.ChPodServiceK8sLabels,
+		K8sLabelsKey,
+	]
 }
 
 func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 	mng := &ChPodServiceK8sLabels{
-		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabels, K8sLabelsKey](
+		newSubscriberComponent[
+			*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
+			message.PodServiceDelete,
+			mysqlmodel.PodService,
+			mysqlmodel.ChPodServiceK8sLabels,
+			K8sLabelsKey,
+		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABELS,
 		),
 	}

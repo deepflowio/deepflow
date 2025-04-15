@@ -26,12 +26,32 @@ import (
 )
 
 type ChChost struct {
-	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChChost, IDKey]
+	SubscriberComponent[
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete,
+		mysqlmodel.VM,
+		mysqlmodel.ChChost,
+		IDKey,
+	]
 }
 
 func NewChChost() *ChChost {
 	mng := &ChChost{
-		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChChost, IDKey](
+		newSubscriberComponent[
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+			message.VMDelete,
+			mysqlmodel.VM,
+			mysqlmodel.ChChost,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST,
 		),
 	}
