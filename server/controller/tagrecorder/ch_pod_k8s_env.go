@@ -24,12 +24,32 @@ import (
 )
 
 type ChPodK8sEnv struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sEnv, K8sEnvKey]
+	SubscriberComponent[
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sEnv,
+		K8sEnvKey,
+	]
 }
 
 func NewChPodK8sEnv() *ChPodK8sEnv {
 	mng := &ChPodK8sEnv{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sEnv, K8sEnvKey](
+		newSubscriberComponent[
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sEnv,
+			K8sEnvKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ENV,
 		),
 	}

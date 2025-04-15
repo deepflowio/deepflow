@@ -26,13 +26,33 @@ import (
 )
 
 type ChPodNode struct {
-	SubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, metadbmodel.PodNode, metadbmodel.ChPodNode, IDKey]
+	SubscriberComponent[
+		*message.PodNodeAdd,
+		message.PodNodeAdd,
+		*message.PodNodeFieldsUpdate,
+		message.PodNodeFieldsUpdate,
+		*message.PodNodeDelete,
+		message.PodNodeDelete,
+		metadbmodel.PodNode,
+		metadbmodel.ChPodNode,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 	mng := &ChPodNode{
-		newSubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, metadbmodel.PodNode, metadbmodel.ChPodNode, IDKey](
+		newSubscriberComponent[
+			*message.PodNodeAdd,
+			message.PodNodeAdd,
+			*message.PodNodeFieldsUpdate,
+			message.PodNodeFieldsUpdate,
+			*message.PodNodeDelete,
+			message.PodNodeDelete,
+			metadbmodel.PodNode,
+			metadbmodel.ChPodNode,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_NODE_EN, RESOURCE_TYPE_CH_POD_NODE,
 		),
 		resourceTypeToIconID,

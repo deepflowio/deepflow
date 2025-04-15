@@ -26,13 +26,33 @@ import (
 )
 
 type ChPodCluster struct {
-	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChPodCluster, IDKey]
+	SubscriberComponent[
+		*message.PodClusterAdd,
+		message.PodClusterAdd,
+		*message.PodClusterFieldsUpdate,
+		message.PodClusterFieldsUpdate,
+		*message.PodClusterDelete,
+		message.PodClusterDelete,
+		metadbmodel.PodCluster,
+		metadbmodel.ChPodCluster,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	mng := &ChPodCluster{
-		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, metadbmodel.PodCluster, metadbmodel.ChPodCluster, IDKey](
+		newSubscriberComponent[
+			*message.PodClusterAdd,
+			message.PodClusterAdd,
+			*message.PodClusterFieldsUpdate,
+			message.PodClusterFieldsUpdate,
+			*message.PodClusterDelete,
+			message.PodClusterDelete,
+			metadbmodel.PodCluster,
+			metadbmodel.ChPodCluster,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_CLUSTER_EN, RESOURCE_TYPE_CH_POD_CLUSTER,
 		),
 		resourceTypeToIconID,

@@ -26,12 +26,32 @@ import (
 )
 
 type ChPodIngress struct {
-	SubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, metadbmodel.PodIngress, metadbmodel.ChPodIngress, IDKey]
+	SubscriberComponent[
+		*message.PodIngressAdd,
+		message.PodIngressAdd,
+		*message.PodIngressFieldsUpdate,
+		message.PodIngressFieldsUpdate,
+		*message.PodIngressDelete,
+		message.PodIngressDelete,
+		metadbmodel.PodIngress,
+		metadbmodel.ChPodIngress,
+		IDKey,
+	]
 }
 
 func NewChPodIngress() *ChPodIngress {
 	mng := &ChPodIngress{
-		newSubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, metadbmodel.PodIngress, metadbmodel.ChPodIngress, IDKey](
+		newSubscriberComponent[
+			*message.PodIngressAdd,
+			message.PodIngressAdd,
+			*message.PodIngressFieldsUpdate,
+			message.PodIngressFieldsUpdate,
+			*message.PodIngressDelete,
+			message.PodIngressDelete,
+			metadbmodel.PodIngress,
+			metadbmodel.ChPodIngress,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_INGRESS_EN, RESOURCE_TYPE_CH_POD_INGRESS,
 		),
 	}

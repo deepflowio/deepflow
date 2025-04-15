@@ -24,12 +24,32 @@ import (
 )
 
 type ChOSAppTag struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTag, OSAPPTagKey]
+	SubscriberComponent[
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete,
+		metadbmodel.Process,
+		metadbmodel.ChOSAppTag,
+		OSAPPTagKey,
+	]
 }
 
 func NewChOSAppTag() *ChOSAppTag {
 	mng := &ChOSAppTag{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, metadbmodel.Process, metadbmodel.ChOSAppTag, OSAPPTagKey](
+		newSubscriberComponent[
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
+			message.ProcessDelete,
+			metadbmodel.Process,
+			metadbmodel.ChOSAppTag,
+			OSAPPTagKey,
+		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
 	}
