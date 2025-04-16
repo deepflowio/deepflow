@@ -57,19 +57,13 @@ func (v *VTapInterface) getVTapInterfaces() gin.HandlerFunc {
 		}
 
 		fuzzyFields := []string{"name", "mac", "device_name", "vtap_name", "tap_name", "tap_mac"}
-		fuzzyCount := 0
 		for _, field := range fuzzyFields {
 			if value, ok := c.GetQuery("fuzzy_" + field); ok {
-				if fuzzyCount > 0 {
-					response.JSON(c, response.SetData(nil), response.SetError(fmt.Errorf("only one fuzzy field is allowed")))
-					return
-				}
 				if strings.TrimSpace(value) == "" {
 					response.JSON(c, response.SetData(nil), response.SetError(fmt.Errorf("fuzzy_%s cannot be empty", field)))
 					return
 				}
 				args["fuzzy_"+field] = value
-				fuzzyCount++
 			}
 		}
 
