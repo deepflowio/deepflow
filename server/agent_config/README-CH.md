@@ -6740,7 +6740,7 @@ processors:
 
 部分 MySQL 数据包采用 LZ77 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
 设置为 false 以关闭解压，提升性能。
-参考：https://dev.mysql.com/doc/dev/mysql-server/8.4.3/page_protocol_basic_compression.html
+参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
 
 ### 过滤器 {#processors.request_log.filters}
 
