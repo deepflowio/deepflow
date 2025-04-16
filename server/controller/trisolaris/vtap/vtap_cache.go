@@ -576,13 +576,15 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		)
 	}
 
+	configure.UserConfig.Set("inputs.cbpf.special_network.dpdk.source", "None")
 	if !c.EnabledNetDpdk() {
-		configure.UserConfig.Set("inputs.cbpf.special_network.dpdk.source", "null")
+		//configure.UserConfig.Delete("inputs.cbpf.special_network.dpdk.source")
+		configure.UserConfig.Set("inputs.cbpf.special_network.dpdk.source", "None")
 		configure.UserConfig.Set("inputs.cbpf.special_network.vhost_user.vhost_socket_path", "")
 		configure.UserConfig.Set("inputs.ebpf.socket.uprobe.dpdk.command", "")
 		configure.UserConfigComment = append(
 			configure.UserConfigComment,
-			"# inputs.cbpf.special_network.dpdk.source = null, set by feature controller",
+			"# inputs.cbpf.special_network.dpdk.source = '', set by feature controller",
 		)
 		configure.UserConfigComment = append(
 			configure.UserConfigComment,
@@ -636,9 +638,11 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		)
 	}
 
+	configure.UserConfig.Delete("plugins")
 	if !c.EnabledTraceBiz() && !c.EnabledDevTraceBiz() {
 		configure.UserConfig.Set("processors.request_log.tag_extraction.custom_field_policies", []string{})
 		configure.UserConfig.Set("processors.request_log.application_protocol_inference.custom_protocols", []string{})
+		// configure.UserConfig.Delete("plugins")
 		configure.UserConfig.Set("plugins", "null")
 		configure.UserConfigComment = append(
 			configure.UserConfigComment,
@@ -650,7 +654,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		)
 		configure.UserConfigComment = append(
 			configure.UserConfigComment,
-			"# plugins = null, set by feature controller",
+			"# plugins = '', set by feature controller",
 		)
 	}
 
