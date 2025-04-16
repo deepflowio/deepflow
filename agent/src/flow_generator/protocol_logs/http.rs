@@ -1534,16 +1534,16 @@ const HTTP_METHODS: [&'static str; 15] = [
 ];
 const RESPONSE_PREFIX: &'static str = "HTTP/";
 
+// check if `s` starts with `prefix` and a space
+fn has_prefix(s: &[u8], prefix: &[u8]) -> bool {
+    s.len() >= prefix.len() + 1 && s.starts_with(prefix) && s[prefix.len()] == b' '
+}
+
 pub fn is_http_v1_payload(buf: &[u8]) -> bool {
     if buf.starts_with(RESPONSE_PREFIX.as_bytes()) {
         return true;
     }
-    for m in HTTP_METHODS {
-        if buf.starts_with(m.as_bytes()) {
-            return true;
-        }
-    }
-    false
+    HTTP_METHODS.iter().position(|m| has_prefix(buf, m.as_bytes())).is_some()
 }
 
 // check first line is http request line
@@ -1553,16 +1553,13 @@ pub fn is_http_req_line(line: &str) -> bool {
     }
 
     // consider use prefix tree in future
-    for i in HTTP_METHODS.iter() {
-        if line.starts_with(i) {
-            let end = &line[line.len() - 8..];
-            match end {
-                "HTTP/0.9" | "HTTP/1.0" | "HTTP/1.1" => return true,
-                _ => return false,
-            }
-        }
+    if HTTP_METHODS.iter().position(|m| has_prefix(line.as_bytes(), m.as_bytes())).is_none() {
+        return false;
+    };
+    match line.rsplit_once(' ') {
+        Some((_, "HTTP/0.9" | "HTTP/1.0" | "HTTP/1.1")) => true,
+        _ => false,
     }
-    false
 }
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -2241,5 +2238,24 @@ mod tests {
         let path = String::from("/api/v1/users/123?query=456");
         let expected_output = "/api/v1"; // prefixes match, but the keep_segments is 0, use the default value 2 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+    }
+
+    #[test]
+    fn segmented_tcp_false_positive() {
+        let packet = MetaPacket::empty();
+        let mut param = ParseParam::new(
+            &packet,
+            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        param.l4_protocol = IpProtocol::TCP;
+
+        let mut parser = HttpLog::new_v1();
+        assert!(!parser.check_payload(concat!(r#"POST","name":"一些中文""#, "\r\nblablabla\r\n").as_bytes(), &param));
+        assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
     }
 }
