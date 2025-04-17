@@ -410,7 +410,7 @@ func (p *PlatformDataOP) generateGProcessInfo() {
 	for _, process := range processes {
 		podId := rawData.containerIdToPodId[process.ContainerID]
 		p := &trident.GProcessInfo{
-			GprocessId: proto.Uint32(uint32(process.ID)),
+			GprocessId: proto.Uint32(process.GID),
 			VtapId:     proto.Uint32(uint32(process.VTapID)),
 			PodId:      proto.Uint32(uint32(podId)),
 			Pid:        proto.Uint32(uint32(process.PID)),

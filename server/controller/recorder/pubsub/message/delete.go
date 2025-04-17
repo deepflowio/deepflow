@@ -293,7 +293,7 @@ type ProcessDelete struct {
 }
 
 type ProcessDeleteAddition struct {
-	DeletedGIDs []uint64
+	DeletedGIDs []uint32
 }
 
 type CustomServiceDelete struct {

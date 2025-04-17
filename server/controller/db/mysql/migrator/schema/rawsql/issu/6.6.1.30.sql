@@ -28,4 +28,4 @@ CALL AddColumnIfNotExists('process', 'pod_group_id', 'INTEGER', 'deviceid');
 
 DROP PROCEDURE AddColumnIfNotExists;
 
-UPDATE db_version SET version='7.0.1.14';
+UPDATE db_version SET version='6.6.1.30';

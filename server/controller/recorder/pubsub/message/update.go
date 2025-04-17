@@ -750,6 +750,7 @@ type ProcessFieldsUpdate struct {
 	OSAPPTags   fieldDetail[string]
 	VMID        fieldDetail[int]
 	VPCID       fieldDetail[int]
+	GID         fieldDetail[uint32]
 }
 type ProcessUpdate struct {
 	Fields[ProcessFieldsUpdate]

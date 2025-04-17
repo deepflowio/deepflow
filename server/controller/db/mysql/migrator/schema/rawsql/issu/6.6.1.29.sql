@@ -28,4 +28,4 @@ CALL AddColumnIfNotExists('process', 'gid', 'INTEGER NOT NULL', 'pid');
 
 DROP PROCEDURE AddColumnIfNotExists;
 
-UPDATE db_version SET version='7.0.1.13';
+UPDATE db_version SET version='6.6.1.29';
