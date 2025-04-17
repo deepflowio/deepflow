@@ -117,8 +117,8 @@ type DataSet struct {
 	vtapIDToType           map[int]int
 	vtapIDToLaunchServerID map[int]int
 
-	processIdentifierToGID map[ProcessIdentifier]uint64
-	processGIDToCount      map[uint64]uint
+	processIdentifierToGID map[ProcessIdentifier]uint32
+	processGIDToCount      map[uint32]uint
 }
 
 type ProcessIdentifier struct {
@@ -211,8 +211,8 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		vtapIDToType:           make(map[int]int),
 		vtapIDToLaunchServerID: make(map[int]int),
 
-		processIdentifierToGID: make(map[ProcessIdentifier]uint64),
-		processGIDToCount:      make(map[uint64]uint),
+		processIdentifierToGID: make(map[ProcessIdentifier]uint32),
+		processGIDToCount:      make(map[uint32]uint),
 	}
 }
 
@@ -1035,7 +1035,7 @@ func (t *DataSet) AddProcess(item *mysqlmodel.Process) {
 		Name: item.Name,
 	}
 
-	identifier := t.GetProcessIdentifierByProcess(item)
+	identifier := t.GetProcessIdentifierByDBProcess(item)
 	t.processIdentifierToGID[identifier] = item.GID
 	t.processGIDToCount[item.GID]++
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -1046,7 +1046,7 @@ func (t *DataSet) DeleteProcess(dbItem *mysqlmodel.Process) {
 	if count, exists := t.processGIDToCount[dbItem.GID]; exists {
 		t.processGIDToCount[dbItem.GID]--
 		if count <= 0 {
-			identifier := t.GetProcessIdentifierByProcess(dbItem)
+			identifier := t.GetProcessIdentifierByDBProcess(dbItem)
 			delete(t.processIdentifierToGID, identifier)
 			delete(t.processGIDToCount, dbItem.GID)
 		}
@@ -1054,24 +1054,28 @@ func (t *DataSet) DeleteProcess(dbItem *mysqlmodel.Process) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, dbItem.Lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) GetProcessIdentifierByProcess(p *mysqlmodel.Process) ProcessIdentifier {
+func (t *DataSet) GetProcessIdentifierByDBProcess(p *mysqlmodel.Process) ProcessIdentifier {
+	return t.GetProcessIdentifier(p.Name, p.PodGroupID, p.VTapID, p.CommandLine)
+}
+
+func (t *DataSet) GetProcessIdentifier(name string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
 	var identifier ProcessIdentifier
-	if p.PodGroupID == 0 {
+	if podGroupID == 0 {
 		identifier = ProcessIdentifier{
-			Name:        p.Name,
-			VTapID:      p.VTapID,
-			CommandLine: p.CommandLine,
+			Name:        name,
+			VTapID:      vtapID,
+			CommandLine: commandLine,
 		}
 	} else {
 		identifier = ProcessIdentifier{
-			Name:       p.Name,
-			PodGroupID: p.PodGroupID,
+			Name:       name,
+			PodGroupID: podGroupID,
 		}
 	}
 	return identifier
 }
 
-func (t *DataSet) GetProcessGIDByIdentifier(identifier ProcessIdentifier) (uint64, bool) {
+func (t *DataSet) GetProcessGIDByIdentifier(identifier ProcessIdentifier) (uint32, bool) {
 	pid, exists := t.processIdentifierToGID[identifier]
 	return pid, exists
 }

@@ -72,7 +72,7 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       newIDPool[mysqlmodel.PodGroup](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[mysqlmodel.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysqlmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
-		ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN:        newIDPool[mysqlmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN:        newProcessGIDPool(mng.org, ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysqlmodel.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
 
@@ -82,13 +82,10 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		return nil, err
 	}
 	if orgTableExists && orgID == ctrlrcommon.DEFAULT_ORG_ID {
-		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[mysqlmodel.ORG](
+		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newORGIDPool(
 			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
 		)
-		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN].(*IDPool[mysqlmodel.ORG]).resetKeyField("org_id")
 	}
-
-	mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN].(*IDPool[mysqlmodel.Process]).resetKeyField("gid")
 	return mng, nil
 }
 
@@ -132,11 +129,17 @@ type IDPoolUpdater interface {
 	recycle(ids []int)
 }
 
+type idGetter[MT MySQLModel] interface {
+	getRealID(*MT) int
+}
+
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type IDPool[MT MySQLModel] struct {
 	mutex    sync.RWMutex
 	keyField string
 	AscIDAllocator
+
+	idGetter idGetter[MT]
 }
 
 func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
@@ -160,7 +163,7 @@ func (p *IDPool[MT]) load() (mapset.Set[int], error) {
 	}
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
-		inUseIDsSet.Add((*item).GetID())
+		inUseIDsSet.Add(p.getID(item))
 	}
 	log.Infof("loaded %s ids successfully", p.resourceType, p.org.LogPrefix)
 	return inUseIDsSet, nil
@@ -176,11 +179,18 @@ func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 	inUseIDs := make([]int, 0)
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
-			inUseIDs = append(inUseIDs, (*item).GetID())
+			inUseIDs = append(inUseIDs, p.getID(item))
 		}
 		log.Infof("%s ids: %+v are in use.", p.resourceType, inUseIDs, p.org.LogPrefix)
 	}
 	return inUseIDs, nil
+}
+
+func (p *IDPool[MT]) getID(item *MT) int {
+	if p.idGetter == nil {
+		return (*item).GetID()
+	}
+	return p.idGetter.getRealID(item)
 }
 
 func (p *IDPool[MT]) refresh() error {
@@ -201,4 +211,34 @@ func (p *IDPool[MT]) recycle(ids []int) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.Recycle(ids)
+}
+
+type ProcessGIDPool struct {
+	*IDPool[mysqlmodel.Process]
+}
+
+func newProcessGIDPool(org *common.ORG, resourceType string, max int) IDPoolUpdater {
+	p := &ProcessGIDPool{newIDPool[mysqlmodel.Process](org, resourceType, max)}
+	p.idGetter = p
+	p.resetKeyField("gid")
+	return p
+}
+
+func (p *ProcessGIDPool) getRealID(item *mysqlmodel.Process) int {
+	return int(item.GID)
+}
+
+type ORGIDPool struct {
+	*IDPool[mysqlmodel.ORG]
+}
+
+func newORGIDPool(org *common.ORG, resourceType string, max int) IDPoolUpdater {
+	p := &ORGIDPool{newIDPool[mysqlmodel.ORG](org, resourceType, max)}
+	p.idGetter = p
+	p.resetKeyField("org_id")
+	return p
+}
+
+func (p *ORGIDPool) getRealID(item *mysqlmodel.ORG) int {
+	return item.ORGID
 }
