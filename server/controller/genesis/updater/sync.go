@@ -522,7 +522,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(orgID int, vtapID uint32, messa
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
 		processes = append(processes, model.GenesisProcess{
-			Lcuuid:      ccommon.GetUUIDByOrgID(orgID, strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID))),
+			Lcuuid:      ccommon.GetUUIDByOrgID(orgID, strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID))+p.GetCmdline()),
 			PID:         pID,
 			NetnsID:     p.GetNetnsId(),
 			Name:        p.GetName(),

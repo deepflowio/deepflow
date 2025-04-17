@@ -147,7 +147,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 	}
 
 	gid, _ := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
-		p.cache.ToolDataSet.GetProcessIdentifierByProcess(dbItem),
+		p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(dbItem),
 	)
 	dbItem.GID = gid
 	dbItem.Lcuuid = cloudItem.Lcuuid
@@ -176,17 +176,39 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 		mapInfo["deviceid"] = deviceID
 	}
 
+	if len(mapInfo) > 0 {
+		var podGroupID int
+		if deviceType == common.VIF_DEVICE_TYPE_POD {
+			podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+				return nil, nil, false
+			}
+
+			if podInfo != nil {
+				podGroupID = podInfo.PodGroupID
+			}
+		}
+		gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
+			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
+		)
+		if !ok {
+			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
+			return nil, nil, false
+		}
+		structInfo.GID.Set(gid, gid)
+	}
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
 
 func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Process, *message.ProcessAddAddition, bool) {
 	idToNewGIDFlag := make(map[int]bool)
-	identifierToNewGID := make(map[tool.ProcessIdentifier]uint64)
+	identifierToNewGID := make(map[tool.ProcessIdentifier]uint32)
 	for _, item := range dbData {
 		if item.GID != 0 {
 			continue
 		}
-		identifier := p.cache.ToolDataSet.GetProcessIdentifierByProcess(item)
+		identifier := p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)
 		if _, ok := identifierToNewGID[identifier]; !ok {
 			idToNewGIDFlag[item.ID] = true
 			identifierToNewGID[identifier] = item.GID
@@ -207,7 +229,7 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 
 		start := 0
 		for k := range identifierToNewGID {
-			identifierToNewGID[k] = uint64(ids[start])
+			identifierToNewGID[k] = uint32(ids[start])
 			start++
 		}
 
@@ -215,17 +237,17 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 			if item.GID != 0 {
 				continue
 			}
-			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByProcess(item)]
+			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)]
 		}
 	}
 	return dbData, &message.ProcessAddAddition{IDToTagRecorderNewGIDFlag: idToNewGIDFlag}, true
 }
 
 func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.ProcessDeleteAddition, bool) {
-	deletedGIDs := mapset.NewSet[uint64]()
+	deletedGIDs := mapset.NewSet[uint32]()
 	gids := make([]int, 0)
 	for _, item := range dbData {
-		if _, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByProcess(item)); ok {
+		if _, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); ok {
 			deletedGIDs.Add(item.GID)
 			gids = append(gids, int(item.GID))
 		}
