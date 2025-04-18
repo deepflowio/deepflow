@@ -394,14 +394,16 @@ global:
     # description:
     #   en: |-
     #     CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-    #     without being migrated to other processors. Invalid ID will be ignored. Example:
+    #     without being migrated to other processors. Invalid ID will be ignored. Currently only
+    #     works for dispatcher threads. Example:
     #     ```yaml
     #     global:
     #       tunning:
     #         cpu_affinity: [1, 3, 5, 7, 9]
     #     ```
     #   ch: |-
-    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。举例：
+    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。当前仅对
+    #     dispatcher 线程生效。举例：
     #     ```yaml
     #     global:
     #       tunning:
@@ -4501,19 +4503,47 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     deepflow-agent will mark the long live stream and application protocol for each
-      #     <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
-      #     to be identified for many times (for multiple packets, Socket Data, Function Data),
-      #     the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
-      #     try (incurring significant computational overhead) until the duration exceeds
-      #     l7-protocol-inference-ttl.
+      #     The agent records the application protocol resolution results of each server through a hash table, including the
+      #     protocol, the number of continuous resolution failures, and the last resolution time
+      #
+      #     When an app protocol for Flow has never been successfully resolved, a hash table is used to decide which protocols
+      #     to try to resolve:
+      #     - If the result is not found in the hash table, or the result is not available (the protocol is unknown, or the
+      #       number of failures exceeds the limit, or the time is more than inference_result_ttl from the current time)
+      #       - If the number of failures has been exceeded, Flow is marked as prohibited for resolution for a period of
+      #         inference_result_ttl
+      #       - Otherwise, iterate through all open application protocols and try to parse them
+      #         - When the parsing is successful, the protocol, parsing time, and number of failures (0) are updated to the hash
+      #           table to keep the successful parsing results fresh
+      #         - When parsing fails, the parsing time and number of failures (+1) are updated to the hash table so that the failed
+      #           attempts can be accumulated, and subsequent attempts will be prohibited after the accumulation exceeds the threshold
+      #       - If a specific, available protocol is found in the hash table, it is attempted using that protocol
+      #         - When the parsing is successful, the protocol, parsing time, and number of failures (0) are updated to the hash table
+      #           to keep the successful parsing results fresh
+      #         - When parsing fails, the parsing time and number of failures (+1) are updated to the hash table so that the failed
+      #           attempts can be accumulated, and subsequent attempts will be prohibited after the accumulation exceeds the threshold
+      #
+      #     Once a Flow is successfully parsed once, it will only use that protocol type to try to parse it once, and there is no need
+      #     to query the hash table。
+      #     Each time the resolution is successful, the protocol in the hash table (for HTTP2/gRPC needs to be updated), the resolution
+      #     time, and the number of failures will be updated.
       #   ch: |-
-      #     deepflow-agent 会周期性标记每一个 `<vpc, ip, protocol, port>` 四元组承载的应用协议类型，以加速
-      #     后续数据的应用协议采集过程。如果一个时间周期内，连续多次尝试解析 Packet 数据、Socket 数据无法推断
-      #     出该四元组承载的应用协议，agent 会将该四元组标记为 unknown 类型，并在本周期内暂停对后续数据的应用
-      #     协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
+      #     Agent 通过一张哈希表记录每一个服务端的应用协议解析结果，包括协议、持续解析失败次数、最后一次解析时间。
+      #
+      #     当一条 Flow 的应用协议从未成功解析过时，使用哈希表决定尝试解析哪些协议：
+      #     - 若没有在哈希表中查到结果，或者查到的结果不可用（协议未知，或失败次数超限，或时间距当前超过 inference_result_ttl）
+      #       - 若失败次数已经超限，则将 Flow 标记为禁止解析，禁止期为 inference_result_ttl
+      #       - 否则，遍历所有开启的应用协议，尝试解析
+      #         - 解析成功时会将协议、解析时间、失败次数（0）更新到哈希表中，使得成功的解析结果保鲜
+      #         - 解析失败时会将解析时间和失败次数（+1）更新到哈希表中，使得失败的尝试能够累计，累计超过阈值后会禁止后续尝试
+      #     - 如果在哈希表中查到了具体的、可用的协议，则使用该协议进行尝试
+      #       - 解析成功时会将协议、解析时间、失败次数（0）更新到哈希表中，使得成功的解析结果保鲜
+      #       - 解析失败时会将解析时间和失败次数（+1）更新到哈希表中，使得失败的尝试能够累计，累计超过阈值后会禁止后续尝试
+      #
+      #     当 Flow 一旦成功解析过一次，后续都仅使用该协议类型尝试解析，且无需再查询哈希表。
+      #     每次解析成功时，将会更新哈希表中的协议（针对 HTTP2/gRPC 需进行更新）、解析时间、失败次数。
       # upgrade_from: static_config.l7-protocol-inference-max-fail-count
-      inference_max_retries: 5
+      inference_max_retries: 128
       # type: duration
       # name:
       #   en: Inference Result TTL
