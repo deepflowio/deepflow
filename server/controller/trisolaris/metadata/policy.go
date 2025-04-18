@@ -135,20 +135,18 @@ func (p *Policy) addFlowACL(flowACL *trident.FlowAcl, aclType int) {
 	}
 }
 
-var tnFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION,
-	VTAP_LICENSE_FUNCTION_NETWORK_MONITORING)
-var tFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION)
-var nFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_NETWORK_MONITORING)
+var tnFunction mapset.Set = mapset.NewSet(AGENT_LICENSE_FUNCTION_NET_NPB, AGENT_LICENSE_FUNCTION_NET_NPMD)
+var tnDedicatedFunction mapset.Set = mapset.NewSet(AGENT_LICENSE_FUNCTION_DEV_NET_NPB, AGENT_LICENSE_FUNCTION_DEV_NET_NPMD)
 
 func (p *Policy) getPolicyString(functions mapset.Set) []byte {
 	if functions.Cardinality() == 0 {
 		return nil
 	}
-	if tnFunction.IsSubset(functions) {
+	if tnFunction.IsSubset(functions) || tnDedicatedFunction.IsSubset(functions) {
 		return p.serializeString
-	} else if tFunction.IsSubset(functions) {
+	} else if functions.Contains(AGENT_LICENSE_FUNCTION_NET_NPB) || functions.Contains(AGENT_LICENSE_FUNCTION_DEV_NET_NPB) {
 		return p.npbSerializeString
-	} else if nFunction.IsSubset(functions) {
+	} else if functions.Contains(AGENT_LICENSE_FUNCTION_NET_NPMD) || functions.Contains(AGENT_LICENSE_FUNCTION_DEV_NET_NPMD) {
 		return p.pcapSerializeString
 	}
 
@@ -159,11 +157,11 @@ func (p *Policy) getPolicyVersion(functions mapset.Set) uint64 {
 	if functions.Cardinality() == 0 {
 		return 0xFFFFFFFF
 	}
-	if tnFunction.IsSubset(functions) {
+	if tnFunction.IsSubset(functions) || tnDedicatedFunction.IsSubset(functions) {
 		return p.version
-	} else if tFunction.IsSubset(functions) {
+	} else if functions.Contains(AGENT_LICENSE_FUNCTION_NET_NPB) || functions.Contains(AGENT_LICENSE_FUNCTION_DEV_NET_NPB) {
 		return p.npbVersion
-	} else if nFunction.IsSubset(functions) {
+	} else if functions.Contains(AGENT_LICENSE_FUNCTION_NET_NPMD) || functions.Contains(AGENT_LICENSE_FUNCTION_DEV_NET_NPMD) {
 		return p.pcapVersion
 	}
 
