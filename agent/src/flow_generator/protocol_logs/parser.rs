@@ -672,6 +672,11 @@ impl SessionQueue {
 
     fn flush_till(&mut self, time: Timestamp) {
         self.entries.forward_time(time, |item| {
+            self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+            self.counter.cached_request_resource.fetch_sub(
+                item.l7_info.get_request_resource_length() as u64,
+                Ordering::Relaxed,
+            );
             self.bs.send(item.clone(), Some(L7ResponseStatus::Timeout));
             None
         });
