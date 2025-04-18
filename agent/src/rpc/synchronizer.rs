@@ -838,7 +838,7 @@ impl Synchronizer {
         if wait_ntp {
             // Here, it is necessary to wait for the NTP synchronization timestamp to start
             // collecting traffic and avoid using incorrect timestamps
-            info!("Waitting for NTP ...");
+            info!("Waiting for NTP synchronization to complete... The agent will remain temporarily disabled until synchronization is finished.");
             let _ = ntp_receiver.changed().await;
         }
         if updated {
@@ -1086,48 +1086,48 @@ impl Synchronizer {
                     .await;
 
                 if let Err(e) = response {
-                    warn!("ntp request failed with: {:?}", e);
+                    warn!("NTP request failed with: {:?}, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.", e);
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 let response = response.unwrap().into_inner();
                 if response.response.is_none() {
-                    warn!("ntp response empty");
+                    warn!("NTP response is empty, please check the NTP service. If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
                     time::sleep(sync_interval).await;
                     continue;
                 }
 
                 let resp_packet = NtpPacket::try_from(response.response.unwrap().as_ref());
                 if let Err(e) = resp_packet {
-                    warn!("parse ntp response failed: {:?}", e);
+                    warn!("Parse NTP response failed: {:?}, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.", e);
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 let mut resp_packet = resp_packet.unwrap();
 
                 if resp_packet.get_mode() != NtpMode::Server {
-                    warn!("NTP: invalid mod in response");
+                    warn!("NTP: invalid mod in response, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 if resp_packet.ts_xmit == 0 {
-                    warn!("NTP: invalid transmit time in response");
+                    warn!("NTP: invalid transmit time in response, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 if resp_packet.ts_orig != ntp_msg.ts_xmit {
-                    warn!("NTP: server response mismatch");
+                    warn!("NTP: server response mismatch, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 if resp_packet.ts_recv > resp_packet.ts_xmit {
-                    warn!("NTP: server clock ticked backwards");
+                    warn!("NTP: server clock ticked backwards, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
                     time::sleep(sync_interval).await;
                     continue;
                 }
                 let recv_time = SystemTime::now();
                 if let Err(e) = recv_time.duration_since(send_time) {
-                    warn!("system time err: {:?}", e);
+                    warn!("System time err: {:?}, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.", e);
                     time::sleep(sync_interval).await;
                     continue;
                 }
