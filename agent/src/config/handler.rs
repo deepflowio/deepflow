@@ -49,7 +49,7 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        SessionTimeout, TagFilterOperator, UserConfig,
+        RequestLogTunning, SessionTimeout, TagFilterOperator, UserConfig,
     },
     ConfigError, KubernetesPollerType,
 };
@@ -1011,7 +1011,8 @@ impl Default for LogParserConfig {
     fn default() -> Self {
         Self {
             l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_max_entries: 16384,
+            l7_log_session_aggr_max_entries: RequestLogTunning::default()
+                .session_aggregate_max_entries,
             l7_log_session_aggr_max_timeout: SessionTimeout::DEFAULT,
             l7_log_session_aggr_timeout: HashMap::new(),
             l7_log_dynamic: L7LogDynamicConfig::default(),

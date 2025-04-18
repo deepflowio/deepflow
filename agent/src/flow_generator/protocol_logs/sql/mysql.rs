@@ -1354,7 +1354,6 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
-            ("a-testcase.pcap", "mysql-use.result"),
             ("mysql-use.pcap", "mysql-use.result"),
             ("mysql-exec.pcap", "mysql-exec.result"),
             ("mysql-statement-id.pcap", "mysql-statement-id.result"),
