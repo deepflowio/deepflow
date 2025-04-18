@@ -64,6 +64,7 @@ const (
 	STATUS_SERVER_ERROR
 	STATUS_CLIENT_ERROR
 	STATUS_UNKNOWN
+	STATUS_PARSE_FAILED
 )
 
 func (t LogMessageStatus) String() string {
@@ -78,6 +79,8 @@ func (t LogMessageStatus) String() string {
 		return "Server Error"
 	case STATUS_CLIENT_ERROR:
 		return "Client Error"
+	case STATUS_PARSE_FAILED:
+		return "Parse Failed"
 	default:
 		return "Unknown"
 	}
