@@ -1043,9 +1043,9 @@ func (t *DataSet) AddProcess(item *mysqlmodel.Process) {
 
 func (t *DataSet) DeleteProcess(dbItem *mysqlmodel.Process) {
 	delete(t.processLcuuidToInfo, dbItem.Lcuuid)
-	if count, exists := t.processGIDToCount[dbItem.GID]; exists {
+	if _, exists := t.processGIDToCount[dbItem.GID]; exists {
 		t.processGIDToCount[dbItem.GID]--
-		if count <= 0 {
+		if t.processGIDToCount[dbItem.GID] <= 0 {
 			identifier := t.GetProcessIdentifierByDBProcess(dbItem)
 			delete(t.processIdentifierToGID, identifier)
 			delete(t.processGIDToCount, dbItem.GID)
