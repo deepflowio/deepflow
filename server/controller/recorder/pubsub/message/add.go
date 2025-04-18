@@ -226,7 +226,7 @@ type ProcessAdd struct {
 }
 
 type ProcessAddAddition struct {
-	IDToTagRecorderNewGIDFlag map[int]bool // 标识是否是新建的 pid，遵循 tagrecorder 需求，重复使用新建的 pid，仅随机标记 1 次新建
+	// CreatedGIDs []uint32 // reserved for tagrecorder use
 }
 
 type CustomServiceAdd struct {
