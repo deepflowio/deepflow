@@ -34,12 +34,14 @@ type NATVMConnection struct {
 		metadbmodel.NATVMConnection,
 		*message.NATVMConnectionAdd,
 		message.NATVMConnectionAdd,
+		message.AddNoneAddition,
 		*message.NATVMConnectionUpdate,
 		message.NATVMConnectionUpdate,
 		*message.NATVMConnectionFieldsUpdate,
 		message.NATVMConnectionFieldsUpdate,
 		*message.NATVMConnectionDelete,
-		message.NATVMConnectionDelete]
+		message.NATVMConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMConnection) *NATVMConnection {
@@ -51,11 +53,14 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 			metadbmodel.NATVMConnection,
 			*message.NATVMConnectionAdd,
 			message.NATVMConnectionAdd,
+			message.AddNoneAddition,
 			*message.NATVMConnectionUpdate,
 			message.NATVMConnectionUpdate,
 			*message.NATVMConnectionFieldsUpdate,
 			message.NATVMConnectionFieldsUpdate,
 			*message.NATVMConnectionDelete,
+			message.NATVMConnectionDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,

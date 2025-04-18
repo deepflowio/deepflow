@@ -25,12 +25,14 @@ type DHCPPort struct {
 	ResourcePubSubComponent[
 		*message.DHCPPortAdd,
 		message.DHCPPortAdd,
+		message.AddNoneAddition,
 		*message.DHCPPortUpdate,
 		message.DHCPPortUpdate,
 		*message.DHCPPortFieldsUpdate,
 		message.DHCPPortFieldsUpdate,
 		*message.DHCPPortDelete,
-		message.DHCPPortDelete]
+		message.DHCPPortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewDHCPPort() *DHCPPort {
@@ -38,12 +40,14 @@ func NewDHCPPort() *DHCPPort {
 		ResourcePubSubComponent[
 			*message.DHCPPortAdd,
 			message.DHCPPortAdd,
+			message.AddNoneAddition,
 			*message.DHCPPortUpdate,
 			message.DHCPPortUpdate,
 			*message.DHCPPortFieldsUpdate,
 			message.DHCPPortFieldsUpdate,
 			*message.DHCPPortDelete,
 			message.DHCPPortDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeDHCPPort),
 			resourceType:    common.RESOURCE_TYPE_DHCP_PORT_EN,

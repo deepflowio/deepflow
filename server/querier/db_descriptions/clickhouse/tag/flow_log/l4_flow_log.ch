@@ -88,6 +88,7 @@ l7_protocol           , 应用协议                     ,
 request_domain        , 请求域名                     ,
 
 flow_id               , 流日志 ID                    ,
+aggregated_flow_ids   , 聚合流日志 ID                ,
 start_time            , 开始时间                     , 单位: 微秒。表示当前自然分钟内流的开始时间，对于新建流表示首包时间。
 end_time              , 结束时间                     , 单位: 微秒。表示当前自然分钟内流的结束时间，若流在该分钟内 close，则为尾包时间或流状态机超时的时间。
 close_type            , 流结束类型                   ,

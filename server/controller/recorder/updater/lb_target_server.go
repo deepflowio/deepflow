@@ -34,12 +34,14 @@ type LBTargetServer struct {
 		metadbmodel.LBTargetServer,
 		*message.LBTargetServerAdd,
 		message.LBTargetServerAdd,
+		message.AddNoneAddition,
 		*message.LBTargetServerUpdate,
 		message.LBTargetServerUpdate,
 		*message.LBTargetServerFieldsUpdate,
 		message.LBTargetServerFieldsUpdate,
 		*message.LBTargetServerDelete,
-		message.LBTargetServerDelete]
+		message.LBTargetServerDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetServer) *LBTargetServer {
@@ -51,11 +53,14 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 			metadbmodel.LBTargetServer,
 			*message.LBTargetServerAdd,
 			message.LBTargetServerAdd,
+			message.AddNoneAddition,
 			*message.LBTargetServerUpdate,
 			message.LBTargetServerUpdate,
 			*message.LBTargetServerFieldsUpdate,
 			message.LBTargetServerFieldsUpdate,
 			*message.LBTargetServerDelete,
+			message.LBTargetServerDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,

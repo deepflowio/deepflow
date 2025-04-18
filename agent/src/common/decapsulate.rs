@@ -788,11 +788,8 @@ mod tests {
             is_ipv6: false,
             from: 0,
         };
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
@@ -825,11 +822,8 @@ mod tests {
             is_ipv6: false,
             from: 0,
         };
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
@@ -862,11 +856,8 @@ mod tests {
             is_ipv6: false,
             from: 0,
         };
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap")).into();
         let packet = packets[3].as_mut_slice();
 
         let l2_len = 14;
@@ -892,11 +883,8 @@ mod tests {
             is_ipv6: false,
             from: 0,
         };
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap")).into();
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
@@ -923,7 +911,7 @@ mod tests {
             from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ff-vxlan.pcap"), None).into();
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ff-vxlan.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
@@ -948,11 +936,8 @@ mod tests {
             is_ipv6: false,
             from: 0,
         };
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap")).into();
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
@@ -979,7 +964,7 @@ mod tests {
             from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"), None).into();
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
@@ -1006,7 +991,7 @@ mod tests {
             from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"), None).into();
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
@@ -1023,11 +1008,8 @@ mod tests {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan, TunnelType::Erspan]);
         let mut actual_bitmap = TunnelTypeBitmap::new(&vec![TunnelType::None]);
 
-        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
-            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
-            None,
-        )
-        .into();
+        let mut packets: Vec<Vec<u8>> =
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap")).into();
 
         let l2_len = 14;
 
@@ -1055,7 +1037,7 @@ mod tests {
             from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("geneve.pcap"), None).into();
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("geneve.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let mut actual = TunnelInfo::default();
@@ -1079,7 +1061,7 @@ mod tests {
             from: 0,
         };
         let mut packets: Vec<Vec<u8>> =
-            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("vxlan-nsh.pcap"), None).into();
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("vxlan-nsh.pcap")).into();
         let packet = packets[0].as_mut_slice();
 
         let mut actual = TunnelInfo::default();

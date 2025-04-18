@@ -17,6 +17,7 @@
 package idmng
 
 import (
+	"fmt"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -71,6 +72,7 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       newIDPool[metadbmodel.PodGroup](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[metadbmodel.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[metadbmodel.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN:        newProcessGIDPool(mng.org, ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[metadbmodel.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
 
@@ -80,11 +82,10 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		return nil, err
 	}
 	if orgTableExists && orgID == ctrlrcommon.DEFAULT_ORG_ID {
-		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[metadbmodel.ORG](
+		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newORGIDPool(
 			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
 		)
 	}
-
 	return mng, nil
 }
 
@@ -128,33 +129,41 @@ type IDPoolUpdater interface {
 	recycle(ids []int)
 }
 
+type idGetter[MT MySQLModel] interface {
+	getRealID(*MT) int
+}
+
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type IDPool[MT MySQLModel] struct {
-	mutex sync.RWMutex
+	mutex    sync.RWMutex
+	keyField string
 	AscIDAllocator
+
+	idGetter idGetter[MT]
 }
 
 func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
 	p := &IDPool[MT]{
+		keyField:       "id",
 		AscIDAllocator: NewAscIDAllocator(org, resourceType, minID, max),
 	}
 	p.SetInUseIDsProvider(p)
 	return p
 }
 
+func (p *IDPool[MT]) resetKeyField(keyField string) {
+	p.keyField = keyField
+}
+
 func (p *IDPool[MT]) load() (mapset.Set[int], error) {
-	idField := "id"
-	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_ORG_EN {
-		idField = "org_id"
-	}
-	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select(idField))
+	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select(p.keyField))
 	if err != nil {
 		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
-		inUseIDsSet.Add((*item).GetID())
+		inUseIDsSet.Add(p.getID(item))
 	}
 	log.Infof("loaded %s ids successfully", p.resourceType, p.org.LogPrefix)
 	return inUseIDsSet, nil
@@ -162,7 +171,7 @@ func (p *IDPool[MT]) load() (mapset.Set[int], error) {
 
 func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 	var dbItems []*MT
-	err := p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err := p.org.DB.Unscoped().Where(fmt.Sprintf("%s IN ?", p.keyField), ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err
@@ -170,11 +179,18 @@ func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 	inUseIDs := make([]int, 0)
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
-			inUseIDs = append(inUseIDs, (*item).GetID())
+			inUseIDs = append(inUseIDs, p.getID(item))
 		}
 		log.Infof("%s ids: %+v are in use.", p.resourceType, inUseIDs, p.org.LogPrefix)
 	}
 	return inUseIDs, nil
+}
+
+func (p *IDPool[MT]) getID(item *MT) int {
+	if p.idGetter == nil {
+		return (*item).GetID()
+	}
+	return p.idGetter.getRealID(item)
 }
 
 func (p *IDPool[MT]) refresh() error {
@@ -195,4 +211,34 @@ func (p *IDPool[MT]) recycle(ids []int) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.Recycle(ids)
+}
+
+type ProcessGIDPool struct {
+	*IDPool[metadbmodel.Process]
+}
+
+func newProcessGIDPool(org *common.ORG, resourceType string, max int) IDPoolUpdater {
+	p := &ProcessGIDPool{newIDPool[metadbmodel.Process](org, resourceType, max)}
+	p.idGetter = p
+	p.resetKeyField("gid")
+	return p
+}
+
+func (p *ProcessGIDPool) getRealID(item *metadbmodel.Process) int {
+	return int(item.GID)
+}
+
+type ORGIDPool struct {
+	*IDPool[metadbmodel.ORG]
+}
+
+func newORGIDPool(org *common.ORG, resourceType string, max int) IDPoolUpdater {
+	p := &ORGIDPool{newIDPool[metadbmodel.ORG](org, resourceType, max)}
+	p.idGetter = p
+	p.resetKeyField("org_id")
+	return p
+}
+
+func (p *ORGIDPool) getRealID(item *metadbmodel.ORG) int {
+	return item.ORGID
 }

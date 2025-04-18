@@ -17,13 +17,17 @@
 package updater
 
 import (
+	mapset "github.com/deckarep/golang-set/v2"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -35,12 +39,14 @@ type Process struct {
 		metadbmodel.Process,
 		*message.ProcessAdd,
 		message.ProcessAdd,
+		message.ProcessAddAddition,
 		*message.ProcessUpdate,
 		message.ProcessUpdate,
 		*message.ProcessFieldsUpdate,
 		message.ProcessFieldsUpdate,
 		*message.ProcessDelete,
-		message.ProcessDelete]
+		message.ProcessDelete,
+		message.ProcessDeleteAddition]
 }
 
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
@@ -52,11 +58,14 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 			metadbmodel.Process,
 			*message.ProcessAdd,
 			message.ProcessAdd,
+			message.ProcessAddAddition,
 			*message.ProcessUpdate,
 			message.ProcessUpdate,
 			*message.ProcessFieldsUpdate,
 			message.ProcessFieldsUpdate,
 			*message.ProcessDelete,
+			message.ProcessDelete,
+			message.ProcessDeleteAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
@@ -66,6 +75,8 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		),
 	}
 	updater.dataGenerator = updater
+	updater.hookers[hookerBeforeDBAddPage] = updater
+	updater.hookers[hookerAfterDBDeletePage] = updater
 	return updater
 }
 
@@ -78,14 +89,16 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
 	// add pod node id
 	var podNodeID int
+	var podGroupID int
 	if deviceType == common.VIF_DEVICE_TYPE_POD {
 		podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
 		if err != nil {
 			log.Error(err)
 		}
 
-		if podInfo != nil && podInfo.PodNodeID != 0 {
+		if podInfo != nil {
 			podNodeID = podInfo.PodNodeID
+			podGroupID = podInfo.PodGroupID
 		}
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		podNodeID = deviceID
@@ -113,7 +126,6 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 	if vmInfo != nil {
 		vpcID = vmInfo.VPCID
 	}
-
 	dbItem := &metadbmodel.Process{
 		Name:        cloudItem.Name,
 		VTapID:      cloudItem.VTapID,
@@ -128,10 +140,16 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 		NetnsID:     cloudItem.NetnsID,
 		DeviceType:  deviceType,
 		DeviceID:    deviceID,
+		PodGroupID:  podGroupID,
 		PodNodeID:   podNodeID,
 		VMID:        vmID,
 		VPCID:       vpcID,
 	}
+
+	gid, _ := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
+		p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(dbItem),
+	)
+	dbItem.GID = gid
 	dbItem.Lcuuid = cloudItem.Lcuuid
 
 	return dbItem, true
@@ -158,5 +176,91 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 		mapInfo["deviceid"] = deviceID
 	}
 
+	if len(mapInfo) > 0 {
+		var podGroupID int
+		if deviceType == common.VIF_DEVICE_TYPE_POD {
+			podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+				return nil, nil, false
+			}
+
+			if podInfo != nil {
+				podGroupID = podInfo.PodGroupID
+			}
+		}
+		gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
+			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
+		)
+		if !ok {
+			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
+			return nil, nil, false
+		}
+		structInfo.GID.Set(gid, gid)
+	}
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.Process, *message.ProcessAddAddition, bool) {
+	idToNewGIDFlag := make(map[int]bool)
+	identifierToNewGID := make(map[tool.ProcessIdentifier]uint32)
+	for _, item := range dbData {
+		if item.GID != 0 {
+			continue
+		}
+		identifier := p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)
+		if _, ok := identifierToNewGID[identifier]; !ok {
+			idToNewGIDFlag[item.ID] = true
+			identifierToNewGID[identifier] = item.GID
+		}
+	}
+	log.Infof("TODO beforeAddPage idToNewGIDFlag: %#v", idToNewGIDFlag, p.metadata.LogPrefixes)
+	log.Infof("TODO beforeAddPage identifierToNewGID: %#v", identifierToNewGID, p.metadata.LogPrefixes)
+	if len(identifierToNewGID) > 0 {
+		// TODO combine with operator module
+		// TODO support partial ids allocation
+		gidResourceType := ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN
+		ids, err := idmng.GetIDs(p.metadata.GetORGID(), gidResourceType, len(identifierToNewGID))
+		if err != nil {
+			log.Errorf("%s request gids failed", gidResourceType, p.metadata.LogPrefixes)
+			return dbData, nil, false
+		}
+		log.Infof("%s use gids: %v", gidResourceType, ids, p.metadata.LogPrefixes)
+
+		start := 0
+		for k := range identifierToNewGID {
+			identifierToNewGID[k] = uint32(ids[start])
+			start++
+		}
+
+		for _, item := range dbData {
+			if item.GID != 0 {
+				continue
+			}
+			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)]
+		}
+	}
+	return dbData, &message.ProcessAddAddition{IDToTagRecorderNewGIDFlag: idToNewGIDFlag}, true
+}
+
+func (p *Process) afterDeletePage(dbData []*metadbmodel.Process) (*message.ProcessDeleteAddition, bool) {
+	deletedGIDs := mapset.NewSet[uint32]()
+	gids := mapset.NewSet[int]()
+	for _, item := range dbData {
+		if _, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); !ok {
+			deletedGIDs.Add(item.GID)
+			gids.Add(int(item.GID))
+		}
+	}
+	if deletedGIDs.Cardinality() == 0 {
+		return &message.ProcessDeleteAddition{}, false
+	}
+
+	gidResourceType := ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN
+	err := idmng.ReleaseIDs(p.metadata.GetORGID(), gidResourceType, gids.ToSlice())
+	if err != nil {
+		log.Errorf("%s release gids: %v failed", gidResourceType, gids, p.metadata.LogPrefixes)
+	}
+	log.Infof("%s return used gids: %v", gidResourceType, gids, p.metadata.LogPrefixes)
+	return &message.ProcessDeleteAddition{DeletedGIDs: deletedGIDs.ToSlice()}, true
 }

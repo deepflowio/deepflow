@@ -23,5 +23,5 @@ import (
 type Listener[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase] interface {
 	OnUpdaterAdded(addedDBItems []*MT)
 	OnUpdaterUpdated(cloudItem *CT, diffBaseItem BT)
-	OnUpdaterDeleted(lcuuids []string)
+	OnUpdaterDeleted(lcuuids []string, deletedDBItems []*MT)
 }

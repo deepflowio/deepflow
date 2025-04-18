@@ -161,6 +161,8 @@ MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1, FEATURE_FLAG_SOCKET_TRACER)
  */
 MAP_ARRAY(proto_infer_cache_map, __u32, struct proto_infer_cache_t, PROTO_INFER_CACHE_SIZE, FEATURE_FLAG_SOCKET_TRACER)
 #endif
+// Store IO event information
+MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1, FEATURE_FLAG_SOCKET_TRACER)
 /* *INDENT-ON* */
 
 static __inline bool is_protocol_enabled(int protocol)
@@ -1888,8 +1890,7 @@ KRETFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf,
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
-	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
-	if (write_args != NULL && write_args->fd > 2) {
+	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
 		process_syscall_data((struct pt_regs *)ctx, id, T_EGRESS,
 				     write_args, bytes_count);
@@ -1940,8 +1941,7 @@ KRETFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count,
 	__u64 id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
-	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
-	if (read_args != NULL && read_args->fd > 2) {
+	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
 		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS,
 				     read_args, bytes_count);
@@ -2703,10 +2703,6 @@ KFUNC_PROG(__sys_connect, int fd, struct sockaddr __user * uservaddr,
 	return 0;
 }
 
-// Store IO event information
-MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1,
-	     FEATURE_FLAG_SOCKET_TRACER)
-
 static __inline int finalize_data_output(void *ctx,
 					 struct tracer_ctx_s *tracer_ctx,
 					 __u64 curr_time, __u64 diff,
@@ -3134,185 +3130,6 @@ PROGKP(data_submit) (void *ctx) {
 	return 0;
 }
 
-static __inline bool is_regular_file(int fd,
-				     struct member_fields_offset *off_ptr)
-{
-	struct member_fields_offset *offset = off_ptr;
-	if (offset == NULL) {
-		__u32 k0 = 0;
-		offset = members_offset__lookup(&k0);
-	}
-	void *file = fd_to_file(fd, offset);
-	__u32 i_mode = file_to_i_mode(file, offset);
-	return S_ISREG(i_mode);
-}
-
-static __inline void set_file_metric_data(struct __io_event_buffer *buffer,
-					   int fd,
-					   struct member_fields_offset *off_ptr)
-{
-#define MAX_DIRECTORY_DEPTH 20
-
-	struct member_fields_offset *offset = off_ptr;
-	if (offset == NULL) {
-		__u32 k0 = 0;
-		offset = members_offset__lookup(&k0);
-	}
-
-	void *file = fd_to_file(fd, offset);
-	if (file == NULL)
-		return;
-
-	bpf_probe_read_kernel(&buffer->offset, sizeof(buffer->offset),
-			      file + offset->struct_file_f_pos_offset);
-
-	void *dentry = NULL, *parent;
-	bpf_probe_read_kernel(&dentry, sizeof(dentry),
-			      file + offset->struct_file_dentry_offset);
-	buffer->len = 0;
-#pragma unroll
-	for (int i = 0; i < MAX_DIRECTORY_DEPTH; i++) {
-		char *name = NULL;
-		bpf_probe_read_kernel(&name, sizeof(name),
-				      dentry +
-				      offset->struct_dentry_name_offset);
-		struct __dentry_name *d_n =
-		    (struct __dentry_name *)(buffer->filename + buffer->len);
-		if (buffer->len + sizeof(d_n->name) > sizeof(buffer->filename))
-			break;
-		buffer->len +=
-		    bpf_probe_read_kernel_str(d_n->name, sizeof(d_n->name), name);
-
-		bpf_probe_read_kernel(&parent, sizeof(parent),
-                              dentry + offset->struct_dentry_d_parent_offset);
-
-		if (parent == dentry || parent == NULL)
-			break;
-		dentry = parent;
-	}
-}
-
-static __inline int trace_io_event_common(void *ctx,
-					  struct member_fields_offset *offset,
-					  struct data_args_t *data_args,
-					  enum traffic_direction direction,
-					  __u64 pid_tgid)
-{
-	__u64 latency = 0;
-	__u64 trace_id = 0;
-	__u32 k0 = 0;
-	__u32 tgid = pid_tgid >> 32;
-
-	if (data_args->bytes_count <= 0) {
-		return -1;
-	}
-
-	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
-	if (tracer_ctx == NULL) {
-		return -1;
-	}
-
-	if (tracer_ctx->io_event_collect_mode == 0) {
-		return -1;
-	}
-
-	__u32 timeout = tracer_ctx->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout, false);
-	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
-	if (trace_info_ptr) {
-		trace_id = trace_info_ptr->thread_trace_id;
-	}
-
-	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
-		return -1;
-	}
-
-	int data_max_sz = tracer_ctx->data_limit_max;
-
-	if (!is_regular_file(data_args->fd, offset)) {
-		return -1;
-	}
-
-	latency = bpf_ktime_get_ns() - data_args->enter_ts;
-	if (latency < tracer_ctx->io_event_minimal_duration) {
-		return -1;
-	}
-
-	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
-	if (!buffer) {
-		return -1;
-	}
-
-	buffer->bytes_count = data_args->bytes_count;
-	buffer->latency = latency;
-	buffer->operation = direction;
-	set_file_metric_data(buffer, data_args->fd, offset);
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		return -1;
-
-	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
-		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
-		return -1;
-	}
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
-	v->tgid = tgid;
-	v->pid = (__u32) pid_tgid;
-	v->coroutine_id = trace_key.goid;
-	v->timestamp = data_args->enter_ts;
-
-	v->syscall_len = sizeof(*buffer);
-
-	v->source = DATA_SOURCE_IO_EVENT;
-
-	v->thread_trace_id = trace_id;
-	v->msg_type = MSG_COMMON;
-	bpf_get_current_comm(v->comm, sizeof(v->comm));
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
-	struct tail_calls_context *context =
-	    (struct tail_calls_context *)v->data;
-	context->max_size_limit = data_max_sz;
-	context->push_reassembly_bytes = 0;
-	context->vecs = false;
-	context->is_close = false;
-	context->dir = direction;
-
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
-	return 0;
-#else
-	return __output_data_common(ctx, tracer_ctx, v_buff, data_args,
-				    direction, false, data_max_sz, false, 0);
-#endif
-}
-
-PROGTP(io_event) (void *ctx) {
-	__u64 id = bpf_get_current_pid_tgid();
-
-	struct data_args_t *data_args = NULL;
-
-	data_args = active_read_args_map__lookup(&id);
-	if (data_args) {
-		trace_io_event_common(ctx, NULL, data_args, T_INGRESS, id);
-		active_read_args_map__delete(&id);
-		return 0;
-	}
-
-	data_args = active_write_args_map__lookup(&id);
-	if (data_args) {
-		trace_io_event_common(ctx, NULL, data_args, T_EGRESS, id);
-		active_write_args_map__delete(&id);
-		return 0;
-	}
-
-	return 0;
-}
-
 static __inline int push_socket_data(struct syscall_comm_enter_ctx *ctx)
 {
 	__u32 k0 = 0;
@@ -3403,6 +3220,7 @@ TP_SYSCALL_PROG(enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 //Refer to the eBPF programs here
+#include "files_rw.bpf.c"
 #include "go_tls.bpf.c"
 #include "go_http2.bpf.c"
 #include "openssl.bpf.c"

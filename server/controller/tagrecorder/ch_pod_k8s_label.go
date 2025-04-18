@@ -24,12 +24,32 @@ import (
 )
 
 type ChPodK8sLabel struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sLabel, K8sLabelKey]
+	SubscriberComponent[
+		*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sLabel,
+		K8sLabelKey,
+	]
 }
 
 func NewChPodK8sLabel() *ChPodK8sLabel {
 	mng := &ChPodK8sLabel{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, metadbmodel.Pod, metadbmodel.ChPodK8sLabel, K8sLabelKey](
+		newSubscriberComponent[
+			*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sLabel,
+			K8sLabelKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_LABEL,
 		),
 	}

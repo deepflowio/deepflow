@@ -1247,6 +1247,7 @@ impl FlowMap {
             } else {
                 self.generate_flow_id(lookup_key.timestamp, self.id)
             },
+            aggregated_flow_ids: Vec::new(),
             start_time: lookup_key.timestamp.into(),
             flow_stat_time: lookup_key.timestamp.round_to(TIME_UNIT.into()),
             vlan: meta_packet.vlan,
@@ -3258,8 +3259,8 @@ mod tests {
             ebpf: None,
         };
 
-        let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap", None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap");
+        let packets = capture.collect::<Vec<_>>();
 
         let dst_mac = packets[0].lookup_key.dst_mac;
         let timestamp = time::SystemTime::now()
@@ -3357,8 +3358,8 @@ mod tests {
             ebpf: None,
         };
 
-        let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap");
+        let packets = capture.collect::<Vec<_>>();
 
         flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
         let dst_mac = packets[0].lookup_key.dst_mac;
@@ -3400,11 +3401,8 @@ mod tests {
             ebpf: None,
         };
 
-        let capture = Capture::load_pcap(
-            "resources/test/flow_generator/tcp-syn-ack-zerowin.pcap",
-            None,
-        );
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap("resources/test/flow_generator/tcp-syn-ack-zerowin.pcap");
+        let packets = capture.collect::<Vec<_>>();
 
         flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
         let timestamp = time::SystemTime::now()
@@ -3494,9 +3492,8 @@ mod tests {
             ebpf: None,
         };
 
-        let capture =
-            Capture::load_pcap("resources/test/flow_generator/handshake-retrans.pcap", None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap("resources/test/flow_generator/handshake-retrans.pcap");
+        let packets = capture.collect::<Vec<_>>();
 
         flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
         let dst_mac = packets[0].lookup_key.dst_mac;

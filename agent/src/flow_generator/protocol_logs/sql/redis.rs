@@ -1060,8 +1060,8 @@ mod tests {
     fn run(name: &str) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let capture = Capture::load_pcap(pcap_file, None);
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(pcap_file);
+        let mut packets = capture.collect::<Vec<_>>();
         if packets.is_empty() {
             return "".to_string();
         }
@@ -1277,8 +1277,8 @@ mod tests {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
         let mut redis = RedisLog::default();
 
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
+        let mut packets = capture.collect::<Vec<_>>();
         if packets.len() < 2 {
             unreachable!();
         }

@@ -60,6 +60,7 @@ type VTapLKResult struct {
 	VTapType       int
 	LaunchServer   string
 	LaunchServerID int
+	CPUNum         int
 	VTapName       string
 	AZ             string
 	Region         string
@@ -622,12 +623,13 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 	}
 
 	var vTapName, launchServer, az, region, lcuuid string
-	var vTapType, launchServerID int
+	var vTapType, launchServerID, cpuNum int
 	if host.HType == HOST_HTYPE_ESXI || domainType == CLOUD_TOWER {
 		vTapName = fmt.Sprintf("%s-H%d", host.Name, host.ID)
 		vTapType = VTAP_TYPE_ESXI
 		launchServer = host.IP
 		launchServerID = host.ID
+		cpuNum = host.VCPUNum
 		az = host.AZ
 		region = host.Region
 		lcuuid = uuid.NewString()
@@ -656,6 +658,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 		lcuuid = vm.Lcuuid
 	}
 	return &VTapLKResult{
+		CPUNum:         cpuNum,
 		VTapType:       vTapType,
 		LaunchServer:   launchServer,
 		LaunchServerID: launchServerID,
@@ -675,6 +678,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 	dbVTap := &models.VTap{
 		CtrlIP:          r.ctrlIP,
 		CtrlMac:         r.ctrlMac,
+		CPUNum:          vtapLKResult.CPUNum,
 		Type:            vtapLKResult.VTapType,
 		LaunchServer:    vtapLKResult.LaunchServer,
 		LaunchServerID:  vtapLKResult.LaunchServerID,

@@ -25,12 +25,14 @@ type Host struct {
 	ResourcePubSubComponent[
 		*message.HostAdd,
 		message.HostAdd,
+		message.AddNoneAddition,
 		*message.HostUpdate,
 		message.HostUpdate,
 		*message.HostFieldsUpdate,
 		message.HostFieldsUpdate,
 		*message.HostDelete,
-		message.HostDelete]
+		message.HostDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewHost() *Host {
@@ -38,12 +40,14 @@ func NewHost() *Host {
 		ResourcePubSubComponent[
 			*message.HostAdd,
 			message.HostAdd,
+			message.AddNoneAddition,
 			*message.HostUpdate,
 			message.HostUpdate,
 			*message.HostFieldsUpdate,
 			message.HostFieldsUpdate,
 			*message.HostDelete,
 			message.HostDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeHost),
 			resourceType:    common.RESOURCE_TYPE_HOST_EN,

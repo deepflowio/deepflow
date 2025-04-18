@@ -715,9 +715,9 @@ mod test {
 
     fn check_and_parse(file_name: &str) -> (FastCGIInfo, L7PerfStats) {
         let pcap_file = Path::new(FILE_DIR).join(file_name);
-        let capture = Capture::load_pcap(pcap_file, None);
+        let capture = Capture::load_pcap(pcap_file);
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let mut p = capture.as_meta_packets();
+        let mut p = capture.collect::<Vec<_>>();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
 

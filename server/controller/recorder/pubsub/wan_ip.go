@@ -25,12 +25,14 @@ type WANIP struct {
 	ResourcePubSubComponent[
 		*message.WANIPAdd,
 		message.WANIPAdd,
+		message.AddNoneAddition,
 		*message.WANIPUpdate,
 		message.WANIPUpdate,
 		*message.WANIPFieldsUpdate,
 		message.WANIPFieldsUpdate,
 		*message.WANIPDelete,
-		message.WANIPDelete]
+		message.WANIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewWANIP() *WANIP {
@@ -38,12 +40,14 @@ func NewWANIP() *WANIP {
 		ResourcePubSubComponent[
 			*message.WANIPAdd,
 			message.WANIPAdd,
+			message.AddNoneAddition,
 			*message.WANIPUpdate,
 			message.WANIPUpdate,
 			*message.WANIPFieldsUpdate,
 			message.WANIPFieldsUpdate,
 			*message.WANIPDelete,
 			message.WANIPDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeWANIP),
 			resourceType:    common.RESOURCE_TYPE_WAN_IP_EN,

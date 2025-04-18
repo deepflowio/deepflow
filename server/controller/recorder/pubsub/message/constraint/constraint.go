@@ -25,6 +25,8 @@ type AddPtr[T Add] interface {
 
 	SetMySQLItems(interface{})
 	GetMySQLItems() interface{} // return []*constraint.MySQLModel
+	SetAddition(interface{})
+	GetAddition() interface{} // return *message.Addition
 }
 
 type Add interface {
@@ -97,6 +99,8 @@ type DeletePtr[T Delete] interface {
 	GetLcuuids() []string
 	SetMySQLItems(interface{})
 	GetMySQLItems() interface{} // return []*constraint.MySQLModel
+	SetAddition(interface{})
+	GetAddition() interface{} // return *constraint.Addition
 }
 
 type Delete interface {

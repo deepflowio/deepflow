@@ -6720,6 +6720,39 @@ processors:
 在不同的 Oracle 版本中，ID 为 0x04 的响应会有不同的数据结构，如果环境中该响应数据的
 `影响行数`前有 1byte 的额外数据，请开启此开关。
 
+##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
+
+###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        mysql:
+          decompress_payload: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+部分 MySQL 数据包采用 LZ77 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
+设置为 false 以关闭解压，提升性能。
+参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
@@ -8688,6 +8721,42 @@ outputs:
 **详细描述**:
 
 配置该参数后，deepflow-agent将不采集列表中观测点的应用调用日志。默认值`[]`表示所有观测点均采集。
+
+### 聚合器 {#outputs.flow_log.aggregators}
+
+#### 聚合健康检查流日志 {#outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.flow_log.aggregators.aggregate_health_check_l4_flow_log`
+
+**默认值**:
+```yaml
+outputs:
+  flow_log:
+    aggregators:
+      aggregate_health_check_l4_flow_log: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+Agent 会将如下类型的流标记为 `close_type = 正常结束-客户端重置`：
+- 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 RST
+- 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 ACK，客户端发送 RST
+
+此类流量是正常的负载均衡器后端主机检查检查流量，不会携带任何有意义的应用层载荷。
+
+本配置项设置为 true 时，Agent 会将流日志的客户端端口号重置为 0 之后再聚合输出，
+从而降低带宽和存储开销。
 
 ### 限速器 {#outputs.flow_log.throttles}
 

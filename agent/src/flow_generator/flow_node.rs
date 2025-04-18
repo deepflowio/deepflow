@@ -414,9 +414,8 @@ mod tests {
         let mut outputs = vec![];
         let mut tcp_segments = PacketSegmentationReassembly::default();
 
-        let capture =
-            Capture::load_pcap("resources/test/flow_generator/tcp-segment.pcap", Some(2000));
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap("resources/test/flow_generator/tcp-segment.pcap");
+        let mut packets = capture.collect::<Vec<_>>();
 
         for packet in &mut packets {
             if let Some(mut packets) = tcp_segments.inject(packet.to_owned_segment()) {

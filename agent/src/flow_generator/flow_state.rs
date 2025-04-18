@@ -928,8 +928,8 @@ mod tests {
         let (module_config, mut flow_map, output_queue_receiver) =
             _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
 
-        let capture = Capture::load_pcap(pcap_file, None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(pcap_file);
+        let packets = capture.collect::<Vec<_>>();
         let delta = packets.first().unwrap().lookup_key.timestamp;
         let mut last_timestamp = Timestamp::ZERO;
         let ep = EndpointDataPov::new(Arc::new(EndpointData {

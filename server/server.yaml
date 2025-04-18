@@ -81,6 +81,8 @@ controller:
   http:
     # resource api redis cache refresh interval, unit:s
     redis_refresh_interval: 3600
+    # whether enable redis cache when get resource api via page
+    resource_api_page_get_redis_enabled: false
     # additional domains
     additional_domains:
 
@@ -324,6 +326,9 @@ controller:
     ## org data refresh interval
     ## uint: s, default: 60
     #org-data-refresh-interval: 60
+
+    ## tmp config: whether to log agent cpu/memory
+    log-agent-config: False
 
   genesis:
     # 平台数据老化时间，单位：秒

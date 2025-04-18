@@ -50,20 +50,20 @@ func GetIDs(orgID int, resourceType string, count int) (ids []int, err error) {
 	client := api.NewControllerClient(conn)
 	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: proto.Uint32(uint32(count)), OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
-		log.Errorf("%s get %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("get %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
 	for _, uID := range resp.GetIds() {
 		ids = append(ids, int(uID))
 	}
-	log.Infof("%s get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids), logger.NewORGPrefix(orgID))
+	log.Infof("get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids), logger.NewORGPrefix(orgID))
 	return
 }
 
 func ReleaseIDs(orgID int, resourceType string, ids []int) (err error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
-		log.Errorf("%s create grpc connection failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("create grpc connection failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return err
 	}
 	defer conn.Close()
@@ -75,8 +75,8 @@ func ReleaseIDs(orgID int, resourceType string, ids []int) (err error) {
 	client := api.NewControllerClient(conn)
 	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType, OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
-		log.Errorf("%s release %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("release %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
 	}
-	log.Infof("%s release %s ids: %v (count: %d)", resourceType, ids, len(ids), logger.NewORGPrefix(orgID))
+	log.Infof("release %s ids: %v (count: %d)", resourceType, ids, len(ids), logger.NewORGPrefix(orgID))
 	return
 }

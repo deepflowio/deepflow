@@ -2098,8 +2098,8 @@ mod tests {
         let mut output = String::new();
 
         let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
-        let capture = Capture::load_pcap(file, None);
-        let packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(file);
+        let packets = capture.collect::<Vec<_>>();
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"
@@ -2169,8 +2169,8 @@ mod tests {
         let mut output = String::new();
 
         let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
-        let capture = Capture::load_pcap(file, None);
-        let mut packets = capture.as_meta_packets();
+        let capture = Capture::load_pcap(file);
+        let mut packets = capture.collect::<Vec<_>>();
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"

@@ -25,12 +25,14 @@ type Network struct {
 	ResourcePubSubComponent[
 		*message.NetworkAdd,
 		message.NetworkAdd,
+		message.AddNoneAddition,
 		*message.NetworkUpdate,
 		message.NetworkUpdate,
 		*message.NetworkFieldsUpdate,
 		message.NetworkFieldsUpdate,
 		*message.NetworkDelete,
-		message.NetworkDelete]
+		message.NetworkDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNetwork() *Network {
@@ -38,12 +40,14 @@ func NewNetwork() *Network {
 		ResourcePubSubComponent[
 			*message.NetworkAdd,
 			message.NetworkAdd,
+			message.AddNoneAddition,
 			*message.NetworkUpdate,
 			message.NetworkUpdate,
 			*message.NetworkFieldsUpdate,
 			message.NetworkFieldsUpdate,
 			*message.NetworkDelete,
 			message.NetworkDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNetwork),
 			resourceType:    common.RESOURCE_TYPE_NETWORK_EN,

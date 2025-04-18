@@ -95,7 +95,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		if node.State == common.POD_NODE_STATE_EXCEPTION {
 			state = common.VM_STATE_EXCEPTION
 		}
-		vmLcuuid := "ff" + common.GetUUID(node.Name, uuid.Nil)[2:]
+		vmLcuuid := "ff" + common.GetUUID(node.Lcuuid, uuid.Nil)[2:]
 		vms = append(vms, model.VM{
 			Lcuuid:       vmLcuuid,
 			Name:         node.Name,

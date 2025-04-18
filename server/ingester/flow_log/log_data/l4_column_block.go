@@ -455,6 +455,7 @@ type FlowInfoBlock struct {
 	ColCloseType            proto.ColUInt16
 	ColSignalSource         proto.ColUInt16
 	ColFlowId               proto.ColUInt64
+	ColAggregatedFlowIds    proto.ColStr
 	ColCaptureNetworkTypeId proto.ColUInt8
 	ColNatSource            proto.ColUInt8
 	ColCaptureNicType       proto.ColUInt8
@@ -486,6 +487,7 @@ func (b *FlowInfoBlock) Reset() {
 	b.ColCloseType.Reset()
 	b.ColSignalSource.Reset()
 	b.ColFlowId.Reset()
+	b.ColAggregatedFlowIds.Reset()
 	b.ColCaptureNetworkTypeId.Reset()
 	b.ColNatSource.Reset()
 	b.ColCaptureNicType.Reset()
@@ -518,6 +520,7 @@ func (b *FlowInfoBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_CLOSE_TYPE, Data: &b.ColCloseType},
 		proto.InputColumn{Name: ckdb.COLUMN_SIGNAL_SOURCE, Data: &b.ColSignalSource},
 		proto.InputColumn{Name: ckdb.COLUMN_FLOW_ID, Data: &b.ColFlowId},
+		proto.InputColumn{Name: ckdb.COLUMN_AGGREGATED_FLOW_IDS, Data: &b.ColAggregatedFlowIds},
 		proto.InputColumn{Name: ckdb.COLUMN_CAPTURE_NETWORK_TYPE_ID, Data: &b.ColCaptureNetworkTypeId},
 		proto.InputColumn{Name: ckdb.COLUMN_NAT_SOURCE, Data: &b.ColNatSource},
 		proto.InputColumn{Name: ckdb.COLUMN_CAPTURE_NIC_TYPE, Data: &b.ColCaptureNicType},
@@ -558,6 +561,7 @@ func (n *FlowInfo) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColCloseType.Append(n.CloseType)
 	block.ColSignalSource.Append(n.SignalSource)
 	block.ColFlowId.Append(n.FlowID)
+	block.ColAggregatedFlowIds.Append(n.AggregatedFlowIDs)
 	block.ColCaptureNetworkTypeId.Append(n.TapType)
 	block.ColNatSource.Append(n.NatSource)
 	block.ColCaptureNicType.Append(n.TapPortType)

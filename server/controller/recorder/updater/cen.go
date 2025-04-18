@@ -35,12 +35,14 @@ type CEN struct {
 		metadbmodel.CEN,
 		*message.CENAdd,
 		message.CENAdd,
+		message.AddNoneAddition,
 		*message.CENUpdate,
 		message.CENUpdate,
 		*message.CENFieldsUpdate,
 		message.CENFieldsUpdate,
 		*message.CENDelete,
-		message.CENDelete]
+		message.CENDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
@@ -52,11 +54,14 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 			metadbmodel.CEN,
 			*message.CENAdd,
 			message.CENAdd,
+			message.AddNoneAddition,
 			*message.CENUpdate,
 			message.CENUpdate,
 			*message.CENFieldsUpdate,
 			message.CENFieldsUpdate,
 			*message.CENDelete,
+			message.CENDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
