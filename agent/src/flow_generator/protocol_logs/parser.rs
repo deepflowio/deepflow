@@ -60,8 +60,6 @@ use public::{
 
 const QUEUE_BATCH_SIZE: usize = 1024;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
-// 尽力而为的聚合默认120秒(AppProtoLogs.aggr*SLOT_WIDTH)内的请求和响应
-pub const SLOT_WIDTH: u64 = 5; // 每个slot存5秒
 
 const THROTTLE_BUCKET_BITS: u8 = 2;
 const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送方是有突发的，需要累积一定时间做采样
@@ -544,19 +542,22 @@ impl SessionQueue {
             return;
         }
 
-        if item.base_info.start_time <= self.window_start {
+        let timeout_time = item.base_info.start_time + Self::get_timeout(config, &item);
+        if timeout_time <= self.window_start {
             self.counter
                 .send_before_window
                 .fetch_add(1, Ordering::Relaxed);
             debug!(
-                "l7 log {:?} time {:?} sent before aggregate start time {:?}",
-                item.base_info.head.proto, item.base_info.start_time, self.window_start
+                "l7 log {:?} time {:?} timeout {:?} sent before aggregate start time {:?}",
+                item.base_info.head.proto,
+                item.base_info.start_time,
+                timeout_time,
+                self.window_start
             );
             self.bs.send(item, None);
             return;
         }
 
-        let timeout_time = item.base_info.start_time + Self::get_timeout(config, &item);
         let key = item.calc_key();
         if let Some(v) = self.entries.get_mut(&key) {
             if item.need_protocol_merge() {
@@ -648,6 +649,7 @@ impl SessionQueue {
             return;
         }
 
+        self.counter.cached.fetch_add(1, Ordering::Relaxed);
         self.counter.cached_request_resource.fetch_add(
             item.l7_info.get_request_resource_length() as u64,
             Ordering::Relaxed,
