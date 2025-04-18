@@ -202,7 +202,6 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 }
 
 func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Process, *message.ProcessAddAddition, bool) {
-	idToNewGIDFlag := make(map[int]bool)
 	identifierToNewGID := make(map[tool.ProcessIdentifier]uint32)
 	for _, item := range dbData {
 		if item.GID != 0 {
@@ -210,12 +209,10 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 		}
 		identifier := p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)
 		if _, ok := identifierToNewGID[identifier]; !ok {
-			idToNewGIDFlag[item.ID] = true
 			identifierToNewGID[identifier] = item.GID
 		}
 	}
-	log.Infof("TODO beforeAddPage idToNewGIDFlag: %#v", idToNewGIDFlag, p.metadata.LogPrefixes)
-	log.Infof("TODO beforeAddPage identifierToNewGID: %#v", identifierToNewGID, p.metadata.LogPrefixes)
+	var createdGIDs []uint32
 	if len(identifierToNewGID) > 0 {
 		// TODO combine with operator module
 		// TODO support partial ids allocation
@@ -230,6 +227,7 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 		start := 0
 		for k := range identifierToNewGID {
 			identifierToNewGID[k] = uint32(ids[start])
+			createdGIDs = append(createdGIDs, identifierToNewGID[k])
 			start++
 		}
 
@@ -240,7 +238,7 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)]
 		}
 	}
-	return dbData, &message.ProcessAddAddition{IDToTagRecorderNewGIDFlag: idToNewGIDFlag}, true
+	return dbData, &message.ProcessAddAddition{}, true
 }
 
 func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.ProcessDeleteAddition, bool) {

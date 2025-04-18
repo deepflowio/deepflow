@@ -251,6 +251,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) addPage(dbItemsToAdd []*MT) {
 	var addition *MAAT
 	if hooker, ok := u.hookers[hookerBeforeDBAddPage]; ok {
+		log.Infof("start to run %s beforeAddPage hooker", u.resourceType, u.metadata.LogPrefixes)
 		dbItemsToAdd, addition, ok = hooker.(addPageHooker[MT, MAAT]).beforeAddPage(dbItemsToAdd)
 		if !ok {
 			log.Errorf("%s failed to run hooker beforeAddPage", u.resourceType, u.metadata.LogPrefixes)
@@ -306,6 +307,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 
 		var addition *MDAT
 		if hooker, ok := u.hookers[hookerAfterDBDeletePage]; ok {
+			log.Infof("start to run %s afterDeletePage hooker", u.resourceType, u.metadata.LogPrefixes)
 			addition, ok = hooker.(deletePageHooker[MT, MDAT]).afterDeletePage(dbItems)
 			if !ok {
 				log.Errorf("%s failed to run hooker afterDeletePage", u.resourceType, u.metadata.LogPrefixes)
