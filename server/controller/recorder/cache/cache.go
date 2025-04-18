@@ -1430,10 +1430,10 @@ func (c *Cache) AddProcesses(items []*mysqlmodel.Process) {
 	}
 }
 
-func (c *Cache) DeleteProcesses(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.DeleteProcess(lcuuid)
-		c.ToolDataSet.DeleteProcess(lcuuid)
+func (c *Cache) DeleteProcesses(dbItems []*mysqlmodel.Process) {
+	for _, dbItem := range dbItems {
+		c.DiffBaseDataSet.DeleteProcess(dbItem.Lcuuid)
+		c.ToolDataSet.DeleteProcess(dbItem)
 	}
 }
 

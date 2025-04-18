@@ -97,6 +97,7 @@ func (d *fieldDetail[T]) SetOld(old T) {
 	d.old = old
 }
 
+// TODO rename to metadb
 type MySQLData[MT constraint.MySQLModel] struct {
 	new *MT
 	old *MT
@@ -744,10 +745,12 @@ type PodUpdate struct {
 type ProcessFieldsUpdate struct {
 	Key
 	Name        fieldDetail[string]
+	ProcessName fieldDetail[string]
 	ContainerID fieldDetail[string]
 	OSAPPTags   fieldDetail[string]
 	VMID        fieldDetail[int]
 	VPCID       fieldDetail[int]
+	GID         fieldDetail[uint32]
 }
 type ProcessUpdate struct {
 	Fields[ProcessFieldsUpdate]

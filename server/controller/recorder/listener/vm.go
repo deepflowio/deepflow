@@ -49,7 +49,7 @@ func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) 
 	vm.cache.UpdateVM(cloudItem)
 }
 
-func (vm *VM) OnUpdaterDeleted(lcuuids []string) {
+func (vm *VM) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VM) {
 	vm.eventProducer.ProduceByDelete(lcuuids)
 	vm.cache.DeleteVMs(lcuuids)
 }

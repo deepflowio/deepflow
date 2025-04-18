@@ -34,12 +34,14 @@ type PodService struct {
 		mysqlmodel.PodService,
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
+		message.AddNoneAddition,
 		*message.PodServiceUpdate,
 		message.PodServiceUpdate,
 		*message.PodServiceFieldsUpdate,
 		message.PodServiceFieldsUpdate,
 		*message.PodServiceDelete,
-		message.PodServiceDelete]
+		message.PodServiceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
@@ -51,11 +53,14 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 			mysqlmodel.PodService,
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
+			message.AddNoneAddition,
 			*message.PodServiceUpdate,
 			message.PodServiceUpdate,
 			*message.PodServiceFieldsUpdate,
 			message.PodServiceFieldsUpdate,
 			*message.PodServiceDelete,
+			message.PodServiceDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			wholeCache,

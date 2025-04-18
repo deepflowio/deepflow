@@ -41,6 +41,6 @@ func (s *Subnet) OnUpdaterUpdated(cloudItem *cloudmodel.Subnet, diffBase *diffba
 	diffBase.Update(cloudItem)
 }
 
-func (s *Subnet) OnUpdaterDeleted(lcuuids []string) {
+func (s *Subnet) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Subnet) {
 	s.cache.DeleteSubnets(lcuuids)
 }

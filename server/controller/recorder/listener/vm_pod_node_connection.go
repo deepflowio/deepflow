@@ -40,6 +40,6 @@ func (c *VMPodNodeConnection) OnUpdaterAdded(addedDBItems []*mysqlmodel.VMPodNod
 func (c *VMPodNodeConnection) OnUpdaterUpdated(cloudItem *cloudmodel.VMPodNodeConnection, diffBase *diffbase.VMPodNodeConnection) {
 }
 
-func (c *VMPodNodeConnection) OnUpdaterDeleted(lcuuids []string) {
+func (c *VMPodNodeConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VMPodNodeConnection) {
 	c.cache.DeleteVMPodNodeConnections(lcuuids)
 }

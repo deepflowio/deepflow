@@ -26,13 +26,33 @@ import (
 )
 
 type ChPodGroup struct {
-	SubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysqlmodel.PodGroup, mysqlmodel.ChPodGroup, IDKey]
+	SubscriberComponent[
+		*message.PodGroupAdd,
+		message.PodGroupAdd,
+		*message.PodGroupFieldsUpdate,
+		message.PodGroupFieldsUpdate,
+		*message.PodGroupDelete,
+		message.PodGroupDelete,
+		mysqlmodel.PodGroup,
+		mysqlmodel.ChPodGroup,
+		IDKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 	mng := &ChPodGroup{
-		newSubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysqlmodel.PodGroup, mysqlmodel.ChPodGroup, IDKey](
+		newSubscriberComponent[
+			*message.PodGroupAdd,
+			message.PodGroupAdd,
+			*message.PodGroupFieldsUpdate,
+			message.PodGroupFieldsUpdate,
+			*message.PodGroupDelete,
+			message.PodGroupDelete,
+			mysqlmodel.PodGroup,
+			mysqlmodel.ChPodGroup,
+			IDKey,
+		](
 			common.RESOURCE_TYPE_POD_GROUP_EN, RESOURCE_TYPE_CH_POD_GROUP,
 		),
 		resourceTypeToIconID,

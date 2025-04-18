@@ -25,12 +25,14 @@ type RoutingTable struct {
 	ResourcePubSubComponent[
 		*message.RoutingTableAdd,
 		message.RoutingTableAdd,
+		message.AddNoneAddition,
 		*message.RoutingTableUpdate,
 		message.RoutingTableUpdate,
 		*message.RoutingTableFieldsUpdate,
 		message.RoutingTableFieldsUpdate,
 		*message.RoutingTableDelete,
-		message.RoutingTableDelete]
+		message.RoutingTableDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRoutingTable() *RoutingTable {
@@ -38,12 +40,14 @@ func NewRoutingTable() *RoutingTable {
 		ResourcePubSubComponent[
 			*message.RoutingTableAdd,
 			message.RoutingTableAdd,
+			message.AddNoneAddition,
 			*message.RoutingTableUpdate,
 			message.RoutingTableUpdate,
 			*message.RoutingTableFieldsUpdate,
 			message.RoutingTableFieldsUpdate,
 			*message.RoutingTableDelete,
 			message.RoutingTableDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRoutingTable),
 			resourceType:    common.RESOURCE_TYPE_ROUTING_TABLE_EN,

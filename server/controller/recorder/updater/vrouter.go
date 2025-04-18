@@ -35,12 +35,14 @@ type VRouter struct {
 		mysqlmodel.VRouter,
 		*message.VRouterAdd,
 		message.VRouterAdd,
+		message.AddNoneAddition,
 		*message.VRouterUpdate,
 		message.VRouterUpdate,
 		*message.VRouterFieldsUpdate,
 		message.VRouterFieldsUpdate,
 		*message.VRouterDelete,
-		message.VRouterDelete]
+		message.VRouterDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
@@ -52,11 +54,14 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 			mysqlmodel.VRouter,
 			*message.VRouterAdd,
 			message.VRouterAdd,
+			message.AddNoneAddition,
 			*message.VRouterUpdate,
 			message.VRouterUpdate,
 			*message.VRouterFieldsUpdate,
 			message.VRouterFieldsUpdate,
 			*message.VRouterDelete,
+			message.VRouterDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,

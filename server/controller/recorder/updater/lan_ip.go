@@ -36,12 +36,14 @@ type LANIP struct {
 		mysqlmodel.LANIP,
 		*message.LANIPAdd,
 		message.LANIPAdd,
+		message.AddNoneAddition,
 		*message.LANIPUpdate,
 		message.LANIPUpdate,
 		*message.LANIPFieldsUpdate,
 		message.LANIPFieldsUpdate,
 		*message.LANIPDelete,
-		message.LANIPDelete]
+		message.LANIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
@@ -53,11 +55,14 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 			mysqlmodel.LANIP,
 			*message.LANIPAdd,
 			message.LANIPAdd,
+			message.AddNoneAddition,
 			*message.LANIPUpdate,
 			message.LANIPUpdate,
 			*message.LANIPFieldsUpdate,
 			message.LANIPFieldsUpdate,
 			*message.LANIPDelete,
+			message.LANIPDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,

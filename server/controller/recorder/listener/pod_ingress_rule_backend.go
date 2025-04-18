@@ -41,6 +41,6 @@ func (b *PodIngressRuleBackend) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodIng
 func (b *PodIngressRuleBackend) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngressRuleBackend, diffBase *diffbase.PodIngressRuleBackend) {
 }
 
-func (b *PodIngressRuleBackend) OnUpdaterDeleted(lcuuids []string) {
+func (b *PodIngressRuleBackend) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodIngressRuleBackend) {
 	b.cache.DeletePodIngressRuleBackends(lcuuids)
 }

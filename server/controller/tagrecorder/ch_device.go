@@ -27,13 +27,33 @@ import (
 )
 
 type ChVMDevice struct {
-	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete,
+		mysqlmodel.VM,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 	mng := &ChVMDevice{
-		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, mysqlmodel.VM, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+			message.VMDelete,
+			mysqlmodel.VM,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -107,13 +127,33 @@ func (c *ChVMDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, db
 }
 
 type ChHostDevice struct {
-	SubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, mysqlmodel.Host, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.HostAdd,
+		message.HostAdd,
+		*message.HostFieldsUpdate,
+		message.HostFieldsUpdate,
+		*message.HostDelete,
+		message.HostDelete,
+		mysqlmodel.Host,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 	mng := &ChHostDevice{
-		newSubscriberComponent[*message.HostFieldsUpdate, message.HostFieldsUpdate, mysqlmodel.Host, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.HostAdd,
+			message.HostAdd,
+			*message.HostFieldsUpdate,
+			message.HostFieldsUpdate,
+			*message.HostDelete,
+			message.HostDelete,
+			mysqlmodel.Host,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_HOST_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -188,13 +228,33 @@ func (c *ChHostDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, 
 }
 
 type ChVRouterDevice struct {
-	SubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, mysqlmodel.VRouter, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.VRouterAdd,
+		message.VRouterAdd,
+		*message.VRouterFieldsUpdate,
+		message.VRouterFieldsUpdate,
+		*message.VRouterDelete,
+		message.VRouterDelete,
+		mysqlmodel.VRouter,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 	mng := &ChVRouterDevice{
-		newSubscriberComponent[*message.VRouterFieldsUpdate, message.VRouterFieldsUpdate, mysqlmodel.VRouter, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.VRouterAdd,
+			message.VRouterAdd,
+			*message.VRouterFieldsUpdate,
+			message.VRouterFieldsUpdate,
+			*message.VRouterDelete,
+			message.VRouterDelete,
+			mysqlmodel.VRouter,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_VROUTER_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -251,13 +311,33 @@ func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevic
 }
 
 type ChDHCPPortDevice struct {
-	SubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, mysqlmodel.DHCPPort, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.DHCPPortAdd,
+		message.DHCPPortAdd,
+		*message.DHCPPortFieldsUpdate,
+		message.DHCPPortFieldsUpdate,
+		*message.DHCPPortDelete,
+		message.DHCPPortDelete,
+		mysqlmodel.DHCPPort,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice {
 	mng := &ChDHCPPortDevice{
-		newSubscriberComponent[*message.DHCPPortFieldsUpdate, message.DHCPPortFieldsUpdate, mysqlmodel.DHCPPort, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.DHCPPortAdd,
+			message.DHCPPortAdd,
+			*message.DHCPPortFieldsUpdate,
+			message.DHCPPortFieldsUpdate,
+			*message.DHCPPortDelete,
+			message.DHCPPortDelete,
+			mysqlmodel.DHCPPort,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_DHCP_PORT_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -314,13 +394,33 @@ func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevi
 }
 
 type ChNATGatewayDevice struct {
-	SubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, mysqlmodel.NATGateway, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.NATGatewayAdd,
+		message.NATGatewayAdd,
+		*message.NATGatewayFieldsUpdate,
+		message.NATGatewayFieldsUpdate,
+		*message.NATGatewayDelete,
+		message.NATGatewayDelete,
+		mysqlmodel.NATGateway,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDevice {
 	mng := &ChNATGatewayDevice{
-		newSubscriberComponent[*message.NATGatewayFieldsUpdate, message.NATGatewayFieldsUpdate, mysqlmodel.NATGateway, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.NATGatewayAdd,
+			message.NATGatewayAdd,
+			*message.NATGatewayFieldsUpdate,
+			message.NATGatewayFieldsUpdate,
+			*message.NATGatewayDelete,
+			message.NATGatewayDelete,
+			mysqlmodel.NATGateway,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_NAT_GATEWAY_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -381,13 +481,33 @@ func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDe
 }
 
 type ChLBDevice struct {
-	SubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, mysqlmodel.LB, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.LBAdd,
+		message.LBAdd,
+		*message.LBFieldsUpdate,
+		message.LBFieldsUpdate,
+		*message.LBDelete,
+		message.LBDelete,
+		mysqlmodel.LB,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 	mng := &ChLBDevice{
-		newSubscriberComponent[*message.LBFieldsUpdate, message.LBFieldsUpdate, mysqlmodel.LB, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.LBAdd,
+			message.LBAdd,
+			*message.LBFieldsUpdate,
+			message.LBFieldsUpdate,
+			*message.LBDelete,
+			message.LBDelete,
+			mysqlmodel.LB,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_LB_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -448,13 +568,31 @@ func (c *ChLBDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, db
 }
 
 type ChRDSInstanceDevice struct {
-	SubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, mysqlmodel.RDSInstance, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.RDSInstanceAdd,
+		message.RDSInstanceAdd,
+		*message.RDSInstanceFieldsUpdate,
+		message.RDSInstanceFieldsUpdate,
+		*message.RDSInstanceDelete,
+		message.RDSInstanceDelete,
+		mysqlmodel.RDSInstance,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstanceDevice {
 	mng := &ChRDSInstanceDevice{
-		newSubscriberComponent[*message.RDSInstanceFieldsUpdate, message.RDSInstanceFieldsUpdate, mysqlmodel.RDSInstance, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.RDSInstanceAdd,
+			message.RDSInstanceAdd,
+			*message.RDSInstanceFieldsUpdate,
+			message.RDSInstanceFieldsUpdate,
+			*message.RDSInstanceDelete,
+			message.RDSInstanceDelete,
+			mysqlmodel.RDSInstance,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_RDS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -515,13 +653,31 @@ func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChD
 }
 
 type ChRedisInstanceDevice struct {
-	SubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, mysqlmodel.RedisInstance, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.RedisInstanceAdd,
+		message.RedisInstanceAdd,
+		*message.RedisInstanceFieldsUpdate,
+		message.RedisInstanceFieldsUpdate,
+		*message.RedisInstanceDelete,
+		message.RedisInstanceDelete,
+		mysqlmodel.RedisInstance,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInstanceDevice {
 	mng := &ChRedisInstanceDevice{
-		newSubscriberComponent[*message.RedisInstanceFieldsUpdate, message.RedisInstanceFieldsUpdate, mysqlmodel.RedisInstance, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.RedisInstanceAdd,
+			message.RedisInstanceAdd,
+			*message.RedisInstanceFieldsUpdate,
+			message.RedisInstanceFieldsUpdate,
+			*message.RedisInstanceDelete,
+			message.RedisInstanceDelete,
+			mysqlmodel.RedisInstance,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_REDIS_INSTANCE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -582,13 +738,31 @@ func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.C
 }
 
 type ChPodServiceDevice struct {
-	SubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodServiceAdd,
+		message.PodServiceAdd,
+		*message.PodServiceFieldsUpdate,
+		message.PodServiceFieldsUpdate,
+		*message.PodServiceDelete,
+		message.PodServiceDelete,
+		mysqlmodel.PodService,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDevice {
 	mng := &ChPodServiceDevice{
-		newSubscriberComponent[*message.PodServiceFieldsUpdate, message.PodServiceFieldsUpdate, mysqlmodel.PodService, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodServiceAdd,
+			message.PodServiceAdd,
+			*message.PodServiceFieldsUpdate,
+			message.PodServiceFieldsUpdate,
+			*message.PodServiceDelete,
+			message.PodServiceDelete,
+			mysqlmodel.PodService,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -659,13 +833,31 @@ func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDe
 }
 
 type ChPodDevice struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodAdd,
+		message.PodAdd,
+		*message.PodFieldsUpdate,
+		message.PodFieldsUpdate,
+		*message.PodDelete,
+		message.PodDelete,
+		mysqlmodel.Pod,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 	mng := &ChPodDevice{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodAdd,
+			message.PodAdd,
+			*message.PodFieldsUpdate,
+			message.PodFieldsUpdate,
+			*message.PodDelete,
+			message.PodDelete,
+			mysqlmodel.Pod,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -723,13 +915,31 @@ func (c *ChPodDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, d
 }
 
 type ChPodGroupDevice struct {
-	SubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysqlmodel.PodGroup, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodGroupAdd,
+		message.PodGroupAdd,
+		*message.PodGroupFieldsUpdate,
+		message.PodGroupFieldsUpdate,
+		*message.PodGroupDelete,
+		message.PodGroupDelete,
+		mysqlmodel.PodGroup,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice {
 	mng := &ChPodGroupDevice{
-		newSubscriberComponent[*message.PodGroupFieldsUpdate, message.PodGroupFieldsUpdate, mysqlmodel.PodGroup, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodGroupAdd,
+			message.PodGroupAdd,
+			*message.PodGroupFieldsUpdate,
+			message.PodGroupFieldsUpdate,
+			*message.PodGroupDelete,
+			message.PodGroupDelete,
+			mysqlmodel.PodGroup,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_GROUP_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -788,13 +998,31 @@ func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevi
 }
 
 type ChPodNodeDevice struct {
-	SubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, mysqlmodel.PodNode, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[*message.PodNodeAdd,
+		message.PodNodeAdd,
+		*message.PodNodeFieldsUpdate,
+		message.PodNodeFieldsUpdate,
+		*message.PodNodeDelete,
+		message.PodNodeDelete,
+		mysqlmodel.PodNode,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 	mng := &ChPodNodeDevice{
-		newSubscriberComponent[*message.PodNodeFieldsUpdate, message.PodNodeFieldsUpdate, mysqlmodel.PodNode, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[*message.PodNodeAdd,
+			message.PodNodeAdd,
+			*message.PodNodeFieldsUpdate,
+			message.PodNodeFieldsUpdate,
+			*message.PodNodeDelete,
+			message.PodNodeDelete,
+			mysqlmodel.PodNode,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_NODE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -859,13 +1087,33 @@ func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevic
 }
 
 type ChPodClusterDevice struct {
-	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysqlmodel.PodCluster, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.PodClusterAdd,
+		message.PodClusterAdd,
+		*message.PodClusterFieldsUpdate,
+		message.PodClusterFieldsUpdate,
+		*message.PodClusterDelete,
+		message.PodClusterDelete,
+		mysqlmodel.PodCluster,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDevice {
 	mng := &ChPodClusterDevice{
-		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysqlmodel.PodCluster, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.PodClusterAdd,
+			message.PodClusterAdd,
+			*message.PodClusterFieldsUpdate,
+			message.PodClusterFieldsUpdate,
+			*message.PodClusterDelete,
+			message.PodClusterDelete,
+			mysqlmodel.PodCluster,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_POD_CLUSTER_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -922,13 +1170,33 @@ func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDe
 }
 
 type ChProcessDevice struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.ProcessAdd,
+		message.ProcessAdd,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.ProcessDelete,
+		message.ProcessDelete,
+		mysqlmodel.Process,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 	mng := &ChProcessDevice{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.ProcessAdd,
+			message.ProcessAdd,
+			*message.ProcessFieldsUpdate,
+			message.ProcessFieldsUpdate,
+			*message.ProcessDelete,
+			message.ProcessDelete,
+			mysqlmodel.Process,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,
@@ -986,13 +1254,33 @@ func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevic
 }
 
 type ChCustomServiceDevice struct {
-	SubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, mysqlmodel.CustomService, mysqlmodel.ChDevice, DeviceKey]
+	SubscriberComponent[
+		*message.CustomServiceAdd,
+		message.CustomServiceAdd,
+		*message.CustomServiceFieldsUpdate,
+		message.CustomServiceFieldsUpdate,
+		*message.CustomServiceDelete,
+		message.CustomServiceDelete,
+		mysqlmodel.CustomService,
+		mysqlmodel.ChDevice,
+		DeviceKey,
+	]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomServiceDevice {
 	mng := &ChCustomServiceDevice{
-		newSubscriberComponent[*message.CustomServiceFieldsUpdate, message.CustomServiceFieldsUpdate, mysqlmodel.CustomService, mysqlmodel.ChDevice, DeviceKey](
+		newSubscriberComponent[
+			*message.CustomServiceAdd,
+			message.CustomServiceAdd,
+			*message.CustomServiceFieldsUpdate,
+			message.CustomServiceFieldsUpdate,
+			*message.CustomServiceDelete,
+			message.CustomServiceDelete,
+			mysqlmodel.CustomService,
+			mysqlmodel.ChDevice,
+			DeviceKey,
+		](
 			common.RESOURCE_TYPE_CUSTOM_SERVICE_EN, RESOURCE_TYPE_CH_DEVICE,
 		),
 		resourceTypeToIconID,

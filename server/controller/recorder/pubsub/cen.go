@@ -25,12 +25,14 @@ type CEN struct {
 	ResourcePubSubComponent[
 		*message.CENAdd,
 		message.CENAdd,
+		message.AddNoneAddition,
 		*message.CENUpdate,
 		message.CENUpdate,
 		*message.CENFieldsUpdate,
 		message.CENFieldsUpdate,
 		*message.CENDelete,
-		message.CENDelete]
+		message.CENDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewCEN() *CEN {
@@ -38,12 +40,14 @@ func NewCEN() *CEN {
 		ResourcePubSubComponent[
 			*message.CENAdd,
 			message.CENAdd,
+			message.AddNoneAddition,
 			*message.CENUpdate,
 			message.CENUpdate,
 			*message.CENFieldsUpdate,
 			message.CENFieldsUpdate,
 			*message.CENDelete,
 			message.CENDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeCEN),
 			resourceType:    common.RESOURCE_TYPE_CEN_EN,

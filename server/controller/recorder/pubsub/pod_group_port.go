@@ -25,12 +25,14 @@ type PodGroupPort struct {
 	ResourcePubSubComponent[
 		*message.PodGroupPortAdd,
 		message.PodGroupPortAdd,
+		message.AddNoneAddition,
 		*message.PodGroupPortUpdate,
 		message.PodGroupPortUpdate,
 		*message.PodGroupPortFieldsUpdate,
 		message.PodGroupPortFieldsUpdate,
 		*message.PodGroupPortDelete,
-		message.PodGroupPortDelete]
+		message.PodGroupPortDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodGroupPort() *PodGroupPort {
@@ -38,12 +40,14 @@ func NewPodGroupPort() *PodGroupPort {
 		ResourcePubSubComponent[
 			*message.PodGroupPortAdd,
 			message.PodGroupPortAdd,
+			message.AddNoneAddition,
 			*message.PodGroupPortUpdate,
 			message.PodGroupPortUpdate,
 			*message.PodGroupPortFieldsUpdate,
 			message.PodGroupPortFieldsUpdate,
 			*message.PodGroupPortDelete,
 			message.PodGroupPortDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodGroupPort),
 			resourceType:    common.RESOURCE_TYPE_POD_GROUP_PORT_EN,

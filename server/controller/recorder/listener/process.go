@@ -48,7 +48,7 @@ func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *diff
 	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
-func (p *Process) OnUpdaterDeleted(lcuuids []string) {
+func (p *Process) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Process) {
 	p.eventProducer.ProduceByDelete(lcuuids)
-	p.cache.DeleteProcesses(lcuuids)
+	p.cache.DeleteProcesses(deletedDBItems)
 }

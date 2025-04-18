@@ -34,12 +34,14 @@ type NATRule struct {
 		mysqlmodel.NATRule,
 		*message.NATRuleAdd,
 		message.NATRuleAdd,
+		message.AddNoneAddition,
 		*message.NATRuleUpdate,
 		message.NATRuleUpdate,
 		*message.NATRuleFieldsUpdate,
 		message.NATRuleFieldsUpdate,
 		*message.NATRuleDelete,
-		message.NATRuleDelete]
+		message.NATRuleDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
@@ -51,11 +53,14 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 			mysqlmodel.NATRule,
 			*message.NATRuleAdd,
 			message.NATRuleAdd,
+			message.AddNoneAddition,
 			*message.NATRuleUpdate,
 			message.NATRuleUpdate,
 			*message.NATRuleFieldsUpdate,
 			message.NATRuleFieldsUpdate,
 			*message.NATRuleDelete,
+			message.NATRuleDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,

@@ -34,12 +34,14 @@ type PodIngressRule struct {
 		mysqlmodel.PodIngressRule,
 		*message.PodIngressRuleAdd,
 		message.PodIngressRuleAdd,
+		message.AddNoneAddition,
 		*message.PodIngressRuleUpdate,
 		message.PodIngressRuleUpdate,
 		*message.PodIngressRuleFieldsUpdate,
 		message.PodIngressRuleFieldsUpdate,
 		*message.PodIngressRuleDelete,
-		message.PodIngressRuleDelete]
+		message.PodIngressRuleDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
@@ -51,11 +53,14 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 			mysqlmodel.PodIngressRule,
 			*message.PodIngressRuleAdd,
 			message.PodIngressRuleAdd,
+			message.AddNoneAddition,
 			*message.PodIngressRuleUpdate,
 			message.PodIngressRuleUpdate,
 			*message.PodIngressRuleFieldsUpdate,
 			message.PodIngressRuleFieldsUpdate,
 			*message.PodIngressRuleDelete,
+			message.PodIngressRuleDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,

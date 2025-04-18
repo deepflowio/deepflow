@@ -68,6 +68,9 @@ const (
 	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
 
 	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "custom_service"
+
+	// used for gprocess_id of process in id manager
+	RESOURCE_TYPE_GPROCESS_EN = "gprocess"
 )
 
 var VIF_DEVICE_TYPE_TO_RESOURCE_TYPE = map[int]string{

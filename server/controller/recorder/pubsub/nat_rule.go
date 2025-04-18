@@ -25,12 +25,14 @@ type NATRule struct {
 	ResourcePubSubComponent[
 		*message.NATRuleAdd,
 		message.NATRuleAdd,
+		message.AddNoneAddition,
 		*message.NATRuleUpdate,
 		message.NATRuleUpdate,
 		*message.NATRuleFieldsUpdate,
 		message.NATRuleFieldsUpdate,
 		*message.NATRuleDelete,
-		message.NATRuleDelete]
+		message.NATRuleDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewNATRule() *NATRule {
@@ -38,12 +40,14 @@ func NewNATRule() *NATRule {
 		ResourcePubSubComponent[
 			*message.NATRuleAdd,
 			message.NATRuleAdd,
+			message.AddNoneAddition,
 			*message.NATRuleUpdate,
 			message.NATRuleUpdate,
 			*message.NATRuleFieldsUpdate,
 			message.NATRuleFieldsUpdate,
 			*message.NATRuleDelete,
 			message.NATRuleDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATRule),
 			resourceType:    common.RESOURCE_TYPE_NAT_RULE_EN,

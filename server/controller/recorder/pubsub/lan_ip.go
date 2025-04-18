@@ -25,12 +25,14 @@ type LANIP struct {
 	ResourcePubSubComponent[
 		*message.LANIPAdd,
 		message.LANIPAdd,
+		message.AddNoneAddition,
 		*message.LANIPUpdate,
 		message.LANIPUpdate,
 		*message.LANIPFieldsUpdate,
 		message.LANIPFieldsUpdate,
 		*message.LANIPDelete,
-		message.LANIPDelete]
+		message.LANIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewLANIP() *LANIP {
@@ -38,12 +40,14 @@ func NewLANIP() *LANIP {
 		ResourcePubSubComponent[
 			*message.LANIPAdd,
 			message.LANIPAdd,
+			message.AddNoneAddition,
 			*message.LANIPUpdate,
 			message.LANIPUpdate,
 			*message.LANIPFieldsUpdate,
 			message.LANIPFieldsUpdate,
 			*message.LANIPDelete,
 			message.LANIPDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLANIP),
 			resourceType:    common.RESOURCE_TYPE_LAN_IP_EN,

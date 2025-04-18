@@ -42,6 +42,6 @@ func (a *AZ) OnUpdaterUpdated(cloudItem *cloudmodel.AZ, diffBase *diffbase.AZ) {
 	diffBase.Update(cloudItem)
 }
 
-func (a *AZ) OnUpdaterDeleted(lcuuids []string) {
+func (a *AZ) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.AZ) {
 	a.cache.DeleteAZs(lcuuids)
 }

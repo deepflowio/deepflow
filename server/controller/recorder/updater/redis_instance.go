@@ -34,12 +34,14 @@ type RedisInstance struct {
 		mysqlmodel.RedisInstance,
 		*message.RedisInstanceAdd,
 		message.RedisInstanceAdd,
+		message.AddNoneAddition,
 		*message.RedisInstanceUpdate,
 		message.RedisInstanceUpdate,
 		*message.RedisInstanceFieldsUpdate,
 		message.RedisInstanceFieldsUpdate,
 		*message.RedisInstanceDelete,
-		message.RedisInstanceDelete]
+		message.RedisInstanceDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
@@ -51,11 +53,14 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 			mysqlmodel.RedisInstance,
 			*message.RedisInstanceAdd,
 			message.RedisInstanceAdd,
+			message.AddNoneAddition,
 			*message.RedisInstanceUpdate,
 			message.RedisInstanceUpdate,
 			*message.RedisInstanceFieldsUpdate,
 			message.RedisInstanceFieldsUpdate,
 			*message.RedisInstanceDelete,
+			message.RedisInstanceDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,
