@@ -21,11 +21,15 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
+	ctrlCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
@@ -52,7 +56,7 @@ func getIDs[MT constraint.MySQLModel](db *metadb.DB, domainLcuuid string) (ids [
 	return
 }
 
-func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
+func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](
 	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
@@ -74,14 +78,14 @@ func pageDeleteExpiredAndPublish[MT constraint.MySQLSoftDeleteModel](
 		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
 			log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		} else {
-			publishTagrecorder(db, items, resourceType, toolData)
+			publishTagrecorder[MDPT, MDT, MT](db, items, resourceType, toolData)
 		}
 	}
 
 	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
 }
 
-func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
+func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
 	msgMetadataToDBItems := make(map[*message.Metadata][]*MT)
 	for _, item := range dbItems {
 		var msgMetadata *message.Metadata
@@ -99,11 +103,41 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbIte
 	if len(msgMetadataToDBItems) == 0 {
 		return
 	}
-	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) {
+
+	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) { // TODO use pubsub
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
-			sub.OnResourceBatchDeleted(msgMetadata, dbItems)
+			msgData := MDPT(new(MDT))
+			msgData.SetMySQLItems(dbItems)
+			if resourceType == ctrlCommon.RESOURCE_TYPE_PROCESS_EN {
+				msgData.SetAddition(getProcessMessageDeleteAddition(db, dbItems, resourceType, toolData)) // TODO optimize
+				log.Infof("process delete addition: %s", msgData.GetAddition(), db.LogPrefixORGID)
+			}
+			sub.OnResourceBatchDeleted(msgMetadata, msgData)
 		}
 	}
+}
+
+func getProcessMessageDeleteAddition(db *metadb.DB, dbItems interface{}, resourceType string, toolData *toolData) *message.ProcessDeleteAddition {
+	addition := &message.ProcessDeleteAddition{}
+	var allProcesses []*metadbmodel.Process
+	if err := db.Unscoped().Find(&allProcesses).Error; err != nil {
+		log.Errorf("failed to get all processes: %s", err.Error(), db.LogPrefixORGID)
+		return addition
+	}
+	gidToCount := make(map[uint32]int)
+	for _, item := range allProcesses {
+		gidToCount[item.GID]++
+	}
+	for _, item := range dbItems.([]*metadbmodel.Process) {
+		gidToCount[item.GID]--
+	}
+	deletedGIDs := mapset.NewSet[uint32]()
+	for gid, count := range gidToCount {
+		if count == 0 {
+			deletedGIDs.Add(gid)
+		}
+	}
+	return &message.ProcessDeleteAddition{DeletedGIDs: deletedGIDs.ToSlice()}
 }
 
 type toolData struct {
