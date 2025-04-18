@@ -34,12 +34,14 @@ type VIP struct {
 		metadbmodel.VIP,
 		*message.VIPAdd,
 		message.VIPAdd,
+		message.AddNoneAddition,
 		*message.VIPUpdate,
 		message.VIPUpdate,
 		*message.VIPFieldsUpdate,
 		message.VIPFieldsUpdate,
 		*message.VIPDelete,
-		message.VIPDelete]
+		message.VIPDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
@@ -51,11 +53,14 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 			metadbmodel.VIP,
 			*message.VIPAdd,
 			message.VIPAdd,
+			message.AddNoneAddition,
 			*message.VIPUpdate,
 			message.VIPUpdate,
 			*message.VIPFieldsUpdate,
 			message.VIPFieldsUpdate,
 			*message.VIPDelete,
+			message.VIPDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,

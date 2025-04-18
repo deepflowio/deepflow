@@ -27,12 +27,32 @@ import (
 )
 
 type ChPodNSCloudTags struct {
-	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, metadbmodel.PodNamespace, metadbmodel.ChPodNSCloudTags, CloudTagsKey]
+	SubscriberComponent[
+		*message.PodNamespaceAdd,
+		message.PodNamespaceAdd,
+		*message.PodNamespaceFieldsUpdate,
+		message.PodNamespaceFieldsUpdate,
+		*message.PodNamespaceDelete,
+		message.PodNamespaceDelete,
+		metadbmodel.PodNamespace,
+		metadbmodel.ChPodNSCloudTags,
+		CloudTagsKey,
+	]
 }
 
 func NewChPodNSCloudTags() *ChPodNSCloudTags {
 	mng := &ChPodNSCloudTags{
-		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, metadbmodel.PodNamespace, metadbmodel.ChPodNSCloudTags, CloudTagsKey](
+		newSubscriberComponent[
+			*message.PodNamespaceAdd,
+			message.PodNamespaceAdd,
+			*message.PodNamespaceFieldsUpdate,
+			message.PodNamespaceFieldsUpdate,
+			*message.PodNamespaceDelete,
+			message.PodNamespaceDelete,
+			metadbmodel.PodNamespace,
+			metadbmodel.ChPodNSCloudTags,
+			CloudTagsKey,
+		](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
 		),
 	}

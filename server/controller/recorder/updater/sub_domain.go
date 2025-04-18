@@ -34,12 +34,14 @@ type SubDomain struct {
 		metadbmodel.SubDomain,
 		*message.SubDomainAdd,
 		message.SubDomainAdd,
+		message.AddNoneAddition,
 		*message.SubDomainUpdate,
 		message.SubDomainUpdate,
 		*message.SubDomainFieldsUpdate,
 		message.SubDomainFieldsUpdate,
 		*message.SubDomainDelete,
-		message.SubDomainDelete]
+		message.SubDomainDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *SubDomain {
@@ -51,11 +53,14 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 			metadbmodel.SubDomain,
 			*message.SubDomainAdd,
 			message.SubDomainAdd,
+			message.AddNoneAddition,
 			*message.SubDomainUpdate,
 			message.SubDomainUpdate,
 			*message.SubDomainFieldsUpdate,
 			message.SubDomainFieldsUpdate,
 			*message.SubDomainDelete,
+			message.SubDomainDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,

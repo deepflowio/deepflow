@@ -43,6 +43,6 @@ func (h *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *diffbase.H
 	h.cache.UpdateHost(cloudItem)
 }
 
-func (h *Host) OnUpdaterDeleted(lcuuids []string) {
+func (h *Host) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Host) {
 	h.cache.DeleteHosts(lcuuids)
 }

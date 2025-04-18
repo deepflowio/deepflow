@@ -24,12 +24,32 @@ import (
 )
 
 type ChChostCloudTag struct {
-	SubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChChostCloudTag, CloudTagKey]
+	SubscriberComponent[
+		*message.VMAdd,
+		message.VMAdd,
+		*message.VMFieldsUpdate,
+		message.VMFieldsUpdate,
+		*message.VMDelete,
+		message.VMDelete,
+		metadbmodel.VM,
+		metadbmodel.ChChostCloudTag,
+		CloudTagKey,
+	]
 }
 
 func NewChChostCloudTag() *ChChostCloudTag {
 	mng := &ChChostCloudTag{
-		newSubscriberComponent[*message.VMFieldsUpdate, message.VMFieldsUpdate, metadbmodel.VM, metadbmodel.ChChostCloudTag, CloudTagKey](
+		newSubscriberComponent[
+			*message.VMAdd,
+			message.VMAdd,
+			*message.VMFieldsUpdate,
+			message.VMFieldsUpdate,
+			*message.VMDelete,
+			message.VMDelete,
+			metadbmodel.VM,
+			metadbmodel.ChChostCloudTag,
+			CloudTagKey,
+		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_VM_CLOUD_TAG,
 		),
 	}

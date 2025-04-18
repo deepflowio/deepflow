@@ -34,12 +34,14 @@ type PeerConnection struct {
 		metadbmodel.PeerConnection,
 		*message.PeerConnectionAdd,
 		message.PeerConnectionAdd,
+		message.AddNoneAddition,
 		*message.PeerConnectionUpdate,
 		message.PeerConnectionUpdate,
 		*message.PeerConnectionFieldsUpdate,
 		message.PeerConnectionFieldsUpdate,
 		*message.PeerConnectionDelete,
-		message.PeerConnectionDelete]
+		message.PeerConnectionDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConnection) *PeerConnection {
@@ -51,11 +53,14 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 			metadbmodel.PeerConnection,
 			*message.PeerConnectionAdd,
 			message.PeerConnectionAdd,
+			message.AddNoneAddition,
 			*message.PeerConnectionUpdate,
 			message.PeerConnectionUpdate,
 			*message.PeerConnectionFieldsUpdate,
 			message.PeerConnectionFieldsUpdate,
 			*message.PeerConnectionDelete,
+			message.PeerConnectionDelete,
+			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,

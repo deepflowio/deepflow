@@ -19,3 +19,24 @@ package model
 type ORGDataCreate struct {
 	ORGID int `json:"ORGANIZATION_ID" binding:"required"`
 }
+
+type PageParams struct {
+	PageIndex int `schema:"page_index,omitempty"`
+	PageSize  int `schema:"page_size,omitempty"`
+}
+
+type VTapInterfaceQuery struct {
+	PageParams
+
+	TeamID     int `schema:"team_id,omitempty"`
+	UserID     int `schema:"user_id,omitempty"`
+	DeviceType int `schema:"device_type,omitempty"`
+	VTapType   int `schema:"vtap_type,omitempty"`
+
+	FuzzyName       string `schema:"fuzzy_name,omitempty"`
+	FuzzyMAC        string `schema:"fuzzy_mac,omitempty"`
+	FuzzyDeviceName string `schema:"fuzzy_device_name,omitempty"`
+	FuzzyVTapName   string `schema:"fuzzy_vtap_name,omitempty"`
+	FuzzyTapName    string `schema:"fuzzy_tap_name,omitempty"`
+	FuzzyTapMAC     string `schema:"fuzzy_tap_mac,omitempty"`
+}

@@ -116,6 +116,16 @@ type DataSet struct {
 
 	vtapIDToType           map[int]int
 	vtapIDToLaunchServerID map[int]int
+
+	processIdentifierToGID map[ProcessIdentifier]uint32
+	processGIDToCount      map[uint32]uint
+}
+
+type ProcessIdentifier struct {
+	Name        string
+	PodGroupID  int
+	VTapID      uint32
+	CommandLine string
 }
 
 func NewDataSet(md *rcommon.Metadata) *DataSet {
@@ -200,6 +210,9 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 
 		vtapIDToType:           make(map[int]int),
 		vtapIDToLaunchServerID: make(map[int]int),
+
+		processIdentifierToGID: make(map[ProcessIdentifier]uint32),
+		processGIDToCount:      make(map[uint32]uint),
 	}
 }
 
@@ -1014,6 +1027,57 @@ func (t *DataSet) DeletePod(lcuuid string) {
 	delete(t.podLcuuidToID, lcuuid)
 	delete(t.podIDToLcuuid, id)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid), t.metadata.LogPrefixes)
+}
+
+func (t *DataSet) AddProcess(item *metadbmodel.Process) {
+	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
+		ID:   item.ID,
+		Name: item.Name,
+	}
+
+	identifier := t.GetProcessIdentifierByDBProcess(item)
+	t.processIdentifierToGID[identifier] = item.GID
+	t.processGIDToCount[item.GID]++
+	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, item.Lcuuid), t.metadata.LogPrefixes)
+}
+
+func (t *DataSet) DeleteProcess(dbItem *metadbmodel.Process) {
+	delete(t.processLcuuidToInfo, dbItem.Lcuuid)
+	if count, exists := t.processGIDToCount[dbItem.GID]; exists {
+		t.processGIDToCount[dbItem.GID]--
+		if count <= 0 {
+			identifier := t.GetProcessIdentifierByDBProcess(dbItem)
+			delete(t.processIdentifierToGID, identifier)
+			delete(t.processGIDToCount, dbItem.GID)
+		}
+	}
+	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, dbItem.Lcuuid), t.metadata.LogPrefixes)
+}
+
+func (t *DataSet) GetProcessIdentifierByDBProcess(p *metadbmodel.Process) ProcessIdentifier {
+	return t.GetProcessIdentifier(p.Name, p.PodGroupID, p.VTapID, p.CommandLine)
+}
+
+func (t *DataSet) GetProcessIdentifier(name string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
+	var identifier ProcessIdentifier
+	if podGroupID == 0 {
+		identifier = ProcessIdentifier{
+			Name:        name,
+			VTapID:      vtapID,
+			CommandLine: commandLine,
+		}
+	} else {
+		identifier = ProcessIdentifier{
+			Name:       name,
+			PodGroupID: podGroupID,
+		}
+	}
+	return identifier
+}
+
+func (t *DataSet) GetProcessGIDByIdentifier(identifier ProcessIdentifier) (uint32, bool) {
+	pid, exists := t.processIdentifierToGID[identifier]
+	return pid, exists
 }
 
 func (t *DataSet) RefreshVTaps(v []*metadbmodel.VTap) {
@@ -2442,19 +2506,6 @@ func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, b
 		return 0, false
 	}
 
-}
-
-func (t *DataSet) AddProcess(item *metadbmodel.Process) {
-	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
-		ID:   item.ID,
-		Name: item.Name,
-	}
-	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, item.Lcuuid), t.metadata.LogPrefixes)
-}
-
-func (t *DataSet) DeleteProcess(lcuuid string) {
-	delete(t.processLcuuidToInfo, lcuuid)
-	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
 func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {

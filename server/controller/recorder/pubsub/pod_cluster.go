@@ -25,12 +25,14 @@ type PodCluster struct {
 	ResourcePubSubComponent[
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
+		message.AddNoneAddition,
 		*message.PodClusterUpdate,
 		message.PodClusterUpdate,
 		*message.PodClusterFieldsUpdate,
 		message.PodClusterFieldsUpdate,
 		*message.PodClusterDelete,
-		message.PodClusterDelete]
+		message.PodClusterDelete,
+		message.DeleteNoneAddition]
 }
 
 func NewPodCluster() *PodCluster {
@@ -38,12 +40,14 @@ func NewPodCluster() *PodCluster {
 		ResourcePubSubComponent[
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
+			message.AddNoneAddition,
 			*message.PodClusterUpdate,
 			message.PodClusterUpdate,
 			*message.PodClusterFieldsUpdate,
 			message.PodClusterFieldsUpdate,
 			*message.PodClusterDelete,
 			message.PodClusterDelete,
+			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodCluster),
 			resourceType:    common.RESOURCE_TYPE_POD_CLUSTER_EN,
