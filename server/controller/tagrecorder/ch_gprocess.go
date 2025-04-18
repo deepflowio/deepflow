@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"slices"
+
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -58,6 +60,8 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.hookers[hookerAddPage] = mng
+	mng.hookers[hookerDeletePage] = mng
 	return mng
 }
 
@@ -70,10 +74,10 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
-
-	keys = append(keys, IDKey{ID: source.ID})
+	gid := int(source.GID)
+	keys = append(keys, IDKey{ID: gid})
 	targets = append(targets, metadbmodel.ChGProcess{
-		ID:          source.ID,
+		ID:          gid,
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
@@ -99,9 +103,10 @@ func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
 	if len(updateInfo) > 0 {
+		gid := fieldsUpdate.GID.GetNew()
 		var chItem metadbmodel.ChGProcess
-		db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
+		db.Where("id = ?", gid).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: int(gid)}, db)
 	}
 }
 
@@ -111,4 +116,27 @@ func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess,
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
+}
+
+func (c *ChGProcess) beforAddPage(dbData []*metadbmodel.Process, msg message.ProcessAdd) []*metadbmodel.Process {
+	idToNewGIDFlag := msg.GetAddition().(message.ProcessAddAddition).IDToTagRecorderNewGIDFlag
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		isNew, _ := idToNewGIDFlag[item.ID]
+		if isNew {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
+}
+
+func (c *ChGProcess) beforDeletePage(dbData []*metadbmodel.Process, msg message.ProcessDelete) []*metadbmodel.Process {
+	gids := msg.GetAddition().(message.ProcessDeleteAddition).DeletedGIDs
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		if slices.Contains(gids, item.GID) {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
 }
