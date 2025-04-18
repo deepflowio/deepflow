@@ -66,7 +66,7 @@ func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
 	}
 	dpswd, err := common.DecryptSecretKey(pswd)
 	if err != nil {
-		log.Error("decrypt password failed", logger.NewORGPrefix(orgID))
+		log.Errorf("decrypt password failed (%s)", logger.NewORGPrefix(orgID))
 		return
 	}
 	c.Password = dpswd

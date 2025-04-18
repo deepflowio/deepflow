@@ -245,11 +245,11 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 
 func (p *Process) afterDeletePage(dbData []*metadbmodel.Process) (*message.ProcessDeleteAddition, bool) {
 	deletedGIDs := mapset.NewSet[uint32]()
-	gids := make([]int, 0)
+	gids := mapset.NewSet[int]()
 	for _, item := range dbData {
-		if _, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); ok {
+		if _, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); !ok {
 			deletedGIDs.Add(item.GID)
-			gids = append(gids, int(item.GID))
+			gids.Add(int(item.GID))
 		}
 	}
 	if deletedGIDs.Cardinality() == 0 {
@@ -257,7 +257,7 @@ func (p *Process) afterDeletePage(dbData []*metadbmodel.Process) (*message.Proce
 	}
 
 	gidResourceType := ctrlrcommon.RESOURCE_TYPE_GPROCESS_EN
-	err := idmng.ReleaseIDs(p.metadata.GetORGID(), gidResourceType, gids)
+	err := idmng.ReleaseIDs(p.metadata.GetORGID(), gidResourceType, gids.ToSlice())
 	if err != nil {
 		log.Errorf("%s release gids: %v failed", gidResourceType, gids, p.metadata.LogPrefixes)
 	}

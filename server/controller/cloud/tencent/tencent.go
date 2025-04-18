@@ -107,7 +107,7 @@ func NewTencent(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfi
 
 	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
 	if err != nil {
-		log.Error("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
