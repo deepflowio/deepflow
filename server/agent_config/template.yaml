@@ -5458,7 +5458,7 @@ processors:
       #   ch: |-
       #     会话聚合最大条目数。
       #     如果 l7_flow_log 条目总数超过该配置，最老的条目将被丢弃，并设置其 response 状态为 `Unknown`。
-      session_aggregate_max_entries: 16384
+      session_aggregate_max_entries: 65536
       # type: bool
       # name:
       #   en: Consistent Timestamp in L7 Metrics

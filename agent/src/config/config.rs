@@ -1796,7 +1796,7 @@ impl Default for RequestLogTunning {
     fn default() -> Self {
         Self {
             payload_truncation: 1024,
-            session_aggregate_max_entries: 16384,
+            session_aggregate_max_entries: 65536,
             consistent_timestamp_in_l7_metrics: false,
         }
     }
