@@ -2062,6 +2062,7 @@ impl FlowMap {
                 collect_stats = true;
             }
         }
+        self.perf_cache.borrow_mut().remove(&flow.flow_id);
 
         self.size -= 1;
         self.stats_counter
