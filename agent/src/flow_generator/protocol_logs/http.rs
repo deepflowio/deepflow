@@ -1624,7 +1624,10 @@ pub fn is_http_v1_payload(buf: &[u8]) -> bool {
     if buf.starts_with(RESPONSE_PREFIX.as_bytes()) {
         return true;
     }
-    HTTP_METHODS.iter().position(|m| has_prefix(buf, m.as_bytes())).is_some()
+    HTTP_METHODS
+        .iter()
+        .position(|m| has_prefix(buf, m.as_bytes()))
+        .is_some()
 }
 
 // check first line is http request line
@@ -1634,7 +1637,11 @@ pub fn is_http_req_line(line: &str) -> bool {
     }
 
     // consider use prefix tree in future
-    if HTTP_METHODS.iter().position(|m| has_prefix(line.as_bytes(), m.as_bytes())).is_none() {
+    if HTTP_METHODS
+        .iter()
+        .position(|m| has_prefix(line.as_bytes(), m.as_bytes()))
+        .is_none()
+    {
         return false;
     };
     match line.rsplit_once(' ') {
@@ -2431,7 +2438,10 @@ mod tests {
         param.l4_protocol = IpProtocol::TCP;
 
         let mut parser = HttpLog::new_v1();
-        assert!(!parser.check_payload(concat!(r#"POST","name":"一些中文""#, "\r\nblablabla\r\n").as_bytes(), &param));
+        assert!(!parser.check_payload(
+            concat!(r#"POST","name":"一些中文""#, "\r\nblablabla\r\n").as_bytes(),
+            &param
+        ));
         assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
     }
 }
