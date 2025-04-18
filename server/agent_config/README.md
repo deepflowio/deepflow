@@ -8012,7 +8012,7 @@ The following metrics can be used as reference data for adjusting this configura
 processors:
   request_log:
     tunning:
-      session_aggregate_max_entries: 16384
+      session_aggregate_max_entries: 65536
 ```
 
 **Schema**:

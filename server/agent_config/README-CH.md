@@ -7792,7 +7792,7 @@ LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目
 processors:
   request_log:
     tunning:
-      session_aggregate_max_entries: 16384
+      session_aggregate_max_entries: 65536
 ```
 
 **模式**:
