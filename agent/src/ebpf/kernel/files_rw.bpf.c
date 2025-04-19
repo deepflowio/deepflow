@@ -218,7 +218,6 @@ KPROG(do_preadv) (struct pt_regs *ctx) {
 	return do_sys_enter_pread(fd, SYSCALL_FUNC_PREADV);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_pread64/format
 TP_SYSCALL_PROG(enter_pread64) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
@@ -236,19 +235,6 @@ TP_SYSCALL_PROG(enter_preadv2) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
 	return do_sys_enter_pread(fd, SYSCALL_FUNC_PREADV2);
 }
-#else
-KFUNC_PROG(ksys_pread64, unsigned int fd, char __user *buf, size_t count,
-	   loff_t pos)
-{
-	return do_sys_enter_pread(fd, SYSCALL_FUNC_PREAD64);
-}
-
-KFUNC_PROG(do_preadv, unsigned long fd, const struct iovec __user *vec,
-	   unsigned long vlen, loff_t pos, rwf_t flags)
-{
-	return do_sys_enter_pread(fd, SYSCALL_FUNC_PREADV);
-}
-#endif /* LINUX_VER_KFUNC */
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 static __inline int do_sys_exit_pread(void *ctx, ssize_t bytes_count)
@@ -281,7 +267,6 @@ KRETPROG(do_preadv) (struct pt_regs *ctx) {
 	return do_sys_exit_pread((void *)ctx, bytes_count);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_pwrite64/format
 TP_SYSCALL_PROG(exit_pread64) (struct syscall_comm_exit_ctx *ctx) {
 	return do_sys_exit_pread((void *)ctx, (ssize_t) ctx->ret);
@@ -296,19 +281,6 @@ TP_SYSCALL_PROG(exit_preadv) (struct syscall_comm_exit_ctx *ctx) {
 TP_SYSCALL_PROG(exit_preadv2) (struct syscall_comm_exit_ctx *ctx) {
 	return do_sys_exit_pread((void *)ctx, (ssize_t) ctx->ret);
 }
-#else
-KRETFUNC_PROG(ksys_pread64, unsigned int fd, char __user *buf, size_t count,
-	      loff_t pos, ssize_t bytes_count)
-{
-	return do_sys_exit_pread((void *)ctx, bytes_count);
-}
-
-KRETFUNC_PROG(do_preadv, unsigned long fd, const struct iovec __user *vec,
-	      unsigned long vlen, loff_t pos, rwf_t flags, ssize_t bytes_count)
-{
-	return do_sys_exit_pread((void *)ctx, bytes_count);
-}
-#endif /* LINUX_VER_KFUNC */
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 // File Write Event Tracing
@@ -346,7 +318,6 @@ KPROG(do_pwritev) (struct pt_regs *ctx) {
 	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_pwrite64/format
 TP_SYSCALL_PROG(enter_pwrite64) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
@@ -364,20 +335,6 @@ TP_SYSCALL_PROG(enter_pwritev2) (struct syscall_comm_enter_ctx *ctx) {
 	int fd = ctx->fd;
 	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV2);
 }
-
-#else
-KFUNC_PROG(ksys_pwrite64, unsigned int fd, const char __user *buf,
-	   size_t count, loff_t pos)
-{
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITE64);
-}
-
-KFUNC_PROG(do_pwritev, unsigned long fd, const struct iovec __user *vec,
-	   unsigned long vlen, loff_t pos, rwf_t flags)
-{
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV);
-}
-#endif /* LINUX_VER_KFUNC */
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 // pwrite64()/pwritev()/pwritev2() exit
@@ -411,7 +368,6 @@ KRETPROG(do_pwritev) (struct pt_regs *ctx) {
 	return do_sys_exit_pwrite((void *)ctx, bytes_count);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_pwrite64/format
 TP_SYSCALL_PROG(exit_pwrite64) (struct syscall_comm_exit_ctx *ctx) {
 	return do_sys_exit_pwrite((void *)ctx, (ssize_t) ctx->ret);
@@ -426,20 +382,6 @@ TP_SYSCALL_PROG(exit_pwritev) (struct syscall_comm_exit_ctx *ctx) {
 TP_SYSCALL_PROG(exit_pwritev2) (struct syscall_comm_exit_ctx *ctx) {
 	return do_sys_exit_pwrite((void *)ctx, (ssize_t) ctx->ret);
 }
-
-#else
-KRETFUNC_PROG(ksys_pwrite64, unsigned int fd, const char __user *buf,
-	      size_t count, loff_t pos, ssize_t bytes_count)
-{
-	return do_sys_exit_pwrite((void *)ctx, bytes_count);
-}
-
-KRETFUNC_PROG(do_pwritev, unsigned long fd, const struct iovec __user *vec,
-	      unsigned long vlen, loff_t pos, rwf_t flags, ssize_t bytes_count)
-{
-	return do_sys_exit_pwrite((void *)ctx, bytes_count);
-}
-#endif /* LINUX_VER_KFUNC */
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 PROGTP(io_event) (void *ctx) {

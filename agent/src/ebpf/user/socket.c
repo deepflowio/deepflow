@@ -208,12 +208,6 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_sym_for_entry_and_exit(tps, "do_writev");
 	kfunc_set_sym_for_entry_and_exit(tps, "do_readv");
 
-	// Probe points for file read/write operations
-	kfunc_set_sym_for_entry_and_exit(tps, "ksys_pwrite64");
-	kfunc_set_sym_for_entry_and_exit(tps, "ksys_pread64");
-	kfunc_set_sym_for_entry_and_exit(tps, "do_preadv");
-	kfunc_set_sym_for_entry_and_exit(tps, "do_pwritev");
-
 #if defined(__x86_64__)
 	kfunc_set_symbol(tps, "__x64_sys_close", false);
 #else
@@ -255,6 +249,22 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
+
+        // file R/W probes
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pread64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwrite64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pread64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_preadv");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwrite64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev");
+	if (!access(SYSCALL_PRWV2_TP_PATH, F_OK)) {
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_preadv2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev2");
+	}
 }
 
 static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
@@ -304,14 +314,6 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
 
-	// file R/W probes
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pread64");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv2");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwrite64");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev2");
-
 	// exit tracepoints
 	/*
 	 * `tracepoint/syscalls/sys_exit_socket` This is currently added only to
@@ -351,13 +353,21 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 	
-	// file R/W probes
+        // file R/W probes
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pread64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwrite64");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pread64");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_preadv");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_preadv2");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwrite64");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev2");
+	if (!access(SYSCALL_PRWV2_TP_PATH, F_OK)) {
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_preadv2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev2");
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev2");
+	}
 }
 
 
