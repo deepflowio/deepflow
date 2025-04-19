@@ -588,7 +588,8 @@ global:
 
 **详细描述**:
 
-操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。举例：
+操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。当前仅对
+dispatcher 线程生效。举例：
 ```yaml
 global:
   tunning:
@@ -6521,7 +6522,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-max-fail-count`
 processors:
   request_log:
     application_protocol_inference:
-      inference_max_retries: 5
+      inference_max_retries: 128
 ```
 
 **模式**:
@@ -6532,10 +6533,20 @@ processors:
 
 **详细描述**:
 
-deepflow-agent 会周期性标记每一个 `<vpc, ip, protocol, port>` 四元组承载的应用协议类型，以加速
-后续数据的应用协议采集过程。如果一个时间周期内，连续多次尝试解析 Packet 数据、Socket 数据无法推断
-出该四元组承载的应用协议，agent 会将该四元组标记为 unknown 类型，并在本周期内暂停对后续数据的应用
-协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
+Agent 通过一张哈希表记录每一个服务端的应用协议解析结果，包括协议、持续解析失败次数、最后一次解析时间。
+
+当一条 Flow 的应用协议从未成功解析过时，使用哈希表决定尝试解析哪些协议：
+- 若没有在哈希表中查到结果，或者查到的结果不可用（协议未知，或失败次数超限，或时间距当前超过 inference_result_ttl）
+  - 若失败次数已经超限，则将 Flow 标记为禁止解析，禁止期为 inference_result_ttl
+  - 否则，遍历所有开启的应用协议，尝试解析
+    - 解析成功时会将协议、解析时间、失败次数（0）更新到哈希表中，使得成功的解析结果保鲜
+    - 解析失败时会将解析时间和失败次数（+1）更新到哈希表中，使得失败的尝试能够累计，累计超过阈值后会禁止后续尝试
+- 如果在哈希表中查到了具体的、可用的协议，则使用该协议进行尝试
+  - 解析成功时会将协议、解析时间、失败次数（0）更新到哈希表中，使得成功的解析结果保鲜
+  - 解析失败时会将解析时间和失败次数（+1）更新到哈希表中，使得失败的尝试能够累计，累计超过阈值后会禁止后续尝试
+
+当 Flow 一旦成功解析过一次，后续都仅使用该协议类型尝试解析，且无需再查询哈希表。
+每次解析成功时，将会更新哈希表中的协议（针对 HTTP2/gRPC 需进行更新）、解析时间、失败次数。
 
 #### 推断结果 TTL {#processors.request_log.application_protocol_inference.inference_result_ttl}
 
@@ -7781,7 +7792,7 @@ LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目
 processors:
   request_log:
     tunning:
-      session_aggregate_max_entries: 16384
+      session_aggregate_max_entries: 65536
 ```
 
 **模式**:

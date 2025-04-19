@@ -203,8 +203,8 @@ pub struct FlowLog {
     // we use the server_port to judge packet's direction.
     pub server_port: u16,
 
-    is_success: bool,
-    is_skip: bool,
+    l7_protocol_inference_succeed: bool,
+    skip_l7_protocol_inference: bool,
 
     wasm_vm: Rc<RefCell<Option<WasmVm>>>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -213,7 +213,7 @@ pub struct FlowLog {
     rrt_timeout: usize,
 
     // the timestamp sec of accumulate fail exceed l7_protocol_inference_max_fail_count
-    last_fail: Option<u64>,
+    start_of_skip_l7_protocol_inference: Option<u64>,
     l7_protocol_inference_ttl: u64,
 
     ntp_diff: Arc<AtomicI64>,
@@ -226,11 +226,17 @@ impl FlowLog {
     // if flow parse fail exceed l7_protocol_inference_max_fail_count and time exceed l7_protocol_inference_ttl,
     // recover the flow check and parse
     fn check_fail_recover(&mut self) {
-        if self.is_skip {
+        if self.skip_l7_protocol_inference {
             let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-            if now.as_secs() > self.last_fail.unwrap() + self.l7_protocol_inference_ttl {
-                self.last_fail = None;
-                self.is_skip = false;
+            if now.as_secs()
+                > self.start_of_skip_l7_protocol_inference.unwrap() + self.l7_protocol_inference_ttl
+            {
+                self.start_of_skip_l7_protocol_inference = None;
+                self.skip_l7_protocol_inference = false;
+
+                if !self.l7_protocol_inference_succeed {
+                    self.l7_protocol_log_parser = None
+                }
             }
         }
     }
@@ -302,15 +308,16 @@ impl FlowLog {
             };
             parser.reset();
 
-            if !self.is_success {
-                self.is_success = ret.is_ok();
-                if self.is_success && !cached {
+            if !self.l7_protocol_inference_succeed {
+                self.l7_protocol_inference_succeed = ret.is_ok();
+                if self.l7_protocol_inference_succeed && !cached {
                     cache_proto(self.l7_protocol_enum.clone());
                 }
-                if !self.is_success {
-                    self.is_skip = cache_proto(L7ProtocolEnum::default());
-                    if self.is_skip {
-                        self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
+                if !self.l7_protocol_inference_succeed {
+                    self.skip_l7_protocol_inference = cache_proto(L7ProtocolEnum::default());
+                    if self.skip_l7_protocol_inference {
+                        self.start_of_skip_l7_protocol_inference =
+                            Some(packet.lookup_key.timestamp.as_secs())
                     }
                 }
             }
@@ -414,7 +421,7 @@ impl FlowLog {
                 }
             }
 
-            self.is_skip = match packet.signal_source {
+            self.skip_l7_protocol_inference = match packet.signal_source {
                 SignalSource::EBPF => app_table.set_protocol_from_ebpf(
                     packet,
                     L7ProtocolEnum::default(),
@@ -423,8 +430,9 @@ impl FlowLog {
                 ),
                 _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
             };
-            if self.is_skip {
-                self.last_fail = Some(packet.lookup_key.timestamp.as_secs())
+            if self.skip_l7_protocol_inference {
+                self.start_of_skip_l7_protocol_inference =
+                    Some(packet.lookup_key.timestamp.as_secs())
             }
         }
 
@@ -444,7 +452,7 @@ impl FlowLog {
         checker: &L7ProtocolChecker,
     ) -> Result<L7ParseResult> {
         self.check_fail_recover();
-        if self.is_skip {
+        if self.skip_l7_protocol_inference {
             return Err(Error::L7ProtocolParseLimit);
         }
 
@@ -538,14 +546,14 @@ impl FlowLog {
             perf_cache,
             l7_protocol_enum,
             server_port: server_port,
-            is_success: false,
-            is_skip,
+            l7_protocol_inference_succeed: false,
+            skip_l7_protocol_inference: is_skip,
             wasm_vm,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_plugin,
             stats_counter,
             rrt_timeout,
-            last_fail: last_time,
+            start_of_skip_l7_protocol_inference: last_time,
             l7_protocol_inference_ttl,
             ntp_diff,
             obfuscate_cache,

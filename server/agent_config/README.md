@@ -598,7 +598,8 @@ global:
 **Description**:
 
 CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-without being migrated to other processors. Invalid ID will be ignored. Example:
+without being migrated to other processors. Invalid ID will be ignored. Currently only
+works for dispatcher threads. Example:
 ```yaml
 global:
   tunning:
@@ -6681,7 +6682,7 @@ Upgrade from old version: `static_config.l7-protocol-inference-max-fail-count`
 processors:
   request_log:
     application_protocol_inference:
-      inference_max_retries: 5
+      inference_max_retries: 128
 ```
 
 **Schema**:
@@ -6692,12 +6693,30 @@ processors:
 
 **Description**:
 
-deepflow-agent will mark the long live stream and application protocol for each
-<vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
-to be identified for many times (for multiple packets, Socket Data, Function Data),
-the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
-try (incurring significant computational overhead) until the duration exceeds
-l7-protocol-inference-ttl.
+The agent records the application protocol resolution results of each server through a hash table, including the
+protocol, the number of continuous resolution failures, and the last resolution time
+
+When an app protocol for Flow has never been successfully resolved, a hash table is used to decide which protocols
+to try to resolve:
+- If the result is not found in the hash table, or the result is not available (the protocol is unknown, or the
+  number of failures exceeds the limit, or the time is more than inference_result_ttl from the current time)
+  - If the number of failures has been exceeded, Flow is marked as prohibited for resolution for a period of
+    inference_result_ttl
+  - Otherwise, iterate through all open application protocols and try to parse them
+    - When the parsing is successful, the protocol, parsing time, and number of failures (0) are updated to the hash
+      table to keep the successful parsing results fresh
+    - When parsing fails, the parsing time and number of failures (+1) are updated to the hash table so that the failed
+      attempts can be accumulated, and subsequent attempts will be prohibited after the accumulation exceeds the threshold
+  - If a specific, available protocol is found in the hash table, it is attempted using that protocol
+    - When the parsing is successful, the protocol, parsing time, and number of failures (0) are updated to the hash table
+      to keep the successful parsing results fresh
+    - When parsing fails, the parsing time and number of failures (+1) are updated to the hash table so that the failed
+      attempts can be accumulated, and subsequent attempts will be prohibited after the accumulation exceeds the threshold
+
+Once a Flow is successfully parsed once, it will only use that protocol type to try to parse it once, and there is no need
+to query the hash table。
+Each time the resolution is successful, the protocol in the hash table (for HTTP2/gRPC needs to be updated), the resolution
+time, and the number of failures will be updated.
 
 #### Inference Result TTL {#processors.request_log.application_protocol_inference.inference_result_ttl}
 
@@ -7993,7 +8012,7 @@ The following metrics can be used as reference data for adjusting this configura
 processors:
   request_log:
     tunning:
-      session_aggregate_max_entries: 16384
+      session_aggregate_max_entries: 65536
 ```
 
 **Schema**:
