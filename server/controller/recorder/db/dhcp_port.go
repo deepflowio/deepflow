@@ -26,12 +26,12 @@ type DHCPPort struct {
 }
 
 func NewDHCPPort() *DHCPPort {
-	operater := &DHCPPort{
+	operator := &DHCPPort{
 		newOperatorBase[*metadbmodel.DHCPPort](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

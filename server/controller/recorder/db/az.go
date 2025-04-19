@@ -26,12 +26,12 @@ type AZ struct {
 }
 
 func NewAZ() *AZ {
-	operater := &AZ{
+	operator := &AZ{
 		newOperatorBase[*metadbmodel.AZ](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }
