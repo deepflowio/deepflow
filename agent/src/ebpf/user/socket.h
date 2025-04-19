@@ -24,7 +24,9 @@
 
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
+#define SYSCALL_PRWV2_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_enter_preadv2"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
+
 /*
  * The `__sys_recvmmsg` interface underwent a change in its parameter list starting
  * from Linux kernel version 5.0. If earlier kernel versions support the `fentry/fexit`
