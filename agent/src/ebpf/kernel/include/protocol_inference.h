@@ -111,6 +111,9 @@ __protocol_port_check(enum traffic_protocol proto,
 		return false;
 	}
 
+	if (conn_info->sk_type == SOCK_UNIX)
+		return true;
+
 	__u32 key = proto;
 	ports_bitmap_t *ports = proto_ports_bitmap__lookup(&key);
 	if (ports) {
@@ -3919,10 +3922,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	if (conn_info->sk == NULL)
 		return inferred_message;
 
-	if (conn_info->tuple.dport == 0 || conn_info->tuple.num == 0) {
-		return inferred_message;
-	}
-
 	/*
 	 * The socket that is indeed determined to be a protocol does not
 	 * enter drop_msg_by_comm().
@@ -4001,7 +4000,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 * If the data source comes from kernel system calls, it is discarded
 	 * directly because some kernel probes do not handle TLS data.
 	 */
-	if (protocol_port_check_1(PROTO_TLS, conn_info) &&
+	if (conn_info->sk_type != SOCK_UNIX &&
+	    protocol_port_check_1(PROTO_TLS, conn_info) &&
 	    extra->source == DATA_SOURCE_SYSCALL) {
 		/*
 		 * TLS first performs handshake protocol inference and discards the data
