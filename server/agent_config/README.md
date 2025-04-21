@@ -1082,9 +1082,44 @@ global:
 **Description**:
 
 The maximum allowed flow rate for sending observability data to the server-side Ingester module.
-When this rate limit is exceeded, the data will be actively discarded,
+If `ingester_traffic_overflow_action` is set to `drop`,
+when this rate limit is exceeded, the data will be actively discarded,
 and the agent will be marked as abnormal and trigger an alarm.
 Setting it to 0 means no speed limit.
+
+### Action when the Ingester traffic exceeds the limit {#global.communication.ingester_traffic_overflow_action}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.communication.ingester_traffic_overflow_action`
+
+**Default value**:
+```yaml
+global:
+  communication:
+    ingester_traffic_overflow_action: 0
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| 0 | wait |
+| 1 | drop |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Action when the Ingester traffic exceeds the limit
+- wait: pause sending, cache data into queue, and wait for next sending
+- drop: the data is discarded directly and the Agent `DATA_BPS_THRESHOLD_EXCEEDED` exception is triggered
 
 ### Request via NAT IP Address {#global.communication.request_via_nat_ip}
 
