@@ -55,6 +55,8 @@ struct OverwriteQueue<T: Sized> {
 
     counter: Counter,
 
+    total_overwritten_count: AtomicU64,
+
     _marker: PhantomData<T>,
 }
 
@@ -78,6 +80,7 @@ impl<T> OverwriteQueue<T> {
             notify: Condvar::new(),
             terminated: AtomicBool::new(false),
             counter: Counter::default(),
+            total_overwritten_count: AtomicU64::new(0),
             _marker: PhantomData,
         }
     }
@@ -129,6 +132,8 @@ impl<T> OverwriteQueue<T> {
                 );
                 self.counter
                     .overwritten
+                    .fetch_add(to_overwrite as u64, Ordering::Relaxed);
+                self.total_overwritten_count
                     .fetch_add(to_overwrite as u64, Ordering::Relaxed);
             }
         }
@@ -415,6 +420,13 @@ impl<T> Receiver<T> {
                 Err(e) => Err(e),
             }
         }
+    }
+
+    pub fn total_overwritten_count(&self) -> u64 {
+        self.counter()
+            .queue
+            .total_overwritten_count
+            .load(Ordering::Relaxed)
     }
 }
 
