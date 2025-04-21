@@ -1253,6 +1253,7 @@ impl<'a> Iterator for KvExtractor<'a> {
 // test log parse
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
     use std::path::Path;
     use std::rc::Rc;
     use std::{cell::RefCell, fs};
@@ -1323,7 +1324,12 @@ mod tests {
                 if info.is_none() {
                     let mut i = MysqlInfo::default();
                     i.protocol_version = mysql.protocol_version;
-                    output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
+                    let _ = write!(
+                        &mut output,
+                        "{} is_mysql: {}\n",
+                        serde_json::to_string(&i).unwrap(),
+                        is_mysql
+                    );
                     previous_command = 0;
                     continue;
                 }
@@ -1339,14 +1345,24 @@ mod tests {
                         }
 
                         i.rrt = 0;
-                        output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
+                        let _ = write!(
+                            &mut output,
+                            "{} is_mysql: {}\n",
+                            serde_json::to_string(&i).unwrap(),
+                            is_mysql
+                        );
                     }
                     _ => unreachable!(),
                 }
             } else {
                 let mut i = MysqlInfo::default();
                 i.protocol_version = mysql.protocol_version;
-                output.push_str(&format!("{:?} is_mysql: {}\n", i, is_mysql));
+                let _ = write!(
+                    &mut output,
+                    "{} is_mysql: {}\n",
+                    serde_json::to_string(&i).unwrap(),
+                    is_mysql
+                );
             }
         }
         output
