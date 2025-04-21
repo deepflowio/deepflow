@@ -1,0 +1,4 @@
+{"msg_type":"Request","request_type":3,"request_resource":"SELECT * FROM `az_controller_connection`","response_code":0,"response_status":"Unknown","rrt":0,"statement_id":0,"captured_request_byte":45,"captured_response_byte":0,"trace_id":null,"span_id":null} is_mysql: true
+{"msg_type":"Response","request_type":0,"response_code":254,"response_status":"Ok","rrt":0,"statement_id":0,"captured_request_byte":0,"captured_response_byte":779,"trace_id":null,"span_id":null} is_mysql: false
+{"msg_type":"Request","request_type":3,"request_resource":"SELECT * FROM `controller`","response_code":0,"response_status":"Unknown","rrt":0,"statement_id":0,"captured_request_byte":31,"captured_response_byte":0,"trace_id":null,"span_id":null} is_mysql: true
+{"msg_type":"Response","request_type":0,"response_code":0,"response_status":"ParseFailed","rrt":0,"statement_id":0,"captured_request_byte":0,"captured_response_byte":1024,"trace_id":null,"span_id":null} is_mysql: false

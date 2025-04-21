@@ -15,7 +15,7 @@
  */
 
 use std::cell::RefCell;
-use std::fmt::Debug;
+use std::fmt;
 use std::net::IpAddr;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -280,7 +280,7 @@ pub trait L7ProtocolParserInterface {
     fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EbpfParam<'a> {
     pub is_tls: bool,
     // 目前仅 http2 uprobe 有意义
@@ -481,6 +481,35 @@ pub struct ParseParam<'a> {
     pub oracle_parse_conf: OracleConfig,
 }
 
+impl<'a> fmt::Debug for ParseParam<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ParseParam")
+            .field("l4_protocol", &self.l4_protocol)
+            .field("ip_src", &self.ip_src)
+            .field("ip_dst", &self.ip_dst)
+            .field("port_src", &self.port_src)
+            .field("port_dst", &self.port_dst)
+            .field("flow_id", &self.flow_id)
+            .field("icmp_data", &self.icmp_data)
+            .field("direction", &self.direction)
+            .field("ebpf_type", &self.ebpf_type)
+            .field("ebpf_param", &self.ebpf_param)
+            .field("packet_start_seq", &self.packet_start_seq)
+            .field("packet_end_seq", &self.packet_end_seq)
+            .field("time", &self.time)
+            .field("parse_perf", &self.parse_perf)
+            .field("parse_log", &self.parse_log)
+            .field("parse_config", &self.parse_config)
+            .field("wasm_vm", &self.wasm_vm.borrow().is_some())
+            .field("so_func", &self.so_func.borrow().is_some())
+            .field("rrt_timeout", &self.rrt_timeout)
+            .field("buf_size", &self.buf_size)
+            .field("captured_byte", &self.captured_byte)
+            .field("oracle_parse_conf", &self.oracle_parse_conf)
+            .finish()
+    }
+}
+
 impl<'a> ParseParam<'a> {
     pub fn is_from_ebpf(&self) -> bool {
         self.ebpf_type != EbpfType::None
@@ -653,8 +682,8 @@ impl From<&[String]> for L7ProtocolBitmap {
     }
 }
 
-impl Debug for L7ProtocolBitmap {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for L7ProtocolBitmap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut p = vec![];
         for i in get_all_protocol() {
             if self.is_enabled(i.protocol()) {
