@@ -493,6 +493,7 @@ impl Trident {
         let ntp_diff = Arc::new(AtomicI64::new(0));
         let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
         let exception_handler = ExceptionHandler::default();
+        let sender_leaky_bucket = Arc::new(LeakyBucket::new(Some(0)));
 
         let log_stats_shared_connection = Arc::new(Mutex::new(Connection::new()));
         let mut stats_sender = UniformSenderThread::new(
@@ -503,6 +504,7 @@ impl Trident {
             exception_handler.clone(),
             Some(log_stats_shared_connection.clone()),
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
         stats_sender.start();
 
@@ -539,6 +541,7 @@ impl Trident {
                 exception_handler.clone(),
                 ntp_diff.clone(),
                 log_stats_shared_connection,
+                sender_leaky_bucket.clone(),
             );
             logger_writers.push(Box::new(remote_log_writer));
         }
@@ -605,6 +608,7 @@ impl Trident {
                     sidecar_mode,
                     cgroups_disabled,
                     ntp_diff,
+                    sender_leaky_bucket,
                 ) {
                     error!(
                         "Launching deepflow-agent failed: {}, deepflow-agent restart...",
@@ -637,6 +641,7 @@ impl Trident {
         sidecar_mode: bool,
         cgroups_disabled: bool,
         ntp_diff: Arc<AtomicI64>,
+        sender_leaky_bucket: Arc<LeakyBucket>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Brief tag: {}", version_info.brief_tag());
@@ -1066,6 +1071,7 @@ impl Trident {
                         gateway_vmac_addrs,
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
+                        sender_leaky_bucket.clone(),
                     )?;
 
                     comp.start();
@@ -2088,6 +2094,7 @@ impl AgentComponents {
         gateway_vmac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
+        sender_leaky_bucket: Arc<LeakyBucket>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -2395,6 +2402,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let metrics_queue_name = "3-doc-to-collector-sender";
@@ -2418,6 +2426,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
@@ -2445,6 +2454,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let analyzer_ip = if candidate_config
@@ -2513,6 +2523,7 @@ impl AgentComponents {
             exception_handler.clone(),
             Some(pcap_packet_shared_connection.clone()),
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -2539,6 +2550,7 @@ impl AgentComponents {
             exception_handler.clone(),
             Some(pcap_packet_shared_connection),
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let bpf_builder = bpf::Builder {
@@ -2655,6 +2667,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let profile_queue_name = "1-profile-to-sender";
@@ -2680,6 +2693,7 @@ impl AgentComponents {
             // profiler compress is a special one, it requires compressed and directly write into db
             // so we compress profile data inside and not compress secondly
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
@@ -2710,6 +2724,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let skywalking_queue_name = "1-skywalking-to-sender";
@@ -2741,6 +2756,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let datadog_queue_name = "1-datadog-to-sender";
@@ -2772,6 +2788,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
@@ -2909,6 +2926,7 @@ impl AgentComponents {
             } else {
                 SenderEncoder::Raw
             },
+            sender_leaky_bucket.clone(),
         );
 
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
@@ -2968,6 +2986,7 @@ impl AgentComponents {
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection.clone()),
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let telegraf_queue_name = "1-telegraf-to-sender";
@@ -2995,6 +3014,7 @@ impl AgentComponents {
             exception_handler.clone(),
             Some(prometheus_telegraf_shared_connection),
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
@@ -3022,6 +3042,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             SenderEncoder::Raw,
+            sender_leaky_bucket.clone(),
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(
@@ -3358,6 +3379,7 @@ impl Components {
         gateway_vmac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
+        sender_leaky_bucket: Arc<LeakyBucket>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
         if crate::utils::environment::running_in_only_watch_k8s_mode() {
@@ -3382,6 +3404,7 @@ impl Components {
             gateway_vmac_addrs,
             agent_mode,
             runtime,
+            sender_leaky_bucket,
         )?;
         return Ok(Components::Agent(components));
     }
