@@ -1058,8 +1058,42 @@ global:
 **详细描述**:
 
 向 Server 端 Ingester 模块发送可观测性数据的最大允许流量,
-超过此限速时数据将会主动丢弃、且采集器会标记为异常状态并触发告警。
+超限行为参考 `ingester_traffic_overflow_action` 配置描述。
 配置为 0 表示不限速。
+
+### Ingester 流量超限的动作 {#global.communication.ingester_traffic_overflow_action}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.communication.ingester_traffic_overflow_action`
+
+**默认值**:
+```yaml
+global:
+  communication:
+    ingester_traffic_overflow_action: WAIT
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| WAIT | |
+| DROP | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+Ingester 流量超限的动作
+- WAIT：暂停发送，数据缓存到队列，等待下次发送。
+- DROP：直接丢弃数据，并触发 Agent `数据流量达到限速`异常。
 
 ### 请求 NAT IP 地址 {#global.communication.request_via_nat_ip}
 

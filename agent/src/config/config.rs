@@ -2121,6 +2121,33 @@ impl Default for Ntp {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TrafficOverflowAction {
+    #[default]
+    Waiting = 0,
+    Dropping = 1,
+}
+
+fn to_traffic_overflow_action<'de: 'a, 'a, D>(
+    deserializer: D,
+) -> Result<TrafficOverflowAction, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match <&'a str>::deserialize(deserializer)?
+        .to_uppercase()
+        .as_str()
+    {
+        "WAIT" => Ok(TrafficOverflowAction::Waiting),
+        "DROP" => Ok(TrafficOverflowAction::Dropping),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"WAIT|DROP",
+        )),
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Communication {
@@ -2133,6 +2160,8 @@ pub struct Communication {
     #[serde(deserialize_with = "deser_usize_with_mega_unit")]
     pub grpc_buffer_size: usize,
     pub max_throughput_to_ingester: u64,
+    #[serde(deserialize_with = "to_traffic_overflow_action")]
+    pub ingester_traffic_overflow_action: TrafficOverflowAction,
     pub request_via_nat_ip: bool,
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
@@ -2149,6 +2178,7 @@ impl Default for Communication {
             ingester_port: 30033,
             grpc_buffer_size: 5 << 20,
             max_throughput_to_ingester: 100,
+            ingester_traffic_overflow_action: TrafficOverflowAction::Waiting,
             request_via_nat_ip: false,
         }
     }
