@@ -738,14 +738,32 @@ global:
     # description:
     #   en: |-
     #     The maximum allowed flow rate for sending observability data to the server-side Ingester module.
-    #     When this rate limit is exceeded, the data will be actively discarded,
-    #     and the agent will be marked as abnormal and trigger an alarm.
+    #     For the overflow action, refer to the `ingester_traffic_overflow_action` configuration description.
     #     Setting it to 0 means no speed limit.
     #   ch: |-
     #     向 Server 端 Ingester 模块发送可观测性数据的最大允许流量,
-    #     超过此限速时数据将会主动丢弃、且采集器会标记为异常状态并触发告警。
+    #     超限行为参考 `ingester_traffic_overflow_action` 配置描述。
     #     配置为 0 表示不限速。
     max_throughput_to_ingester: 100
+    # type: string
+    # name:
+    #   en: Action when the Ingester traffic exceeds the limit
+    #   ch: Ingester 流量超限的动作
+    # unit:
+    # range: []
+    # enum_options: [WAIT, DROP]
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Action when the Ingester traffic exceeds the limit
+    #     - WAIT: pause sending, cache data into queue, and wait for next sending
+    #     - DROP: the data is discarded directly and the Agent `DATA_BPS_THRESHOLD_EXCEEDED` exception is triggered
+    #   ch: |-
+    #     Ingester 流量超限的动作
+    #     - WAIT：暂停发送，数据缓存到队列，等待下次发送。
+    #     - DROP：直接丢弃数据，并触发 Agent `数据流量达到限速`异常。
+    ingester_traffic_overflow_action: WAIT
     # type: bool
     # name:
     #   en: Request via NAT IP Address
