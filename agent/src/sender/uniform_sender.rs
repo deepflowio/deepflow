@@ -30,12 +30,15 @@ use std::time::{Duration, Instant, SystemTime};
 use arc_swap::access::Access;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
-use public::sender::{SendMessageType, Sendable};
+use public::{
+    leaky_bucket::LeakyBucket,
+    sender::{SendMessageType, Sendable},
+};
 use rand::{thread_rng, RngCore};
 
 use super::{get_sender_id, QUEUE_BATCH_SIZE};
 
-use crate::config::handler::SenderAccess;
+use crate::config::{handler::SenderAccess, TrafficOverflowAction};
 use crate::exception::ExceptionHandler;
 use crate::trident::SenderEncoder;
 use crate::utils::stats::{
@@ -53,6 +56,7 @@ pub struct SenderCounter {
     pub tx: AtomicU64,
     pub tx_bytes: AtomicU64,
     pub dropped: AtomicU64,
+    pub waited: AtomicU64,
 }
 
 impl RefCountable for SenderCounter {
@@ -88,6 +92,11 @@ impl RefCountable for SenderCounter {
                 "dropped",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.dropped.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "waited",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.waited.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -153,10 +162,10 @@ impl<T: Sendable> Encoder<T> {
                 version: HEADER_VESION,
                 team_id: 0,
                 organization_id: 0,
-                agent_id: agent_id,
+                agent_id,
                 reserved_1: 0,
                 reserved_2: 0,
-                encoder: encoder,
+                encoder,
             },
             _marker: PhantomData,
         }
@@ -340,6 +349,7 @@ lazy_static! {
     static ref TOTAL_SENT_BYTES: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
     static ref SENT_START_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
     static ref LAST_LOGGING_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
+    static ref LEAKY_BUCKET: LeakyBucket = LeakyBucket::new(Some(0));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -380,6 +390,7 @@ pub struct UniformSender<T> {
 
     input: Arc<Receiver<T>>,
     counter: Arc<SenderCounter>,
+    overwritten_count: u64,
 
     encoder: Encoder<T>,
     private_conn: Mutex<Connection>,
@@ -389,6 +400,8 @@ pub struct UniformSender<T> {
     multiple_sockets_to_ingester: bool,
     dest_ip: String,
     dest_port: u16,
+    max_throughput_mbps: u64,
+    ingester_traffic_overflow_action: TrafficOverflowAction,
 
     config: SenderAccess,
 
@@ -426,6 +439,7 @@ impl<T: Sendable> UniformSender<T> {
             name,
             input,
             counter: Arc::new(SenderCounter::default()),
+            overwritten_count: 0,
             encoder: Encoder::new(
                 0,
                 SendMessageType::TaggedFlow,
@@ -440,6 +454,8 @@ impl<T: Sendable> UniformSender<T> {
             multiple_sockets_to_ingester: false,
             dest_ip: "127.0.0.1".to_string(),
             dest_port: cfg.dest_port,
+            max_throughput_mbps: 0,
+            ingester_traffic_overflow_action: TrafficOverflowAction::Waiting,
 
             running,
             stats,
@@ -522,6 +538,11 @@ impl<T: Sendable> UniformSender<T> {
     }
 
     fn send_buffer(&mut self) {
+        if self.is_traffic_overflow()
+            && self.ingester_traffic_overflow_action == TrafficOverflowAction::Dropping
+        {
+            return;
+        }
         let mut conn = match self.connection_type {
             ConnectionType::Global => self.global_shared_conn.lock().unwrap(),
             ConnectionType::PrivateShared => {
@@ -626,37 +647,51 @@ impl<T: Sendable> UniformSender<T> {
         }
     }
 
-    fn is_exceed_max_throughput(&mut self, max_throughput_mbps: u64) -> bool {
-        if max_throughput_mbps == 0 {
+    fn log_when_traffic_overflow(&mut self) {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        // to prevent frequent log printing, print at least once every 10 seconds
+        if now - Duration::from_nanos(LAST_LOGGING_DURATION.load(Ordering::Relaxed))
+            > Duration::from_secs(10)
+        {
+            warn!(
+                "{} sender dropping message, throughput exceed setting value 'max_throughput_to_ingester' {}Mbps, action {:?}, total overwrittern count {}",
+                self.name, self.max_throughput_mbps, self.ingester_traffic_overflow_action, self.overwritten_count
+            );
+            LAST_LOGGING_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
+        }
+    }
+
+    fn is_traffic_overflow(&mut self) -> bool {
+        if self.max_throughput_mbps == 0 {
             return false;
         }
-        let max_throughput_bytes = max_throughput_mbps << 20 >> 3;
-        if TOTAL_SENT_BYTES.load(Ordering::Relaxed) > max_throughput_bytes {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap();
-
-            let used = now - Duration::from_nanos(SENT_START_DURATION.load(Ordering::Relaxed));
-            if used > Duration::from_secs(1) {
-                SENT_START_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
-                TOTAL_SENT_BYTES.store(0, Ordering::Relaxed);
-            } else {
-                // to prevent frequent log printing, print at least once every 5 seconds
-                if now - Duration::from_nanos(LAST_LOGGING_DURATION.load(Ordering::Relaxed))
-                    > Duration::from_secs(5)
-                {
-                    warn!(
-                        "{} sender dropping message, throughput execeed setting value 'max_throughput_to_ingester' {}Mbps",
-                        self.name, max_throughput_mbps
-                    );
-                    LAST_LOGGING_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
+        let mut overflow = false;
+        if self.ingester_traffic_overflow_action == TrafficOverflowAction::Waiting {
+            while !LEAKY_BUCKET.acquire(self.encoder.buffer_len() as u64) {
+                // LEAKY_BUCKET token is updated every 100ms by default,
+                // wait 10ms each time until the token is acquired
+                thread::sleep(Duration::from_millis(10));
+                if self.input.total_overwritten_count() > self.overwritten_count {
+                    overflow = true;
+                    self.overwritten_count = self.input.total_overwritten_count();
                 }
-                self.exception_handler
-                    .set(Exception::DataBpsThresholdExceeded);
-                return true;
+                self.counter.waited.fetch_add(1, Ordering::Relaxed);
+            }
+        } else {
+            if !LEAKY_BUCKET.acquire(self.encoder.buffer_len() as u64) {
+                overflow = true;
+                self.counter.dropped.fetch_add(1, Ordering::Relaxed);
             }
         }
-        return false;
+
+        if overflow {
+            self.exception_handler
+                .set(Exception::DataBpsThresholdExceeded);
+            self.log_when_traffic_overflow();
+        }
+        overflow
     }
 
     fn check_or_register_counterable(&mut self, message_type: SendMessageType) {
@@ -677,7 +712,12 @@ impl<T: Sendable> UniformSender<T> {
         while self.running.load(Ordering::Relaxed) {
             let config = self.config.load();
             let socket_type = config.collector_socket_type;
-            let max_throughput_mpbs = config.max_throughput_to_ingester;
+            let max_throughput_mbps = config.max_throughput_to_ingester;
+            if self.max_throughput_mbps != max_throughput_mbps {
+                LEAKY_BUCKET.set_rate(Some(max_throughput_mbps << 17)); // Mbit -> byte
+                self.max_throughput_mbps = max_throughput_mbps;
+            }
+            self.ingester_traffic_overflow_action = config.ingester_traffic_overflow_action;
             match self.input.recv_all(
                 &mut batch,
                 Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)),
@@ -687,13 +727,6 @@ impl<T: Sendable> UniformSender<T> {
                     if start_cached.elapsed() >= Duration::from_secs(10) {
                         start_cached = Instant::now();
                         self.cached = false;
-                    }
-                    if self.is_exceed_max_throughput(max_throughput_mpbs) {
-                        self.counter
-                            .dropped
-                            .fetch_add(batch.len() as u64, Ordering::Relaxed);
-                        batch.clear();
-                        continue;
                     }
                     for send_item in batch.drain(..) {
                         if !self.running.load(Ordering::Relaxed) {
