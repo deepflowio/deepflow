@@ -1654,6 +1654,11 @@ inputs:
   proc:
     process_matcher:
     - enabled_features:
+      - proc.gprocess_info
+      ignore: true
+      match_regex: ^(sleep|sh|bash|pause|runc)$
+      only_in_container: false
+    - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
       match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
@@ -1695,7 +1700,7 @@ rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的�
 - match_regex: 用于匹配进程的表达式，缺省值为 `""`。
 - match_type: 被用于正则表达式匹配的对象，缺省值为 `process_name`，可选项为：
   [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-- ignore: 是否要忽略正则匹配，缺省值为 `false`
+- ignore: 是否要忽略匹配到的进程，缺省值为 `false`
 - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
 - enabled_features: 为匹配到的进程开启的特性列表，可选项如下
   - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
@@ -1948,7 +1953,7 @@ inputs:
 
 **详细描述**:
 
-Whether to ingore matched processes..
+Whether to ignore matched processes..
 
 #### 重命名 {#inputs.proc.process_matcher.rewrite_name}
 
