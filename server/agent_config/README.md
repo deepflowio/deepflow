@@ -1674,6 +1674,11 @@ inputs:
   proc:
     process_matcher:
     - enabled_features:
+      - proc.gprocess_info
+      ignore: true
+      match_regex: ^(sleep|sh|bash|pause|runc)$
+      only_in_container: false
+    - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
       match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
@@ -1716,7 +1721,7 @@ Configuration Item:
 - match_regex: The regexp use for match the process, default value is `""`
 - match_type: regexp match field, default value is `process_name`, options are
   [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-- ignore: Whether to ignore when regex match, default value is `false`
+- ignore: Whether to ignore matched processes, default value is `false`
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
 - enabled_features: List of features enabled for matched processes. Available options:
@@ -1970,7 +1975,7 @@ inputs:
 
 **Description**:
 
-Whether to ingore matched processes..
+Whether to ignore matched processes..
 
 #### Rewrite Name {#inputs.proc.process_matcher.rewrite_name}
 

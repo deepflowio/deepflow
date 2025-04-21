@@ -570,6 +570,13 @@ impl Default for Proc {
             tag_extraction: TagExtraction::default(),
             process_matcher: vec![
                 ProcessMatcher {
+                    match_regex: Regex::new(r"^(sleep|sh|bash|pause|runc)$").unwrap(),
+                    only_in_container: false,
+                    ignore: true,
+                    enabled_features: vec!["proc.gprocess_info".to_string()],
+                    ..Default::default()
+                },
+                ProcessMatcher {
                     match_regex: Regex::new(r"\bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)").unwrap(),
                     only_in_container: false,
                     match_type: ProcessMatchType::CmdWithArgs,

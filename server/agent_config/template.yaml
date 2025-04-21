@@ -1183,7 +1183,7 @@ inputs:
     #     - match_regex: 用于匹配进程的表达式，缺省值为 `""`。
     #     - match_type: 被用于正则表达式匹配的对象，缺省值为 `process_name`，可选项为：
     #       [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-    #     - ignore: 是否要忽略正则匹配，缺省值为 `false`
+    #     - ignore: 是否要忽略匹配到的进程，缺省值为 `false`
     #     - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
     #     - enabled_features: 为匹配到的进程开启的特性列表，可选项如下
     #       - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
@@ -1235,7 +1235,7 @@ inputs:
     #     - match_regex: The regexp use for match the process, default value is `""`
     #     - match_type: regexp match field, default value is `process_name`, options are
     #       [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-    #     - ignore: Whether to ignore when regex match, default value is `false`
+    #     - ignore: Whether to ignore matched processes, default value is `false`
     #     - rewrite_name: The name will replace the process name or cmd use regexp replace.
     #       Default value `""` means no replacement.
     #     - enabled_features: List of features enabled for matched processes. Available options:
@@ -1381,7 +1381,7 @@ inputs:
     # ee_feature: false
     # description:
     #   en: |-
-    #     Whether to ingore matched processes..
+    #     Whether to ignore matched processes..
     # upgrade_from: static_config.os-proc-regex.action
     # ---
     # ignore: false
@@ -1450,6 +1450,10 @@ inputs:
     # ---
     # enabled_features: []
     process_matcher:
+      - match_regex: ^(sleep|sh|bash|pause|runc)$
+        only_in_container: false
+        ignore: true
+        enabled_features: [proc.gprocess_info]
       - match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
         match_type: cmdline_with_args
         only_in_container: false
