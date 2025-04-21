@@ -1672,9 +1672,3 @@ fn get_direction(
 
     [src_direct, dst_direct]
 }
-
-// 生成32位flowID,确保在1分钟内1个thread的flowID不重复
-pub fn get_uniq_flow_id_in_one_minute(flow_id: u64) -> u64 {
-    // flowID中时间低8位可保证1分钟内时间的唯一，counter可保证一秒内流的唯一性（假设fps < 2^24）
-    (flow_id >> 32 & 0xff << 24) | (flow_id & COUNTER_FLOW_ID_MASK)
-}

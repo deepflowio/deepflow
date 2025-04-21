@@ -1773,6 +1773,7 @@ impl FlowMap {
                             .unknown_l7_protocol
                             .fetch_add(1, Ordering::Relaxed);
                     }
+                    Err(Error::ZeroPayloadLen) => (),
                     Err(e) => log::trace!("unhandled log parse error: {}", e),
                 }
             }
@@ -2159,10 +2160,11 @@ impl FlowMap {
                 // If this protocol has session_id, the AppProto in SessionAggregator cannot be found based on flow_id alone.
                 if !l7_protocol.has_session_id() {
                     let session_key = MetaAppProto::session_key(
-                        node.tagged_flow.flow.flow_id,
-                        node.last_cap_seq,
                         node.tagged_flow.flow.signal_source,
+                        node.tagged_flow.flow.flow_id,
                         l7_protocol,
+                        None,
+                        node.last_cap_seq,
                     );
                     self.protolog_buffer
                         .push(AppProto::SocketClosed(session_key));

@@ -34,7 +34,7 @@ use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData, LogMessageT
 
 use crate::{
     common::{
-        flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection, SignalSource},
+        flow::{L7Protocol, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         meta_packet::ProtocolData,
         MetaPacket, TaggedFlow, Timestamp,
@@ -66,7 +66,7 @@ const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送�
 
 #[derive(Debug)]
 pub enum AppProto {
-    SocketClosed(u64),
+    SocketClosed(u128),
     MetaAppProto(Box<MetaAppProto>),
 }
 
@@ -210,76 +210,68 @@ impl MetaAppProto {
         self.base_info.head.msg_type == LogMessageType::Response
     }
 
-    fn calc_key(&self) -> u64 {
-        if self.base_info.signal_source == SignalSource::EBPF {
-            // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
-            return self.ebpf_flow_session_id();
-        };
-        if let L7ProtocolInfo::MqttInfo(_) = self.l7_info {
-            return self.base_info.flow_id;
-        }
-        let request_id = if let Some(id) = self.l7_info.session_id() {
-            id
-        } else {
-            0
-        };
-        // key需保证流日志1分钟内唯一，由1分钟内唯一的flow_id和request_id组成
-        get_uniq_flow_id_in_one_minute(self.base_info.flow_id) << 32 | (request_id as u64)
+    fn calc_cbpf_key(flow_id: u64, session_id: Option<u32>) -> u128 {
+        // Packet key with session_id:
+        //     | 64b flow_id | 32b 0 | 32b session_id |
+        // Packet key without session_id:
+        //     | 64b flow_id | 64b 0 |
+        (flow_id as u128) << 64 | (session_id.unwrap_or_default() as u128)
     }
 
-    fn ebpf_flow_session_id(&self) -> u64 {
-        // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
-        // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
-
-        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
-        let proto = if self.base_info.head.proto == L7Protocol::Grpc {
-            if let L7ProtocolInfo::HttpInfo(_) = &self.l7_info {
-                L7Protocol::Http2
-            } else {
-                unreachable!()
-            }
-        } else {
-            self.base_info.head.proto
-        };
-
-        let flow_id_part =
-            (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
-        if let Some(session_id) = self.l7_info.session_id() {
-            flow_id_part | (proto as u64) << 24 | ((session_id as u64) & 0xffffff)
-        } else {
-            let mut cap_seq = self
-                .base_info
-                .syscall_cap_seq_0
-                .max(self.base_info.syscall_cap_seq_1);
-            if self.base_info.head.msg_type == LogMessageType::Request {
-                cap_seq += 1;
-            };
-            flow_id_part | ((proto as u64) << 24) | (cap_seq as u64 & 0xffffff)
-        }
-    }
-
-    // TODO: merge with calc_key/ebpf_flow_session_id
-    pub fn session_key(
+    fn calc_ebpf_key(
         flow_id: u64,
+        mut proto: L7Protocol,
+        session_id: Option<u32>,
         cap_seq: u32,
-        signal_source: SignalSource,
-        l7_protocol: L7Protocol,
-    ) -> u64 {
-        if signal_source != SignalSource::EBPF {
-            if l7_protocol == L7Protocol::MQTT {
-                return flow_id;
-            }
-            return get_uniq_flow_id_in_one_minute(flow_id) << 32;
+    ) -> u128 {
+        // eBPF key with session_id:
+        //     | 64b flow_id | 24b 0 | 8b proto | 32b session_id |
+        // eBPF key without session_id:
+        //     | 64b flow_id | 24b 0 | 8b proto | 32b cap_seq |
+        let mut key = (flow_id as u128) << 64;
+
+        if proto == L7Protocol::Grpc {
+            proto = L7Protocol::Http2;
+        }
+        key |= (proto as u128) << 32;
+
+        if let Some(session_id) = session_id {
+            key |= session_id as u128;
+        } else {
+            key |= cap_seq as u128;
         }
 
-        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
-        let l7_protocol = if l7_protocol == L7Protocol::Grpc {
-            L7Protocol::Http2
-        } else {
-            l7_protocol
-        };
-        let flow_id_part = (flow_id >> 56 << 56) | (flow_id << 40 >> 8);
-        flow_id_part | ((l7_protocol as u64) << 24) | (cap_seq as u64 & 0xffffff)
+        key
+    }
+
+    fn calc_key(&self) -> u128 {
+        let mut cap_seq = self
+            .base_info
+            .syscall_cap_seq_0
+            .max(self.base_info.syscall_cap_seq_1);
+        if self.base_info.head.msg_type == LogMessageType::Request {
+            cap_seq += 1;
+        }
+        Self::session_key(
+            self.base_info.signal_source,
+            self.base_info.flow_id,
+            self.base_info.head.proto,
+            self.l7_info.session_id(),
+            cap_seq,
+        )
+    }
+
+    pub fn session_key(
+        signal_source: SignalSource,
+        flow_id: u64,
+        l7_protocol: L7Protocol,
+        session_id: Option<u32>,
+        cap_seq: u32,
+    ) -> u128 {
+        match signal_source {
+            SignalSource::EBPF => Self::calc_ebpf_key(flow_id, l7_protocol, session_id, cap_seq),
+            _ => Self::calc_cbpf_key(flow_id, session_id),
+        }
     }
 
     pub fn session_merge(&mut self, log: &mut Self) -> Result<()> {
@@ -462,7 +454,7 @@ struct SessionQueue {
     window_start: Timestamp,
     max_timelines: usize,
     max_entries: usize,
-    entries: ChronoMap<Timestamp, u64, Box<MetaAppProto>>,
+    entries: ChronoMap<Timestamp, u128, Box<MetaAppProto>>,
 
     counter: Arc<SessionAggrCounter>,
 
