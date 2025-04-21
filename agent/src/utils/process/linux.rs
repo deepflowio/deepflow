@@ -426,12 +426,20 @@ impl ProcessListener {
 
             let mut pids = vec![];
             let mut process_datas = vec![];
+            let mut ignore_pids = HashSet::new();
 
             for matcher in &value.process_matcher {
                 for pdata in process_data_cache.values() {
                     if let Some(process_data) = matcher.get_process_data(pdata, &tags_map) {
-                        pids.push(pdata.pid as u32);
-                        process_datas.push(process_data);
+                        if matcher.ignore {
+                            ignore_pids.insert(pdata.pid);
+                            continue;
+                        }
+
+                        if !ignore_pids.contains(&pdata.pid) {
+                            pids.push(pdata.pid as u32);
+                            process_datas.push(process_data);
+                        }
                     }
                 }
             }
