@@ -346,9 +346,11 @@ func (c *Cleaner) cleanDirtyData() {
 		c.cleanVMDirty(domain.Lcuuid)
 		c.cleanNetworkDirty(domain.Lcuuid)
 		c.cleanVRouterDirty(domain.Lcuuid)
+		c.cleanPodClusterDirty(domain.Lcuuid)
+		c.cleanPodNamespaceDirty(domain.Lcuuid)
+		c.cleanPodNodeDirty(domain.Lcuuid)
 		c.cleanPodIngressDirty(domain.Lcuuid)
 		c.cleanPodServiceDirty(domain.Lcuuid)
-		c.cleanPodNodeDirty(domain.Lcuuid)
 		c.cleanPodGroupDirty(domain.Lcuuid)
 		c.cleanPodDirty(domain.Lcuuid)
 		c.cleanVInterfaceDirty(domain.Lcuuid)
@@ -458,6 +460,16 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 			c.org.DB.Delete(&podIngressRuleBkds)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds), c.org.LogPrefix)
 		}
+
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
+			c.org.DB,
+			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
+		)
+		if len(podServices) != 0 {
+			c.org.DB.Delete(&podServices)
+			publishTagrecorder[*message.PodServiceDelete, message.PodServiceDelete, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podServices), c.org.LogPrefix)
+		}
 	}
 }
 
@@ -516,6 +528,15 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 			publishTagrecorder[*message.PodDelete, message.PodDelete, mysqlmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods), c.org.LogPrefix)
 		}
+
+		podReplicaSets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
+			c.org.DB,
+			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
+		)
+		if len(podReplicaSets) != 0 {
+			c.org.DB.Delete(&podReplicaSets)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podReplicaSets), c.org.LogPrefix)
+		}
 	}
 }
 
@@ -568,6 +589,126 @@ func (c *Cleaner) cleanPodDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs), c.org.LogPrefix)
 
 			c.fillStatsd(domainLcuuid, tagTypeDeviceIPConn, len(vifs))
+		}
+	}
+}
+
+func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
+	podClusterIDs := getIDs[metadbmodel.PodCluster](c.org.DB, domainLcuuid)
+	if len(podClusterIDs) != 0 {
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(pods) != 0 {
+			c.org.DB.Delete(&pods)
+			publishTagrecorder[*message.PodDelete, message.PodDelete, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, pods), c.org.LogPrefix)
+		}
+		podReplicasets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podReplicasets) != 0 {
+			c.org.DB.Delete(&podReplicasets)
+			publishTagrecorder[*message.PodReplicaSetDelete, message.PodReplicaSetDelete, metadbmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podReplicasets), c.org.LogPrefix)
+		}
+		podGroups, _ := WhereFindPtr[metadbmodel.PodGroup](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podGroups) != 0 {
+			c.org.DB.Delete(&podGroups)
+			publishTagrecorder[*message.PodGroupDelete, message.PodGroupDelete, metadbmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podGroups), c.org.LogPrefix)
+		}
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podServices) != 0 {
+			c.org.DB.Delete(&podServices)
+			publishTagrecorder[*message.PodServiceDelete, message.PodServiceDelete, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podServices), c.org.LogPrefix)
+		}
+		podIngresses, _ := WhereFindPtr[metadbmodel.PodIngress](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podIngresses) != 0 {
+			c.org.DB.Delete(&podIngresses)
+			publishTagrecorder[*message.PodIngressDelete, message.PodIngressDelete, metadbmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podIngresses), c.org.LogPrefix)
+		}
+		podNamespaces, _ := WhereFindPtr[metadbmodel.PodNamespace](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podNamespaces) != 0 {
+			c.org.DB.Delete(&podNamespaces)
+			publishTagrecorder[*message.PodNamespaceDelete, message.PodNamespaceDelete, metadbmodel.PodNamespace](c.org.DB, podNamespaces, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podNamespaces), c.org.LogPrefix)
+		}
+		podNodes, _ := WhereFindPtr[metadbmodel.PodNode](
+			c.org.DB,
+			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+		)
+		if len(podNodes) != 0 {
+			c.org.DB.Delete(&podNodes)
+			publishTagrecorder[*message.PodNodeDelete, message.PodNodeDelete, metadbmodel.PodNode](c.org.DB, podNodes, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podNodes), c.org.LogPrefix)
+		}
+	}
+}
+
+func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
+	podNamespaceIDs := getIDs[metadbmodel.PodNamespace](c.org.DB, domainLcuuid)
+	if len(podNamespaceIDs) != 0 {
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
+			c.org.DB,
+			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+		)
+		if len(pods) != 0 {
+			c.org.DB.Delete(&pods)
+			publishTagrecorder[*message.PodDelete, message.PodDelete, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, pods), c.org.LogPrefix)
+		}
+		podGroups, _ := WhereFindPtr[metadbmodel.PodGroup](
+			c.org.DB,
+			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+		)
+		if len(podGroups) != 0 {
+			c.org.DB.Delete(&podGroups)
+			publishTagrecorder[*message.PodGroupDelete, message.PodGroupDelete, metadbmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podGroups), c.org.LogPrefix)
+		}
+		podReplicasets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
+			c.org.DB,
+			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+		)
+		if len(podReplicasets) != 0 {
+			c.org.DB.Delete(&podReplicasets)
+			publishTagrecorder[*message.PodReplicaSetDelete, message.PodReplicaSetDelete, metadbmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podReplicasets), c.org.LogPrefix)
+		}
+		podIngresses, _ := WhereFindPtr[metadbmodel.PodIngress](
+			c.org.DB,
+			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+		)
+		if len(podIngresses) != 0 {
+			c.org.DB.Delete(&podIngresses)
+			publishTagrecorder[*message.PodIngressDelete, message.PodIngressDelete, metadbmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podIngresses), c.org.LogPrefix)
+		}
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
+			c.org.DB,
+			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+		)
+		if len(podServices) != 0 {
+			c.org.DB.Delete(&podServices)
+			publishTagrecorder[*message.PodServiceDelete, message.PodServiceDelete, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podServices), c.org.LogPrefix)
 		}
 	}
 }
