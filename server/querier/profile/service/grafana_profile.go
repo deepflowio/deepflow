@@ -25,7 +25,7 @@ func GrafanaProfile(args model.Profile, cfg *config.QuerierConfig, where string)
 	result = &model.GrafanaProfileValue{}
 	result.Columns = []string{"level", "function", "self_value", "total_value"}
 
-	tree, generateDebug, err := GenerateProfile(args, cfg, where)
+	tree, generateDebug, err := GenerateProfile(args, cfg, where, model.ProfileDebug{})
 	debug = generateDebug
 	if err != nil {
 		return
