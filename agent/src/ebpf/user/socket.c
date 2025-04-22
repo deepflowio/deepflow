@@ -2472,6 +2472,8 @@ retry_load:
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
 	}
 
+	ebpf_info("== Unix domain socket ==\n");
+
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
 		__set_data_limit_max(0);
