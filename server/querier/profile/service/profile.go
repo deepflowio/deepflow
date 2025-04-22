@@ -45,22 +45,72 @@ const (
 	initNodeCapacity     = 8192
 )
 
-func Profile(args model.Profile, cfg *config.QuerierConfig) (result model.ProfileTree, debug interface{}, err error) {
+func GetAppService(args model.Profile, where string, debugs model.ProfileDebug) ([]string, model.ProfileDebug, error) {
+	sql := fmt.Sprintf(
+		"SELECT app_service FROM %s WHERE %s GROUP BY app_service LIMIT 11",
+		common.TABLE_PROFILE, where,
+	)
+	ckEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
+	ckEngine.Init()
+	querierArgs := querier_common.QuerierParams{
+		DB:      common.DATABASE_PROFILE,
+		Sql:     sql,
+		Debug:   strconv.FormatBool(args.Debug),
+		Context: args.Context,
+		ORGID:   args.OrgID,
+	}
+
+	querierResult, querierDebug, err := ckEngine.ExecuteQuery(&querierArgs)
+	profileDebug := NewProfileDebug(sql, querierDebug)
+	debugs.QuerierDebug = append(debugs.QuerierDebug, profileDebug)
+	appServices := []string{}
+	if err != nil {
+		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
+		return appServices, debugs, err
+	}
+	values := querierResult.Values
+	for _, value := range values {
+		switch valueSlice := value.(type) {
+		case []interface{}:
+			appService, ok := valueSlice[0].(string)
+			if ok {
+				appServices = append(appServices, appService)
+			}
+		}
+	}
+	return appServices, debugs, nil
+}
+
+func Profile(args model.Profile, cfg *config.QuerierConfig) (model.ProfileTree, interface{}, error) {
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
-	whereSlice = append(whereSlice, fmt.Sprintf(" app_service='%s'", args.AppService))
+	if args.AppService != "" {
+		whereSlice = append(whereSlice, fmt.Sprintf(" app_service='%s'", args.AppService))
+	}
 	whereSlice = append(whereSlice, fmt.Sprintf(" profile_language_type='%s'", args.ProfileLanguageType))
 	whereSlice = append(whereSlice, fmt.Sprintf(" profile_event_type='%s'", args.ProfileEventType))
 	if args.TagFilter != "" {
 		whereSlice = append(whereSlice, " ("+args.TagFilter+")")
 	}
 	whereSql := strings.Join(whereSlice, " AND")
-	return GenerateProfile(args, cfg, whereSql)
+	debugs := model.ProfileDebug{}
+	if args.AppService == "" {
+		appServices, appDebugs, err := GetAppService(args, whereSql, debugs)
+		debugs = appDebugs
+		if err != nil {
+			log.Errorf("GetAppService failed: %v", err)
+			return model.ProfileTree{}, debugs, err
+		}
+		if len(appServices) < 1 || len(appServices) > 10 {
+			return model.ProfileTree{}, debugs, fmt.Errorf("app_service count %d is invalid", len(appServices))
+		}
+		args.AppService = strings.Join(appServices, ", ")
+	}
+	return GenerateProfile(args, cfg, whereSql, debugs)
 }
 
-func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string) (result model.ProfileTree, debug interface{}, err error) {
-	debugs := model.ProfileDebug{}
+func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string, debugs model.ProfileDebug) (result model.ProfileTree, debug interface{}, err error) {
 	limitSql := cfg.Profile.FlameQueryLimit
 	sql := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s LIMIT %d",

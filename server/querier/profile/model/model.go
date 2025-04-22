@@ -19,7 +19,7 @@ package model
 import "context"
 
 type Profile struct {
-	AppService          string `json:"app_service" binding:"required"`
+	AppService          string `json:"app_service"`
 	ProfileEventType    string `json:"profile_event_type" binding:"required"`
 	ProfileLanguageType string `json:"profile_language_type" binding:"required"`
 	TagFilter           string `json:"tag_filter"`
