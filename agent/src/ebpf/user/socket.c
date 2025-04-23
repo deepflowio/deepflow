@@ -1231,6 +1231,14 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
+			if (sd->source == DATA_SOURCE_UNIX_SOCKET) {
+				submit_data->tuple.l4_protocol = IPPROTO_UDP;
+				submit_data->tuple.dport = submit_data->tuple.num = 0; 
+				submit_data->tuple.addr_len = 4;
+				*(in_addr_t *)submit_data->tuple.rcv_saddr = htonl(0x7F000001); 
+				*(in_addr_t *)submit_data->tuple.daddr = htonl(0x7F000001);
+			}
+
 			submit_data->process_id = sd->tgid;
 			submit_data->thread_id = sd->pid;
 			submit_data->coroutine_id = sd->coroutine_id;

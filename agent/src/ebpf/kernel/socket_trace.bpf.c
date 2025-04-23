@@ -1640,7 +1640,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		v->extra_data_count = 0;
 
 	v->coroutine_id = trace_key.goid;
-	v->source = extra->source;
+
+	if (conn_info->sk_type == SOCK_UNIX)
+		v->source = DATA_SOURCE_UNIX_SOCKET;
+	else
+		v->source = extra->source;
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	__u32 cache_key = ((__u32) bpf_get_current_pid_tgid()) >> 16;
