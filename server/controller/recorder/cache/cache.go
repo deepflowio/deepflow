@@ -1425,7 +1425,9 @@ func (c *Cache) refreshPods() {
 
 func (c *Cache) AddProcesses(items []*mysqlmodel.Process) {
 	for _, item := range items {
-		c.DiffBaseDataSet.AddProcess(item, c.Sequence)
+		if !item.DeletedAt.Valid {
+			c.DiffBaseDataSet.AddProcess(item, c.Sequence)
+		}
 		c.ToolDataSet.AddProcess(item)
 	}
 }
@@ -1440,7 +1442,7 @@ func (c *Cache) DeleteProcesses(dbItems []*mysqlmodel.Process) {
 func (c *Cache) refreshProcesses() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN), c.metadata.LogPrefixes)
 	var processes []*mysqlmodel.Process
-	processes, err := query.FindInBatches[mysqlmodel.Process](c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid))
+	processes, err := query.FindInBatches[mysqlmodel.Process](c.metadata.DB.Unscoped().Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid))
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, err), c.metadata.LogPrefixes)
 		return
