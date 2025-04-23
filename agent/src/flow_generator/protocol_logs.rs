@@ -85,6 +85,7 @@ pub enum L7ResponseStatus {
     ClientError = 4,
     #[default]
     Unknown = 5,
+    ParseFailed = 6,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]

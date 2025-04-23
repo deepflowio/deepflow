@@ -4,3 +4,4 @@
 3       , Server Error    ,
 4       , Client Error    ,
 5       , Unknown         ,
+6       , Parse Failed    ,
