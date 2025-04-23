@@ -128,13 +128,10 @@ func getProcessMessageDeleteAddition(db *metadb.DB, dbItems interface{}, resourc
 	for _, item := range allProcesses {
 		gidToCount[item.GID]++
 	}
-	for _, item := range dbItems.([]*metadbmodel.Process) {
-		gidToCount[item.GID]--
-	}
 	deletedGIDs := mapset.NewSet[uint32]()
-	for gid, count := range gidToCount {
-		if count <= 0 {
-			deletedGIDs.Add(gid)
+	for _, item := range dbItems.([]*metadbmodel.Process) {
+		if _, ok := gidToCount[item.GID]; !ok {
+			deletedGIDs.Add(item.GID)
 		}
 	}
 	return &message.ProcessDeleteAddition{DeletedGIDs: deletedGIDs.ToSlice()}
