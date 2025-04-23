@@ -117,8 +117,9 @@ type DataSet struct {
 	vtapIDToType           map[int]int
 	vtapIDToLaunchServerID map[int]int
 
-	processIdentifierToGID map[ProcessIdentifier]uint32
-	processGIDToCount      map[uint32]uint
+	processIdentifierToGID       map[ProcessIdentifier]uint32
+	processGIDToTotalCount       map[uint32]uint
+	processGIDToSoftDeletedCount map[uint32]uint
 }
 
 type ProcessIdentifier struct {
@@ -211,8 +212,9 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		vtapIDToType:           make(map[int]int),
 		vtapIDToLaunchServerID: make(map[int]int),
 
-		processIdentifierToGID: make(map[ProcessIdentifier]uint32),
-		processGIDToCount:      make(map[uint32]uint),
+		processIdentifierToGID:       make(map[ProcessIdentifier]uint32),
+		processGIDToTotalCount:       make(map[uint32]uint),
+		processGIDToSoftDeletedCount: make(map[uint32]uint),
 	}
 }
 
@@ -1030,27 +1032,24 @@ func (t *DataSet) DeletePod(lcuuid string) {
 }
 
 func (t *DataSet) AddProcess(item *metadbmodel.Process) {
-	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
-		ID:   item.ID,
-		Name: item.Name,
+	if item.DeletedAt.Valid {
+		t.processGIDToSoftDeletedCount[item.GID]++
+	} else {
+		t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
+			ID:   item.ID,
+			Name: item.Name,
+		}
 	}
 
 	identifier := t.GetProcessIdentifierByDBProcess(item)
 	t.processIdentifierToGID[identifier] = item.GID
-	t.processGIDToCount[item.GID]++
+	t.processGIDToTotalCount[item.GID]++
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 
 func (t *DataSet) DeleteProcess(dbItem *metadbmodel.Process) {
 	delete(t.processLcuuidToInfo, dbItem.Lcuuid)
-	if _, exists := t.processGIDToCount[dbItem.GID]; exists {
-		t.processGIDToCount[dbItem.GID]--
-		if t.processGIDToCount[dbItem.GID] <= 0 {
-			identifier := t.GetProcessIdentifierByDBProcess(dbItem)
-			delete(t.processIdentifierToGID, identifier)
-			delete(t.processGIDToCount, dbItem.GID)
-		}
-	}
+	t.processGIDToSoftDeletedCount[dbItem.GID]++
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, dbItem.Lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -1078,6 +1077,10 @@ func (t *DataSet) GetProcessIdentifier(name string, podGroupID int, vtapID uint3
 func (t *DataSet) GetProcessGIDByIdentifier(identifier ProcessIdentifier) (uint32, bool) {
 	pid, exists := t.processIdentifierToGID[identifier]
 	return pid, exists
+}
+
+func (t *DataSet) IsProcessGIDSoftDeleted(gid uint32) bool {
+	return t.processGIDToSoftDeletedCount[gid] == t.processGIDToTotalCount[gid]
 }
 
 func (t *DataSet) RefreshVTaps(v []*metadbmodel.VTap) {
