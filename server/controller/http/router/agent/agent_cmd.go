@@ -37,6 +37,7 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	service "github.com/deepflowio/deepflow/server/controller/http/service/agent"
+	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 )
 
 const (
@@ -112,6 +113,13 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if err := license.GetChecker().CheckAgent(agent, common.AGENT_LICENSE_FUNCTION_LEGACY_PROBE); err != nil {
+			log.Error(err, db.LogPrefixORGID)
+			response.JSON(c, response.SetError(err))
+			c.Abort()
+			return
+		}
+
 		key := agent.CtrlIP + "-" + agent.CtrlMac
 		// handle forward times
 		var forwardTimes int

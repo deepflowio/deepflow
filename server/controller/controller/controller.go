@@ -40,6 +40,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/router"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
+	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/native_field"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
@@ -179,6 +180,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	go checkAndStartMasterFunctions(cfg, ctx, controllerCheck, analyzerCheck)
 	// native field
 	native_field.Refresh()
+
+	license.BuildChecker().Init(cfg.MonitorCfg.Warrant)
 
 	router.SetInitStageForHealthChecker("Register routers init")
 	httpServer.SetControllerChecker(controllerCheck)

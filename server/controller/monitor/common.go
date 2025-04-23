@@ -22,12 +22,19 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	configs "github.com/deepflowio/deepflow/server/controller/config/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("monitor")
+
+type LicenseChecker interface {
+	Init(configs.Warrant)
+	Check(function int) error
+	CheckAgent(agent *metadbmodel.VTap, function int) error
+}
 
 type dfHostCheck struct {
 	lastTimeUnix int64
