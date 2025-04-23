@@ -20,6 +20,13 @@ type Swagger struct {
 	Enabled bool `default:"true" yaml:"enabled"`
 }
 
+type Warrant struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"warrant" yaml:"host"`
+	Port    int    `default:"20413" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 // TODO use this
 type FPermit struct {
 	Enabled bool   `default:"false" yaml:"enabled"`

@@ -18,7 +18,6 @@ package recorder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -82,6 +81,10 @@ func (d *domain) CloseStatsd() {
 
 func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
 	log.Infof("refresh target: %s", target, d.metadata.LogPrefixes)
+	if err := d.checkLicense(); err != nil {
+		return err
+	}
+
 	switch target {
 	case RefreshTargetDomain:
 		log.Info("refresher started, triggered by ticker/hand", d.metadata.LogPrefixes)
@@ -94,12 +97,26 @@ func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
 		return d.subDomains.RefreshOne(cloudData.SubDomainResources)
 	default:
 		log.Info("invalid refresh target", d.metadata.LogPrefixes)
-		return errors.New("invalid refresh target")
+		return fmt.Errorf("invalid refresh target")
 	}
 }
 
 func (d *domain) refreshDomainExcludeSubDomain(cloudData cloudmodel.Resource) error {
 	return d.tryRefresh(cloudData)
+}
+
+func (d *domain) checkLicense() error {
+	var domain *metadbmodel.Domain
+	err := d.metadata.DB.Select("state").Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	if err != nil {
+		log.Errorf("failed to get domain from db: %s", err, d.metadata.LogPrefixes)
+		return err
+	}
+	if domain.State == common.RESOURCE_STATE_CODE_NO_LICENSE {
+		log.Errorf("domain %s has no license", d.metadata.Domain.Lcuuid, d.metadata.LogPrefixes)
+		return fmt.Errorf("domain %s has no license", d.metadata.Domain.Lcuuid)
+	}
+	return nil
 }
 
 func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {

@@ -217,6 +217,7 @@ controller:
     #   lost_time_max: 3600
     # warrant
     warrant:
+      enabled: false
       host: warrant
       port: 20413
       timeout: 30

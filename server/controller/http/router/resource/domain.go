@@ -29,6 +29,7 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
+	ctrlCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
@@ -36,6 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 )
 
 var log = logging.MustGetLogger("controller.resource")
@@ -64,11 +66,11 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.PATCH("/v2/sub-domains/:lcuuid/", updateSubDomain(d.cfg))
 	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain(d.cfg))
 
-	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
-	e.GET("/v1/domain-additional-resources/", listDomainAddtionalResource)
+	e.PUT("/v1/domain-additional-resources/", applyDomainAdditionalResource)
+	e.GET("/v1/domain-additional-resources/", listDomainAdditionalResource)
 	e.GET("/v1/domain-additional-resources/example/", GetDomainAdditionalResourceExample)
-	e.PATCH("/v1/domain-additional-resources/advanced/", updateDomainAddtionalResourceAdvanced)
-	e.GET("/v1/domain-additional-resources/advanced/", getDomainAddtionalResourceAdvanced)
+	e.PATCH("/v1/domain-additional-resources/advanced/", updateDomainAdditionalResourceAdvanced)
+	e.GET("/v1/domain-additional-resources/advanced/", getDomainAdditionalResourceAdvanced)
 }
 
 func getDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
@@ -397,7 +399,12 @@ func updateSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	})
 }
 
-func applyDomainAddtionalResource(c *gin.Context) {
+func applyDomainAdditionalResource(c *gin.Context) {
+	if err := license.GetChecker().Check(ctrlCommon.AGENT_LICENSE_FUNCTION_ASSET_CMDB); err != nil {
+		response.JSON(c, response.SetError(err))
+		return
+	}
+
 	b, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
@@ -423,11 +430,11 @@ func applyDomainAddtionalResource(c *gin.Context) {
 		return
 	}
 
-	err = resource.ApplyDomainAddtionalResource(data, db)
+	err = resource.ApplyDomainAdditionalResource(data, db)
 	response.JSON(c, response.SetError(err))
 }
 
-func listDomainAddtionalResource(c *gin.Context) {
+func listDomainAdditionalResource(c *gin.Context) {
 	var resourceType, resourceName string
 	t, ok := c.GetQuery("type")
 	if ok {
@@ -457,7 +464,12 @@ func GetDomainAdditionalResourceExample(c *gin.Context) {
 	response.JSON(c, response.SetData(data), response.SetError(err))
 }
 
-func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
+func updateDomainAdditionalResourceAdvanced(c *gin.Context) {
+	if err := license.GetChecker().Check(ctrlCommon.AGENT_LICENSE_FUNCTION_ASSET_CMDB); err != nil {
+		response.JSON(c, response.SetError(err))
+		return
+	}
+
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
 		response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))
@@ -467,7 +479,7 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 	data := &model.AdditionalResource{}
 	err = c.ShouldBindBodyWith(&data, binding.YAML)
 	if err == nil || err == io.EOF {
-		if err = resource.ApplyDomainAddtionalResource(*data, db); err != nil {
+		if err = resource.ApplyDomainAdditionalResource(*data, db); err != nil {
 			response.JSON(c, response.SetError(err))
 			return
 		}
@@ -488,7 +500,7 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 	}
 }
 
-func getDomainAddtionalResourceAdvanced(c *gin.Context) {
+func getDomainAdditionalResourceAdvanced(c *gin.Context) {
 	db, err := common.GetContextOrgDB(c)
 	if err != nil {
 		response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))

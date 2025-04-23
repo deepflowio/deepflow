@@ -35,8 +35,6 @@ const (
 	ORG_ID_INVALID                  = "ORG_ID_INVALID"
 	CHECK_SCOPE_TEAMS_FAIL          = "CHECK_SCOPE_TEAMS_FAIL"
 	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND" // TODO map to http.StatusNotFound ?
-	// K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
-	// SET_RESOUORCE_FAIL              = "SET_RESOUORCE_FAIL"
 
 	// map to http.StatusInternalServerError
 	FAIL              = "FAIL"
@@ -48,7 +46,9 @@ const (
 	SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
 
 	// map to http.StatusForbidden
-	NO_PERMISSIONS = "NO_PERMISSIONS"
+	NO_PERMISSIONS                   = "NO_PERMISSIONS"
+	NO_LICENSE_FUNCTION_ASSET_CMDB   = "NO_LICENSE_FUNCTION_ASSET_CMDB"
+	NO_LICENSE_FUNCTION_LEGACY_PROBE = "NO_LICENSE_FUNCTION_LEGACY_PROBE"
 
 	// map to http.StatusPartialContent
 	PARTIAL_CONTENT = "PARTIAL_RESULT"
@@ -76,7 +76,9 @@ var (
 
 		SERVICE_UNAVAILABLE: http.StatusServiceUnavailable,
 
-		NO_PERMISSIONS: http.StatusForbidden,
+		NO_PERMISSIONS:                   http.StatusForbidden,
+		NO_LICENSE_FUNCTION_ASSET_CMDB:   http.StatusForbidden,
+		NO_LICENSE_FUNCTION_LEGACY_PROBE: http.StatusForbidden,
 
 		PARTIAL_CONTENT: http.StatusPartialContent,
 	}

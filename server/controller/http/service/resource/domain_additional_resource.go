@@ -74,7 +74,7 @@ func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDa
 	}
 }
 
-func ApplyDomainAddtionalResource(reqData model.AdditionalResource, orgDB *metadb.DB) error {
+func ApplyDomainAdditionalResource(reqData model.AdditionalResource, orgDB *metadb.DB) error {
 	log.Infof("apply domain additional resource: %#v", reqData, orgDB.LogPrefixORGID)
 	domainUUIDToToolDataSet, err := generateToolDataSet(reqData, orgDB)
 	if err != nil {
