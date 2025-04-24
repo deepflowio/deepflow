@@ -397,7 +397,7 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
 	}
 
-	h.ResponseStatus = uint8(datatype.STATUS_TIMEOUT)
+	h.ResponseStatus = uint8(datatype.STATUS_UNKNOWN)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
 	h.fillL7FlowLog(l, cfg)
@@ -426,20 +426,23 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		h.Endpoint = l.Req.Endpoint
 	}
 
-	if l.Resp != nil && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.ResponseResult = l.Resp.Result
-		h.responseCode = l.Resp.Code
+	if l.Resp != nil {
+		// if the l7 log type is Request, also need to read the response status
 		h.ResponseStatus = uint8(l.Resp.Status)
-		h.ResponseException = l.Resp.Exception
-		if h.ResponseException == "" {
-			h.fillExceptionDesc(l)
-		}
+		if h.Type != uint8(datatype.MSG_T_REQUEST) {
+			h.ResponseResult = l.Resp.Result
+			h.responseCode = l.Resp.Code
+			h.ResponseException = l.Resp.Exception
+			if h.ResponseException == "" {
+				h.fillExceptionDesc(l)
+			}
 
-		if h.responseCode != datatype.L7PROTOCOL_LOG_RESP_CODE_NONE {
-			h.ResponseCode = &h.responseCode
-		}
-		if h.responseLength != -1 {
-			h.ResponseLength = &h.responseLength
+			if h.responseCode != datatype.L7PROTOCOL_LOG_RESP_CODE_NONE {
+				h.ResponseCode = &h.responseCode
+			}
+			if h.responseLength != -1 {
+				h.ResponseLength = &h.responseLength
+			}
 		}
 	}
 
