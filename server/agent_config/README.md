@@ -307,10 +307,12 @@ global:
 When the host has an invalid NFS file system or a docker is running,
 sometime program hang when checking the core file, so the core file
 check provides a switch to prevent the process hang. Additional links:
-- https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
-- https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
+- [https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory](https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory)
+- [https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file](https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file)
 
 ## Circuit Breakers {#global.circuit_breakers}
+
+Control deepflow-agent to stop running or stop some functions under certain environmental conditions.
 
 ### System Free Memory Percentage {#global.circuit_breakers.sys_memory_percentage}
 
@@ -345,13 +347,13 @@ global:
 
 **Description**:
 
-Setting sys_memory_limit to 0 indicates that the system free/available memory ratio is not checked.
-1. When the current system free/available memory ratio is below sys_memory_limit * 70%,
+Setting it to 0 indicates that the system free/available memory ratio is not checked.
+1. When the current system free/available memory ratio is below trigger_threshold * 70%,
    the agent will automatically restart.
-2. When the current system free/available memory ratio is below sys_memory_limit but above 70%,
-   the agent enters the disabled state.
-3. When the current system free/available memory ratio remains above sys_memory_limit * 110%,
-   the agent recovers from the disabled state.
+2. When the current system free/available memory ratio is below trigger_threshold but above 70%,
+   the agent is set to the abnormal state of `FREE_MEM_EXCEEDED` and reports an alarm.
+3. When the current system free/available memory ratio remains above trigger_threshold * 110%,
+   the agent recovers from the abnormal state.
 
 #### Metric {#global.circuit_breakers.sys_memory_percentage.metric}
 
@@ -569,6 +571,8 @@ global:
 Monitoring interval for outbound traffic rate of NPB interface.
 
 ## Tunning {#global.tunning}
+
+Tune the operation of deepflow-agent.
 
 ### CPU Affinity {#global.tunning.cpu_affinity}
 
@@ -832,6 +836,8 @@ global:
 When the clock drift exceeds this value, the timestamp will be corrected.
 
 ## Communication {#global.communication}
+
+Configure deepflow-agent communication parameters.
 
 ### Proactive Request Interval {#global.communication.proactive_request_interval}
 
@@ -1110,11 +1116,15 @@ deepflow-server. For example, when deepflow-server is behind a NAT gateway,
 or the host where deepflow-server is located has multiple node IP addresses
 and different deepflow-agents need to access different node IPs, you can
 set an additional NAT IP for each deepflow-server address, and modify this
-value to true.
+value to `true`.
 
 ## Self Monitoring {#global.self_monitoring}
 
+Configuration of deepflow-agent's own diagnosis.
+
 ### Log {#global.self_monitoring.log}
+
+Configuration of deepflow-agent's own logs.
 
 #### Log Level {#global.self_monitoring.log.log_level}
 
@@ -1196,6 +1206,7 @@ global:
 
 **Description**:
 
+The file where deepflow-agent logs are written.
 Note that this configuration is only used in standalone mode.
 
 #### Log Backhaul Enabled {#global.self_monitoring.log.log_backhaul_enabled}
@@ -1381,6 +1392,8 @@ global:
 statsd interval.
 
 ## Standalone Mode {#global.standalone_mode}
+
+Configuration of deepflow-agent standalone mode.
 
 ### Maximum Data File Size {#global.standalone_mode.max_data_file_size}
 
@@ -1654,7 +1667,7 @@ inputs:
 
 **Description**:
 
-The user who should execute the `os-app-tag-exec` command.
+The user who should execute the `script_command` command.
 
 ### Process Matcher {#inputs.proc.process_matcher}
 
@@ -1917,7 +1930,7 @@ inputs:
 
 **Description**:
 
-Default value true means only match processes in container.
+Default value `true` means only match processes in container.
 
 #### Only with Tag {#inputs.proc.process_matcher.only_with_tag}
 
@@ -1946,7 +1959,7 @@ inputs:
 
 **Description**:
 
-Default value false means match processes with or without tags.
+Default value `false` means match processes with or without tags.
 
 #### Ignore {#inputs.proc.process_matcher.ignore}
 
@@ -1975,7 +1988,7 @@ inputs:
 
 **Description**:
 
-Whether to ignore matched processes..
+Whether to ignore matched processes.
 
 #### Rewrite Name {#inputs.proc.process_matcher.rewrite_name}
 
@@ -2239,14 +2252,14 @@ inputs:
 
 **Description**:
 
-Mirror mode is used when deepflow-agent cannot directly capture the traffic from
+`Virtual Mirror` mode is used when deepflow-agent cannot directly capture the traffic from
 the source. For example:
 - in the K8s macvlan environment, capture the Pod traffic through the Node NIC
 - in the Hyper-V environment, capture the VM traffic through the Hypervisor NIC
 - in the ESXi environment, capture traffic through VDS/VSS local SPAN
 - in the DPDK environment, capture traffic through DPDK ring buffer
 
-Use Physical Mirror mode when deepflow-agent captures traffic through physical
+Use `Physical Mirror` mode when deepflow-agent captures traffic through physical
 switch mirroring.
 
 <mark>`Physical Mirror` is only supported in the Enterprise Edition.</mark>
@@ -2293,7 +2306,7 @@ Calico:        cali.*
 Cilium         lxc.*
 Kube-OVN       [0-9a-f]+_h$
 ```
-When the `tap_interface_regex` is not configured, it indicates
+When it is not configured, it indicates
 that network card traffic is not being collected
 
 #### Inner Net Namespace Capture Enabled {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
@@ -2324,12 +2337,12 @@ inputs:
 Whether to collect traffic in sub net namespaces.
 When enabled, agent will spawn recv engine threads to capture traffic in different namespaces,
 causing additional memory consumption for each namespace captured.
-The default setting of inputs.cbpf.af_packet.tunning.ring_blocks is 128,
+The default setting of `inputs.cbpf.af_packet.tunning.ring_blocks` is 128,
 which means that the memory consumption will be 128 * 1MB for each namespace.
 For example, a node with 20 pods will require 20 * 128 * 1MB = 2.56GB for dispatcher.
 Make sure to estimate this memory consumption before enabling this feature.
-Enabling inputs.cbpf.af_packet.tunning.ring_blocks_enabled and change
-inputs.cbpf.af_packet.tunning.ring_blocks to reduce memory consumption.
+Enabling `inputs.cbpf.af_packet.tunning.ring_blocks_enabled` and change
+`inputs.cbpf.af_packet.tunning.ring_blocks` to reduce memory consumption.
 
 #### Inner Net Namespace Interface Regex {#inputs.cbpf.af_packet.inner_interface_regex}
 
@@ -2387,7 +2400,7 @@ inputs:
 **Description**:
 
 Packets of interfaces in the same group can be aggregated together,
-Only effective when capture_mode is 0.
+Only effective when `inputs.cbpf.common.capture_mode` is 0.
 
 Example:
 ```yaml
@@ -2459,7 +2472,7 @@ inputs:
 
 Packet will be captured in regex matched namespaces besides the default
 namespace. NICs captured in extra namespaces are also filtered with
-`tap_interface_regex`.
+`inputs.cbpf.af_packet.interface_regex`.
 
 Default value `""` means no extra network namespace (default namespace only).
 
@@ -2492,7 +2505,7 @@ inputs:
 **Description**:
 
 If not configured, all traffic will be collected. Please
-refer to BPF syntax: https://biot.com/capstats/bpf.html
+refer to BPF syntax: [https://biot.com/capstats/bpf.html](https://biot.com/capstats/bpf.html)
 
 #### TAP Interfaces {#inputs.cbpf.af_packet.src_interfaces}
 
@@ -2549,9 +2562,9 @@ inputs:
 
 **Description**:
 
-When mirror-traffic-pcp <= 7 calculate TAP value from vlan tag only if vlan pcp matches this value.
-when mirror-traffic-pcp is 8 calculate TAP value from outer vlan tag, when mirror-traffic-pcp is 9
-calculate TAP value from inner vlan tag.
+- When this configuration <= 7 calculate TAP value from vlan tag only if vlan pcp matches this value.
+- when this configuration is 8 calculate TAP value from outer vlan tag,
+- when this configuration is 9 calculate TAP value from inner vlan tag.
 
 #### BPF Filter Disabled {#inputs.cbpf.af_packet.bpf_filter_disabled}
 
@@ -2683,8 +2696,8 @@ inputs:
 
 **Description**:
 
-When capture_mode != 2, you need to explicitly turn on this switch to
-configure 'afpacket-blocks'.
+When `inputs.cbpf.common.capture_mode` != `Physical Mirror`, you need to explicitly turn on this switch to
+configure 'inputs.cbpf.af_packet.tunning.ring_blocks'.
 
 ##### Ring Blocks {#inputs.cbpf.af_packet.tunning.ring_blocks}
 
@@ -2748,14 +2761,14 @@ inputs:
 
 **Description**:
 
-The configuration takes effect when capture_mode is 0 and extra_netns_regex is null,
+The configuration takes effect when `inputs.cbpf.common.capture_mode` is `Local` and `inputs.cbpf.af_packet.extra_netns_regex` is null,
 PACKET_FANOUT is to enable load balancing and parallel processing, scaling dispatcher for
-better performance of handling network applications. When the `local-dispatcher-count`
+better performance of handling network applications. When the `packet_fanout_count`
 is greater than 1, multiple dispatcher threads will be launched, consuming more CPU and
-memory. Increasing the `local-dispatcher-count` helps to reduce the operating system's
+memory. Increasing the `packet_fanout_count` helps to reduce the operating system's
 software interrupts on multi-core CPU servers.
 
-Attention: only valid for `traffic_capture_mode` = Local
+Attention: only valid for `inputs.cbpf.common.capture_mode` = `Local`
 
 ##### Packet Fanout Mode {#inputs.cbpf.af_packet.tunning.packet_fanout_mode}
 
@@ -2799,8 +2812,8 @@ inputs:
 
 The configuration is a parameter used with the PACKET_FANOUT feature in the Linux
 kernel to specify the desired packet distribution algorithm. Refer to:
-- https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
-- https://www.stackpath.com/blog/bpf-hook-points-part-1/
+- [https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71](https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71)
+- [https://www.stackpath.com/blog/bpf-hook-points-part-1/](https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71)
 
 ##### Interface Promisc Enabled {#inputs.cbpf.af_packet.tunning.interface_promisc_enabled}
 
@@ -2829,8 +2842,8 @@ inputs:
 **Description**:
 
 The following scenarios require promiscuous mode to be enabled:
-- capture_mode is 1 or 2
-- capture_mode is 0 and traffic to the virtual machine cannot be collected
+- `inputs.cbpf.common.capture_mode` is `Virtual Mirror` or `Physical Mirror`
+- `inputs.cbpf.common.capture_mode` is `Local` and traffic to the virtual machine cannot be collected
 Note: After the NIC is enabled in promiscuous mode, more traffic will be collected, resulting in lower performance
 
 ### Special Network {#inputs.cbpf.special_network}
@@ -2872,7 +2885,7 @@ inputs:
 **Description**:
 
 Currently, there are two ways to collect DPDK traffic, including:
-- pdump: See details https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+- pdump: See details [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
 - eBPF: Use eBPF Uprobe to obtain DPDK traffic
 
 ##### reorder cache window size {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
@@ -2902,7 +2915,7 @@ inputs:
 
 **Description**:
 
-When dpdk.source is eBPF, the larger the time window will cause the agent to use more memory.
+When `inputs.cbpf.special_network.dpdk.source` is eBPF, the larger the time window will cause the agent to use more memory.
 
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
@@ -3070,8 +3083,8 @@ inputs:
 
 **Description**:
 
-The configuration takes effect when capture_mode is 0 or 1,
-dispatcher-queue is always true when capture_mode is 2.
+The configuration takes effect when `inputs.cbpf.common.capture_mode` is `Local` or `Virtual Mirror`,
+dispatcher-queue is always true when `inputs.cbpf.common.capture_mode` is `Physical Mirror`.
 
 Available for all recv_engines.
 
@@ -3140,11 +3153,11 @@ To avoid memory allocation for each packet, a memory block of size
 raw_packet_buffer_block_size is allocated for multiple packets.
 Larger value will reduce memory allocation for raw packet, but will also
 delay memory free.
-This configuration is effective for the following dispatcher modes:
+This configuration is effective for the following `inputs.cbpf.common.capture_mode`:
 - analyzer mode
-- local mode with inner_interface_capture_enabled = true
-- local mode with dispatcher_queue = true
-- mirror mode with dispatcher_queue = true
+- local mode with `inputs.cbpf.af_packet.inner_interface_capture_enabled` = true
+- local mode with `inputs.cbpf.tunning.dispatcher_queue_enabled` = true
+- mirror mode with `inputs.cbpf.tunning.dispatcher_queue_enabled` = true
 
 #### Raw Packet Queue Size {#inputs.cbpf.tunning.raw_packet_queue_size}
 
@@ -3175,7 +3188,7 @@ inputs:
 
 **Description**:
 
-The length of the following queues (only for capture_mode = 2):
+The length of the following queues (only for `inputs.cbpf.common.capture_mode` = `Physical Mirror`):
 - 0.1-bytes-to-parse
 - 0.2-packet-to-flowgenerator
 - 0.3-packet-to-pipeline
@@ -3292,7 +3305,7 @@ inputs:
 Whether to remove the tunnel header in mirrored traffic.
 Only the Enterprise Edition supports decap ERSPAN and TEB.
 
-#### Packet Segmentation Reassembly {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
+#### Packet Segmentation Reassembly Ports {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
 
 **Tags**:
 
@@ -3321,7 +3334,7 @@ inputs:
 
 **Description**:
 
-Consecutive TCP packets will be aggregated together for application log parsing.
+For the specified ports, consecutive TCP packets will be aggregated together for application log parsing.
 
 ### Physical Mirror Traffic {#inputs.cbpf.physical_mirror}
 
@@ -3362,7 +3375,7 @@ inputs:
 deepflow-agent will mark the TAP (Traffic Access Point) location
 according to the outer vlan tag in the mirrored traffic of the physical
 switch. When the vlan tag has no corresponding TAP value, or the vlan
-pcp does not match the 'mirror-traffic-pcp', it will assign the TAP value.
+pcp does not match the `inputs.cbpf.af_packet.vlan_pcp_in_physical_mirror_traffic`, it will assign the TAP value.
 This configuration item. Default value `3` means Cloud Network.
 
 #### Packet Dedup Disabled {#inputs.cbpf.physical_mirror.packet_dedup_disabled}
@@ -3393,7 +3406,7 @@ inputs:
 
 **Description**:
 
-Whether to enable mirror traffic deduplication when capture_mode = 2.
+Whether to enable mirror traffic deduplication when `inputs.cbpf.common.capture_mode` = `Physical Mirror`.
 
 #### Gateway Traffic of Private Cloud {#inputs.cbpf.physical_mirror.private_cloud_gateway_traffic}
 
@@ -3423,7 +3436,7 @@ inputs:
 
 **Description**:
 
-Whether it is the mirrored traffic of NFVGW (cloud gateway).
+Whether it is the mirrored traffic of NFVGW (cloud gateway) when `inputs.cbpf.common.capture_mode` = `Physical Mirror`.
 
 ## eBPF {#inputs.ebpf}
 
@@ -3740,7 +3753,7 @@ inputs:
 
 Specify the appropriate packet transmission hook point according to the actual network card driver.
 To obtain the driver method and configure the transmission hook point, as well as precautions，refer
-to the description of 'rx_hooks'.
+to the description of `inputs.ebpf.socket.uprobe.dpdk.rx_hooks`.
 
 Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
@@ -3909,7 +3922,7 @@ inputs:
 
 **Description**:
 
-When full map preallocation is too expensive, setting 'map_prealloc_disabled' to true will
+When full map preallocation is too expensive, set this configuration to `true` will
 prevent memory pre-allocation during map definition, but it may result in some performance
 degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
 Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
@@ -3949,8 +3962,8 @@ inputs:
 
 OOOR: Out Of Order Reassembly
 
-When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
-eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
+When `out_of_order_reassembly_protocols` is enabled, up to `out_of_order_reassembly_cache_size`
+eBPF socket events (each event consuming up to `processors.request_log.tunning.payload_truncation` bytes) will be cached
 in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
 parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
 mainly occur when requests and responses within a single session are processed by different
@@ -3997,7 +4010,7 @@ out-of-order-reassembly processing for it. Note that the agent will consume more
 in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
 the agent's memory usage.
 
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 Attention: use `HTTP2` for `gRPC` Protocol.
 
@@ -4040,10 +4053,10 @@ SR: Segmentation Reassembly
 When this capability is enabled for a specific application protocol, the agent will add
 segmentation-reassembly processing to merge application protocol content spread across
 multiple syscalls before parsing it. This enhances the success rate of application
-protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
+protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
 this feature to be effective.
 
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 Attention: use `HTTP2` for `gRPC` Protocol.
 
@@ -4087,9 +4100,9 @@ inputs:
 **Description**:
 
 Collection modes:
-- 0: Indicates that no IO events are collected.
-- 1: Indicates that only IO events within the request life cycle are collected.
-- 2: Indicates that all IO events are collected.
+- Disabled: Indicates that no IO events are collected.
+- Request Life Cycle: Indicates that only IO events within the request life cycle are collected.
+- All: Indicates that all IO events are collected.
 
 ##### Minimal Duration {#inputs.ebpf.file.io_event.minimal_duration}
 
@@ -4154,10 +4167,10 @@ inputs:
 
 **Description**:
 
-The default setting is "true", agent will use frame pointer based unwinding for
+The default setting is `true`, agent will use frame pointer based unwinding for
 all processes. If a process does not contain frame pointers, the stack cannot be
 displayed correctly.
-Setting it to "false" will enable DWARF based stack unwinding for all processes that
+Setting it to `false` will enable DWARF based stack unwinding for all processes that
 do not contain frame pointers. Agent uses a heuristic algorithm to determine whether
 the process being analyzed contains frame pointers.
 Additionally, setting `dwarf_regex` to force DWARF based stack unwinding for certain
@@ -4360,9 +4373,9 @@ inputs:
 **Description**:
 
 Whether to obtain the value of CPUID and decide whether to participate in aggregation.
-- Set to 1: Obtain the value of CPUID and will be included in the aggregation of stack
+- `true`: Obtain the value of CPUID and will be included in the aggregation of stack
   trace data.
-- Set to 0: It will not be included in the aggregation. Any other value is considered
+- `false`: It will not be included in the aggregation. Any other value is considered
   invalid, the CPU value for stack trace data reporting is a special value
   `CPU_INVALID: 0xfff` used to indicate that it is an invalid value.
 
@@ -4432,9 +4445,9 @@ inputs:
 **Description**:
 
 Whether to obtain the value of CPUID and decide whether to participate in aggregation.
-- Set to 1: Obtain the value of CPUID and will be included in the aggregation of stack
+- `true`: Obtain the value of CPUID and will be included in the aggregation of stack
   trace data.
-- Set to 0: It will not be included in the aggregation. Any other value is considered
+- `false`: It will not be included in the aggregation. Any other value is considered
   invalid, the CPU value for stack trace data reporting is a special value
   `CPU_INVALID: 0xfff` used to indicate that it is an invalid value.
 
@@ -4945,9 +4958,9 @@ How to extract the real MAC address of the virtual machine when the
 agent runs on the KVM host.
 
 Explanation of the options:
-- 0: extracted from tap interface MAC address
-- 1: extracted from tap interface name
-- 2: extracted from the XML file of the virtual machine
+- Interface MAC Address: extracted from tap interface MAC address
+- Interface Name: extracted from tap interface name
+- Qemu XML File: extracted from the XML file of the virtual machine
 
 #### VM XML Directory {#inputs.resources.private_cloud.vm_xml_directory}
 
@@ -6270,7 +6283,7 @@ processors:
 **Description**:
 
 When set to 0, deepflow-agent will automatically adjust the map size
-according to max_memory.
+according to `global.limits.max_memory`.
 Note: In practice, it should not be set to less than 8000.
 
 #### Fast-path Disabled {#processors.packet.policy.fast_path_disabled}
@@ -6300,7 +6313,7 @@ processors:
 
 **Description**:
 
-When set to true, deepflow-agent will not use fast path.
+When set to `true`, deepflow-agent will not use fast path.
 
 #### Forward Table Capacity {#processors.packet.policy.forward_table_capacity}
 
@@ -6462,7 +6475,7 @@ processors:
 **Description**:
 
 packet-sequence-flag determines which fields need to be reported, the default
-value is 0, which means the feature is disabled, and 255, which means all fields
+value is `0`, which means the feature is disabled, and `255`, which means all fields
 need to be reported all fields corresponding to each bit:
 ```
 | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
@@ -6790,7 +6803,7 @@ processors:
 
 Turning off some protocol identification can reduce deepflow-agent resource consumption.
 
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
 
@@ -6993,7 +7006,7 @@ HTTP2: 1-65535
 HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
 All data obtained through uprobe is not subject to port restrictions.
 
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
 
@@ -7075,7 +7088,7 @@ the blacklist from being collected by the agent or included in application perfo
 It's recommended to only place non-business request logs like heartbeats or health checks in this
 blacklist. Including business request logs might lead to breaks in the distributed tracing tree.
 
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
 
@@ -7942,7 +7955,7 @@ processors:
 
 The maximum data length used for application protocol identification,
 note that the effective value is less than the value of
-capture_packet_size.
+`inputs.cbpf.tunning.max_capture_packet_size`.
 
 NOTE: For eBPF data, the largest valid value is 16384.
 
@@ -8251,7 +8264,7 @@ processors:
 **Description**:
 
 For Cloud traffic, only the MAC address corresponding to the side with
-L2End = true is matched when generating the flow. Set this value to true to
+L2End = true is matched when generating the flow. Set this value to `true` to
 force a double-sided MAC address match and only aggregate traffic with
 exactly equal MAC addresses.
 
@@ -8478,8 +8491,8 @@ processors:
 
 Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
 the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
-is not enough, it will be unable to calculate the rrt of l7. When capture_mode is 2 and
-concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
+is not enough, it will be unable to calculate the rrt of l7. When `inputs.cbpf.common.capture_mode`
+is `Physical Mirror` and concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
 
 #### Memory Pool Size {#processors.flow_log.tunning.memory_pool_size}
 
@@ -8955,8 +8968,8 @@ outputs:
 
 **Description**:
 
-Use the value of tap_side to control which l7_flow_log should be ignored for
-collection.
+Use the value of observation points to control which l7_flow_log should be ignored for
+collection. The default value `[]` means that all observation points are collected.
 
 ### Aggregators {#outputs.flow_log.aggregators}
 
@@ -8990,7 +9003,7 @@ Agent will mark the following types of flows as `close_type = normal end-client 
 - Client sends SYN, server replies SYN-ACK, client sends ACK, client sends RST
 This type of traffic is normal load balancer backend host inspection traffic and does not carry any meaningful application layer payload.
 
-When this configuration item is set to true, Agent will reset the client port number of the flow log to 0 before aggregating the output,
+When this configuration item is set to `true`, Agent will reset the client port number of the flow log to 0 before aggregating the output,
 thereby reducing bandwidth and storage overhead.
 
 ### Throttles {#outputs.flow_log.throttles}
