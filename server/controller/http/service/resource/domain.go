@@ -601,7 +601,7 @@ func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	condition := "domain = ? AND deleted_at IS NOT NULL"
 	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid, db.LogPrefixORGID)
 	forceDelete[mysqlmodel.CEN](db, condition, lcuuid)
-	forceDelete[mysqlmodel.PeerConnection](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PeerConnection](db, "remote_domain = ? OR local_domain = ? AND deleted_at IS NOT NULL", lcuuid, lcuuid)
 	forceDelete[mysqlmodel.RedisInstance](db, condition, lcuuid)
 	forceDelete[mysqlmodel.RDSInstance](db, condition, lcuuid)
 	forceDelete[mysqlmodel.LBListener](db, condition, lcuuid)
@@ -669,7 +669,7 @@ func deleteDomain(domain *mysqlmodel.Domain, db *mysql.DB, userInfo *httpcommon.
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.FloatingIP{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VInterface{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.CEN{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PeerConnection{})
+	db.Unscoped().Where("local_domain = ? OR remote_domain = ?", lcuuid, lcuuid).Delete(&mysqlmodel.PeerConnection{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.RedisInstance{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.RDSInstance{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LBVMConnection{})

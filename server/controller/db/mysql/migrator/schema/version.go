@@ -18,7 +18,7 @@ package schema
 
 const (
 	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.6.1.32"
+	DB_VERSION_EXPECTED = "6.6.1.33"
 )
 
 const (

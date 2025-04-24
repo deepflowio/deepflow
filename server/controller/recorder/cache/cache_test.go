@@ -239,8 +239,6 @@ func TestAddLBVMConnections(t *testing.T) {
 func TestAddPeerConnections(t *testing.T) {
 	mysqlItem := &mysqlmodel.PeerConnection{Base: mysqlmodel.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.regionIDToLcuuid[mysqlItem.RemoteRegionID] = uuid.New().String()
-	cache.regionIDToLcuuid[mysqlItem.LocalRegionID] = uuid.New().String()
 	assert.Equal(t, len(cache.PeerConnections), 0)
 	cache.AddPeerConnections([]*mysqlmodel.PeerConnection{mysqlItem})
 	assert.Equal(t, len(cache.PeerConnections), 1)
