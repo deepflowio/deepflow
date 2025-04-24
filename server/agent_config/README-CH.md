@@ -303,11 +303,11 @@ global:
 
 **详细描述**:
 
-When the host has an invalid NFS file system or a docker is running,
-sometime program hang when checking the core file, so the core file
-check provides a switch to prevent the process hang. Additional links:
-- https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
-- https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
+当主机存在无效的 NFS 文件系统，或者 Docker 正在运行时，
+检查 core 文件时可能会导致程序挂起。
+因此，core 文件检查提供了一个开关，以防止进程挂起。参考链接：
+- [https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory](https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory)
+- [https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file](https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file)
 
 ## 熔断机制 {#global.circuit_breakers}
 
@@ -518,13 +518,13 @@ global:
 
 **详细描述**:
 
-如果流量分发所用网络接口的出方向吞吐量达到或超出此阈值，deepflow-agent 停止流量
-分发；如果该网络接口的出方向吞吐量连续 5 个监控周期低于`(trigger_threshold -
+如果流量分发所用网络接口的出方向吞吐量达到或超出此阈值，deepflow-agent 停止流量分发；
+如果该网络接口的出方向吞吐量连续 5 个监控周期低于`(trigger_threshold -
 outputs.npb.max_tx_throughput)*90%`，deepflow-agent 恢复流量分发。
 
 注意：
 1. 取值为 0 时，该特性不生效；
-2. 若取非 0 值，必须大于 `max_tx_throughput`。
+2. 若取非 0 值，必须大于 `outputs.npb.max_tx_throughput`。
 
 #### 吞吐监控间隔 {#global.circuit_breakers.tx_throughput.throughput_monitoring_interval}
 
@@ -783,7 +783,7 @@ global:
 
 **详细描述**:
 
-当 deepflow-agent 与 deepflow-server 之间的时间偏移大于‘max_drift’设置值时，agent 会自动重启。
+当 deepflow-agent 与 deepflow-server 之间的时间偏移大于此设置值时，agent 会自动重启。
 
 ### 最小时钟偏差 {#global.ntp.min_drift}
 
@@ -812,7 +812,7 @@ global:
 
 **详细描述**:
 
-当 deepflow-agent 与 deepflow-server 之间的时间偏移大于‘min_drift’设置值时，对 agent 的
+当 deepflow-agent 与 deepflow-server 之间的时间偏移大于此设置值时，对 agent 的
 时间戳进行纠正。
 
 ## 通信 {#global.communication}
@@ -1634,7 +1634,7 @@ inputs:
 
 **详细描述**:
 
-deepflow-agent 执行 `os-app-tag-exec` 脚本命令的用户名。
+deepflow-agent 执行 `script_command` 脚本命令的用户名。
 
 ### 进程匹配器 {#inputs.proc.process_matcher}
 
@@ -1767,7 +1767,7 @@ inputs:
 
 **详细描述**:
 
-The regex of matcher.
+匹配正则表达式。
 
 #### 匹配类型 {#inputs.proc.process_matcher.match_type}
 
@@ -1805,7 +1805,7 @@ inputs:
 
 **详细描述**:
 
-The type of matcher.
+匹配类型。
 
 #### 匹配语言 {#inputs.proc.process_matcher.match_languages}
 
@@ -1841,7 +1841,7 @@ inputs:
 
 **详细描述**:
 
-Default value `[]` match all languages.
+默认值“[]”匹配所有语言。
 
 #### 匹配用户名 {#inputs.proc.process_matcher.match_usernames}
 
@@ -1868,7 +1868,7 @@ inputs:
 
 **详细描述**:
 
-Default value `[]` match all usernames.
+默认值“[]”匹配所有语言。
 
 #### 仅匹配容器内的进程 {#inputs.proc.process_matcher.only_in_container}
 
@@ -1895,7 +1895,7 @@ inputs:
 
 **详细描述**:
 
-Default value true means only match processes in container.
+默认值 true 表示仅匹配容器中的进程。
 
 #### 仅匹配有 Tag 的进程 {#inputs.proc.process_matcher.only_with_tag}
 
@@ -1924,7 +1924,7 @@ inputs:
 
 **详细描述**:
 
-Default value false means match processes with or without tags.
+默认值 false 表示匹配所有进程。
 
 #### 忽略 {#inputs.proc.process_matcher.ignore}
 
@@ -1953,7 +1953,7 @@ inputs:
 
 **详细描述**:
 
-Whether to ignore matched processes..
+是否忽略匹配的进程。
 
 #### 重命名 {#inputs.proc.process_matcher.rewrite_name}
 
@@ -1982,7 +1982,7 @@ inputs:
 
 **详细描述**:
 
-New name after matched.
+匹配后的新名称。
 
 #### 开启功能列表 {#inputs.proc.process_matcher.enabled_features}
 
@@ -2275,11 +2275,11 @@ inputs:
 是否采集内网络命名空间流量。
 设置为启用会使采集器为每个内网络命名空间创建一个独立的接收引擎线程，
 这会导致额外的内存消耗。
-默认配置 inputs.cbpf.af_packet.tunning.ring_blocks 为 128，
+默认配置 `inputs.cbpf.af_packet.tunning.ring_blocks` 为 128，
 这意味着每个网络命名空间将消耗 128 * 1MB 的内存。
 一个有 20 个 POD 的节点将需要 20 * 128 * 1MB = 2.56GB 的内存。
-请在启用此功能之前估计内存消耗，启用 inputs.cbpf.af_packet.tunning.ring_blocks_enabled
-并调整 inputs.cbpf.af_packet.tunning.ring_blocks 以减少内存消耗。
+请在启用此功能之前估计内存消耗，启用 `inputs.cbpf.af_packet.tunning.ring_blocks_enabled`
+并调整 `inputs.cbpf.af_packet.tunning.ring_blocks` 以减少内存消耗。
 
 #### 内网络命名空间网卡名正则表达式 {#inputs.cbpf.af_packet.inner_interface_regex}
 
@@ -2336,10 +2336,10 @@ inputs:
 
 **详细描述**:
 
-Packets of interfaces in the same group can be aggregated together,
-Only effective when capture_mode is 0.
+同一组内接口的数据包可以聚合在一起，
+仅当 `inputs.cbpf.common.capture_mode` 为0时有效。
 
-Example:
+例子:
 ```yaml
 inputs:
   cbpf:
@@ -2408,7 +2408,7 @@ inputs:
 **详细描述**:
 
 除默认网络 namespace 之外，deepflow-agent 还会根据此参数正则匹配额外的网络 namespace，
-在匹配命中的网络 namespace 中根据`tap_interface_regex`正则匹配网络接口并采集流量。默认
+在匹配命中的网络 namespace 中根据`inputs.cbpf.af_packet.interface_regex`正则匹配网络接口并采集流量。默认
 配置 `""` 表示仅采集默认网络 namesapce，不采集额外的网络 namespace 流量。
 
 #### 额外的 BPF 过滤器 {#inputs.cbpf.af_packet.extra_bpf_filter}
@@ -2439,7 +2439,7 @@ inputs:
 
 **详细描述**:
 
-如果不配置该参数，则采集全部流量。BPF 语法详见：https://biot.com/capstats/bpf.html
+如果不配置该参数，则采集全部流量。BPF 语法详见：[https://biot.com/capstats/bpf.html](https://biot.com/capstats/bpf.html)
 
 #### TAP Interfaces {#inputs.cbpf.af_packet.src_interfaces}
 
@@ -2496,9 +2496,9 @@ inputs:
 
 **详细描述**:
 
-当 mirror-traffic-pcp 的值小于等于 7 时，仅当 VLAN PCP 与该值匹配时，从 VLAN tag 中计算 TAP。
-当 mirror-traffic-pcp 的值为 8 时，从外层 VLAN tag 中计算 TAP，
-当 mirror-traffic-pcp 的值为 9 时，从内层 VLAN tag 中计算 TAP。
+当此配置值小于等于 7 时，仅当 VLAN PCP 与该值匹配时，从 VLAN tag 中计算 TAP。
+当此配置值为 8 时，从外层 VLAN tag 中计算 TAP，
+当此配置值为 9 时，从内层 VLAN tag 中计算 TAP。
 
 #### 禁用 BPF 过滤 {#inputs.cbpf.af_packet.bpf_filter_disabled}
 
@@ -2627,7 +2627,8 @@ inputs:
 
 **详细描述**:
 
-`本地流量`和`虚拟网络镜像`模式下，需开启此开关，并配置 `afpacket-blocks` 参数。
+当 `inputs.cbpf.common.capture_mode` 为 `本地流量`或`虚拟网络镜像`模式，需开启此开关，
+并配置 `inputs.cbpf.af_packet.tunning.ring_blocks` 参数。
 
 ##### Ring Blocks {#inputs.cbpf.af_packet.tunning.ring_blocks}
 
@@ -2690,11 +2691,11 @@ inputs:
 
 **详细描述**:
 
-数据包 Fanout 的路数大于 1 时，deepflow-agent 将开启多个 dispatcher 线程，并把数据包分散到多个处理
-线程并行处理，弹性扩展 dispatcher 以优化网络应用的处理性能。增加`packet_fanout_count`可以降低
+当此配置值大于 1 时，deepflow-agent 将开启多个 dispatcher 线程，并把数据包分散到多个处理
+线程并行处理，弹性扩展 dispatcher 以优化网络应用的处理性能。增大此配置可以降低
 多核服务器的操作系统软中断数量，但会消耗更多的 CPU 和内存。
 
-注意：参数仅在`capture_mode`为 0，且`extra_netns_regex`为空时有效。
+注意：参数仅在`inputs.cbpf.common.capture_mode`为 `本地流量`，且`inputs.cbpf.af_packet.extra_netns_regex`为空时有效。
 
 ##### Packet Fanout 模式 {#inputs.cbpf.af_packet.tunning.packet_fanout_mode}
 
@@ -2737,8 +2738,8 @@ inputs:
 **详细描述**:
 
 数据包 Fanout 的算法/模式。参考：
-- https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
-- https://www.stackpath.com/blog/bpf-hook-points-part-1/
+- [https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71](https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71)
+- [https://www.stackpath.com/blog/bpf-hook-points-part-1/](https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71)
 
 ##### 开启网卡混杂模式 {#inputs.cbpf.af_packet.tunning.interface_promisc_enabled}
 
@@ -2767,8 +2768,8 @@ inputs:
 **详细描述**:
 
 如下场景需要开启混杂模式：
-- capture_mode 等于 1 或 2
-- capture_mode 等于 0 并且无法采集到虚拟机的流量
+- `inputs.cbpf.common.capture_mode` 等于`虚拟网络镜像`或`物理网络镜像`
+- `inputs.cbpf.common.capture_mode` 等于`本地流量`并且无法采集到虚拟机的流量
 注意：网卡开启混杂模式后会采集更多的流量导致性能降低。
 
 ### 特殊网络 {#inputs.cbpf.special_network}
@@ -2810,7 +2811,7 @@ inputs:
 **详细描述**:
 
 目前支持两种采集 DPDK 流量的方式，包括：
-- pdump: 详情见 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+- pdump: 详情见 [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
 - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
 
 ##### 乱序重排缓存时间窗口大小 {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
@@ -2840,7 +2841,7 @@ inputs:
 
 **详细描述**:
 
-当 dpdk.source 为 eBPF 时该配置生效，时间窗口变大会导致 agent 占用更多的内存。
+当 `inputs.cbpf.special_network.dpdk.source` 为 eBPF 时该配置生效，时间窗口变大会导致 agent 占用更多的内存。
 
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
@@ -3006,7 +3007,7 @@ inputs:
 
 **详细描述**:
 
-当 capture_mode 为 0 或 1时该配置生效。
+当 `inputs.cbpf.common.capture_mode` 为`本地流量`或`虚拟网络镜像`时该配置生效。
 
 对所有流量采集方式都可用。
 
@@ -3073,11 +3074,11 @@ inputs:
 Analyzer 模式下采集到的包进入队列前需要分配内存暂存。为避免每个包进行内存申请，每次开辟
 raw_packet_buffer_block_size 大小的内存块给数个包使用。
 更大的配置可以减少内存分配，但会延迟内存释放。
-该配置对以下采集模式生效：
+该配置对以下采集模式(`inputs.cbpf.common.capture_mode`)生效：
 - analyzer 模式
-- local 模式，且 inner_interface_capture_enabled = true
-- local 模式，且 dispatcher_queue = true
-- mirror 模式，且 dispatcher_queue = true
+- local 模式，且 `inputs.cbpf.af_packet.inner_interface_capture_enabled` = true
+- local 模式，且 `inputs.cbpf.tunning.dispatcher_queue_enabled` = true
+- mirror 模式，且 `inputs.cbpf.tunning.dispatcher_queue_enabled` = true
 
 #### 裸包队列大小 {#inputs.cbpf.tunning.raw_packet_queue_size}
 
@@ -3108,7 +3109,7 @@ inputs:
 
 **详细描述**:
 
-以下队列的长度（仅在 capture_mode = 2 时有效）：
+以下队列的长度（仅在 `inputs.cbpf.common.capture_mode` = `物理网络镜像`时有效）：
 - 0.1-bytes-to-parse
 - 0.2-packet-to-flowgenerator
 - 0.3-packet-to-pipeline
@@ -3223,7 +3224,7 @@ inputs:
 流量镜像（虚拟或物理）模式下，deepflow-agent 需要剥离的隧道头协议类型。
 仅企业版支持解析 ERSPAN 和 TEB。
 
-#### TCP分段重组开关 {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
+#### TCP分段重组端口 {#inputs.cbpf.preprocess.packet_segmentation_reassembly}
 
 **标签**:
 
@@ -3252,7 +3253,7 @@ inputs:
 
 **详细描述**:
 
-开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
+对指定端口的流，相邻的两个TCP分段 Packet 聚合在一起解析应用日志
 
 ### 物理网络流量镜像 {#inputs.cbpf.physical_mirror}
 
@@ -3290,9 +3291,9 @@ inputs:
 
 **详细描述**:
 
-在`物理网络镜像`模式下，deepflow-agent 通过镜像流量的外层 VLAN 标签识别并标记采集数据的
+在 `inputs.cbpf.common.capture_mode` 为`物理网络镜像`模式下，deepflow-agent 通过镜像流量的外层 VLAN 标签识别并标记采集数据的
 TAP(Traffic Access Point)值。当流量外层 VLAN 标签没有对应的 TAP 值，或 VLAN pcp 值与
-'vlan_pap_in_physical_mirror_traffic'的配置不一致时，deepflow-agent 使用本参数值
+`inputs.cbpf.af_packet.vlan_pcp_in_physical_mirror_traffic` 的配置不一致时，deepflow-agent 使用本参数值
 标记数据的 TAP 值。
 
 #### 禁用 Packet 去重 {#inputs.cbpf.physical_mirror.packet_dedup_disabled}
@@ -3323,7 +3324,7 @@ inputs:
 
 **详细描述**:
 
-`物理网络镜像`模式下该参数配置为 `true` 时，deepflow-agent 将不对数据包做去重处理。
+当 `inputs.cbpf.common.capture_mode` 为`物理网络镜像`模式, 该参数配置为 `true` 时，deepflow-agent 将不对数据包做去重处理。
 
 #### 专有云网关流量 {#inputs.cbpf.physical_mirror.private_cloud_gateway_traffic}
 
@@ -3353,7 +3354,7 @@ inputs:
 
 **详细描述**:
 
-`物理网络镜像`模式下该参数配置为 `true` 时，deepflow-agent 会将流量识别为 NFVGW 流量。
+当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 模式，该参数配置为 `true` 时，deepflow-agent 会将流量识别为 NFVGW 流量。
 
 ## eBPF {#inputs.ebpf}
 
@@ -3653,7 +3654,7 @@ inputs:
 
 **详细描述**:
 
-根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置以及注意事项参考 'rx_hooks' 的说明.
+根据实际的网卡驱动填写合适的数据包发送 hook 点, 获取驱动方法和发送hook点设置以及注意事项参考 `inputs.ebpf.socket.uprobe.dpdk.rx_hooks` 的说明.
 
 配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
@@ -3822,8 +3823,8 @@ inputs:
 
 **详细描述**:
 
-当完整的map预分配过于昂贵时，将 `map_prealloc_disabled` 设置为 true 可以防止在定义map时进行
-内存预分配，但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
+当完整的map预分配过于昂贵时，将此配置设置为 true 可以防止在定义map时进行内存预分配，
+但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
 #### 预处理 {#inputs.ebpf.socket.preprocess}
@@ -3861,8 +3862,8 @@ inputs:
 由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
 会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
 事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
-条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
-中，可适当调大该参数。
+条事件数据占用的字节数上限受 `processors.request_log.tunning.payload_truncation` 控制）。在 Syscall 数据乱序较严重
+导致应用调用采集不全的环境中，可适当调大该参数。
 
 ##### 乱序重排（OOOR）协议列表 {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols}
 
@@ -3936,7 +3937,7 @@ inputs:
 **详细描述**:
 
 配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
+协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`out_of_order_reassembly_protocols`
 开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
 
 ### File {#inputs.ebpf.file}
@@ -3979,9 +3980,9 @@ inputs:
 **详细描述**:
 
 采集模式：
-- 0：不采集任何文件 IO 事件。
-- 1：仅采集调用生命周期内的文件 IO 事件。
-- 2：采集所有的文件 IO 事件。
+- 禁用：不采集任何文件 IO 事件。
+- 调用生命周期：仅采集调用生命周期内的文件 IO 事件。
+- 全部：采集所有的文件 IO 事件。
 
 ##### 最小耗时 {#inputs.ebpf.file.io_event.minimal_duration}
 
@@ -4047,8 +4048,8 @@ inputs:
 
 **详细描述**:
 
-默认设置为“true”，将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
-设置为“false”将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
+默认设置为 `true`，将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
+设置为 `false` 将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
 设置 `dwarf_regex` 后，将强制对匹配的进程使用 DWARF 回溯。
 
 ##### DWARF 回溯进程匹配正则表达式 {#inputs.ebpf.profile.unwinding.dwarf_regex}
@@ -4804,9 +4805,9 @@ inputs:
 **详细描述**:
 
 配置 deepflow-agent 提取 VM 真实 MAC 地址的方法:
-- 0: 从 tap 接口的 MAC 地址中提取 VM 的 MAC 地址
-- 1: 从 tap 接口的名字中提取 MAC 地址
-- 2: 从 VM XML 文件中提取 MAC 地址
+- 网卡 MAC 地址: 从 tap 接口的 MAC 地址中提取 VM 的 MAC 地址
+- 网卡名称: 从 tap 接口的名字中提取 MAC 地址
+- Qemu XML 文件: 从 VM XML 文件中提取 MAC 地址
 
 #### 虚拟机 XML 文件夹 {#inputs.resources.private_cloud.vm_xml_directory}
 
@@ -5047,7 +5048,7 @@ inputs:
 
 **详细描述**:
 
-K8s API resource name.
+K8s API 资源名
 
 ##### 组 {#inputs.resources.kubernetes.api_resources.group}
 
@@ -5077,7 +5078,7 @@ inputs:
 
 **详细描述**:
 
-K8s API resource group.
+K8s API 资源组
 
 ##### 版本 {#inputs.resources.kubernetes.api_resources.version}
 
@@ -5107,7 +5108,7 @@ inputs:
 
 **详细描述**:
 
-K8s API version.
+K8s API 版本
 
 ##### Disabled {#inputs.resources.kubernetes.api_resources.disabled}
 
@@ -5137,7 +5138,7 @@ inputs:
 
 **详细描述**:
 
-K8s API resource disabled.
+禁用 K8s API 资源
 
 ##### Field Selector {#inputs.resources.kubernetes.api_resources.field_selector}
 
@@ -5167,7 +5168,7 @@ inputs:
 
 **详细描述**:
 
-K8s API resource field selector.
+K8s API 资源字段选择器
 
 #### K8s API List 页大小 {#inputs.resources.kubernetes.api_list_page_size}
 
@@ -6115,7 +6116,7 @@ processors:
 
 **详细描述**:
 
-设置为`0`时，deepflow-agent 根据 `max_memory` 参数自动调整 Fast-path 字典大小。
+设置为`0`时，deepflow-agent 根据 `global.limits.max_memory` 参数自动调整 Fast-path 字典大小。
 注意：实践中不应配置小于 8000 的值。
 
 #### 禁用 Fast-path {#processors.packet.policy.fast_path_disabled}
@@ -6820,7 +6821,7 @@ HTTP2: 1-65535
 注意：
 1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
 
-支持协议：https://www.deepflow.io/docs/features/l7-protocols/overview/
+支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
 
 <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
 
@@ -6886,6 +6887,19 @@ processors:
 **详细描述**:
 
 控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
+Tag filter 配置例子:
+```yaml
+processors:
+  request_log:
+    filters:
+      tag_filters:
+        HTTP:
+          - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
+            operator: equal               # equal, prefix
+            value: somevalue
+        HTTP2: []
+        # 其他协议
+```
 
 ##### $HTTP Tag 过滤器 {#processors.request_log.filters.tag_filters.HTTP}
 
@@ -6972,7 +6986,7 @@ processors:
 
 **详细描述**:
 
-Match field name.
+匹配字段名
 
 ###### 匹配操作符 {#processors.request_log.filters.tag_filters.HTTP.operator}
 
@@ -7009,7 +7023,7 @@ processors:
 
 **详细描述**:
 
-Match operator.
+匹配操作符
 
 ###### 字段值 {#processors.request_log.filters.tag_filters.HTTP.field_value}
 
@@ -7040,7 +7054,7 @@ processors:
 
 **详细描述**:
 
-匹配字段。
+匹配字段值。
 
 #### 不关心的 DNS NXDOMAIN 错误 {#processors.request_log.filters.unconcerned_dns_nxdomain_response_suffixes}
 
@@ -7732,7 +7746,7 @@ processors:
 
 **详细描述**:
 
-应用调用日志采集解析的最大 payload 长度。注意实际的值小于 capture_packet_size。
+应用调用日志采集解析的最大 payload 长度。注意实际的值小于 `inputs.cbpf.tunning.max_capture_packet_size`。
 注意：eBPF 数据的 payload 可解析长度上限为 16384 Byte。
 
 #### 会话聚合桶容量 {#processors.request_log.tunning.session_aggregate_slot_capacity}
@@ -7772,9 +7786,9 @@ LRU 策略淘汰以减少内存占用。注意，被淘汰的 l7_flow_log 条目
 发送给 deepflow-server。
 
 以下指标可以作为调整该配置的参考数据：
-- Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+- Metric `deepflow_tenant.deepflow_agent_l7_session_aggr.cached-request-resource`
   用于记录当前时刻所有时间槽中缓存的 request_resource 字段占用的总内存，单位为字节。
-- Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+- Metric `deepflow_tenant.deepflow_agent_l7_session_aggr.over-limit`
   用于记录达到 LRU 容量限制并触发淘汰的次数。
 
 #### 会话聚合最大条目数 {#processors.request_log.tunning.session_aggregate_max_entries}
@@ -8057,7 +8071,8 @@ processors:
 
 **详细描述**:
 
-TODO
+当在同一位置采集的双向流量的 VLAN 不对称时，流量无法聚合为同一条流。您可以
+此时设置此值。仅适用于 IDC（非云）流量。
 
 #### 超时设置 {#processors.flow_log.conntrack.timeouts}
 
@@ -8248,7 +8263,7 @@ processors:
 
 FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
 例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-将无法计算 L7 的 RRT。当 capture_mode 为 2 并且 concurrent_flow_limit 小于等于 65535 时，
+将无法计算 L7 的 RRT。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等于 65535 时，
 将会被强制设置为 u32::MAX。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
