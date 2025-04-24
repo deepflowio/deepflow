@@ -1361,14 +1361,17 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
 		offset.struct_files_private_data_offset = 0xa8;
+		offset.struct_file_f_pos_offset = 0x68;
 		break;
 	case K_TYPE_KYLIN:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc0;
+		offset.struct_file_f_pos_offset = 0x60;
 		break;
 	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc8;
+		offset.struct_file_f_pos_offset = 0x68;
 	};
 
 	/*
