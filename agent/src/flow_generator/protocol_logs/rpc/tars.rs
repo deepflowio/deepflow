@@ -14,6 +14,16 @@
  * limitations under the License.
  */
 
+use std::{num::NonZeroUsize, str};
+
+use nom::{
+    bytes::complete::take,
+    number::complete::{be_i16, be_i32, be_i64, be_i8, be_u32, be_u8},
+    IResult,
+};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::Serialize;
+
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
@@ -28,10 +38,7 @@ use crate::{
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
-    utils::bytes::{read_u16_be, read_u32_be},
 };
-use serde::Serialize;
-use std::str;
 
 /*
 These parameters can be determined from the framework code (Refer to the notes below)
@@ -42,32 +49,58 @@ const HEADER_SIZE: usize = 4;
 const VERSION_INDEX: usize = 5;
 const INITIAL_LEN: usize = 7;
 
-const TARS_SERVER_SUCCESS: i32 = 0; // Server-side processing is successful
-const TARS_SERVER_DECODE_ERR: i32 = -1; // Server-side decoding exception
-const TARS_SERVER_ENCODE_ERR: i32 = -2; // Server-side encoding exception
-const TARS_SERVER_NO_FUNC_ERR: i32 = -3; // Server-side does not have the function
-const TARS_SERVER_NO_SERVANT_ERR: i32 = -4; // Server-side does not have the Servant object
-const TARS_SERVER_RESET_GRID: i32 = -5; // Server-side gray status is inconsistent
-const TARS_SERVER_QUEUE_TIMEOUT: i32 = -6; // Server-side queue exceeds the limit
-const TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT: i32 = -7; // Asynchronous call timeout or Invocation timeout, duplicate of TARS_ASYNC_CALL_TIMEOUT
-const TARS_PROXY_CONNECT_ERR: i32 = -8; // Proxy connection exception
-const TARS_SERVER_OVERLOAD: i32 = -9; // Server-side overload, exceeds queue length
-const TARS_ADAPTER_NULL: i32 = -10; // Client-side routing is empty, service does not exist or all services are down
-const TARS_INVOKE_BY_INVALID_ESET: i32 = -11; // Client-side invocation by set rule is illegal
-const TARS_CLIENT_DECODE_ERR: i32 = -12; // Client-side decoding exception
-const TARS_SERVER_UNKNOWN_ERR: i32 = -99; // Server-side unknown exception
-
-#[derive(Debug, Clone)]
-struct ByteParser {
-    byte_type: u8,
-    tag: u8,
+#[derive(Clone, Copy, Debug, Default, TryFromPrimitive, IntoPrimitive, Serialize)]
+#[repr(i32)]
+enum ErrorCode {
+    // Server-side processing is successful
+    ServerSuccess = 0,
+    // Server-side decoding exception
+    ServerDecodeErr = -1,
+    // Server-side encoding exception
+    ServerEncodeErr = -2,
+    // Server-side does not have the function
+    ServerNoFuncErr = -3,
+    // Server-side does not have the Servant object
+    ServerNoServantErr = -4,
+    // Server-side gray status is inconsistent
+    ServerResetGrid = -5,
+    // Server-side queue exceeds the limit
+    ServerQueueTimeout = -6,
+    // Asynchronous call timeout or Invocation timeout
+    AsyncCallOrInvokeTimeout = -7,
+    // Proxy connection exception
+    ProxyConnectErr = -8,
+    // Server-side overload, exceeds queue length
+    ServerOverload = -9,
+    // Client-side routing is empty, service does not exist or all services are down
+    AdapterNull = -10,
+    // Client-side invocation by set rule is illegal
+    InvokeByInvalidEset = -11,
+    // Client-side decoding exception
+    ClientDecodeErr = -12,
+    // Server-side unknown exception
+    #[default]
+    ServerUnknownErr = -99,
 }
 
-impl From<u8> for ByteParser {
-    fn from(byte: u8) -> Self {
-        let byte_type = byte & 0x0F;
-        let tag = (byte >> 4) & 0x0F;
-        ByteParser { byte_type, tag }
+impl From<ErrorCode> for L7ResponseStatus {
+    fn from(value: ErrorCode) -> Self {
+        match value {
+            ErrorCode::ServerSuccess => L7ResponseStatus::Ok,
+            ErrorCode::AdapterNull
+            | ErrorCode::InvokeByInvalidEset
+            | ErrorCode::ClientDecodeErr => L7ResponseStatus::ClientError,
+            ErrorCode::ServerDecodeErr
+            | ErrorCode::ServerEncodeErr
+            | ErrorCode::ServerNoFuncErr
+            | ErrorCode::ServerNoServantErr
+            | ErrorCode::ServerResetGrid
+            | ErrorCode::ServerQueueTimeout
+            | ErrorCode::AsyncCallOrInvokeTimeout
+            | ErrorCode::ProxyConnectErr
+            | ErrorCode::ServerOverload
+            | ErrorCode::ServerUnknownErr => L7ResponseStatus::ServerError,
+        }
     }
 }
 
@@ -81,11 +114,10 @@ pub struct TarsInfo {
 
     req_len: u32,
     resp_len: u32,
-    resp_status: L7ResponseStatus,
 
+    pkt_type: u32,
     request_id: u32,
     imsg_type: u32,
-    pkg_type: u32,
 
     req_service_name: Option<String>,
     req_method_name: Option<String>,
@@ -93,7 +125,7 @@ pub struct TarsInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
-    ret: i32,
+    ret: Option<ErrorCode>,
 
     is_on_blacklist: bool,
 
@@ -138,6 +170,82 @@ const TYPE_STRUCT_END: u8 = 11;
 const TYPE_ZERO: u8 = 12;
 const TYPE_SIMPLE_LIST: u8 = 13;
 
+#[derive(Clone, Copy)]
+enum Field<'a> {
+    Integer(u8, i64),
+    String(u8, &'a str),
+    // there are other irrelevant types
+}
+
+impl<'a> Field<'a> {
+    fn parse(input: &'a [u8]) -> IResult<&'a [u8], Field<'a>> {
+        let (input, b) = take(1usize)(input)?;
+        let field_type = b[0] & 0x0F;
+        let tag = (b[0] >> 4) & 0x0F;
+
+        // tag id larger than 14 is not necessary at the moment
+        if tag == 0xF {
+            return Err(nom::Err::Failure(nom::error::Error::new(
+                b,
+                nom::error::ErrorKind::Verify,
+            )));
+        }
+
+        match field_type {
+            TYPE_INT8 => {
+                let (input, value) = be_i8(input)?;
+                Ok((input, Field::Integer(tag, value as i64)))
+            }
+            TYPE_INT16 => {
+                let (input, value) = be_i16(input)?;
+                Ok((input, Field::Integer(tag, value as i64)))
+            }
+            TYPE_INT32 => {
+                let (input, value) = be_i32(input)?;
+                Ok((input, Field::Integer(tag, value as i64)))
+            }
+            TYPE_INT64 => {
+                let (input, value) = be_i64(input)?;
+                Ok((input, Field::Integer(tag, value as i64)))
+            }
+            TYPE_STRING1 => {
+                let (input, value) = be_u8(input)?;
+                let (input, s) = take(value as usize)(input)?;
+                match str::from_utf8(s) {
+                    Ok(s) => Ok((input, Field::String(tag, s))),
+                    Err(_) => Err(nom::Err::Failure(nom::error::Error::new(
+                        s,
+                        nom::error::ErrorKind::Verify,
+                    ))),
+                }
+            }
+            TYPE_STRING4 => {
+                let (input, value) = be_u32(input)?;
+                let (input, s) = take(value as usize)(input)?;
+                match str::from_utf8(s) {
+                    Ok(s) => Ok((input, Field::String(tag, s))),
+                    Err(_) => Err(nom::Err::Failure(nom::error::Error::new(
+                        s,
+                        nom::error::ErrorKind::Verify,
+                    ))),
+                }
+            }
+            TYPE_ZERO => Ok((input, Field::Integer(tag, 0))),
+            _ => Err(nom::Err::Failure(nom::error::Error::new(
+                b,
+                nom::error::ErrorKind::Verify,
+            ))),
+        }
+    }
+
+    fn tag(&self) -> u8 {
+        match self {
+            Field::Integer(tag, _) => *tag,
+            Field::String(tag, _) => *tag,
+        }
+    }
+}
+
 /*
 The parsing rules are:
 1. The current field gets tag and type based on the header of the data type.(use ByteParser)
@@ -154,150 +262,126 @@ For details, please refer to the protocol document and actual framework code.
 */
 
 impl TarsInfo {
-    fn parse<'a>(payload: &'a [u8], _param: &ParseParam) -> Option<(&'a [u8], TarsInfo)> {
-        let mut info = TarsInfo::default();
-        let body_size = read_u32_be(payload.get(0..HEADER_SIZE)?) as usize;
-        if body_size < MIN_BODY_SIZE {
-            return None;
+    fn parse(payload: &[u8]) -> IResult<&[u8], TarsInfo> {
+        let (input, total_len) = be_u32(payload)?;
+        if total_len as usize > payload.len() {
+            return Err(nom::Err::Incomplete(nom::Needed::Size(
+                NonZeroUsize::new(total_len as usize).unwrap(),
+            )));
         }
 
-        let head_ver = ByteParser::from(payload[HEADER_SIZE]);
-        if head_ver.tag != TYPE_INT16 || head_ver.byte_type != TYPE_INT8 {
-            return None;
-        }
-
-        if !matches!(payload[VERSION_INDEX], 1 | 3) {
-            return None;
-        }
-
-        let mut len = INITIAL_LEN;
-        let head_pkt_type = ByteParser::from(payload[INITIAL_LEN - 1]);
-        let pkt_type = match head_pkt_type.byte_type {
-            TYPE_INT8 => {
-                let value = payload[len] as u32;
-                len += 1;
-                value
+        let (mut input, ver) = Field::parse(input)?;
+        let ver = match ver {
+            // only support version 1 and 3
+            Field::Integer(1, v) if v == 1 || v == 3 => v,
+            _ => {
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    payload,
+                    nom::error::ErrorKind::Verify,
+                )))
             }
-            TYPE_ZERO => 0,
-            _ => return None,
         };
 
-        let mut head_fields = Vec::new();
-        let mut data_fields = Vec::new();
+        /*
+           we only care about field 2-6 in tars packets
 
-        for _ in 0..2 {
-            let head_field = ByteParser::from(payload[len]);
-            len += 1;
+           request fields:
+               struct RequestPacket
+               {
+                   1  require short        iVersion;         //版本号
+                   2  optional byte        cPacketType;      //包类型
+                   3  optional int         iMessageType;     //消息类型
+                   4  require int          iRequestId;       //请求ID
+                   5  require string       sServantName;     //servant名字
+                   6  require string       sFuncName;        //函数名称
+                   7  require vector<byte> sBuffer;          //二进制buffer
+                   8  optional int         iTimeout;         //超时时间（毫秒）
+                   9  optional map<string, string> context;  //业务上下文
+                   10 optional map<string, string> status;   //框架协议上下文
+               };
 
-            let data_field = match head_field.byte_type {
-                TYPE_INT8 => {
-                    let value = payload[len] as u32;
-                    len += 1;
-                    value
-                }
-                TYPE_INT16 => {
-                    let value = read_u16_be(payload.get(len..len + 2)?) as u32;
-                    len += 2;
-                    value
-                }
-                TYPE_INT32 => {
-                    let value = read_u32_be(payload.get(len..len + 4)?) as u32;
-                    len += 4;
-                    value
-                }
-                TYPE_ZERO => 0,
-                _ => return None,
+           response fields:
+               struct ResponsePacket
+               {
+                   1 require short         iVersion;       //版本号
+                   2 optional byte         cPacketType;    //包类型
+                   3 require int           iRequestId;     //请求ID
+                   4 optional int          iMessageType;   //消息类型
+                   5 optional int          iRet;           //返回值
+                   6 require vector<byte>  sBuffer;        //二进制流
+                   7 optional map<string, string> status;  //协议上下文
+                   8 optional string       sResultDesc;    //结果描述
+               };
+        */
+        let mut fields = [None; 5]; // field 2-6
+
+        // assume tag is in ascending order
+        loop {
+            let Ok((next, field)) = Field::parse(input) else {
+                break;
             };
-            head_fields.push(head_field);
-            data_fields.push(data_field);
+            let tag = field.tag() as usize;
+            match tag {
+                2..=6 => fields[tag - 2] = Some(field),
+                _ => break,
+            }
+            input = next;
         }
 
-        let head_name_or_ret = ByteParser::from(payload[len]);
-        len += 1;
-
-        match head_name_or_ret.tag {
-            5 => match head_name_or_ret.byte_type {
-                TYPE_STRING1 | TYPE_STRING4 => {
-                    info.msg_type = LogMessageType::Request;
-                    info.tars_version = payload[VERSION_INDEX] as u8;
-                    info.req_len = payload.len() as u32;
-                    info.request_id = data_fields[1];
-                    info.imsg_type = data_fields[0];
-                    info.pkg_type = pkt_type;
-                    info.captured_request_byte = (payload.len() - len) as u32;
-
-                    let size = if head_name_or_ret.byte_type == TYPE_STRING1 {
-                        let size = payload[len] as usize;
-                        len += 1;
-                        size
-                    } else {
-                        0
-                    };
-
-                    info.req_service_name =
-                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
-                    len += size;
-
-                    let head_func_name = ByteParser::from(payload[len]);
-                    len += 1;
-                    let size = if head_func_name.byte_type == TYPE_STRING1 {
-                        let size = payload[len] as usize;
-                        len += 1;
-                        size
-                    } else {
-                        0
-                    };
-
-                    if len + size >= payload.len() {
-                        return None;
-                    }
-                    info.req_method_name =
-                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
-
-                    info.endpoint = info.get_endpoint();
-                }
-                _ => {
-                    info.msg_type = LogMessageType::Response;
-                    info.tars_version = payload[VERSION_INDEX] as u8;
-                    info.resp_len = payload.len() as u32;
-                    info.request_id = data_fields[0];
-                    info.imsg_type = data_fields[1];
-                    info.pkg_type = pkt_type;
-                    info.captured_response_byte = (payload.len() - len) as u32;
-                    info.ret = if head_name_or_ret.byte_type == 0 {
-                        payload[len] as i32
-                    } else {
-                        0
-                    };
-                    match info.ret {
-                        TARS_ADAPTER_NULL
-                        | TARS_INVOKE_BY_INVALID_ESET
-                        | TARS_CLIENT_DECODE_ERR => {
-                            info.resp_status = L7ResponseStatus::ClientError;
-                        }
-
-                        TARS_SERVER_DECODE_ERR
-                        | TARS_SERVER_ENCODE_ERR
-                        | TARS_SERVER_NO_FUNC_ERR
-                        | TARS_SERVER_NO_SERVANT_ERR
-                        | TARS_SERVER_RESET_GRID
-                        | TARS_SERVER_QUEUE_TIMEOUT
-                        | TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT
-                        | TARS_PROXY_CONNECT_ERR
-                        | TARS_SERVER_UNKNOWN_ERR => {
-                            info.resp_status = L7ResponseStatus::ServerError;
-                        }
-
-                        _ => {
-                            info.resp_status = L7ResponseStatus::Ok;
-                        }
-                    }
-                }
-            },
-            _ => return None,
+        let mut info = TarsInfo {
+            tars_version: ver as u8,
+            ..Default::default()
+        };
+        if let Some(Field::Integer(tag, value)) = fields[0] {
+            assert_eq!(tag, 2);
+            info.pkt_type = value as u32;
         }
+        // if field 5 exists and is a string, then it's tars request
+        match fields[3] {
+            Some(Field::String(tag, _)) => {
+                assert_eq!(tag, 5);
 
-        Some((payload, info))
+                info.msg_type = LogMessageType::Request;
+                info.req_len = total_len;
+                info.captured_request_byte = payload.len() as u32;
+                if let Some(Field::Integer(tag, value)) = fields[1] {
+                    assert_eq!(tag, 3);
+                    info.imsg_type = value as u32;
+                }
+                if let Some(Field::Integer(tag, value)) = fields[2] {
+                    assert_eq!(tag, 4);
+                    info.request_id = value as u32;
+                }
+                if let Some(Field::String(tag, value)) = fields[3] {
+                    assert_eq!(tag, 5);
+                    info.req_service_name = Some(value.to_string());
+                }
+                if let Some(Field::String(tag, value)) = fields[4] {
+                    assert_eq!(tag, 6);
+                    info.req_method_name = Some(value.to_string());
+                }
+                info.endpoint = info.get_endpoint();
+            }
+            _ => {
+                info.msg_type = LogMessageType::Response;
+                info.resp_len = total_len;
+                info.captured_response_byte = payload.len() as u32;
+
+                if let Some(Field::Integer(tag, value)) = fields[1] {
+                    assert_eq!(tag, 3);
+                    info.request_id = value as u32;
+                }
+                if let Some(Field::Integer(tag, value)) = fields[2] {
+                    assert_eq!(tag, 4);
+                    info.imsg_type = value as u32;
+                }
+                if let Some(Field::Integer(tag, value)) = fields[3] {
+                    assert_eq!(tag, 5);
+                    info.ret = Some(ErrorCode::try_from(value as i32).unwrap_or_default());
+                }
+            }
+        }
+        Ok((input, info))
     }
 
     fn merge(&mut self, other: &mut Self) {
@@ -352,23 +436,22 @@ impl L7ProtocolParserInterface for TarsLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        if payload.len() < 12 {
-            return false;
-        }
-        TarsInfo::parse(payload, param).is_some()
+        TarsInfo::parse(payload).is_ok()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        let mut info = TarsInfo::parse(payload, param)
-            .ok_or(Error::L7LogParseFailed {
-                proto: L7Protocol::Tars,
-                reason: "parse result empty".into(),
-            })?
-            .1;
-
+        let mut info = match TarsInfo::parse(payload) {
+            Ok((_, info)) => info,
+            Err(e) => {
+                return Err(Error::L7LogParseFailed {
+                    proto: L7Protocol::Tars,
+                    reason: format!("parser has error: {e:?}").into(),
+                });
+            }
+        };
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
@@ -423,8 +506,8 @@ impl From<TarsInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             resp: L7Response {
-                code: info.ret.into(),
-                status: info.resp_status,
+                code: info.ret.map(|r| r.into()),
+                status: info.ret.unwrap_or_default().into(),
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
@@ -480,10 +563,9 @@ impl L7ProtocolInfoInterface for TarsInfo {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, fmt::Write, fs, path::Path, rc::Rc};
+
     use serde_json;
-    use std::path::Path;
-    use std::rc::Rc;
-    use std::{cell::RefCell, fs};
 
     use super::*;
 
@@ -554,13 +636,11 @@ mod tests {
             if let Ok(info) = info {
                 match info {
                     L7ParseResult::Single(s) => {
-                        output.push_str(&serde_json::to_string(&s).unwrap());
-                        output.push_str("\n");
+                        let _ = write!(&mut output, "{}\n", serde_json::to_string(&s).unwrap());
                     }
                     L7ParseResult::Multi(m) => {
                         for i in m {
-                            output.push_str(&serde_json::to_string(&i).unwrap());
-                            output.push_str("\n");
+                            let _ = write!(&mut output, "{}\n", serde_json::to_string(&i).unwrap());
                         }
                     }
                     L7ParseResult::None => {
@@ -568,14 +648,19 @@ mod tests {
                     }
                 }
             } else {
-                output.push_str(&format!("{:?}\n", TarsInfo::default()));
+                let _ = write!(
+                    &mut output,
+                    "{}\n",
+                    serde_json::to_string(&TarsInfo::default()).unwrap()
+                );
             }
         }
 
         output
     }
+
     #[test]
-    fn tarscheck() {
+    fn check() {
         let files = vec![("tars-echo.pcap", "tars-echo.result")];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
@@ -592,5 +677,10 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn truncated() {
+        assert!(TarsInfo::parse(&[0xde, 0xad, 0xbe, 0xef]).is_err());
     }
 }
