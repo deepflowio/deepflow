@@ -493,11 +493,7 @@ type LBVMConnectionUpdate struct {
 
 type PeerConnectionFieldsUpdate struct {
 	Key
-	Name               fieldDetail[string]
-	RemoteRegionID     fieldDetail[int]
-	RemoteRegionLcuuid fieldDetail[string]
-	LocalRegionID      fieldDetail[int]
-	LocalRegionLcuuid  fieldDetail[string]
+	Name fieldDetail[string]
 }
 type PeerConnectionUpdate struct {
 	Fields[PeerConnectionFieldsUpdate]

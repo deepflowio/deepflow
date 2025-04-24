@@ -95,30 +95,14 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
-	if !exists {
-		log.Error(resourceAForResourceBNotFound(
-			ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.RemoteRegionLcuuid,
-			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
-		), c.metadata.LogPrefixes)
-		return nil, false
-	}
-	localRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.LocalRegionLcuuid)
-	if !exists {
-		log.Error(resourceAForResourceBNotFound(
-			ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.LocalRegionLcuuid,
-			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
-		), c.metadata.LogPrefixes)
-		return nil, false
-	}
 	dbItem := &mysqlmodel.PeerConnection{
-		Name:           cloudItem.Name,
-		Label:          cloudItem.Label,
-		Domain:         c.metadata.Domain.Lcuuid,
-		RemoteVPCID:    remoteVPCID,
-		LocalVPCID:     localVPCID,
-		RemoteRegionID: remoteRegionID,
-		LocalRegionID:  localRegionID,
+		Name:         cloudItem.Name,
+		Label:        cloudItem.Label,
+		Domain:       c.metadata.Domain.Lcuuid,
+		RemoteVPCID:  remoteVPCID,
+		LocalVPCID:   localVPCID,
+		RemoteDomain: c.metadata.Domain.Lcuuid,
+		LocalDomain:  c.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -130,32 +114,6 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
-	}
-	if diffBase.RemoteRegionLcuuid != cloudItem.RemoteRegionLcuuid {
-		remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
-		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.RemoteRegionLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
-			), c.metadata.LogPrefixes)
-			return nil, nil, false
-		}
-		mapInfo["remote_region_id"] = remoteRegionID
-		structInfo.RemoteRegionID.SetNew(remoteRegionID)
-		structInfo.RemoteRegionLcuuid.Set(diffBase.RemoteRegionLcuuid, cloudItem.RemoteRegionLcuuid)
-	}
-	if diffBase.LocalRegionLcuuid != cloudItem.LocalRegionLcuuid {
-		localRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.LocalRegionLcuuid)
-		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.LocalRegionLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
-			), c.metadata.LogPrefixes)
-			return nil, nil, false
-		}
-		mapInfo["local_region_id"] = localRegionID
-		structInfo.LocalRegionID.SetNew(localRegionID)
-		structInfo.LocalRegionLcuuid.Set(diffBase.LocalRegionLcuuid, cloudItem.LocalRegionLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

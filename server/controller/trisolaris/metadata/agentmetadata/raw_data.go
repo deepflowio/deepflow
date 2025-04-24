@@ -155,6 +155,8 @@ type PlatformRawData struct {
 
 	launchServerToVRouterIDs map[string][]int
 
+	domainUUIDToVPCIDs map[string][]int
+
 	ORGID
 }
 
@@ -243,6 +245,8 @@ func NewPlatformRawData(orgID ORGID) *PlatformRawData {
 		containerIdToPodId:    make(map[string]int),
 
 		launchServerToVRouterIDs: make(map[string][]int),
+
+		domainUUIDToVPCIDs: make(map[string][]int),
 
 		ORGID: orgID,
 	}
@@ -534,6 +538,7 @@ func (r *PlatformRawData) ConvertDBVPC(dbDataCache *DBDataCache) {
 		r.idToVPC[vpc.ID] = vpc
 		r.vpcIDs.Add(vpc.ID)
 		r.tunnelIDs.Add(vpc.TunnelID)
+		r.domainUUIDToVPCIDs[vpc.Domain] = append(r.domainUUIDToVPCIDs[vpc.Domain], vpc.ID)
 	}
 }
 
