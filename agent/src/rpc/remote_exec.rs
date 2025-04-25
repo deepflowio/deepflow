@@ -62,6 +62,20 @@ use public::{
 pub use public::rpc::remote_exec::*;
 
 const MIN_BATCH_LEN: usize = 1024;
+const TIMEOUT_PARAM: &'static Parameter = &Parameter {
+    name: "timeout",
+    regex: Some("^[0-9]+s$"),
+    required: true,
+    param_type: ParamType::Text,
+    description: "The period to run strace",
+};
+const PID_PARAM: &'static Parameter = &Parameter {
+    name: "pid",
+    regex: Some("^[0-9]+$"),
+    required: true,
+    param_type: ParamType::Text,
+    description: "The PID to run strace on",
+};
 const KUBERNETES_NAMESPACE_PARAM: &'static Parameter = &Parameter {
     name: "ns",
     regex: Some("^[\\-0-9a-z]{1,64}$"), // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
@@ -107,6 +121,15 @@ fn all_supported_commands() -> Vec<Command> {
             cmdline: "ip address",
             output_format: OutputFormat::Text,
             command_type: CMD_TYPE_SYSTEM,
+            ..Default::default()
+        },
+        Command {
+            // use "--preserve-status" to avoid timeout error
+            cmdline: "timeout --preserve-status $timeout strace -f -p $pid",
+            output_format: OutputFormat::Text,
+            command_type: CMD_TYPE_SYSTEM,
+            desc: "strace",
+            params: vec![*TIMEOUT_PARAM, *PID_PARAM],
             ..Default::default()
         },
         Command {
