@@ -56,7 +56,7 @@ nat_real_ip           , NAT IP Address                    , The real IP address 
 nat_real_port         , NAT Port                          , The real port number before NAT works, the value is extracted from TOA (TCP Option Address).
 
 process_id                , Process ID                    ,
-process_kname             , Kernel Thread Name            ,
+process_kname             , System Process                ,
 
 k8s.label             , K8s Label                         ,
 k8s.annotation        , K8s Annotation                    ,
