@@ -193,7 +193,25 @@ void symbolizer_kernel_unlock(void);
 #endif
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
-void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);
+/**
+ * @brief Retrieve container ID and process name from the cache based on a PID.
+ *
+ * This function looks up the given PID in the symbolizer cache to retrieve
+ * the associated container ID (`cid`) and process name (`name`). If no entry
+ * is found, both output buffers will be zeroed.
+ *
+ * @param pid        The process ID to look up.
+ * @param cid        Output buffer to store the container ID.
+ * @param cid_size   Size of the `cid` buffer in bytes.
+ * @param name       Output buffer to store the process name (comm).
+ * @param name_size  Size of the `name` buffer in bytes.
+ *
+ * @note If the process entry is found, its reference count is incremented
+ *       before use and decremented after, ensuring thread safety.
+ * @note If no valid data is found, `cid` and `name` will remain zero-filled.
+ */
+void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				 uint8_t *name, int name_size);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers

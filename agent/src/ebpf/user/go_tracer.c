@@ -728,7 +728,7 @@ static inline bool golang_process_check(int pid)
 	char c_id[65];
 	memset(c_id, 0, sizeof(c_id));
 	if ((k_version < KERNEL_VERSION(4, 16, 0)) &&
-	    (fetch_container_id(pid, c_id, sizeof(c_id)) == 0))
+	    (fetch_container_id_from_proc(pid, c_id, sizeof(c_id)) == 0))
 		return false;
 
 	return true;

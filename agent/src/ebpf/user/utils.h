@@ -279,6 +279,7 @@ void fetch_linux_release(const char *buf, int buf_len);
 u64 get_process_starttime_and_comm(pid_t pid,
 				   char *name_base,
 				   int len);
+int fetch_process_name_from_proc(pid_t pid, char *name, int n_size);
 u32 legacy_fetch_log2_page_size(void);
 u64 get_netns_id_from_pid(pid_t pid);
 bool check_netns_enabled(void);
@@ -291,7 +292,7 @@ int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path);
 int exec_command(const char *cmd, const char *args, char *ret_buf, int ret_buf_size);
 u64 current_sys_time_secs(void);
 int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
-int fetch_container_id(pid_t pid, char *id, int copy_bytes);
+int fetch_container_id_from_proc(pid_t pid, char *id, int copy_bytes);
 int parse_num_range(const char *config_str, int bytes_count,
 		    bool **mask, int *count);
 int parse_num_range_disorder(const char *config_str,
