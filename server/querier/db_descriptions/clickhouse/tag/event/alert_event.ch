@@ -62,7 +62,7 @@ nat_real_ip               , NAT IP 地址              , NAT 作用前（后）�
 nat_real_port             , NAT Port                 , NAT 作用前的真实端口号，该值从 TOA（TCP Option Address）中提取。
 
 process_id                , 进程 ID                  ,
-process_kname             , 内核线程名               ,
+process_kname             , 系统进程                 ,
 
 k8s.label                 , K8s Label                , K8s 自定义 Label。
 k8s.annotation            , K8s Annotation           ,

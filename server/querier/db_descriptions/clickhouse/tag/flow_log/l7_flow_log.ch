@@ -88,7 +88,7 @@ app_service               , 应用服务                 ,
 app_instance              , 应用实例                 ,
 endpoint                  , 端点                     ,
 process_id                , 进程 ID                  ,
-process_kname             , 内核线程名               ,
+process_kname             , 系统进程                 ,
 
 trace_id                  , TraceID                  ,
 span_id                   , SpanID                   ,
