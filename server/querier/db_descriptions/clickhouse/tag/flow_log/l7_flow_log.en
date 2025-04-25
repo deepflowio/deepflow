@@ -82,7 +82,7 @@ app_service               , Application Service           ,
 app_instance              , Application Instance          ,
 endpoint                  , API Endpoint                  ,
 process_id                , Process ID                    ,
-process_kname             , Kernel Thread Name            ,
+process_kname             , System Process                ,
 
 trace_id                  , TraceID                       ,
 span_id                   , SpanID                        ,

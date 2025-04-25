@@ -184,7 +184,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("signal_source", ckdb.UInt8).SetComment("事件来源"),
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
-		ckdb.NewColumn("process_kname", ckdb.String).SetComment("进程名"),
+		ckdb.NewColumn("process_kname", ckdb.String).SetComment("系统进程"),
 
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
 
