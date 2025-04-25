@@ -56,7 +56,7 @@ nat_real_ip               , nat_real_ip_0             , nat_real_ip_1           
 nat_real_port             , nat_real_port_0           , nat_real_port_1            , int            ,                       , Capture Info      , 111          , 0             , 110
 
 process_id                , process_id_0              , process_id_1               , int            ,                       , Service Info      , 111          , 0             , 110
-process_kname             , process_kname_0           , process_kname_1            , string         ,                       , Service Info      , 111          , 0             , 110
+process_name              , process_name_0            , process_name_1             , string         ,                       , Service Info      , 111          , 0             , 110
 
 k8s.label                  , k8s.label_0               , k8s.label_1               , map           ,                        , Custom Tag        , 111          , 0             , 110
 k8s.annotation             , k8s.annotation_0          , k8s.annotation_1          , map           ,                        , Custom Tag        , 111          , 0             , 110

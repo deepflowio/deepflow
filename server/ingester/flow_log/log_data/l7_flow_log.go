@@ -80,8 +80,8 @@ type L7Base struct {
 
 	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
 	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
-	ProcessKName0          string `json:"process_kname_0" category:"$tag" sub:"service_info"`
-	ProcessKName1          string `json:"process_kname_1" category:"$tag" sub:"service_info"`
+	ProcessName0           string `json:"process_name_0" category:"$tag" sub:"service_info"`
+	ProcessName1           string `json:"process_name_1" category:"$tag" sub:"service_info"`
 	SyscallTraceIDRequest  uint64 `json:"syscall_trace_id_request" category:"$tag" sub:"tracing_info"`
 	SyscallTraceIDResponse uint64 `json:"syscall_trace_id_response" category:"$tag" sub:"tracing_info"`
 	SyscallThread0         uint32 `json:"syscall_thread_0" category:"$tag" sub:"tracing_info"`
@@ -132,8 +132,8 @@ func L7BaseColumns() []*ckdb.Column {
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
-		ckdb.NewColumn("process_kname_0", ckdb.String).SetComment("客户端进程名"),
-		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
+		ckdb.NewColumn("process_name_0", ckdb.String).SetComment("客户端进程名"),
+		ckdb.NewColumn("process_name_1", ckdb.String).SetComment("服务端进程名"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
 		ckdb.NewColumn("syscall_thread_0", ckdb.UInt32).SetComment("Syscall线程-请求"),
@@ -520,8 +520,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1
-	b.ProcessKName0 = l.ProcessKname_0
-	b.ProcessKName1 = l.ProcessKname_1
+	b.ProcessName0 = l.ProcessKname_0
+	b.ProcessName1 = l.ProcessKname_1
 	b.SyscallTraceIDRequest = l.SyscallTraceIdRequest
 	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
 	b.SyscallThread0 = l.SyscallTraceIdThread_0

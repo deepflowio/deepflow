@@ -97,7 +97,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	{
 		Dbs:         []string{"event"},
 		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
-		ColumnNames: []string{"process_kname"},
+		ColumnNames: []string{"process_name"},
 		ColumnType:  ckdb.String,
 	},
 	{
@@ -382,6 +382,18 @@ var ColumnAdd70 = []*ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
 		ColumnNames: []string{"aggregated_flow_ids"},
+		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"process_name_0", "process_name_1"},
+		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"event", "event_local", "perf_event", "perf_event_local"},
+		ColumnNames: []string{"process_name"},
 		ColumnType:  ckdb.String,
 	},
 }

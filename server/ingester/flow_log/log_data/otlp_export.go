@@ -194,8 +194,8 @@ func (l7 *L7FlowLog) EncodeToOtlp(utags *utag.UniversalTagsManager, dataTypeBits
 
 		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
 		putIntWithoutZero(resAttrs, "process.pid_1", int64(l7.ProcessID1))
-		putStrWithoutEmpty(resAttrs, "thread.name_0", l7.ProcessKName0)
-		putStrWithoutEmpty(resAttrs, "thread.name_1", l7.ProcessKName1)
+		putStrWithoutEmpty(resAttrs, "process.name_0", l7.ProcessName0)
+		putStrWithoutEmpty(resAttrs, "process.name_1", l7.ProcessName1)
 	}
 
 	if dataTypeBits&config.FLOW_INFO != 0 {

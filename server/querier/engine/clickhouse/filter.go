@@ -778,7 +778,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		} else {
 			switch noIDTag {
 			case "pod_group_type", "host_ip", "host_hostname", "chost_ip", "chost_hostname", "pod_node_ip", "pod_node_hostname", "province",
-				"is_internet", "tcp_flags_bit", "l2_end", "l3_end", "nat_real_ip", "nat_real_port", "process_id", "process_kname", "k8s.label",
+				"is_internet", "tcp_flags_bit", "l2_end", "l3_end", "nat_real_ip", "nat_real_port", "process_id", "process_name", "k8s.label",
 				"k8s.annotation", "k8s.env", "cloud.tag", "os.app":
 				_, err := strconv.Atoi(t.Value)
 				if strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") || strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {

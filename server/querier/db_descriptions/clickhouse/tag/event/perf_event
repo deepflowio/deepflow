@@ -49,7 +49,7 @@ is_ipv4                    , is_ipv4                   , is_ipv4                
 
 event_type                 , event_type                , event_type                , string_enum    , perf_event_type       , Event Info      , 111             , 0
 
-process_kname              , process_kname             , process_kname             , string         ,                           , Service Info    , 111         , 0
+process_name               , process_name              , process_name              , string         ,                           , Service Info    , 111         , 0
 app_instance               , app_instance              , app_instance              , string         ,                           , Service Info    , 111         , 0
 vtap                       , vtap                      , vtap                      , resource       ,                           , Capture Info    , 111         , 1
 agent                      , agent                     , agent                     , resource       ,                           , Capture Info    , 111         , 0

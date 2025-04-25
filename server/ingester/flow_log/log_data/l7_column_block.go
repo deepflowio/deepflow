@@ -52,8 +52,8 @@ type L7BaseBlock struct {
 	ColBizType                proto.ColUInt8
 	ColProcessId0             proto.ColInt32
 	ColProcessId1             proto.ColInt32
-	ColProcessKname0          proto.ColStr
-	ColProcessKname1          proto.ColStr
+	ColProcessName0           proto.ColStr
+	ColProcessName1           proto.ColStr
 	ColSyscallTraceIdRequest  proto.ColUInt64
 	ColSyscallTraceIdResponse proto.ColUInt64
 	ColSyscallThread0         proto.ColUInt32
@@ -93,8 +93,8 @@ func (b *L7BaseBlock) Reset() {
 	b.ColBizType.Reset()
 	b.ColProcessId0.Reset()
 	b.ColProcessId1.Reset()
-	b.ColProcessKname0.Reset()
-	b.ColProcessKname1.Reset()
+	b.ColProcessName0.Reset()
+	b.ColProcessName1.Reset()
 	b.ColSyscallTraceIdRequest.Reset()
 	b.ColSyscallTraceIdResponse.Reset()
 	b.ColSyscallThread0.Reset()
@@ -135,8 +135,8 @@ func (b *L7BaseBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_TYPE, Data: &b.ColBizType},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_0, Data: &b.ColProcessId0},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_1, Data: &b.ColProcessId1},
-		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_KNAME_0, Data: &b.ColProcessKname0},
-		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_KNAME_1, Data: &b.ColProcessKname1},
+		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_NAME_0, Data: &b.ColProcessName0},
+		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_NAME_1, Data: &b.ColProcessName1},
 		proto.InputColumn{Name: ckdb.COLUMN_SYSCALL_TRACE_ID_REQUEST, Data: &b.ColSyscallTraceIdRequest},
 		proto.InputColumn{Name: ckdb.COLUMN_SYSCALL_TRACE_ID_RESPONSE, Data: &b.ColSyscallTraceIdResponse},
 		proto.InputColumn{Name: ckdb.COLUMN_SYSCALL_THREAD_0, Data: &b.ColSyscallThread0},
@@ -185,8 +185,8 @@ func (n *L7Base) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColBizType.Append(n.BizType)
 	block.ColProcessId0.Append(int32(n.ProcessID0))
 	block.ColProcessId1.Append(int32(n.ProcessID1))
-	block.ColProcessKname0.Append(n.ProcessKName0)
-	block.ColProcessKname1.Append(n.ProcessKName1)
+	block.ColProcessName0.Append(n.ProcessName0)
+	block.ColProcessName1.Append(n.ProcessName1)
 	block.ColSyscallTraceIdRequest.Append(n.SyscallTraceIDRequest)
 	block.ColSyscallTraceIdResponse.Append(n.SyscallTraceIDResponse)
 	block.ColSyscallThread0.Append(n.SyscallThread0)

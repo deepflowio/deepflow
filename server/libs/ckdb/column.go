@@ -192,9 +192,9 @@ const (
 	COLUMN_PROCESS_ID                 = "process_id"
 	COLUMN_PROCESS_ID_0               = "process_id_0"
 	COLUMN_PROCESS_ID_1               = "process_id_1"
-	COLUMN_PROCESS_KNAME              = "process_kname"
-	COLUMN_PROCESS_KNAME_0            = "process_kname_0"
-	COLUMN_PROCESS_KNAME_1            = "process_kname_1"
+	COLUMN_PROCESS_NAME               = "process_name"
+	COLUMN_PROCESS_NAME_0             = "process_name_0"
+	COLUMN_PROCESS_NAME_1             = "process_name_1"
 	COLUMN_PROCESS_START_TIME         = "process_start_time"
 	COLUMN_PROFILE_CREATE_TIMESTAMP   = "profile_create_timestamp"
 	COLUMN_PROFILE_EVENT_TYPE         = "profile_event_type"
@@ -517,9 +517,9 @@ var ColumnNames = []string{
 	COLUMN_PROCESS_ID,
 	COLUMN_PROCESS_ID_0,
 	COLUMN_PROCESS_ID_1,
-	COLUMN_PROCESS_KNAME,
-	COLUMN_PROCESS_KNAME_0,
-	COLUMN_PROCESS_KNAME_1,
+	COLUMN_PROCESS_NAME,
+	COLUMN_PROCESS_NAME_0,
+	COLUMN_PROCESS_NAME_1,
 	COLUMN_PROCESS_START_TIME,
 	COLUMN_PROFILE_CREATE_TIMESTAMP,
 	COLUMN_PROFILE_EVENT_TYPE,

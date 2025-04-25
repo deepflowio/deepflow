@@ -65,7 +65,7 @@ type EventStore struct {
 	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"perf_event_signal_source"` // Resource / File IO
 	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"perf_event_type"`
 	EventDescription string
-	ProcessKName     string `json:"process_kname" category:"$tag" sub:"service_info"` // us
+	ProcessName      string `json:"process_name" category:"$tag" sub:"service_info"` // us
 
 	GProcessID uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
 
@@ -184,7 +184,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("signal_source", ckdb.UInt8).SetComment("事件来源"),
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
-		ckdb.NewColumn("process_kname", ckdb.String).SetComment("进程名"),
+		ckdb.NewColumn("process_name", ckdb.String).SetComment("进程名"),
 
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
 

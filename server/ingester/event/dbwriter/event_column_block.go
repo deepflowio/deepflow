@@ -33,7 +33,7 @@ type EventBlock struct {
 	ColSignalSource     proto.ColUInt8
 	ColEventType        *proto.ColLowCardinality[string]
 	ColEventDesc        proto.ColStr
-	ColProcessKname     proto.ColStr
+	ColProcessName      proto.ColStr
 	ColGprocessId       proto.ColUInt32
 	ColRegionId         proto.ColUInt16
 	ColAzId             proto.ColUInt16
@@ -77,7 +77,7 @@ func (b *EventBlock) Reset() {
 	b.ColSignalSource.Reset()
 	b.ColEventType.Reset()
 	b.ColEventDesc.Reset()
-	b.ColProcessKname.Reset()
+	b.ColProcessName.Reset()
 	b.ColGprocessId.Reset()
 	b.ColRegionId.Reset()
 	b.ColAzId.Reset()
@@ -121,7 +121,7 @@ func (b *EventBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_SIGNAL_SOURCE, Data: &b.ColSignalSource},
 		proto.InputColumn{Name: ckdb.COLUMN_EVENT_TYPE, Data: b.ColEventType},
 		proto.InputColumn{Name: ckdb.COLUMN_EVENT_DESC, Data: &b.ColEventDesc},
-		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_KNAME, Data: &b.ColProcessKname},
+		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_NAME, Data: &b.ColProcessName},
 		proto.InputColumn{Name: ckdb.COLUMN_GPROCESS_ID, Data: &b.ColGprocessId},
 		proto.InputColumn{Name: ckdb.COLUMN_REGION_ID, Data: &b.ColRegionId},
 		proto.InputColumn{Name: ckdb.COLUMN_AZ_ID, Data: &b.ColAzId},
@@ -186,7 +186,7 @@ func (n *EventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColSignalSource.Append(n.SignalSource)
 	block.ColEventType.Append(n.EventType)
 	block.ColEventDesc.Append(n.EventDescription)
-	block.ColProcessKname.Append(n.ProcessKName)
+	block.ColProcessName.Append(n.ProcessName)
 	block.ColGprocessId.Append(n.GProcessID)
 	block.ColRegionId.Append(n.RegionID)
 	block.ColAzId.Append(n.AZID)
