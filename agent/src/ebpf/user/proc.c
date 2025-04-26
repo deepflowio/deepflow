@@ -319,27 +319,31 @@ static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 	return 0;
 }
 
-void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
+void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				 uint8_t *name, int name_size)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	memset(id, 0, id_size);
+	memset(cid, 0, cid_size);
+	memset(name, 0, name_size);
 	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		AO_INC(&p->use);
 		if (strlen(p->container_id) > 0) {
-			memcpy_s_inline((void *)id, id_size, p->container_id,
+			memcpy_s_inline((void *)cid, cid_size, p->container_id,
 					sizeof(p->container_id));
 		}
-		AO_DEC(&p->use);
-		return;
-	}
 
-	fetch_container_id(pid, (char *)id, id_size);
+		if (strlen(p->comm) > 0) {
+			memcpy_s_inline((void *)name, name_size, p->comm,
+					sizeof(p->comm));
+		}
+		AO_DEC(&p->use);
+	}
 }
 
 static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
@@ -539,7 +543,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->thread_names_lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
 
-	fetch_container_id(pid, p->container_id, sizeof(p->container_id));
+	fetch_container_id_from_proc(pid, p->container_id, sizeof(p->container_id));
 
 	p->stime = (u64) get_process_starttime_and_comm(pid,
 							p->comm,
@@ -989,10 +993,11 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	return;
 }
 
-void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
+void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				 uint8_t *name, int name_size)
 {
-	memset(id, 0, id_size);
-	fetch_container_id(pid, (char *)id, id_size);
+	memset(cid, 0, cid_size);
+	memset(name, 0, name_size);
 }
 
 int create_and_init_proc_info_caches(void)
@@ -1026,7 +1031,7 @@ bool process_probing_check(int pid)
 	memset(c_id, 0, sizeof(c_id));
 	// Linux 3.10.0 kernel does not support probing files in containers.
 	if ((k_version == KERNEL_VERSION(3, 10, 0)) &&
-	    (fetch_container_id(pid, c_id, sizeof(c_id)) == 0))
+	    (fetch_container_id_from_proc(pid, c_id, sizeof(c_id)) == 0))
 		return false;
 
 	return true;

@@ -579,6 +579,14 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
+int fetch_process_name_from_proc(pid_t pid, char *name, int n_size)
+{
+	u64 ts = get_process_starttime_and_comm(pid, name, n_size);
+	if (ts == 0)
+		return -1;
+	return 0;
+}
+
 int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 {
 	struct utsname sys_info;
@@ -1259,7 +1267,7 @@ int fetch_container_id_from_str(char *buff, char *id, int copy_bytes)
 	return 0;
 }
 
-int fetch_container_id(pid_t pid, char *id, int copy_bytes)
+int fetch_container_id_from_proc(pid_t pid, char *id, int copy_bytes)
 {
 	char file[PATH_MAX], buff[MAXLINE];
 	memset(buff, 0, sizeof(buff));

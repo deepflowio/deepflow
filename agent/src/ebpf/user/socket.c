@@ -938,6 +938,35 @@ copy_event:
 	return event_len;
 }
 
+static void set_cid_and_name(struct socket_bpf_data *submit_data,
+			     struct __socket_data *sd)
+{
+	get_cid_and_name_from_cache(sd->tgid, submit_data->container_id,
+				    sizeof(submit_data->container_id),
+				    submit_data->process_kname,
+				    sizeof(submit_data->process_kname));
+	if (submit_data->container_id[0] == '\0') {
+		fetch_container_id_from_proc(sd->tgid,
+					     (char *)submit_data->container_id,
+					     sizeof(submit_data->container_id));
+	}
+
+	if (submit_data->process_kname[0] == '\0') {
+		if (fetch_process_name_from_proc(sd->tgid,
+						 (char *)submit_data->process_kname,
+						 sizeof(submit_data->process_kname))) {
+			safe_buf_copy(submit_data->process_kname,
+				      sizeof(submit_data->process_kname),
+				      sd->comm, sizeof(sd->comm));
+		}
+	}
+
+	submit_data->process_kname[sizeof(submit_data->process_kname) -
+				   1] = '\0';
+	submit_data->container_id[sizeof(submit_data->container_id) -
+				   1] = '\0';
+}
+
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
@@ -1117,11 +1146,6 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
-		safe_buf_copy(submit_data->process_kname,
-			      sizeof(submit_data->process_kname), sd->comm,
-			      sizeof(sd->comm));
-		submit_data->process_kname[sizeof(submit_data->process_kname) -
-					   1] = '\0';
 		submit_data->l7_protocal_hint = sd->data_type;
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
@@ -1140,14 +1164,15 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			submit_data->cap_seq = sd->data_seq;
 			submit_data->syscall_trace_id_call =
 			    sd->thread_trace_id;
-			get_container_id_from_procs_cache(sd->tgid,
-							  submit_data->
-							  container_id,
-							  sizeof(submit_data->
-								 container_id));
+			set_cid_and_name(submit_data, sd);
 			submit_data->msg_type = sd->msg_type;
 			submit_data->socket_role = sd->socket_role;
 		} else {
+			safe_buf_copy(submit_data->process_kname,
+				      sizeof(submit_data->process_kname), sd->comm,
+				      sizeof(sd->comm));
+			submit_data->process_kname[sizeof(submit_data->process_kname) -
+						   1] = '\0';
 			if (sd->direction == T_EGRESS) {
 				atomic64_inc(&tracer->tx_pkts);
 				atomic64_add(&tracer->tx_bytes, sd->syscall_len);
