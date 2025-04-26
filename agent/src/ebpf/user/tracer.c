@@ -821,7 +821,7 @@ static struct ebpf_link *exec_attach_uprobe(struct ebpf_prog *prog,
 
 	char c_id[65];
 	memset(c_id, 0, sizeof(c_id));
-	fetch_container_id(pid, c_id, sizeof(c_id));
+	fetch_container_id_from_proc(pid, c_id, sizeof(c_id));
 	const char *container_flag = "false";
 	if (strlen(c_id) > 0)
 		container_flag = "true";
