@@ -1,114 +1,106 @@
 config:
- data_dir: /vector-log-checkpoint
- sources:
-   kubernetes_logs:
-     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-     type: kubernetes_logs
-     namespace_annotation_fields:
-       namespace_labels: ""
-     node_annotation_fields:
-       node_labels: ""
-     pod_annotation_fields:
-       pod_annotations: ""
-       pod_labels: ""
-     extra_label_selector: "app=deepflow,component!=front-end"
-   kubernetes_logs_frontend:
-     self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-     type: kubernetes_logs
-     namespace_annotation_fields:
-       namespace_labels: ""
-     node_annotation_fields:
-       node_labels: ""
-     pod_annotation_fields:
-       pod_annotations: ""
-       pod_labels: ""
-     extra_label_selector: "app=deepflow,component=front-end"
- transforms:
-   multiline_kubernetes_logs:
-     type: reduce
-     inputs:
-       - kubernetes_logs
-     group_by:
-       - file
-       - stream
-     merge_strategies:
-       message: concat_newline
-     starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
-     expire_after_ms: 2000
-     flush_period_ms: 500
-   flush_kubernetes_logs:
-    type: remap
-    inputs:
-      - multiline_kubernetes_logs
-    source: |-
-        .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
-   remap_kubernetes_logs:
+  data_dir: /vector-log-checkpoint
+  sources:
+    kubernetes_logs:
+      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+      type: kubernetes_logs
+      namespace_annotation_fields:
+        namespace_labels: ""
+      node_annotation_fields:
+        node_labels: ""
+      pod_annotation_fields:
+        pod_annotations: ""
+        pod_labels: ""
+      extra_label_selector: "app=deepflow,component!=front-end"
+    kubernetes_logs_frontend:
+      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+      type: kubernetes_logs
+      namespace_annotation_fields:
+        namespace_labels: ""
+      node_annotation_fields:
+        node_labels: ""
+      pod_annotation_fields:
+        pod_annotations: ""
+        pod_labels: ""
+      extra_label_selector: "app=deepflow,component=front-end"
+  transforms:
+    multiline_kubernetes_logs:
+      type: reduce
+      inputs:
+        - kubernetes_logs
+      group_by:
+        - file
+        - stream
+      merge_strategies:
+        message: concat_newline
+      starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
+      expire_after_ms: 2000
+      flush_period_ms: 500
+    flush_kubernetes_logs:
      type: remap
      inputs:
-     - flush_kubernetes_logs
-     - kubernetes_logs_frontend
+       - multiline_kubernetes_logs
      source: |-
-         if is_string(.message) && is_json(string!(.message)) {
-             tags = parse_json(.message) ?? {}
-             ._df_log_type = tags._df_log_type
-             .org_id = to_int(tags.org_id) ?? 0
-             .user_id = to_int(tags.user_id) ?? 0
-             .message = tags.message || tags.msg
-             del(tags._df_log_type)
-             del(tags.org_id)
-             del(tags.user_id)
-             del(tags.message)
-             del(tags.msg)
-             .json = tags
-         }
-         if !exists(.level) {
-            if exists(.json) {
-               .level = to_string!(.json.level)
-               del(.json.level)
-            } else {
-              level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
-              if !exists(level_tags.level) {
-                 level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
-              }
-              if exists(level_tags.level) {
-                 level_tags.level = upcase(string!(level_tags.level))
-                 if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
-                     level_tags.level = "INFO"
-                 }
-                 if level_tags.level == "WARNING" {
-                     level_tags.level = "WARN"
-                 }
-                 if level_tags.level == "DEBU" {
-                     level_tags.level = "DEBUG"
-                 }
-                 if level_tags.level == "ERRO" {
-                     level_tags.level = "ERROR"
-                 }
-                 if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
-                     level_tags.level = "FATAL"
-                 }
-                 .level = level_tags.level
-              }
-            }
-         }
-         if !exists(._df_log_type) {
-             ._df_log_type = "system"
-         }
-         if !exists(.app_service) {
-             .app_service = .kubernetes.container_name
-         }
- sinks:
-   http:
-     type: http
-     inputs: [remap_kubernetes_logs]
-     uri: http://127.0.0.1:38086/api/v1/log
-     encoding:
-       codec: json
-       sinks:
-         http:
-           encoding:
-             codec: json
-           inputs:
-           - tag_kubernetes_logs
-           type: http
-           uri: http://127.0.0.1:38086/api/v1/log
+         .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
+    remap_kubernetes_logs:
+      type: remap
+      inputs:
+      - flush_kubernetes_logs
+      - kubernetes_logs_frontend
+      source: |-
+          if is_string(.message) && is_json(string!(.message)) {
+              tags = parse_json(.message) ?? {}
+              ._df_log_type = tags._df_log_type
+              .org_id = to_int(tags.org_id) ?? 0
+              .user_id = to_int(tags.user_id) ?? 0
+              .message = tags.message || tags.msg
+              del(tags._df_log_type)
+              del(tags.org_id)
+              del(tags.user_id)
+              del(tags.message)
+              del(tags.msg)
+              .json = tags
+          }
+          if !exists(.level) {
+             if exists(.json) {
+                .level = to_string!(.json.level)
+                del(.json.level)
+             } else {
+               level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
+               if !exists(level_tags.level) {
+                  level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
+               }
+               if exists(level_tags.level) {
+                  level_tags.level = upcase(string!(level_tags.level))
+                  if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
+                      level_tags.level = "INFO"
+                  }
+                  if level_tags.level == "WARNING" {
+                      level_tags.level = "WARN"
+                  }
+                  if level_tags.level == "DEBU" {
+                      level_tags.level = "DEBUG"
+                  }
+                  if level_tags.level == "ERRO" {
+                      level_tags.level = "ERROR"
+                  }
+                  if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
+                      level_tags.level = "FATAL"
+                  }
+                  .level = level_tags.level
+               }
+             }
+          }
+          if !exists(._df_log_type) {
+              ._df_log_type = "system"
+          }
+          if !exists(.app_service) {
+              .app_service = .kubernetes.container_name
+          }
+  sinks:
+    http:
+      type: http
+      inputs: [remap_kubernetes_logs]
+      uri: http://127.0.0.1:38086/api/v1/log
+      encoding:
+        codec: json
