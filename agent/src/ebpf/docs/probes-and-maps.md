@@ -15,33 +15,49 @@
 - __sys_sendmsg
 - __sys_sendmmsg
 - __sys_recvmsg
-- __sys_recvmmsg
-- do_writev
-- do_readv
+- sys_writev (Linux 3.10)
+- sys_readv (Linux 3.10)
+- do_writev (非 Linux 3.10)
+- do_readv (非 Linux 3.10)
 
 ## Tracepoint
 - tracepoint/syscalls/sys_enter_write
-- tracepoint/syscalls/sys_exit_write
 - tracepoint/syscalls/sys_enter_read
-- tracepoint/syscalls/sys_exit_read 
 - tracepoint/syscalls/sys_enter_sendto
-- tracepoint/syscalls/sys_exit_sendto
 - tracepoint/syscalls/sys_enter_recvfrom
-- tracepoint/syscalls/sys_exit_recvfrom 
+- tracepoint/syscalls/sys_enter_connect
+- tracepoint/syscalls/sys_enter_recvmmsg
+- tracepoint/syscalls/sys_exit_socket
+- tracepoint/syscalls/sys_exit_read
+- tracepoint/syscalls/sys_exit_write
+- tracepoint/syscalls/sys_exit_sendto
+- tracepoint/syscalls/sys_exit_recvfrom
 - tracepoint/syscalls/sys_exit_sendmsg
 - tracepoint/syscalls/sys_exit_sendmmsg
 - tracepoint/syscalls/sys_exit_recvmsg
 - tracepoint/syscalls/sys_exit_recvmmsg
 - tracepoint/syscalls/sys_exit_writev
 - tracepoint/syscalls/sys_exit_readv
+- tracepoint/syscalls/sys_exit_accept
+- tracepoint/syscalls/sys_exit_accept4
+- tracepoint/syscalls/sys_exit_fork (进程的执行和退出监控)
+- tracepoint/syscalls/sys_exit_clone (进程的执行和退出监控)
+- tracepoint/sched/sched_process_exec (进程的执行和退出监控)
+- tracepoint/sched/sched_process_exit (进程的执行和退出监控)
 - tracepoint/syscalls/sys_enter_close
-- tracepoint/syscalls/sys_enter_getppid
-  - 用于超时发送积压的socket data机制
-- tracepoint/syscalls/sys_exit_socket
-  - 用于管理socket(链接)
-- tracepoint/sched/sched_process_fork
-  - 用于uprobes管理
-- tracepoint/sched/sched_process_exit
+- tracepoint/syscalls/sys_enter_getppid (用于超时发送积压的socket data机制)
+- tracepoint/syscalls/sys_enter_pread64 (files r/w)
+- tracepoint/syscalls/sys_enter_preadv (files r/w)
+- tracepoint/syscalls/sys_enter_pwrite64 (files r/w)
+- tracepoint/syscalls/sys_enter_pwritev (files r/w)
+- tracepoint/syscalls/sys_exit_pread64 (files r/w)
+- tracepoint/syscalls/sys_exit_preadv (files r/w)
+- tracepoint/syscalls/sys_exit_pwrite64 (files r/w)
+- tracepoint/syscalls/sys_exit_pwritev (files r/w)
+- tracepoint/syscalls/sys_enter_preadv2 (files r/w)
+- tracepoint/syscalls/sys_exit_preadv2 (files r/w)
+- tracepoint/syscalls/sys_enter_pwritev2 (files r/w)
+- tracepoint/syscalls/sys_exit_pwritev2 (files r/w)
 
 ## Uprobes
 - base
