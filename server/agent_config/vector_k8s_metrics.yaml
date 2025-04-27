@@ -63,15 +63,15 @@ config:
       - cadvisor_relabel_filter
       - kubelet_relabel_filter
       - kube_state_relabel_filter
-      source: |
+      source: |-
         if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
-        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
+        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
         }
-    sinks:
-      prometheus_remote_write:
-        type: prometheus_remote_write
-        inputs:
-        - common_relabel_config
-        endpoint: http://127.0.0.1:38086/api/v1/prometheus
-        healthcheck:
-          enabled: false
+  sinks:
+    prometheus_remote_write:
+      type: prometheus_remote_write
+      inputs:
+      - common_relabel_config
+      endpoint: http://127.0.0.1:38086/api/v1/prometheus
+      healthcheck:
+        enabled: false
