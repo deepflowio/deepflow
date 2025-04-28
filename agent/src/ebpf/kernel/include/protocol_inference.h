@@ -578,6 +578,13 @@ static __inline enum message_type parse_http2_headers_frame(const char
 	return msg_type;
 }
 
+/*
+ * Note: infer_http2_message() must be executed within infer_protocol_1() because
+ * the KPROBE feature might be disabled, while UPROBE depends on the inference from
+ * KPROBE. The upper layer retains the execution of infer_protocol_1(), but may skip
+ * the execution of infer_protocol_2(). Therefore, it is necessary to ensure that it
+ * is placed inside infer_protocol_1().
+ */
 static __inline enum message_type infer_http2_message(const char *buf_kern,
 						      size_t syscall_len,
 						      const char *buf_src,

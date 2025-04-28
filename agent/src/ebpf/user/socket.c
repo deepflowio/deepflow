@@ -51,6 +51,7 @@
 static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
+static bool kprobe_feature_disable;	// Whether to enable the kprobe feature.
 /*
  * Control whether to disable the tracing feature.
  * 'true' disables the tracing feature, and 'false' enables it.
@@ -1527,6 +1528,10 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	bpf_offset_param_t offset;
 	memset(&offset, 0, sizeof(offset));
 
+	if (kprobe_feature_disable) {
+		offset.kprobe_invalid = 1;
+	}
+
 	switch (kern_type) {
 	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
@@ -1724,6 +1729,11 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_sock_common_ipv6only_offset);
 
 	bpf_offset_param_t offset;
+	memset(&offset, 0, sizeof(offset));
+	if (kprobe_feature_disable) {
+		offset.kprobe_invalid = 1;
+	}
+
 	offset.ready = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
@@ -3430,3 +3440,16 @@ void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act)
 	else if (feat == FEATURE_UPROBE_OPENSSL)
 		openssl_trace_handle(pid, act);
 }
+
+void disable_kprobe_feature(void)
+{
+	kprobe_feature_disable = true;
+	ebpf_info("Kprobe feature has been disabled.\n");
+}
+
+void enable_kprobe_feature(void)
+{
+	kprobe_feature_disable = false;
+	ebpf_info("Kprobe feature has been enabled.\n");
+}
+

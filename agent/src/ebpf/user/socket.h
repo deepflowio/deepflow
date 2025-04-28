@@ -414,4 +414,20 @@ int disable_syscall_trace_id(void);
 void config_probe(struct tracer_probes_conf *tps, int type, const char *fn,
 		  const char *tp_name, bool is_exit);
 void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act);
+
+/**
+ * @brief Disables the KPROBE feature while retaining UPROBE and I/O event handling.
+ *
+ * This function will disable the KPROBE functionality, but UPROBE and I/O event processing 
+ * will continue to work as usual. 
+ */
+void disable_kprobe_feature(void);
+
+/**
+ * @brief Enables the KPROBE feature.
+ *
+ * This function enables the KPROBE functionality, allowing kernel probes to be used 
+ * for monitoring and tracing specific points in the kernel.
+ */
+void enable_kprobe_feature(void);
 #endif /* DF_USER_SOCKET_H */
