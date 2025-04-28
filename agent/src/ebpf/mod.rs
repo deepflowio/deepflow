@@ -731,6 +731,22 @@ extern "C" {
     pub fn get_dwarf_shard_map_size() -> c_int;
     pub fn set_dwarf_shard_map_size(size: c_int) -> c_void;
 
+    /**
+     * @brief Disables the KPROBE feature while retaining UPROBE and I/O event handling.
+     *
+     * This function will disable the KPROBE functionality, but UPROBE and I/O event processing
+     * will continue to work as usual.
+     */
+    pub fn disable_kprobe_feature();
+
+    /**
+     * @brief Enables the KPROBE feature.
+     *
+     * This function enables the KPROBE functionality, allowing kernel probes to be used
+     * for monitoring and tracing specific points in the kernel.
+     */
+    pub fn enable_kprobe_feature();
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;

@@ -1692,6 +1692,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (!offset)
 		return -1;
 
+	__u8 disable_kprobe = offset->kprobe_invalid;
 	if (unlikely(!offset->ready))
 		return -1;
 
@@ -1711,7 +1712,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 		return trace_io_event_common(ctx, offset, args, direction, id);
 #else
-		return -1;
+		return -2; // This means attempting to handle I/O events.
 #endif
 	}
 
@@ -1755,8 +1756,16 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	}
 
 	int act;
+	/*
+	 * UPROBE-based HTTP/2 inference depends on the KPROBE inference program,
+	 * so it must be executed before verifying whether the KPROBE feature is
+	 * disabled.
+	 */
 	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
 			       bytes_count, sock_state, extra);
+
+	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)
+		return -1;
 
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	if (act == INFER_CONTINUE) {
@@ -1815,11 +1824,12 @@ static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 		.is_go_process = is_current_go_process(),
 	};
 
-	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
+	int result = process_data(ctx, id, direction, args, bytes_count, &extra);
+	if (result == 0) {
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_DATA_SUBMIT_TP_IDX);
-	} else {
+	} else if (result == -2) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_IO_EVENT_TP_IDX);
 #endif
@@ -1838,11 +1848,12 @@ static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 		.is_go_process = is_current_go_process(),
 	};
 
-	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
+	int result = process_data(ctx, id, direction, args, bytes_count, &extra);
+	if (result == 0) {
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_DATA_SUBMIT_TP_IDX);
-	} else {
+	} else if (result == -2) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_IO_EVENT_TP_IDX);
 #endif

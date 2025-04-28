@@ -332,6 +332,7 @@ struct debug_data {
 
 struct member_fields_offset {
 	__u8 ready;
+	__u8 kprobe_invalid;			// This indicates that the KPROBE feature has been disabled.
 	__u16 struct_dentry_d_parent_offset;    // offsetof(struct dentry, d_parent)
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;
@@ -354,7 +355,6 @@ struct member_fields_offset {
 	__u32 struct_sock_sport_offset;	// offsetof(struct sock_common, skc_num)
 	__u32 struct_sock_skc_state_offset;	// offsetof(struct sock_common, skc_state)
 	__u32 struct_sock_common_ipv6only_offset;	// offsetof(struct sock_common, skc_flags)
-
 };
 
 typedef struct member_fields_offset bpf_offset_param_t;
