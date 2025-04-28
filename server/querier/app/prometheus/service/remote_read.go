@@ -50,8 +50,11 @@ type prometheusReader struct {
 
 func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, querierSql, sql string, duration float64, err error) {
 	// promrequest trans to sql
-	if req == nil || len(req.Queries) == 0 {
+	if req == nil || len(req.Queries) == 0 || req.Queries[0] == nil {
 		return nil, "", "", 0, errors.New("len(req.Queries) == 0, this feature is not yet implemented! ")
+	}
+	if req.Queries[0].Hints == nil || req.Queries[0].Matchers == nil {
+		return nil, "", "", 0, errors.New("req.Queries dont have hint or matchers! ")
 	}
 	start, end := cache.GetPromRequestQueryTime(req.Queries[0])
 	metricName := cache.GetMetricFromLabelMatcher(&req.Queries[0].Matchers)
