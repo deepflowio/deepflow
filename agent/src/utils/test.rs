@@ -130,7 +130,7 @@ impl Iterator for Capture {
 
         #[cfg(target_os = "windows")]
         while let Ok(packet) = self.cap.next_packet() {
-            if let Some(meta) = self.build_meta_packet(&packet) {
+            if let Some(meta) = Self::build_meta_packet(self.dl_type, &packet) {
                 return Some(meta);
             }
         }
