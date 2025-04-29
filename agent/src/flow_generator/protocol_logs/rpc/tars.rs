@@ -507,7 +507,10 @@ impl From<TarsInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 code: info.ret.map(|r| r.into()),
-                status: info.ret.unwrap_or_default().into(),
+                status: match info.ret {
+                    Some(r) => r.into(),
+                    None => L7ResponseStatus::Unknown,
+                },
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
