@@ -3198,6 +3198,14 @@ impl ConfigHandler {
 
         let kprobe = &mut ebpf.socket.kprobe;
         let new_kprobe = &mut new_ebpf.socket.kprobe;
+        if kprobe.disabled != new_kprobe.disabled {
+            info!(
+                "Update inputs.ebpf.socket.kprobe.disabled from {:?} to {:?}.",
+                kprobe.disabled, new_kprobe.disabled
+            );
+            kprobe.disabled = new_kprobe.disabled;
+            restart_agent = !first_run;
+        }
         if kprobe.blacklist.ports != new_kprobe.blacklist.ports {
             info!(
                 "Update inputs.ebpf.socket.kprobe.blacklist.ports from {:?} to {:?}.",
@@ -4767,6 +4775,13 @@ impl ConfigHandler {
                 .unconcerned_dns_nxdomain_response_suffixes
                 .clone();
             restart_agent = !first_run;
+        }
+        if filters.cbpf_disabled != new_filters.cbpf_disabled {
+            info!(
+                "Update processors.request_log.filters.cbpf_disabled from {:?} to {:?}.",
+                filters.cbpf_disabled, new_filters.cbpf_disabled
+            );
+            filters.cbpf_disabled = new_filters.cbpf_disabled;
         }
         let timeouts = &mut request_log.timeouts;
         let new_timeouts = &mut new_request_log.timeouts;
