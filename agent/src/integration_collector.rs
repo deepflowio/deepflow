@@ -545,7 +545,7 @@ fn fill_l7_stats(
     };
     let (endpoint, _) = policy_getter
         .policy()
-        .lookup_all_by_epc(&mut lookup_key, local_epc_id as i32);
+        .lookup_from_otel(&mut lookup_key, local_epc_id as i32);
     let (src_info, dst_info) = (endpoint.src_info, endpoint.dst_info);
     let peer_src = &mut flow.flow_metrics_peers[0];
     peer_src.l3_epc_id = src_info.l3_epc_id;

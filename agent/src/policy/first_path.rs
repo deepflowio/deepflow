@@ -23,7 +23,7 @@ use std::sync::{
 use ahash::AHashMap;
 use log::{info, warn};
 
-use super::fast_path::FastPath;
+use super::fast_path::{EndpointTableType, FastPath};
 use super::{Error as PError, Result as PResult};
 use crate::common::endpoint::{EndpointData, FeatureFlags};
 use crate::common::lookup_key::LookupKey;
@@ -708,8 +708,9 @@ impl FirstPath {
         return Some((forward_policy, forward_endpoints));
     }
 
-    pub fn ebpf_fast_get(
+    pub fn endpoint_fast_get(
         &mut self,
+        table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
@@ -720,19 +721,26 @@ impl FirstPath {
         }
 
         self.fast
-            .ebpf_get_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst)
+            .get_endpoints(table_type, ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst)
     }
 
-    pub fn ebpf_fast_add(
+    pub fn endpoint_fast_add(
         &mut self,
+        table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
         endpoints: EndpointData,
     ) -> Arc<EndpointData> {
-        self.fast
-            .ebpf_add_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, endpoints)
+        self.fast.add_endpoints(
+            table_type,
+            ip_src,
+            ip_dst,
+            l3_epc_id_src,
+            l3_epc_id_dst,
+            endpoints,
+        )
     }
 
     pub fn fast_get(

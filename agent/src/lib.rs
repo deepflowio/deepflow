@@ -78,6 +78,7 @@ pub use {
         DirectionType as _DirectionType, NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType,
         TapSide as _TapSide,
     },
+    policy::fast_path::EndpointTableType as _EndpointTableType,
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
 };

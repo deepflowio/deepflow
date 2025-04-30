@@ -27,6 +27,7 @@ use deepflow_agent::_Cidr as Cidr;
 use deepflow_agent::_DirectionType as DirectionType;
 use deepflow_agent::_EndpointData as EndpointData;
 use deepflow_agent::_EndpointInfo as EndpointInfo;
+use deepflow_agent::_EndpointTableType as EndpointTableType;
 use deepflow_agent::_FeatureFlags as FeatureFlags;
 use deepflow_agent::_FirstPath as FirstPath;
 use deepflow_agent::_IpGroupData as IpGroupData;
@@ -250,11 +251,18 @@ fn bench_policy(c: &mut Criterion) {
             },
         };
 
-        first.ebpf_fast_add(key.src_ip, key.dst_ip, 2, 0, endpoints);
+        first.endpoint_fast_add(
+            EndpointTableType::Ebpf,
+            key.src_ip,
+            key.dst_ip,
+            2,
+            0,
+            endpoints,
+        );
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                first.ebpf_fast_get(key.src_ip, key.dst_ip, 2, 0);
+                first.endpoint_fast_get(EndpointTableType::Ebpf, key.src_ip, key.dst_ip, 2, 0);
             }
             start.elapsed()
         })
