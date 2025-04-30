@@ -23,60 +23,9 @@ pub mod policy;
 
 pub use policy::{Policy, PolicyGetter, PolicySetter};
 
-use std::alloc::{dealloc, Layout};
-use std::ptr;
-use std::thread;
-use std::time::Duration;
-
-pub fn free(address: *mut u8, layout: Layout) {
-    unsafe {
-        thread::sleep(MEM_SAFE_TIME);
-        ptr::drop_in_place(address);
-        dealloc(address, layout);
-    }
-}
-
-struct UnsafeWrapper<T> {
-    pointer: *mut T,
-}
-
-const MEM_SAFE_TIME: Duration = Duration::from_millis(50);
-const MAX_QUEUE_COUNT: usize = 128;
-
-impl<T> From<T> for UnsafeWrapper<T> {
-    fn from(value: T) -> Self {
-        Self {
-            pointer: Box::into_raw(Box::new(value)),
-        }
-    }
-}
-
-impl<T> UnsafeWrapper<T> {
-    fn free(address: *mut u8, layout: Layout) {
-        unsafe {
-            thread::sleep(MEM_SAFE_TIME);
-            ptr::drop_in_place(address);
-            dealloc(address, layout);
-        }
-    }
-
-    pub fn set(&mut self, p: T) {
-        let p = Box::into_raw(Box::new(p));
-        let last = self.pointer;
-        self.pointer = p;
-        Self::free(last as *mut u8, Layout::new::<T>());
-    }
-
-    pub fn get(&self) -> &T {
-        return unsafe { &(*self.pointer) };
-    }
-
-    pub fn get_mut(&mut self) -> &mut T {
-        return unsafe { &mut (*self.pointer) };
-    }
-}
-
 use thiserror::Error;
+
+const MAX_QUEUE_COUNT: usize = 128;
 
 #[derive(Debug, Error)]
 pub enum Error {
