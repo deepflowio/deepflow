@@ -1,8 +1,0 @@
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: deepflow-agent-config
-  namespace: yunshan-deepflow
-data:
-  # 注：下行配置文件名会由helm自动渲染，请不要修改格式
-  deepflow-agent.yaml: |-

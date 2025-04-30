@@ -58,7 +58,7 @@ use public::{
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
-const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
+const DEFAULT_STANDALONE_CONFIG: &str = "/etc/data-agent-standalone.yaml";
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -1893,8 +1893,8 @@ mod tests {
     #[test]
     fn read_yaml_file() {
         // TODO: improve test cases
-        let c = Config::load_from_file("config/deepflow-agent.yaml")
-            .expect("failed loading config file");
+        let c =
+            Config::load_from_file("config/data-agent.yaml").expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");
     }

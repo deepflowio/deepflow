@@ -1563,7 +1563,7 @@ fn get_direction(
             }
             _ => {
                 // 采集器类型不正确，不应该发生
-                error!("invalid trident type, deepflow-agent restart...");
+                error!("invalid trident type, data-agent restart...");
                 thread::sleep(Duration::from_secs(1));
                 process::exit(1)
             }

@@ -1,1 +1,1 @@
-deb-systemd-invoke stop deepflow-agent.service
+deb-systemd-invoke stop data-agent.service

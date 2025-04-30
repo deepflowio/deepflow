@@ -314,7 +314,7 @@ impl BaseDispatcher {
     pub(super) fn init(&mut self) -> Result<()> {
         if let Err(e) = self.engine.init() {
             error!(
-                "dispatcher recv_engine init error: {}, deepflow-agent restart...",
+                "dispatcher recv_engine init error: {}, data-agent restart...",
                 e
             );
             return Err(e.into());
@@ -462,7 +462,7 @@ impl BaseDispatcher {
             }
             Err(e) => {
                 error!(
-                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
+                    "dispatcher recv_engine init error: {}, data-agent restart...",
                     e
                 );
                 Err(e.into())
@@ -876,7 +876,7 @@ impl BaseDispatcherListener {
     fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
-            info!("Afpacket version update, deepflow-agent restart...");
+            info!("Afpacket version update, data-agent restart...");
             crate::utils::notify_exit(1);
         }
     }

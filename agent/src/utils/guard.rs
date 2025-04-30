@@ -158,7 +158,7 @@ impl Guard {
         cgroups_disabled: bool,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
-            return Err("get the process' pid failed: {}, deepflow-agent restart...");
+            return Err("get the process' pid failed: {}, data-agent restart...");
         };
         Ok(Self {
             config,
@@ -349,7 +349,7 @@ impl Guard {
                         if !check_cgroup_result {
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
-                                    error!("cpu usage over cpu limit twice, deepflow-agent restart...");
+                                    error!("cpu usage over cpu limit twice, data-agent restart...");
                                     crate::utils::notify_exit(-1);
                                     break;
                                 } else {
@@ -363,7 +363,7 @@ impl Guard {
                     } else {
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
-                                error!("cpu usage over cpu limit twice, deepflow-agent restart...");
+                                error!("cpu usage over cpu limit twice, data-agent restart...");
                                 crate::utils::notify_exit(-1);
                                 break;
                             } else {
@@ -400,7 +400,7 @@ impl Guard {
                                 if memory_usage >= memory_limit {
                                     if over_memory_limit {
                                         error!(
-                                    "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
+                                    "memory usage over memory limit twice, current={}, memory_limit={}, data-agent restart...",
                                     ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
                                     );
                                         crate::utils::notify_exit(-1);
@@ -431,7 +431,7 @@ impl Guard {
                     if current_sys_free_memory_percentage < sys_free_memory_limit {
                         if under_sys_free_memory_limit {
                             error!(
-                                    "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, deepflow-agent restart...",
+                                    "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, data-agent restart...",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
                             crate::utils::notify_exit(-1);
@@ -455,7 +455,7 @@ impl Guard {
                                 thread_num, thread_limit
                             );
                             if thread_num > thread_limit * 2 {
-                                error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
+                                error!("the number of thread exceeds the limit by 2 times, data-agent restart...");
                                 crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                                 break;
                             }
@@ -484,7 +484,7 @@ impl Guard {
                                     warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
                                 }
                                 Some(last) if last.elapsed() > config.max_sockets_tolerate_interval => {
-                                    warn!("the number of socket exceeds the limit longer than {:?}, deepflow-agent restart...", config.max_sockets_tolerate_interval);
+                                    warn!("the number of socket exceeds the limit longer than {:?}, data-agent restart...", config.max_sockets_tolerate_interval);
                                     warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
                                     crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                                     break;

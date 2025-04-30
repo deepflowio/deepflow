@@ -2012,7 +2012,7 @@ impl ConfigHandler {
             candidate_config.tap_mode = new_config.tap_mode;
             if let Some(c) = components.as_mut() {
                 if yaml_config.local_dispatcher_count > 1 {
-                    info!("tap_mode changes and fanout is enabled, deepflow-agent restart...");
+                    info!("tap_mode changes and fanout is enabled, data-agent restart...");
                     crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
                     return vec![];
                 } else {
@@ -2207,7 +2207,7 @@ impl ConfigHandler {
                         .as_ref()
                         .map(|re| public::netns::find_ns_files_by_regex(&re));
                     if old_netns != new_netns {
-                        info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
+                        info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, data-agent restart...", old_netns, new_netns);
                         crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
                         return vec![];
                     }
@@ -2236,10 +2236,7 @@ impl ConfigHandler {
                             .dispatcher
                             .switch_recv_engine(&handler.candidate_config.dispatcher)
                         {
-                            log::error!(
-                                "switch RecvEngine error: {}, deepflow-agent restart...",
-                                e
-                            );
+                            log::error!("switch RecvEngine error: {}, data-agent restart...", e);
                             crate::utils::notify_exit(-1);
                             return;
                         }
@@ -2254,7 +2251,7 @@ impl ConfigHandler {
                 candidate_config.dispatcher.capture_packet_size =
                     new_config.dispatcher.capture_packet_size;
                 if !components.is_none() {
-                    info!("Capture packet size update, deepflow-agent restart...");
+                    info!("Capture packet size update, data-agent restart...");
                     crate::utils::notify_exit(1);
                     return vec![];
                 }

@@ -32,11 +32,11 @@ struct Opts {
         short = 'f',
         visible_short_alias = 'c',
         long,
-        default_value = "/etc/deepflow-agent.yaml"
+        default_value = "/etc/data-agent.yaml"
     )]
     config_file: String,
 
-    /// Enable standalone mode, default config path is /etc/deepflow-agent-standalone.yaml
+    /// Enable standalone mode, default config path is /etc/data-agent-standalone.yaml
     #[clap(long)]
     standalone: bool,
 
@@ -71,7 +71,7 @@ struct Opts {
     #[clap(long)]
     sidecar: bool,
 
-    /// Disable cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits.
+    /// Disable cgroups, data-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits.
     #[clap(long)]
     cgroups_disabled: bool,
 }

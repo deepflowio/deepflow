@@ -56,7 +56,7 @@
 #define CP_PERF_PG_NUM	16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
-#define DEEPFLOW_AGENT_NAME "deepflow-agent"
+#define DEEPFLOW_AGENT_NAME "data-agent"
 
 extern int sys_cpus_count;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
@@ -627,9 +627,9 @@ int check_profiler_running_pid(int pid)
 	}
 	// Compare the recorded and actual start times
 	if (recorded_start_time == actual_start_time) {
-		ebpf_error("The deepflow-agent with process ID %d is already "
+		ebpf_error("The data-agent with process ID %d is already "
 			   "running. You can disable the continuous profiling "
-			   "feature of the deepflow-agent to skip this check.\n",
+			   "feature of the data-agent to skip this check.\n",
 			   recorded_pid);
 		return ETR_EXIST;
 	} else {

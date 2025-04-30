@@ -1004,7 +1004,7 @@ impl Synchronizer {
                         let (ts, cvar) = &*trident_state;
                         *ts.lock().unwrap() = trident::State::Disabled(None);
                         cvar.notify_one();
-                        warn!("as max escape time expired, deepflow-agent restart...");
+                        warn!("as max escape time expired, data-agent restart...");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
                         // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
@@ -1213,7 +1213,7 @@ impl Synchronizer {
                     .await
                 {
                     return Err(format!(
-                        "patch deepflow-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
+                        "patch data-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
                         &current_k8s_image, e
                     ));
                 }
@@ -1246,8 +1246,8 @@ impl Synchronizer {
             return Err(format!("rpc error {:?}", m));
         }
 
-        let binary_path = get_executable_path()
-            .map_err(|_| format!("Cannot get deepflow-agent path for this OS"))?;
+        let binary_path =
+            get_executable_path().map_err(|_| format!("Cannot get data-agent path for this OS"))?;
         let mut temp_path = binary_path.clone();
         #[cfg(unix)]
         temp_path.set_extension("test");
@@ -1533,7 +1533,7 @@ impl Synchronizer {
                                 let (ts, cvar) = &*trident_state;
                                 *ts.lock().unwrap() = trident::State::Terminated;
                                 cvar.notify_one();
-                                warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
+                                warn!("agent upgrade is successful and restarts normally, data-agent restart...");
                                 crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                                 return;
                             },

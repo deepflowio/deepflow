@@ -17,13 +17,13 @@
 use std::time::Duration;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub const PROCESS_NAME: &str = "deepflow-agent";
+pub const PROCESS_NAME: &str = "data-agent";
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub const PROCESS_NAME_SECONDARY: &str = "trident";
 #[cfg(target_os = "windows")]
-pub const PROCESS_NAME: &str = "deepflow-agent.exe";
-pub const DAEMONSET_NAME: &str = "deepflow-agent";
-pub const CONTAINER_NAME: &str = "deepflow-agent";
+pub const PROCESS_NAME: &str = "data-agent.exe";
+pub const DAEMONSET_NAME: &str = "data-agent";
+pub const CONTAINER_NAME: &str = "data-agent";
 
 pub const DEFAULT_INGESTER_PORT: u16 = 30033;
 pub const DEFAULT_CONTROLLER_PORT: u16 = 30035;
@@ -39,15 +39,15 @@ pub const DEFAULT_CPU_CFS_PERIOD_US: u32 = 100000; // cfs_period_us默认值
 
 pub const DEFAULT_LOG_RETENTION: u32 = 365;
 pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
-pub const CGROUP_PROCS_PATH: &'static str = "cpu/deepflow-agent/cgroup.procs";
-pub const CGROUP_TASKS_PATH: &'static str = "cpu/deepflow-agent/tasks";
-pub const CGROUP_V2_PROCS_PATH: &'static str = "deepflow-agent/cgroup.procs";
-pub const CGROUP_V2_THREADS_PATH: &'static str = "deepflow-agent/cgroup.threads";
+pub const CGROUP_PROCS_PATH: &'static str = "cpu/data-agent/cgroup.procs";
+pub const CGROUP_TASKS_PATH: &'static str = "cpu/data-agent/tasks";
+pub const CGROUP_V2_PROCS_PATH: &'static str = "data-agent/cgroup.procs";
+pub const CGROUP_V2_THREADS_PATH: &'static str = "data-agent/cgroup.threads";
 
 #[cfg(target_os = "linux")]
 mod platform_consts {
-    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/deepflow-agent/deepflow-agent.log";
-    pub const DEFAULT_CONF_FILE: &'static str = "/etc/deepflow-agent.yaml";
+    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/data-agent/data-agent.log";
+    pub const DEFAULT_CONF_FILE: &'static str = "/etc/data-agent.yaml";
     pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
     pub const COREFILE_FORMAT: &'static str = "core";
     pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
@@ -57,8 +57,8 @@ mod platform_consts {
 /* TODO: fix constants for android */
 #[cfg(target_os = "android")]
 mod platform_consts {
-    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/deepflow-agent/deepflow-agent.log";
-    pub const DEFAULT_CONF_FILE: &'static str = "/etc/deepflow-agent.yaml";
+    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/data-agent/data-agent.log";
+    pub const DEFAULT_CONF_FILE: &'static str = "/etc/data-agent.yaml";
     pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
     pub const COREFILE_FORMAT: &'static str = "core";
     pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
@@ -66,14 +66,12 @@ mod platform_consts {
 
 #[cfg(target_os = "windows")]
 mod platform_consts {
-    pub const DEFAULT_LOG_FILE: &'static str =
-        "C:\\DeepFlow\\deepflow-agent\\log\\deepflow-agent.log";
+    pub const DEFAULT_LOG_FILE: &'static str = "C:\\DeepFlow\\data-agent\\log\\data-agent.log";
     // NOTE yaml must be full path, otherwise service wouldn't start as you wish.
-    pub const DEFAULT_CONF_FILE: &'static str =
-        "C:\\DeepFlow\\deepflow-agent\\deepflow-agent-windows.yaml";
+    pub const DEFAULT_CONF_FILE: &'static str = "C:\\DeepFlow\\data-agent\\data-agent-windows.yaml";
     pub const DEFAULT_TRIDENT_CONF_FILE: &'static str =
         "C:\\DeepFlow\\trident\\trident-windows.yaml";
-    pub const DEFAULT_COREFILE_PATH: &'static str = "C:\\DeepFlow\\deepflow-agent";
+    pub const DEFAULT_COREFILE_PATH: &'static str = "C:\\DeepFlow\\data-agent";
     pub const COREFILE_FORMAT: &'static str = "dump";
 }
 

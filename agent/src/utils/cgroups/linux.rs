@@ -146,7 +146,7 @@ impl Cgroups {
                     if max_millicpus != last_millicpus || max_memory != last_memory {
                         if let Err(e) = Self::apply(cgroup.clone(), max_millicpus, max_memory) {
                             warn!(
-                                "apply cgroups resource failed, {}, deepflow-agent restart...",
+                                "apply cgroups resource failed, {}, data-agent restart...",
                                 e
                             );
                             crate::utils::notify_exit(1);

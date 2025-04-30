@@ -61,7 +61,7 @@ fn get_branch() -> Result<String, Box<dyn Error>> {
 struct EnvCommand(&'static str, Vec<&'static str>);
 
 fn set_build_info() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
+    println!("cargo:rustc-env=AGENT_NAME=data-agent-ce");
     println!("cargo:rustc-env=BRANCH={}", get_branch()?);
     println!(
         "cargo:rustc-env=COMPILE_TIME={}",

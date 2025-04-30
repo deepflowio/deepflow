@@ -255,14 +255,14 @@ pub async fn get_current_k8s_image() -> Option<String> {
     };
 
     // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
-    // The deepflow-agent DaemonSet.spec format is as follows:
+    // The data-agent DaemonSet.spec format is as follows:
     // {
     //   "spec":{
     //     "template":{
     //       "spec":{
     //         "containers":[{
-    //           "name":"deepflow-agent",
-    //           "image":"deepflow-agent:latest",
+    //           "name":"data-agent",
+    //           "image":"data-agent:latest",
     //         }]
     //       }
     //     }

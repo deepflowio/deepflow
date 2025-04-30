@@ -182,9 +182,9 @@ CompileTime: {}",
             self.rev_count,
             self.commit_id,
             match self.name {
-                "deepflow-agent-ce" => "deepflow-agent community edition",
-                "deepflow-agent-ee" => "deepflow-agent enterprise edition",
-                _ => panic!("{:?} unknown deepflow-agent edition", &self.name),
+                "data-agent-ce" => "data-agent community edition",
+                "data-agent-ee" => "data-agent enterprise edition",
+                _ => panic!("{:?} unknown data-agent edition", &self.name),
             },
             self.branch,
             self.commit_id,
@@ -394,10 +394,7 @@ impl Trident {
                 cgroups_disabled,
                 ntp_diff,
             ) {
-                warn!(
-                    "Launching deepflow-agent failed: {}, deepflow-agent restart...",
-                    e
-                );
+                warn!("Launching data-agent failed: {}, data-agent restart...", e);
                 crate::utils::notify_exit(1);
             }
         }));
@@ -423,7 +420,7 @@ impl Trident {
         cgroups_disabled: bool,
         ntp_diff: Arc<AtomicI64>,
     ) -> Result<()> {
-        info!("==================== Launching DeepFlow-Agent ====================");
+        info!("==================== Launching Data-Agent ====================");
         info!("Environment variables: {:?}", get_env());
 
         if running_in_container() {
@@ -568,7 +565,7 @@ impl Trident {
             // fixme: Linux after kernel version 2.6.24 can use cgroups
             info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
         } else if cgroups_disabled {
-            info!("don't initialize cgroups controller, disable cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits");
+            info!("don't initialize cgroups controller, disable cgroups, data-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
@@ -774,7 +771,7 @@ impl Trident {
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
-                    let info = "yaml_config updated, deepflow-agent restart...";
+                    let info = "yaml_config updated, data-agent restart...";
                     warn!("{}", info);
                     thread::sleep(Duration::from_secs(1));
                     return Err(anyhow!(info));
@@ -3061,10 +3058,7 @@ fn build_dispatchers(
     let dispatcher = match dispatcher_builder.build() {
         Ok(d) => d,
         Err(e) => {
-            warn!(
-                "dispatcher creation failed: {}, deepflow-agent restart...",
-                e
-            );
+            warn!("dispatcher creation failed: {}, data-agent restart...", e);
             thread::sleep(Duration::from_secs(1));
             return Err(e.into());
         }

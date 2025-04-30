@@ -472,8 +472,8 @@ static int kernel_offset_infer_init(void)
 			     " port %d is not occupied by other services.\n\n"
 			     "If port %d is occupied by other services, you can either"
 			     " change the port number of the other service or wait until"
-			     " the deepflow-agent is started before starting this service."
-			     "This is because the deepflow-agent only temporarily uses "
+			     " the data-agent is started before starting this service."
+			     "This is because the data-agent only temporarily uses "
 			     "port %d during its startup phase and will close the service"
 			     "once it is started.\n\n",
 			     OFFSET_INFER_SERVER_ADDR,
@@ -2048,7 +2048,7 @@ static int check_dependencies(void)
 	}
 
 	if (access(FTRACE_SYSCALLS_PATH, F_OK) != 0) {
-		ebpf_warning("Directory %s does not exist. deepflow-agent "
+		ebpf_warning("Directory %s does not exist. data-agent "
 			     "relies on the kernel compilation option "
 			     "'CONFIG_FTRACE_SYSCALLS'. Please ensure that "
 			     "this kernel compilation option is enabled (when "

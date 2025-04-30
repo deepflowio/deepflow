@@ -152,7 +152,7 @@ pub fn controller_ip_check(ips: &[String]) {
     }
 
     error!(
-        "controller ip({:?}) is not support both IPv4 and IPv6, deepflow-agent restart...",
+        "controller ip({:?}) is not support both IPv4 and IPv6, data-agent restart...",
         ips
     );
 
@@ -166,7 +166,7 @@ pub fn trident_process_check(process_threshold: u32) {
         Ok(num) => {
             if num > process_threshold {
                 error!(
-                    "the number of process exceeds the limit({} > {}), deepflow-agent restart...",
+                    "the number of process exceeds the limit({} > {}), data-agent restart...",
                     num, process_threshold
                 );
                 crate::utils::notify_exit(-1);
@@ -373,6 +373,6 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         return Ok((ip, mac));
     }
     Err(Error::Environment(
-        "failed getting control ip and mac, deepflow-agent restart...".to_owned(),
+        "failed getting control ip and mac, data-agent restart...".to_owned(),
     ))
 }

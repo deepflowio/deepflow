@@ -217,7 +217,7 @@ impl FastPath {
             }
             _ => {
                 warn!(
-                    "IpAddr({:?} and {:?}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
+                    "IpAddr({:?} and {:?}) is invalid: ip address version is inconsistent, data-agent restart...\n",
                     ip_src, ip_dst,
                 );
                 thread::sleep(Duration::from_secs(1));

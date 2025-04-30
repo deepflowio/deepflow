@@ -17,14 +17,14 @@ controller-ips:
 #controller-cert-file-prefix: ""
 
 ## logfile path
-#log-file: /var/log/deepflow-agent/deepflow-agent.log
+#log-file: /var/log/data-agent/data-agent.log
 
 ## When running in the K8s environment, if this value is empty,
-## deepflow-agent requests deepflow-server through the MD5 of the CA file of the K8s cluster to get k8s-cluster-id.
+## data-agent requests deepflow-server through the MD5 of the CA file of the K8s cluster to get k8s-cluster-id.
 ## You can also manually fill in an existing k8s-cluster-id in deepflow-server.
 #kubernetes-cluster-id:
 
-## When running in the K8s environment, if this is configured, deepflow-agent will carry this name when
+## When running in the K8s environment, if this is configured, data-agent will carry this name when
 ## requesting to get k8s-cluster-id, and deepflow-server will use this name to mark the K8s cluster.
 #kubernetes-cluster-name:
 
@@ -38,3 +38,16 @@ controller-ips:
 ## async workers are used mainly used for grpc calls, synchronizer and
 ## kubernetes api watcher
 #async-worker-thread-number: 16
+
+## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
+#agent-unique-identifier: ip-and-mac
+
+## Pid file path, defaults to ""
+## Will create pid file in the path if specified.
+#pid-file:
+
+## Team identity for server sync, defaults to ""
+#team-id:
+
+## Disabled cgroups, data-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits
+#cgroups-disabled: false

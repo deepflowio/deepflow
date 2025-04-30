@@ -2,7 +2,7 @@
 name = "deepflow-agent"
 version = "0.1.0"
 edition = "2021"
-default-run = "deepflow-agent"
+default-run = "data-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -145,6 +145,10 @@ tonic-build = "0.8.0"
 enterprise = ["off_cpu", "enterprise-utils"]
 off_cpu = []
 dylib_pcap = []
+
+[[bin]]
+name = "data-agent"
+path = "src/main.rs"
 
 [[bench]]
 name = "common"

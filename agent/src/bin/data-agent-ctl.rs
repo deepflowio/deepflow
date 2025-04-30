@@ -40,14 +40,14 @@ const ERR_PORT_MSG: &str = "error: The following required arguments were not pro
     \t--port <PORT> required arguments were not provided";
 
 #[derive(Parser)]
-#[clap(name = "deepflow-agent-ctl")]
+#[clap(name = "data-agent-ctl")]
 struct Cmd {
     #[clap(subcommand)]
     command: ControllerCmd,
-    /// remote deepflow-agent listening port
+    /// remote data-agent listening port
     #[clap(short, long, parse(try_from_str))]
     port: Option<u16>,
-    /// remote deepflow-agent host ip
+    /// remote data-agent host ip
     ///
     /// ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
     #[clap(short, long, parse(try_from_str), default_value_t=IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
@@ -61,14 +61,14 @@ enum ControllerCmd {
     #[cfg(target_os = "linux")]
     /// get information about the k8s platform
     Platform(PlatformCmd),
-    /// monitor various queues of the selected deepflow-agent
+    /// monitor various queues of the selected data-agent
     Queue(QueueCmd),
     /// get information about the policy
     Policy(PolicyCmd),
     #[cfg(target_os = "linux")]
     /// get information about the ebpf
     Ebpf(EbpfCmd),
-    /// get information about the deepflow-agent
+    /// get information about the data-agent
     List,
 }
 
@@ -78,7 +78,7 @@ struct QueueCmd {
     ///
     /// eg: monitor 1-tagged-flow-to-quadruple-generator queue with 60s
     ///
-    /// deepflow-agent-ctl queue --on 1-tagged-flow-to-quadruple-generator --duration 60
+    /// data-agent-ctl queue --on 1-tagged-flow-to-quadruple-generator --duration 60
     #[clap(long, requires = "monitor")]
     on: Option<String>,
     /// monitoring duration in seconds
@@ -88,17 +88,17 @@ struct QueueCmd {
     ///
     /// eg: turn off 1-tagged-flow-to-quadruple-generator queue monitor
     ///
-    /// deepflow-agent-ctl queue --off 1-tagged-flow-to-quadruple-generator queue
+    /// data-agent-ctl queue --off 1-tagged-flow-to-quadruple-generator queue
     #[clap(long)]
     off: Option<String>,
     /// show queue list
     ///
-    /// eg: deepflow-agent-ctl queue --show
+    /// eg: data-agent-ctl queue --show
     #[clap(long)]
     show: bool,
     /// turn off all queue
     ///
-    /// eg: deepflow-agent-ctl queue --clear
+    /// eg: data-agent-ctl queue --clear
     #[clap(long)]
     clear: bool,
 }
@@ -108,12 +108,12 @@ struct QueueCmd {
 struct PlatformCmd {
     /// get resources with k8s api
     ///
-    /// eg: deepflow-agent-ctl platform --k8s_get node
+    /// eg: data-agent-ctl platform --k8s_get node
     #[clap(short, long, arg_enum)]
     k8s_get: Option<Resource>,
     /// show k8s container mac to global interface index mappings
     ///
-    /// eg: deepflow-agent-ctl platform --mac_mappings
+    /// eg: data-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
 }
@@ -135,7 +135,7 @@ enum PolicySubCmd {
 struct AnalyzingArgs {
     /// Set policy id
     ///
-    /// eg: deepflow-agent-ctl policy analyzing --id 10
+    /// eg: data-agent-ctl policy analyzing --id 10
     #[clap(long, parse(try_from_str))]
     id: Option<u32>,
 }
@@ -161,12 +161,12 @@ enum EbpfSubCmd {
 struct EbpfArgs {
     /// Set datadump pid
     ///
-    /// eg: deepflow-agent-ctl ebpf datadump --pid 10001
+    /// eg: data-agent-ctl ebpf datadump --pid 10001
     #[clap(long, parse(try_from_str), default_value_t = 0)]
     pid: u32,
     /// Set datadump name
     ///
-    /// eg: deepflow-agent-ctl ebpf datadump --name nginx
+    /// eg: data-agent-ctl ebpf datadump --name nginx
     #[clap(long, parse(try_from_str), default_value = "")]
     name: String,
     /// Set datadump app protocol
@@ -176,12 +176,12 @@ struct EbpfArgs {
     ///   MySQL(60), PostGreSQL(61), Oracle(62), Redis(80),
     ///   Kafka(100), MQTT(101), DNS(120), TLS(121),
     ///
-    /// eg: deepflow-agent-ctl ebpf datadump --proto 20
+    /// eg: data-agent-ctl ebpf datadump --proto 20
     #[clap(long, parse(try_from_str), default_value_t = 0)]
     proto: u8,
     /// Set datadump/cpdbg duration
     ///
-    /// eg: deepflow-agent-ctl ebpf datadump --duration 10
+    /// eg: data-agent-ctl ebpf datadump --duration 10
     #[clap(long, parse(try_from_str), default_value_t = 30)]
     duration: u16,
 }
@@ -254,7 +254,7 @@ struct RpcCmd {
     /// Get data from RPC
     ///
     /// eg: get rpc config data
-    /// deepflow-agent-ctl rpc --get config
+    /// data-agent-ctl rpc --get config
     ///
     #[clap(long, arg_enum)]
     get: RpcData,
@@ -324,8 +324,8 @@ impl Controller {
     }
 
     /*
-    $ deepflow-agent-ctl list
-    deepflow-agent-ctl listening udp port 30035 to find deepflow-agent
+    $ data-agent-ctl list
+    data-agent-ctl listening udp port 30035 to find data-agent
 
     -----------------------------------------------------------------------------------------------------
     VTAP ID        HOSTNAME                     IP                                            PORT
@@ -343,7 +343,7 @@ impl Controller {
         let mut vtap_map = HashSet::new();
 
         println!(
-            "deepflow-agent-ctl listening udp port {} to find deepflow-agent\n",
+            "data-agent-ctl listening udp port {} to find data-agent\n",
             beacon_port
         );
         println!("{:-<100}", "");
@@ -591,7 +591,7 @@ impl Controller {
                     PlatformMessage::MacMappings(e) => {
                         match e {
                             /*
-                            $ deepflow-agent-ctl -p 42700 platform --mac-mappings
+                            $ data-agent-ctl -p 42700 platform --mac-mappings
                             Interface Index          MAC address
                             12                       01:02:03:04:05:06
                             13                       01:02:03:04:05:06
@@ -625,7 +625,7 @@ impl Controller {
                     match res {
                         PlatformMessage::Version(v) => {
                             /*
-                            $ deepflow-agent-ctl -p 54911 platform --k8s-get version
+                            $ data-agent-ctl -p 54911 platform --k8s-get version
                             k8s-api-watcher-version xxx
                             */
                             match v {
@@ -652,7 +652,7 @@ impl Controller {
                 match res {
                     PlatformMessage::Watcher(v) => {
                         /*
-                        $ deepflow-agent-ctl -p 54911 platform --k8s-get node
+                        $ data-agent-ctl -p 54911 platform --k8s-get node
                         nodes entries...
                         */
                         match Self::decode_entry(&mut decoder, v.as_slice()) {
