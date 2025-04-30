@@ -15,7 +15,7 @@
  */
 
 mod bit;
-mod fast_path;
+pub mod fast_path;
 pub mod first_path;
 mod forward;
 pub mod labeler;
