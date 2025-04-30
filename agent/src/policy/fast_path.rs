@@ -235,6 +235,9 @@ pub struct FastPath {
     // Multi threaded access has thread safety issues, the ebpf
     // table must be accessed by an ebpf dispatcher thread.
     ebpf_table: LruCache<u128, Arc<EndpointData>>,
+    // Multi threaded access has thread safety issues, the otel
+    // table must be accessed by an otel dispatcher thread
+    otel_table: LruCache<u128, Arc<EndpointData>>,
 
     // Use the first 16 bits of the IPv4 address to query the table and obtain the corresponding netmask.
     netmask_table: RwLock<Vec<u32>>,
@@ -242,12 +245,19 @@ pub struct FastPath {
     policy_table_flush_flags: [AtomicBool; super::MAX_QUEUE_COUNT + 1],
     caches: [Option<(Vec<PortRange>, Vec<u32>)>; super::MAX_QUEUE_COUNT + 1],
     ebpf_table_flush_flag: AtomicBool,
+    otel_table_flush_flag: AtomicBool,
 
     mask_from_interface: RwLock<Vec<u32>>,
     mask_from_ipgroup: RwLock<Vec<u32>>,
     mask_from_cidr: RwLock<Vec<u32>>,
 
     map_size: usize,
+}
+
+#[derive(Clone, Copy)]
+pub enum EndpointTableType {
+    Ebpf,
+    Otel,
 }
 
 const FLUSH_FLAGS: AtomicBool = AtomicBool::new(false);
@@ -262,6 +272,7 @@ impl FastPath {
             f.store(true, Ordering::Relaxed);
         });
         self.ebpf_table_flush_flag.store(true, Ordering::Relaxed);
+        self.otel_table_flush_flag.store(true, Ordering::Relaxed);
     }
 
     pub fn generate_mask_from_interface(&mut self, interfaces: &Vec<Arc<Interface>>) {
@@ -478,55 +489,84 @@ impl FastPath {
         table.get_policy(packet)
     }
 
-    // NOTE: Only one thread can access it at a time.
-    pub fn ebpf_add_endpoints(
+    fn flush_endpoint_table(&mut self, table_type: EndpointTableType) -> bool {
+        match table_type {
+            EndpointTableType::Ebpf => {
+                if self.ebpf_table_flush_flag.swap(false, Ordering::Relaxed) {
+                    self.ebpf_table.clear();
+
+                    true
+                } else {
+                    false
+                }
+            }
+            EndpointTableType::Otel => {
+                if self.otel_table_flush_flag.swap(false, Ordering::Relaxed) {
+                    self.otel_table.clear();
+
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn get_endpoint_table(
         &mut self,
+        table_type: EndpointTableType,
+    ) -> &mut LruCache<u128, Arc<EndpointData>> {
+        match table_type {
+            EndpointTableType::Ebpf => &mut self.ebpf_table,
+            EndpointTableType::Otel => &mut self.otel_table,
+        }
+    }
+
+    pub fn add_endpoints(
+        &mut self,
+        table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
         endpoints: EndpointData,
     ) -> Arc<EndpointData> {
-        let (key_0, key_1) = self.generate_ebpf_map_key(
-            ip_src,
-            ip_dst,
-            l3_epc_id_src,
-            l3_epc_id_dst,
-            endpoints.src_info.l2_end,
-        );
+        let (key_0, key_1) = self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, endpoints.src_info.l2_end);
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let endpoints = Arc::new(endpoints);
-        self.ebpf_table.put(key, endpoints.clone());
+        let table = self.get_endpoint_table(table_type);
+        table.put(key, endpoints.clone());
 
         // NOTE: key_0 and key_1 cannot be the same.
         let key = (key_1 as u128) << 64 | key_0 as u128;
-        self.ebpf_table.put(key, Arc::new(endpoints.reversed()));
+        table.put(key, Arc::new(endpoints.reversed()));
 
         return endpoints;
     }
 
-    pub fn ebpf_get_endpoints(
+    pub fn get_endpoints(
         &mut self,
+        table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
         l2_end_0: bool,
     ) -> Option<Arc<EndpointData>> {
-        if self.ebpf_table_flush_flag.load(Ordering::Relaxed) {
-            self.ebpf_table.clear();
-            self.ebpf_table_flush_flag.store(false, Ordering::Relaxed);
+        if self.flush_endpoint_table(table_type) {
             return None;
         }
 
         let (key_0, key_1) =
-            self.generate_ebpf_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0);
+            self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0);
         let key = (key_0 as u128) << 64 | key_1 as u128;
 
-        self.ebpf_table.get(&key).and_then(|x| Some(x.clone()))
+        self.get_endpoint_table(table_type)
+            .get(&key)
+            .and_then(|x| Some(x.clone()))
     }
 
-    fn generate_ebpf_map_key(
+    fn generate_endpoints_map_key(
         &self,
         ip_src: IpAddr,
         ip_dst: IpAddr,
@@ -577,10 +617,12 @@ impl FastPath {
                 table
             },
             ebpf_table: LruCache::new(map_size.try_into().unwrap()),
+            otel_table: LruCache::new(map_size.try_into().unwrap()),
 
             caches: [ARRAY_REPEAT_NONE; super::MAX_QUEUE_COUNT + 1],
             policy_table_flush_flags: [FLUSH_FLAGS; super::MAX_QUEUE_COUNT + 1],
             ebpf_table_flush_flag: FLUSH_FLAGS,
+            otel_table_flush_flag: FLUSH_FLAGS,
         }
     }
 
@@ -592,7 +634,8 @@ impl FastPath {
         self.policy_table_flush_flags.iter_mut().for_each(|f| {
             f.store(true, Ordering::Relaxed);
         });
-        self.ebpf_table_flush_flag.store(true, Ordering::Relaxed)
+        self.ebpf_table_flush_flag.store(true, Ordering::Relaxed);
+        self.otel_table_flush_flag.store(true, Ordering::Relaxed);
     }
 }
 
@@ -858,24 +901,24 @@ mod tests {
         endpoints.src_info.l3_epc_id = 10;
         endpoints.dst_info.l3_epc_id = 20;
 
-        let e = table.ebpf_add_endpoints(ip_src, ip_dst, 10, 0, endpoints);
+        let e = table.add_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 0, endpoints);
         assert_eq!(10, e.src_info.l3_epc_id);
         assert_eq!(20, e.dst_info.l3_epc_id);
         let e = table
-            .ebpf_get_endpoints(ip_src, ip_dst, 10, 0, true)
+            .get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 0, true)
             .unwrap();
         assert_eq!(10, e.src_info.l3_epc_id);
         assert_eq!(20, e.dst_info.l3_epc_id);
         let e = table
-            .ebpf_get_endpoints(ip_dst, ip_src, 0, 10, false)
+            .get_endpoints(EndpointTableType::Ebpf, ip_dst, ip_src, 0, 10, false)
             .unwrap();
         assert_eq!(20, e.src_info.l3_epc_id);
         assert_eq!(10, e.dst_info.l3_epc_id);
-        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 0, true);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 0, true);
         assert!(e.is_none());
-        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 10, false);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 10, false);
         assert!(e.is_none());
-        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 10, 20, true);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 20, true);
         assert!(e.is_none());
 
         let ip_src = IpAddr::from("192.168.1.100".parse::<Ipv4Addr>().unwrap());
@@ -884,19 +927,15 @@ mod tests {
         endpoints.src_info.l2_end = true;
         endpoints.src_info.l3_epc_id = 10;
         endpoints.dst_info.l3_epc_id = 10;
-        let e = table.ebpf_add_endpoints(ip_src, ip_dst, 10, 10, endpoints);
+        let e = table.add_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 10, endpoints);
         assert_eq!(true, e.src_info.l2_end);
         assert_eq!(false, e.dst_info.l2_end);
 
-        let e = table
-            .ebpf_get_endpoints(ip_src, ip_dst, 10, 10, true)
-            .unwrap();
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 10, true).unwrap();
         assert_eq!(true, e.src_info.l2_end);
         assert_eq!(false, e.dst_info.l2_end);
 
-        let e = table
-            .ebpf_get_endpoints(ip_dst, ip_src, 10, 10, false)
-            .unwrap();
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_dst, ip_src, 10, 10, false).unwrap();
         assert_eq!(false, e.src_info.l2_end);
         assert_eq!(true, e.dst_info.l2_end);
     }
