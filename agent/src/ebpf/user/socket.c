@@ -196,6 +196,50 @@ kfunc_set_sym_for_entry_and_exit(struct tracer_probes_conf *tps, const char *fn)
 	kfunc_set_symbol(tps, fn, true);
 }
 
+static inline void config_probes_for_proc_event(struct tracer_probes_conf *tps)
+{
+	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
+		/*
+		 * Different CPU architectures have variations in system calls.
+		 * It is necessary to confirm whether a specific system call exists.
+		 * You can check https://arm64.syscall.sh/ for reference.
+		 */
+		if (kallsyms_lookup_name("sys_fork"))
+			probes_set_exit_symbol(tps, "sys_fork");
+		else if (kallsyms_lookup_name("__arm64_sys_fork"))
+			probes_set_exit_symbol(tps, "__arm64_sys_fork");
+		else if (kallsyms_lookup_name("__x64_sys_fork"))
+			probes_set_exit_symbol(tps, "__x64_sys_fork");
+	} else {
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	}
+
+	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
+		if (kallsyms_lookup_name("sys_clone"))
+			probes_set_exit_symbol(tps, "sys_clone");
+		else if (kallsyms_lookup_name("__arm64_sys_clone"))
+			probes_set_exit_symbol(tps, "__arm64_sys_clone");
+		else if (kallsyms_lookup_name("__x64_sys_clone"))
+			probes_set_exit_symbol(tps, "__x64_sys_clone");
+	} else {
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
+	}
+
+	if (access(FTRACE_SCHED_PROC_PATH, F_OK)) {
+#if defined(__x86_64__)	
+		probes_set_exit_symbol(tps, "__x64_sys_execveat");
+		probes_set_exit_symbol(tps, "__x64_sys_execve");
+#else
+		probes_set_exit_symbol(tps, "__arm64_sys_execveat");
+		probes_set_exit_symbol(tps, "__arm64_sys_execve");
+#endif
+		probes_set_enter_symbol(tps, "do_exit");
+	} else {
+		tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
+		tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
+	}
+}
+
 static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 {
 	kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
@@ -216,30 +260,7 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_symbol(tps, "__sys_socket", true);
 	kfunc_set_symbol(tps, "__sys_accept4", true);
 	kfunc_set_symbol(tps, "__sys_connect", false);
-	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
-		/*
-		 * Different CPU architectures have variations in system calls.
-		 * It is necessary to confirm whether a specific system call exists.
-		 * You can check https://arm64.syscall.sh/ for reference.
-		 */
-		if (kallsyms_lookup_name("sys_fork"))
-			probes_set_exit_symbol(tps, "sys_fork");
-	}
-
-	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
-		if (kallsyms_lookup_name("sys_clone"))
-			probes_set_exit_symbol(tps, "sys_clone");
-	}
-	// process execute
-	if (!access(SYSCALL_FORK_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
-	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
-
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
-	// process exit
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
-
+	config_probes_for_proc_event(tps);
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 }
@@ -264,20 +285,7 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 		probes_set_enter_symbol(tps, "do_readv");
 	}
 
-	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
-		/*
-		 * Different CPU architectures have variations in system calls.
-		 * It is necessary to confirm whether a specific system call exists.
-		 * You can check https://arm64.syscall.sh/ for reference.
-		 */
-		if (kallsyms_lookup_name("sys_fork"))
-			probes_set_exit_symbol(tps, "sys_fork");
-	}
-
-	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
-		if (kallsyms_lookup_name("sys_clone"))
-			probes_set_exit_symbol(tps, "sys_clone");
-	}
+	config_probes_for_proc_event(tps);
 
 	/* tracepoints */
 
@@ -315,15 +323,6 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
-	// process execute
-	if (!access(SYSCALL_FORK_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
-	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
-	// process exit
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
-
 	// clear trace connection & fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 
@@ -373,16 +372,7 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 		probes_set_symbol(tps, "do_readv");
 	}
 
-	/*
-	 * Different CPU architectures have variations in system calls.
-	 * It is necessary to confirm whether a specific system call exists.
-	 * You can check https://arm64.syscall.sh/ for reference.
-	 */
-	if (kallsyms_lookup_name("sys_fork"))
-		probes_set_exit_symbol(tps, "sys_fork");
-
-	if (kallsyms_lookup_name("sys_clone"))
-		probes_set_exit_symbol(tps, "sys_clone");
+	config_probes_for_proc_event(tps);
 
 #if defined(__x86_64__)
 	probes_set_enter_symbol(tps, "__x64_sys_getppid");
@@ -397,8 +387,6 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__close_fd");
 	probes_set_exit_symbol(tps, "__sys_socket");
 	probes_set_enter_symbol(tps, "__sys_connect");
-	probes_set_exit_symbol(tps, "do_execveat");
-	probes_set_exit_symbol(tps, "do_execve");
 }
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
