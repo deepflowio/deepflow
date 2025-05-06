@@ -346,12 +346,13 @@ global:
 
 **详细描述**:
 
-设置为 0 表示不检查系统可用内存/空闲内存比率。
-1. 当系统可用内存/空闲内存比率低于 Trigger_threshold * 70% 时，
+设置为 0 表示不检查系统内存比率。
+观测内存比率是由 `global.circuit_breakers.sys_memory_percentage.metric` 决定.
+1. 当系统`观测内存比率`低于 `trigger_threshold` * 70% 时，
    采集器将自动重启。
-2. 当系统可用内存/空闲内存比率低于 Trigger_threshold 但高于 70% 时，
+2. 当系统`观测内存比率低于 `trigger_threshold` 但高于 70% 时，
    采集器设置为 `FREE_MEM_EXCEEDED` 的异常状态，并上报采集器异常告警。
-3. 当系统可用内存/空闲内存比率持续高于 Trigger_threshold * 110% 时，
+3. 当系统`观测内存比率`持续高于 `trigger_threshold` * 110% 时，
    采集器将从异常状态恢复。
 
 #### 观测指标 {#global.circuit_breakers.sys_memory_percentage.metric}

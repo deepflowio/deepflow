@@ -347,12 +347,13 @@ global:
 
 **Description**:
 
-Setting it to 0 indicates that the system free/available memory ratio is not checked.
-1. When the current system free/available memory ratio is below trigger_threshold * 70%,
+Setting it to 0 indicates that the system memory ratio is not checked.
+The `observed memory ratio` is determined by `global.circuit_breakers.sys_memory_percentage.metric`.
+1. When the current system `observed memory ratio` is below `trigger_threshold` * 70%,
    the agent will automatically restart.
-2. When the current system free/available memory ratio is below trigger_threshold but above 70%,
+2. When the current system `observed memory ratio` is below trigger_threshold but above 70%,
    the agent is set to the abnormal state of `FREE_MEM_EXCEEDED` and reports an alarm.
-3. When the current system free/available memory ratio remains above trigger_threshold * 110%,
+3. When the current system `observed memory ratio` remains above `trigger_threshold` * 110%,
    the agent recovers from the abnormal state.
 
 #### Metric {#global.circuit_breakers.sys_memory_percentage.metric}
@@ -572,7 +573,7 @@ Monitoring interval for outbound traffic rate of NPB interface.
 
 ## Tunning {#global.tunning}
 
-Tune the operation of deepflow-agent.
+Tune the runtime of deepflow-agent.
 
 ### CPU Affinity {#global.tunning.cpu_affinity}
 
@@ -837,7 +838,7 @@ When the clock drift exceeds this value, the timestamp will be corrected.
 
 ## Communication {#global.communication}
 
-Configure deepflow-agent communication parameters.
+Configuration of deepflow-agent communication.
 
 ### Proactive Request Interval {#global.communication.proactive_request_interval}
 
