@@ -461,9 +461,12 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		nodeIP := nodeIPSlice[0]
 		IPs := strings.Split(vItem.IPs, ",")
 		for _, ipString := range IPs {
+			if ipString == "" {
+				continue
+			}
 			ipPrefix, err := netaddr.ParseIPPrefix(ipString)
 			if err != nil {
-				log.Errorf("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error(), logger.NewORGPrefix(k.orgID))
+				log.Infof("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error(), logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			switch {
