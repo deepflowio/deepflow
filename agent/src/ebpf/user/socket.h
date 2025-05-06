@@ -26,6 +26,7 @@
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define SYSCALL_PRWV2_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_enter_preadv2"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
+#define FTRACE_SCHED_PROC_PATH "/sys/kernel/debug/tracing/events/sched/sched_process_exec"
 
 /*
  * The `__sys_recvmmsg` interface underwent a change in its parameter list starting
