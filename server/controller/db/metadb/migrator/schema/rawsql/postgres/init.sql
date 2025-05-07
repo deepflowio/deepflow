@@ -1106,7 +1106,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     synced_analyzer_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     boot_time               INTEGER DEFAULT 0,
-    exceptions              INTEGER DEFAULT 0 CHECK (exceptions >= 0),
+    exceptions              BIGINT DEFAULT 0 CHECK (exceptions >= 0),
     vtap_lcuuid             VARCHAR(64) DEFAULT NULL,
     vtap_group_lcuuid       VARCHAR(64) DEFAULT NULL,
     cpu_num                 INTEGER DEFAULT 0,
