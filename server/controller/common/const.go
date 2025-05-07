@@ -167,10 +167,11 @@ var VTapTypeChinese = map[int]string{
 
 // need synchronized update with the cli
 const (
-	VTAP_EXCEPTION_PRODUCT_NOT_SUPPORTED   = 0x8000000
-	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH     = 0x10000000
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED   = 0x40000000
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED = 0x80000000
+	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH     = 0x100000000
+	VTAP_EXCEPTION_PRODUCT_NOT_SUPPORTED   = 0x200000000
+	VTAP_EXCEPTION_NOT_ALLOWED_CE          = 0x400000000
 )
 
 var VTapExceptionChinese = map[int64]string{
@@ -196,10 +197,11 @@ var VTapExceptionChinese = map[int64]string{
 	1 << 19:                                "CGROUPS配置错误",
 	1 << 20:                                "系统负载超限触发熔断",
 	1 << 21:                                "数据流量达到限速",
-	VTAP_EXCEPTION_PRODUCT_NOT_SUPPORTED:   "当前产品不支持此类采集器",
-	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH:     "采集器授权个数不足",
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED:   "分配数据节点失败",
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED: "分配控制器失败",
+	VTAP_EXCEPTION_PRODUCT_NOT_SUPPORTED:   "当前产品不支持此类采集器",
+	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH:     "采集器授权个数不足",
+	VTAP_EXCEPTION_NOT_ALLOWED_CE:          "社区版采集器无法在企业版中使用",
 }
 
 const VTAP_LICENSE_CHECK_INTERVAL = time.Minute

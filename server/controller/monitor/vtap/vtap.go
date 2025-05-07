@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
+	"github.com/deepflowio/deepflow/server/controller/monitor/vtap/version"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -61,6 +62,8 @@ func (v *VTapCheck) Start(sCtx context.Context) {
 					v.launchServerCheck(db)
 					// check vtap type
 					v.typeCheck(db)
+					// check vtap version
+					v.versionCheck(db)
 					// check vtap lost time
 					if v.cfg.VTapAutoDelete.Enabled {
 						v.deleteLostVTap(db)
@@ -312,6 +315,13 @@ func (v *VTapCheck) typeCheck(db *metadb.DB) {
 	}
 
 	log.Debugf("vtap type check end", db.LogPrefixORGID)
+}
+
+func (v *VTapCheck) versionCheck(db *metadb.DB) {
+	err := version.VTapVersionCheck(db)
+	if err != nil {
+		log.Error(err.Error(), db.LogPrefixORGID)
+	}
 }
 
 func (v *VTapCheck) deleteLostVTap(db *metadb.DB) {
