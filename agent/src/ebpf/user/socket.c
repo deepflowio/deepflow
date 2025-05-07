@@ -393,6 +393,10 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 	probes_set_symbol(tps, "__sys_sendmmsg");
 	probes_set_symbol(tps, "__sys_recvmsg");
 	probes_set_symbol(tps, "__sys_recvmmsg");
+	probes_set_symbol(tps, "ksys_pread64");
+	probes_set_symbol(tps, "do_preadv");
+	probes_set_symbol(tps, "ksys_pwrite64");
+	probes_set_symbol(tps, "do_pwritev");
 
 	if (k_version == KERNEL_VERSION(3, 10, 0)) {
 		/*
