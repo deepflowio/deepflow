@@ -188,7 +188,7 @@ type VTap struct {
 	SyncedAnalyzerAt    time.Time `gorm:"column:synced_analyzer_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_ANALYZER_AT"`
 	CreatedAt           time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	BootTime            int       `gorm:"column:boot_time;type:int;default:0" json:"BOOT_TIME"`
-	Exceptions          int64     `gorm:"column:exceptions;type:int unsigned;default:0" json:"EXCEPTIONS"`
+	Exceptions          int64     `gorm:"column:exceptions;type:bigint unsigned;default:0" json:"EXCEPTIONS"`
 	VTapLcuuid          string    `gorm:"column:vtap_lcuuid;type:char(64);default:null" json:"VTAP_LCUUID"`
 	VtapGroupLcuuid     string    `gorm:"column:vtap_group_lcuuid;type:char(64);default:null" json:"VTAP_GROUP_LCUUID"`
 	CPUNum              int       `gorm:"column:cpu_num;type:int;default:0" json:"CPU_NUM"` // logical number of cpu
