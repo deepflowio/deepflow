@@ -382,18 +382,20 @@ impl Throttle {
 
     fn acquire(&mut self, current: Duration) -> bool {
         self.period_count += 1;
-
+        
         // Local timestamp may be modified
         if current < self.last_flush_time {
+            info!("throttle (current={}  last={} ) ", current.as_micros(), self.last_flush_time.as_micros());
             self.last_flush_time = current;
         }
 
         if current > self.last_flush_time + self.interval || self.last_flush_time.is_zero() {
+            info!("throttle tick (current={} {} last={} count={} throttle={}) ", current.as_micros(), current.as_secs(),self.last_flush_time.as_micros(), self.period_count, self.throttle);
             self.tick(current);
         }
 
         if self.period_count >= self.throttle {
-            return self.small_rng.gen_range(0..self.period_count) < self.throttle;
+            return false;
         }
 
         true
