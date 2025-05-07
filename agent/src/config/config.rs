@@ -2505,12 +2505,16 @@ impl Default for Npb {
 #[serde(default)]
 pub struct OutputCompression {
     pub application_log: bool,
+    pub l7_flow_log: bool,
+    pub l4_flow_log: bool,
 }
 
 impl Default for OutputCompression {
     fn default() -> Self {
         Self {
             application_log: true,
+            l7_flow_log: true,
+            l4_flow_log: false,
         }
     }
 }
