@@ -1536,6 +1536,8 @@ pub struct MetricServerConfig {
     pub compressed: bool,
     pub profile_compressed: bool,
     pub application_log_compressed: bool,
+    pub l7_flow_log_compressed: bool,
+    pub l4_flow_log_compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2138,6 +2140,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 compressed: conf.inputs.integration.compression.trace,
                 profile_compressed: conf.inputs.integration.compression.profile,
                 application_log_compressed: conf.outputs.compression.application_log,
+                l7_flow_log_compressed: conf.outputs.compression.l7_flow_log,
+                l4_flow_log_compressed: conf.outputs.compression.l4_flow_log,
             },
             agent_type: conf.global.common.agent_type,
             port_config: PortConfig {

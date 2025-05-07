@@ -9646,6 +9646,58 @@ Whether to compress the integrated application log data received by deepflow-age
 ratio is about 5:1~20:1. Turning on this feature will result in higher CPU consumption
 of deepflow-agent.
 
+### L7_Flow_Log {#outputs.compression.l7_flow_log}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.l7_flow_log`
+
+**Default value**:
+```yaml
+outputs:
+  compression:
+    l7_flow_log: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the l7 flow log.
+
+### L4_Flow_Log {#outputs.compression.l4_flow_log}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.l4_flow_log`
+
+**Default value**:
+```yaml
+outputs:
+  compression:
+    l4_flow_log: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the l4 flow log.
+
 # Plugins {#plugins}
 
 ## Wasm Plugins {#plugins.wasm_plugins}

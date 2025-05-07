@@ -6628,6 +6628,38 @@ outputs:
     #     开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
     #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
     application_log: true
+    # type: bool
+    # name:
+    #   en: L7_Flow_Log
+    #   ch: L7_Flow_Log
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to compress the l7 flow log.
+    #   ch: |-
+    #     开启后，deepflow-agent 将对调用日志进行压缩处理。注意：
+    #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
+    l7_flow_log: true
+    # type: bool
+    # name:
+    #   en: L4_Flow_Log
+    #   ch: L4_Flow_Log
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to compress the l4 flow log.
+    #   ch: |-
+    #     开启后，deepflow-agent 将对网络流日志进行压缩处理。注意：
+    #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
+    l4_flow_log: false
 
 # type: section
 # name:

@@ -9409,6 +9409,60 @@ outputs:
 开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
+### L7_Flow_Log {#outputs.compression.l7_flow_log}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.l7_flow_log`
+
+**默认值**:
+```yaml
+outputs:
+  compression:
+    l7_flow_log: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对调用日志进行压缩处理。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
+
+### L4_Flow_Log {#outputs.compression.l4_flow_log}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.l4_flow_log`
+
+**默认值**:
+```yaml
+outputs:
+  compression:
+    l4_flow_log: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对网络流日志进行压缩处理。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
+
 # 插件 {#plugins}
 
 ## Wasm 插件列表 {#plugins.wasm_plugins}
