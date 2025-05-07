@@ -169,8 +169,11 @@ static __inline int trace_io_event_common(void *ctx,
 	context->vecs = false;
 	context->is_close = false;
 	context->dir = direction;
-
+#ifdef SUPPORTS_KPROBE_ONLY
+	bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), PROG_OUTPUT_DATA_KP_IDX);
+#else
 	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
+#endif
 	return 0;
 #else
 	return __output_data_common(ctx, tracer_ctx, v_buff, data_args,
@@ -384,7 +387,11 @@ TP_SYSCALL_PROG(exit_pwritev2) (struct syscall_comm_exit_ctx *ctx) {
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
 
+#ifndef SUPPORTS_KPROBE_ONLY
 PROGTP(io_event) (void *ctx) {
+#else
+PROGKP(io_event) (void *ctx) {
+#endif
 	__u64 id = bpf_get_current_pid_tgid();
 
 	struct data_args_t *data_args = NULL;
