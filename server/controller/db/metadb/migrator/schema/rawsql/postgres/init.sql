@@ -1087,6 +1087,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     id                      SERIAL PRIMARY KEY,
     name                    VARCHAR(256) NOT NULL,
     raw_hostname            VARCHAR(256),
+    `owner`                 VARCHAR(64) DEFAULT '',
     state                   INTEGER DEFAULT 1,
     enable                  INTEGER DEFAULT 1,
     type                    INTEGER DEFAULT 0,
