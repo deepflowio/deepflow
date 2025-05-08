@@ -61,7 +61,7 @@ l7 = { path = "plugins/l7" }
 libc = "0.2.103"
 log = "0.4"
 lru = "0.9.0"
-md-5 = "0.10.1"
+md-5 = "0.10"
 nom = "7"
 npb_handler = { path = "plugins/npb_handler" }
 npb_pcap_policy = { path = "plugins/npb_pcap_policy" }

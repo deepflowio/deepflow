@@ -708,18 +708,16 @@ impl Trident {
                 .unwrap(),
         );
 
+        let mut k8s_opaque_id = None;
         if matches!(
             config_handler.static_config.agent_mode,
             RunningMode::Managed
         ) && running_in_k8s()
-            && config_handler
-                .static_config
-                .kubernetes_cluster_id
-                .is_empty()
         {
-            config_handler.static_config.kubernetes_cluster_id =
-                Config::get_k8s_cluster_id(&runtime, &session, &config_handler.static_config)
-                    .unwrap_or_default();
+            config_handler
+                .static_config
+                .fill_k8s_info(&runtime, &session);
+            k8s_opaque_id = Config::get_k8s_ca_md5();
         }
 
         let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
@@ -735,6 +733,7 @@ impl Trident {
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
+            k8s_opaque_id,
             config_handler.static_config.override_os_hostname.clone(),
             config_handler.static_config.agent_unique_identifier,
             exception_handler.clone(),

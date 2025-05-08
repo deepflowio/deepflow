@@ -172,8 +172,8 @@ impl Config {
         }
     }
 
-    pub async fn async_get_k8s_cluster_id(session: &Session, config: &Config) -> Option<String> {
-        let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
+    pub fn get_k8s_ca_md5() -> Option<String> {
+        match fs::read_to_string(K8S_CA_CRT_PATH) {
             Ok(c) => Some(
                 Md5::digest(c.as_bytes())
                     .into_iter()
@@ -181,22 +181,31 @@ impl Config {
             ),
             Err(e) => {
                 info!(
-                    "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
-                    K8S_CA_CRT_PATH, e
+                    "failed to read from {K8S_CA_CRT_PATH}: {e}, agent may not be running in K8s."
                 );
-                return None;
+                None
             }
+        }
+    }
+
+    // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
+    // 如果agent在容器中运行且ConfigMap中kubernetes-cluster-id为空,
+    // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
+    // ======================================================================================================
+    // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
+    // If agent is running in container and the kubernetes-cluster-id in the
+    // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
+    // after 1 minute of sleep until it succeeds
+    async fn async_get_k8s_cluster_id(session: &Session, config: &Config) -> Option<String> {
+        let request = agent::KubernetesClusterIdRequest {
+            ca_md5: Self::get_k8s_ca_md5(),
+            kubernetes_cluster_name: config.kubernetes_cluster_name.clone(),
+            team_id: Some(config.team_id.clone()),
         };
 
         loop {
-            let request = agent::KubernetesClusterIdRequest {
-                ca_md5: ca_md5.clone(),
-                kubernetes_cluster_name: config.kubernetes_cluster_name.clone(),
-                team_id: Some(config.team_id.clone()),
-            };
-
             match session
-                .grpc_get_kubernetes_cluster_id_with_statsd(request)
+                .grpc_get_kubernetes_cluster_id_with_statsd(request.clone())
                 .await
             {
                 Ok(response) => {
@@ -236,20 +245,12 @@ impl Config {
         }
     }
 
-    // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
-    // 如果agent在容器中运行且ConfigMap中kubernetes-cluster-id为空,
-    // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
-    // ======================================================================================================
-    // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
-    // If agent is running in container and the kubernetes-cluster-id in the
-    // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
-    // after 1 minute of sleep until it succeeds
-    pub fn get_k8s_cluster_id(
-        runtime: &Runtime,
-        session: &Session,
-        config: &Config,
-    ) -> Option<String> {
-        runtime.block_on(Self::async_get_k8s_cluster_id(session, config))
+    pub fn fill_k8s_info(&mut self, rt: &Runtime, session: &Session) {
+        if self.kubernetes_cluster_id.is_empty() {
+            if let Some(id) = rt.block_on(Self::async_get_k8s_cluster_id(session, self)) {
+                self.kubernetes_cluster_id = id;
+            }
+        }
     }
 }
 
