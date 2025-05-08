@@ -37,6 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
@@ -194,6 +195,7 @@ type VTapCache struct {
 	state              int
 	enable             int
 	vTapType           int
+	owner              *string
 	ctrlIP             *string
 	ctrlMac            *string
 	tapMac             *string
@@ -291,9 +293,9 @@ func (c *VTapCache) String() ([]byte, error) {
 		"id":                      c.GetVTapID(),
 		"name":                    c.GetVTapHost(),
 		"rawHostname":             c.GetVTapRawHostname(),
-		"state":                   c.state,
-		"enable":                  c.enable,
-		"vTapType":                c.vTapType,
+		"state":                   c.GetVTapState(),
+		"enable":                  c.GetVTapEnabled(),
+		"vTapType":                c.GetVTapType(),
 		"ctrlIP":                  c.GetCtrlIP(),
 		"ctrlMac":                 c.GetCtrlMac(),
 		"tsdbIP":                  c.GetTSDBIP(),
@@ -307,11 +309,11 @@ func (c *VTapCache) String() ([]byte, error) {
 		"bootTime":                c.GetBootTime(),
 		"exceptions":              c.GetExceptions(),
 		"vTapGroupLcuuid":         c.GetVTapGroupLcuuid(),
-		"licenseType":             c.licenseType,
-		"tapMode":                 c.tapMode,
-		"teamID":                  c.teamID,
-		"organizeID":              c.organizeID,
-		"licenseFunctionSet":      c.licenseFunctionSet.ToSlice(),
+		"licenseType":             c.GetLicenseType(),
+		"tapMode":                 c.GetTapMode(),
+		"teamID":                  c.GetTeamID(),
+		"organizeID":              c.GetOrganizeID(),
+		"licenseFunctionSet":      c.GetFunctions().ToSlice(),
 		"enabledNetNpb":           c.EnabledNetNpb(),
 		"enabledNetNpmd":          c.EnabledNetNpmd(),
 		"enabledNetDpdk":          c.EnabledNetDpdk(),
@@ -330,14 +332,14 @@ func (c *VTapCache) String() ([]byte, error) {
 		"enabledDevNetNpmd":       c.EnabledDevNetNpmd(),
 		"enabledDevTraceNet":      c.EnabledDevTraceNet(),
 		"enabledDevTraceBiz":      c.EnabledDevTraceBiz(),
-		"podDomains":              c.podDomains,
-		"pushVersionPlatformData": c.pushVersionPlatformData,
-		"pushVersionPolicy":       c.pushVersionPolicy,
-		"pushVersionGroups":       c.pushVersionGroups,
+		"podDomains":              c.getPodDomains(),
+		"pushVersionPlatformData": c.GetPushVersionPlatformData(),
+		"pushVersionPolicy":       c.GetPushVersionPolicy(),
+		"pushVersionGroups":       c.GetPushVersionGroups(),
 		"expectedRevision":        c.GetExpectedRevision(),
 		"upgradePackage":          c.GetUpgradePackage(),
-		"podClusterID":            c.podClusterID,
-		"vpcID":                   c.VPCID,
+		"podClusterID":            c.GetPodClusterID(),
+		"vpcID":                   c.GetVPCID(),
 	}
 	return json.Marshal(ret)
 }
@@ -347,6 +349,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
 	vTapCache.rawHostname = proto.String(vtap.RawHostname)
+	vTapCache.owner = proto.String(vtap.Owner)
 	vTapCache.state = vtap.State
 	vTapCache.enable = vtap.Enable
 	vTapCache.vTapType = vtap.Type
@@ -487,46 +490,48 @@ func (c *VTapCache) convertLicenseFunctions() {
 	}
 	c.licenseFunctionSet = functionSet
 
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPB) {
+	isOwnerCluster := c.GetOwner() == common.VTAP_OWNER_DEEPFLOW
+	isDedicated := c.GetVTapType() == common.VTAP_TYPE_DEDICATED
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPB) {
 		c.enabledNetNpb.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPMD) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPMD) {
 		c.enabledNetNpmd.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_DPDK) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_DPDK) {
 		c.enabledNetDpdk.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_NET) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_NET) {
 		c.enabledTraceNet.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_SYS) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_SYS) {
 		c.enabledTraceSys.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_APP) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_APP) {
 		c.enabledTraceApp.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_IO) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_IO) {
 		c.enabledTraceIo.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_BIZ) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_BIZ) {
 		c.enabledTraceBiz.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_CPU) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_CPU) {
 		c.enabledProfileCpu.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_RAM) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_RAM) {
 		c.enabledProfileRam.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_INT) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_INT) {
 		c.enabledProfileInt.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_METRIC) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_METRIC) {
 		c.enabledLegacyMetric.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_LOG) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_LOG) {
 		c.enabledLegacyLog.Set()
 	}
-	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_PROBE) {
+	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_PROBE) {
 		c.enabledLegacyProbe.Set()
 	}
 	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_NET_NPB) {
@@ -853,8 +858,26 @@ func (c *VTapCache) GetVTapType() int {
 	return c.vTapType
 }
 
+func (c *VTapCache) GetVTapState() int {
+	return c.state
+}
+
 func (c *VTapCache) GetVTapEnabled() int {
 	return c.enable
+}
+
+func (c *VTapCache) GetOwner() string {
+	if c.owner != nil {
+		return *c.owner
+	}
+	return ""
+}
+
+func (c *VTapCache) UpdateOwner(isOwnerCluster bool) {
+	if !isOwnerCluster {
+		return
+	}
+	c.owner = proto.String(common.VTAP_OWNER_DEEPFLOW)
 }
 
 func (c *VTapCache) GetVTapHost() string {
@@ -1160,6 +1183,10 @@ func (c *VTapCache) GetCurrentK8SImage() string {
 
 func (c *VTapCache) updateCurrentK8SImage(currentK8sImage string) {
 	c.currentK8sImage = &currentK8sImage
+}
+
+func (c *VTapCache) GetLicenseType() int {
+	return c.licenseType
 }
 
 func (c *VTapCache) GetTapMode() int {

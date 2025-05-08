@@ -983,6 +983,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                    VARCHAR(256) NOT NULL,
     raw_hostname            VARCHAR(256),
+    `owner`                 varchar(64) DEFAULT '',
     state                   INTEGER DEFAULT 1 COMMENT '0.not-connected 1.normal',
     enable                  INTEGER DEFAULT 1 COMMENT '0: stop 1: running',
     type                    INTEGER DEFAULT 0 COMMENT '1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod',
