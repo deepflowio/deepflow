@@ -14,27 +14,12 @@
  * limitations under the License.
  */
 
-mod bit;
-pub mod fast_path;
-pub mod first_path;
-mod forward;
-pub mod labeler;
-pub mod policy;
+package version
 
-pub use policy::{Policy, PolicyGetter, PolicySetter};
+import (
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+)
 
-use thiserror::Error;
-
-const MAX_QUEUE_COUNT: usize = 128;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("{0}")]
-    CustomError(String),
-    #[error(
-        "DDBS memory limit will be exceed, please enlarge total memory limit or optimize policy."
-    )]
-    ExceedMemoryLimit,
+func VTapVersionCheck(orgDB *metadb.DB) error {
+	return nil
 }
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;

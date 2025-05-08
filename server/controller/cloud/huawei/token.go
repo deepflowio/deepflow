@@ -113,7 +113,9 @@ func (h *HuaWei) refreshTokenMap() error {
 	for i := range jProjects {
 		jp := jProjects[i]
 		if !cloudcommon.CheckJsonAttributes(jp, []string{"id", "name"}) {
-			continue
+			err := fmt.Errorf("json attributes not match, id: %s, name: %s", jp.Get("id").MustString(), jp.Get("name").MustString())
+			log.Error(err.Error(), logger.NewORGPrefix(h.orgID))
+			return err
 		}
 		name := jp.Get("name").MustString()
 		if _, ok := h.config.IncludeRegions[name]; !ok {
@@ -130,7 +132,7 @@ func (h *HuaWei) refreshTokenMap() error {
 			} else {
 				log.Error(msg, logger.NewORGPrefix(h.orgID))
 			}
-			continue
+			return err
 		}
 		projectIDs = append(projectIDs, id)
 		h.projectTokenMap[Project{name, id}] = token
@@ -138,7 +140,7 @@ func (h *HuaWei) refreshTokenMap() error {
 
 	for p, t := range h.projectTokenMap {
 		if !common.Contains(projectIDs, p.id) {
-			log.Infof("project (%+v) lose", p, logger.NewORGPrefix(h.orgID))
+			log.Infof("exclude project: %+v, not in project list: %+v", p, jProjects, logger.NewORGPrefix(h.orgID))
 			delete(h.projectTokenMap, p)
 			continue
 		}
@@ -146,10 +148,9 @@ func (h *HuaWei) refreshTokenMap() error {
 			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.Domain, p.id), t.token, "vpcs", pageQueryMethodMarker,
 		))
 		if err != nil {
-			delete(h.projectTokenMap, p)
-			continue
+			return err
 		} else if len(jvpcs) == 0 {
-			log.Infof("exclude project (%+v), has no vpc", p, logger.NewORGPrefix(h.orgID))
+			log.Infof("exclude project: %+v, has no vpc", p, logger.NewORGPrefix(h.orgID))
 			delete(h.projectTokenMap, p)
 			continue
 		}
