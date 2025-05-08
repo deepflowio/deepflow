@@ -121,6 +121,7 @@ message SyncRequest {
     optional KubernetesWatchPolicy kubernetes_watch_policy = 41;
     optional string kubernetes_cluster_id = 45;    // 仅对容器类型的 agent 有意义
     optional string kubernetes_cluster_name = 46;  // 仅对容器类型的 agent 有意义
+    optional string kubernetes_cluster_md5 = 47;  // 仅对容器类型的 agent 有意义
 }
 
 enum Status {
