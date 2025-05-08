@@ -102,6 +102,7 @@ pub struct StaticConfig {
     pub env: RuntimeEnvironment,
     pub kubernetes_cluster_id: String,
     pub kubernetes_cluster_name: Option<String>,
+    pub kubernetes_cluster_opaque_id: Option<String>,
 
     pub override_os_hostname: Option<String>,
     pub agent_unique_identifier: AgentIdentifier,
@@ -129,6 +130,7 @@ impl Default for StaticConfig {
             env: Default::default(),
             kubernetes_cluster_id: Default::default(),
             kubernetes_cluster_name: Default::default(),
+            kubernetes_cluster_opaque_id: Default::default(),
             override_os_hostname: None,
             agent_unique_identifier: Default::default(),
             current_k8s_image: None,
@@ -522,6 +524,7 @@ impl Synchronizer {
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         kubernetes_cluster_name: Option<String>,
+        kubernetes_cluster_opaque_id: Option<String>,
         override_os_hostname: Option<String>,
         agent_unique_identifier: crate::config::AgentIdType,
         exception_handler: ExceptionHandler,
@@ -540,6 +543,7 @@ impl Synchronizer {
                 env: RuntimeEnvironment::new(),
                 kubernetes_cluster_id,
                 kubernetes_cluster_name,
+                kubernetes_cluster_opaque_id,
                 override_os_hostname,
                 agent_unique_identifier: agent_unique_identifier.into(),
                 #[cfg(any(target_os = "linux"))]
@@ -665,6 +669,7 @@ impl Synchronizer {
             agent_group_id_request: Some(static_config.vtap_group_id_request.clone()),
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
+            kubernetes_cluster_md5: static_config.kubernetes_cluster_opaque_id.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
             kubernetes_watch_policy: Some(
                 pb::KubernetesWatchPolicy::from(KubeWatchPolicy::get()).into(),
