@@ -2512,6 +2512,8 @@ impl Default for Npb {
 pub struct OutputCompression {
     pub application_log: bool,
     pub pcap: bool,
+    pub l7_flow_log: bool,
+    pub l4_flow_log: bool,
 }
 
 impl Default for OutputCompression {
@@ -2519,6 +2521,8 @@ impl Default for OutputCompression {
         Self {
             application_log: true,
             pcap: true,
+            l7_flow_log: true,
+            l4_flow_log: false,
         }
     }
 }
