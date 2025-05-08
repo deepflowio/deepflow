@@ -263,6 +263,15 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_symbol(tps, "__sys_accept4", true);
 	kfunc_set_symbol(tps, "__sys_connect", false);
 	config_probes_for_proc_event(tps);
+
+	/*
+	 * On certain kernels, such as 5.15.0-127-generic and 5.10.134-18.al8.x86_64,
+	 * `recvmmsg()` probes of type `kprobe`/`kfunc` may not work properly. To address
+	 * this, we use the more stable `tracepoint`-based probe instead.
+	 */
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
+
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 
