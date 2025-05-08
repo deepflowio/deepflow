@@ -26,6 +26,7 @@
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define SYSCALL_PRWV2_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_enter_preadv2"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
+#define FTRACE_SCHED_PROC_PATH "/sys/kernel/debug/tracing/events/sched/sched_process_exec"
 
 /*
  * The `__sys_recvmmsg` interface underwent a change in its parameter list starting
@@ -51,6 +52,7 @@ enum linux_kernel_type {
 	K_TYPE_VER_3_10,
 	K_TYPE_KFUNC,
 	K_TYPE_RT,
+	K_TYPE_KPROBE,
 };
 
 enum probes_act_type {
@@ -430,4 +432,5 @@ void disable_kprobe_feature(void);
  * for monitoring and tracing specific points in the kernel.
  */
 void enable_kprobe_feature(void);
+bool is_pure_kprobe_ebpf(void);
 #endif /* DF_USER_SOCKET_H */
