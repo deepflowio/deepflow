@@ -2389,7 +2389,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
-            SenderEncoder::Raw,
+            if candidate_config.metric_server.l4_flow_log_compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let metrics_queue_name = "3-doc-to-collector-sender";
@@ -2435,7 +2439,11 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
-            SenderEncoder::Raw,
+            if candidate_config.metric_server.l7_flow_log_compressed {
+                SenderEncoder::Zlib
+            } else {
+                SenderEncoder::Raw
+            },
         );
 
         let analyzer_ip = if candidate_config
