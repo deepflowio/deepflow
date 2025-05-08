@@ -1089,6 +1089,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     raw_hostname            VARCHAR(256),
     state                   INTEGER DEFAULT 1,
     enable                  INTEGER DEFAULT 1,
+    same_cluster            INTEGER DEFAULT 0,
     type                    INTEGER DEFAULT 0,
     ctrl_ip                 VARCHAR(64) NOT NULL,
     ctrl_mac                VARCHAR(64),

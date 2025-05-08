@@ -985,6 +985,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     raw_hostname            VARCHAR(256),
     state                   INTEGER DEFAULT 1 COMMENT '0.not-connected 1.normal',
     enable                  INTEGER DEFAULT 1 COMMENT '0: stop 1: running',
+    same_cluster            INTEGER DEFAULT 0 COMMENT '0: false 1: true',
     type                    INTEGER DEFAULT 0 COMMENT '1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod',
     ctrl_ip                 CHAR(64) NOT NULL,
     ctrl_mac                CHAR(64),

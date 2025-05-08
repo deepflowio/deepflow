@@ -143,13 +143,13 @@ func DecryptSecretKey(secretKey string) (string, error) {
 	return decryptSecretKey, nil
 }
 
-func GetLocalClusterID() (string, error) {
+func GetLocalCAMD5() (string, error) {
 	caData, err := os.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return "", err
 	}
-	return GenerateKuberneteClusterIDByMD5(GenerateAesKey(caData))
+	return GenerateAesKey(caData), nil
 }
 
 func getCAMD5() string {
