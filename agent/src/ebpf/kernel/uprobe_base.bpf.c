@@ -614,8 +614,7 @@ UPROG(exit_runtime_newproc1) (struct pt_regs *ctx)
 	return 0;
 }
 
-// /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
-TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
+static __inline int do_process_exit(void *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -641,6 +640,15 @@ TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
 
 	bpf_map_delete_elem(&goroutines_map, &id);
 	return 0;
+}
+
+KPROG(do_exit) (struct pt_regs *ctx) {
+	return do_process_exit((void *)ctx);
+}
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
+TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx) {
+	return do_process_exit((void *)ctx);
 }
 
 static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
@@ -677,7 +685,6 @@ static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
 	bpf_get_current_comm(data.name, sizeof(data.name));
 	bpf_perf_event_output(ctx, &NAME(socket_data),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));
-
 	return 0;
 }
 
@@ -691,7 +698,23 @@ KRETPROG(sys_fork) (struct pt_regs* ctx) {
 	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
 }
 
+KRETPROG(__x64_sys_fork) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
+}
+
+KRETPROG(__arm64_sys_fork) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
+}
+
 KRETPROG(sys_clone) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
+}
+
+KRETPROG(__x64_sys_clone) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
+}
+
+KRETPROG(__arm64_sys_clone) (struct pt_regs* ctx) {
 	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
 }
 
@@ -705,8 +728,7 @@ TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
 	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
 }
 
-// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
-TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
+static __inline int __process_exec(void *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -727,4 +749,28 @@ TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 	}
 
 	return 0;
+}
+
+#if defined(__x86_64__)
+KRETPROG(__x64_sys_execve) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+
+KRETPROG(__x64_sys_execveat) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+#else
+KRETPROG(__arm64_sys_execve) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+
+KRETPROG(__arm64_sys_execveat) (struct pt_regs *ctx) {
+	return __process_exec((void *)ctx);
+}
+#endif
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
+TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
+{
+	return __process_exec((void *)ctx);
 }
