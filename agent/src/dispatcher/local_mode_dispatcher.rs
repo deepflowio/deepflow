@@ -226,7 +226,7 @@ impl LocalModeDispatcher {
             base.counter.rx.fetch_add(1, Ordering::Relaxed);
             base.counter
                 .rx_bytes
-                .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+                .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
             if base.tunnel_info.tunnel_type != TunnelType::None {
                 meta_packet.tunnel = Some(base.tunnel_info);
