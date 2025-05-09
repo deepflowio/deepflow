@@ -672,7 +672,9 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
                 match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
+                    EbpfType::GoHttp2Uprobe
+                    | EbpfType::GoHttp2UprobeData
+                    | EbpfType::UnixSocket => {
                         if param.direction == PacketDirection::ServerToClient {
                             return false;
                         }

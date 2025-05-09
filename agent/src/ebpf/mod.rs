@@ -154,6 +154,8 @@ pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
+#[allow(dead_code)]
+pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
 cfg_if::cfg_if! {
     if #[cfg(feature = "extended_observability")] {
         #[allow(dead_code)]
