@@ -4019,6 +4019,15 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 *
 	 * Due to the limitation of the number of eBPF instruction in kernel, this feature
 	 * is suitable for Linux5.2+
+	 *
+	 * When loading the kfunc bytecode, we encountered the error:
+	 * "bcc_prog_load() failed. name: kretfunc____sys_sendmmsg, Argument
+	 * list too long errno: 7.” The instruction count reached 20,902, and
+	 * although it hasn't exceeded the `BPF_MAXINSNS` limit (which defaults
+	 * to one million), the number or complexity of instructions may have
+	 * exceeded the verifier's capabilities. To avoid this issue, we reduced
+	 * the code size by removing less frequently used protocols(e.g.: PROTO_ZMTP)
+	 * from the fast path of protocol inference.
 	 */
 
 	__u32 pid = (__u32) bpf_get_current_pid_tgid();
@@ -4215,16 +4224,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						    conn_info)) !=
 			    MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_OPENWIRE;
-				return inferred_message;
-			}
-			break;
-		case PROTO_ZMTP:
-			if ((inferred_message.type =
-			     infer_zmtp_message(infer_buf, count,
-						syscall_infer_addr,
-						syscall_infer_len,
-						conn_info)) != MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_ZMTP;
 				return inferred_message;
 			}
 			break;
