@@ -167,6 +167,7 @@ impl LocalMultinsModeDispatcher {
                     &mut packet.timestamp,
                     (packet.ns_ino as u64) << 32 | (packet.if_index as u64),
                     &mut packet.raw,
+                    packet.original_length as u64,
                 ) else {
                     continue;
                 };
