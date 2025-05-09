@@ -319,8 +319,8 @@ static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 	return 0;
 }
 
-void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				 uint8_t *name, int name_size)
+int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				uint8_t *name, int name_size)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
@@ -343,7 +343,10 @@ void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 					sizeof(p->comm));
 		}
 		AO_DEC(&p->use);
+		return 0;
 	}
+
+	return -1;
 }
 
 static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
@@ -993,11 +996,12 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	return;
 }
 
-void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				 uint8_t *name, int name_size)
+int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				uint8_t *name, int name_size)
 {
 	memset(cid, 0, cid_size);
 	memset(name, 0, name_size);
+	return -1;
 }
 
 int create_and_init_proc_info_caches(void)
