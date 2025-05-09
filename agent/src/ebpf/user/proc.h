@@ -205,13 +205,15 @@ int create_and_init_proc_info_caches(void);
  * @param cid_size   Size of the `cid` buffer in bytes.
  * @param name       Output buffer to store the process name (comm).
  * @param name_size  Size of the `name` buffer in bytes.
- *
+ * @return
+ *    0 : In process cache, successfully obtained.
+ *   -1 : Not in process cache, failed to obtain.
  * @note If the process entry is found, its reference count is incremented
  *       before use and decremented after, ensuring thread safety.
  * @note If no valid data is found, `cid` and `name` will remain zero-filled.
  */
-void get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				 uint8_t *name, int name_size);
+int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+				uint8_t *name, int name_size);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers
