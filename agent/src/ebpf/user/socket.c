@@ -1008,11 +1008,14 @@ copy_event:
 static void set_cid_and_name(struct socket_bpf_data *submit_data,
 			     struct __socket_data *sd)
 {
-	get_cid_and_name_from_cache(sd->tgid, submit_data->container_id,
-				    sizeof(submit_data->container_id),
-				    submit_data->process_kname,
-				    sizeof(submit_data->process_kname));
-	if (submit_data->container_id[0] == '\0') {
+	int ret;
+	ret = get_cid_and_name_from_cache(sd->tgid, submit_data->container_id,
+					  sizeof(submit_data->container_id),
+					  submit_data->process_kname,
+					  sizeof(submit_data->process_kname));
+
+	// Not found in the process cache, attempting to retrieve from procfs.
+	if (ret) {
 		fetch_container_id_from_proc(sd->tgid,
 					     (char *)submit_data->container_id,
 					     sizeof(submit_data->container_id));
