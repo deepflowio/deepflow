@@ -74,6 +74,7 @@ impl LocalModeDispatcher {
         timestamp: &mut Duration,
         if_index: u64,
         data: &'a mut [u8],
+        capture_length: u64,
     ) -> Option<MetaPacket<'a>> {
         let pipeline = {
             let pipelines = is.pipelines.lock().unwrap();
@@ -169,7 +170,7 @@ impl LocalModeDispatcher {
         is.counter.rx.fetch_add(1, Ordering::Relaxed);
         is.counter
             .rx_bytes
-            .fetch_add(data.len() as u64, Ordering::Relaxed);
+            .fetch_add(capture_length, Ordering::Relaxed);
 
         if is.tunnel_info.tunnel_type != TunnelType::None {
             meta_packet.tunnel = Some(is.tunnel_info);
@@ -283,6 +284,7 @@ impl LocalModeDispatcher {
                 &mut timestamp,
                 packet.if_index as u64,
                 &mut packet.data,
+                packet.capture_length as u64,
             ) else {
                 continue;
             };
