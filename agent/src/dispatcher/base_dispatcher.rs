@@ -295,7 +295,7 @@ impl BaseDispatcher {
         counter.rx_all.fetch_add(1, Ordering::Relaxed);
         counter
             .rx_all_bytes
-            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+            .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
         Some((packet, timestamp))
     }
