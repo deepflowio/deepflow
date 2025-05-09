@@ -624,6 +624,8 @@ type PeerConnection struct {
 	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_EPC_ID" mapstructure:"REMOTE_EPC_ID"`
 	LocalRegionID  int    `gorm:"column:local_region_id;type:int;default:0" json:"LOCAL_REGION_ID" mapstructure:"LOCAL_REGION_ID"`
 	RemoteRegionID int    `gorm:"column:remote_region_id;type:int;default:0" json:"REMOTE_REGION_ID" mapstructure:"REMOTE_REGION_ID"`
+	LocalDomain    string `gorm:"column:local_domain;type:char(64);default:''" json:"LOCAL_DOMAIN" mapstructure:"LOCAL_DOMAIN"`
+	RemoteDomain   string `gorm:"column:remote_domain;type:char(64);default:''" json:"REMOTE_DOMAIN" mapstructure:"REMOTE_DOMAIN"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }

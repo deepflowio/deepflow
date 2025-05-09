@@ -119,6 +119,8 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		LocalVPCID:     localVPCID,
 		RemoteRegionID: remoteRegionID,
 		LocalRegionID:  localRegionID,
+		RemoteDomain:   c.metadata.Domain.Lcuuid,
+		LocalDomain:    c.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

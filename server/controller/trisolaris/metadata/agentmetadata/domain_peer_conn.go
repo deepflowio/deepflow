@@ -32,16 +32,19 @@ type DomainPeerConnProto struct {
 
 const noDomain = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-func NewDomainPeerConnProto(length int) *DomainPeerConnProto {
+func NewDomainPeerConnProto() *DomainPeerConnProto {
 	return &DomainPeerConnProto{
 		domainToPeerConns: make(DomainPeerConnsData),
-		peerConns:         make(TPeerConnections, 0, length),
-		noDomainPeerConns: make(TPeerConnections, 0, length),
+		peerConns:         make(TPeerConnections, 0),
+		noDomainPeerConns: make(TPeerConnections, 0),
 	}
 }
 
-func (d *DomainPeerConnProto) addData(domain string, data *agent.PeerConnection) {
+func (d *DomainPeerConnProto) addData(data *agent.PeerConnection) {
 	d.peerConns = append(d.peerConns, data)
+}
+
+func (d *DomainPeerConnProto) addDomainData(domain string, data *agent.PeerConnection) {
 	if domain == "" || domain == noDomain {
 		d.noDomainPeerConns = append(d.noDomainPeerConns, data)
 		return
