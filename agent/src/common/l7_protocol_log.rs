@@ -483,8 +483,8 @@ pub struct ParseParam<'a> {
 
 impl<'a> fmt::Debug for ParseParam<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ParseParam")
-            .field("l4_protocol", &self.l4_protocol)
+        let mut ds = f.debug_struct("ParseParam");
+        ds.field("l4_protocol", &self.l4_protocol)
             .field("ip_src", &self.ip_src)
             .field("ip_dst", &self.ip_dst)
             .field("port_src", &self.port_src)
@@ -500,9 +500,10 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("parse_perf", &self.parse_perf)
             .field("parse_log", &self.parse_log)
             .field("parse_config", &self.parse_config)
-            .field("wasm_vm", &self.wasm_vm.borrow().is_some())
-            .field("so_func", &self.so_func.borrow().is_some())
-            .field("rrt_timeout", &self.rrt_timeout)
+            .field("wasm_vm", &self.wasm_vm.borrow().is_some());
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        ds.field("so_func", &self.so_func.borrow().is_some());
+        ds.field("rrt_timeout", &self.rrt_timeout)
             .field("buf_size", &self.buf_size)
             .field("captured_byte", &self.captured_byte)
             .field("oracle_parse_conf", &self.oracle_parse_conf)
