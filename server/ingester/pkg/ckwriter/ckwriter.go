@@ -158,7 +158,7 @@ func (qc *QueueContext) EndpointsChange(addrs []string) {
 	}
 }
 
-func (qc *QueueContext) Init(addrs []string, user, password, insertTable string) error {
+func (qc *QueueContext) Init(addrs []string, user, password string, table *ckdb.Table) error {
 	qc.addrs = addrs
 	qc.connCount = len(addrs)
 	qc.conns = make([]*ch.Client, qc.connCount)
@@ -183,6 +183,7 @@ func (qc *QueueContext) Init(addrs []string, user, password, insertTable string)
 		orgCaches[i] = new(Cache)
 		orgCaches[i].orgID = uint16(i)
 		orgCaches[i].queueContext = qc
+		insertTable := fmt.Sprintf("%s.`%s`", table.OrgDatabase(uint16(i)), table.LocalName)
 		orgCaches[i].prepare = fmt.Sprintf("INSERT INTO %s VALUES", insertTable)
 	}
 	qc.orgCaches = orgCaches
@@ -391,8 +392,7 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 	queueContexts := make([]*QueueContext, queueCount)
 	for i := range queueContexts {
 		queueContexts[i] = &QueueContext{}
-		insertTable := fmt.Sprintf("%s.`%s`", table.OrgDatabase(uint16(i)), table.LocalName)
-		if err := queueContexts[i].Init(addrs, user, password, insertTable); err != nil {
+		if err := queueContexts[i].Init(addrs, user, password, table); err != nil {
 			return nil, err
 		}
 	}
