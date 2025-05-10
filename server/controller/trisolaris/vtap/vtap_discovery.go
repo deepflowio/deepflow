@@ -209,7 +209,7 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 			},
 			DoNothing: true,
 		}).Create(dbVTap).Error; err != nil {
-			log.Errorf(r.Logf("insert agent(%s) to DB faild, err: %s", r, err))
+			log.Errorf(r.Logf("insert agent(%s) to DB failed, err: %s", r, err))
 			errID := idmng.ReleaseIDs(r.GetORGID(), RESOURCE_TYPE_VTAP_EN, ids)
 			if errID != nil {
 				log.Error(r.Logf("Release ids=%v err: %s", ids, errID))
