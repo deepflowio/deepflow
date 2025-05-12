@@ -4056,9 +4056,7 @@ segmentation-reassembly processing to merge application protocol content spread 
 multiple syscalls before parsing it. This enhances the success rate of application
 protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
 this feature to be effective.
-
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-
 Attention: use `HTTP2` for `gRPC` Protocol.
 
 ### File {#inputs.ebpf.file}
@@ -6803,9 +6801,7 @@ processors:
 **Description**:
 
 Turning off some protocol identification can reduce deepflow-agent resource consumption.
-
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-
 <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
 
 #### Protocol Special Config {#processors.request_log.application_protocol_inference.protocol_special_config}
@@ -7004,14 +7000,12 @@ HTTP: 80,1000-2000
 HTTP2: 1-65535
 ```
 
-HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
-All data obtained through uprobe is not subject to port restrictions.
-
-Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
-
-Attention: use `HTTP2` for `gRPC` Protocol.
+NOTE:
+1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
+   All data obtained through Uprobe is not subject to port restrictions.
+   - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
+   - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+2. Attention: use `HTTP2` for `gRPC` Protocol.
 
 #### Tag Filters {#processors.request_log.filters.tag_filters}
 

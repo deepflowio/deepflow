@@ -2957,14 +2957,16 @@ inputs:
         #     multiple syscalls before parsing it. This enhances the success rate of application
         #     protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
         #     this feature to be effective.
-        #
         #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-        #
         #     Attention: use `HTTP2` for `gRPC` Protocol.
         #   ch: |-
         #     配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-        #     协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`out_of_order_reassembly_protocols`
-        #     开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        #     协议解析，以增强应用协议的采集成功率。
+        #
+        #     注意：
+        #     1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
+        #        - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
+        #     2. 如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
         # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
         segmentation_reassembly_protocols: []
     # type: section
@@ -4642,9 +4644,7 @@ processors:
       # description:
       #   en: |-
       #     Turning off some protocol identification can reduce deepflow-agent resource consumption.
-      #
       #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #
       #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
       #     deepflow-agent 仅对列表内的应用协议进行数据采集。通过该参数可以控制 agent 的数据采集范围以
@@ -4764,14 +4764,12 @@ processors:
       #     HTTP2: 1-65535
       #     ```
       #
-      #     HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
-      #     All data obtained through uprobe is not subject to port restrictions.
-      #
-      #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #
-      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
-      #
-      #     Attention: use `HTTP2` for `gRPC` Protocol.
+      #     NOTE:
+      #     1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
+      #        All data obtained through Uprobe is not subject to port restrictions.
+      #        - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
+      #        - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #     2. Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
       #     配置样例:
       #     ```
@@ -4780,12 +4778,9 @@ processors:
       #     ```
       #
       #     注意：
-      #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
-      #
-      #     支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-      #
-      #     <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
-      #
+      #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
+      #        - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
+      #        - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
       #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       port_number_prefilters:

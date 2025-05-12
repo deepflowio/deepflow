@@ -3956,8 +3956,12 @@ inputs:
 **详细描述**:
 
 配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`out_of_order_reassembly_protocols`
-开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+协议解析，以增强应用协议的采集成功率。
+
+注意：
+1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
+   - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
+2. 如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
 
 ### File {#inputs.ebpf.file}
 
@@ -6837,12 +6841,9 @@ HTTP2: 1-65535
 ```
 
 注意：
-1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
-
-支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-
-<mark>Oracle 和 TLS 仅在企业版中支持。</mark>
-
+1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
+   - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
+   - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
 2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
 
 #### Tag 过滤器 {#processors.request_log.filters.tag_filters}
