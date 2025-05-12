@@ -35,8 +35,8 @@ UPDATE peer_connection SET remote_domain = domain;
 DROP PROCEDURE IF EXISTS BackupColumnIfExists;
 CREATE PROCEDURE BackupColumnIfExists(
     IN tableName VARCHAR(255),
-    IN colName VARCHAR(255)，
-    IN colType VARCHAR(255),
+    IN colName VARCHAR(255),
+    IN colType VARCHAR(255)
 )
 BEGIN
     DECLARE column_count INT;
