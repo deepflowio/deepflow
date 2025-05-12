@@ -1,0 +1,2 @@
+{"request_id":49808,"request_type":"SRV","request_resource":"_PORT0._tcp.deepflow-byconity-server.deepflow.svc.cluster.local","response_status":"Unknown","msg_type":"Request","captured_request_byte":94,"captured_response_byte":0,"rrt":0} headers_offset: 0 is_dns: true
+{"request_id":49808,"request_type":"SRV","request_resource":"_PORT0._tcp.deepflow-byconity-server.deepflow.svc.cluster.local","response_result":"SRV","response_status":"Ok","response_code":0,"msg_type":"Response","captured_request_byte":0,"captured_response_byte":295,"rrt":69} headers_offset: 0 is_dns: false
