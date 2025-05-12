@@ -68,10 +68,6 @@ pub enum Error {
     #[error("mongodb log parse failed")]
     MongoDBLogParseFailed,
     #[error("{0}")]
-    DNSLogParseFailed(String),
-    #[error("{0}")]
-    DNSPerfParseFailed(&'static str),
-    #[error("{0}")]
     TlsLogParseFailed(String),
     #[error("{0}")]
     TlsPerfParseFailed(&'static str),
