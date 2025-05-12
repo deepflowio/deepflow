@@ -612,12 +612,15 @@ func (f *PerSecondFunction) Init() {
 				interval = f.Time.Interval
 			}
 		} else {
-			interval = int(f.Time.TimeEnd-f.Time.TimeStart) + f.Time.DatasourceInterval
+			alignInterval := int(f.Time.TimeEnd)/f.Time.DatasourceInterval*f.Time.DatasourceInterval - int(f.Time.TimeStart)/f.Time.DatasourceInterval*f.Time.DatasourceInterval
+			if f.Time.DatasourceInterval > alignInterval {
+				interval = f.Time.DatasourceInterval
+			} else {
+				// not line chart
+				interval = alignInterval
+			}
 		}
 	} else {
-		interval = f.Time.DatasourceInterval
-	}
-	if interval <= 0 {
 		interval = f.Time.DatasourceInterval
 	}
 	interval = interval * f.Time.WindowSize
@@ -888,7 +891,13 @@ func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
 			interval = f.Time.Interval
 		}
 	} else {
-		interval = int(f.Time.TimeEnd-f.Time.TimeStart) + f.Time.DatasourceInterval
+		alignInterval := int(f.Time.TimeEnd)/f.Time.DatasourceInterval*f.Time.DatasourceInterval - int(f.Time.TimeStart)/f.Time.DatasourceInterval*f.Time.DatasourceInterval
+		if f.Time.DatasourceInterval > alignInterval {
+			interval = f.Time.DatasourceInterval
+		} else {
+			// not line chart
+			interval = alignInterval
+		}
 	}
 	buf.WriteString(fmt.Sprintf("sum(%s)/(%d/%d)", f.Fields[0].ToString(), interval, f.Time.DatasourceInterval))
 	buf.WriteString(f.Math)
