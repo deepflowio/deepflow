@@ -6775,6 +6775,30 @@ processors:
 设置为 false 以关闭解压，提升性能。
 参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
 
+#### 自定义协议解析 {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**标签**:
+
+<mark></mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: null
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
@@ -7690,6 +7714,30 @@ processors:
 **详细描述**:
 
 字段名
+
+#### 自定义字段提取策略 {#processors.request_log.tag_extraction.custom_field_policies}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: null
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 

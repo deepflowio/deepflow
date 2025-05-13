@@ -4741,6 +4741,12 @@ processors:
           #     设置为 false 以关闭解压，提升性能。
           #     参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
           decompress_payload: true
+      # type: dict
+      # name:
+      #   en: custom protocol parsing
+      #   ch: 自定义协议解析 
+      # ee_feature: true
+      custom_protocols:
     # type: section
     # name:
     #   en: Filters
@@ -5422,6 +5428,15 @@ processors:
         # field_name: ""
         HTTP: []
         HTTP2: []
+      # type: dict
+      # name:
+      #   en: Custom Fields Policies
+      #   ch: 自定义字段提取策略
+      # unit:
+      # range: []
+      # modification: agent_restart
+      # ee_feature: true
+      custom_field_policies:
       # type: string
       # name:
       #   en: Obfuscate Protocols
