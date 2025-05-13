@@ -612,8 +612,8 @@ func IsNil(i interface{}) bool {
 func (w *CKWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
-	for i, qc := range w.queueContexts {
-		for _, c := range qc.conns {
+	for _, qc := range w.queueContexts {
+		for i, c := range qc.conns {
 			if !IsNil(c) {
 				c.Close()
 				qc.conns[i] = nil
