@@ -25,6 +25,7 @@ pub mod enums;
 pub mod error;
 pub mod l7_protocol;
 pub mod leaky_bucket;
+pub mod throttle;
 pub mod packet;
 pub mod proto;
 pub mod pwd;
@@ -37,3 +38,4 @@ pub mod utils;
 pub mod netns;
 
 pub use leaky_bucket::LeakyBucket;
+pub use throttle::Throttle;
