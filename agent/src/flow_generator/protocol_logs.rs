@@ -396,6 +396,15 @@ pub struct BoxAppProtoLogsData {
     pub override_resp_status: Option<L7ResponseStatus>,
 }
 
+impl BoxAppProtoLogsData {
+    pub fn new(data: Box<MetaAppProto>, override_resp_status: Option<L7ResponseStatus>) -> Self {
+        Self {
+            data,
+            override_resp_status,
+        }
+    }
+}
+
 impl Sendable for BoxAppProtoLogsData {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {

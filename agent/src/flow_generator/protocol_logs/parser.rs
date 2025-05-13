@@ -26,8 +26,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{debug, info, warn};
-use rand::prelude::{Rng, SeedableRng, SmallRng};
+use log::{debug, info};
 use serde::Serialize;
 
 use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData, LogMessageType};
@@ -55,14 +54,12 @@ use public::utils::string::get_string_from_chars;
 use public::{
     chrono_map::ChronoMap,
     queue::{self, DebugSender, Receiver},
+    throttle::{Throttle, ThrottleCounter},
     utils::net::MacAddr,
 };
 
 const QUEUE_BATCH_SIZE: usize = 1024;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
-
-const THROTTLE_BUCKET_BITS: u8 = 2;
-const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送方是有突发的，需要累积一定时间做采样
 
 #[derive(Debug)]
 pub enum AppProto {
@@ -342,109 +339,23 @@ impl RefCountable for SessionAggrCounter {
     }
 }
 
-struct Throttle {
-    interval: Duration,
-    last_flush_time: Duration,
-    throttle: u32,
-    throttle_multiple: u32,
-    period_count: u32,
-    config: LogParserAccess,
-    small_rng: SmallRng,
-}
-
-impl Throttle {
-    fn new(config: LogParserAccess, interval: u64) -> Self {
-        Self {
-            config,
-            interval: Duration::from_secs(interval),
-            throttle: 0,
-            throttle_multiple: interval as u32,
-            period_count: 0,
-            last_flush_time: Duration::ZERO,
-            small_rng: SmallRng::from_entropy(),
-        }
-    }
-
-    fn tick(&mut self, current: Duration) {
-        self.last_flush_time = current;
-        self.period_count = 0;
-        self.throttle =
-            (self.config.load().l7_log_collect_nps_threshold as u32) * self.throttle_multiple;
-    }
-
-    fn acquire(&mut self, current: Duration) -> bool {
-        self.period_count += 1;
-
-        // Local timestamp may be modified
-        if current < self.last_flush_time {
-            self.last_flush_time = current;
-        }
-
-        if current > self.last_flush_time + self.interval || self.last_flush_time.is_zero() {
-            self.tick(current);
-        }
-
-        if self.period_count >= self.throttle {
-            return self.small_rng.gen_range(0..self.period_count) < self.throttle;
-        }
-
-        true
+impl ThrottleCounter for SessionAggrCounter {
+    fn throttle_dropped(&self) {
+        self.throttle_drop.fetch_add(1, Ordering::Relaxed);
     }
 }
 
-struct BufferSender {
-    batch: Vec<BoxAppProtoLogsData>,
-
-    output_queue: DebugSender<BoxAppProtoLogsData>,
-    throttle: Throttle,
-
-    counter: Arc<SessionAggrCounter>,
+struct L7Throttle {
+    throttle: Throttle<BoxAppProtoLogsData, SessionAggrCounter>,
 }
 
-impl BufferSender {
-    fn new(
-        config: LogParserAccess,
-        output_queue: DebugSender<BoxAppProtoLogsData>,
-        counter: Arc<SessionAggrCounter>,
-    ) -> Self {
-        Self {
-            batch: Vec::with_capacity(QUEUE_BATCH_SIZE),
-            output_queue,
-            throttle: Throttle::new(config, 1),
-            counter,
-        }
-    }
-
-    fn send(&mut self, item: Box<MetaAppProto>, override_resp_status: Option<L7ResponseStatus>) {
-        if item.l7_info.skip_send() || item.l7_info.is_on_blacklist() {
+impl L7Throttle {
+    fn send(&mut self, data: Box<MetaAppProto>, override_resp_status: Option<L7ResponseStatus>) {
+        if data.l7_info.skip_send() || data.l7_info.is_on_blacklist() {
             return;
         }
-
-        if !self.throttle.acquire(item.base_info.start_time.into()) {
-            self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
-            return;
-        }
-
-        if self.batch.len() >= QUEUE_BATCH_SIZE {
-            if let Err(e) = self.output_queue.send_all(&mut self.batch) {
-                warn!("output queue failed to send data, because: {:?}", e);
-                self.batch.clear();
-            }
-        }
-
-        self.batch.push(BoxAppProtoLogsData {
-            data: item,
-            override_resp_status,
-        });
-    }
-
-    fn flush(&mut self) {
-        if !self.batch.is_empty() {
-            if let Err(e) = self.output_queue.send_all(&mut self.batch) {
-                warn!("output queue failed to send data, because: {:?}", e);
-                self.batch.clear();
-            }
-        }
+        self.throttle
+            .send(BoxAppProtoLogsData::new(data, override_resp_status));
     }
 }
 
@@ -458,7 +369,8 @@ struct SessionQueue {
 
     counter: Arc<SessionAggrCounter>,
 
-    bs: BufferSender,
+    l7_throttle: L7Throttle,
+    l7_log_collect_nps_threshold: u64,
 }
 
 impl SessionQueue {
@@ -480,7 +392,14 @@ impl SessionQueue {
 
             counter: counter.clone(),
 
-            bs: BufferSender::new(config, output_queue, counter),
+            l7_throttle: L7Throttle {
+                throttle: Throttle::new(
+                    conf.l7_log_collect_nps_threshold,
+                    output_queue,
+                    counter.clone(),
+                ),
+            },
+            l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
         }
     }
 
@@ -507,7 +426,7 @@ impl SessionQueue {
                     p.l7_info.get_request_resource_length() as u64,
                     Ordering::Relaxed,
                 );
-                self.bs.send(p, None);
+                self.l7_throttle.send(p, None);
             }
             self.counter.receive.fetch_add(1, Ordering::Relaxed);
             return;
@@ -530,7 +449,7 @@ impl SessionQueue {
             if item.base_info.end_time.is_zero() {
                 item.base_info.end_time = item.base_info.start_time;
             }
-            self.bs.send(item, None);
+            self.l7_throttle.send(item, None);
             return;
         }
 
@@ -546,7 +465,7 @@ impl SessionQueue {
                 timeout_time,
                 self.window_start
             );
-            self.bs.send(item, None);
+            self.l7_throttle.send(item, None);
             return;
         }
 
@@ -560,7 +479,8 @@ impl SessionQueue {
                         v.l7_info.get_request_resource_length() as u64,
                         Ordering::Relaxed,
                     );
-                    self.bs.send(self.entries.remove(&key).unwrap(), None);
+                    self.l7_throttle
+                        .send(self.entries.remove(&key).unwrap(), None);
                 }
             } else {
                 match item.base_info.head.msg_type {
@@ -569,7 +489,7 @@ impl SessionQueue {
                         if v.is_request() && item.base_info.start_time > v.base_info.start_time =>
                     {
                         if let Err(_) = v.session_merge(&mut item) {
-                            self.bs.send(item, None);
+                            self.l7_throttle.send(item, None);
                         }
                         self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                         self.counter.cached_request_resource.fetch_sub(
@@ -577,7 +497,8 @@ impl SessionQueue {
                             Ordering::Relaxed,
                         );
                         self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        self.bs.send(self.entries.remove(&key).unwrap(), None);
+                        self.l7_throttle
+                            .send(self.entries.remove(&key).unwrap(), None);
                     }
                     // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
                     LogMessageType::Request
@@ -591,23 +512,24 @@ impl SessionQueue {
                         );
                         let mut v = self.entries.remove(&key).unwrap();
                         if let Err(_) = item.session_merge(&mut v) {
-                            self.bs.send(v, None);
+                            self.l7_throttle.send(v, None);
                         }
                         self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                         self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        self.bs.send(item, None);
+                        self.l7_throttle.send(item, None);
                     }
                     // if entry and item cannot merge, send the early one and cache the other
                     _ => {
                         if v.base_info.start_time > item.base_info.start_time {
-                            self.bs.send(item, None);
+                            self.l7_throttle.send(item, None);
                         } else {
                             // swap out old item and send
                             self.counter.cached_request_resource.fetch_sub(
                                 v.l7_info.get_request_resource_length() as u64,
                                 Ordering::Relaxed,
                             );
-                            self.bs.send(self.entries.remove(&key).unwrap(), None);
+                            self.l7_throttle
+                                .send(self.entries.remove(&key).unwrap(), None);
                             self.counter.cached_request_resource.fetch_add(
                                 item.l7_info.get_request_resource_length() as u64,
                                 Ordering::Relaxed,
@@ -636,7 +558,7 @@ impl SessionQueue {
                     v.l7_info.get_request_resource_length() as u64,
                     Ordering::Relaxed,
                 );
-                self.bs.send(v, None);
+                self.l7_throttle.send(v, None);
             }
             return;
         }
@@ -651,9 +573,9 @@ impl SessionQueue {
 
     fn flush(&mut self) {
         for item in self.entries.drain(..) {
-            self.bs.send(item, None);
+            self.l7_throttle.send(item, None);
         }
-        self.bs.flush();
+        self.l7_throttle.throttle.flush();
         self.counter.cached.store(0, Ordering::Relaxed);
         self.counter
             .cached_request_resource
@@ -669,7 +591,8 @@ impl SessionQueue {
                 item.l7_info.get_request_resource_length() as u64,
                 Ordering::Relaxed,
             );
-            self.bs.send(item.clone(), Some(L7ResponseStatus::Timeout));
+            self.l7_throttle
+                .send(item.clone(), Some(L7ResponseStatus::Timeout));
             None
         });
         // update timestamp
@@ -779,6 +702,21 @@ impl SessionAggregator {
                     if config.l7_log_session_aggr_max_entries != session_queue.max_entries {
                         session_queue.max_entries = config.l7_log_session_aggr_max_entries;
                         session_queue.flush();
+                    }
+                    if config.l7_log_collect_nps_threshold
+                        != session_queue.l7_log_collect_nps_threshold
+                    {
+                        info!(
+                            "update l7_log_collect_nps_threshold from {} to {}",
+                            session_queue.l7_log_collect_nps_threshold,
+                            config.l7_log_collect_nps_threshold
+                        );
+                        session_queue.l7_log_collect_nps_threshold =
+                            config.l7_log_collect_nps_threshold;
+                        session_queue
+                            .l7_throttle
+                            .throttle
+                            .set_rate(config.l7_log_collect_nps_threshold);
                     }
                 }
                 session_queue.flush();
