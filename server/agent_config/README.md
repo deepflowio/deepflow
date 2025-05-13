@@ -6939,6 +6939,30 @@ Some MySQL packets have payload compressed with LZ77 algorithm. Enable this opti
 Set to false to disable decompression for better performance.
 ref: [MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
 
+#### custom protocol parsing {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**Tags**:
+
+<mark></mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: null
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
 ### Filters {#processors.request_log.filters}
 
 #### Port Number Pre-filters {#processors.request_log.filters.port_number_prefilters}
@@ -7879,6 +7903,30 @@ processors:
 **Description**:
 
 Field name.
+
+#### Custom Fields Policies {#processors.request_log.tag_extraction.custom_field_policies}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: null
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 
