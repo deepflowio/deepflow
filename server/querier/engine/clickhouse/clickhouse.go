@@ -578,6 +578,18 @@ func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*comm
 	return rst, debug, err
 }
 
+func AddAutoTypeTag(array []string, tag string) []string {
+	for _, suffix := range []string{"", "_0", "_1"} {
+		for _, resourceName := range []string{"auto_instance", "auto_service"} {
+			resourceTypeSuffix := resourceName + "_type" + suffix
+			if tag == resourceName+suffix {
+				array = append(array, resourceTypeSuffix)
+			}
+		}
+	}
+	return array
+}
+
 func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
 	if !strings.Contains(sql, "SLIMIT") && !strings.Contains(sql, "slimit") {
 		return "", nil, nil, nil
@@ -698,6 +710,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+							outerWhereLeftSlice = AddAutoTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
 						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
@@ -716,14 +729,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
-						}
-					}
-					for _, suffix := range []string{"", "_0", "_1"} {
-						for _, resourceName := range []string{"auto_instance", "auto_service"} {
-							resourceTypeSuffix := resourceName + "_type" + suffix
-							if sqlparser.String(colName) == resourceName+suffix {
-								outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, resourceTypeSuffix)
-							}
+							outerWhereLeftSlice = AddAutoTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
 						}
 					}
 				}

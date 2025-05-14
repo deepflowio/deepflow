@@ -473,6 +473,24 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	v := c.vTapInfo
 	c.unsetLicenseFunctionEnable()
+	if c.GetVTapType() == common.VTAP_TYPE_DEDICATED || c.GetOwner() == common.VTAP_OWNER_DEEPFLOW {
+		c.enabledNetNpb.Set()
+		c.enabledNetNpmd.Set()
+		c.enabledNetDpdk.Set()
+		c.enabledTraceNet.Set()
+		c.enabledTraceSys.Set()
+		c.enabledTraceApp.Set()
+		c.enabledTraceIo.Set()
+		c.enabledTraceBiz.Set()
+		c.enabledProfileCpu.Set()
+		c.enabledProfileRam.Set()
+		c.enabledProfileInt.Set()
+		c.enabledLegacyMetric.Set()
+		c.enabledLegacyLog.Set()
+		c.enabledLegacyProbe.Set()
+		return
+	}
+
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
 		c.licenseFunctionSet = mapset.NewSet()
 		log.Warningf(v.Logf("vtap(%s) no license functions", c.GetKey()))
@@ -489,49 +507,46 @@ func (c *VTapCache) convertLicenseFunctions() {
 		functionSet.Add(function)
 	}
 	c.licenseFunctionSet = functionSet
-
-	isOwnerCluster := c.GetOwner() == common.VTAP_OWNER_DEEPFLOW
-	isDedicated := c.GetVTapType() == common.VTAP_TYPE_DEDICATED
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPB) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPB) {
 		c.enabledNetNpb.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPMD) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_NPMD) {
 		c.enabledNetNpmd.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_DPDK) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_NET_DPDK) {
 		c.enabledNetDpdk.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_NET) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_NET) {
 		c.enabledTraceNet.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_SYS) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_SYS) {
 		c.enabledTraceSys.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_APP) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_APP) {
 		c.enabledTraceApp.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_IO) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_IO) {
 		c.enabledTraceIo.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_BIZ) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_TRACE_BIZ) {
 		c.enabledTraceBiz.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_CPU) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_CPU) {
 		c.enabledProfileCpu.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_RAM) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_RAM) {
 		c.enabledProfileRam.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_INT) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_PROFILE_INT) {
 		c.enabledProfileInt.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_METRIC) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_METRIC) {
 		c.enabledLegacyMetric.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_LOG) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_LOG) {
 		c.enabledLegacyLog.Set()
 	}
-	if isDedicated || isOwnerCluster || slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_PROBE) {
+	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_LEGACY_PROBE) {
 		c.enabledLegacyProbe.Set()
 	}
 	if slices.Contains(licenseFunctionsInt, AGENT_LICENSE_FUNCTION_DEV_NET_NPB) {

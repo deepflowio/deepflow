@@ -24,16 +24,12 @@ import (
 )
 
 func (b *DataSet) AddPeerConnection(dbItem *metadbmodel.PeerConnection, seq int, toolDataSet *tool.DataSet) {
-	remoteRegionLcuuid, _ := toolDataSet.GetRegionLcuuidByID(dbItem.RemoteRegionID)
-	localRegionLcuuid, _ := toolDataSet.GetRegionLcuuidByID(dbItem.LocalRegionID)
 	b.PeerConnections[dbItem.Lcuuid] = &PeerConnection{
 		DiffBase: DiffBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
-		Name:               dbItem.Name,
-		RemoteRegionLcuuid: remoteRegionLcuuid,
-		LocalRegionLcuuid:  localRegionLcuuid,
+		Name: dbItem.Name,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }

@@ -63,7 +63,7 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 	domainInterfaceProto.Store(NewDomainInterfaceProto(metaData.ORGID))
 
 	domainPeerConnProto := &atomic.Value{}
-	domainPeerConnProto.Store(NewDomainPeerConnProto(0))
+	domainPeerConnProto.Store(NewDomainPeerConnProto())
 
 	domainCIDRProto := &atomic.Value{}
 	domainCIDRProto.Store(newDomainCIDRProto(0))
@@ -213,14 +213,45 @@ func (p *PlatformDataOP) GetNoDomainPeerConns() TPeerConnections {
 func (p *PlatformDataOP) generatePeerConnections() {
 	dbDataCache := p.metaData.GetDBDataCache()
 	peerConns := dbDataCache.GetPeerConnections()
-	dpcData := NewDomainPeerConnProto(len(peerConns))
+
+	rawData := p.GetRawData()
+	dpcData := NewDomainPeerConnProto()
 	for _, pc := range peerConns {
-		data := &agent.PeerConnection{
-			Id:          proto.Uint32(uint32(pc.ID)),
-			LocalEpcId:  proto.Uint32(uint32(pc.LocalVPCID)),
-			RemoteEpcId: proto.Uint32(uint32(pc.RemoteVPCID)),
+		if pc.LocalDomain == pc.RemoteDomain && pc.LocalVPCID != 0 && pc.RemoteVPCID != 0 {
+			proto := &agent.PeerConnection{
+				Id:          proto.Uint32(uint32(pc.ID)),
+				LocalEpcId:  proto.Uint32(uint32(pc.LocalVPCID)),
+				RemoteEpcId: proto.Uint32(uint32(pc.RemoteVPCID)),
+			}
+			dpcData.addData(proto)
+			dpcData.addDomainData(pc.LocalDomain, proto)
+			continue
 		}
-		dpcData.addData(pc.Domain, data)
+
+		localVPCIDs := make([]int, 0)
+		if pc.LocalVPCID == 0 {
+			localVPCIDs = rawData.domainUUIDToVPCIDs[pc.LocalDomain]
+		} else {
+			localVPCIDs = append(localVPCIDs, pc.LocalVPCID)
+		}
+		remoteVPCIDs := make([]int, 0)
+		if pc.RemoteVPCID == 0 {
+			remoteVPCIDs = rawData.domainUUIDToVPCIDs[pc.RemoteDomain]
+		} else {
+			remoteVPCIDs = append(remoteVPCIDs, pc.RemoteVPCID)
+		}
+		for _, localVPCID := range localVPCIDs {
+			for _, remoteVPCID := range remoteVPCIDs {
+				proto := &agent.PeerConnection{
+					Id:          proto.Uint32(uint32(pc.ID)),
+					LocalEpcId:  proto.Uint32(uint32(localVPCID)),
+					RemoteEpcId: proto.Uint32(uint32(remoteVPCID)),
+				}
+				dpcData.addData(proto)
+				dpcData.addDomainData(pc.LocalDomain, proto)
+				dpcData.addDomainData(pc.RemoteDomain, proto)
+			}
+		}
 	}
 
 	// Add CEN(Cloud Enterprise Network) data to peer connection.
@@ -238,7 +269,8 @@ func (p *PlatformDataOP) generatePeerConnections() {
 					LocalEpcId:  proto.Uint32(uint32(epcIDs[i])),
 					RemoteEpcId: proto.Uint32(uint32(epcIDs[j])),
 				}
-				dpcData.addData(cen.Domain, data)
+				dpcData.addData(data)
+				dpcData.addDomainData(cen.Domain, data)
 			}
 		}
 	}
