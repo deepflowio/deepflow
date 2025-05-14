@@ -185,6 +185,7 @@ impl FastPath {
         *self.netmask_table.write().unwrap() = netmask_table;
     }
 
+    #[inline]
     fn generate_mask_ip(&self, ip_src: IpAddr, ip_dst: IpAddr) -> (u32, u32) {
         match (ip_src, ip_dst) {
             (IpAddr::V4(src_addr), IpAddr::V4(dst_addr)) => {
@@ -263,12 +264,14 @@ impl FastPath {
         *self.interest_table.write().unwrap() = interest_table;
     }
 
+    #[inline]
     fn interest_table_map(&self, key: &mut LookupKey) {
         let table = &self.interest_table.read().unwrap();
         key.src_port = table[key.src_port as usize].min();
         key.dst_port = table[key.dst_port as usize].min();
     }
 
+    #[inline]
     fn table_flush_check(&mut self, key: &LookupKey) -> bool {
         let start_index = key.fast_index * MAX_TAP_TYPE;
         if self.policy_table_flush_flags[key.fast_index].load(Ordering::Relaxed) {
@@ -288,6 +291,7 @@ impl FastPath {
         false
     }
 
+    #[inline]
     pub fn add_policy(
         &mut self,
         packet: &mut LookupKey,
@@ -374,6 +378,7 @@ impl FastPath {
         return (forward_policy, forward_endpoints);
     }
 
+    #[inline]
     pub fn get_policy(
         &mut self,
         packet: &mut LookupKey,
@@ -448,6 +453,7 @@ impl FastPath {
     }
 
     // 查询路径调用会影响性能
+    #[inline]
     fn generate_map_key(&self, key: &LookupKey) -> (u64, u64) {
         let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(key.src_ip, key.dst_ip);
 

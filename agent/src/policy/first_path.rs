@@ -619,6 +619,7 @@ impl FirstPath {
         self.fast.flush();
     }
 
+    #[inline]
     fn get_policy_from_table4(
         &self,
         field: &MatchedFieldv4,
@@ -637,6 +638,7 @@ impl FirstPath {
         }
     }
 
+    #[inline]
     fn get_policy_from_table6(
         &self,
         field: &MatchedFieldv6,
@@ -655,6 +657,7 @@ impl FirstPath {
         }
     }
 
+    #[inline]
     fn get_policy_from_table(
         &mut self,
         key: &mut LookupKey,
@@ -682,6 +685,7 @@ impl FirstPath {
         }
     }
 
+    #[inline]
     pub fn first_get(
         &mut self,
         key: &mut LookupKey,
@@ -735,6 +739,7 @@ impl FirstPath {
             .ebpf_add_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, endpoints)
     }
 
+    #[inline]
     pub fn fast_get(
         &mut self,
         key: &mut LookupKey,

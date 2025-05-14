@@ -267,6 +267,7 @@ pub struct MetaPacket<'a> {
 }
 
 impl<'a> MetaPacket<'a> {
+    #[inline]
     pub fn timestamp_adjust(&mut self, time_diff: i64) {
         if time_diff >= 0 {
             self.lookup_key.timestamp += Timestamp::from_nanos(time_diff as u64);
@@ -281,28 +282,34 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
+    #[inline]
     pub fn is_tls(&self) -> bool {
         self.ebpf_flags.contains(EbpfFlags::TLS)
     }
 
+    #[inline]
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
             ..Default::default()
         }
     }
 
+    #[inline]
     pub fn reset(&mut self) {
         *self = Self::empty();
     }
 
+    #[inline]
     pub fn is_reversed(&self) -> bool {
         self.lookup_key.l2_end_1
     }
 
+    #[inline]
     pub fn is_ndp_response(&self) -> bool {
         self.nd_reply_or_arp_request && self.lookup_key.proto == IpProtocol::ICMPV6
     }
 
+    #[inline]
     pub fn is_syn(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
             return tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN;
@@ -310,6 +317,7 @@ impl<'a> MetaPacket<'a> {
         false
     }
 
+    #[inline]
     pub fn is_syn_ack(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
             return tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN_ACK && self.payload_len == 0;
@@ -317,6 +325,7 @@ impl<'a> MetaPacket<'a> {
         false
     }
 
+    #[inline]
     pub fn is_ack(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
             return tcp_data.flags & TcpFlags::MASK == TcpFlags::ACK && self.payload_len == 0;
@@ -324,6 +333,7 @@ impl<'a> MetaPacket<'a> {
         false
     }
 
+    #[inline]
     pub fn is_psh_ack(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
             return tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1;
@@ -331,10 +341,12 @@ impl<'a> MetaPacket<'a> {
         false
     }
 
+    #[inline]
     pub fn has_valid_payload(&self) -> bool {
         self.payload_len > 1
     }
 
+    #[inline]
     pub fn tcp_options_size(&self) -> usize {
         if (self.header_type != HeaderType::Ipv4Tcp && self.header_type != HeaderType::Ipv6Tcp)
             && self.l4_opt_size == 0
@@ -351,6 +363,7 @@ impl<'a> MetaPacket<'a> {
         size + (self.tcp_options_flag & TCP_OPT_FLAG_SACK) as usize
     }
 
+    #[inline]
     fn update_tcp_opt(&mut self, packet: &[u8]) {
         let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size as usize;
         let payload_offset = (offset + self.l4_opt_size as usize).min(packet.len());
@@ -425,6 +438,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
+    #[inline]
     fn update_ip6_opt(&mut self, packet: &[u8], l2_opt_size: usize) -> (u8, usize) {
         let mut next_header = packet[IPV6_PROTO_OFFSET + l2_opt_size];
         let original_offset = ETH_HEADER_SIZE + IPV6_HEADER_SIZE + l2_opt_size;
@@ -495,6 +509,7 @@ impl<'a> MetaPacket<'a> {
         (packet[IPV6_PROTO_OFFSET + l2_opt_size], 0)
     }
 
+    #[inline]
     pub fn get_pkt_size(&self) -> u16 {
         if self.packet_len < u16::MAX as u32 {
             self.packet_len as u16
@@ -503,6 +518,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
+    #[inline]
     pub fn get_restored_packet_size(&self) -> u16 {
         // 压缩包头仅支持发送最内层的VLAN，所以QINQ场景下长度不能计算外层的VLAN
         let mut skip_vlan_header_size = 0u16;
@@ -518,6 +534,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
+    #[inline]
     fn get_l3_payload(&self) -> Option<&[u8]> {
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
             return None;
@@ -533,6 +550,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     // 目前仅支持获取UDP或TCP的Payload
+    #[inline]
     pub fn get_l4_payload(&self) -> Option<&[u8]> {
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
             return Some(&self.raw_from_ebpf[self.raw_from_ebpf_offset..]);
@@ -549,6 +567,7 @@ impl<'a> MetaPacket<'a> {
         None
     }
 
+    #[inline]
     pub fn get_l7(&self) -> Option<&[u8]> {
         if self.lookup_key.proto == IpProtocol::TCP || self.lookup_key.proto == IpProtocol::UDP {
             return self.get_l4_payload();
@@ -561,6 +580,7 @@ impl<'a> MetaPacket<'a> {
         None
     }
 
+    #[inline]
     pub fn update<P: AsRef<[u8]> + Into<RawPacket<'a>>>(
         &mut self,
         raw_packet: P,
@@ -580,6 +600,7 @@ impl<'a> MetaPacket<'a> {
         Ok(())
     }
 
+    #[inline]
     fn update_fields(
         &mut self,
         packet: &[u8],
@@ -974,23 +995,27 @@ impl<'a> MetaPacket<'a> {
     }
 
     /// Get the meta packet's l3 payload len.
+    #[inline]
     pub fn l3_payload_len(&self) -> usize {
         self.l3_payload_len as usize
     }
 
     /// Get the meta packet's l4 payload len.
+    #[inline]
     pub fn l4_payload_len(&self) -> usize {
         self.l4_payload_len as usize
     }
 
     // The socket_id obtained by ebpf from upprobe and kprobe on the same flow,
     // but the application protocols are inconsistent.
+    #[inline]
     pub fn generate_ebpf_flow_id(&self) -> u64 {
         let source: u8 = self.ebpf_type.into();
         let socket_id = self.socket_id & !((0xff as u64) << 48);
         (source as u64) << 48 | socket_id
     }
 
+    #[inline]
     pub fn get_captured_byte(&self) -> usize {
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
             return self.packet_len as usize - 54;
@@ -1019,6 +1044,7 @@ impl<'a> MetaPacket<'a> {
         0
     }
 
+    #[inline]
     pub fn merge(&mut self, packet: &mut MetaPacket) {
         if self.ebpf_type == EbpfType::None {
             return;
@@ -1043,6 +1069,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline]
     pub unsafe fn from_ebpf(data: &mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
@@ -1149,6 +1176,7 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
+    #[inline]
     pub fn npb_mode(&self) -> NpbMode {
         if self.lookup_key.is_l2() {
             NpbMode::L2
@@ -1173,6 +1201,7 @@ impl<'a> MetaPacket<'a> {
         if one side port is 6379, this side assume is server addr
         otherwise use addr according to direction which may be wrong
     */
+    #[inline]
     pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
         const REDIS_PORT: u16 = 6379;
 
@@ -1208,6 +1237,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
+    #[inline]
     pub fn to_owned_segment(&self) -> Box<dyn Segment> {
         let raw = self.raw.as_ref().unwrap().to_vec();
 
@@ -1230,6 +1260,7 @@ impl<'a> MetaPacket<'a> {
         })
     }
 
+    #[inline]
     pub fn set_vip_info(&mut self, client_real_ip: IpAddr, server_real_ip: IpAddr) {
         if !client_real_ip.is_unspecified() {
             match self.lookup_key.direction {
