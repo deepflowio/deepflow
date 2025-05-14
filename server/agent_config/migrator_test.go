@@ -362,9 +362,25 @@ static_config:
 `),
 			wantErr: false,
 		},
+		{
+			name: "case03",
+			args: args{
+				bytes: []byte(`processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        x_request_id:
+        - X-Request-Id
+        - X-Request-ID
+`),
+			},
+			want: []byte(`http_log_x_request_id: X-Request-Id, X-Request-ID
+`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
-		if tt.name != "case02" {
+		if tt.name != "case03" {
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {

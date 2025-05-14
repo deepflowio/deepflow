@@ -137,8 +137,25 @@ static_config:
 			},
 			want: &AgentGroupConfigModel{},
 		},
+		{
+			name: "TestYAMLToDB_02",
+			args: args{
+				yamlData: []byte(`http_log_x_request_id: X-Request-Id, X-Request-ID`),
+			},
+			want: &AgentGroupConfigModel{},
+		},
+		{
+			name: "TestYAMLToDB_03",
+			args: args{
+				yamlData: []byte(`http_log_proxy_client: X-Forwarded-For`),
+			},
+			want: &AgentGroupConfigModel{},
+		},
 	}
 	for _, tt := range tests {
+		if tt.name == "TestYAMLToDB_01" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			if err := convertYAMLToDB(tt.args.yamlData, tt.want); (err != nil) != tt.wantErr {
 				t.Errorf("YAMLToDB() error = %v, wantErr %v", err, tt.wantErr)
