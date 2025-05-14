@@ -184,6 +184,7 @@ impl Forward {
         }
     }
 
+    #[inline]
     fn is_link_local(ip_addr: IpAddr) -> bool {
         match ip_addr {
             IpAddr::V4(ip) => ip.is_link_local(),
@@ -278,11 +279,13 @@ impl Forward {
         *self.vip_device_tables.write().unwrap() = vip_device_table
     }
 
+    #[inline]
     fn query_vip(&self, mac: MacAddr) -> bool {
         let mac = u64::from(mac);
         return self.vip_device_tables.read().unwrap().get(&mac).is_some();
     }
 
+    #[inline]
     pub fn query(&mut self, _index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {
         let key = L3Key { mac, ip };
         if self.mac_ip_tables.read().unwrap().peek(&key).is_none() {
@@ -292,6 +295,7 @@ impl Forward {
         return true;
     }
 
+    #[inline]
     pub fn add(&mut self, _index: usize, packet: &LookupKey, tap_port: TapPort, from: u16) {
         let key = L3Key {
             mac: packet.src_mac,
