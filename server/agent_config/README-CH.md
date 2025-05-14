@@ -9509,18 +9509,22 @@ outputs:
 ```yaml
 outputs:
   compression:
-    l7_flow_log: true
+    l7_flow_log: 0
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | int |
 
 **详细描述**:
 
 开启后，deepflow-agent 将对调用日志进行压缩处理，压缩比例在 8:1 左右。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
+- 0: 无压缩
+- 1: Zlib
+- 2: Gzip
+- 3: Zstd
 
 ### L4_Flow_Log {#outputs.compression.l4_flow_log}
 

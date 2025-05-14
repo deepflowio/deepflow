@@ -432,6 +432,15 @@ impl BufferSender {
             }
         }
 
+        for i in 0..39 {
+            let mut data = item.clone();
+            data.direction_score = i;
+            self.batch.push(BoxAppProtoLogsData {
+                data,
+                override_resp_status,
+            });
+        }
+
         self.batch.push(BoxAppProtoLogsData {
             data: item,
             override_resp_status,

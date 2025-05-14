@@ -6673,7 +6673,7 @@ outputs:
     #     开启后，deepflow-agent 将对抓取的 Pcap 数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
     #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
     pcap: true
-    # type: bool
+    # type: int
     # name:
     #   en: L7_Flow_Log
     #   ch: L7_Flow_Log
@@ -6689,7 +6689,11 @@ outputs:
     #   ch: |-
     #     开启后，deepflow-agent 将对调用日志进行压缩处理，压缩比例在 8:1 左右。注意：
     #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
-    l7_flow_log: true
+    #     - 0: 无压缩
+    #     - 1: Zlib
+    #     - 2: Gzip
+    #     - 3: Zstd
+    l7_flow_log: 0 
     # type: bool
     # name:
     #   en: L4_Flow_Log

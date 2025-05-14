@@ -1542,7 +1542,7 @@ pub struct MetricServerConfig {
     pub compressed: bool,
     pub profile_compressed: bool,
     pub application_log_compressed: bool,
-    pub l7_flow_log_compressed: bool,
+    pub l7_flow_log_compressed: u8,
     pub l4_flow_log_compressed: bool,
 }
 

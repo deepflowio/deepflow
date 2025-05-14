@@ -2438,10 +2438,12 @@ impl AgentComponents {
             stats_collector.clone(),
             exception_handler.clone(),
             None,
-            if candidate_config.metric_server.l7_flow_log_compressed {
-                SenderEncoder::Zlib
-            } else {
-                SenderEncoder::Raw
+            match candidate_config.metric_server.l7_flow_log_compressed {
+                0 => SenderEncoder::Raw,
+                1 => SenderEncoder::Zlib,
+                2 => SenderEncoder::Gzip,
+                3 => SenderEncoder::Zstd,
+                _ => SenderEncoder::Raw,
             },
         );
 

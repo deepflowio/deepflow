@@ -9740,13 +9740,13 @@ of deepflow-agent.
 ```yaml
 outputs:
   compression:
-    l7_flow_log: true
+    l7_flow_log: 0
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | bool |
+| Type | int |
 
 **Description**:
 
