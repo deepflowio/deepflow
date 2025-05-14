@@ -814,6 +814,8 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"http_log_span_id",
 	}
 	p.higherVersionListToStrKeys = []string{
+		"processors.request_log.tag_extraction.tracing_tag.http_real_client",
+		"processors.request_log.tag_extraction.tracing_tag.x_request_id",
 		"processors.request_log.tag_extraction.tracing_tag.apm_trace_id",
 		"processors.request_log.tag_extraction.tracing_tag.apm_span_id",
 	}
