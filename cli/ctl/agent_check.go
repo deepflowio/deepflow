@@ -255,7 +255,7 @@ func agentInitCmd(cmd *cobra.Command, cmds []AgentCmdExecute) {
 		return
 	}
 	defer conn.Close()
-	name := "agent"
+	name := ""
 	groupID := agentParamData.GroupID
 	clusterID := agentParamData.ClusterID
 	teamID := agentParamData.TeamID

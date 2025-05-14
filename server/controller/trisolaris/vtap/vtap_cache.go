@@ -488,7 +488,6 @@ func (c *VTapCache) convertLicenseFunctions() {
 		c.enabledLegacyMetric.Set()
 		c.enabledLegacyLog.Set()
 		c.enabledLegacyProbe.Set()
-		return
 	}
 
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
@@ -496,6 +495,7 @@ func (c *VTapCache) convertLicenseFunctions() {
 		log.Warningf(v.Logf("vtap(%s) no license functions", c.GetKey()))
 		return
 	}
+
 	licenseFunctionsInt, err := ConvertStrToIntList(*c.licenseFunctions)
 	if err != nil {
 		log.Errorf(v.Logf("convert licence functions failed err :%s", err))

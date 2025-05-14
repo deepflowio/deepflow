@@ -1467,15 +1467,20 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 				return errors.New(errStr)
 			}
 		}
-		// TODO: 特殊处理塞进group的fromat中
-		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(groupTag, e)
-		if !ok {
-			return nil
+		// vpc/l2_vpc not null filter
+		noSuffixGroupTag := strings.TrimSuffix(groupTag, "_0")
+		noSuffixGroupTag = strings.TrimSuffix(noSuffixGroupTag, "_1")
+		noSuffixGroupTag = strings.TrimSuffix(noSuffixGroupTag, "_id")
+		if slices.Contains([]string{"vpc", "l2_vpc", "chost", "router", "dhcpgw", "redis", "rds", "lb", "natgw", "chost_ip", "chost_hostname"}, noSuffixGroupTag) {
+			whereStmt := Where{}
+			notNullExpr, ok := GetNotNullFilter(groupTag, e)
+			if !ok {
+				return nil
+			}
+			filter := view.Filters{Expr: notNullExpr}
+			whereStmt.filter = &filter
+			e.Statements = append(e.Statements, &whereStmt)
 		}
-		filter := view.Filters{Expr: notNullExpr}
-		whereStmt.filter = &filter
-		e.Statements = append(e.Statements, &whereStmt)
 	// func(field)
 	case *sqlparser.FuncExpr:
 		/* name, args, err := e.parseFunction(expr)
