@@ -136,6 +136,7 @@ impl Labeler {
         *self.mac_table.write().unwrap() = mac_table;
     }
 
+    #[inline]
     fn get_real_ip_by_mac(&self, mac: u64, is_ipv6: bool) -> IpAddr {
         if let Some(interface) = self.mac_table.read().unwrap().get(&mac) {
             for ip in &(interface.ips) {
@@ -151,6 +152,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn get_interface_by_mac(&self, mac: u64) -> Option<PlatformData> {
         if let Some(platform) = self.mac_table.read().unwrap().get(&mac) {
             return Some(platform.as_ref().clone());
@@ -184,6 +186,7 @@ impl Labeler {
         *self.epc_ip_table.write().unwrap() = epc_ip_table;
     }
 
+    #[inline]
     fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<PlatformData> {
         match ip {
             IpAddr::V4(ip) => {
@@ -225,6 +228,7 @@ impl Labeler {
         *self.peer_table.write().unwrap() = peer_table;
     }
 
+    #[inline]
     fn get_epc_by_peer(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) {
         if let Some(list) = self.peer_table.read().unwrap().get(&epc_id) {
             for peer_epc in list {
@@ -242,6 +246,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn get_cidr_masklen_range(&self, epc_id: i32) -> (usize, usize) {
         if let Some((min, max)) = self.epc_cidr_masklen_table.read().unwrap().get(&epc_id) {
             return (*min as usize, *max as usize);
@@ -313,6 +318,7 @@ impl Labeler {
         *self.container_table.write().unwrap() = table;
     }
 
+    #[inline]
     pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         if let Some(pod_id) = self.container_table.read().unwrap().get(container_id) {
             return *pod_id;
@@ -341,6 +347,7 @@ impl Labeler {
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC和VIP标记
     // 注意当查询外网时必须给epc参数传递EPC_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
+    #[inline]
     fn set_epc_vip_by_tunnel(
         &self,
         ip: IpAddr,
@@ -370,6 +377,7 @@ impl Labeler {
         false
     }
 
+    #[inline]
     fn set_vip_by_cidr(&self, ip: IpAddr, epc_id: i32, info: &mut EndpointInfo) -> bool {
         let (min, max) = self.get_cidr_masklen_range(epc_id);
         let cidr_key = EpcNetIpKey::new(&ip, max as u8, epc_id);
@@ -473,6 +481,7 @@ impl Labeler {
         self.update_ip_table(interfaces);
     }
 
+    #[inline]
     fn get_endpoint_info(
         &self,
         mac: u64,
@@ -541,6 +550,7 @@ impl Labeler {
         return (info, is_wan);
     }
 
+    #[inline]
     fn modify_endpoint_data(&self, endpoint: &mut EndpointData, key: &LookupKey) {
         let mut src_data = &mut endpoint.src_info;
         let mut dst_data = &mut endpoint.dst_info;
@@ -580,6 +590,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn get_l3_by_peer(&self, src: IpAddr, dst: IpAddr, endpoint: &mut EndpointData) {
         let src_data = &mut endpoint.src_info;
         let dst_data = &mut endpoint.dst_info;
@@ -590,6 +601,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn get_l3_by_wan(&self, src: IpAddr, dst: IpAddr, endpoint: &mut EndpointData) -> (bool, bool) {
         let src_data = &mut endpoint.src_info;
         let dst_data = &mut endpoint.dst_info;
@@ -620,6 +632,7 @@ impl Labeler {
         return (found_src, fount_dst);
     }
 
+    #[inline]
     fn get_vip(
         &self,
         key: &LookupKey,
@@ -655,6 +668,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn is_multicast(ip: &IpAddr) -> bool {
         match ip {
             IpAddr::V4(a) => a.is_broadcast() || a.is_multicast(),
@@ -662,6 +676,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn is_private(ip: &Ipv4Addr) -> bool {
         match ip.octets() {
             // The Shared Address Space address range is 100.64.0.0/10.
@@ -671,6 +686,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn is_intranet_address(ip: &IpAddr) -> bool {
         let is_multicast = Self::is_multicast(ip);
         match ip {
@@ -679,6 +695,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     fn modify_internet_epc(&self, ip_src: &IpAddr, ip_dst: &IpAddr, endpoint: &mut EndpointData) {
         let src_data = &mut endpoint.src_info;
         let dst_data = &mut endpoint.dst_info;
@@ -697,6 +714,7 @@ impl Labeler {
         }
     }
 
+    #[inline]
     pub fn get_endpoint_data(&self, key: &LookupKey) -> EndpointData {
         let is_loopback = key.src_mac == key.dst_mac;
         // l2: mac查询
@@ -745,6 +763,7 @@ impl Labeler {
         return endpoint;
     }
 
+    #[inline]
     pub fn get_endpoint_data_by_epc(
         &self,
         src: IpAddr,

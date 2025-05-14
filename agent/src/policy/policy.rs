@@ -138,6 +138,7 @@ impl Policy {
         self.monitor = Some(PolicyMonitor { sender, enabled });
     }
 
+    #[inline]
     pub fn lookup_l3(&mut self, packet: &mut MetaPacket) {
         let key = &mut packet.lookup_key;
         let index = key.fast_index;
@@ -167,6 +168,7 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
+    #[inline]
     fn fill_gpid_entry(packet: &mut MetaPacket, gpid_entry: &GpidEntry) {
         if gpid_entry.port_1 == 0 && gpid_entry.port_0 == 0 {
             return;
@@ -267,6 +269,7 @@ impl Policy {
         }
     }
 
+    #[inline]
     pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         packet.lookup_key.fast_index = index;
         self.lookup_l3(packet);
@@ -289,6 +292,7 @@ impl Policy {
         }
     }
 
+    #[inline]
     fn send(
         &self,
         key: &LookupKey,
@@ -304,6 +308,7 @@ impl Policy {
         }
     }
 
+    #[inline]
     fn send_ebpf(
         &self,
         src_ip: IpAddr,
@@ -321,6 +326,7 @@ impl Policy {
         }
     }
 
+    #[inline]
     pub fn lookup_all_by_key(
         &mut self,
         key: &mut LookupKey,
@@ -392,6 +398,7 @@ impl Policy {
         (endpoints, entry)
     }
 
+    #[inline]
     fn lookup_from_ebpf(
         &mut self,
         key: &mut LookupKey,
@@ -440,6 +447,7 @@ impl Policy {
         (endpoints, entry)
     }
 
+    #[inline]
     pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         self.labeler.lookup_pod_id(container_id)
     }
@@ -481,6 +489,7 @@ impl Policy {
         Ok(())
     }
 
+    #[inline]
     fn lookup_gpid_entry(&self, key: &mut LookupKey, _endpoints: &EndpointData) -> GpidEntry {
         if !key.is_ipv4() || (key.proto != IpProtocol::UDP && key.proto != IpProtocol::TCP) {
             return GpidEntry::default();
@@ -588,6 +597,7 @@ impl PolicyGetter {
         self.switch = false;
     }
 
+    #[inline]
     pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         if !self.switch {
             return;
@@ -595,6 +605,7 @@ impl PolicyGetter {
         self.policy().lookup(packet, index, local_epc_id);
     }
 
+    #[inline]
     pub fn lookup_all_by_key(
         &mut self,
         key: &mut LookupKey,
@@ -602,10 +613,12 @@ impl PolicyGetter {
         self.policy().lookup_all_by_key(key)
     }
 
+    #[inline]
     pub fn lookup_epc_by_epc(&mut self, src: IpAddr, dst: IpAddr, l3_epc_id_src: i32) -> i32 {
         self.policy().lookup_epc_by_epc(src, dst, l3_epc_id_src)
     }
 
+    #[inline]
     pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         self.policy().lookup_pod_id(container_id)
     }
