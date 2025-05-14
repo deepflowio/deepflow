@@ -102,6 +102,10 @@ const (
 )
 
 const (
+	VTAP_OWNER_DEEPFLOW = "deepflow"
+)
+
+const (
 	VTAP_STATE_NOT_CONNECTED = iota
 	VTAP_STATE_NORMAL
 	VTAP_STATE_DISABLE

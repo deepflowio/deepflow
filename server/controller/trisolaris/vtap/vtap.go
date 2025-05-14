@@ -113,6 +113,7 @@ type VTapInfo struct {
 	vTapIPs *atomic.Value // []*trident.VtapIp
 
 	localClusterID *string
+	localCAMD5     *string
 
 	processInfo      *ProcessInfo
 	agentProcessInfo *AgentProcessInfo
@@ -779,6 +780,16 @@ func (v *VTapInfo) IsTheSameCluster(clusterID string) bool {
 	return v.getLocalClusterID() == clusterID
 }
 
+func (v *VTapInfo) CheckClusterOwner(k8sClusterMD5 string) bool {
+	if v == nil {
+		return false
+	}
+	if v.getLocalCAMD5() != k8sClusterMD5 {
+		return false
+	}
+	return true
+}
+
 func GetKey(vtap *mysql_model.VTap) string {
 	if vtap.CtrlMac == "" {
 		return vtap.CtrlIP
@@ -896,6 +907,7 @@ func (v *VTapInfo) GenerateVTapCache() {
 	v.updateCacheToDB()
 	v.generateVTapIP()
 	v.generateLocalClusterID()
+	v.generateLocalCAMD5()
 }
 
 func (v *VTapInfo) UpdateTSDBVTapInfo(cVTaps []*trident.CommunicationVtap, tsdbIP string) {
@@ -947,7 +959,13 @@ func (v *VTapInfo) getLocalClusterID() string {
 	if v.localClusterID != nil {
 		return *v.localClusterID
 	}
+	return ""
+}
 
+func (v *VTapInfo) getLocalCAMD5() string {
+	if v.localCAMD5 != nil {
+		return *v.localCAMD5
+	}
 	return ""
 }
 
@@ -960,6 +978,18 @@ func (v *VTapInfo) generateLocalClusterID() {
 		}
 		v.localClusterID = proto.String(clusterID)
 		log.Infof(v.Logf("local cluster id: %s", v.getLocalClusterID()))
+	}
+}
+
+func (v *VTapInfo) generateLocalCAMD5() {
+	if v.getLocalCAMD5() == "" {
+		md5, err := GetLocalCAMD5()
+		if err != nil {
+			log.Error(v.Logf("%s", err))
+			return
+		}
+		v.localCAMD5 = proto.String(md5)
+		log.Infof(v.Logf("local ca md5: %s", v.getLocalCAMD5()))
 	}
 }
 
@@ -978,6 +1008,7 @@ func (v *VTapInfo) InitData() {
 	v.generateAllVTapRemoteSegements()
 	v.generateVTapIP()
 	v.generateLocalClusterID()
+	v.generateLocalCAMD5()
 	v.isReady.Set()
 }
 
@@ -1188,6 +1219,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.Revision = cacheVTap.GetRevision()
 			dbVTap.BootTime = cacheVTap.GetBootTime()
 			dbVTap.CPUNum = cacheVTap.GetCPUNum()
+			dbVTap.Owner = cacheVTap.GetOwner()
 			dbVTap.MemorySize = cacheVTap.GetMemorySize()
 			dbVTap.Arch = cacheVTap.GetArch()
 			dbVTap.Os = cacheVTap.GetOs()

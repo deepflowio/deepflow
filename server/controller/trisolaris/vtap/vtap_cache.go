@@ -198,6 +198,7 @@ type VTapCache struct {
 	state              int
 	enable             int
 	vTapType           int
+	owner              *string
 	ctrlIP             *string
 	ctrlMac            *string
 	tapMac             *string
@@ -289,10 +290,10 @@ func (c *VTapCache) String() string {
 			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
 			"podDomains: %v, pushVersionPlatformData: %d, pushVersionPolicy: %d, pushVersionGroups: %d, "+
 			"expectedRevision: %s, upgradePackage: %s, podClusterID: %d, VPCID: %d}",
-		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.state, c.enable, c.vTapType,
+		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.GetVTapState(), c.GetVTapEnabled(), c.GetVTapType(),
 		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
 		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
-		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.licenseType,
+		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.GetLicenseType(),
 		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
 		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
 		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
@@ -305,6 +306,7 @@ func NewVTapCache(vtap *mysqlmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
 	vTapCache.rawHostname = proto.String(vtap.RawHostname)
+	vTapCache.owner = proto.String(vtap.Owner)
 	vTapCache.state = vtap.State
 	vTapCache.enable = vtap.Enable
 	vTapCache.vTapType = vtap.Type
@@ -406,6 +408,22 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	v := c.vTapInfo
 	c.unsetLicenseFunctionEnable()
+	if c.GetOwner() == VTAP_OWNER_DEEPFLOW {
+		c.enabledCallMonitoring.Set()
+		c.enabledNetworkMonitoring.Set()
+		c.enabledTrafficDistribution.Set()
+		c.enabledFunctionMonitoring.Set()
+		c.enabledApplicationMonitoring.Set()
+		c.enabledLogMonitoring.Set()
+		c.enabledIndicatorMonitoring.Set()
+		return
+	}
+	if c.GetVTapType() == VTAP_TYPE_DEDICATED {
+		c.enabledCallMonitoring.Set()
+		c.enabledLogMonitoring.Set()
+		c.enabledIndicatorMonitoring.Set()
+		return
+	}
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
 		c.licenseFunctionSet = mapset.NewSet()
 		log.Warningf(v.Logf("vtap(%s) no license functions", c.GetKey()))
@@ -701,6 +719,24 @@ func (c *VTapCache) GetVTapEnabled() int {
 	return c.enable
 }
 
+func (c *VTapCache) GetVTapState() int {
+	return c.state
+}
+
+func (c *VTapCache) GetOwner() string {
+	if c.owner != nil {
+		return *c.owner
+	}
+	return ""
+}
+
+func (c *VTapCache) UpdateOwner(isOwnerCluster bool) {
+	if !isOwnerCluster {
+		return
+	}
+	c.owner = proto.String(VTAP_OWNER_DEEPFLOW)
+}
+
 func (c *VTapCache) GetVTapHost() string {
 	if c.name != nil {
 		return *c.name
@@ -821,7 +857,6 @@ func (c *VTapCache) GetLaunchServer() string {
 	if c.launchServer != nil {
 		return *c.launchServer
 	}
-
 	return ""
 }
 
@@ -1002,6 +1037,10 @@ func (c *VTapCache) GetCurrentK8SImage() string {
 
 func (c *VTapCache) updateCurrentK8SImage(currentK8sImage string) {
 	c.currentK8sImage = &currentK8sImage
+}
+
+func (c *VTapCache) GetLicenseType() int {
+	return c.licenseType
 }
 
 func (c *VTapCache) GetTapMode() int {
