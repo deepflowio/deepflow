@@ -254,7 +254,7 @@ impl Interior {
             let mut stream = match client.remote_execute(responser).await {
                 Ok(stream) => stream,
                 Err(e) => {
-                    warn!("remote_execute failed: {:?}", e);
+                    warn!("calling server remote_execute rpc failed: {:?}", e);
                     self.exc.set(pb::Exception::ControllerSocketError);
                     tokio::time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
@@ -273,7 +273,7 @@ impl Interior {
                         break;
                     }
                     Err(e) => {
-                        warn!("remote_execute failed: {:?}", e);
+                        warn!("receiving server remote_execute rpc has error: {:?}", e);
                         self.exc.set(pb::Exception::ControllerSocketError);
                         break;
                     }
