@@ -1030,6 +1030,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.9.25",
  "signal-hook",
+ "simple-dns",
  "socket2 0.4.9",
  "special_recv_engine",
  "sysinfo",
@@ -3734,6 +3735,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "simple-dns"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c88e405cb7f98ae6f6ca32e9cc1259d97f845b180fa26cd6280011a87375075e"
+dependencies = [
+ "bitflags 2.4.0",
 ]
 
 [[package]]

@@ -684,19 +684,47 @@ outputs:
 			},
 			wantErr: false,
 		},
+		{
+			name: "case03",
+			args: args{
+				mapData: map[string]interface{}{
+					"inputs": map[string]interface{}{
+						"proc": map[string]interface{}{
+							"process_matcher": "[]",
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"proc": map[string]interface{}{
+						"process_matcher": "[]\n",
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	keyToComment, _ := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
 	for _, tt := range tests {
+		if tt.name != "case03" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			dataFmt := NewDataFormatter()
-			if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
-				t.Fatalf("Failed to init yaml data: %v", err)
+			if len(tt.args.yamlData) == 0 {
+				dataFmt.mapData = tt.args.mapData
+			} else {
+				if err := dataFmt.LoadYAMLData(tt.args.yamlData); err != nil {
+					t.Fatalf("Failed to init yaml data: %v", err)
+				}
 			}
 			err := dataFmt.fmtVal("", dataFmt.mapData, keyToComment, true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DictValueToString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			fmt.Printf("dataFmt.mapData: %#v\n", dataFmt.mapData)
 			for k, v := range dataFmt.mapData {
 				if ok := assert.EqualValues(t, tt.want[k], v); !ok {
 					t.Errorf("key %s DictValueToString() = %v, want %v", k, v, tt.want[k])

@@ -651,44 +651,45 @@ func (f *DataFormatter) fmtVal(ancestors string, data interface{}, keyToComment 
 	switch data := data.(type) {
 	case map[string]interface{}:
 		for key, value := range data {
+			if f.isKeyComment(key) {
+				continue
+			}
 			newAncestors := f.appendAncestor(ancestors, key)
-			if !f.isKeyComment(key) {
-				if f.isDictValue(keyToComment[newAncestors]) {
-					if dictValToStr {
-						valueStr, err := f.dictToString(value)
-						if err != nil {
-							return fmt.Errorf("convert dict value to string error: %v, key: %s", err, newAncestors)
-						}
-						data[key] = valueStr
-					} else {
-						if strings.HasPrefix(strings.TrimSpace(value.(string)), "-") {
-							var valueMap map[string]interface{}
-							err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
-							if err != nil {
-								return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
-							}
-							data[key] = valueMap[key]
-						} else {
-							var valueMap map[string]interface{}
-							err := yaml.Unmarshal([]byte(value.(string)), &valueMap)
-							if err != nil {
-								return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
-							}
-							data[key] = valueMap
-						}
+			if f.isDictValue(keyToComment[newAncestors]) {
+				if dictValToStr {
+					valueStr, err := f.dictToString(value)
+					if err != nil {
+						return fmt.Errorf("convert dict value to string error: %v, key: %s", err, newAncestors)
 					}
-					keyToComment["valueChanged"] = make(map[string]interface{})
-				} else if f.isIntValue(keyToComment[newAncestors]) {
-					switch value := value.(type) {
-					case int:
-						data[key] = value
-					case float64:
-						data[key] = int(value)
-						keyToComment["valueChanged"] = make(map[string]interface{})
+					data[key] = valueStr
+				} else {
+					if strings.HasPrefix(strings.TrimSpace(value.(string)), "-") {
+						var valueMap map[string]interface{}
+						err := yaml.Unmarshal([]byte(key+":\n"+value.(string)), &valueMap)
+						if err != nil {
+							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+						}
+						data[key] = valueMap[key]
+					} else {
+						var valueMap map[string]interface{}
+						err := yaml.Unmarshal([]byte(value.(string)), &valueMap)
+						if err != nil {
+							return fmt.Errorf("unmarshal string to map error: %v, key: %s", err, newAncestors)
+						}
+						data[key] = valueMap
 					}
 				}
-				f.fmtVal(newAncestors, value, keyToComment, dictValToStr)
+				keyToComment["valueChanged"] = make(map[string]interface{})
+			} else if f.isIntValue(keyToComment[newAncestors]) {
+				switch value := value.(type) {
+				case int:
+					data[key] = value
+				case float64:
+					data[key] = int(value)
+					keyToComment["valueChanged"] = make(map[string]interface{})
+				}
 			}
+			f.fmtVal(newAncestors, value, keyToComment, dictValToStr)
 		}
 	default:
 		return nil
@@ -708,6 +709,9 @@ func (f *DataFormatter) formatJson(data interface{}) ([]byte, error) {
 }
 
 func (f *DataFormatter) dictToString(data interface{}) (string, error) {
+	if str, ok := data.(string); ok {
+		return f.listToString(str)
+	}
 	var buf strings.Builder
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -716,6 +720,18 @@ func (f *DataFormatter) dictToString(data interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func (f *DataFormatter) listToString(data string) (string, error) {
+	var list []interface{}
+	err := yaml.Unmarshal([]byte(data), &list)
+	if err != nil {
+		return "", fmt.Errorf("unmarshal data to list error: %v", err)
+	}
+
+	// 将解析后的切片重新编码为 YAML 格式
+	yamlOutput, err := yaml.Marshal(list)
+	return string(yamlOutput), err
 }
 
 func (f *DataFormatter) isKeyComment(key string) bool {

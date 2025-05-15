@@ -109,7 +109,7 @@ type VTapInfo struct {
 
 	vTapIPs *atomic.Value // []*trident.VtapIp
 
-	localClusterID *string
+	localCAMD5 *string
 
 	processInfo      *ProcessInfo
 	agentProcessInfo *AgentProcessInfo
@@ -693,11 +693,14 @@ func (v *VTapInfo) GetAgentPolicyVersion(vtapID int, functions mapset.Set) uint6
 	return v.vTapPolicyData.getAgentPolicyVersion(vtapID, functions)
 }
 
-func (v *VTapInfo) IsTheSameCluster(clusterID string) bool {
+func (v *VTapInfo) CheckClusterOwner(k8sClusterMD5 string) bool {
 	if v == nil {
 		return false
 	}
-	return v.getLocalClusterID() == clusterID
+	if v.getLocalCAMD5() != k8sClusterMD5 {
+		return false
+	}
+	return true
 }
 
 func GetKey(vtap *mysql_model.VTap) string {
@@ -816,7 +819,7 @@ func (v *VTapInfo) GenerateVTapCache() {
 	v.updateVTapInfo()
 	v.updateCacheToDB()
 	v.generateVTapIP()
-	v.generateLocalClusterID()
+	v.generateLocalCAMD5()
 }
 
 func (v *VTapInfo) UpdateTSDBVTapInfo(cVTaps []*trident.CommunicationVtap, tsdbIP string) {
@@ -864,23 +867,23 @@ func (v *VTapInfo) generateAllVTapPlatformData() {
 	log.Debug(v.Logf("%s", v.vTapPlatformData))
 }
 
-func (v *VTapInfo) getLocalClusterID() string {
-	if v.localClusterID != nil {
-		return *v.localClusterID
+func (v *VTapInfo) getLocalCAMD5() string {
+	if v.localCAMD5 != nil {
+		return *v.localCAMD5
 	}
 
 	return ""
 }
 
-func (v *VTapInfo) generateLocalClusterID() {
-	if v.getLocalClusterID() == "" {
-		clusterID, err := GetLocalClusterID()
+func (v *VTapInfo) generateLocalCAMD5() {
+	if v.getLocalCAMD5() == "" {
+		md5, err := GetLocalCAMD5()
 		if err != nil {
 			log.Error(v.Logf("%s", err))
 			return
 		}
-		v.localClusterID = proto.String(clusterID)
-		log.Infof(v.Logf("local cluster id: %s", v.getLocalClusterID()))
+		v.localCAMD5 = proto.String(md5)
+		log.Infof(v.Logf("local ca md5: %s", v.getLocalCAMD5()))
 	}
 }
 
@@ -898,7 +901,7 @@ func (v *VTapInfo) InitData() {
 	// 最后生成romote segment
 	v.generateAllVTapRemoteSegements()
 	v.generateVTapIP()
-	v.generateLocalClusterID()
+	v.generateLocalCAMD5()
 	v.isReady.Set()
 }
 
@@ -1116,6 +1119,7 @@ func (v *VTapInfo) updateCacheToDB() {
 				}
 			}
 			dbVTap.CPUNum = cpuNum
+			dbVTap.Owner = cacheVTap.GetOwner()
 			dbVTap.Revision = cacheVTap.GetRevision()
 			dbVTap.BootTime = cacheVTap.GetBootTime()
 			dbVTap.MemorySize = cacheVTap.GetMemorySize()
