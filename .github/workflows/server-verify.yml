@@ -1,6 +1,6 @@
 name: verify server
 
-on: 
+on:
   pull_request:
     paths:
       - 'server/**'
@@ -20,23 +20,41 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@master
         with:
-          go-version: 1.21.x
+          go-version: 1.24.x
+
+      - name: Set up GOPATH env
+        run: echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
         with:
           version: '3.6.1'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          
+
+      - name: Checkout github.com/gogo/protobuf
+        uses: actions/checkout@v3
+        with:
+          repository: 'gogo/protobuf'
+          path: "protobuf"
+          ref: 'v1.3.2'
+          fetch-depth: 1
+
+      - name: Move github.com/gogo/protobuf to $GOPATH/src
+        run: |
+          mkdir -p "${{ env.GOPATH }}/src/github.com/gogo"
+          mv protobuf "${{ env.GOPATH }}/src/github.com/gogo/protobuf"
+
       - name: Install dependencies
         run: |
           pip3 install ujson
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
-          GO111MODULE="off" go get github.com/gogo/protobuf/proto
-          GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
-          GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
-          GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
+
+          cd server
+          go install github.com/gogo/protobuf/protoc-gen-gofast
+          go install github.com/gogo/protobuf/proto
+          go install github.com/gogo/protobuf/jsonpb
+          go install github.com/gogo/protobuf/protoc-gen-gogo
+          go install github.com/gogo/protobuf/gogoproto
+          go install github.com/golang/protobuf/protoc-gen-go
 
       - name: verify server
         run: |

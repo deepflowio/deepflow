@@ -27,6 +27,7 @@ vendor:
 	cp -r ${MSG}/* vendor/${MESSAGE}/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
+	rm -rf ${MSG} && cp -r vendor/${MESSAGE} ${MSG} && go mod vendor
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < ../server/patch/clickhouse-go/write_improve.patch
 	patch -p1 -d vendor/github.com/cornelk/hashmap < ../server/patch/cornelk_hashmap/complex128.patch
 
