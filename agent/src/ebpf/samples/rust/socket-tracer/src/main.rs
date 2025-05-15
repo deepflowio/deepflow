@@ -463,7 +463,7 @@ fn main() {
                     process_event_handle,
                 ) != 0
                 {
-                    println!("register_event_handle() faild");
+                    println!("register_event_handle() failed");
                     ::std::process::exit(1);
                 }
         */
