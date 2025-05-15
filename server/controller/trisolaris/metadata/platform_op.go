@@ -239,11 +239,13 @@ func (p *PlatformDataOP) generatePeerConnections() {
 	rawData := p.GetRawData()
 	dpcData := NewDomainPeerConnProto()
 	for _, pc := range peerConns {
-		if pc.LocalDomain == pc.RemoteDomain && pc.LocalVPCID != 0 && pc.RemoteVPCID != 0 {
+		localVPCID := pc.GetLocalVPCID()
+		remoteVPCID := pc.GetRemoteVPCID()
+		if pc.LocalDomain == pc.RemoteDomain && localVPCID != 0 && remoteVPCID != 0 {
 			proto := &trident.PeerConnection{
 				Id:          proto.Uint32(uint32(pc.ID)),
-				LocalEpcId:  proto.Uint32(uint32(pc.LocalVPCID)),
-				RemoteEpcId: proto.Uint32(uint32(pc.RemoteVPCID)),
+				LocalEpcId:  proto.Uint32(uint32(localVPCID)),
+				RemoteEpcId: proto.Uint32(uint32(remoteVPCID)),
 			}
 			dpcData.addData(proto)
 			dpcData.addDomainData(pc.LocalDomain, proto)
@@ -251,19 +253,22 @@ func (p *PlatformDataOP) generatePeerConnections() {
 		}
 
 		localVPCIDs := make([]int, 0)
-		if pc.LocalVPCID == 0 {
+		if localVPCID == 0 {
 			localVPCIDs = rawData.domainUUIDToVPCIDs[pc.LocalDomain]
 		} else {
-			localVPCIDs = append(localVPCIDs, pc.LocalVPCID)
+			localVPCIDs = append(localVPCIDs, localVPCID)
 		}
 		remoteVPCIDs := make([]int, 0)
-		if pc.RemoteVPCID == 0 {
+		if remoteVPCID == 0 {
 			remoteVPCIDs = rawData.domainUUIDToVPCIDs[pc.RemoteDomain]
 		} else {
-			remoteVPCIDs = append(remoteVPCIDs, pc.RemoteVPCID)
+			remoteVPCIDs = append(remoteVPCIDs, remoteVPCID)
 		}
 		for _, localVPCID := range localVPCIDs {
 			for _, remoteVPCID := range remoteVPCIDs {
+				if localVPCID == remoteVPCID {
+					continue
+				}
 				proto := &trident.PeerConnection{
 					Id:          proto.Uint32(uint32(pc.ID)),
 					LocalEpcId:  proto.Uint32(uint32(localVPCID)),

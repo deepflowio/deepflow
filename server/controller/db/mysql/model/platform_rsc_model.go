@@ -618,8 +618,9 @@ type PeerConnection struct {
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_EPC_ID" mapstructure:"LOCAL_EPC_ID"`
-	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_EPC_ID" mapstructure:"REMOTE_EPC_ID"`
+	TeamID         int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID" mapstructure:"TEAM_ID"`
+	LocalVPCID     *int   `gorm:"column:local_epc_id;type:int;default:null" json:"LOCAL_EPC_ID" mapstructure:"LOCAL_EPC_ID"`
+	RemoteVPCID    *int   `gorm:"column:remote_epc_id;type:int;default:null" json:"REMOTE_EPC_ID" mapstructure:"REMOTE_EPC_ID"`
 	LocalDomain    string `gorm:"column:local_domain;type:char(64);default:''" json:"LOCAL_DOMAIN" mapstructure:"LOCAL_DOMAIN"`
 	RemoteDomain   string `gorm:"column:remote_domain;type:char(64);default:''" json:"REMOTE_DOMAIN" mapstructure:"REMOTE_DOMAIN"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
@@ -632,6 +633,20 @@ func (p PeerConnection) GetDomainLcuuid() string {
 
 func (p PeerConnection) GetSubDomainLcuuid() string {
 	return ""
+}
+
+func (p PeerConnection) GetLocalVPCID() int {
+	if p.LocalVPCID == nil {
+		return 0
+	}
+	return *p.LocalVPCID
+}
+
+func (p PeerConnection) GetRemoteVPCID() int {
+	if p.RemoteVPCID == nil {
+		return 0
+	}
+	return *p.RemoteVPCID
 }
 
 type CEN struct {

@@ -41,14 +41,10 @@ func (b *DataSet) DeletePeerConnection(lcuuid string) {
 
 type PeerConnection struct {
 	DiffBase
-	Name               string `json:"name"`
-	RemoteRegionLcuuid string `json:"remote_region_lcuuid"`
-	LocalRegionLcuuid  string `json:"local_region_lcuuid"`
+	Name string `json:"name"`
 }
 
 func (p *PeerConnection) Update(cloudItem *cloudmodel.PeerConnection) {
 	p.Name = cloudItem.Name
-	p.RemoteRegionLcuuid = cloudItem.RemoteRegionLcuuid
-	p.LocalRegionLcuuid = cloudItem.LocalRegionLcuuid
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, p))
 }
