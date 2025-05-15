@@ -113,7 +113,7 @@ impl LocalMultinsModeDispatcher {
         while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
                 flow: &base.flow_map_config.load(),
-                log_parser: &base.log_parse_config.load(),
+                log_parser: &base.log_parser_config.load(),
                 collector: &base.collector_config.load(),
                 ebpf: None,
             };

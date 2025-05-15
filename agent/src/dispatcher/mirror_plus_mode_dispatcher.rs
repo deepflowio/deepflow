@@ -69,7 +69,7 @@ pub struct MirrorPlusModeDispatcherListener {
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
     agent_type: Arc<RwLock<AgentType>>,
-    base: BaseDispatcherListener,
+    pub(super) base: BaseDispatcherListener,
 }
 
 impl MirrorPlusModeDispatcherListener {
@@ -276,7 +276,7 @@ impl MirrorPlusModeDispatcher {
         let log_output_queue = base.log_output_queue.clone();
         let ntp_diff = base.ntp_diff.clone();
         let flow_map_config = base.flow_map_config.clone();
-        let log_parse_config = base.log_parse_config.clone();
+        let log_parser_config = base.log_parser_config.clone();
         let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
@@ -323,7 +323,7 @@ impl MirrorPlusModeDispatcher {
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {
                             flow: &flow_map_config.load(),
-                            log_parser: &log_parse_config.load(),
+                            log_parser: &log_parser_config.load(),
                             collector: &collector_config.load(),
                             #[cfg(any(target_os = "linux", target_os = "android"))]
                             ebpf: None,

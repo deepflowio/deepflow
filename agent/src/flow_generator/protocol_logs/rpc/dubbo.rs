@@ -1220,7 +1220,7 @@ mod tests {
                 true,
             );
             param.set_captured_byte(payload.len());
-            param.set_log_parse_config(&config);
+            param.set_log_parser_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 
             let i = dubbo.parse_payload(payload, param);
@@ -1317,7 +1317,7 @@ mod tests {
             true,
         );
         param.set_captured_byte(payload.len());
-        param.set_log_parse_config(&config);
+        param.set_log_parser_config(&config);
         let is_dubbo = dubbo.check_payload(payload, param);
 
         let i = dubbo.parse_payload(payload, param);
@@ -1417,7 +1417,7 @@ mod tests {
             true,
         );
         param.set_captured_byte(payload.len());
-        param.set_log_parse_config(&config);
+        param.set_log_parser_config(&config);
         let is_dubbo = dubbo.check_payload(payload, param);
 
         let i = dubbo.parse_payload(payload, param);
@@ -1523,7 +1523,7 @@ mod tests {
                 true,
                 true,
             );
-            param.set_log_parse_config(&config);
+            param.set_log_parser_config(&config);
             if packet.get_l4_payload().is_some() {
                 let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
             }

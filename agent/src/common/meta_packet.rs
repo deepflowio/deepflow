@@ -290,6 +290,7 @@ impl<'a> MetaPacket<'a> {
     #[inline]
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
+            sub_packets: Vec::with_capacity(1),
             ..Default::default()
         }
     }

@@ -320,6 +320,19 @@ impl DispatcherListener {
         }
     }
 
+    // notify dispatcher to reload config
+    pub fn notify_reload_config(&self) {
+        match self {
+            Self::Local(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+            #[cfg(target_os = "linux")]
+            Self::LocalMultins(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+            Self::LocalPlus(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+            Self::Analyzer(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+            Self::Mirror(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+            Self::MirrorPlus(l) => l.base.need_reload_config.store(true, Ordering::Relaxed),
+        }
+    }
+
     pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr], gateway_vmac_addrs: &[MacAddr]) {
         match self {
             // Enterprise Edition Feature: analyzer_mode
@@ -736,7 +749,7 @@ pub struct DispatcherBuilder {
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
-    log_parse_config: Option<LogParserAccess>,
+    log_parser_config: Option<LogParserAccess>,
     collector_config: Option<CollectorAccess>,
     dispatcher_config: Option<DispatcherAccess>,
     policy_getter: Option<PolicyGetter>,
@@ -860,8 +873,8 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn log_parse_config(mut self, v: LogParserAccess) -> Self {
-        self.log_parse_config = Some(v);
+    pub fn log_parser_config(mut self, v: LogParserAccess) -> Self {
+        self.log_parser_config = Some(v);
         self
     }
 
@@ -1027,6 +1040,7 @@ impl DispatcherBuilder {
             tunnel_type_bitmap: Default::default(),
             tunnel_info: Default::default(),
 
+            need_reload_config: Default::default(),
             need_update_bpf: Arc::new(AtomicBool::new(true)),
             reset_whitelist: Default::default(),
             tap_interface_whitelist: Default::default(),
@@ -1068,8 +1082,8 @@ impl DispatcherBuilder {
                 .flow_map_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no flow map config".into()))?,
-            log_parse_config: self
-                .log_parse_config
+            log_parser_config: self
+                .log_parser_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no log parse config".into()))?,
             collector_config: self

@@ -240,11 +240,21 @@ impl LocalModeDispatcher {
         );
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
 
+        let mut flow_config = base.flow_map_config.load().clone();
+        let mut log_parser_config = base.log_parser_config.load().clone();
+        let mut collector_config = base.collector_config.load().clone();
+
         while !base.terminated.load(Ordering::Relaxed) {
+            if base.need_reload_config.swap(false, Ordering::Relaxed) {
+                info!("dispatcher reload config");
+                flow_config = base.flow_map_config.load().clone();
+                log_parser_config = base.log_parser_config.load().clone();
+                collector_config = base.collector_config.load().clone();
+            }
             let config = Config {
-                flow: &base.flow_map_config.load(),
-                log_parser: &base.log_parse_config.load(),
-                collector: &base.collector_config.load(),
+                flow: &flow_config,
+                log_parser: &log_parser_config,
+                collector: &collector_config,
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 ebpf: None,
             };
@@ -327,7 +337,7 @@ impl LocalModeDispatcher {
 
 #[derive(Clone)]
 pub struct LocalModeDispatcherListener {
-    base: BaseDispatcherListener,
+    pub(super) base: BaseDispatcherListener,
     #[cfg(target_os = "linux")]
     extractor: Arc<LibvirtXmlExtractor>,
     rewriter: MacRewriter,

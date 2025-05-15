@@ -2324,7 +2324,7 @@ mod tests {
                 l7_log_dynamic: config.clone(),
                 ..Default::default()
             };
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             let is_openwire = OpenWireLog::check_protocol(payload, param);
             let infos = openwire.parse(payload, param);

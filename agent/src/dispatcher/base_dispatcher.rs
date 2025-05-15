@@ -90,7 +90,7 @@ pub(super) struct InternalState {
     pub(super) pipelines: Arc<Mutex<HashMap<u64, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
-    pub(super) log_parse_config: LogParserAccess,
+    pub(super) log_parser_config: LogParserAccess,
     pub(super) collector_config: CollectorAccess,
     pub(super) dispatcher_config: DispatcherAccess,
 
@@ -100,6 +100,7 @@ pub(super) struct InternalState {
 
     pub(super) tap_type_handler: CaptureNetworkTypeHandler,
 
+    pub(super) need_reload_config: Arc<AtomicBool>,
     pub(super) need_update_bpf: Arc<AtomicBool>,
     // 该表中的tap接口采集包长不截断
     pub(super) reset_whitelist: Arc<AtomicBool>,
@@ -171,6 +172,7 @@ impl BaseDispatcher {
             bpf_options: is.bpf_options.clone(),
             pipelines: is.pipelines.clone(),
             tap_interfaces: is.tap_interfaces.clone(),
+            need_reload_config: is.need_reload_config.clone(),
             need_update_bpf: is.need_update_bpf.clone(),
             #[cfg(target_os = "linux")]
             platform_poller: is.platform_poller.clone(),
@@ -749,6 +751,7 @@ pub struct BaseDispatcherListener {
     pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub pipelines: Arc<Mutex<HashMap<u64, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
+    pub need_reload_config: Arc<AtomicBool>,
     pub need_update_bpf: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     pub platform_poller: Arc<crate::platform::GenericPoller>,

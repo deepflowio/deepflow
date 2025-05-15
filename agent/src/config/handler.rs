@@ -2669,6 +2669,25 @@ impl ConfigHandler {
             info!("{:#?}", &new_config.user_config);
         }
 
+        let mut dispatcher_need_reload_config = candidate_config.flow != new_config.flow;
+        dispatcher_need_reload_config |= candidate_config.log_parser != new_config.log_parser;
+        dispatcher_need_reload_config |= candidate_config.collector != new_config.collector;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            dispatcher_need_reload_config |= candidate_config.ebpf != new_config.ebpf;
+        }
+        if dispatcher_need_reload_config {
+            info!("dispatcher will reload config");
+            callbacks.push(|_, c| {
+                for dispatcher in c.dispatcher_components.iter() {
+                    dispatcher.dispatcher_listener.notify_reload_config();
+                }
+                if let Some(d) = c.ebpf_dispatcher_component.as_ref() {
+                    d.ebpf_collector.notify_reload_config();
+                }
+            })
+        }
+
         // inputs
         let af_packet = &mut config.inputs.cbpf.af_packet;
         let new_af_packet = &mut new_config.user_config.inputs.cbpf.af_packet;

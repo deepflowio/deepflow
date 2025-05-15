@@ -628,7 +628,7 @@ mod tests {
                 ..Default::default()
             };
 
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             if !tars.check_payload(payload, param) {
                 output.push_str("not tars\n");
