@@ -72,7 +72,7 @@ pub struct MirrorModeDispatcherListener {
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
     agent_type: Arc<RwLock<AgentType>>,
-    base: BaseDispatcherListener,
+    pub(super) base: BaseDispatcherListener,
 }
 
 impl MirrorModeDispatcherListener {
@@ -572,7 +572,7 @@ impl MirrorModeDispatcher {
         while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
                 flow: &base.flow_map_config.load(),
-                log_parser: &base.log_parse_config.load(),
+                log_parser: &base.log_parser_config.load(),
                 collector: &base.collector_config.load(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 ebpf: None,

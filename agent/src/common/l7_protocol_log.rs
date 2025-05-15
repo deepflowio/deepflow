@@ -638,7 +638,7 @@ impl<'a> ParseParam<'a> {
         self.rrt_timeout = t;
     }
 
-    pub fn set_log_parse_config(&mut self, conf: &'a LogParserConfig) {
+    pub fn set_log_parser_config(&mut self, conf: &'a LogParserConfig) {
         self.parse_config = Some(conf);
     }
 

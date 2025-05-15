@@ -1891,7 +1891,7 @@ mod tests {
                 true,
             );
             param.set_captured_byte(payload.len());
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             let get_http_info = |i: L7ProtocolInfo| match i {
                 L7ProtocolInfo::HttpInfo(mut h) => {
@@ -2248,7 +2248,7 @@ mod tests {
                     true,
                     true,
                 );
-                param.set_log_parse_config(&config);
+                param.set_log_parser_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }
