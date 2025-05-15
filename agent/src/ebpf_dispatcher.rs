@@ -383,7 +383,12 @@ impl EbpfDispatcher {
         }
     }
 
-    fn run(&self, counter: Arc<EbpfCounter>, exception_handler: ExceptionHandler) {
+    fn run(
+        &self,
+        counter: Arc<EbpfCounter>,
+        exception_handler: ExceptionHandler,
+        need_reload_config: Arc<AtomicBool>,
+    ) {
         let ebpf_config = self.config.load();
         let out_of_order_reassembly_bitmap = L7ProtocolBitmap::from(
             ebpf_config
@@ -422,11 +427,24 @@ impl EbpfDispatcher {
         let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.socket.tunning.max_capture_rate));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+
+        let mut flow_config = self.flow_map_config.load().clone();
+        let mut log_parser_config = self.log_parser_config.load().clone();
+        let mut collector_config = self.collector_config.load().clone();
+        let mut ebpf_config = self.config.load().clone();
+
         while unsafe { SWITCH } {
+            if need_reload_config.swap(false, Ordering::Relaxed) {
+                info!("ebpf dispatcher reload config");
+                flow_config = self.flow_map_config.load().clone();
+                log_parser_config = self.log_parser_config.load().clone();
+                collector_config = self.collector_config.load().clone();
+                ebpf_config = self.config.load().clone();
+            }
             let config = Config {
-                flow: &self.flow_map_config.load(),
-                log_parser: &self.log_parser_config.load(),
-                collector: &self.collector_config.load(),
+                flow: &flow_config,
+                log_parser: &log_parser_config,
+                collector: &collector_config,
                 ebpf: Some(&ebpf_config),
             };
 
@@ -502,6 +520,7 @@ pub struct EbpfCollector {
 
     counter: Arc<EbpfCounter>,
     stats_collector: Arc<stats::Collector>,
+    need_reload_config: Arc<AtomicBool>,
 
     exception_handler: ExceptionHandler,
     process_listener: Arc<ProcessListener>,
@@ -1247,6 +1266,7 @@ impl EbpfCollector {
                 rx: AtomicU64::new(0),
                 get_token_failed: AtomicU64::new(0),
             }),
+            need_reload_config: Default::default(),
             stats_collector,
             exception_handler,
             process_listener: process_listener.clone(),
@@ -1263,6 +1283,10 @@ impl EbpfCollector {
         SyncEbpfDispatcher {
             pause: self.thread_dispatcher.pause.clone(),
         }
+    }
+
+    pub fn notify_reload_config(&self) {
+        self.need_reload_config.store(true, Ordering::Relaxed);
     }
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
@@ -1331,11 +1355,12 @@ impl EbpfCollector {
 
         let sync_counter = self.counter.clone();
         let exception_handler = self.exception_handler.clone();
+        let need_reload_config = self.need_reload_config.clone();
         let dispatcher = self.thread_dispatcher.clone();
         self.thread_handle = Some(
             thread::Builder::new()
                 .name("ebpf-collector".to_owned())
-                .spawn(move || dispatcher.run(sync_counter, exception_handler))
+                .spawn(move || dispatcher.run(sync_counter, exception_handler, need_reload_config))
                 .unwrap(),
         );
 

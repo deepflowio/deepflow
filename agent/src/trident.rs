@@ -3664,7 +3664,7 @@ fn build_dispatchers(
         .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
         .stats_collector(stats_collector.clone())
         .flow_map_config(config_handler.flow())
-        .log_parse_config(config_handler.log_parser())
+        .log_parser_config(config_handler.log_parser())
         .collector_config(config_handler.collector())
         .dispatcher_config(config_handler.dispatcher())
         .policy_getter(policy_getter)

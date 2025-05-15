@@ -1025,7 +1025,7 @@ mod tests {
                 ..Default::default()
             };
 
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             if first_packet {
                 first_packet = false;
