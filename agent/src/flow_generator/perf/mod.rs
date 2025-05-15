@@ -262,7 +262,7 @@ impl FlowLog {
                 is_parse_perf,
                 is_parse_log,
             );
-            parse_param.set_log_parse_config(log_parser_config);
+            parse_param.set_log_parser_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
             parse_param.set_counter(self.stats_counter.clone());
             parse_param.set_rrt_timeout(self.rrt_timeout);
@@ -357,7 +357,7 @@ impl FlowLog {
                 is_parse_perf,
                 is_parse_log,
             );
-            param.set_log_parse_config(log_parser_config);
+            param.set_log_parser_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
             param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);

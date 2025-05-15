@@ -1007,7 +1007,7 @@ mod tests {
                 ..Default::default()
             };
 
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             if !pulsar.check_payload(payload, param) {
                 output.push_str("not pulsar\n");

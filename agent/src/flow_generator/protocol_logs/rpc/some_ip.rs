@@ -340,7 +340,7 @@ mod tests {
                 ..Default::default()
             };
 
-            param.set_log_parse_config(parse_config);
+            param.set_log_parser_config(parse_config);
 
             let info = some_ip.parse_payload(payload, param);
             if let Ok(info) = info {
