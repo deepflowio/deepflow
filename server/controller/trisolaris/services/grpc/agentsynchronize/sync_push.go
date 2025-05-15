@@ -58,7 +58,7 @@ func NewAgentEvent() *AgentEvent {
 	return &AgentEvent{}
 }
 
-func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAgentInfo *vtap.VTapInfo, orgID int) *koanf.Koanf {
+func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, gAgentInfo *vtap.VTapInfo, isOwnerCluster bool, orgID int) *koanf.Koanf {
 	userConfig := c.GetUserConfig()
 
 	configTSDBIP := gAgentInfo.GetConfigTSDBIP()
@@ -72,7 +72,7 @@ func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, clusterID string, gAg
 		userConfig.Set(CONFIG_KEY_INGESTER_IP, trisolaris.GetORGNodeInfo(orgID).GetTSDBNatIP(c.GetTSDBIP()))
 	}
 
-	if isPodVTap(c.GetVTapType()) && gAgentInfo.IsTheSameCluster(clusterID) {
+	if isPodVTap(c.GetVTapType()) && isOwnerCluster {
 		userConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_IP, trisolaris.GetORGNodeInfo(orgID).GetControllerPodIP(c.GetControllerIP()))
 		userConfig.Set(CONFIG_KEY_PROXY_CONTROLLER_PORT, trisolaris.GetGrpcPort())
 
@@ -312,7 +312,9 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 			dynamicConfig.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
-	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	isOwnerCluster := gAgentInfo.CheckClusterOwner(in.GetKubernetesClusterMd5())
+	vtapCache.UpdateOwner(isOwnerCluster)
+	userConfig := e.generateUserConfig(vtapCache, gAgentInfo, isOwnerCluster, orgID)
 	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
@@ -554,7 +556,9 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		}
 	}
 
-	userConfig := e.generateUserConfig(vtapCache, clusterID, gAgentInfo, orgID)
+	isOwnerCluster := gAgentInfo.CheckClusterOwner(in.GetKubernetesClusterMd5())
+	vtapCache.UpdateOwner(isOwnerCluster)
+	userConfig := e.generateUserConfig(vtapCache, gAgentInfo, isOwnerCluster, orgID)
 	if userConfig.String(CONFIG_KEY_INGESTER_IP) == "" {
 		dynamicConfig.Enabled = proto.Bool(false)
 		log.Errorf("agent(%s) has no ingester_ip, "+
