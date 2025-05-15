@@ -1659,6 +1659,30 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 #endif
 }
 
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+static __inline void preprocess_for_uprobe(int tgid,
+					   enum traffic_direction dir,
+					   __u32 fd,
+					   size_t count)
+{
+	/*
+	 * Golang HTTP/2 uprobe handling requires precomputing the
+	 * TCP sequence number at the syscall level.
+	 */
+	if (skip_http2_kprobe() && dir == T_INGRESS) {
+		struct http2_tcp_seq_key tcp_seq_key = {
+			.tgid = tgid,
+			.fd = fd,
+			.tcp_seq_end = get_tcp_read_seq(fd, NULL, NULL),
+		};
+
+		__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;
+		bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key,
+				    &tcp_seq, BPF_NOEXIST);
+	}
+}
+#endif
+
 static __inline int trace_io_event_common(void *ctx,
 					  struct member_fields_offset *offset,
 					  struct data_args_t *data_args,
@@ -1716,6 +1740,18 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 #endif
 	}
 
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	/*
+	 * When loading the kfunc bytecode, we encountered the error:
+	 * "bcc_prog_load() failed. name: kretfunc____sys_sendmmsg, Argument
+	 * list too long errno: 7.” Here, handle it to prevent this type of
+	 * loading error.
+	 */
+	preprocess_for_uprobe(id >> 32, direction, args->fd, bytes_count);
+	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)	
+		return -1;
+#endif
+
 	init_conn_info(id >> 32, args->fd, conn_info, sk, direction,
 		       bytes_count, offset);
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP
@@ -1764,10 +1800,10 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
 			       bytes_count, sock_state, extra);
 
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)
 		return -1;
 
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	if (act == INFER_CONTINUE) {
 		ctx_map->tail_call.conn_info = __conn_info;
 		ctx_map->tail_call.extra = *extra;
@@ -1795,6 +1831,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			conn_info->is_reasm_seg = true;
 		}
 	}
+
 	// When at least one of protocol or message_type is valid, 
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
