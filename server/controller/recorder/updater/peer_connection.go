@@ -99,9 +99,10 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	dbItem := &metadbmodel.PeerConnection{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
+		TeamID:       c.msgMetadata.TeamID,
 		Domain:       c.metadata.Domain.Lcuuid,
-		RemoteVPCID:  remoteVPCID,
-		LocalVPCID:   localVPCID,
+		RemoteVPCID:  &remoteVPCID,
+		LocalVPCID:   &localVPCID,
 		RemoteDomain: c.metadata.Domain.Lcuuid,
 		LocalDomain:  c.metadata.Domain.Lcuuid,
 	}
