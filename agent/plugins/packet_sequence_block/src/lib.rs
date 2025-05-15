@@ -30,6 +30,10 @@ impl PacketSequenceBlock {
         unimplemented!();
     }
 
+    pub fn with_capacity(_: usize, _: u32) -> Self {
+        unimplemented!();
+    }
+
     pub fn is_available(&self, _: usize, _: u32) -> bool {
         unimplemented!();
     }
