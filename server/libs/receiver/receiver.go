@@ -800,10 +800,11 @@ func (r *Receiver) decompressBuffer(encoder uint8, receiveBuffer []byte, start, 
 		defer reader.Close()
 	case datatype.MESSAGE_ENCODER_ZSTD: // zstd
 		// zstd Reader did not implement io.ReadCloser
-		reader, err := zstd.NewReader(encodeBuffer)
+		notReadCloser, err := zstd.NewReader(encodeBuffer)
 		if err != nil {
 			return receiveBuffer, err
 		}
+		reader = notReadCloser.IOReadCloser()
 		defer reader.Close()
 	}
 
