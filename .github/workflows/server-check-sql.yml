@@ -1,0 +1,25 @@
+name: sqlcheck 
+on: 
+  pull_request:
+    paths:
+      - 'server/controller/db/metadb/migrator/schema/rawsql/mysql/init.sql'
+      - 'server/controller/db/metadb/migrator/schema/rawsql/mysql/issu/*.sql'
+jobs:
+  sqlcheck:
+    name: sqlcheck job
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    - uses: yokawasa/action-sqlcheck@v1.5.0
+      id: sqlcheck
+      with:
+        post-comment: true
+        risk-level: 3
+        verbose: false
+        token: ${{ secrets.GITHUB_TOKEN }}
+        postfixes: |
+          sql

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS plugin (
+CREA TE TABLE IF NOT EXISTS plugin (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
     type                INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
