@@ -9,16 +9,19 @@ jobs:
     name: sqlcheck job
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
-    - uses: yokawasa/action-sqlcheck@v1.4.0
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    - uses: yokawasa/action-sqlcheck@v1.5.0
       id: sqlcheck
       with:
         post-comment: true
-        risk-level: 3
+        risk-level: 1
         verbose: true
         token: ${{ secrets.GITHUB_TOKEN }}
         postfixes: |
           sql
         directories: |
-          server/controller/db/metadb/migrator/schema/rawsql/mysql/
-          server/controller/db/metadb/migrator/schema/rawsql/mysql/issu/
+          server/controller/db/metadb/migrator/schema/rawsql
