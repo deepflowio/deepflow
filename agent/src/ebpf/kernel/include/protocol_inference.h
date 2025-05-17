@@ -438,6 +438,11 @@ static __inline enum message_type parse_http2_headers_frame(const char
  */
 #define HTTPV2_FRAME_READ_SZ            21
 #define HTTPV2_STATIC_TABLE_IDX_MAX     61
+/*
+ * Many implementations (such as NGINX, gRPC, and nghttp2) impose
+ * a smaller upper limit on individual frame size (e.g., 16KB).
+ */
+#define HTTPV2_FRAME_SZ_MAX		16384 
 
 	/*
 	 * If the server reads data in multiple passes, and the previous pass
@@ -452,6 +457,21 @@ static __inline enum message_type parse_http2_headers_frame(const char
 	if (count < HTTPV2_FRAME_PROTO_SZ)
 		return MSG_UNKNOWN;
 
+	/*
+	 * The frame payload length (excluding the initial 9 bytes) must not
+	 * exceed the actual length of the system call.
+	 */
+	if ((__bpf_ntohl(*(__u32 *) buf_kern) >> 8) > syscall_len - HTTPV2_FRAME_PROTO_SZ)
+		return MSG_UNKNOWN;
+
+	/*
+	 * The highest bit of the 5th byte (i.e., the first byte of the Stream
+	 * Identifier) must be 0, indicating that the reserved bit (R) is 0;
+	 * otherwise, it violates the HTTP/2 specification.
+	 */
+	if (buf_kern[5] >> 7 != 0)
+		return MSG_UNKNOWN;
+	
 	__u32 offset = 0;
 	__u8 flags_unset = 0, flags_padding = 0, flags_priority = 0;
 	__u8 type = 0, reserve = 0, static_table_idx, i, block_fragment_offset;
