@@ -33,7 +33,7 @@ type ChPodK8sEnvs struct {
 		message.PodDelete,
 		mysqlmodel.Pod,
 		mysqlmodel.ChPodK8sEnvs,
-		K8sEnvsKey,
+		IDKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 			message.PodDelete,
 			mysqlmodel.Pod,
 			mysqlmodel.ChPodK8sEnvs,
-			K8sEnvsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ENVS,
 		),
@@ -65,29 +65,30 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 		envs, _ := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
 		updateInfo["envs"] = envs
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChPodK8sEnvs
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sEnvsKey{{ID: sourceID}},
-				[]mysqlmodel.ChPodK8sEnvs{{ID: sourceID, Envs: updateInfo["envs"].(string)}},
+				[]IDKey{targetKey},
+				[]mysqlmodel.ChPodK8sEnvs{{
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, Envs: updateInfo["envs"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sEnvsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *mysqlmodel.Pod) (keys []K8sEnvsKey, targets []mysqlmodel.ChPodK8sEnvs) {
-	if item.ENV == "" {
+func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKey, targets []mysqlmodel.ChPodK8sEnvs) {
+	if source.ENV == "" {
 		return
 	}
-	envs, _ := common.StrToJsonAndMap(item.ENV)
-	return []K8sEnvsKey{{ID: item.ID}}, []mysqlmodel.ChPodK8sEnvs{{
-		ID:          item.ID,
+	envs, _ := common.StrToJsonAndMap(source.ENV)
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodK8sEnvs{{
+		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Envs:        envs,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

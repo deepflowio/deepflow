@@ -36,7 +36,7 @@ type ChPodNSCloudTags struct {
 		message.PodNamespaceDelete,
 		mysqlmodel.PodNamespace,
 		mysqlmodel.ChPodNSCloudTags,
-		CloudTagsKey,
+		IDKey,
 	]
 }
 
@@ -51,7 +51,7 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 			message.PodNamespaceDelete,
 			mysqlmodel.PodNamespace,
 			mysqlmodel.ChPodNSCloudTags,
-			CloudTagsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
 		),
@@ -72,33 +72,36 @@ func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 		}
 		updateInfo["cloud_tags"] = string(bytes)
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChPodNSCloudTags
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]CloudTagsKey{{ID: sourceID}},
-				[]mysqlmodel.ChPodNSCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				[]IDKey{targetKey},
+				[]mysqlmodel.ChPodNSCloudTags{{
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, CloudTags: updateInfo["cloud_tags"].(string)}},
 				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysqlmodel.PodNamespace) (keys []CloudTagsKey, targets []mysqlmodel.ChPodNSCloudTags) {
-	if len(item.CloudTags) == 0 {
+func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodNamespace) (keys []IDKey, targets []mysqlmodel.ChPodNSCloudTags) {
+	if len(source.CloudTags) == 0 {
 		return
 	}
-	bytes, err := json.Marshal(item.CloudTags)
+	bytes, err := json.Marshal(source.CloudTags)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysqlmodel.ChPodNSCloudTags{{
-		ID:          item.ID,
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodNSCloudTags{{
+		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		CloudTags:   string(bytes),
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

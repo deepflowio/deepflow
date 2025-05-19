@@ -33,7 +33,7 @@ type ChPodK8sEnv struct {
 		message.PodDelete,
 		mysqlmodel.Pod,
 		mysqlmodel.ChPodK8sEnv,
-		K8sEnvKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 			message.PodDelete,
 			mysqlmodel.Pod,
 			mysqlmodel.ChPodK8sEnv,
-			K8sEnvKey,
+			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ENV,
 		),
@@ -59,51 +59,50 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
-	keysToAdd := make([]K8sEnvKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]mysqlmodel.ChPodK8sEnv, 0)
-	keysToDelete := make([]K8sEnvKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChPodK8sEnv, 0)
-	var chItem mysqlmodel.ChPodK8sEnv
-	var updateKey K8sEnvKey
-	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
 		_, old := common.StrToJsonAndMap(fieldsUpdate.ENV.GetOld())
 
 		for k, v := range new {
+			targetKey := NewIDKeyKey(sourceID, k)
 			oldV, ok := old[k]
 			if !ok {
-				keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sEnv{
-					ID:    sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
 				})
-			} else {
-				if oldV != v {
-					updateKey = K8sEnvKey{ID: sourceID, Key: k}
-					updateInfo["value"] = v
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sEnv{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem mysqlmodel.ChPodK8sEnv
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sEnv{
+						ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, K8sEnvKey{ID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodK8sEnv{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -117,13 +116,13 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []K8sEnvKey, targets []mysqlmodel.ChPodK8sEnv) {
+func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKeyKey, targets []mysqlmodel.ChPodK8sEnv) {
 	_, envMap := common.StrToJsonAndMap(source.ENV)
 
 	for k, v := range envMap {
-		keys = append(keys, K8sEnvKey{ID: source.ID, Key: k})
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, mysqlmodel.ChPodK8sEnv{
-			ID:          source.ID,
+			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,

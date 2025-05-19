@@ -68,7 +68,7 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysqlmodel.ChChost{
-		ID:       source.ID,
+		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID},
 		Name:     sourceName,
 		L3EPCID:  source.VPCID,
 		HostID:   source.HostID,
@@ -102,11 +102,7 @@ func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFields
 	if fieldsUpdate.NetworkID.IsDifferent() {
 		updateInfo["subnet_id"] = fieldsUpdate.NetworkID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChChost
-		db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
-	}
+	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

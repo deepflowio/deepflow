@@ -69,11 +69,7 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChAZ
-		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
-		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
-	}
+	a.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
@@ -98,7 +94,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysqlmodel.AZ) (keys []I
 		name += " (deleted)"
 	}
 	targets = append(targets, mysqlmodel.ChAZ{
-		ID:       az.ID,
+		ChIDBase: mysqlmodel.ChIDBase{ID: az.ID},
 		Name:     name,
 		IconID:   iconID,
 		TeamID:   md.TeamID,

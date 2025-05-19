@@ -33,7 +33,7 @@ type ChPodServiceK8sAnnotations struct {
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
 		mysqlmodel.ChPodServiceK8sAnnotations,
-		K8sAnnotationsKey,
+		IDKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
 			mysqlmodel.ChPodServiceK8sAnnotations,
-			K8sAnnotationsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS,
 		),
@@ -68,35 +68,31 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 			updateInfo["annotations"] = annotations
 		}
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sAnnotationsKey{{ID: sourceID}},
+				[]IDKey{targetKey},
 				[]mysqlmodel.ChPodServiceK8sAnnotations{{
-					ID:          sourceID,
+					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
 					Annotations: updateInfo["annotations"].(string),
 				}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(
-				chItem,
-				updateInfo,
-				K8sAnnotationsKey{ID: sourceID},
-				db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysqlmodel.PodService) (keys []K8sAnnotationsKey, targets []mysqlmodel.ChPodServiceK8sAnnotations) {
-	if item.Annotation == "" {
+func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodService) (keys []IDKey, targets []mysqlmodel.ChPodServiceK8sAnnotations) {
+	if source.Annotation == "" {
 		return
 	}
-	annotations, _ := common.StrToJsonAndMap(item.Annotation)
-	return []K8sAnnotationsKey{{ID: item.ID}}, []mysqlmodel.ChPodServiceK8sAnnotations{{
-		ID:          item.ID,
+	annotations, _ := common.StrToJsonAndMap(source.Annotation)
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodServiceK8sAnnotations{{
+		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
