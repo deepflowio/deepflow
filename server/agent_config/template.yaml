@@ -6625,8 +6625,8 @@ outputs:
     application_log: true
     # type: bool
     # name:
-    #   en: L7_Flow_Log
-    #   ch: L7_Flow_Log
+    #   en: Request Log
+    #   ch: 调用日志
     # unit:
     # range: []
     # enum_options: []
@@ -6641,8 +6641,8 @@ outputs:
     l7_flow_log: true
     # type: bool
     # name:
-    #   en: L4_Flow_Log
-    #   ch: L4_Flow_Log
+    #   en: Flow Log
+    #   ch: 流日志
     # unit:
     # range: []
     # enum_options: []
