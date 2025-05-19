@@ -33,7 +33,7 @@ type ChPodK8sAnnotations struct {
 		message.PodDelete,
 		metadbmodel.Pod,
 		metadbmodel.ChPodK8sAnnotations,
-		K8sAnnotationsKey,
+		IDKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 			message.PodDelete,
 			metadbmodel.Pod,
 			metadbmodel.ChPodK8sAnnotations,
-			K8sAnnotationsKey,
+			IDKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS,
 		),
 	}
 	mng.subscriberDG = mng
@@ -65,29 +65,30 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *mess
 		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		updateInfo["annotations"] = annotations
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChPodK8sAnnotations
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sAnnotationsKey{{ID: sourceID}},
-				[]metadbmodel.ChPodK8sAnnotations{{ID: sourceID, Annotations: updateInfo["annotations"].(string)}},
+				[]IDKey{targetKey},
+				[]metadbmodel.ChPodK8sAnnotations{{
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID}, Annotations: updateInfo["annotations"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sAnnotationsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, item *metadbmodel.Pod) (keys []K8sAnnotationsKey, targets []metadbmodel.ChPodK8sAnnotations) {
-	if item.Annotation == "" {
+func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKey, targets []metadbmodel.ChPodK8sAnnotations) {
+	if source.Annotation == "" {
 		return
 	}
-	annotations, _ := common.StrToJsonAndMap(item.Annotation)
-	return []K8sAnnotationsKey{{ID: item.ID}}, []metadbmodel.ChPodK8sAnnotations{{
-		ID:          item.ID,
+	annotations, _ := common.StrToJsonAndMap(source.Annotation)
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sAnnotations{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

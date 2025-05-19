@@ -63,15 +63,15 @@ func (l *ChLbListener) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChL
 		}
 		if lbListener.DeletedAt.Valid {
 			keyToItem[IDKey{ID: lbListener.ID}] = metadbmodel.ChLBListener{
-				ID:     lbListener.ID,
-				Name:   lbListener.Name + " (deleted)",
-				TeamID: DomainToTeamID[lbListener.Domain],
+				ChIDBase: metadbmodel.ChIDBase{ID: lbListener.ID},
+				Name:     lbListener.Name + " (deleted)",
+				TeamID:   DomainToTeamID[lbListener.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: lbListener.ID}] = metadbmodel.ChLBListener{
-				ID:     lbListener.ID,
-				Name:   lbListener.Name,
-				TeamID: DomainToTeamID[lbListener.Domain],
+				ChIDBase: metadbmodel.ChIDBase{ID: lbListener.ID},
+				Name:     lbListener.Name,
+				TeamID:   DomainToTeamID[lbListener.Domain],
 			}
 		}
 	}

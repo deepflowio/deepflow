@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
@@ -95,6 +96,15 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 	return ss
 }
 
+func (m *SubscriberManager) GetSubscriber(resourceType string) Subscriber {
+	for _, s := range m.subscribers {
+		if s.GetSubResourceType() == resourceType {
+			return s
+		}
+	}
+	return nil
+}
+
 func (c *SubscriberManager) getSubscribers() []Subscriber {
 	subscribers := []Subscriber{
 		NewChVMDevice(c.resourceTypeToIconID),
@@ -157,7 +167,7 @@ type Subscriber interface {
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
-	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB)
+	updateSyncTriggerFlag(md *message.Metadata, db *metadb.DB)
 }
 
 type SubscriberDataGenerator[
@@ -169,7 +179,7 @@ type SubscriberDataGenerator[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT, *metadb.DB)
@@ -185,7 +195,7 @@ type SubscriberComponent[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ] struct {
 	cfg config.ControllerConfig
 
@@ -207,7 +217,7 @@ func newSubscriberComponent[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ](
 	sourceResourceTypeName, resourceTypeName string,
 ) SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT] {
@@ -265,7 +275,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	}
 	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -276,7 +286,30 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
+}
+
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateOrSync(db *metadb.DB, key KT, updateInfo map[string]interface{}) {
+	condMap := KeyToMap(key)
+	if len(condMap) == 0 {
+		log.Errorf("% key is empty: %v", s.resourceTypeName, key, db.LogPrefixORGID)
+		return
+	}
+	query := db.GetGORMDB()
+	for k, v := range condMap {
+		query = query.Where(fmt.Sprintf("`%s` = ?", k), v)
+	}
+	var chItem CT
+	if err := query.First(&chItem).Error; err != nil {
+		log.Errorf("failed to get %s by key %v: %v", s.resourceTypeName, key, err, db.LogPrefixORGID)
+		return
+	}
+	if len(updateInfo) == 0 {
+		updateInfo = map[string]interface{}{
+			"updated_at": time.Now(), // use update_at as synchronize time
+		}
+	}
+	s.dbOperator.update(chItem, updateInfo, key, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -306,7 +339,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Delete resource by domain
@@ -319,7 +352,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Delete resource by sub domain
@@ -332,7 +365,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Update team_id of resource by sub domain
@@ -347,9 +380,9 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	}
 }
 
-// ResourceUpdateAtInfoUpdated updates the updated_at field of the sync trigger item in the CH table
+// updateSyncTriggerFlag updates the updated_at field of the sync trigger item in the CH table
 // to trigger the sync of the corresponding resource in ClickHouse.
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB) {
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateSyncTriggerFlag(md *message.Metadata, db *metadb.DB) {
 	var syncTriggerItem CT
 	err := db.Where(fmt.Sprintf("%s = ?", s.syncTriggerKeyInChTable), 0).First(&syncTriggerItem).Error
 	if err == nil {

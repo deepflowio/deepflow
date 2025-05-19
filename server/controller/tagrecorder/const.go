@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"strings"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
@@ -58,55 +60,29 @@ const (
 )
 
 const (
-	RESOURCE_TYPE_CH_K8S_ANNOTATION  = "ch_k8s_annotation"
-	RESOURCE_TYPE_CH_K8S_ANNOTATIONS = "ch_k8s_annotations"
-	RESOURCE_TYPE_CH_K8S_ENV         = "ch_k8s_env"
-	RESOURCE_TYPE_CH_K8S_ENVS        = "ch_k8s_envs"
+	RESOURCE_TYPE_CH_REGION      = "ch_region"
+	RESOURCE_TYPE_CH_IP_RELATION = "ch_ip_relation"
+	RESOURCE_TYPE_CH_IP_RESOURCE = "ch_ip_resource"
+	RESOURCE_TYPE_CH_USER        = "ch_user"
 
-	RESOURCE_TYPE_CH_K8S_LABEL         = "ch_k8s_label"
-	RESOURCE_TYPE_CH_K8S_LABELS        = "ch_k8s_labels"
-	RESOURCE_TYPE_CH_VM_CLOUD_TAG      = "ch_chost_cloud_tag"
-	RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG  = "ch_pod_namespace_cloud_tag"
-	RESOURCE_TYPE_CH_VM_CLOUD_TAGS     = "ch_chost_cloud_tags"
-	RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS = "ch_pod_namespace_cloud_tags"
-	RESOURCE_TYPE_CH_OS_APP_TAG        = "ch_os_app_tag"
-	RESOURCE_TYPE_CH_OS_APP_TAGS       = "ch_os_app_tags"
-	RESOURCE_TYPE_CH_REGION            = "ch_region"
-	RESOURCE_TYPE_CH_AZ                = "ch_az"
-	RESOURCE_TYPE_CH_VPC               = "ch_vpc"
-	RESOURCE_TYPE_CH_DEVICE            = "ch_device"
-	RESOURCE_TYPE_CH_IP_RELATION       = "ch_ip_relation"
-	RESOURCE_TYPE_CH_IP_RESOURCE       = "ch_ip_resource"
-	RESOURCE_TYPE_CH_USER              = "ch_user"
+	// RESOURCE_TYPE_CH_POD_GROUP_TYPE = "ch_pod_group_type"
+	RESOURCE_TYPE_TAP_TYPE        = "ch_tap_type"
+	RESOURCE_TYPE_CH_VTAP         = "ch_vtap"
+	RESOURCE_TYPE_CH_VTAP_PORT    = "ch_vtap_port"
+	RESOURCE_TYPE_CH_LB_LISTENER  = "ch_lb_listener"
+	RESOURCE_TYPE_CH_STRING_ENUM  = "ch_string_enum"
+	RESOURCE_TYPE_CH_INT_ENUM     = "ch_int_enum"
+	RESOURCE_TYPE_CH_NODE_TYPE    = "ch_node_type"
+	RESOURCE_TYPE_CH_POLICY       = "ch_policy"
+	RESOURCE_TYPE_CH_NPB_TUNNEL   = "ch_npb_tunnel"
+	RESOURCE_TYPE_CH_ALARM_POLICY = "ch_alarm_policy"
 
-	RESOURCE_TYPE_CH_NETWORK        = "ch_network"
-	RESOURCE_TYPE_CH_POD            = "ch_pod"
-	RESOURCE_TYPE_CH_POD_GROUP      = "ch_pod_group"
-	RESOURCE_TYPE_CH_POD_GROUP_TYPE = "ch_pod_group_type"
-	RESOURCE_TYPE_CH_POD_INGRESS    = "ch_pod_ingress"
-	RESOURCE_TYPE_CH_POD_NAMESPACE  = "ch_pod_namespace"
-	RESOURCE_TYPE_CH_POD_NODE       = "ch_pod_node"
-	RESOURCE_TYPE_CH_POD_CLUSTER    = "ch_pod_cluster"
-	RESOURCE_TYPE_TAP_TYPE          = "ch_tap_type"
-	RESOURCE_TYPE_CH_VTAP           = "ch_vtap"
-	RESOURCE_TYPE_CH_VTAP_PORT      = "ch_vtap_port"
-	RESOURCE_TYPE_CH_LB_LISTENER    = "ch_lb_listener"
-	RESOURCE_TYPE_CH_STRING_ENUM    = "ch_string_enum"
-	RESOURCE_TYPE_CH_INT_ENUM       = "ch_int_enum"
-	RESOURCE_TYPE_CH_NODE_TYPE      = "ch_node_type"
-	RESOURCE_TYPE_CH_GPROCESS       = "ch_gprocess"
-	RESOURCE_TYPE_CH_POD_SERVICE    = "ch_pod_service"
-	RESOURCE_TYPE_CH_CHOST          = "ch_chost"
-	RESOURCE_TYPE_CH_POLICY         = "ch_policy"
-	RESOURCE_TYPE_CH_NPB_TUNNEL     = "ch_npb_tunnel"
-	RESOURCE_TYPE_CH_ALARM_POLICY   = "ch_alarm_policy"
-
-	RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
-	RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
-	RESOURCE_TYPE_CH_POD_GROUP_RC                    = "pod_group_rc"
-	RESOURCE_TYPE_CH_POD_GROUP_DAEMON_SET            = "pod_group_daemon_set"
-	RESOURCE_TYPE_CH_POD_GROUP_REPLICASET_CONTROLLER = "pod_group_replicaset_controller"
-	RESOURCE_TYPE_CH_POD_GROUP_CLONESET              = "pod_group_cloneset"
+	// RESOURCE_TYPE_CH_POD_GROUP_DEPLOYMENT            = "pod_group_deployment"
+	// RESOURCE_TYPE_CH_POD_GROUP_STATEFULSET           = "pod_group_statefulset"
+	// RESOURCE_TYPE_CH_POD_GROUP_RC                    = "pod_group_rc"
+	// RESOURCE_TYPE_CH_POD_GROUP_DAEMON_SET            = "pod_group_daemon_set"
+	// RESOURCE_TYPE_CH_POD_GROUP_REPLICASET_CONTROLLER = "pod_group_replicaset_controller"
+	// RESOURCE_TYPE_CH_POD_GROUP_CLONESET              = "pod_group_cloneset"
 
 	RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "ch_promytheus_metric_app_label_layout"
 	RESOURCE_TYPE_CH_TARGET_LABEL                       = "ch_target_label"
@@ -116,43 +92,84 @@ const (
 	RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "ch_prometheus_target_label_layout"
 )
 
+func chDictNameToMetaDBTableName(dictionaryName string) string {
+	return "ch_" + strings.ReplaceAll(dictionaryName, "_map", "")
+}
+
+var (
+	CH_DICTIONARY_DEVICE    = "device_map" // vm, host, vgw, dhcp_port, pod, pod_service, pod_node, redis, rds, lb, nat
+	RESOURCE_TYPE_CH_DEVICE = chDictNameToMetaDBTableName(CH_DICTIONARY_DEVICE)
+
+	CH_DICTIONARY_AZ    = "az_map"
+	RESOURCE_TYPE_CH_AZ = chDictNameToMetaDBTableName(CH_DICTIONARY_AZ)
+
+	CH_DICTIONARY_CHOST    = "chost_map"
+	RESOURCE_TYPE_CH_CHOST = chDictNameToMetaDBTableName(CH_DICTIONARY_CHOST)
+
+	CH_DICTIONARY_VPC        = "l3_epc_map"
+	RESOURCE_TYPE_CH_VPC     = chDictNameToMetaDBTableName(CH_DICTIONARY_VPC)
+	CH_DICTIONARY_NETWORK    = "subnet_map"
+	RESOURCE_TYPE_CH_NETWORK = chDictNameToMetaDBTableName(CH_DICTIONARY_NETWORK)
+
+	CH_DICTIONARY_POD_CLUSTER      = "pod_cluster_map"
+	RESOURCE_TYPE_CH_POD_CLUSTER   = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_CLUSTER)
+	CH_DICTIONARY_POD_NODE         = "pod_node_map"
+	RESOURCE_TYPE_CH_POD_NODE      = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_NODE)
+	CH_DICTIONARY_POD_NAMESPACE    = "pod_ns_map"
+	RESOURCE_TYPE_CH_POD_NAMESPACE = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_NAMESPACE)
+	CH_DICTIONARY_POD_INGRESS      = "pod_ingress_map" // TODO delete
+	RESOURCE_TYPE_CH_POD_INGRESS   = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_INGRESS)
+	CH_DICTIONARY_POD_SERVICE      = "pod_service_map"
+	RESOURCE_TYPE_CH_POD_SERVICE   = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_SERVICE)
+	CH_DICTIONARY_POD_GROUP        = "pod_group_map"
+	RESOURCE_TYPE_CH_POD_GROUP     = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_GROUP)
+	CH_DICTIONARY_POD              = "pod_map"
+	RESOURCE_TYPE_CH_POD           = chDictNameToMetaDBTableName(CH_DICTIONARY_POD)
+
+	CH_DICTIONARY_GPROCESS    = "gprocess_map"
+	RESOURCE_TYPE_CH_GPROCESS = chDictNameToMetaDBTableName(CH_DICTIONARY_GPROCESS)
+
+	CH_DICTIONARY_CHOST_CLOUD_TAG                = "chost_cloud_tag_map"
+	RESOURCE_TYPE_CH_CHOST_CLOUD_TAG             = chDictNameToMetaDBTableName(CH_DICTIONARY_CHOST_CLOUD_TAG)
+	CH_DICTIONARY_CHOST_CLOUD_TAGS               = "chost_cloud_tags_map"
+	RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS            = chDictNameToMetaDBTableName(CH_DICTIONARY_CHOST_CLOUD_TAGS)
+	CH_DICTIONARY_POD_NS_CLOUD_TAG               = "pod_ns_cloud_tag_map"
+	RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG            = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_NS_CLOUD_TAG)
+	CH_DICTIONARY_POD_NS_CLOUD_TAGS              = "pod_ns_cloud_tags_map"
+	RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS           = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_NS_CLOUD_TAGS)
+	CH_DICTIONARY_POD_SERVICE_K8S_LABEL          = "pod_service_k8s_label_map"
+	RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL       = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_SERVICE_K8S_LABEL)
+	CH_DICTIONARY_POD_SERVICE_K8S_LABELS         = "pod_service_k8s_labels_map"
+	RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS      = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_SERVICE_K8S_LABELS)
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION     = "pod_service_k8s_annotation_map"
+	RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATION  = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION)
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS    = "pod_service_k8s_annotations_map"
+	RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS)
+	CH_DICTIONARY_POD_K8S_ENV                    = "pod_k8s_env_map"
+	RESOURCE_TYPE_CH_POD_K8S_ENV                 = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ENV)
+	CH_DICTIONARY_POD_K8S_ENVS                   = "pod_k8s_envs_map"
+	RESOURCE_TYPE_CH_POD_K8S_ENVS                = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ENVS)
+	CH_DICTIONARY_POD_K8S_LABEL                  = "pod_k8s_label_map"
+	RESOURCE_TYPE_CH_POD_K8S_LABEL               = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_LABEL)
+	CH_DICTIONARY_POD_K8S_LABELS                 = "pod_k8s_labels_map"
+	RESOURCE_TYPE_CH_POD_K8S_LABELS              = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_LABELS)
+	CH_DICTIONARY_POD_K8S_ANNOTATION             = "pod_k8s_annotation_map"
+	RESOURCE_TYPE_CH_POD_K8S_ANNOTATION          = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ANNOTATION)
+	CH_DICTIONARY_POD_K8S_ANNOTATIONS            = "pod_k8s_annotations_map"
+	RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS         = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ANNOTATIONS)
+	CH_DICTIONARY_OS_APP_TAG                     = "os_app_tag_map"
+	RESOURCE_TYPE_CH_OS_APP_TAG                  = chDictNameToMetaDBTableName(CH_DICTIONARY_OS_APP_TAG)
+	CH_DICTIONARY_OS_APP_TAGS                    = "os_app_tags_map"
+	RESOURCE_TYPE_CH_OS_APP_TAGS                 = chDictNameToMetaDBTableName(CH_DICTIONARY_OS_APP_TAGS)
+)
+
 const (
-	CH_DICTIONARY_POD_K8S_ANNOTATION          = "pod_k8s_annotation_map"
-	CH_DICTIONARY_POD_K8S_ANNOTATIONS         = "pod_k8s_annotations_map"
-	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION  = "pod_service_k8s_annotation_map"
-	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS = "pod_service_k8s_annotations_map"
-	CH_DICTIONARY_POD_K8S_ENV                 = "pod_k8s_env_map"
-	CH_DICTIONARY_POD_K8S_ENVS                = "pod_k8s_envs_map"
-
-	CH_DICTIONARY_REGION        = "region_map"
-	CH_DICTIONARY_AZ            = "az_map"
-	CH_DICTIONARY_DEVICE        = "device_map" // vm, host, vgw, dhcp_port, pod, pod_service, pod_node, redis, rds, lb, nat
-	CH_DICTIONARY_VPC           = "l3_epc_map"
-	CH_DICTIONARY_VL2           = "subnet_map"
-	CH_DICTIONARY_POD_CLUSTER   = "pod_cluster_map"
-	CH_DICTIONARY_POD_NAMESPACE = "pod_ns_map"
-	CH_DICTIONARY_POD_NODE      = "pod_node_map"
-	CH_DICTIONARY_POD_GROUP     = "pod_group_map"
-	CH_DICTIONARY_POD_INGRESS   = "pod_ingress_map"
-	CH_DICTIONARY_POD           = "pod_map"
-	CH_DICTIONARY_VTAP_PORT     = "vtap_port_map"
-	CH_DICTIONARY_TAP_TYPE      = "tap_type_map"
-	CH_DICTIONARY_VTAP          = "vtap_map"
-	CH_DICTIONARY_LB_LISTENER   = "lb_listener_map"
-	CH_DICTIONARY_USER          = "user_map"
-
-	CH_DICTIONARY_POD_K8S_LABEL  = "pod_k8s_label_map"
-	CH_DICTIONARY_POD_K8S_LABELS = "pod_k8s_labels_map"
-
-	CH_DICTIONARY_POD_SERVICE_K8S_LABEL  = "pod_service_k8s_label_map"
-	CH_DICTIONARY_POD_SERVICE_K8S_LABELS = "pod_service_k8s_labels_map"
-
-	CH_DICTIONARY_CHOST_CLOUD_TAG   = "chost_cloud_tag_map"
-	CH_DICTIONARY_POD_NS_CLOUD_TAG  = "pod_ns_cloud_tag_map"
-	CH_DICTIONARY_CHOST_CLOUD_TAGS  = "chost_cloud_tags_map"
-	CH_DICTIONARY_POD_NS_CLOUD_TAGS = "pod_ns_cloud_tags_map"
-	CH_DICTIONARY_OS_APP_TAG        = "os_app_tag_map"
-	CH_DICTIONARY_OS_APP_TAGS       = "os_app_tags_map"
+	CH_DICTIONARY_REGION      = "region_map"
+	CH_DICTIONARY_VTAP_PORT   = "vtap_port_map"
+	CH_DICTIONARY_TAP_TYPE    = "tap_type_map"
+	CH_DICTIONARY_VTAP        = "vtap_map"
+	CH_DICTIONARY_LB_LISTENER = "lb_listener_map"
+	CH_DICTIONARY_USER        = "user_map"
 
 	CH_DICTIONARY_POD_NODE_PORT  = "pod_node_port_map"
 	CH_DICTIONARY_POD_GROUP_PORT = "pod_group_port_map"
@@ -164,14 +181,10 @@ const (
 	CH_DICTIONARY_IP_RELATION = "ip_relation_map"
 	CH_DICTIONARY_IP_RESOURCE = "ip_resource_map"
 
-	CH_DICTIONARY_POD_SERVICE = "pod_service_map"
-	CH_DICTIONARY_CHOST       = "chost_map"
-
 	CH_STRING_DICTIONARY_ENUM = "string_enum_map"
 	CH_INT_DICTIONARY_ENUM    = "int_enum_map"
 
 	CH_DICTIONARY_NODE_TYPE = "node_type_map"
-	CH_DICTIONARY_GPROCESS  = "gprocess_map"
 
 	CH_DICTIONARY_POLICY     = "policy_map"
 	CH_DICTIONARY_NPB_TUNNEL = "npb_tunnel_map"
@@ -560,7 +573,7 @@ const (
 		"FROM %s.target_label_map"
 )
 
-var DBNodeTypeToResourceType = map[string]string{
+var DBNodeTypeToResourceType = map[string]string{ // TODO optimize const define
 	"region":         RESOURCE_TYPE_REGION,
 	"az":             RESOURCE_TYPE_AZ,
 	"host":           RESOURCE_TYPE_HOST,
@@ -592,8 +605,8 @@ var CREATE_SQL_MAP = map[string]string{
 
 	CH_DICTIONARY_CHOST: CREATE_CHOST_DICTIONARY_SQL,
 
-	CH_DICTIONARY_VPC: CREATE_VPC_DICTIONARY_SQL,
-	CH_DICTIONARY_VL2: CREATE_VL2_DICTIONARY_SQL,
+	CH_DICTIONARY_VPC:     CREATE_VPC_DICTIONARY_SQL,
+	CH_DICTIONARY_NETWORK: CREATE_VL2_DICTIONARY_SQL,
 
 	CH_DICTIONARY_POD_CLUSTER:   CREATE_POD_CLUSTER_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NAMESPACE: CREATE_POD_NS_DICTIONARY_SQL,

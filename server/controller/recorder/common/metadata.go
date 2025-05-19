@@ -23,8 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-type Metadata struct {
-	Config      config.RecorderConfig
+type MetadataBase struct {
 	ORGID       int        // org id
 	DB          *metadb.DB // org database connection
 	Domain      *DomainInfo
@@ -32,10 +31,9 @@ type Metadata struct {
 	LogPrefixes []logger.Prefix
 }
 
-func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
+func NewMetadataBase(orgID int) (MetadataBase, error) {
 	db, err := metadb.GetDB(orgID)
-	return &Metadata{
-		Config:      cfg,
+	return MetadataBase{
 		ORGID:       orgID,
 		DB:          db,
 		Domain:      new(DomainInfo),
@@ -44,26 +42,47 @@ func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
 	}, err
 }
 
+type Metadata struct {
+	Config config.RecorderConfig
+	MetadataBase
+}
+
+func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
+	db, err := metadb.GetDB(orgID)
+	return &Metadata{
+		Config: cfg,
+		MetadataBase: MetadataBase{
+			ORGID:       orgID,
+			DB:          db,
+			Domain:      new(DomainInfo),
+			SubDomain:   new(SubDomainInfo),
+			LogPrefixes: []logger.Prefix{logger.NewORGPrefix(orgID)},
+		},
+	}, err
+}
+
 func (m *Metadata) Copy() *Metadata {
 	return &Metadata{
-		Config:      m.Config,
-		ORGID:       m.ORGID,
-		DB:          m.DB,
-		Domain:      m.Domain,
-		SubDomain:   m.SubDomain,
-		LogPrefixes: m.LogPrefixes[:],
+		Config: m.Config,
+		MetadataBase: MetadataBase{
+			ORGID:       m.ORGID,
+			DB:          m.DB,
+			Domain:      m.Domain,
+			SubDomain:   m.SubDomain,
+			LogPrefixes: m.LogPrefixes[:],
+		},
 	}
 }
 
-func (m *Metadata) GetDB() *metadb.DB {
+func (m *MetadataBase) GetDB() *metadb.DB {
 	return m.DB
 }
 
-func (m *Metadata) GetORGID() int {
+func (m *MetadataBase) GetORGID() int {
 	return m.ORGID
 }
 
-func (m *Metadata) GetTeamID() int {
+func (m *MetadataBase) GetTeamID() int {
 	if m.SubDomain.TeamID != 0 {
 		return m.SubDomain.TeamID
 	} else {
@@ -71,21 +90,21 @@ func (m *Metadata) GetTeamID() int {
 	}
 }
 
-func (m *Metadata) GetDomainInfo() *DomainInfo {
+func (m *MetadataBase) GetDomainInfo() *DomainInfo {
 	return m.Domain
 }
 
-func (m *Metadata) GetSubDomainInfo() *SubDomainInfo {
+func (m *MetadataBase) GetSubDomainInfo() *SubDomainInfo {
 	return m.SubDomain
 }
 
-func (m *Metadata) SetDomain(domain metadbmodel.Domain) {
+func (m *MetadataBase) SetDomain(domain metadbmodel.Domain) {
 	m.Domain = &DomainInfo{domain}
 	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
 	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
 }
 
-func (m *Metadata) SetSubDomain(subDomain metadbmodel.SubDomain) {
+func (m *MetadataBase) SetSubDomain(subDomain metadbmodel.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
 	if subDomain.TeamID != 0 {
 		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
@@ -96,7 +115,6 @@ func (m *Metadata) SetSubDomain(subDomain metadbmodel.SubDomain) {
 type DomainInfo struct {
 	metadbmodel.Domain
 }
-
 type SubDomainInfo struct {
 	metadbmodel.SubDomain
 }

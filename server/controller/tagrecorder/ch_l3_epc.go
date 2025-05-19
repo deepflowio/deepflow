@@ -73,7 +73,7 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *metadbmodel.VPC) (k
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, metadbmodel.ChVPC{
-		ID:       source.ID,
+		ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
 		Name:     sourceName,
 		UID:      source.UID,
 		IconID:   iconID,
