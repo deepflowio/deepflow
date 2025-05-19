@@ -253,7 +253,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
                 _ => {}
             }
             if info.at_lease_one_block {
-                info.cal_rrt(param).map(|rrt| {
+                info.cal_rrt(param, &None).map(|(rrt, _)| {
                     info.rrt = rrt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                 });

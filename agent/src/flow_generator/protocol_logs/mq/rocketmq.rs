@@ -170,11 +170,7 @@ impl L7ProtocolInfoInterface for RocketmqInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if self.ext_topic.is_empty() || self.ext_queue_id.is_empty() {
-            None
-        } else {
-            Some(format!("{}-{}", self.ext_topic, self.ext_queue_id))
-        }
+        self.endpoint.clone()
     }
 
     fn get_request_resource_length(&self) -> usize {
@@ -187,6 +183,14 @@ impl L7ProtocolInfoInterface for RocketmqInfo {
 }
 
 impl RocketmqInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        if self.ext_topic.is_empty() || self.ext_queue_id.is_empty() {
+            None
+        } else {
+            Some(format!("{}-{}", self.ext_topic, self.ext_queue_id))
+        }
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         swap_if!(self, resp_msg_size, is_none, other);
         if self.status == L7ResponseStatus::default() {
@@ -308,8 +312,11 @@ impl L7ProtocolParserInterface for RocketmqLog {
                 }
                 _ => {}
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                 info.rrt = rrt;
+                if info.msg_type == LogMessageType::Response {
+                    info.endpoint = endpoint;
+                }
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
@@ -421,7 +428,7 @@ impl RocketmqLog {
             };
             info.resp_body = body.body_data.body;
         }
-        info.endpoint = info.get_endpoint();
+        info.endpoint = info.generate_endpoint();
 
         // extract trace info according to the message type
         if info.msg_type == LogMessageType::Request {
