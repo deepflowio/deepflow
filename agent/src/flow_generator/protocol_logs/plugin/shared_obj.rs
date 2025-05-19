@@ -192,8 +192,16 @@ impl L7ProtocolParserInterface for SoLog {
                                     _ => {}
                                 }
 
-                                info.cal_rrt(param).map(|rrt| {
+                                let endpoint = if info.req.endpoint.is_empty() {
+                                    None
+                                } else {
+                                    Some(info.req.endpoint.clone())
+                                };
+                                info.cal_rrt(param, &endpoint).map(|(rrt, endpoint)| {
                                     info.rrt = rrt;
+                                    if info.msg_type == LogMessageType::Response {
+                                        info.req.endpoint = endpoint.unwrap_or_default();
+                                    }
                                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                                 });
                                 if res.len == 1 {

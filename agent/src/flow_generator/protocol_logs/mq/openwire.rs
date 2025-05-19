@@ -1925,8 +1925,11 @@ impl L7ProtocolParserInterface for OpenWireLog {
                     _ => {}
                 }
                 if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param).map(|rtt| {
+                    info.cal_rrt(param, &info.topic).map(|(rtt, endpoint)| {
                         info.rtt = rtt;
+                        if info.msg_type == LogMessageType::Response {
+                            info.topic = endpoint;
+                        }
                         self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                     });
                 }

@@ -771,8 +771,11 @@ impl L7ProtocolParserInterface for HttpLog {
                         }
                     }
                     if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param).map(|rrt| {
+                        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                             info.rrt = rrt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                         });
                     }
@@ -787,9 +790,14 @@ impl L7ProtocolParserInterface for HttpLog {
                         }
 
                         if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
-                                info.rrt = rrt;
-                            });
+                            info.cal_rrt_for_multi_merge_log(param, &info.endpoint).map(
+                                |(rrt, endpoint)| {
+                                    info.rrt = rrt;
+                                    if info.msg_type == LogMessageType::Response {
+                                        info.endpoint = endpoint;
+                                    }
+                                },
+                            );
                         }
 
                         if info.is_req_end || info.is_resp_end {
@@ -820,8 +828,11 @@ impl L7ProtocolParserInterface for HttpLog {
                             }
                         }
                         if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt(param).map(|rrt| {
+                            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                                 info.rrt = rrt;
+                                if info.msg_type == LogMessageType::Response {
+                                    info.endpoint = endpoint;
+                                }
                                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                             });
                         }
