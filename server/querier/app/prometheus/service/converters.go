@@ -97,6 +97,14 @@ var edgeTableNames = []string{
 	L7_FLOW_LOG_TABLE,
 }
 
+var podUniversalTags = []string{
+	"pod", "pod_group", "pod_service", "pod_node", "pod_ns", "pod_cluster",
+}
+
+var hostUniversalTags = []string{
+	"chost", "host", "subnet", "vpc", "region", "az",
+}
+
 // definition: https://github.com/prometheus/prometheus/blob/main/promql/parser/lex.go#L106
 // docs: https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 // convert promql aggregation functions to querier functions
@@ -309,7 +317,21 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		filters = append(filters, newFilter)
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
-			if isDeepFlowTag && (len(q.Hints.Grouping) == 0 || tagAlias != "") {
+			if isDeepFlowTag && len(q.Hints.Grouping) == 0 {
+				expectedDeepFlowNativeTags[tagName] = tagAlias
+				// append all priority higher tags
+				if greaterTags, hasIDSuffix := getTagsGreaterThan(tagName); greaterTags != nil {
+					for i := range greaterTags {
+						appendTag := fmt.Sprintf("`%s`", greaterTags[i])
+						if hasIDSuffix {
+							appendTag = fmt.Sprintf("`%s_id`", greaterTags[i])
+						}
+						expectedDeepFlowNativeTags[appendTag] = ""
+					}
+				}
+			}
+
+			if isDeepFlowTag && tagAlias != "" {
 				expectedDeepFlowNativeTags[tagName] = tagAlias
 			}
 
@@ -558,7 +580,7 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 	return tagsArray, nil
 }
 
-func parseDeepFlowTag(prefixType prefix, tag string) (tagName string, tagAlias string) {
+func parseDeepFlowTag(tag string) (tagName string, tagAlias string) {
 	if enumAlias, ok := formatEnumTag(tag); ok {
 		return enumAlias, fmt.Sprintf("`%s%s`", tag, ENUM_TAG_SUFFIX)
 	} else {
@@ -590,9 +612,9 @@ func (p *prometheusReader) parsePromQLTag(prefixType prefix, db, tag string) (ta
 	// `tagAlias` return only when tag is `enum tag` (returns `Enum(tag)` as `_tag_enum`)
 	if isDeepFlowTag {
 		if strings.HasPrefix(tag, config.Cfg.Prometheus.AutoTaggingPrefix) {
-			tagName, tagAlias = parseDeepFlowTag(prefixType, p.convertToQuerierAllowedTagName(removeDeepFlowPrefix(tag)))
+			tagName, tagAlias = parseDeepFlowTag(p.convertToQuerierAllowedTagName(removeDeepFlowPrefix(tag)))
 		} else {
-			tagName, tagAlias = parseDeepFlowTag(prefixType, p.convertToQuerierAllowedTagName(tag))
+			tagName, tagAlias = parseDeepFlowTag(p.convertToQuerierAllowedTagName(tag))
 		}
 	} else {
 		// query ext_metrics/prometheus
@@ -1086,6 +1108,15 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 			// if not grouping tag, but use filter or has alias for enum tag, append into `expectedDeepFlowNativeTags` for `select df_tag`
 			// why cap(groupBy) == 0: select would influence group result, so when cap(groupBy)>0, we don't append select
 			expectedQueryTags[tagName] = tagAlias
+			if greaterTags, hasIDSuffix := getTagsGreaterThan(tagName); greaterTags != nil {
+				for i := range greaterTags {
+					appendTag := fmt.Sprintf("`%s`", greaterTags[i])
+					if hasIDSuffix {
+						appendTag = fmt.Sprintf("`%s_id`", greaterTags[i])
+					}
+					expectedQueryTags[appendTag] = ""
+				}
+			}
 		}
 	}
 	if len(p.extraFilters) > 0 {
@@ -1474,6 +1505,25 @@ func escapeSingleQuote(v string) string {
 
 func removeEscapeQuote(v string, r string) string {
 	return strings.TrimPrefix(strings.TrimSuffix(v, r), r)
+}
+
+// use priority for deepflow querier, when try to query "x", all universal tags which greaterthan "x" would append to querier
+func getTagsGreaterThan(tag string) ([]string, bool) {
+	queryTag := removeEscapeQuote(tag, "`")
+	hasIDSuffix := false
+	if strings.HasSuffix(queryTag, "_id") {
+		hasIDSuffix = true
+		queryTag = strings.TrimSuffix(tag, "_id")
+	}
+	if idx := slices.Index(podUniversalTags, queryTag); idx >= 0 && idx < len(podUniversalTags) {
+		return podUniversalTags[idx+1:], hasIDSuffix
+	}
+
+	if idx := slices.Index(hostUniversalTags, queryTag); idx >= 0 && idx < len(hostUniversalTags) {
+		return hostUniversalTags[idx+1:], hasIDSuffix
+	}
+
+	return nil, false
 }
 
 func parseOperator(op string) prompb.LabelMatcher_Type {
