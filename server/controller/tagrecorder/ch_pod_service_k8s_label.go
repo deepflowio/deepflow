@@ -50,7 +50,7 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 			mysqlmodel.ChPodServiceK8sLabel,
 			K8sLabelKey,
 		](
-			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABEL,
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL,
 		),
 	}
 	mng.subscriberDG = mng

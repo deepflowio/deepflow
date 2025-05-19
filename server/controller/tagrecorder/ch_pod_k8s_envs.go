@@ -50,7 +50,7 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 			mysqlmodel.ChPodK8sEnvs,
 			K8sEnvsKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ENVS,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ENVS,
 		),
 	}
 	mng.subscriberDG = mng

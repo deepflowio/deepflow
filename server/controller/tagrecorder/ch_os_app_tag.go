@@ -23,6 +23,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
+const (
+	syncTriggerKeyPID = "pid"
+)
+
 type ChOSAppTag struct {
 	SubscriberComponent[
 		*message.ProcessAdd,

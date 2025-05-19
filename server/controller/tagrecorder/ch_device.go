@@ -26,6 +26,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
+const (
+	syncTriggerKeyDeviceID = "deviceid"
+)
+
 type ChVMDevice struct {
 	SubscriberComponent[
 		*message.VMAdd,

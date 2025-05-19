@@ -50,7 +50,7 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 			mysqlmodel.ChPodK8sAnnotations,
 			K8sAnnotationsKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS,
 		),
 	}
 	mng.subscriberDG = mng
