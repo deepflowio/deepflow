@@ -33,7 +33,7 @@ type ChPodK8sLabel struct {
 		message.PodDelete,
 		mysqlmodel.Pod,
 		mysqlmodel.ChPodK8sLabel,
-		K8sLabelKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 			message.PodDelete,
 			mysqlmodel.Pod,
 			mysqlmodel.ChPodK8sLabel,
-			K8sLabelKey,
+			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_LABEL,
 		),
@@ -59,51 +59,50 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
-	keysToAdd := make([]K8sLabelKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]mysqlmodel.ChPodK8sLabel, 0)
-	keysToDelete := make([]K8sLabelKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChPodK8sLabel, 0)
-	var chItem mysqlmodel.ChPodK8sLabel
-	var updateKey K8sLabelKey
-	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Label.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		_, old := common.StrToJsonAndMap(fieldsUpdate.Label.GetOld())
 
 		for k, v := range new {
+			targetKey := NewIDKeyKey(sourceID, k)
 			oldV, ok := old[k]
 			if !ok {
-				keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sLabel{
-					ID:    sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
 				})
-			} else {
-				if oldV != v {
-					updateKey = K8sLabelKey{ID: sourceID, Key: k}
-					updateInfo["value"] = v
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sLabel{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem mysqlmodel.ChPodK8sLabel
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sLabel{
+						ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, K8sLabelKey{ID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodK8sLabel{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -117,12 +116,12 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []K8sLabelKey, targets []mysqlmodel.ChPodK8sLabel) {
+func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKeyKey, targets []mysqlmodel.ChPodK8sLabel) {
 	_, labelMap := common.StrToJsonAndMap(source.Label)
 	for k, v := range labelMap {
-		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, mysqlmodel.ChPodK8sLabel{
-			ID:          source.ID,
+			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,

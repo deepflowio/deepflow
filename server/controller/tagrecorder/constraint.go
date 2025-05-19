@@ -18,6 +18,8 @@
 package tagrecorder
 
 import (
+	"time"
+
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
@@ -34,9 +36,28 @@ type MySQLChModel interface {
 		mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodService | mysqlmodel.ChChost | mysqlmodel.ChPolicy | mysqlmodel.ChNpbTunnel
 }
 
+type SubscriberMetaDBChModel interface {
+	mysqlmodel.ChDevice | mysqlmodel.ChAZ | mysqlmodel.ChChost | mysqlmodel.ChVPC | mysqlmodel.ChNetwork | mysqlmodel.ChLBListener |
+		mysqlmodel.ChPodCluster | mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChPodIngress | mysqlmodel.ChPodService |
+		mysqlmodel.ChPodGroup | mysqlmodel.ChPod | mysqlmodel.ChGProcess | mysqlmodel.ChOSAppTag | mysqlmodel.ChOSAppTags |
+		mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
+		mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag |
+		mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations | mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodK8sLabel |
+		mysqlmodel.ChPodK8sLabels
+
+	GetID() int
+	GetUpdatedAt() time.Time
+}
+
 // ch资源的组合key
 type ChModelKey interface {
-	PrometheusTargetLabelKey | PrometheusAPPLabelKey | OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
-		IPRelationKey | TapTypeKey | K8sLabelsKey | NodeTypeKey | K8sAnnotationKey | K8sAnnotationsKey |
-		K8sEnvKey | K8sEnvsKey | PolicyKey
+	PrometheusTargetLabelKey | PrometheusAPPLabelKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey |
+		PortIDKey | PortIPKey | PortDeviceKey | IPRelationKey | TapTypeKey | NodeTypeKey | PolicyKey |
+		IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+}
+
+type SubscriberChModelKey interface {
+	IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+
+	Map() map[string]interface{}
 }

@@ -33,7 +33,7 @@ type ChPodNSCloudTag struct {
 		message.PodNamespaceDelete,
 		mysqlmodel.PodNamespace,
 		mysqlmodel.ChPodNSCloudTag,
-		CloudTagKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 			message.PodNamespaceDelete,
 			mysqlmodel.PodNamespace,
 			mysqlmodel.ChPodNSCloudTag,
-			CloudTagKey,
+			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
 		),
@@ -59,49 +59,49 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
-	keysToAdd := make([]CloudTagKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]mysqlmodel.ChPodNSCloudTag, 0)
-	keysToDelete := make([]CloudTagKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChPodNSCloudTag, 0)
-	var chItem mysqlmodel.ChPodNSCloudTag
-	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		new := fieldsUpdate.CloudTags.GetNew()
 		old := fieldsUpdate.CloudTags.GetOld()
 		for k, v := range new {
+			targetKey := NewIDKeyKey(sourceID, k)
 			oldV, ok := old[k]
 			if !ok {
-				keysToAdd = append(keysToAdd, CloudTagKey{ID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
-					ID:    sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
 				})
-			} else {
-				if oldV != v {
-					key := CloudTagKey{ID: sourceID, Key: k}
-					updateInfo["value"] = v
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, key)
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, key, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem mysqlmodel.ChPodNSCloudTag
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
+						ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, CloudTagKey{ID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodNSCloudTag{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -115,11 +115,11 @@ func (c *ChPodNSCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodNamespace) (keys []CloudTagKey, targets []mysqlmodel.ChPodNSCloudTag) {
+func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodNamespace) (keys []IDKeyKey, targets []mysqlmodel.ChPodNSCloudTag) {
 	for k, v := range source.CloudTags {
-		keys = append(keys, CloudTagKey{ID: source.ID, Key: k})
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, mysqlmodel.ChPodNSCloudTag{
-			ID:          source.ID,
+			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,

@@ -76,7 +76,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 	gid := int(source.GID)
 	keys = append(keys, IDKey{ID: gid})
 	targets = append(targets, mysqlmodel.ChGProcess{
-		ID:          gid,
+		ChIDBase:    mysqlmodel.ChIDBase{ID: gid},
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
@@ -101,12 +101,7 @@ func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 	if fieldsUpdate.VPCID.IsDifferent() {
 		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		gid := fieldsUpdate.GID.GetNew()
-		var chItem mysqlmodel.ChGProcess
-		db.Where("id = ?", gid).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: int(gid)}, db)
-	}
+	c.updateOrSync(db, IDKey{ID: int(fieldsUpdate.GID.GetNew())}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

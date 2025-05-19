@@ -33,7 +33,7 @@ type ChPodK8sLabels struct {
 		message.PodDelete,
 		mysqlmodel.Pod,
 		mysqlmodel.ChPodK8sLabels,
-		K8sLabelsKey,
+		IDKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 			message.PodDelete,
 			mysqlmodel.Pod,
 			mysqlmodel.ChPodK8sLabels,
-			K8sLabelsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_LABELS,
 		),
@@ -65,29 +65,30 @@ func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		updateInfo["labels"] = labels
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChPodK8sLabels
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sLabelsKey{{ID: sourceID}},
-				[]mysqlmodel.ChPodK8sLabels{{ID: sourceID, Labels: updateInfo["labels"].(string)}},
+				[]IDKey{targetKey},
+				[]mysqlmodel.ChPodK8sLabels{{
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, Labels: updateInfo["labels"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, item *mysqlmodel.Pod) (keys []K8sLabelsKey, targets []mysqlmodel.ChPodK8sLabels) {
-	if item.Label == "" {
+func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKey, targets []mysqlmodel.ChPodK8sLabels) {
+	if source.Label == "" {
 		return
 	}
-	labels, _ := common.StrToJsonAndMap(item.Label)
-	return []K8sLabelsKey{{ID: item.ID}}, []mysqlmodel.ChPodK8sLabels{{
-		ID:          item.ID,
+	labels, _ := common.StrToJsonAndMap(source.Label)
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodK8sLabels{{
+		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

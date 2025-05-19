@@ -36,7 +36,7 @@ type ChChostCloudTags struct {
 		message.VMDelete,
 		mysqlmodel.VM,
 		mysqlmodel.ChChostCloudTags,
-		CloudTagsKey,
+		IDKey,
 	]
 }
 
@@ -51,7 +51,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 			message.VMDelete,
 			mysqlmodel.VM,
 			mysqlmodel.ChChostCloudTags,
-			CloudTagsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS,
 		),
@@ -71,32 +71,34 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 		}
 		updateInfo["cloud_tags"] = string(bytes)
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChChostCloudTags
-		db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).Find(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]CloudTagsKey{{ID: sourceID}},
-				[]mysqlmodel.ChChostCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				[]IDKey{targetKey},
+				[]mysqlmodel.ChChostCloudTags{{ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, CloudTags: updateInfo["cloud_tags"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
+			return
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, item *mysqlmodel.VM) (keys []CloudTagsKey, targets []mysqlmodel.ChChostCloudTags) {
-	if len(item.CloudTags) == 0 {
+func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKey, targets []mysqlmodel.ChChostCloudTags) {
+	if len(source.CloudTags) == 0 {
 		return
 	}
-	bytes, err := json.Marshal(item.CloudTags)
+	bytes, err := json.Marshal(source.CloudTags)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysqlmodel.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChChostCloudTags{{
+		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID}, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

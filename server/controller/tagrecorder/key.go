@@ -16,13 +16,67 @@
 
 package tagrecorder
 
-type IDKey struct {
-	ID int
+type DeviceKey struct {
+	DeviceID   int `json:"deviceid"`
+	DeviceType int `json:"devicetype"`
 }
 
-type DeviceKey struct {
-	DeviceID   int
-	DeviceType int
+func (k DeviceKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"deviceid":   k.DeviceID,
+		"devicetype": k.DeviceType,
+	}
+}
+
+type IDKey struct {
+	ID int `json:"id"`
+}
+
+func (k IDKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"id": k.ID,
+	}
+}
+
+func NewIDKeyKey(id int, key string) IDKeyKey {
+	return IDKeyKey{
+		ID:  id,
+		Key: key,
+	}
+}
+
+type IDKeyKey struct {
+	ID  int    `json:"id"`
+	Key string `json:"key"`
+}
+
+func (k IDKeyKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"id":    k.ID,
+		"`key`": k.Key,
+	}
+}
+
+type OSAPPTagKey struct {
+	PID int    `json:"pid"`
+	Key string `json:"key"`
+}
+
+func (k OSAPPTagKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"pid":   k.PID,
+		"`key`": k.Key,
+	}
+}
+
+type OSAPPTagsKey struct {
+	PID int `json:"pid"`
+}
+
+func (k OSAPPTagsKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"pid": k.PID,
+	}
 }
 
 type IPResourceKey struct {
@@ -60,15 +114,6 @@ type IPRelationKey struct {
 	IP      string
 }
 
-type K8sLabelKey struct {
-	ID  int
-	Key string
-}
-
-type K8sLabelsKey struct {
-	ID int
-}
-
 type TapTypeKey struct {
 	Value int
 }
@@ -85,42 +130,6 @@ type IntEnumTagKey struct {
 
 type NodeTypeKey struct {
 	ResourceType int
-}
-
-type CloudTagKey struct {
-	ID  int
-	Key string
-}
-
-type CloudTagsKey struct {
-	ID int
-}
-
-type OSAPPTagKey struct {
-	PID int
-	Key string
-}
-
-type OSAPPTagsKey struct {
-	PID int
-}
-
-type K8sAnnotationKey struct {
-	ID  int
-	Key string
-}
-
-type K8sAnnotationsKey struct {
-	ID int
-}
-
-type K8sEnvKey struct {
-	ID  int
-	Key string
-}
-
-type K8sEnvsKey struct {
-	ID int
 }
 
 type PrometheusAPPLabelKey struct {
