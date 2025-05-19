@@ -128,11 +128,7 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if self.topic_name.is_empty() || self.partition < 0 {
-            None
-        } else {
-            Some(format!("{}-{}", self.topic_name, self.partition))
-        }
+        self.endpoint.clone()
     }
 
     fn get_request_resource_length(&self) -> usize {
@@ -147,6 +143,15 @@ impl L7ProtocolInfoInterface for KafkaInfo {
 impl KafkaInfo {
     // https://kafka.apache.org/protocol.html
     const API_KEY_MAX: u16 = 67;
+
+    fn generate_endpoint(&self) -> Option<String> {
+        if self.topic_name.is_empty() || self.partition < 0 {
+            None
+        } else {
+            Some(format!("{}-{}", self.topic_name, self.partition))
+        }
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         swap_if!(self, resp_msg_size, is_none, other);
         if other.status != L7ResponseStatus::default() {
@@ -397,7 +402,7 @@ impl L7ProtocolParserInterface for KafkaLog {
         };
 
         info.command = info.get_command();
-        info.endpoint = info.get_endpoint();
+        info.endpoint = info.generate_endpoint();
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
@@ -410,8 +415,11 @@ impl L7ProtocolParserInterface for KafkaLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                 info.rrt = rrt;
+                if info.msg_type == LogMessageType::Response {
+                    info.endpoint = endpoint;
+                }
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
