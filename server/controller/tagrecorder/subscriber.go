@@ -18,11 +18,13 @@ package tagrecorder
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -97,7 +99,6 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 
 func (c *SubscriberManager) getSubscribers() []Subscriber {
 	subscribers := []Subscriber{
-		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChVMDevice(c.resourceTypeToIconID),
 		NewChHostDevice(c.resourceTypeToIconID),
 		NewChVRouterDevice(c.resourceTypeToIconID),
@@ -113,49 +114,51 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChPodClusterDevice(c.resourceTypeToIconID),
 		NewChProcessDevice(c.resourceTypeToIconID),
 		NewChCustomServiceDevice(c.resourceTypeToIconID),
-		NewChOSAppTag(),
-		NewChOSAppTags(),
-		NewChPodK8sLabel(),
-		NewChPodK8sLabels(),
-		NewChPodK8sAnnotation(),
-		NewChPodK8sAnnotations(),
-		NewChPodK8sEnv(),
-		NewChPodK8sEnvs(),
-		NewChChostCloudTag(),
-		NewChChostCloudTags(),
-		NewChNetwork(c.resourceTypeToIconID),
+
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChChost(),
-		NewChGProcess(c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
+		NewChNetwork(c.resourceTypeToIconID),
 		NewChPodCluster(c.resourceTypeToIconID),
-		NewChPod(c.resourceTypeToIconID),
-		NewChPodGroup(c.resourceTypeToIconID),
-		NewChPodIngress(),
 		NewChPodNode(c.resourceTypeToIconID),
 		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodIngress(),
 		NewChPodService(),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
+		NewChGProcess(c.resourceTypeToIconID),
 
-		NewChPodServiceK8sAnnotation(),
-		NewChPodServiceK8sAnnotations(),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
 		NewChPodNSCloudTag(),
 		NewChPodNSCloudTags(),
 		NewChPodServiceK8sLabel(),
 		NewChPodServiceK8sLabels(),
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodK8sEnv(),
+		NewChPodK8sEnvs(),
+		NewChPodK8sLabel(),
+		NewChPodK8sLabels(),
+		NewChPodK8sAnnotation(),
+		NewChPodK8sAnnotations(),
+		NewChOSAppTag(),
+		NewChOSAppTags(),
 	}
 	return subscribers
 }
 
 type Subscriber interface {
-	Subscribe()
-	SetConfig(config.ControllerConfig)
-	GetSubResourceType() string
 	pubsub.ResourceBatchAddedSubscriber
 	pubsub.ResourceUpdatedSubscriber
 	pubsub.ResourceBatchDeletedSubscriber
+
+	Subscribe()
+	SetConfig(config.ControllerConfig)
+	GetSubResourceType() string
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
-	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB)
 }
 
 type SubscriberDataGenerator[
@@ -240,10 +243,6 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 	s.dbOperator.setConfig(cfg)
 }
 
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetIconInfo(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
-
-}
-
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMessage, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
@@ -260,6 +259,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	}
 	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -270,6 +270,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -298,9 +299,8 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		log.Infof("soft delete (values: %#v) success", chItems, db.LogPrefixORGID)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
-		s.ResourceUpdateAtInfoUpdated(md, db)
 	}
-
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Delete resource by domain
@@ -313,7 +313,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Delete resource by sub domain
@@ -326,7 +326,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Update team_id of resource by sub domain
@@ -339,13 +339,14 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
+	s.updateChTagLastUpdatedAt(md, db)
 }
 
-// Update updated_at when resource is deleted
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB) {
-	var updateItems []MT
-	err := db.Unscoped().First(&updateItems).Error
-	if err == nil {
-		db.Save(updateItems)
+// updateChTagLastUpdatedAt updates the updated_at field of self resource type to trigger clickhouse synchronization
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateChTagLastUpdatedAt(md *message.Metadata, db *mysql.DB) {
+	err := db.Model(&mysqlModel.ChTagLastUpdatedAt{}).Where("table_name = ?", s.resourceTypeName).
+		Updates(map[string]interface{}{"updated_at": time.Now()}).Error
+	if err != nil {
+		log.Errorf("update %s updated_at error: %v", s.resourceTypeName, err, db.LogPrefixORGID)
 	}
 }

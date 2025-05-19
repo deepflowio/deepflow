@@ -50,7 +50,7 @@ func NewChChostCloudTag() *ChChostCloudTag {
 			mysqlmodel.ChChostCloudTag,
 			CloudTagKey,
 		](
-			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_VM_CLOUD_TAG,
+			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST_CLOUD_TAG,
 		),
 	}
 	mng.subscriberDG = mng
