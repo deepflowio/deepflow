@@ -20,6 +20,22 @@ import (
 	"time"
 )
 
+type ChIDBase struct {
+	ID int `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+}
+
+func (b ChIDBase) GetID() int {
+	return b.ID
+}
+
+type ChUpdatedAtBase struct {
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
+
+func (b ChUpdatedAtBase) GetUpdatedAt() time.Time {
+	return b.UpdatedAt
+}
+
 type ChRegion struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string    `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
@@ -28,22 +44,26 @@ type ChRegion struct {
 }
 
 type ChAZ struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
-	IconID    int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name     string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	IconID   int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChVPC struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
-	IconID    int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	UID       string    `gorm:"column:uid;type:char(64);default:null" json:"UID"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name     string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	IconID   int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	UID      string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChVPC) TableName() string {
@@ -51,17 +71,21 @@ func (ChVPC) TableName() string {
 }
 
 type ChDevice struct {
-	DeviceType  int       `gorm:"primaryKey;column:devicetype;type:int;not null" json:"DEVICETYPE"`
-	DeviceID    int       `gorm:"primaryKey;column:deviceid;type:int;not null" json:"DEVICEID"`
-	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
-	IconID      int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	UID         string    `gorm:"column:uid;type:char(64);default:null" json:"UID"`
-	Hostname    string    `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
-	IP          string    `gorm:"column:ip;type:varchar(64)" json:"IP"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	DeviceType      int    `gorm:"primaryKey;column:devicetype;type:int;not null" json:"DEVICETYPE"`
+	DeviceID        int    `gorm:"primaryKey;column:deviceid;type:int;not null" json:"DEVICEID"`
+	Name            string `gorm:"column:name;type:text;default:null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	UID             string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	Hostname        string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP              string `gorm:"column:ip;type:varchar(64)" json:"IP"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+}
+
+func (c ChDevice) GetID() int {
+	return c.DeviceID
 }
 
 type ChVTapPort struct {
@@ -159,14 +183,14 @@ func (ChIPResource) TableName() string {
 }
 
 type ChNetwork struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID      int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Name            string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
 }
 
 func (ChNetwork) TableName() string {
@@ -174,52 +198,58 @@ func (ChNetwork) TableName() string {
 }
 
 type ChPod struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID       int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
-	PodNsID      int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	PodNodeID    int       `gorm:"column:pod_node_id;type:int;not null" json:"POD_NODE_ID"`
-	PodServiceID int       `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
-	PodGroupID   int       `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	PodNodeID    int    `gorm:"column:pod_node_id;type:int;not null" json:"POD_NODE_ID"`
+	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
+	PodGroupID   int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPodCluster struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string    `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
-	IconID      int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Name            string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodGroup struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	PodGroupType int       `gorm:"column:pod_group_type;type:int;default:null" json:"POD_GROUP_TYPE"`
-	IconID       int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
-	PodNsID      int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	PodGroupType int    `gorm:"column:pod_group_type;type:int;default:null" json:"POD_GROUP_TYPE"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPodNamespace struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID       int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChPodNamespace) TableName() string {
@@ -227,14 +257,16 @@ func (ChPodNamespace) TableName() string {
 }
 
 type ChPodNode struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID       int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChVTap struct {
@@ -262,10 +294,12 @@ type ChTapType struct {
 }
 
 type ChLBListener struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChLBListener) TableName() string {
@@ -273,60 +307,62 @@ func (ChLBListener) TableName() string {
 }
 
 type ChPodIngress struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
-	PodNsID      int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPodK8sLabel struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodK8sLabels struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Labels      string    `gorm:"column:labels;type:text;default:null" json:"LABELS"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Labels          string `gorm:"column:labels;type:text;default:null" json:"LABELS"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodServiceK8sLabel struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodServiceK8sLabels struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Labels      string    `gorm:"column:labels;type:text;default:null" json:"LABELS"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Labels          string `gorm:"column:labels;type:text;default:null" json:"LABELS"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChStringEnum struct {
@@ -356,22 +392,24 @@ type ChNodeType struct {
 }
 
 type ChChostCloudTag struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key       string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value     string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key      string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value    string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPodNSCloudTag struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 func (ChPodNSCloudTag) TableName() string {
@@ -379,20 +417,22 @@ func (ChPodNSCloudTag) TableName() string {
 }
 
 type ChChostCloudTags struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	CloudTags string    `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	CloudTags string `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
+	TeamID    int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID  int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPodNSCloudTags struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	CloudTags   string    `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	CloudTags       string `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 func (ChPodNSCloudTags) TableName() string {
@@ -400,42 +440,50 @@ func (ChPodNSCloudTags) TableName() string {
 }
 
 type ChOSAppTag struct {
-	PID         int       `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 func (ChOSAppTag) TableName() string {
 	return "ch_os_app_tag"
 }
 
+func (c ChOSAppTag) GetID() int {
+	return c.PID
+}
+
 type ChOSAppTags struct {
-	PID         int       `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
-	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
+	OSAPPTags       string `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 func (ChOSAppTags) TableName() string {
 	return "ch_os_app_tags"
 }
 
+func (c ChOSAppTags) GetID() int {
+	return c.PID
+}
+
 type ChGProcess struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
-	IconID      int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	CHostID     int       `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Name            string `gorm:"column:name;type:text;default:null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	CHostID         int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 func (ChGProcess) TableName() string {
@@ -443,72 +491,72 @@ func (ChGProcess) TableName() string {
 }
 
 type ChPodK8sAnnotation struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodK8sAnnotations struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Annotations string    `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Annotations     string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodServiceK8sAnnotation struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodServiceK8sAnnotations struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Annotations string    `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Annotations     string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodK8sEnv struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPodK8sEnvs struct {
-	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Envs        string    `gorm:"column:envs;type:text;default:null" json:"ENVS"`
-	L3EPCID     int       `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	PodNsID     int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	Envs            string `gorm:"column:envs;type:text;default:null" json:"ENVS"`
+	L3EPCID         int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID         int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
 }
 
 type ChPrometheusLabelName struct {
@@ -557,27 +605,31 @@ type ChPrometheusTargetLabelLayout struct {
 	UpdatedAt         time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 type ChPodService struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name         string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
-	PodNsID      int       `gorm:"column:pod_ns_id;type:int" json:"POD_NS_ID"`
-	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
+	PodNsID      int    `gorm:"column:pod_ns_id;type:int" json:"POD_NS_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	// UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChChost struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	L3EPCID   int       `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
-	HostID    int       `gorm:"column:host_id;type:int" json:"HOST_ID"`
-	Hostname  string    `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
-	IP        string    `gorm:"column:ip;type:varchar(64)" json:"IP"`
-	SubnetID  int       `gorm:"column:subnet_id;type:int" json:"SUBNET_ID"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID  int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ChIDBase        `gorm:"embedded"`
+	ChUpdatedAtBase `gorm:"embedded"`
+	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name     string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	L3EPCID  int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
+	HostID   int    `gorm:"column:host_id;type:int" json:"HOST_ID"`
+	Hostname string `gorm:"column:hostname;type:varchar(256)" json:"HOSTNAME"`
+	IP       string `gorm:"column:ip;type:varchar(64)" json:"IP"`
+	SubnetID int    `gorm:"column:subnet_id;type:int" json:"SUBNET_ID"`
+	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 type ChPolicy struct {

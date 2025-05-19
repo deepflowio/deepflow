@@ -33,7 +33,7 @@ type ChChostCloudTag struct {
 		message.VMDelete,
 		metadbmodel.VM,
 		metadbmodel.ChChostCloudTag,
-		CloudTagKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,7 +48,7 @@ func NewChChostCloudTag() *ChChostCloudTag {
 			message.VMDelete,
 			metadbmodel.VM,
 			metadbmodel.ChChostCloudTag,
-			CloudTagKey,
+			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST_CLOUD_TAG,
 		),
@@ -59,48 +59,49 @@ func NewChChostCloudTag() *ChChostCloudTag {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *metadb.DB) {
-	keysToAdd := make([]CloudTagKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChChostCloudTag, 0)
-	keysToDelete := make([]CloudTagKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChChostCloudTag, 0)
-	var chItem metadbmodel.ChChostCloudTag
-	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		new := fieldsUpdate.CloudTags.GetNew()
 		old := fieldsUpdate.CloudTags.GetOld()
 		for k, v := range new {
 			oldV, ok := old[k]
+			targetKey := NewIDKeyKey(sourceID, k)
 			if !ok {
-				keysToAdd = append(keysToAdd, c.newTargetKey(sourceID, k))
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
-					ID:    sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
 				})
-			} else {
-				if oldV != v {
-					key := c.newTargetKey(sourceID, k)
-					updateInfo["value"] = v
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, key)
-						targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, key, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem metadbmodel.ChChostCloudTag
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
+						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, c.newTargetKey(sourceID, k))
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, metadbmodel.ChChostCloudTag{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -114,11 +115,11 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []CloudTagKey, targets []metadbmodel.ChChostCloudTag) {
+func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKeyKey, targets []metadbmodel.ChChostCloudTag) {
 	for k, v := range source.CloudTags {
-		keys = append(keys, c.newTargetKey(source.ID, k))
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, metadbmodel.ChChostCloudTag{
-			ID:       source.ID,
+			ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
 			Key:      k,
 			Value:    v,
 			TeamID:   md.TeamID,
@@ -126,10 +127,6 @@ func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmod
 		})
 	}
 	return
-}
-
-func (c *ChChostCloudTag) newTargetKey(id int, key string) CloudTagKey {
-	return CloudTagKey{ID: id, Key: key}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
