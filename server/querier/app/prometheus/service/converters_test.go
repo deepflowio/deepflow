@@ -360,6 +360,15 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,value,`tag` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = '''demo'  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			hasError: false,
 		},
+
+		// universal tag
+		{
+
+			hints:    promqlHints{matcher: `node_cpu_seconds_total{df_pod!=""}`},
+			input:    `node_cpu_seconds_total{df_pod!=""}`,
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,value,`tag`,`pod`,`pod_group`,`pod_service`,`pod_node`,`pod_ns`,`pod_cluster` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND exist(`pod`)  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hasError: false,
+		},
 	}
 
 	Convey("TestPromReaderTransToSQL_Query_Parse_1", t, func() {
