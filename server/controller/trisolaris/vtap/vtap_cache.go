@@ -422,7 +422,6 @@ func (c *VTapCache) convertLicenseFunctions() {
 		c.enabledCallMonitoring.Set()
 		c.enabledLogMonitoring.Set()
 		c.enabledIndicatorMonitoring.Set()
-		return
 	}
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
 		c.licenseFunctionSet = mapset.NewSet()
