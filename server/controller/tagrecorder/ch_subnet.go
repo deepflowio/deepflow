@@ -71,8 +71,8 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, metadbmodel.ChNetwork{
-		ID:   source.ID,
-		Name: networkName,
+		ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
+		Name:     networkName,
 		IconID: c.resourceTypeToIconID[IconKey{
 			NodeType: RESOURCE_TYPE_VL2,
 		}],
@@ -94,11 +94,7 @@ func (c *ChNetwork) onResourceUpdated(sourceID int, fieldsUpdate *message.Networ
 	if fieldsUpdate.VPCID.IsDifferent() {
 		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChNetwork
-		db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
-	}
+	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

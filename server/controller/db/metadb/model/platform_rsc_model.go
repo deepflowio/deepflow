@@ -65,6 +65,10 @@ func (t *OperatedTime) SetUpdatedAt(updatedAt time.Time) {
 	t.UpdatedAt = updatedAt
 }
 
+func (t OperatedTime) GetUpdatedAt() time.Time {
+	return t.UpdatedAt
+}
+
 type SoftDeleteBase struct {
 	OperatedTime `mapstructure:",squash"`
 	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`

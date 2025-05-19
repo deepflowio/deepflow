@@ -17,9 +17,12 @@
 package tagrecorder
 
 import (
+	"fmt"
 	"slices"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
@@ -96,6 +99,15 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 	return ss
 }
 
+func (m *SubscriberManager) GetSubscriber(resourceType string) Subscriber {
+	for _, s := range m.subscribers {
+		if s.GetSubResourceType() == resourceType {
+			return s
+		}
+	}
+	return nil
+}
+
 func (c *SubscriberManager) getSubscribers() []Subscriber {
 	subscribers := []Subscriber{
 		NewChVMDevice(c.resourceTypeToIconID),
@@ -168,8 +180,8 @@ type SubscriberDataGenerator[
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
-	CT MySQLChModel,
-	KT ChModelKey,
+	CT SubscriberMetaDBChModel,
+	KT SubscriberChModelKey,
 ] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT, *metadb.DB)
@@ -184,8 +196,8 @@ type SubscriberComponent[
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
-	CT MySQLChModel,
-	KT ChModelKey,
+	CT SubscriberMetaDBChModel,
+	KT SubscriberChModelKey,
 ] struct {
 	cfg config.ControllerConfig
 
@@ -204,8 +216,8 @@ func newSubscriberComponent[
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
-	CT MySQLChModel,
-	KT ChModelKey,
+	CT SubscriberMetaDBChModel,
+	KT SubscriberChModelKey,
 ](
 	sourceResourceTypeName, resourceTypeName string,
 ) SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT] {
@@ -270,6 +282,31 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 	s.updateChTagLastUpdatedAt(md, db)
+}
+
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateOrSync(db *metadb.DB, key KT, updateInfo map[string]interface{}) {
+	condMap := key.Map()
+	if len(condMap) == 0 {
+		log.Errorf("%s key: %#v is empty", s.resourceTypeName, key, db.LogPrefixORGID)
+		return
+	}
+	query := db.GetGORMDB()
+	for k, v := range condMap {
+		query = query.Where(fmt.Sprintf("%s = ?", k), v)
+	}
+	var chItem CT
+	if err := query.First(&chItem).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			log.Errorf("failed to get %s by key %#v: %v", s.resourceTypeName, key, err, db.LogPrefixORGID)
+		}
+		return
+	}
+	if len(updateInfo) == 0 {
+		updateInfo = map[string]interface{}{
+			"updated_at": time.Now(), // use update_at as synchronize time
+		}
+	}
+	s.dbOperator.update(chItem, updateInfo, key, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
