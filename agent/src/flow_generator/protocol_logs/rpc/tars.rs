@@ -262,7 +262,16 @@ For details, please refer to the protocol document and actual framework code.
 */
 
 impl TarsInfo {
-    fn parse(payload: &[u8]) -> IResult<&[u8], TarsInfo> {
+    fn generate_endpoint(&self) -> Option<String> {
+        format!(
+            "{}/{}",
+            self.req_service_name.as_ref()?,
+            self.req_method_name.as_ref()?
+        )
+        .into()
+    }
+
+    fn parse<'a>(payload: &'a [u8]) -> IResult<&'a [u8], TarsInfo> {
         let (input, total_len) = be_u32(payload)?;
         if total_len as usize > payload.len() {
             return Err(nom::Err::Incomplete(nom::Needed::Size(
@@ -360,7 +369,7 @@ impl TarsInfo {
                     assert_eq!(tag, 6);
                     info.req_method_name = Some(value.to_string());
                 }
-                info.endpoint = info.get_endpoint();
+                info.endpoint = info.generate_endpoint();
             }
             _ => {
                 info.msg_type = LogMessageType::Response;
@@ -465,8 +474,11 @@ impl L7ProtocolParserInterface for TarsLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                 info.rrt = rrt;
+                if info.msg_type == LogMessageType::Response {
+                    info.endpoint = endpoint;
+                }
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
@@ -555,12 +567,7 @@ impl L7ProtocolInfoInterface for TarsInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        format!(
-            "{}/{}",
-            self.req_service_name.as_ref()?,
-            self.req_method_name.as_ref()?
-        )
-        .into()
+        self.endpoint.clone()
     }
 }
 

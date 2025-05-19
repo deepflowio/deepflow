@@ -58,8 +58,8 @@ use crate::{
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
         enums::{CaptureNetworkType, EthernetType, HeaderType, IpProtocol, TcpFlags},
         flow::{
-            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7PerfStatsKey,
-            L7Protocol, L7Stats, PacketDirection, SignalSource, TunnelField,
+            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7Protocol,
+            L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
@@ -1644,44 +1644,46 @@ impl FlowMap {
         consistent_timestamp_in_l7_metrics: bool,
         time_in_micros: u64,
     ) {
-        if let Some(flow_perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
-            let flow_id = &node.tagged_flow.flow.flow_id;
-            let l7_timeout_count = self
-                .perf_cache
-                .borrow_mut()
-                .pop_timeout_count(flow_id, false); // TODO: flow_end is most likely false, but may also be true
-            let (l7_perf_stats, _l7_protocol) =
-                meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
-            let app_proto_head = l7_info.app_proto_head().unwrap();
-            let time_span = if consistent_timestamp_in_l7_metrics
-                && app_proto_head.msg_type == LogMessageType::Response
-                && app_proto_head.rrt != 0
-            {
-                node.tagged_flow.flow.flow_stat_time.as_secs()
-                    - ((time_in_micros - app_proto_head.rrt) / Self::MICROS_IN_SECONDS)
-            } else {
-                0
-            };
-            // FIXME: the endpoint may be None after parsed
-            let endpoint = if let Some(new_endpoint) = l7_info.get_endpoint() {
-                node.tagged_flow.flow.last_endpoint = Some(new_endpoint.clone());
-                Some(new_endpoint)
-            } else {
-                node.tagged_flow.flow.last_endpoint.clone()
-            };
+        let Some(mut perf_stats) = node.tagged_flow.flow.flow_perf_stats.take() else {
+            return;
+        };
 
-            let key = L7PerfStatsKey {
-                endpoint,
-                biz_type: l7_info.get_biz_type(),
-                time_span: time_span as u32,
-            };
+        let flow = &node.tagged_flow.flow;
+        let flow_id = flow.flow_id;
+        let l7_timeout_count = self
+            .perf_cache
+            .borrow_mut()
+            .pop_timeout_count(&flow_id, false); // TODO: flow_end is most likely false, but may also be true
+        let (l7_perf_stats, l7_protocol) =
+            meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+        let app_proto_head = l7_info.app_proto_head().unwrap();
+        let time_span = if consistent_timestamp_in_l7_metrics
+            && app_proto_head.msg_type == LogMessageType::Response
+            && app_proto_head.rrt != 0
+        {
+            time_in_micros / Self::MICROS_IN_SECONDS
+                - ((time_in_micros - app_proto_head.rrt) / Self::MICROS_IN_SECONDS)
+        } else {
+            0
+        };
 
-            if let Some(l7_perf) = flow_perf_stats.l7.get_mut(&key) {
-                l7_perf.sequential_merge(&l7_perf_stats);
-            } else {
-                flow_perf_stats.l7.insert(key, l7_perf_stats);
-            }
-        }
+        let mut l7_stats = L7Stats::default();
+        l7_stats.stats = l7_perf_stats.clone();
+        l7_stats.endpoint = l7_info.get_endpoint();
+        l7_stats.flow_id = flow_id;
+        l7_stats.signal_source = flow.signal_source;
+        l7_stats.time_in_second = Duration::from_secs(time_in_micros / Self::MICROS_IN_SECONDS);
+        l7_stats.l7_protocol = l7_protocol;
+        l7_stats.time_span = time_span as u32;
+        l7_stats.biz_type = l7_info.get_biz_type();
+        l7_stats.flow = None;
+
+        self.l7_stats_output
+            .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
+
+        let l7_perf_stats_all = &mut perf_stats.l7;
+        l7_perf_stats_all.sequential_merge(&l7_perf_stats);
+        node.tagged_flow.flow.flow_perf_stats = Some(perf_stats);
     }
 
     fn collect_metric(
@@ -1975,25 +1977,15 @@ impl FlowMap {
         if collect_stats {
             let flow = &tagged_flow.flow;
             if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
-                let l7_protocol = flow_perf.l7_protocol;
-                let count = flow_perf.l7.len();
-                for (index, (l7_perf_stats_key, l7_perf_stats)) in flow_perf.l7.iter().enumerate() {
-                    let mut l7_stats = L7Stats::default();
-                    l7_stats.stats = l7_perf_stats.clone();
-                    l7_stats.endpoint = l7_perf_stats_key.endpoint.clone();
-                    l7_stats.flow_id = flow.flow_id;
-                    l7_stats.signal_source = flow.signal_source;
-                    l7_stats.time_in_second = flow.flow_stat_time.into();
-                    l7_stats.l7_protocol = l7_protocol;
-                    l7_stats.time_span = l7_perf_stats_key.time_span;
-                    if index + 1 == count {
-                        l7_stats.flow = Some(tagged_flow.clone());
-                    } else {
-                        l7_stats.flow = None;
-                    }
-                    self.l7_stats_output
-                        .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
-                }
+                let mut l7_stats = L7Stats::default();
+                l7_stats.endpoint = None;
+                l7_stats.flow_id = flow.flow_id;
+                l7_stats.signal_source = flow.signal_source;
+                l7_stats.time_in_second = flow.flow_stat_time.into();
+                l7_stats.l7_protocol = flow_perf.l7_protocol;
+                l7_stats.flow = Some(tagged_flow.clone());
+                self.l7_stats_output
+                    .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
         }
     }

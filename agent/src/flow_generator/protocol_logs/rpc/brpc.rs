@@ -65,6 +65,15 @@ pub struct BrpcLog {
 }
 
 impl BrpcInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        format!(
+            "{}/{}",
+            self.req_service_name.as_ref()?,
+            self.req_method_name.as_ref()?
+        )
+        .into()
+    }
+
     fn parse<'a>(payload: &'a [u8], param: &ParseParam) -> Option<(&'a [u8], Self)> {
         let mut info = BrpcInfo::default();
 
@@ -87,7 +96,7 @@ impl BrpcInfo {
             info.req_method_name = Some(req.method_name);
             info.req_log_id = req.log_id;
             info.req_len = Some(body_size as u32 + 12);
-            info.endpoint = info.get_endpoint();
+            info.endpoint = info.generate_endpoint();
             info.msg_type = LogMessageType::Request;
         } else if let Some(resp) = meta.response {
             info.resp_code = resp.error_code;
@@ -240,12 +249,7 @@ impl L7ProtocolInfoInterface for BrpcInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        format!(
-            "{}/{}",
-            self.req_service_name.as_ref()?,
-            self.req_method_name.as_ref()?
-        )
-        .into()
+        self.endpoint.clone()
     }
 
     fn is_on_blacklist(&self) -> bool {
@@ -311,8 +315,11 @@ impl L7ProtocolParserInterface for BrpcLog {
                         _ => {}
                     }
                     if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param).map(|rtt| {
+                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
                             info.rtt = rtt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                         });
                     }

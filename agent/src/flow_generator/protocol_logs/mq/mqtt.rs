@@ -110,30 +110,7 @@ impl L7ProtocolInfoInterface for MqttInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        match self.pkt_type {
-            PacketKind::Publish { .. } => {
-                if let Some(t) = &self.publish_topic {
-                    Some(t.clone())
-                } else {
-                    None
-                }
-            }
-            PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                if let Some(s) = &self.subscribe_topics {
-                    let mut topic_str = String::new();
-                    for i in s {
-                        let _ = write!(&mut topic_str, "{},", i.name);
-                    }
-                    if !topic_str.is_empty() {
-                        topic_str.pop();
-                    }
-                    Some(topic_str)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
+        self.endpoint.clone()
     }
 
     fn get_request_domain(&self) -> String {
@@ -178,6 +155,33 @@ impl Default for MqttInfo {
 }
 
 impl MqttInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        match self.pkt_type {
+            PacketKind::Publish { .. } => {
+                if let Some(t) = &self.publish_topic {
+                    Some(t.clone())
+                } else {
+                    None
+                }
+            }
+            PacketKind::Unsubscribe | PacketKind::Subscribe => {
+                if let Some(s) = &self.subscribe_topics {
+                    let mut topic_str = String::new();
+                    for i in s {
+                        let _ = write!(&mut topic_str, "{},", i.name);
+                    }
+                    if !topic_str.is_empty() {
+                        topic_str.pop();
+                    }
+                    Some(topic_str)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
@@ -306,8 +310,11 @@ impl L7ProtocolParserInterface for MqttLog {
                     }
                     if self.msg_type != LogMessageType::Session {
                         // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
-                        info.cal_rrt(param).map(|rrt| {
+                        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                             info.rrt = rrt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                         });
                     }
@@ -480,7 +487,7 @@ impl MqttLog {
             }
 
             info.status = self.status;
-            info.endpoint = info.get_endpoint();
+            info.endpoint = info.generate_endpoint();
             if parse_log {
                 infos.push(L7ProtocolInfo::MqttInfo(info));
             }

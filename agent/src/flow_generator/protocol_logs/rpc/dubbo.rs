@@ -120,6 +120,14 @@ pub struct DubboInfo {
 }
 
 impl DubboInfo {
+    pub fn generate_endpoint(&self) -> Option<String> {
+        if !self.service_name.is_empty() || !self.method_name.is_empty() {
+            Some(format!("{}/{}", self.service_name, self.method_name))
+        } else {
+            None
+        }
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         if other.is_tls {
             self.is_tls = other.is_tls;
@@ -300,11 +308,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if !self.service_name.is_empty() || !self.method_name.is_empty() {
-            Some(format!("{}/{}", self.service_name, self.method_name))
-        } else {
-            None
-        }
+        self.endpoint.clone()
     }
 
     fn get_request_domain(&self) -> String {
@@ -428,7 +432,7 @@ impl L7ProtocolParserInterface for DubboLog {
         self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
-        info.endpoint = info.get_endpoint();
+        info.endpoint = info.generate_endpoint();
         self.wasm_hook(param, payload, &mut info);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
@@ -442,8 +446,11 @@ impl L7ProtocolParserInterface for DubboLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                 info.rrt = rrt;
+                if info.msg_type == LogMessageType::Response {
+                    info.endpoint = endpoint;
+                }
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
@@ -1431,7 +1438,8 @@ mod tests {
         };
 
         assert_eq!(is_dubbo, true);
-        assert_eq!(info.trace_id, "00000000-332d-351f-ffff-ffff84afb1ba");
+        // EE: assert_eq!(info.trace_id, "00000000-332d-351f-ffff-ffff84afb1ba");
+        assert_eq!(info.trace_id, "JAVA:0:6904424666057469:6865509588089802:3363838533311866:00000000-332d-351f-ffff-ffff84afb1ba:7502612320163056:00000000-39d7-c9b2-ffff-ffff93cf32e0:ffffffff-df3a-bfff-0000-000001c43ef4:dilinkapp_dilinkapp-vehicle-provide-test:-1:-1");
     }
 
     #[test]
