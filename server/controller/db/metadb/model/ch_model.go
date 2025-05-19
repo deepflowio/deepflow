@@ -613,3 +613,8 @@ type ChUser struct {
 	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
+
+type ChTagLastUpdatedAt struct {
+	TableName string    `gorm:"primaryKey;column:table_name;type:varchar(64);not null" json:"NAME"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
