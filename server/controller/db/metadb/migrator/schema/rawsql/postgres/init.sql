@@ -2833,3 +2833,39 @@ CREATE UNIQUE INDEX IF NOT EXISTS custom_service_name_idx ON custom_service(name
 COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT';
 COMMENT ON COLUMN custom_service.domain IS 'reserved for backend';
 COMMENT ON COLUMN custom_service.resource IS 'separated by ,';
+
+CREATE TABLE IF NOT EXISTS ch_tag_last_updated_at (
+    table_name           VARCHAR(64) NOT NULL PRIMARY KEY,
+    updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=innodb DEFAULT CHARSET=utf8;
+
+INSERT INTO ch_tag_last_updated_at (table_name) VALUES
+('ch_device'),
+('ch_az'),
+('ch_chost'),
+('ch_l3_epc'),
+('ch_subnet'),
+('ch_pod_cluster'),
+('ch_pod_ns'),
+('ch_pod_node'),
+('ch_pod_ingress'),
+('ch_pod_service'),
+('ch_pod_group'),
+('ch_pod'),
+('ch_gprocess'),
+('ch_chost_cloud_tag'),
+('ch_chost_cloud_tags'),
+('ch_pod_ns_cloud_tag'),
+('ch_pod_ns_cloud_tags'),
+('ch_pod_service_k8s_label'),
+('ch_pod_service_k8s_labels'),
+('ch_pod_service_k8s_annotation'),
+('ch_pod_service_k8s_annotations'),
+('ch_pod_k8s_env'),
+('ch_pod_k8s_envs'),
+('ch_pod_k8s_label'),
+('ch_pod_k8s_labels'),
+('ch_pod_k8s_annotation'),
+('ch_pod_k8s_annotations'),
+('ch_os_app_tag'),
+('ch_os_app_tags');

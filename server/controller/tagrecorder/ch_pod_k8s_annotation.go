@@ -50,7 +50,7 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 			metadbmodel.ChPodK8sAnnotation,
 			K8sAnnotationKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATION,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ANNOTATION,
 		),
 	}
 	mng.subscriberDG = mng
