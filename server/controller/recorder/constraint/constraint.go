@@ -33,6 +33,7 @@ type MySQLModelPtr[T MySQLModel] interface {
 
 	SetID(int)
 	SetUpdatedAt(time.Time)
+	GetUpdatedAt() time.Time
 }
 
 // 资源的MySQL orm对象
@@ -49,6 +50,7 @@ type MySQLModel interface {
 		metadbmodel.Pod | metadbmodel.Process | metadbmodel.VIP | metadbmodel.CustomService
 
 	GetID() int
+	GetUpdatedAt() time.Time
 }
 
 // 资源的原始数据结构
