@@ -18,6 +18,8 @@
 package tagrecorder
 
 import (
+	"time"
+
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
@@ -34,9 +36,28 @@ type MySQLChModel interface {
 		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel
 }
 
+type SubscriberMetaDBChModel interface {
+	metadbmodel.ChDevice | metadbmodel.ChAZ | metadbmodel.ChChost | metadbmodel.ChVPC | metadbmodel.ChNetwork | metadbmodel.ChLBListener |
+		metadbmodel.ChPodCluster | metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChPodIngress | metadbmodel.ChPodService |
+		metadbmodel.ChPodGroup | metadbmodel.ChPod | metadbmodel.ChGProcess | metadbmodel.ChOSAppTag | metadbmodel.ChOSAppTags |
+		metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
+		metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag |
+		metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations | metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodK8sLabel |
+		metadbmodel.ChPodK8sLabels
+
+	GetID() int
+	GetUpdatedAt() time.Time
+}
+
 // ch资源的组合key
 type ChModelKey interface {
-	PrometheusTargetLabelKey | PrometheusAPPLabelKey | OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
-		IPRelationKey | TapTypeKey | K8sLabelsKey | NodeTypeKey | K8sAnnotationKey | K8sAnnotationsKey |
-		K8sEnvKey | K8sEnvsKey | PolicyKey
+	PrometheusTargetLabelKey | PrometheusAPPLabelKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey |
+		PortIDKey | PortIPKey | PortDeviceKey | IPRelationKey | TapTypeKey | NodeTypeKey | PolicyKey |
+		IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+}
+
+type SubscriberChModelKey interface {
+	IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+
+	Map() map[string]interface{}
 }
