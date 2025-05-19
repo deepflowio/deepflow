@@ -16,14 +16,12 @@
 
 use std::{net::IpAddr, sync::Arc};
 
-use ahash::AHashMap;
-
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointDataPov,
     enums::{CaptureNetworkType, EthernetType, TcpFlags},
-    flow::{FlowMetricsPeer, PacketDirection, SignalSource, TcpPerfStats},
+    flow::{FlowMetricsPeer, L7PerfStats, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
@@ -174,7 +172,7 @@ impl FlowNode {
 
         if let Some(ref mut flow_perf_stats) = &mut flow.flow_perf_stats {
             flow_perf_stats.tcp = TcpPerfStats::default();
-            flow_perf_stats.l7 = AHashMap::new();
+            flow_perf_stats.l7 = L7PerfStats::default();
         }
     }
 

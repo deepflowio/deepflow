@@ -435,6 +435,7 @@ fn rrt_lru(c: &mut Criterion) {
                         ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
                     ),
                     LogCache {
+                        endpoint: None,
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
                         multi_merge_info: None,
@@ -463,6 +464,7 @@ fn rrt_lru(c: &mut Criterion) {
                         ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
                     ),
                     LogCache {
+                        endpoint: None,
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
                         multi_merge_info: None,
@@ -497,6 +499,7 @@ fn rrt_lru(c: &mut Criterion) {
                         ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
                     ),
                     LogCache {
+                        endpoint: None,
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
                         multi_merge_info: None,

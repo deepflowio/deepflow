@@ -547,7 +547,7 @@ impl L7ProtocolParserInterface for MysqlLog {
             }
             if info.msg_type == LogMessageType::Request || info.msg_type == LogMessageType::Response
             {
-                info.cal_rrt(param).map(|rrt| {
+                info.cal_rrt(param, &None).map(|(rrt, _)| {
                     info.rrt = rrt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                 });
