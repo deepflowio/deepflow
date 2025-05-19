@@ -9495,7 +9495,7 @@ outputs:
 开启后，deepflow-agent 将对抓取的 Pcap 数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
-### L7_Flow_Log {#outputs.compression.l7_flow_log}
+### 调用日志 {#outputs.compression.l7_flow_log}
 
 **标签**:
 
@@ -9522,7 +9522,7 @@ outputs:
 开启后，deepflow-agent 将对调用日志进行压缩处理，压缩比例在 8:1 左右。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
-### L4_Flow_Log {#outputs.compression.l4_flow_log}
+### 流日志 {#outputs.compression.l4_flow_log}
 
 **标签**:
 
