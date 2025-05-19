@@ -537,6 +537,12 @@ impl Parsable for Err {
 }
 
 impl NatsInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        self.get_subject()
+            .and_then(|x| x.split('.').next())
+            .map(|x| x.to_string())
+    }
+
     fn try_parse<'a>(
         payload: &'a [u8],
         config: Option<&LogParserConfig>,
@@ -779,9 +785,7 @@ impl L7ProtocolInfoInterface for NatsInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        self.get_subject()
-            .and_then(|x| x.split('.').next())
-            .map(|x| x.to_string())
+        self.endpoint.clone()
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
@@ -906,7 +910,7 @@ impl L7ProtocolParserInterface for NatsLog {
 
                 self.wasm_hook(param, payload, info);
                 set_captured_byte!(info, param);
-                info.endpoint = info.get_endpoint();
+                info.endpoint = info.generate_endpoint();
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
@@ -920,8 +924,11 @@ impl L7ProtocolParserInterface for NatsLog {
                         }
                     }
                     if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param).map(|rtt| {
+                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
                             info.rtt = rtt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                         });
                     }

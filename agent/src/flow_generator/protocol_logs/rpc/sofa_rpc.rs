@@ -197,6 +197,14 @@ pub struct SofaRpcInfo {
 }
 
 impl SofaRpcInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        if !self.target_serv.is_empty() || !self.method.is_empty() {
+            Some(format!("{}/{}", self.target_serv, self.method))
+        } else {
+            None
+        }
+    }
+
     fn fill_with_trace_ctx(&mut self, ctx: String) {
         let ctx = decode_new_rpc_trace_context(ctx.as_bytes());
         if !ctx.trace_id.is_empty() {
@@ -255,11 +263,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if !self.target_serv.is_empty() || !self.method.is_empty() {
-            Some(format!("{}/{}", self.target_serv, self.method))
-        } else {
-            None
-        }
+        self.endpoint.clone()
     }
 
     fn is_on_blacklist(&self) -> bool {
@@ -328,7 +332,7 @@ impl L7ProtocolParserInterface for SofaRpcLog {
                 if !ok {
                     return Ok(L7ParseResult::None);
                 }
-                info.endpoint = info.get_endpoint();
+                info.endpoint = info.generate_endpoint();
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
                 if let Some(config) = param.parse_config {
@@ -513,8 +517,11 @@ impl SofaRpcLog {
             _ => {}
         }
 
-        info.cal_rrt(param).map(|rrt| {
+        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
             info.rrt = rrt;
+            if info.msg_type == LogMessageType::Response {
+                info.endpoint = endpoint;
+            }
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
     }

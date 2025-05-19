@@ -424,6 +424,23 @@ fn read_table(payload: &[u8]) -> Option<(&[u8], Value)> {
 }
 
 impl AmqpInfo {
+    fn generate_endpoint(&self) -> Option<String> {
+        let (exchange, exchange_len) = self
+            .exchange
+            .as_ref()
+            .map(|r| (r.as_str(), r.len()))
+            .unwrap_or(("", 0));
+        let (routing_key, routing_key_len) = self
+            .routing_key
+            .as_ref()
+            .map(|r| (r.as_str(), r.len()))
+            .unwrap_or(("", 0));
+        if exchange_len + routing_key_len == 0 {
+            return self.queue.clone();
+        }
+        Some(format!("{}.{}", exchange, routing_key))
+    }
+
     fn get_packet_type(&self) -> String {
         if self.is_protcol_header {
             return "Protocol-Header".to_string();
@@ -807,20 +824,7 @@ impl L7ProtocolInfoInterface for AmqpInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        let (exchange, exchange_len) = self
-            .exchange
-            .as_ref()
-            .map(|r| (r.as_str(), r.len()))
-            .unwrap_or(("", 0));
-        let (routing_key, routing_key_len) = self
-            .routing_key
-            .as_ref()
-            .map(|r| (r.as_str(), r.len()))
-            .unwrap_or(("", 0));
-        if exchange_len + routing_key_len == 0 {
-            return self.queue.clone();
-        }
-        Some(format!("{}.{}", exchange, routing_key))
+        self.endpoint.clone()
     }
 
     fn is_on_blacklist(&self) -> bool {
@@ -854,7 +858,7 @@ impl L7ProtocolParserInterface for AmqpLog {
             info.msg_type = info.get_log_message_type();
             if info.msg_type == LogMessageType::Request {
                 info.req_type = Some(info.get_packet_type());
-                info.endpoint = info.get_endpoint();
+                info.endpoint = info.generate_endpoint();
             }
             vec.push(L7ProtocolInfo::AmqpInfo(info));
         }
@@ -949,7 +953,7 @@ impl L7ProtocolParserInterface for AmqpLog {
                 LogMessageType::Request => {
                     info.req_len = Some((offset - offset_begin) as u32);
                     info.req_type = Some(info.get_packet_type());
-                    info.endpoint = info.get_endpoint();
+                    info.endpoint = info.generate_endpoint();
                 }
                 LogMessageType::Response => info.resp_len = Some((offset - offset_begin) as u32),
                 _ => {}
@@ -966,14 +970,21 @@ impl L7ProtocolParserInterface for AmqpLog {
                 if !info.is_on_blacklist && !self.last_is_on_blacklist {
                     if info.msg_type == LogMessageType::Request {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
-                        info.cal_rrt(param).map(|rtt| {
+                        info.endpoint = info.generate_endpoint();
+                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
                             info.rtt = rtt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                         });
                     } else if info.msg_type == LogMessageType::Response {
                         self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        info.cal_rrt(param).map(|rtt| {
+                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
                             info.rtt = rtt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                         });
                     }

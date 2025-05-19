@@ -294,6 +294,7 @@ pub struct EbpfParam<'a> {
 pub struct LogCache {
     pub msg_type: LogMessageType,
     pub time: u64,
+    pub endpoint: Option<String>,
     // req_end, resp_end, merged
     // set merged to true when req and resp merge once
     pub multi_merge_info: Option<(bool, bool, bool)>,

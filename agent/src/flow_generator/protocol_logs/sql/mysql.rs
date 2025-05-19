@@ -547,7 +547,7 @@ impl L7ProtocolParserInterface for MysqlLog {
             }
             if info.msg_type == LogMessageType::Request || info.msg_type == LogMessageType::Response
             {
-                info.cal_rrt(param).map(|rrt| {
+                info.cal_rrt(param, &None).map(|(rrt, _)| {
                     info.rrt = rrt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                 });
@@ -1382,7 +1382,7 @@ mod tests {
 
     fn run(name: &str, truncate: Option<usize>) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
-        let capture = Capture::load_pcap(pcap_file, Some(1400));
+        let capture = Capture::load_pcap(pcap_file, Some(60000));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {

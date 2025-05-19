@@ -412,7 +412,7 @@ impl L7ProtocolParserInterface for DnsLog {
                 } else {
                     self.perf_stats.as_mut().map(|p| p.inc_req());
                 }
-                info.cal_rrt(param).map(|rrt| {
+                info.cal_rrt(param, &None).map(|(rrt, _)| {
                     info.rrt = rrt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                 });

@@ -145,7 +145,11 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(&self, param: &ParseParam) -> Option<u64> {
+    fn cal_rrt(
+        &self,
+        param: &ParseParam,
+        endpoint: &Option<String>,
+    ) -> Option<(u64, Option<String>)> {
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
         let cache_key = LogCacheKey::new(param, self.session_id());
         let previous_log_info = perf_cache.pop(cache_key);
@@ -157,13 +161,14 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         if time != 0 {
             let (in_cached_req, timeout_count) = perf_cache.get_or_insert_mut(param.flow_id);
 
-            let Some(previous_log_info) = previous_log_info else {
+            let Some(mut previous_log_info) = previous_log_info else {
                 if msg_type == LogMessageType::Request {
                     *in_cached_req += 1;
                 }
                 perf_cache.put(
                     cache_key,
                     LogCache {
+                        endpoint: endpoint.clone(),
                         msg_type: param.direction.into(),
                         time: param.time,
                         multi_merge_info: None,
@@ -196,7 +201,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     *timeout_count += 1;
                     None
                 } else {
-                    Some(rrt)
+                    Some((rrt, previous_log_info.endpoint.take()))
                 }
             // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
             // calculate the round trip time.
@@ -211,7 +216,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     *timeout_count += 1;
                     None
                 } else {
-                    Some(rrt)
+                    Some((rrt, None))
                 }
             } else {
                 debug!(
@@ -238,6 +243,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     perf_cache.put(
                         cache_key,
                         LogCache {
+                            endpoint: endpoint.clone(),
                             msg_type: param.direction.into(),
                             time: param.time,
                             multi_merge_info: None,
@@ -261,7 +267,11 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     // must have request id
     // the main different with cal_rrt() is need to push back to lru when session not end
-    fn cal_rrt_for_multi_merge_log(&self, param: &ParseParam) -> Option<u64> {
+    fn cal_rrt_for_multi_merge_log(
+        &self,
+        param: &ParseParam,
+        endpoint: &Option<String>,
+    ) -> Option<(u64, Option<String>)> {
         assert!(self.session_id().is_some());
 
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
@@ -294,6 +304,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             perf_cache.put(
                 cache_key,
                 LogCache {
+                    endpoint: endpoint.clone(),
                     msg_type: param.direction.into(),
                     time: param.time,
                     multi_merge_info: Some((req_end, resp_end, false)),
@@ -359,7 +370,11 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 }
                 None
             } else {
-                Some(rrt)
+                if msg_type == LogMessageType::Response {
+                    Some((rrt, previous_log_info.endpoint.clone()))
+                } else {
+                    Some((rrt, None))
+                }
             };
 
             if put_back {

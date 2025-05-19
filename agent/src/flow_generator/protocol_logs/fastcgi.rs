@@ -565,8 +565,11 @@ impl L7ProtocolParserInterface for FastCGILog {
                     }
                 }
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
                 info.rrt = rrt;
+                if info.msg_type == LogMessageType::Response {
+                    info.endpoint = endpoint;
+                }
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
