@@ -46,7 +46,8 @@ var (
 )
 
 type Dictionary struct {
-	cfg config.ControllerConfig
+	cfg    config.ControllerConfig
+	source metaDBCommon.ClickHouseSource
 }
 
 func GetDictionary() *Dictionary {
@@ -58,6 +59,7 @@ func GetDictionary() *Dictionary {
 
 func (c *Dictionary) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
+	c.source = metaDBCommon.GetClickhouseSource(c.cfg.MetadbCfg)
 }
 
 func (c *Dictionary) Start(sCtx context.Context) {
@@ -149,8 +151,7 @@ func (c *Dictionary) Update() {
 func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	// 在本区域所有数据节点更新字典
 	// Update the dictionary at all data nodes in the region
-	source := metaDBCommon.GetClickhouseSource(c.cfg.MetadbCfg)
-	sqlDatabaseName := source.Database
+	sqlDatabaseName := c.source.Database
 	ckDatabaseName := c.cfg.ClickHouseCfg.Database
 	ckDb, err := clickhouse.Connect(*clickHouseCfg)
 	if err != nil {
@@ -169,7 +170,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		CH_DICTIONARY_REGION,
 		CH_DICTIONARY_AZ,
 		CH_DICTIONARY_VPC,
-		CH_DICTIONARY_VL2,
+		CH_DICTIONARY_NETWORK,
 		CH_DICTIONARY_POD_CLUSTER,
 		CH_DICTIONARY_POD_NAMESPACE,
 		CH_DICTIONARY_POD_NODE,
@@ -298,9 +299,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		var addDictError error
 		for _, dict := range addDicts.ToSlice() {
 			dictName := dict.(string)
-			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
-			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, source.Name, source.Host, source.Port, source.UserName, source.UserPassword, source.ReplicaSQL, sqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL := c.fillCreateSQL(dictName, ckDatabaseName, sqlDatabaseName)
 			log.Infof("create dictionary %s", dictName, logger.NewORGPrefix(orgID))
 			log.Info(createSQL, logger.NewORGPrefix(orgID))
 			_, err = ckDb.Exec(createSQL)
@@ -319,7 +318,6 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		var updateDictError error
 		for _, dict := range checkDicts.ToSlice() {
 			dictName := dict.(string)
-			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 			showSQL := fmt.Sprintf("SHOW CREATE DICTIONARY %s.%s", ckDatabaseName, dictName)
 			dictSQL := make([]string, 0)
 			if err := ckDb.Select(&dictSQL, showSQL); err != nil {
@@ -330,10 +328,9 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			if len(dictSQL) <= 0 {
 				break
 			}
-			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, source.Name, source.Host, source.Port, source.UserName, source.UserPassword, source.ReplicaSQL, sqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL := c.fillCreateSQL(dictName, ckDatabaseName, sqlDatabaseName)
 			// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
-			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", source.UserPassword, 1)
+			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.source.UserPassword, 1)
 			if createSQL == checkDictSQL {
 				continue
 			}
@@ -439,4 +436,23 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 	}
 
+}
+
+func (c *Dictionary) fillCreateSQL(dictName string, ckDatabaseName string, sqlDatabaseName string) string {
+	chTable := chDictNameToMetaDBTableName(dictName)
+	createSQL := CREATE_SQL_MAP[dictName]
+	return fmt.Sprintf(
+		createSQL,
+		ckDatabaseName,
+		dictName,
+		c.source.Name,
+		c.source.Host,
+		c.source.Port,
+		c.source.UserName,
+		c.source.UserPassword,
+		c.source.ReplicaSQL,
+		sqlDatabaseName,
+		chTable,
+		chTable,
+		c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 }
