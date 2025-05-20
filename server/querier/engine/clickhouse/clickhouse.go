@@ -578,12 +578,26 @@ func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*comm
 	return rst, debug, err
 }
 
-func AddAutoTypeTag(array []string, tag string) []string {
+func AddTypeTag(array []string, selectTag string) []string {
 	for _, suffix := range []string{"", "_0", "_1"} {
+		// auto
 		for _, resourceName := range []string{"auto_instance", "auto_service"} {
 			resourceTypeSuffix := resourceName + "_type" + suffix
-			if tag == resourceName+suffix {
+			if selectTag == resourceName+suffix {
 				array = append(array, resourceTypeSuffix)
+			}
+		}
+		// device
+		for resourceStr, _ := range tag.DEVICE_MAP {
+			if resourceStr == "pod_service" {
+				continue
+			} else if selectTag == resourceStr+suffix {
+				array = append(array, "device_type_"+selectTag)
+			}
+		}
+		for resource, _ := range tag.HOSTNAME_IP_DEVICE_MAP {
+			if slices.Contains([]string{common.CHOST_HOSTNAME, common.CHOST_IP}, resource) && selectTag == resource+suffix {
+				array = append(array, "device_type_"+selectTag)
 			}
 		}
 	}
@@ -710,7 +724,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, as)
-							outerWhereLeftSlice = AddAutoTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
+							outerWhereLeftSlice = AddTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
 						}
 					} else {
 						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
@@ -729,7 +743,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 							}
 						} else {
 							outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
-							outerWhereLeftSlice = AddAutoTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
+							outerWhereLeftSlice = AddTypeTag(outerWhereLeftSlice, sqlparser.String(colName))
 						}
 					}
 				}
