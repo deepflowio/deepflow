@@ -132,5 +132,5 @@ func (s *AgentService) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSe
 }
 
 func (s *AgentService) RemoteExecute(in api.Synchronizer_RemoteExecuteServer) error {
-	return s.vTapEvent.RemoteExecute(in)
+	return s.vTapEvent.RemoteExecute.RemoteExecute(in)
 }
