@@ -4783,6 +4783,33 @@ inputs:
 
 deepflow-agent 主动向 deepflow-server 上报/同步资源信息的时间间隔。
 
+### 启用云主机资源同步 {#inputs.resources.workload_resource_sync_enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.workload_resource_sync_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  resources:
+    workload_resource_sync_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启开关后，deepflow-server 基于 deepflow-agent 上报的运行环境信息，生成一个云主机资源。
+用于无法通过云平台 API 同步云主机资源的场景，也可用于同步非云环境中普通物理服务器的资源信息。
+
 ### 采集专有云资源 {#inputs.resources.private_cloud}
 
 #### 启用云宿主机资源 {#inputs.resources.private_cloud.hypervisor_resource_enabled}
