@@ -4880,6 +4880,33 @@ inputs:
 The interval at which deepflow-agent actively reports resource information
 to deepflow-server.
 
+### Workload Resource Sync Enabled {#inputs.resources.workload_resource_sync_enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.workload_resource_sync_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  resources:
+    workload_resource_sync_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When enabled, deepflow-server will abstract VM based on the runtime
+environment information reported by deepflow-agent.
+
 ### Collect Private Cloud Resource {#inputs.resources.private_cloud}
 
 #### Hypervisor Resource Enabled {#inputs.resources.private_cloud.hypervisor_resource_enabled}

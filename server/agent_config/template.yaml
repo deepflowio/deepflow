@@ -3507,6 +3507,23 @@ inputs:
     #     deepflow-agent 主动向 deepflow-server 上报/同步资源信息的时间间隔。
     # upgrade_from: platform_sync_interval
     push_interval: 10s
+    # type: bool
+    # name:
+    #   en: Workload Resource Sync Enabled
+    #   ch: 启用云主机资源同步
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When enabled, deepflow-server will abstract VM based on the runtime
+    #     environment information reported by deepflow-agent.
+    #   ch: |-
+    #     开启开关后，deepflow-server 基于 deepflow-agent 上报的运行环境信息，生成一个云主机资源。
+    #     用于无法通过云平台 API 同步云主机资源的场景，也可用于同步非云环境中普通物理服务器的资源信息。
+    workload_resource_sync_enabled: false
     # type: section
     # name:
     #   en: Collect Private Cloud Resource

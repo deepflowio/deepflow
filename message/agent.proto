@@ -539,6 +539,8 @@ message GenesisSyncRequest {
 
     optional GenesisPlatformData platform_data = 9;
     optional GenesisProcessData process_data = 10;
+
+    optional AgentId agent_info = 11;
 }
 
 message GenesisSyncResponse {
@@ -719,6 +721,7 @@ message AgentId {
     optional string ip = 1;
     optional string mac = 2;
     optional string team_id = 3;
+    optional string group_id = 4;
 }
 
 enum OutputFormat {
