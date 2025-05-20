@@ -730,7 +730,10 @@ func (v *GenesisSyncRpcUpdater) UnmarshalAgentProtobuf(orgID int, teamID, vtapID
 
 func (v *GenesisSyncRpcUpdater) UnmarshalAgentKubernetesProtobuf(orgID int, teamID, vtapID uint32, peer string, message *agent.GenesisSyncRequest) common.GenesisSyncDataResponse {
 	genesisSyncData := common.GenesisSyncDataResponse{}
-	genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
+	if message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
+	}
+
 	genesisSyncData.Processes = v.ParseAgentProcessInfo(orgID, vtapID, message)
 	genesisSyncData.Vinterfaces = v.ParseAgentVinterfaceInfo(orgID, teamID, vtapID, peer, common.DEVICE_TYPE_DOCKER_HOST, message)
 
