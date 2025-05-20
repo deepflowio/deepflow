@@ -730,10 +730,7 @@ func (v *GenesisSyncRpcUpdater) UnmarshalAgentProtobuf(orgID int, teamID, vtapID
 
 func (v *GenesisSyncRpcUpdater) UnmarshalAgentKubernetesProtobuf(orgID int, teamID, vtapID uint32, peer string, message *agent.GenesisSyncRequest) common.GenesisSyncDataResponse {
 	genesisSyncData := common.GenesisSyncDataResponse{}
-	if message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
-	}
-
+	genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
 	genesisSyncData.Processes = v.ParseAgentProcessInfo(orgID, vtapID, message)
 	genesisSyncData.Vinterfaces = v.ParseAgentVinterfaceInfo(orgID, teamID, vtapID, peer, common.DEVICE_TYPE_DOCKER_HOST, message)
 
@@ -742,10 +739,7 @@ func (v *GenesisSyncRpcUpdater) UnmarshalAgentKubernetesProtobuf(orgID int, team
 
 func (v *GenesisSyncRpcUpdater) UnmarshalAgentWorkloadProtobuf(orgID int, teamID, vtapID uint32, peer, deviceType string, message *agent.GenesisSyncRequest) common.GenesisSyncDataResponse {
 	genesisSyncData := common.GenesisSyncDataResponse{}
-	if message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
-	}
-
+	genesisSyncData = v.ParseAgentHostAsVmPlatformInfo(orgID, vtapID, peer, message)
 	genesisSyncData.VIPs = v.ParseAgentVIP(orgID, vtapID, message)
 	genesisSyncData.Processes = v.ParseAgentProcessInfo(orgID, vtapID, message)
 	genesisSyncData.Vinterfaces = v.ParseAgentVinterfaceInfo(orgID, teamID, vtapID, peer, deviceType, message)
