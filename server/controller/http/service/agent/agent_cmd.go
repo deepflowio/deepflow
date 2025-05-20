@@ -51,11 +51,11 @@ var (
 
 type AgentCMDManager map[string]*CMDManager
 
-func AgentCommandLock() {
+func LockAgentCMD() {
 	agentCMDMutex.Lock()
 }
 
-func AgentCommandUnlock() {
+func UnlockAgentCMD() {
 	agentCMDMutex.Unlock()
 }
 
@@ -333,19 +333,19 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", timeout)
 		case _, ok := <-cmdResp.RemoteCMDDoneCH:
 			if !ok {
-				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+				return nil, fmt.Errorf("failed to get remote commands, agent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
 			resp.RemoteCommand = GetCommands(key, requestID)
 			namespaceReq := &grpcapi.RemoteExecRequest{RequestId: &requestID, ExecType: grpcapi.ExecutionType_LIST_NAMESPACE.Enum()}
 			manager.ExecCH <- namespaceReq
 		case _, ok := <-cmdResp.LinuxNamespaceDoneCH:
 			if !ok {
-				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+				return nil, fmt.Errorf("failed to get linux namespaces, agent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
 			resp.LinuxNamespace = GetNamespaces(key, requestID)
 		case _, ok := <-cmdResp.ExecDoneCH: // error occurred
 			if !ok {
-				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+				return nil, fmt.Errorf("failed to execute command, agent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
 			if len(GetCommands(key, requestID)) != 0 {
 				return &RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil

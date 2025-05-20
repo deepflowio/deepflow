@@ -52,10 +52,13 @@ var SOCKET_TYPE_TO_MESSAGE = map[string]api.SocketType{
 	"FILE":    FILE_SOCKET,
 }
 
-type AgentEvent struct{}
+type RemoteExecute struct{}
+type AgentEvent struct {
+	RemoteExecute *RemoteExecute
+}
 
 func NewAgentEvent() *AgentEvent {
-	return &AgentEvent{}
+	return &AgentEvent{RemoteExecute: &RemoteExecute{}}
 }
 
 func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, gAgentInfo *vtap.VTapInfo, isOwnerCluster bool, orgID int) *koanf.Koanf {
