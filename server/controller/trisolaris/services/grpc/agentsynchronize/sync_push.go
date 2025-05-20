@@ -85,6 +85,7 @@ func (e *AgentEvent) generateUserConfig(c *vtap.VTapCache, gAgentInfo *vtap.VTap
 	}
 
 	if c.GetVTapEnabled() == 0 {
+		userConfig.Set(CONFIG_KEY_NTP_ENABLED, false)
 		userConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, false)
 	}
 
@@ -301,8 +302,9 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	}
 
 	dynamicConfig := e.generateDynamicConfig(clusterID, vtapCache)
+	// 采集器被禁用时不允许被选中为资源同步采集器
 	// 携带信息有cluster_id && watch_policy != disabled 时选择一个采集器开启云平台同步开关
-	if clusterID != "" && k8sWatchPoilcy != AGENT_KWP_WATCH_DISABLED && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
+	if vtapCache.GetVTapEnabled() != 0 && (clusterID != "" && k8sWatchPoilcy != AGENT_KWP_WATCH_DISABLED && isOpenK8sSyn(vtapCache.GetVTapType()) == true) {
 		value := gAgentInfo.GetKubernetesClusterID(clusterID, vtapCacheKey, k8sForceWatch, int(k8sWatchPoilcy))
 		if value == vtapCacheKey {
 			log.Infof(
@@ -545,8 +547,9 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	}
 
 	dynamicConfig := e.generateDynamicConfig(clusterID, vtapCache)
+	// 采集器被禁用时不允许被选中为资源同步采集器
 	// 携带信息有cluster_id && watch_policy != disabled 时选择一个采集器开启云平台同步开关
-	if clusterID != "" && k8sWatchPoilcy != AGENT_KWP_WATCH_DISABLED && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
+	if vtapCache.GetVTapEnabled() != 0 && (clusterID != "" && k8sWatchPoilcy != AGENT_KWP_WATCH_DISABLED && isOpenK8sSyn(vtapCache.GetVTapType()) == true) {
 		value := gAgentInfo.GetKubernetesClusterID(clusterID, vtapCacheKey, k8sForceWatch, int(k8sWatchPoilcy))
 		if value == vtapCacheKey {
 			log.Infof(
