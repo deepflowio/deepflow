@@ -847,10 +847,7 @@ func (v *GenesisSyncRpcUpdater) UnmarshalKubernetesProtobuf(orgID int, teamID, v
 
 func (v *GenesisSyncRpcUpdater) UnmarshalWorkloadProtobuf(orgID int, teamID, vtapID uint32, peer, deviceType string, message *agent.GenesisSyncRequest) common.GenesisSyncDataResponse {
 	genesisSyncData := common.GenesisSyncDataResponse{}
-	if message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncData = v.ParseHostAsVmPlatformInfo(orgID, vtapID, peer, message)
-	}
-
+	genesisSyncData = v.ParseHostAsVmPlatformInfo(orgID, vtapID, peer, message)
 	genesisSyncData.VIPs = v.ParseVIP(orgID, vtapID, message)
 	genesisSyncData.Processes = v.ParseProcessInfo(orgID, vtapID, message)
 	genesisSyncData.Vinterfaces = v.ParseVinterfaceInfo(orgID, teamID, vtapID, peer, deviceType, message)

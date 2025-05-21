@@ -43,6 +43,7 @@ use crate::{
 use public::l7_protocol::L7Protocol;
 
 const TCP_PAYLOAD_OFFSET: usize = 2;
+const DNS_HEADER_LEN: usize = 12;
 const ANSWER_SPLIT: &str = ";";
 
 impl From<SimpleDnsError> for Error {
@@ -458,6 +459,9 @@ impl DnsLog {
                         break;
                     };
                     let len = read_u16_be(length_bytes) as usize;
+                    if len < DNS_HEADER_LEN || frame.len() < DNS_HEADER_LEN {
+                        break;
+                    }
                     // Offset for TCP DNS:
                     // Example:
                     //                 0            2               ...
