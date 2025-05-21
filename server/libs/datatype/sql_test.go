@@ -51,7 +51,7 @@ func TestTrimCommand(t *testing.T) {
 	for i, c := range cases {
 		r := datatype.TrimCommand(c.in, c.max_len)
 		if r != c.out {
-			t.Errorf("Case: Id %d %v faild, return %v", i, c, r)
+			t.Errorf("Case: Id %d %v failed, return %v", i, c, r)
 		}
 	}
 }
