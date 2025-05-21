@@ -368,6 +368,7 @@ impl From<&AgentId> for agent::AgentId {
             ip: Some(id.ip.to_string()),
             mac: Some(id.mac.to_string()),
             team_id: Some(id.team_id.clone()),
+            group_id: None,
         }
     }
 }
