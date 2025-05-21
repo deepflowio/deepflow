@@ -30,14 +30,10 @@ use flate2::{write::ZlibEncoder, Compression};
 use futures::StreamExt;
 use k8s_openapi::{
     api::{
-        apps::v1::{
-            DaemonSet, DaemonSetSpec, Deployment, DeploymentSpec, ReplicaSet, ReplicaSetSpec,
-            StatefulSet, StatefulSetSpec,
-        },
+        apps::v1::{DaemonSet, Deployment, ReplicaSet, ReplicaSetSpec, StatefulSet},
         core::v1::{
-            Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
-            PodStatus, ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
-            ServiceStatus,
+            ConfigMap, Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod,
+            PodSpec, PodStatus, ReplicationController, Service, ServiceStatus,
         },
         extensions, networking,
     },
@@ -212,6 +208,7 @@ pub enum GenericResourceWatcher {
     V1beta1Ingress(ResourceWatcher<networking::v1beta1::Ingress>),
     ExtV1beta1Ingress(ResourceWatcher<extensions::v1beta1::Ingress>),
     Route(ResourceWatcher<Route>),
+    ConfigMap(ResourceWatcher<ConfigMap>),
 
     // CRDs
     ServiceRule(ResourceWatcher<ServiceRule>),
@@ -278,6 +275,16 @@ impl fmt::Display for Resource {
 
 pub fn default_resources() -> Vec<Resource> {
     vec![
+        Resource {
+            name: "configmaps",
+            pb_name: "*v1.ConfigMap",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: SelectedGv::None,
+            field_selector: String::new(),
+        },
         Resource {
             name: "namespaces",
             pb_name: "*v1.Namespace",
@@ -393,6 +400,16 @@ pub fn default_resources() -> Vec<Resource> {
 
 pub fn supported_resources() -> Vec<Resource> {
     vec![
+        Resource {
+            name: "configmaps",
+            pb_name: "*v1.ConfigMap",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: SelectedGv::None,
+            field_selector: String::new(),
+        },
         Resource {
             name: "namespaces",
             pb_name: "*v1.Namespace",
@@ -1165,25 +1182,12 @@ impl Trimmable for ReplicaSet {
 }
 
 impl Trimmable for ReplicationController {
-    fn trim(mut self) -> Self {
-        let mut trim_rc = ReplicationController::default();
-        trim_rc.metadata = ObjectMeta {
-            uid: self.metadata.uid.take(),
-            name: self.metadata.name.take(),
-            namespace: self.metadata.namespace.take(),
+    fn trim(self) -> Self {
+        ReplicationController {
+            metadata: self.metadata,
+            spec: self.spec,
             ..Default::default()
-        };
-
-        if let Some(rc_spec) = self.spec.take() {
-            trim_rc.spec = Some(ReplicationControllerSpec {
-                replicas: rc_spec.replicas,
-                selector: rc_spec.selector,
-                template: rc_spec.template,
-                ..Default::default()
-            });
         }
-
-        trim_rc
     }
 }
 
@@ -1239,96 +1243,51 @@ impl Trimmable for Route {
     }
 }
 
-impl Trimmable for DaemonSet {
-    fn trim(mut self) -> Self {
-        let mut trim_ds = DaemonSet::default();
-        trim_ds.metadata = ObjectMeta {
-            uid: self.metadata.uid.take(),
-            name: self.metadata.name.take(),
-            namespace: self.metadata.namespace.take(),
-            labels: self.metadata.labels.take(),
+impl Trimmable for ConfigMap {
+    fn trim(self) -> Self {
+        ConfigMap {
+            data: self.data,
+            metadata: self.metadata,
             ..Default::default()
-        };
-        if let Some(ds_spec) = self.spec.take() {
-            trim_ds.spec = Some(DaemonSetSpec {
-                selector: ds_spec.selector,
-                template: ds_spec.template,
-                ..Default::default()
-            })
         }
+    }
+}
 
-        trim_ds
+impl Trimmable for DaemonSet {
+    fn trim(self) -> Self {
+        DaemonSet {
+            metadata: self.metadata,
+            spec: self.spec,
+            ..Default::default()
+        }
     }
 }
 
 impl Trimmable for StatefulSet {
-    fn trim(mut self) -> Self {
-        let mut trim_st = StatefulSet::default();
-        trim_st.metadata = ObjectMeta {
-            uid: self.metadata.uid.take(),
-            name: self.metadata.name.take(),
-            namespace: self.metadata.namespace.take(),
-            labels: self.metadata.labels.take(),
+    fn trim(self) -> Self {
+        StatefulSet {
+            metadata: self.metadata,
+            spec: self.spec,
             ..Default::default()
-        };
-
-        if let Some(st_spec) = self.spec.take() {
-            trim_st.spec = Some(StatefulSetSpec {
-                replicas: st_spec.replicas,
-                selector: st_spec.selector,
-                template: st_spec.template,
-                ..Default::default()
-            })
         }
-        trim_st
     }
 }
 
 impl Trimmable for Deployment {
-    fn trim(mut self) -> Self {
-        let mut trim_de = Deployment::default();
-        trim_de.metadata = ObjectMeta {
-            uid: self.metadata.uid.take(),
-            name: self.metadata.name.take(),
-            namespace: self.metadata.namespace.take(),
-            labels: self.metadata.labels.take(),
+    fn trim(self) -> Self {
+        Deployment {
+            metadata: self.metadata,
+            spec: self.spec,
             ..Default::default()
-        };
-
-        if let Some(de_spec) = self.spec.take() {
-            trim_de.spec = Some(DeploymentSpec {
-                replicas: de_spec.replicas,
-                selector: de_spec.selector,
-                template: de_spec.template,
-                ..Default::default()
-            });
         }
-
-        trim_de
     }
 }
 
 impl Trimmable for Service {
     fn trim(mut self) -> Self {
         let mut trim_svc = Service::default();
-        trim_svc.metadata = ObjectMeta {
-            uid: self.metadata.uid.take(),
-            name: self.metadata.name.take(),
-            namespace: self.metadata.namespace.take(),
-            annotations: self.metadata.annotations.take(),
-            labels: self.metadata.labels.take(),
-            ..Default::default()
-        };
-
-        if let Some(svc_spec) = self.spec.take() {
-            trim_svc.spec = Some(ServiceSpec {
-                selector: svc_spec.selector,
-                type_: svc_spec.type_,
-                cluster_ip: svc_spec.cluster_ip,
-                ports: svc_spec.ports,
-                ..Default::default()
-            });
-        }
+        trim_svc.metadata = self.metadata;
+        trim_svc.spec = self.spec;
         if let Some(svc_status) = self.status.take() {
             trim_svc.status = Some(ServiceStatus {
                 load_balancer: svc_status.load_balancer,
@@ -1436,6 +1395,12 @@ impl ResourceWatcherFactory {
     ) -> Option<GenericResourceWatcher> {
         let namespace = namespace.unwrap_or("");
         let watcher = match resource.name {
+            "configmaps" => GenericResourceWatcher::ConfigMap(self.new_namespace_resource(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
             // 特定namespace不支持Node/Namespace资源
             "nodes" => GenericResourceWatcher::Node(self.new_cluster_resource(
                 resource,
