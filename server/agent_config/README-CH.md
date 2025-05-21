@@ -5012,6 +5012,7 @@ inputs:
       - name: replicasets
       - name: statefulsets
       - name: ingresses
+      - name: configmaps
 ```
 
 **模式**:
@@ -5043,6 +5044,7 @@ inputs:
 - replicasets
 - statefulsets
 - ingresses
+- configmaps
 
 禁用某个资源，在列表中添加 `disabled: true` 的条目：
 ```yaml
@@ -5118,6 +5120,7 @@ inputs:
 | clonesets | |
 | ippools | |
 | opengaussclusters | |
+| configmaps | |
 
 **模式**:
 | Key  | Value                        |
