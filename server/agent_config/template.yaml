@@ -3701,6 +3701,7 @@ inputs:
       #     - replicasets
       #     - statefulsets
       #     - ingresses
+      #     - configmaps
       #
       #     To disable a resource, add an entry to the list with `disabled: true`:
       #     ```yaml
@@ -3761,6 +3762,7 @@ inputs:
       #     - replicasets
       #     - statefulsets
       #     - ingresses
+      #     - configmaps
       #
       #     禁用某个资源，在列表中添加 `disabled: true` 的条目：
       #     ```yaml
@@ -3820,6 +3822,7 @@ inputs:
       #   - clonesets
       #   - ippools
       #   - opengaussclusters
+      #   - configmaps
       # modification: agent_restart
       # ee_feature: false
       # description:
@@ -3909,6 +3912,7 @@ inputs:
       - name: replicasets
       - name: statefulsets
       - name: ingresses
+      - name: configmaps
       # type: int
       # name:
       #   en: K8s API List Page Size
