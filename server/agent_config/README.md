@@ -5143,6 +5143,7 @@ inputs:
       - name: replicasets
       - name: statefulsets
       - name: ingresses
+      - name: configmaps
 ```
 
 **Schema**:
@@ -5174,6 +5175,7 @@ Agent will watch the following resources by default:
 - replicasets
 - statefulsets
 - ingresses
+- configmaps
 
 To disable a resource, add an entry to the list with `disabled: true`:
 ```yaml
@@ -5251,6 +5253,7 @@ inputs:
 | clonesets | |
 | ippools | |
 | opengaussclusters | |
+| configmaps | |
 
 **Schema**:
 | Key  | Value                        |
