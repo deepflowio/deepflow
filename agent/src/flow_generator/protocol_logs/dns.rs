@@ -480,6 +480,7 @@ impl DnsLog {
                     } else {
                         [Some(0), Some(2)]
                     };
+                    let mut valid = false;
                     for t in tries.iter() {
                         if t.is_none() {
                             continue;
@@ -487,11 +488,16 @@ impl DnsLog {
                         let start = t.unwrap();
                         let end_of_frame = frame.len().min(start + len);
                         if let Ok(mut info) = DnsInfo::parse(&param, &frame[start..end_of_frame]) {
+                            valid = true;
                             info.headers_offset = offset as u32;
                             offset += end_of_frame;
                             all_info.push(info);
                             break;
                         }
+                    }
+                    if !valid {
+                        // didn't find a valid DNS packet, finish parsing
+                        break;
                     }
 
                     if check {
@@ -685,5 +691,23 @@ mod tests {
             );
         }
         dns.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn malformed_packet() {
+        let packet = MetaPacket::empty();
+        let mut pp = ParseParam::new(
+            &packet,
+            Rc::new(RefCell::new(L7PerfCache::new(100))),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        pp.l4_protocol = IpProtocol::TCP;
+
+        let mut dns = DnsLog::default();
+        let _ = dns.parse_payload(&[0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &pp);
     }
 }
