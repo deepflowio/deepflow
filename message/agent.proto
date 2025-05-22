@@ -372,6 +372,8 @@ message DynamicConfig {
 
     optional string secret_key = 20; // secret key for dataplane
     optional string hostname = 21;
+
+    optional string group_id = 22;
 }
 
 message SyncResponse {

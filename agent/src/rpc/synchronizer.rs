@@ -479,6 +479,7 @@ impl Status {
             enabled: None,
             hostname: None,
             agent_type: None,
+            group_id: None,
         })) || updated;
         let wait_ntp = self.ntp_enabled && self.first;
 
@@ -777,6 +778,7 @@ impl Synchronizer {
     async fn on_response(
         remote: (String, u16),
         mut resp: pb::SyncResponse,
+        agent_id: &RwLock<AgentId>,
         agent_state: &AgentState,
         ntp_receiver: &mut watch::Receiver<u64>,
         static_config: &Arc<StaticConfig>,
@@ -815,6 +817,12 @@ impl Synchronizer {
         let mut user_config: UserConfig = user_config.unwrap();
         if let Some(dynamic_config) = resp.dynamic_config.as_ref() {
             user_config.set_dynamic_config(dynamic_config);
+            match &dynamic_config.group_id {
+                Some(id) if !id.is_empty() => {
+                    agent_id.write().group_id = id.to_owned();
+                }
+                _ => (),
+            }
         }
 
         // FIXME: Confirm the kvm resource classification and then cancel the comment
@@ -999,6 +1007,7 @@ impl Synchronizer {
                     Self::on_response(
                         session.get_current_server(),
                         message,
+                        &agent_id,
                         &agent_state,
                         &mut ntp_receiver,
                         &static_config,
@@ -1524,6 +1533,7 @@ impl Synchronizer {
                 Self::on_response(
                     session.get_current_server(),
                     response.unwrap().into_inner(),
+                    &agent_id,
                     &agent_state,
                     &mut ntp_receiver,
                     &static_config,
@@ -1598,7 +1608,9 @@ impl Synchronizer {
     ) {
         while let Ok(new_agent_id) = agent_id_rx.recv().await {
             {
-                *agent_id.write() = new_agent_id;
+                let mut old_id = agent_id.write();
+                old_id.ip = new_agent_id.ip;
+                old_id.mac = new_agent_id.mac;
             }
             {
                 let mut sg = status.write();
