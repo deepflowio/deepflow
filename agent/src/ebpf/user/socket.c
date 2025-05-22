@@ -1219,6 +1219,20 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
+			if (sd->source == DATA_SOURCE_UNIX_SOCKET) {
+				submit_data->tuple.l4_protocol = IPPROTO_TCP;
+				submit_data->tuple.dport = submit_data->tuple.num = 0;
+				// 0:unkonwn 1:client(connect) 2:server(accept)
+				if (sd->socket_role == 1) {
+					submit_data->tuple.dport = 1;
+				} else if (sd->socket_role == 2) {
+					submit_data->tuple.num = 1;
+				}
+				submit_data->tuple.addr_len = 4;
+				*(in_addr_t *)submit_data->tuple.rcv_saddr = htonl(0x7F000001); 
+				*(in_addr_t *)submit_data->tuple.daddr = htonl(0x7F000001);
+			}
+
 			submit_data->need_reconfirm =
 			    need_proto_reconfirm(sd->data_type);
 			submit_data->process_id = sd->tgid;
@@ -2572,6 +2586,8 @@ retry_load:
 		ebpf_info
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
 	}
+
+	ebpf_info("== Unix domain socket ==\n");
 
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
