@@ -242,7 +242,7 @@ impl L7ProtocolParserInterface for MongoDBLog {
             if info.reply_false {
                 self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, &None).map(|(rrt, _)| {
                 info.rrt = rrt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });

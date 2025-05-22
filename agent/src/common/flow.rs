@@ -22,7 +22,6 @@ use std::{
     time::Duration,
 };
 
-use ahash::AHashMap;
 use log::{error, warn};
 use serde::{Serialize, Serializer};
 
@@ -473,36 +472,15 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
     }
 }
 
-#[derive(Serialize, Debug, Default, Clone, Eq, Hash, PartialEq)]
-pub struct L7PerfStatsKey {
-    pub endpoint: Option<String>,
-    pub time_span: u32,
-    pub biz_type: u8,
-}
-
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct FlowPerfStats {
     #[serde(flatten)]
     pub tcp: TcpPerfStats,
-    #[serde(flatten, serialize_with = "serialize_l7_perf_stats")]
-    pub l7: AHashMap<L7PerfStatsKey, L7PerfStats>,
+    #[serde(flatten)]
+    pub l7: L7PerfStats,
     pub l4_protocol: L4Protocol,
     pub l7_protocol: L7Protocol,
     pub l7_failed_count: u32,
-}
-
-pub fn serialize_l7_perf_stats<S>(
-    v: &AHashMap<L7PerfStatsKey, L7PerfStats>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut perf_stats = L7PerfStats::default();
-    for (_, value) in v.iter() {
-        perf_stats.sequential_merge(value);
-    }
-    serializer.serialize_newtype_struct("l7_perf_stats", &perf_stats)
 }
 
 impl FlowPerfStats {
@@ -518,13 +496,7 @@ impl FlowPerfStats {
         self.l7_failed_count = self.l7_failed_count.max(other.l7_failed_count);
 
         self.tcp.sequential_merge(&other.tcp);
-        for (key, value) in other.l7.iter() {
-            if let Some(l7) = self.l7.get_mut(key) {
-                l7.sequential_merge(&value);
-            } else {
-                self.l7.insert(key.clone(), value.clone());
-            }
-        }
+        self.l7.sequential_merge(&other.l7);
     }
 
     pub fn reverse(&mut self) {
@@ -552,13 +524,9 @@ impl fmt::Display for FlowPerfStats {
 
 impl From<FlowPerfStats> for flow_log::FlowPerfStats {
     fn from(p: FlowPerfStats) -> Self {
-        let mut l7 = L7PerfStats::default();
-        for (_, stats) in p.l7.iter() {
-            l7.sequential_merge(stats);
-        }
         flow_log::FlowPerfStats {
             tcp: Some(p.tcp.into()),
-            l7: Some(l7.into()),
+            l7: Some(p.l7.into()),
             l4_protocol: p.l4_protocol as u32,
             l7_protocol: p.l7_protocol as u32,
             l7_failed_count: p.l7_failed_count,
@@ -1008,8 +976,6 @@ pub struct Flow {
     pub otel_service: Option<String>,
     #[serde(skip)]
     pub otel_instance: Option<String>,
-    #[serde(skip)]
-    pub last_endpoint: Option<String>,
     pub direction_score: u8,
     pub pod_id: u32,
     pub request_domain: String,

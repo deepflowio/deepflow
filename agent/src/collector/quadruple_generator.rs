@@ -35,7 +35,6 @@ use super::{
     MetricsType, QgStats,
 };
 
-use crate::common::flow::L7PerfStats;
 use crate::common::{
     endpoint::EPC_INTERNET,
     enums::{CaptureNetworkType, EthernetType, IpProtocol},
@@ -1087,10 +1086,8 @@ impl QuadrupleGenerator {
             Some(s) => s,
             None => return flow_meter,
         };
-        let mut l7_perf_stats = L7PerfStats::default();
-        for (_, l7_stats) in stats.l7.iter() {
-            l7_perf_stats.sequential_merge(l7_stats);
-        }
+        let l7_perf_stats = &stats.l7;
+
         match (stats.l7_protocol, tagged_flow.flow.signal_source) {
             (
                 L7Protocol::Unknown,

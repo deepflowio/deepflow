@@ -659,7 +659,7 @@ impl L7ProtocolParserInterface for ZmtpLog {
                     }
                     _ => {}
                 }
-                info.cal_rrt(param).map(|rtt| {
+                info.cal_rrt(param, &None).map(|(rtt, _)| {
                     info.rtt = rtt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                 });

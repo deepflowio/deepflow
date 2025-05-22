@@ -23,7 +23,6 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
-use ahash::AHashMap;
 use flate2::{read::GzDecoder, write::ZlibEncoder, Compression};
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use http::HeaderMap;
@@ -400,6 +399,7 @@ fn fill_l7_stats(
         ip1 = ip;
         flow.directions = [Direction::None, Direction::None];
     }
+    let mut last_endpoint = None;
     for attr in &span.attributes {
         match attr.key.as_str() {
             // According to https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/
@@ -469,13 +469,13 @@ fn fill_l7_stats(
             }
             _ => {}
         }
-    }
-    match l7_protocol {
-        L7Protocol::Http1 | L7Protocol::Http2 => {
-            flow.last_endpoint = Some(handle_endpoint(log_parser_config.as_ref(), &span.name))
-        }
-        _ => {
-            flow.last_endpoint = Some(span.name.clone());
+        match l7_protocol {
+            L7Protocol::Http1 | L7Protocol::Http2 => {
+                last_endpoint = Some(handle_endpoint(log_parser_config.as_ref(), &span.name))
+            }
+            _ => {
+                last_endpoint = Some(span.name.clone());
+            }
         }
     }
 
@@ -530,7 +530,7 @@ fn fill_l7_stats(
     };
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
-        l7: AHashMap::new(),
+        l7: Default::default(),
         l4_protocol,
         l7_protocol,
         ..Default::default()
@@ -555,14 +555,13 @@ fn fill_l7_stats(
     peer_dst.nat_real_ip = flow.flow_key.ip_dst;
     flow.flow_key.tap_type = CaptureNetworkType::Cloud;
     let flow_stat_time = flow.flow_stat_time;
-    let flow_endpoint = flow.last_endpoint.clone();
     let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow = flow;
     let mut allocator = Allocator::new(1);
     L7Stats {
         stats,
         flow: Some(Arc::new(allocator.allocate_one_with(tagged_flow))),
-        endpoint: flow_endpoint,
+        endpoint: last_endpoint,
         flow_id,
         l7_protocol,
         signal_source: SignalSource::OTel,
