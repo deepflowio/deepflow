@@ -56,6 +56,7 @@ fn main() {
         ip: Ipv4Addr::UNSPECIFIED.into(),
         mac: Default::default(),
         team_id: "example-team".to_owned(),
+        group_id: "example-group".to_owned(),
     }));
 
     let executor = Executor::new(agent_id, session, runtime, exc);

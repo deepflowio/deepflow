@@ -350,15 +350,30 @@ pub struct AgentId {
     pub ip: IpAddr,
     pub mac: MacAddr,
     pub team_id: String,
+    pub group_id: String,
+}
+
+impl Default for AgentId {
+    fn default() -> Self {
+        Self {
+            ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            mac: Default::default(),
+            team_id: Default::default(),
+            group_id: Default::default(),
+        }
+    }
 }
 
 impl fmt::Display for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.team_id.is_empty() {
-            write!(f, "{}/{}", self.ip, self.mac)
-        } else {
-            write!(f, "{}/{}/{}", self.ip, self.mac, self.team_id)
+        write!(f, "{}/{}", self.ip, self.mac)?;
+        if !self.team_id.is_empty() {
+            write!(f, "/team={}", self.team_id)?;
         }
+        if !self.group_id.is_empty() {
+            write!(f, "/group={}", self.group_id)?;
+        }
+        Ok(())
     }
 }
 
@@ -368,6 +383,7 @@ impl From<&AgentId> for agent::AgentId {
             ip: Some(id.ip.to_string()),
             mac: Some(id.mac.to_string()),
             team_id: Some(id.team_id.clone()),
+            group_id: Some(id.group_id.clone()),
         }
     }
 }
@@ -649,6 +665,7 @@ impl Trident {
                 ip: ctrl_ip.clone(),
                 mac: ctrl_mac,
                 team_id: config_handler.static_config.team_id.clone(),
+                group_id: config_handler.static_config.vtap_group_id_request.clone(),
             }
         } else {
             // use host ip/mac as agent id if not in sidecar mode
@@ -667,6 +684,7 @@ impl Trident {
                 ip,
                 mac,
                 team_id: config_handler.static_config.team_id.clone(),
+                group_id: config_handler.static_config.vtap_group_id_request.clone(),
             }
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
@@ -674,6 +692,7 @@ impl Trident {
             ip: ctrl_ip.clone(),
             mac: ctrl_mac,
             team_id: config_handler.static_config.team_id.clone(),
+            group_id: config_handler.static_config.vtap_group_id_request.clone(),
         };
 
         info!(
@@ -767,7 +786,6 @@ impl Trident {
             session.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
-            config_handler.static_config.team_id.clone(),
             sidecar_mode,
             agent_id_tx,
         );
@@ -1459,7 +1477,6 @@ pub struct DomainNameListener {
     session: Arc<Session>,
     ips: Vec<String>,
     domain_names: Vec<String>,
-    team_id: String,
 
     sidecar_mode: bool,
 
@@ -1476,7 +1493,6 @@ impl DomainNameListener {
         session: Arc<Session>,
         domain_names: Vec<String>,
         ips: Vec<String>,
-        team_id: String,
         sidecar_mode: bool,
         agent_id_tx: Arc<broadcast::Sender<AgentId>>,
     ) -> DomainNameListener {
@@ -1485,7 +1501,6 @@ impl DomainNameListener {
             session,
             domain_names,
             ips,
-            team_id,
             sidecar_mode,
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -1518,7 +1533,6 @@ impl DomainNameListener {
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
-        let team_id = self.team_id.clone();
         let stopped = self.stopped.clone();
         let agent_id_tx = self.agent_id_tx.clone();
         let session = self.session.clone();
@@ -1571,7 +1585,7 @@ impl DomainNameListener {
                             );
                             #[cfg(target_os = "linux")]
                             let agent_id = if sidecar_mode {
-                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() }
+                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, ..Default::default() }
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
                                 if let Err(e) = netns::NsFile::Root.open_and_setns() {
@@ -1593,10 +1607,10 @@ impl DomainNameListener {
                                     crate::utils::notify_exit(1);
                                     continue;
                                 }
-                                AgentId { ip, mac, team_id: team_id.clone() }
+                                AgentId { ip, mac, ..Default::default() }
                             };
                             #[cfg(any(target_os = "windows", target_os = "android"))]
-                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, team_id: team_id.clone() };
+                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, ..Default::default() };
 
                             session.reset_server_ip(ips.clone());
                             let _ = agent_id_tx.send(agent_id);
