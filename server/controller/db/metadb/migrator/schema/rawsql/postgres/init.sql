@@ -886,6 +886,42 @@ COMMENT ON COLUMN pod.env IS 'separated by ,';
 COMMENT ON COLUMN pod.container_ids IS 'separated by ,';
 COMMENT ON COLUMN pod.state IS '0.Exception 1.Running';
 
+CREATE TABLE IF NOT EXISTS config_map (
+    id                  SERIAL PRIMARY KEY,
+    name                VARCHAR(256) NOT NULL,
+    data                TEXT COMMENT 'yaml',
+    data_hash           VARCHAR(64) DEFAULT '',
+    pod_namespace_id    INTEGER NOT NULL,
+    pod_cluster_id      INTEGER NOT NULL,
+    epc_id              INTEGER NOT NULL,
+    az                  VARCHAR(64) DEFAULT '',
+    region              VARCHAR(64) DEFAULT '',
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              CHAR(64) NOT NULL,
+    lcuuid              CHAR(64) NOT NULL,
+    synced_at           TIMESTAMP DEFAULT NULL,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          TIMESTAMP DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE config_map;
+CREATE INDEX config_map_data_hash_index ON config_map (data_hash);
+CREATE INDEX config_map_domain_index ON config_map (domain);
+
+CREATE TABLE IF NOT EXISTS pod_group_config_map_connection (
+    id                  SERIAL PRIMARY KEY,
+    pod_group_id        INTEGER NOT NULL,
+    config_map_id   INTEGER NOT NULL,
+    sub_domain          VARCHAR(64) DEFAULT '',
+    domain              CHAR(64) NOT NULL,
+    lcuuid              CHAR(64) NOT NULL,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE pod_group_config_map_connection;
+CREATE INDEX pod_group_config_map_connection_pod_group_id_index ON pod_group_config_map_connection (pod_group_id);
+CREATE INDEX pod_group_config_map_connection_config_map_id_index ON pod_group_config_map_connection (config_map_id);
+
 CREATE TABLE IF NOT EXISTS process (
     id                  SERIAL PRIMARY KEY,
     name                TEXT,
