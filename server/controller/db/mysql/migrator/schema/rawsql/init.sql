@@ -830,6 +830,10 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL COMMENT '1: Deployment 2: StatefulSet 3: ReplicationController',
     pod_num             INTEGER DEFAULT 1,
     label               TEXT COMMENT 'separated by ,',
+    metadata            TEXT COMMENT 'yaml',
+    metadata_hash       CHAR(64) DEFAULT '',
+    spec                TEXT COMMENT 'yaml',
+    spec_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
     az                  CHAR(64) DEFAULT '',
@@ -872,6 +876,10 @@ CREATE TABLE IF NOT EXISTS pod_service (
     selector            TEXT COMMENT 'separated by ,',
     external_ip         TEXT COMMENT 'separated by ,',
     service_cluster_ip  CHAR(64) DEFAULT '',
+    metadata            TEXT COMMENT 'yaml',
+    metadata_hash       CHAR(64) DEFAULT '',
+    spec                TEXT COMMENT 'yaml',
+    spec_hash           CHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -2661,3 +2669,39 @@ CREATE TABLE IF NOT EXISTS custom_service (
     UNIQUE INDEX name_index(name)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE custom_service;
+
+CREATE TABLE IF NOT EXISTS config_map (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name                VARCHAR(256) NOT NULL,
+    data                TEXT COMMENT 'yaml',
+    data_hash           CHAR(64) DEFAULT '',
+    pod_namespace_id    INTEGER NOT NULL,
+    pod_cluster_id      INTEGER NOT NULL,
+    epc_id              INTEGER NOT NULL,
+    az                  CHAR(64) DEFAULT '',
+    region              CHAR(64) DEFAULT '',
+    sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) NOT NULL,
+    lcuuid              CHAR(64) NOT NULL,
+    synced_at           DATETIME DEFAULT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          DATETIME DEFAULT NULL,
+    INDEX data_hash_index(data_hash),
+    INDEX domain_index(domain)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE config_map;
+
+CREATE TABLE IF NOT EXISTS pod_group_config_map_connection (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    pod_group_id        INTEGER NOT NULL,
+    config_map_id   INTEGER NOT NULL,
+    sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) NOT NULL,
+    lcuuid              CHAR(64) NOT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX pod_group_id_index(pod_group_id),
+    INDEX config_map_id_index(config_map_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE pod_group_config_map_connection;
