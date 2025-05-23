@@ -54,6 +54,7 @@ func NewChOSAppTags() *ChOSAppTags {
 		),
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyPID)
 	return mng
 }
 

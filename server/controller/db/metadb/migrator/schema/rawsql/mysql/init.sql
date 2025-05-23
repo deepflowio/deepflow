@@ -1982,7 +1982,7 @@ TRUNCATE TABLE ch_vtap;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `l3_epc_id`        INTEGER,
     `pod_ns_id`        INTEGER,
@@ -2279,7 +2279,7 @@ TRUNCATE TABLE dial_test_task;
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
     `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
+    `key`           VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`         VARCHAR(256),
     `team_id`       INTEGER,
     `domain_id`     INTEGER,
@@ -2290,7 +2290,7 @@ TRUNCATE TABLE ch_chost_cloud_tag;
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `team_id`          INTEGER,
     `domain_id`        INTEGER,
@@ -2321,7 +2321,7 @@ TRUNCATE TABLE ch_pod_ns_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
     `pid`              INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `team_id`          INTEGER,
     `domain_id`        INTEGER,
@@ -2356,7 +2356,7 @@ TRUNCATE TABLE ch_gprocess;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `l3_epc_id`        INTEGER,
     `pod_ns_id`        INTEGER,
@@ -2382,7 +2382,7 @@ TRUNCATE TABLE ch_pod_service_k8s_labels;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `l3_epc_id`        INTEGER,
     `pod_ns_id`        INTEGER,
@@ -2408,7 +2408,7 @@ TRUNCATE TABLE ch_pod_k8s_annotations;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `l3_epc_id`        INTEGER,
     `pod_ns_id`        INTEGER,
@@ -2509,7 +2509,7 @@ INSERT INTO resource_version (name, version) VALUES ('prometheus', @prometheus_v
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL,
+    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `l3_epc_id`        INTEGER,
     `pod_ns_id`        INTEGER,
@@ -2659,3 +2659,34 @@ CREATE TABLE IF NOT EXISTS custom_service (
     UNIQUE INDEX name_index(name)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE custom_service;
+
+-- Insert data with an ID of 0 to trigger clickhouse synchronization, the synchronization framwork for these tables is tagrecorder subscriber
+INSERT INTO ch_device (deviceid, devicetype) VALUES (0, 0);
+INSERT INTO ch_az (id) VALUES (0);
+INSERT INTO ch_chost (id) VALUES (0);
+INSERT INTO ch_l3_epc (id) VALUES (0);
+INSERT INTO ch_subnet (id) VALUES (0);
+INSERT INTO ch_pod_cluster (id) VALUES (0);
+INSERT INTO ch_pod_ns (id) VALUES (0);
+INSERT INTO ch_pod_node (id) VALUES (0);
+INSERT INTO ch_pod_ingress (id) VALUES (0);
+INSERT INTO ch_pod_service (id) VALUES (0);
+INSERT INTO ch_pod_group (id) VALUES (0);
+INSERT INTO ch_pod (id) VALUES (0);
+INSERT INTO ch_gprocess (id) VALUES (0);
+INSERT INTO ch_chost_cloud_tag (id, `key`) VALUES (0, '');
+INSERT INTO ch_chost_cloud_tags (id) VALUES (0);
+INSERT INTO ch_pod_ns_cloud_tag (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_ns_cloud_tags (id) VALUES (0);
+INSERT INTO ch_pod_service_k8s_label (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_service_k8s_labels (id) VALUES (0);
+INSERT INTO ch_pod_service_k8s_annotation (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_service_k8s_annotations (id) VALUES (0);
+INSERT INTO ch_pod_k8s_env (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_envs (id) VALUES (0);
+INSERT INTO ch_pod_k8s_label (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_labels (id) VALUES (0);
+INSERT INTO ch_pod_k8s_annotation (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_annotations (id) VALUES (0);
+INSERT INTO ch_os_app_tag (pid, `key`) VALUES (0, '');
+INSERT INTO ch_os_app_tags (pid) VALUES (0);
