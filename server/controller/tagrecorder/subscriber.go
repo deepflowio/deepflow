@@ -17,8 +17,10 @@
 package tagrecorder
 
 import (
+	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
@@ -94,9 +96,17 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 	return ss
 }
 
+func (m *SubscriberManager) GetSubscriber(resourceType string) Subscriber {
+	for _, s := range m.subscribers {
+		if s.GetSubResourceType() == resourceType {
+			return s
+		}
+	}
+	return nil
+}
+
 func (c *SubscriberManager) getSubscribers() []Subscriber {
 	subscribers := []Subscriber{
-		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChVMDevice(c.resourceTypeToIconID),
 		NewChHostDevice(c.resourceTypeToIconID),
 		NewChVRouterDevice(c.resourceTypeToIconID),
@@ -112,49 +122,52 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChPodClusterDevice(c.resourceTypeToIconID),
 		NewChProcessDevice(c.resourceTypeToIconID),
 		NewChCustomServiceDevice(c.resourceTypeToIconID),
-		NewChOSAppTag(),
-		NewChOSAppTags(),
-		NewChPodK8sLabel(),
-		NewChPodK8sLabels(),
-		NewChPodK8sAnnotation(),
-		NewChPodK8sAnnotations(),
-		NewChPodK8sEnv(),
-		NewChPodK8sEnvs(),
-		NewChChostCloudTag(),
-		NewChChostCloudTags(),
-		NewChNetwork(c.resourceTypeToIconID),
+
+		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChChost(),
-		NewChGProcess(c.resourceTypeToIconID),
 		NewChVPC(c.resourceTypeToIconID),
+		NewChNetwork(c.resourceTypeToIconID),
 		NewChPodCluster(c.resourceTypeToIconID),
-		NewChPod(c.resourceTypeToIconID),
-		NewChPodGroup(c.resourceTypeToIconID),
-		NewChPodIngress(),
 		NewChPodNode(c.resourceTypeToIconID),
 		NewChPodNamespace(c.resourceTypeToIconID),
+		NewChPodIngress(),
 		NewChPodService(),
+		NewChPodGroup(c.resourceTypeToIconID),
+		NewChPod(c.resourceTypeToIconID),
+		NewChGProcess(c.resourceTypeToIconID),
 
-		NewChPodServiceK8sAnnotation(),
-		NewChPodServiceK8sAnnotations(),
+		NewChChostCloudTag(),
+		NewChChostCloudTags(),
 		NewChPodNSCloudTag(),
 		NewChPodNSCloudTags(),
 		NewChPodServiceK8sLabel(),
 		NewChPodServiceK8sLabels(),
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodK8sEnv(),
+		NewChPodK8sEnvs(),
+		NewChPodK8sLabel(),
+		NewChPodK8sLabels(),
+		NewChPodK8sAnnotation(),
+		NewChPodK8sAnnotations(),
+		NewChOSAppTag(),
+		NewChOSAppTags(),
 	}
 	return subscribers
 }
 
 type Subscriber interface {
-	Subscribe()
-	SetConfig(config.ControllerConfig)
-	GetSubResourceType() string
 	pubsub.ResourceBatchAddedSubscriber
 	pubsub.ResourceUpdatedSubscriber
 	pubsub.ResourceBatchDeletedSubscriber
+
+	Subscribe()
+	SetConfig(config.ControllerConfig)
+	GetSubResourceType() string
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
-	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB)
+	updateSyncTriggerFlag(md *message.Metadata, db *metadb.DB)
 }
 
 type SubscriberDataGenerator[
@@ -166,7 +179,7 @@ type SubscriberDataGenerator[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(int, MUPT, *metadb.DB)
@@ -182,7 +195,7 @@ type SubscriberComponent[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ] struct {
 	cfg config.ControllerConfig
 
@@ -191,6 +204,8 @@ type SubscriberComponent[
 	dbOperator          operator[CT, KT]
 	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
 	hookers             map[int]interface{}
+
+	syncTriggerKeyInChTable string // ch 表中有一条 value 为 0 的数据用于触发 ck 同步，此字段标识 value 的 key 是什么，默认 key 为 id
 }
 
 func newSubscriberComponent[
@@ -202,14 +217,15 @@ func newSubscriberComponent[
 	MDT msgconstraint.Delete,
 	MT constraint.MySQLModel,
 	CT MySQLChModel,
-	KT ChModelKey,
+	KT SubscriberChModelKey,
 ](
 	sourceResourceTypeName, resourceTypeName string,
 ) SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT] {
 	s := SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]{
-		subResourceTypeName: sourceResourceTypeName,
-		resourceTypeName:    resourceTypeName,
-		hookers:             make(map[int]interface{}),
+		subResourceTypeName:     sourceResourceTypeName,
+		resourceTypeName:        resourceTypeName,
+		hookers:                 make(map[int]interface{}),
+		syncTriggerKeyInChTable: "id",
 	}
 	s.initDBOperator()
 	return s
@@ -239,8 +255,8 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 	s.dbOperator.setConfig(cfg)
 }
 
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetIconInfo(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {
-
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetSyncTriggerKeyInChTable(key string) {
+	s.syncTriggerKeyInChTable = key
 }
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
@@ -259,6 +275,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	}
 	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -269,6 +286,30 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
+	s.updateSyncTriggerFlag(md, db)
+}
+
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateOrSync(db *metadb.DB, key KT, updateInfo map[string]interface{}) {
+	condMap := KeyToMap(key)
+	if len(condMap) == 0 {
+		log.Errorf("% key is empty: %v", s.resourceTypeName, key, db.LogPrefixORGID)
+		return
+	}
+	query := db.GetGORMDB()
+	for k, v := range condMap {
+		query = query.Where(fmt.Sprintf("`%s` = ?", k), v)
+	}
+	var chItem CT
+	if err := query.First(&chItem).Error; err != nil {
+		log.Errorf("failed to get %s by key %v: %v", s.resourceTypeName, key, err, db.LogPrefixORGID)
+		return
+	}
+	if len(updateInfo) == 0 {
+		updateInfo = map[string]interface{}{
+			"updated_at": time.Now(), // use update_at as synchronize time
+		}
+	}
+	s.dbOperator.update(chItem, updateInfo, key, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
@@ -297,9 +338,8 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		log.Infof("soft delete (values: %#v) success", chItems, db.LogPrefixORGID)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
-		s.ResourceUpdateAtInfoUpdated(md, db)
 	}
-
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Delete resource by domain
@@ -312,7 +352,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Delete resource by sub domain
@@ -325,7 +365,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
-	s.ResourceUpdateAtInfoUpdated(md, db)
+	s.updateSyncTriggerFlag(md, db)
 }
 
 // Update team_id of resource by sub domain
@@ -340,11 +380,14 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	}
 }
 
-// Update updated_at when resource is deleted
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *metadb.DB) {
-	var updateItems []MT
-	err := db.Unscoped().First(&updateItems).Error
+// updateSyncTriggerFlag updates the updated_at field of the sync trigger item in the CH table
+// to trigger the sync of the corresponding resource in ClickHouse.
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateSyncTriggerFlag(md *message.Metadata, db *metadb.DB) {
+	var syncTriggerItem CT
+	err := db.Where(fmt.Sprintf("%s = ?", s.syncTriggerKeyInChTable), 0).First(&syncTriggerItem).Error
 	if err == nil {
-		db.Save(updateItems)
+		db.Save(&syncTriggerItem)
+	} else {
+		log.Errorf("update %s updated_at error: %v", s.resourceTypeName, err, db.LogPrefixORGID)
 	}
 }

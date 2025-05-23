@@ -26,6 +26,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
+const (
+	syncTriggerKeyDeviceID = "deviceid"
+)
+
 type ChVMDevice struct {
 	SubscriberComponent[
 		*message.VMAdd,
@@ -59,6 +63,7 @@ func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID) // TODO: abstract
 	return mng
 }
 
@@ -159,6 +164,7 @@ func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -260,6 +266,7 @@ func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -343,6 +350,7 @@ func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -426,6 +434,7 @@ func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -513,6 +522,7 @@ func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -598,6 +608,7 @@ func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstance
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -683,6 +694,7 @@ func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInst
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -768,6 +780,7 @@ func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -863,6 +876,7 @@ func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -945,6 +959,7 @@ func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -1028,6 +1043,7 @@ func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -1119,6 +1135,7 @@ func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -1202,6 +1219,7 @@ func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 
@@ -1286,6 +1304,7 @@ func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomSer
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.SetSyncTriggerKeyInChTable(syncTriggerKeyDeviceID)
 	return mng
 }
 

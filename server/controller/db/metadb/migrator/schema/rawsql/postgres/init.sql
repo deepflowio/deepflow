@@ -2797,3 +2797,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS custom_service_name_idx ON custom_service(name
 COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT';
 COMMENT ON COLUMN custom_service.domain IS 'reserved for backend';
 COMMENT ON COLUMN custom_service.resource IS 'separated by ,';
+
+-- Insert data with an ID of 0 to trigger clickhouse synchronization, the synchronization framwork for these tables is tagrecorder subscriber
+INSERT INTO ch_device (deviceid, devicetype) VALUES (0, 0);
+INSERT INTO ch_az (id) VALUES (0);
+INSERT INTO ch_chost (id) VALUES (0);
+INSERT INTO ch_l3_epc (id) VALUES (0);
+INSERT INTO ch_subnet (id) VALUES (0);
+INSERT INTO ch_pod_cluster (id) VALUES (0);
+INSERT INTO ch_pod_ns (id) VALUES (0);
+INSERT INTO ch_pod_node (id) VALUES (0);
+INSERT INTO ch_pod_ingress (id) VALUES (0);
+INSERT INTO ch_pod_service (id) VALUES (0);
+INSERT INTO ch_pod_group (id) VALUES (0);
+INSERT INTO ch_pod (id) VALUES (0);
+INSERT INTO ch_gprocess (id) VALUES (0);
+INSERT INTO ch_chost_cloud_tag (id, `key`) VALUES (0, '');
+INSERT INTO ch_chost_cloud_tags (id) VALUES (0);
+INSERT INTO ch_pod_ns_cloud_tag (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_ns_cloud_tags (id) VALUES (0);
+INSERT INTO ch_pod_service_k8s_label (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_service_k8s_labels (id) VALUES (0);
+INSERT INTO ch_pod_service_k8s_annotation (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_service_k8s_annotations (id) VALUES (0);
+INSERT INTO ch_pod_k8s_env (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_envs (id) VALUES (0);
+INSERT INTO ch_pod_k8s_label (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_labels (id) VALUES (0);
+INSERT INTO ch_pod_k8s_annotation (id, `key`) VALUES (0, '');
+INSERT INTO ch_pod_k8s_annotations (id) VALUES (0);
+INSERT INTO ch_os_app_tag (pid, `key`) VALUES (0, '');
+INSERT INTO ch_os_app_tags (pid) VALUES (0);

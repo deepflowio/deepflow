@@ -69,11 +69,12 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChAZ
-		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
-		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
-	}
+	a.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
+	// if len(updateInfo) > 0 {
+	// 	var chItem metadbmodel.ChAZ
+	// 	db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
+	// 	a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
+	// }
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
@@ -98,7 +99,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *metadbmodel.AZ) (keys []
 		name += " (deleted)"
 	}
 	targets = append(targets, metadbmodel.ChAZ{
-		ID:       az.ID,
+		ChIDBase: metadbmodel.ChIDBase{ID: az.ID},
 		Name:     name,
 		IconID:   iconID,
 		TeamID:   md.TeamID,

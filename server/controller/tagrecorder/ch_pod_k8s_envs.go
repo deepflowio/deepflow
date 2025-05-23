@@ -33,7 +33,7 @@ type ChPodK8sEnvs struct {
 		message.PodDelete,
 		metadbmodel.Pod,
 		metadbmodel.ChPodK8sEnvs,
-		K8sEnvsKey,
+		IDKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 			message.PodDelete,
 			metadbmodel.Pod,
 			metadbmodel.ChPodK8sEnvs,
-			K8sEnvsKey,
+			IDKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ENVS,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ENVS,
 		),
 	}
 	mng.subscriberDG = mng
@@ -65,29 +65,30 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 		envs, _ := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
 		updateInfo["envs"] = envs
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChPodK8sEnvs
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sEnvsKey{{ID: sourceID}},
-				[]metadbmodel.ChPodK8sEnvs{{ID: sourceID, Envs: updateInfo["envs"].(string)}},
+				[]IDKey{targetKey},
+				[]metadbmodel.ChPodK8sEnvs{{
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID}, Envs: updateInfo["envs"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sEnvsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *metadbmodel.Pod) (keys []K8sEnvsKey, targets []metadbmodel.ChPodK8sEnvs) {
-	if item.ENV == "" {
+func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKey, targets []metadbmodel.ChPodK8sEnvs) {
+	if source.ENV == "" {
 		return
 	}
-	envs, _ := common.StrToJsonAndMap(item.ENV)
-	return []K8sEnvsKey{{ID: item.ID}}, []metadbmodel.ChPodK8sEnvs{{
-		ID:          item.ID,
+	envs, _ := common.StrToJsonAndMap(source.ENV)
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sEnvs{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Envs:        envs,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
