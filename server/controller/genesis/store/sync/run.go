@@ -416,7 +416,7 @@ func (g *GenesisSync) Start() {
 				continue
 			}
 
-			log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.Peer, info.VtapID, info.MessageType, info.Message, logger.NewORGPrefix(info.ORGID))
+			log.Debugf("sync received (%s) vtap_id (%v) type (%v) workload resource enabled (%t) received (%s)|(%s)", info.Peer, info.VtapID, info.MessageType, info.WorkloadResourceEnabled, info.Message, info.AgentMessage, logger.NewORGPrefix(info.ORGID))
 
 			vtap := fmt.Sprintf("%d%d", info.ORGID, info.VtapID)
 			if info.MessageType == common.TYPE_RENEW {
@@ -443,11 +443,11 @@ func (g *GenesisSync) Start() {
 					agentType := info.AgentMessage.GetAgentType()
 					switch agentType {
 					case agent.AgentType_TT_PHYSICAL_MACHINE:
-						genesisSyncData = vUpdater.UnmarshalAgentWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.AgentMessage)
+						genesisSyncData = vUpdater.UnmarshalAgentWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.WorkloadResourceEnabled, info.AgentMessage)
 					case agent.AgentType_TT_PUBLIC_CLOUD:
-						genesisSyncData = vUpdater.UnmarshalAgentWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.AgentMessage)
+						genesisSyncData = vUpdater.UnmarshalAgentWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.WorkloadResourceEnabled, info.AgentMessage)
 					case agent.AgentType_TT_HOST_POD, agent.AgentType_TT_VM_POD, agent.AgentType_TT_K8S_SIDECAR:
-						genesisSyncData = vUpdater.UnmarshalAgentKubernetesProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.AgentMessage)
+						genesisSyncData = vUpdater.UnmarshalAgentKubernetesProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.WorkloadResourceEnabled, info.AgentMessage)
 					default:
 						genesisSyncData = vUpdater.UnmarshalAgentProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.AgentMessage)
 					}

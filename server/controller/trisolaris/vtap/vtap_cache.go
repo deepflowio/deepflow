@@ -216,6 +216,7 @@ type VTapCache struct {
 	exceptions         int64
 	vTapLcuuid         *string
 	vTapGroupLcuuid    *string
+	vTapGroupShortID   *string
 	cpuNum             int
 	memorySize         int64
 	arch               *string
@@ -284,7 +285,7 @@ func (c *VTapCache) String() string {
 		"{id: %d, name: %s, rawHostname: %s, state: %d, enable: %d, vTapType: %d, "+
 			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
 			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
-			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, licenseType: %d, "+
+			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, vTapGroupShortID: %s, licenseType: %d, "+
 			"tapMode: %d, teamID: %d, organizeID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
 			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
 			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
@@ -293,7 +294,7 @@ func (c *VTapCache) String() string {
 		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.GetVTapState(), c.GetVTapEnabled(), c.GetVTapType(),
 		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
 		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
-		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.GetLicenseType(),
+		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.GetVTapGroupShortID(), c.GetLicenseType(),
 		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
 		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
 		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
@@ -330,6 +331,7 @@ func NewVTapCache(vtap *mysqlmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.exceptions = vtap.Exceptions
 	vTapCache.vTapLcuuid = proto.String(vtap.VTapLcuuid)
 	vTapCache.vTapGroupLcuuid = proto.String(vtap.VtapGroupLcuuid)
+	vTapCache.vTapGroupShortID = proto.String(vTapInfo.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 	vTapCache.cpuNum = vtap.CPUNum
 	vTapCache.memorySize = vtap.MemorySize
 	vTapCache.arch = proto.String(vtap.Arch)
@@ -795,8 +797,19 @@ func (c *VTapCache) GetVTapGroupLcuuid() string {
 	return ""
 }
 
+func (c *VTapCache) GetVTapGroupShortID() string {
+	if c.vTapGroupShortID != nil {
+		return *c.vTapGroupShortID
+	}
+	return ""
+}
+
 func (c *VTapCache) updateVTapGroupLcuuid(lcuuid string) {
 	c.vTapGroupLcuuid = &lcuuid
+}
+
+func (c *VTapCache) updateVTapGroupShortID(shortID string) {
+	c.vTapGroupShortID = &shortID
 }
 
 func (c *VTapCache) getPodDomains() []string {
@@ -1335,6 +1348,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *mysqlmodel.VTap) {
 	// 采集器组变化 重新生成平台数据
 	if c.GetVTapGroupLcuuid() != vtap.VtapGroupLcuuid {
 		c.updateVTapGroupLcuuid(vtap.VtapGroupLcuuid)
+		c.updateVTapGroupShortID(v.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 		v.setVTapChangedForPD()
 	}
 	c.updateVTapConfigFromDB()
