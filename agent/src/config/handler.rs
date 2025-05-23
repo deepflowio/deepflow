@@ -51,7 +51,7 @@ use super::{
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
         RequestLogTunning, SessionTimeout, TagFilterOperator, UserConfig,
     },
-    ConfigError, KubernetesPollerType,
+    ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
@@ -232,6 +232,7 @@ pub struct SenderConfig {
     pub npb_socket_type: agent::SocketType,
     pub multiple_sockets_to_ingester: bool,
     pub max_throughput_to_ingester: u64, // unit: Mbps
+    pub ingester_traffic_overflow_action: TrafficOverflowAction,
     pub collector_socket_type: agent::SocketType,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -1748,6 +1749,10 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .throughput_monitoring_interval,
                 multiple_sockets_to_ingester: conf.outputs.socket.multiple_sockets_to_ingester,
                 max_throughput_to_ingester: conf.global.communication.max_throughput_to_ingester,
+                ingester_traffic_overflow_action: conf
+                    .global
+                    .communication
+                    .ingester_traffic_overflow_action,
                 collector_socket_type: conf.outputs.socket.data_socket_type,
                 standalone_data_file_size: conf.global.standalone_mode.max_data_file_size,
                 standalone_data_file_dir: conf.global.standalone_mode.data_file_dir.clone(),
@@ -3874,6 +3879,17 @@ impl ConfigHandler {
                 new_communication.max_throughput_to_ingester
             );
             communication.max_throughput_to_ingester = new_communication.max_throughput_to_ingester;
+        }
+        if communication.ingester_traffic_overflow_action
+            != new_communication.ingester_traffic_overflow_action
+        {
+            info!(
+                "Update global.communication.ingester_traffic_overflow_action from {:?} to {:?}.",
+                communication.ingester_traffic_overflow_action,
+                new_communication.ingester_traffic_overflow_action
+            );
+            communication.ingester_traffic_overflow_action =
+                new_communication.ingester_traffic_overflow_action;
         }
         if communication.ingester_ip != new_communication.ingester_ip {
             info!(

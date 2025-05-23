@@ -30,12 +30,18 @@ use std::time::{Duration, Instant, SystemTime};
 use arc_swap::access::Access;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
-use public::sender::{SendMessageType, Sendable};
+use public::{
+    leaky_bucket::LeakyBucket,
+    sender::{SendMessageType, Sendable},
+};
 use rand::{thread_rng, RngCore};
 
 use super::{get_sender_id, QUEUE_BATCH_SIZE};
 
-use crate::config::handler::SenderAccess;
+use crate::config::{
+    handler::{SenderAccess, SenderConfig},
+    TrafficOverflowAction,
+};
 use crate::exception::ExceptionHandler;
 use crate::trident::SenderEncoder;
 use crate::utils::stats::{
@@ -45,6 +51,7 @@ use public::proto::agent::{Exception, SocketType};
 use public::queue::{Error, Receiver};
 
 const PRE_FILE_SUFFIX: &str = ".pre";
+const MAX_WAIT_TIMES: u32 = 100;
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {
@@ -53,6 +60,7 @@ pub struct SenderCounter {
     pub tx: AtomicU64,
     pub tx_bytes: AtomicU64,
     pub dropped: AtomicU64,
+    pub waited: AtomicU64,
 }
 
 impl RefCountable for SenderCounter {
@@ -88,6 +96,11 @@ impl RefCountable for SenderCounter {
                 "dropped",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.dropped.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "waited",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.waited.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -153,10 +166,10 @@ impl<T: Sendable> Encoder<T> {
                 version: HEADER_VESION,
                 team_id: 0,
                 organization_id: 0,
-                agent_id: agent_id,
+                agent_id,
                 reserved_1: 0,
                 reserved_2: 0,
-                encoder: encoder,
+                encoder,
             },
             _marker: PhantomData,
         }
@@ -191,8 +204,7 @@ impl<T: Sendable> Encoder<T> {
         self.buffer[0..4].copy_from_slice(frame_size.to_be_bytes().as_slice());
     }
 
-    pub fn update_header(&mut self, name: &str, id: usize, config: &SenderAccess) {
-        let config = config.load();
+    pub fn update_header(&mut self, name: &str, id: usize, config: &SenderConfig) {
         if self.header.agent_id != config.agent_id
             || self.header.team_id != config.team_id
             || self.header.organization_id != config.organize_id as u16
@@ -253,6 +265,7 @@ pub struct UniformSenderThread<T> {
 
     private_shared_conn: Option<Arc<Mutex<Connection>>>,
     sender_encoder: SenderEncoder,
+    leaky_bucket: Arc<LeakyBucket>,
 }
 
 impl<T: Sendable> UniformSenderThread<T> {
@@ -264,6 +277,7 @@ impl<T: Sendable> UniformSenderThread<T> {
         exception_handler: ExceptionHandler,
         private_shared_conn: Option<Arc<Mutex<Connection>>>,
         sender_encoder: SenderEncoder,
+        leaky_bucket: Arc<LeakyBucket>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -277,6 +291,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             exception_handler,
             private_shared_conn,
             sender_encoder,
+            leaky_bucket,
         }
     }
 
@@ -299,6 +314,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             self.exception_handler.clone(),
             self.private_shared_conn.clone(),
             self.sender_encoder,
+            self.leaky_bucket.clone(),
         );
         self.thread_handle = Some(
             thread::Builder::new()
@@ -337,9 +353,6 @@ impl<T: Sendable> UniformSenderThread<T> {
 
 lazy_static! {
     static ref GLOBAL_CONNECTION: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::new()));
-    static ref TOTAL_SENT_BYTES: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
-    static ref SENT_START_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
-    static ref LAST_LOGGING_DURATION: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -380,6 +393,7 @@ pub struct UniformSender<T> {
 
     input: Arc<Receiver<T>>,
     counter: Arc<SenderCounter>,
+    overwritten_count: u64,
 
     encoder: Encoder<T>,
     private_conn: Mutex<Connection>,
@@ -389,6 +403,9 @@ pub struct UniformSender<T> {
     multiple_sockets_to_ingester: bool,
     dest_ip: String,
     dest_port: u16,
+    max_throughput_mbps: u64,
+    leaky_bucket: Arc<LeakyBucket>,
+    last_traffic_overflow: Duration,
 
     config: SenderAccess,
 
@@ -419,6 +436,7 @@ impl<T: Sendable> UniformSender<T> {
         exception_handler: ExceptionHandler,
         private_shared_conn: Option<Arc<Mutex<Connection>>>,
         sender_encoder: SenderEncoder,
+        leaky_bucket: Arc<LeakyBucket>,
     ) -> Self {
         let cfg = config.load();
         Self {
@@ -426,6 +444,7 @@ impl<T: Sendable> UniformSender<T> {
             name,
             input,
             counter: Arc::new(SenderCounter::default()),
+            overwritten_count: 0,
             encoder: Encoder::new(
                 0,
                 SendMessageType::TaggedFlow,
@@ -440,6 +459,9 @@ impl<T: Sendable> UniformSender<T> {
             multiple_sockets_to_ingester: false,
             dest_ip: "127.0.0.1".to_string(),
             dest_port: cfg.dest_port,
+            max_throughput_mbps: 0,
+            leaky_bucket,
+            last_traffic_overflow: Duration::ZERO,
 
             running,
             stats,
@@ -453,9 +475,7 @@ impl<T: Sendable> UniformSender<T> {
         }
     }
 
-    fn update_connection(&mut self) {
-        let cfg = self.config.load();
-
+    fn update_connection(&mut self, cfg: &SenderConfig) {
         if self.multiple_sockets_to_ingester != cfg.multiple_sockets_to_ingester
             || self.dest_ip != cfg.dest_ip
             || self.dest_port != cfg.dest_port
@@ -508,7 +528,7 @@ impl<T: Sendable> UniformSender<T> {
         }
     }
 
-    fn flush_encoder(&mut self) {
+    fn flush_encoder(&mut self, config: &SenderConfig) {
         self.cached = true;
         if self.encoder.buffer_len() > 0 {
             self.counter
@@ -516,12 +536,15 @@ impl<T: Sendable> UniformSender<T> {
                 .fetch_add(self.encoder.buffer_len() as u64, Ordering::Relaxed);
             self.encoder.compress_buffer();
             self.encoder.set_header_frame_size();
-            self.send_buffer();
+            self.send_buffer(config);
             self.encoder.reset_buffer();
         }
     }
 
-    fn send_buffer(&mut self) {
+    fn send_buffer(&mut self, config: &SenderConfig) {
+        if self.is_traffic_overflow(config) {
+            return;
+        }
         let mut conn = match self.connection_type {
             ConnectionType::Global => self.global_shared_conn.lock().unwrap(),
             ConnectionType::PrivateShared => {
@@ -602,7 +625,6 @@ impl<T: Sendable> UniformSender<T> {
                         self.counter
                             .tx_bytes
                             .fetch_add(buffer.len() as u64, Ordering::Relaxed);
-                        TOTAL_SENT_BYTES.fetch_add(buffer.len() as u64, Ordering::Relaxed);
                         break;
                     }
                 }
@@ -626,37 +648,55 @@ impl<T: Sendable> UniformSender<T> {
         }
     }
 
-    fn is_exceed_max_throughput(&mut self, max_throughput_mbps: u64) -> bool {
-        if max_throughput_mbps == 0 {
+    fn log_when_traffic_overflow(&mut self, config: &SenderConfig) {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        // to prevent frequent log printing, print at least once every 10 seconds
+        if now - self.last_traffic_overflow > Duration::from_secs(10) {
+            warn!(
+                "{} sender dropping message, throughput exceed setting value 'max_throughput_to_ingester' {}Mbps, action {:?}, total overwrittern count {}",
+                self.name, self.max_throughput_mbps, config.ingester_traffic_overflow_action, self.overwritten_count
+            );
+            self.last_traffic_overflow = now;
+        }
+    }
+
+    fn is_traffic_overflow(&mut self, config: &SenderConfig) -> bool {
+        if self.max_throughput_mbps == 0 {
             return false;
         }
-        let max_throughput_bytes = max_throughput_mbps << 20 >> 3;
-        if TOTAL_SENT_BYTES.load(Ordering::Relaxed) > max_throughput_bytes {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap();
-
-            let used = now - Duration::from_nanos(SENT_START_DURATION.load(Ordering::Relaxed));
-            if used > Duration::from_secs(1) {
-                SENT_START_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
-                TOTAL_SENT_BYTES.store(0, Ordering::Relaxed);
-            } else {
-                // to prevent frequent log printing, print at least once every 5 seconds
-                if now - Duration::from_nanos(LAST_LOGGING_DURATION.load(Ordering::Relaxed))
-                    > Duration::from_secs(5)
-                {
-                    warn!(
-                        "{} sender dropping message, throughput execeed setting value 'max_throughput_to_ingester' {}Mbps",
-                        self.name, max_throughput_mbps
-                    );
-                    LAST_LOGGING_DURATION.store(now.as_nanos() as u64, Ordering::Relaxed);
-                }
-                self.exception_handler
-                    .set(Exception::DataBpsThresholdExceeded);
-                return true;
+        let mut overflow = false;
+        if config.ingester_traffic_overflow_action == TrafficOverflowAction::Waiting {
+            // When stopped, at least one acquire() is successfully triggered every 100ms, and the
+            // loop can be exited quickly without getting stuck here.
+            let mut wait_times = 0;
+            while !self.leaky_bucket.acquire(self.encoder.buffer_len() as u64)
+                && wait_times < MAX_WAIT_TIMES
+            {
+                wait_times += 1;
+                // LeakyBucket token is updated every 100ms by default,
+                // wait 20ms each time until the token is acquired
+                thread::sleep(Duration::from_millis(20));
+                self.counter.waited.fetch_add(1, Ordering::Relaxed);
+            }
+            if wait_times == MAX_WAIT_TIMES {
+                overflow = true;
+            }
+        } else {
+            if !self.leaky_bucket.acquire(self.encoder.buffer_len() as u64) {
+                overflow = true;
+                self.counter.dropped.fetch_add(1, Ordering::Relaxed);
             }
         }
-        return false;
+
+        if overflow || self.input.total_overwritten_count() > self.overwritten_count {
+            self.overwritten_count = self.input.total_overwritten_count();
+            self.exception_handler
+                .set(Exception::DataBpsThresholdExceeded);
+            self.log_when_traffic_overflow(config);
+        }
+        overflow
     }
 
     fn check_or_register_counterable(&mut self, message_type: SendMessageType) {
@@ -677,7 +717,11 @@ impl<T: Sendable> UniformSender<T> {
         while self.running.load(Ordering::Relaxed) {
             let config = self.config.load();
             let socket_type = config.collector_socket_type;
-            let max_throughput_mpbs = config.max_throughput_to_ingester;
+            let max_throughput_mbps = config.max_throughput_to_ingester;
+            if self.max_throughput_mbps != max_throughput_mbps {
+                self.leaky_bucket.set_rate(Some(max_throughput_mbps << 17)); // Mbit -> byte
+                self.max_throughput_mbps = max_throughput_mbps;
+            }
             match self.input.recv_all(
                 &mut batch,
                 Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)),
@@ -687,13 +731,6 @@ impl<T: Sendable> UniformSender<T> {
                     if start_cached.elapsed() >= Duration::from_secs(10) {
                         start_cached = Instant::now();
                         self.cached = false;
-                    }
-                    if self.is_exceed_max_throughput(max_throughput_mpbs) {
-                        self.counter
-                            .dropped
-                            .fetch_add(batch.len() as u64, Ordering::Relaxed);
-                        batch.clear();
-                        continue;
                     }
                     for send_item in batch.drain(..) {
                         if !self.running.load(Ordering::Relaxed) {
@@ -708,7 +745,7 @@ impl<T: Sendable> UniformSender<T> {
 
                         let result = match socket_type {
                             SocketType::File => self.handle_target_file(send_item, &mut kv_string),
-                            _ => self.handle_target_server(send_item),
+                            _ => self.handle_target_server(send_item, &config),
                         };
                         if let Err(e) = result {
                             if self.counter.dropped.load(Ordering::Relaxed) == 0 {
@@ -726,15 +763,15 @@ impl<T: Sendable> UniformSender<T> {
                 Err(Error::Timeout) => match socket_type {
                     SocketType::File => self.flush_writer(),
                     _ => {
-                        self.update_connection();
-                        self.encoder.update_header(self.name, self.id, &self.config);
-                        self.flush_encoder();
+                        self.update_connection(&config);
+                        self.encoder.update_header(self.name, self.id, &config);
+                        self.flush_encoder(&config);
                     }
                 },
                 Err(Error::Terminated(..)) => {
                     match socket_type {
                         SocketType::File => self.flush_writer(),
-                        _ => self.flush_encoder(),
+                        _ => self.flush_encoder(&config),
                     }
                     break;
                 }
@@ -794,13 +831,17 @@ impl<T: Sendable> UniformSender<T> {
         Ok(())
     }
 
-    pub fn handle_target_server(&mut self, send_item: T) -> std::io::Result<()> {
+    pub fn handle_target_server(
+        &mut self,
+        send_item: T,
+        config: &SenderConfig,
+    ) -> std::io::Result<()> {
         self.encoder.cache_to_sender(send_item);
         if !self.cached || self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
-            self.update_connection();
-            self.encoder.update_header(self.name, self.id, &self.config);
-            self.flush_encoder();
+            self.update_connection(config);
+            self.encoder.update_header(self.name, self.id, config);
+            self.flush_encoder(config);
         }
         Ok(())
     }

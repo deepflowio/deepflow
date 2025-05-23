@@ -29,6 +29,7 @@ use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
 use public::{
     queue,
     sender::{SendMessageType, Sendable},
+    LeakyBucket,
 };
 
 use super::stats::{self, QueueStats};
@@ -107,6 +108,7 @@ impl RemoteLogWriter {
         exception_handler: ExceptionHandler,
         ntp_diff: Arc<AtomicI64>,
         shared_conn: Arc<Mutex<Connection>>,
+        leaky_bucket: Arc<LeakyBucket>,
     ) -> Self {
         let module = "remote_logger";
         let (sender, receiver, counter) = queue::bounded(Self::INNER_QUEUE_SIZE);
@@ -125,6 +127,7 @@ impl RemoteLogWriter {
             exception_handler,
             Some(shared_conn),
             SenderEncoder::Raw,
+            leaky_bucket,
         );
         uniform_sender.start();
         Self {
