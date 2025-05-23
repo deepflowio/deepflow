@@ -74,13 +74,14 @@ type K8SRPCMessage struct {
 }
 
 type VIFRPCMessage struct {
-	ORGID          int
-	MessageType    int
-	TeamID         uint32
-	VtapID         uint32
-	Peer           string
-	K8SClusterID   string
-	StorageRefresh bool
-	Message        *trident.GenesisSyncRequest
-	AgentMessage   *agent.GenesisSyncRequest
+	ORGID                   int
+	MessageType             int
+	TeamID                  uint32
+	VtapID                  uint32
+	Peer                    string
+	K8SClusterID            string
+	StorageRefresh          bool
+	WorkloadResourceEnabled bool
+	Message                 *trident.GenesisSyncRequest
+	AgentMessage            *agent.GenesisSyncRequest
 }

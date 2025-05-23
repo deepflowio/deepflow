@@ -71,6 +71,7 @@ type VTapInfo struct {
 	hostIDToVPCID                  map[int]int
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupShortIDToLcuuid       map[string]string
+	vtapGroupLcuuidToShortID       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
 	vtapGroupLcuuidToEAHPEnabled   map[string]*int
@@ -141,6 +142,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		hostIDToVPCID:                  make(map[int]int),
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupShortIDToLcuuid:       make(map[string]string),
+		vtapGroupLcuuidToShortID:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
@@ -256,11 +258,14 @@ func (v *VTapInfo) loadVTapGroup() {
 	}
 
 	vtapGroupShortIDToLcuuid := make(map[string]string)
+	vtapGroupLcuuidToShortID := make(map[string]string)
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupShortIDToLcuuid[vtapGroup.ShortUUID] = vtapGroup.Lcuuid
+		vtapGroupLcuuidToShortID[vtapGroup.Lcuuid] = vtapGroup.ShortUUID
 	}
 
 	v.vtapGroupShortIDToLcuuid = vtapGroupShortIDToLcuuid
+	v.vtapGroupLcuuidToShortID = vtapGroupLcuuidToShortID
 }
 
 func vtapPortToStr(port int64) string {
