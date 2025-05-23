@@ -2160,7 +2160,7 @@ static void process_data(void *queue)
 			pthread_mutex_unlock(&q->mutex);
 		} else {
 			atomic64_add(&q->dequeue_nr, nr);
-			prefetch_and_process_data(q->t, nr, rx_burst);
+			prefetch_and_process_data(q->t, q->id, nr, rx_burst);
 			if (nr == MAX_EVENTS_BURST)
 				atomic64_inc(&q->burst_count);
 		}
@@ -2289,6 +2289,7 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 			return -ENOMEM;
 		}
 
+		tracer->queues[i].id = i;
 		tracer->queues[i].r = r;
 		tracer->queues[i].t = tracer;
 		tracer->queues[i].nr = 0;

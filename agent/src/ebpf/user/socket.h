@@ -329,7 +329,7 @@ do {						\
 /* *INDENT-ON* */
 
 static inline void
-prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
+prefetch_and_process_data(struct bpf_tracer *t, int id, int nb_rx, void **datas_burst)
 {
 /* Configure how many socket_data ahead to prefetch, when reading socket_data */
 #define PREFETCH_OFFSET   3
@@ -363,7 +363,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 			 * time precision is in nanosecond.
 			 */
 			sd->timestamp = sd->timestamp + boot_time;
-			callback(NULL, sd);
+			callback(NULL, id, sd);
 		}
 
 		if (block_head->is_last == 1)
