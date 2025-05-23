@@ -278,7 +278,7 @@ struct mem_block_head {
 	void (*fn) (void *);
 } __attribute__ ((packed));
 
-typedef void (*tracer_callback_t) (void *ctx, void *cp_data);
+typedef void (*tracer_callback_t) (void *ctx, int queue_id, void *cp_data);
 
 struct tracer_probes_conf {
 	char *bin_file;		// only use uprobe;
@@ -320,6 +320,7 @@ struct kfunc {
 };
 
 struct queue {
+	int id; // Queue Identifier
 	struct bpf_tracer *t;
 	struct ring *r;
 	unsigned int ring_size;	// 队列配置大小，值为2的次幂

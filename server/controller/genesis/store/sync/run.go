@@ -415,7 +415,7 @@ func (g *GenesisSync) Start() {
 				continue
 			}
 
-			log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.Peer, info.VtapID, info.MessageType, info.Message, logger.NewORGPrefix(info.ORGID))
+			log.Debugf("sync received (%s) vtap_id (%v) type (%v) workload resource enabled (%t) received (%s)", info.Peer, info.VtapID, info.MessageType, info.WorkloadResourceEnabled, info.Message, logger.NewORGPrefix(info.ORGID))
 
 			vtap := fmt.Sprintf("%d%d", info.ORGID, info.VtapID)
 			if info.MessageType == common.TYPE_RENEW {
@@ -433,11 +433,11 @@ func (g *GenesisSync) Start() {
 				agentType := info.Message.GetAgentType()
 				switch agentType {
 				case agent.AgentType_TT_PHYSICAL_MACHINE:
-					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.Message)
+					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.WorkloadResourceEnabled, info.Message)
 				case agent.AgentType_TT_PUBLIC_CLOUD:
-					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.Message)
+					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.WorkloadResourceEnabled, info.Message)
 				case agent.AgentType_TT_HOST_POD, agent.AgentType_TT_VM_POD, agent.AgentType_TT_K8S_SIDECAR:
-					genesisSyncData = vUpdater.UnmarshalKubernetesProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.Message)
+					genesisSyncData = vUpdater.UnmarshalKubernetesProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.WorkloadResourceEnabled, info.Message)
 				default:
 					genesisSyncData = vUpdater.UnmarshalProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.Message)
 				}

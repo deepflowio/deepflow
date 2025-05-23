@@ -592,7 +592,7 @@ extern "C" {
     // socket_map_max_reclaim: socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作。
     // 返回值：成功返回0，否则返回非0
     pub fn running_socket_tracer(
-        callback: extern "C" fn(_: *mut c_void, sd: *mut SK_BPF_DATA),
+        callback: extern "C" fn(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA),
         thread_nr: c_int,
         perf_pages_cnt: c_uint,
         ring_size: c_uint,
@@ -627,7 +627,7 @@ extern "C" {
     pub fn start_continuous_profiler(
         freq: c_int,
         java_syms_update_delay: c_int,
-        callback: extern "C" fn(ctx: *mut c_void, _data: *mut stack_profile_data),
+        callback: extern "C" fn(ctx: *mut c_void, queue_id: c_int, _data: *mut stack_profile_data),
         callback_ctx: *const [*mut c_void; PROFILER_CTX_NUM],
     ) -> c_int;
 

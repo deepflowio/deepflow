@@ -448,7 +448,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *arg)
 		 * nd the data to the server for storage as required.
 		 */
 		if (likely(ctx->profiler_stop == 0))
-			fun(ctx->callback_ctx, msg);
+			fun(ctx->callback_ctx, 0, msg);
 
 		clib_mem_free((void *)msg);
 		msg_kv->msg_ptr = 0;

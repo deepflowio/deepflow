@@ -19,6 +19,7 @@ package genesis
 import (
 	"context"
 	"os"
+	"time"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -54,6 +55,15 @@ func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
 	genesisK8S.Start()
 
 	synchronizer := grpc.NewGenesisSynchronizerServer(config.GenesisCfg, syncQueue, kubernetesQueue, genesisSync, genesisK8S)
+	synchronizer.GenerateCache()
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			synchronizer.GenerateCache()
+		}
+	}()
 
 	GenesisService = &Genesis{
 		ctx:          ctx,

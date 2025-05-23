@@ -23,17 +23,25 @@ import (
 	"sync"
 	"time"
 
+	kyaml "github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/rawbytes"
+	"github.com/knadh/koanf/v2"
+	"github.com/patrickmn/go-cache"
+	"google.golang.org/grpc/peer"
+
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
 	sstore "github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
-	"google.golang.org/grpc/peer"
 )
 
 var log = logger.MustGetLogger("genesis.grpc")
@@ -43,45 +51,98 @@ type AgentStats struct {
 	TeamID                   int
 	VtapID                   uint32
 	TeamShortLcuuid          string
+	GroupShortLcuuid         string
 	IP                       string
 	Proxy                    string
+	K8sClusterID             string
 	K8sVersion               uint64
 	SyncVersion              uint64
+	SyncResouceEnabled       bool
 	K8sLastSeen              time.Time
 	SyncLastSeen             time.Time
-	K8sClusterID             string
 	SyncAgentType            agent.AgentType
 	SyncDataOperation        *agent.GenesisPlatformData
 	SyncProcessDataOperation *agent.GenesisProcessData
 }
 
 type SynchronizerServer struct {
-	cfg                   config.GenesisConfig
-	k8sQueue              queue.QueueWriter
-	genesisSyncQueue      queue.QueueWriter
-	teamShortLcuuidToInfo sync.Map
-	clusterIDToVersion    sync.Map
-	vtapToVersion         sync.Map
-	vtapToLastSeen        sync.Map
-	clusterIDToLastSeen   sync.Map
-	agentStatsMap         sync.Map
-	gsync                 *sstore.GenesisSync
-	gkubernetes           *kstore.GenesisKubernetes
+	cfg                         config.GenesisConfig
+	k8sQueue                    queue.QueueWriter
+	genesisSyncQueue            queue.QueueWriter
+	teamShortLcuuidToInfo       sync.Map
+	clusterIDToVersion          sync.Map
+	vtapToVersion               sync.Map
+	vtapToLastSeen              sync.Map
+	clusterIDToLastSeen         sync.Map
+	agentStatsMap               sync.Map
+	workloadResouceEnabledCache *cache.Cache
+	gsync                       *sstore.GenesisSync
+	gkubernetes                 *kstore.GenesisKubernetes
 }
 
 func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter,
 	gsync *sstore.GenesisSync, gkubernetes *kstore.GenesisKubernetes) *SynchronizerServer {
 	return &SynchronizerServer{
-		cfg:                 cfg,
-		k8sQueue:            k8sQueue,
-		genesisSyncQueue:    genesisSyncQueue,
-		gsync:               gsync,
-		gkubernetes:         gkubernetes,
-		vtapToVersion:       sync.Map{},
-		vtapToLastSeen:      sync.Map{},
-		clusterIDToVersion:  sync.Map{},
-		clusterIDToLastSeen: sync.Map{},
-		agentStatsMap:       sync.Map{},
+		cfg:                         cfg,
+		k8sQueue:                    k8sQueue,
+		genesisSyncQueue:            genesisSyncQueue,
+		gsync:                       gsync,
+		gkubernetes:                 gkubernetes,
+		vtapToVersion:               sync.Map{},
+		vtapToLastSeen:              sync.Map{},
+		clusterIDToVersion:          sync.Map{},
+		clusterIDToLastSeen:         sync.Map{},
+		agentStatsMap:               sync.Map{},
+		workloadResouceEnabledCache: cache.New(5*time.Minute, 30*time.Minute),
+	}
+}
+
+func (g *SynchronizerServer) GenerateCache() {
+	orgIDs, err := metadb.GetORGIDs()
+	if err != nil {
+		log.Error("get org ids failed")
+		return
+	}
+	for _, orgID := range orgIDs {
+		db, err := metadb.GetDB(orgID)
+		if err != nil {
+			log.Errorf("get org (%d) metadb session failed", orgID)
+			continue
+		}
+		var agentGroups []metadbmodel.VTapGroup
+		if err := db.Find(&agentGroups).Error; err != nil {
+			log.Errorf("get agent groups failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+			continue
+		}
+		var groupConfigs []agent_config.MySQLAgentGroupConfiguration
+		if err := db.Find(&groupConfigs).Error; err != nil {
+			log.Errorf("get agent group configs failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+			continue
+		}
+		LcuuidToGroup := map[string]metadbmodel.VTapGroup{}
+		for _, group := range agentGroups {
+			LcuuidToGroup[group.Lcuuid] = group
+		}
+		for _, config := range groupConfigs {
+			group, ok := LcuuidToGroup[config.AgentGroupLcuuid]
+			if !ok {
+				log.Warningf("agent group config (ID:%d) not found group", config.ID, logger.NewORGPrefix(orgID))
+				continue
+			}
+			k := koanf.New(".")
+			if err := k.Load(rawbytes.Provider([]byte(config.Yaml)), kyaml.Parser()); err != nil {
+				log.Errorf("parse agent config lcuuid (%s) yaml (%s) failed", config.Lcuuid, config.Yaml, logger.NewORGPrefix(orgID))
+				continue
+			}
+			if !k.Bool(common.CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED) {
+				log.Debugf("agent group configuration (ID:%d) workload resource sync disabled", config.ID, logger.NewORGPrefix(orgID))
+				continue
+			}
+			if group.ID == 1 && group.Name == "default" {
+				g.workloadResouceEnabledCache.SetDefault(fmt.Sprintf("%d-", orgID), true)
+			}
+			g.workloadResouceEnabledCache.SetDefault(fmt.Sprintf("%d-%s", orgID, group.ShortUUID), true)
+		}
 	}
 }
 
@@ -174,18 +235,22 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 		}
 	}
 
+	groupShortLcuuid := request.GetAgentInfo().GetGroupId()
+	_, enabled := g.workloadResouceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
+
 	platformData := request.GetPlatformData()
 	if version == localVersion || platformData == nil {
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
 			common.VIFRPCMessage{
-				Peer:           remote,
-				VtapID:         vtapID,
-				ORGID:          orgID,
-				TeamID:         uint32(teamID),
-				MessageType:    common.TYPE_RENEW,
-				Message:        request,
-				StorageRefresh: refresh,
+				Peer:                    remote,
+				VtapID:                  vtapID,
+				ORGID:                   orgID,
+				TeamID:                  uint32(teamID),
+				MessageType:             common.TYPE_RENEW,
+				Message:                 request,
+				StorageRefresh:          refresh,
+				WorkloadResourceEnabled: enabled,
 			},
 		)
 		return &agent.GenesisSyncResponse{Version: &localVersion}, nil
@@ -194,13 +259,14 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
 	g.genesisSyncQueue.Put(
 		common.VIFRPCMessage{
-			Peer:         remote,
-			VtapID:       vtapID,
-			ORGID:        orgID,
-			TeamID:       uint32(teamID),
-			K8SClusterID: k8sClusterID,
-			MessageType:  common.TYPE_UPDATE,
-			Message:      request,
+			Peer:                    remote,
+			VtapID:                  vtapID,
+			ORGID:                   orgID,
+			TeamID:                  uint32(teamID),
+			K8SClusterID:            k8sClusterID,
+			MessageType:             common.TYPE_UPDATE,
+			Message:                 request,
+			WorkloadResourceEnabled: enabled,
 		},
 	)
 
@@ -221,7 +287,9 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 		stats.SyncLastSeen = time.Now()
 		stats.K8sClusterID = k8sClusterID
 		stats.TeamShortLcuuid = teamShortLcuuid
+		stats.GroupShortLcuuid = groupShortLcuuid
 		stats.SyncProcessDataOperation = request.GetProcessData()
+		stats.SyncResouceEnabled = enabled
 		stats.SyncDataOperation = platformData
 		g.agentStatsMap.Store(vtap, stats)
 		g.vtapToVersion.Store(vtap, version)

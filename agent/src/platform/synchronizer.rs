@@ -229,10 +229,7 @@ impl Synchronizer {
 
         'outer: loop {
             let config = args.config.load();
-            let (ctrl_ip, team_id) = {
-                let id = args.agent_id.read();
-                (id.ip.to_string(), id.team_id.clone())
-            };
+            let agent_id: agent::AgentId = (&*args.agent_id.read()).into();
 
             #[cfg(target_os = "linux")]
             if args
@@ -263,26 +260,19 @@ impl Synchronizer {
             }
 
             loop {
-                let msg = if args.version == args.peer_version {
-                    agent::GenesisSyncRequest {
-                        version: Some(args.version),
-                        agent_type: Some(config.agent_type as i32),
-                        source_ip: Some(ctrl_ip.clone()),
-                        agent_id: Some(config.agent_id as u32),
-                        kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
-                        team_id: Some(team_id.clone()),
-                        ..Default::default()
-                    }
-                } else {
-                    info!("local version is {}, will send whole message", args.version);
-                    agent::GenesisSyncRequest {
-                        version: Some(args.version),
-                        agent_type: Some(config.agent_type as i32),
-                        source_ip: Some(ctrl_ip.clone()),
-                        agent_id: Some(config.agent_id as u32),
-                        kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
-                        team_id: Some(team_id.clone()),
-                        ..querier.generate_message(&config)
+                let msg = agent::GenesisSyncRequest {
+                    version: Some(args.version),
+                    agent_type: Some(config.agent_type as i32),
+                    source_ip: agent_id.ip.clone(),
+                    agent_id: Some(config.agent_id as u32),
+                    kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
+                    team_id: agent_id.team_id.clone(),
+                    agent_info: Some(agent_id.clone()),
+                    ..if args.version == args.peer_version {
+                        Default::default()
+                    } else {
+                        info!("local version is {}, will send whole message", args.version);
+                        querier.generate_message(&config)
                     }
                 };
 
