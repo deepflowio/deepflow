@@ -32,6 +32,7 @@ pub struct LeakyBucket {
     rate: Arc<AtomicU64>,
     token: Arc<AtomicU64>,
     running: Arc<AtomicBool>,
+    tick_counter: Arc<AtomicU64>,
 
     handle: JoinHandle<()>,
 }
@@ -41,10 +42,12 @@ impl LeakyBucket {
         let running = Arc::new(AtomicBool::new(true));
         let rate = Arc::new(AtomicU64::new(rate.unwrap_or(0)));
         let token = Arc::new(AtomicU64::new(0));
+        let tick_counter = Arc::new(AtomicU64::new(0));
 
         let t_running = running.clone();
         let t_rate = rate.clone();
         let t_token = token.clone();
+        let t_counter = tick_counter.clone();
         let handle = thread::Builder::new()
             .name("leaky-bucket".to_owned())
             .spawn(move || {
@@ -72,7 +75,7 @@ impl LeakyBucket {
                             Some(t + quantity_per_tick)
                         }
                     });
-
+                    t_counter.fetch_add(1, Ordering::Relaxed);
                     thread::park_timeout(TICK_INTERVAL);
                 }
             })
@@ -83,6 +86,7 @@ impl LeakyBucket {
             token,
             running,
             handle,
+            tick_counter,
         }
     }
 
@@ -105,6 +109,10 @@ impl LeakyBucket {
                 }
             })
             .is_ok()
+    }
+
+    pub fn tick_counter(&self) -> u64 {
+        self.tick_counter.load(Ordering::Relaxed)
     }
 }
 
