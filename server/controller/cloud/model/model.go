@@ -455,6 +455,26 @@ type Pod struct {
 	SubDomainLcuuid     string    `json:"sub_domain_lcuuid" binding:"required"`
 }
 
+type ConfigMap struct {
+	Lcuuid             string    `json:"lcuuid" binding:"required"`
+	Name               string    `json:"name" binding:"required"`
+	Data               string    `json:"data"` // TODO @kangxiang confirm
+	PodNamespaceLcuuid string    `json:"pod_namespace_lcuuid" binding:"required"`
+	PodClusterLcuuid   string    `json:"pod_cluster_lcuuid" binding:"required"`
+	VPCLcuuid          string    `json:"vpc_lcuuid" binding:"required"`
+	AZLcuuid           string    `json:"az_lcuuid" binding:"required"`
+	RegionLcuuid       string    `json:"region_lcuuid" binding:"required"`
+	SubDomainLcuuid    string    `json:"sub_domain_lcuuid" binding:"required"`
+	CreatedAt          time.Time `json:"created_at"`
+}
+
+type PodGroupConfigMapConnection struct {
+	Lcuuid          string `json:"lcuuid" binding:"required"`
+	PodGroupLcuuid  string `json:"pod_group_lcuuid" binding:"required"`
+	ConfigMapLcuuid string `json:"config_map_lcuuid" binding:"required"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid" binding:"required"`
+}
+
 type Process struct {
 	Lcuuid          string    `json:"lcuuid" binding:"required"`
 	Name            string    `json:"name"`
@@ -471,77 +491,81 @@ type Process struct {
 }
 
 type SubDomainResource struct {
-	Verified               bool `json:"verified"`
-	ErrorState             int
-	ErrorMessage           string
-	SyncAt                 time.Time
-	Networks               []Network
-	Subnets                []Subnet
-	VInterfaces            []VInterface
-	IPs                    []IP
-	PodClusters            []PodCluster
-	PodNodes               []PodNode
-	VMPodNodeConnections   []VMPodNodeConnection
-	PodNamespaces          []PodNamespace
-	PodIngresses           []PodIngress
-	PodIngressRules        []PodIngressRule
-	PodIngressRuleBackends []PodIngressRuleBackend
-	PodServices            []PodService
-	PodServicePorts        []PodServicePort
-	PodGroups              []PodGroup
-	PodGroupPorts          []PodGroupPort
-	PodReplicaSets         []PodReplicaSet
-	Pods                   []Pod
-	Processes              []Process
+	Verified                     bool `json:"verified"`
+	ErrorState                   int
+	ErrorMessage                 string
+	SyncAt                       time.Time
+	Networks                     []Network
+	Subnets                      []Subnet
+	VInterfaces                  []VInterface
+	IPs                          []IP
+	PodClusters                  []PodCluster
+	PodNodes                     []PodNode
+	VMPodNodeConnections         []VMPodNodeConnection
+	PodNamespaces                []PodNamespace
+	PodIngresses                 []PodIngress
+	PodIngressRules              []PodIngressRule
+	PodIngressRuleBackends       []PodIngressRuleBackend
+	PodServices                  []PodService
+	PodServicePorts              []PodServicePort
+	PodGroups                    []PodGroup
+	PodGroupPorts                []PodGroupPort
+	PodReplicaSets               []PodReplicaSet
+	Pods                         []Pod
+	ConfigMaps                   []ConfigMap
+	PodGroupConfigMapConnections []PodGroupConfigMapConnection
+	Processes                    []Process
 }
 
 type Resource struct {
-	Verified               bool
-	ErrorState             int
-	ErrorMessage           string
-	SyncAt                 time.Time
-	SubDomains             []SubDomain
-	Regions                []Region
-	AZs                    []AZ
-	Hosts                  []Host
-	VMs                    []VM
-	VPCs                   []VPC
-	Networks               []Network
-	Subnets                []Subnet
-	VRouters               []VRouter
-	RoutingTables          []RoutingTable
-	DHCPPorts              []DHCPPort
-	NATGateways            []NATGateway
-	NATRules               []NATRule
-	NATVMConnections       []NATVMConnection
-	LBs                    []LB
-	LBListeners            []LBListener
-	LBTargetServers        []LBTargetServer
-	LBVMConnections        []LBVMConnection
-	PeerConnections        []PeerConnection
-	CENs                   []CEN
-	RedisInstances         []RedisInstance
-	RDSInstances           []RDSInstance
-	ThirdPartyDevices      []ThirdPartyDevice
-	VInterfaces            []VInterface
-	IPs                    []IP
-	VIPs                   []VIP
-	FloatingIPs            []FloatingIP
-	PodClusters            []PodCluster
-	PodNodes               []PodNode
-	VMPodNodeConnections   []VMPodNodeConnection
-	PodNamespaces          []PodNamespace
-	PodGroups              []PodGroup
-	PodReplicaSets         []PodReplicaSet
-	Pods                   []Pod
-	PodServices            []PodService
-	PodServicePorts        []PodServicePort
-	PodGroupPorts          []PodGroupPort
-	PodIngresses           []PodIngress
-	PodIngressRules        []PodIngressRule
-	PodIngressRuleBackends []PodIngressRuleBackend
-	Processes              []Process
-	SubDomainResources     map[string]SubDomainResource
+	Verified                     bool
+	ErrorState                   int
+	ErrorMessage                 string
+	SyncAt                       time.Time
+	SubDomains                   []SubDomain
+	Regions                      []Region
+	AZs                          []AZ
+	Hosts                        []Host
+	VMs                          []VM
+	VPCs                         []VPC
+	Networks                     []Network
+	Subnets                      []Subnet
+	VRouters                     []VRouter
+	RoutingTables                []RoutingTable
+	DHCPPorts                    []DHCPPort
+	NATGateways                  []NATGateway
+	NATRules                     []NATRule
+	NATVMConnections             []NATVMConnection
+	LBs                          []LB
+	LBListeners                  []LBListener
+	LBTargetServers              []LBTargetServer
+	LBVMConnections              []LBVMConnection
+	PeerConnections              []PeerConnection
+	CENs                         []CEN
+	RedisInstances               []RedisInstance
+	RDSInstances                 []RDSInstance
+	ThirdPartyDevices            []ThirdPartyDevice
+	VInterfaces                  []VInterface
+	IPs                          []IP
+	VIPs                         []VIP
+	FloatingIPs                  []FloatingIP
+	PodClusters                  []PodCluster
+	PodNodes                     []PodNode
+	VMPodNodeConnections         []VMPodNodeConnection
+	PodNamespaces                []PodNamespace
+	PodGroups                    []PodGroup
+	PodReplicaSets               []PodReplicaSet
+	Pods                         []Pod
+	PodServices                  []PodService
+	PodServicePorts              []PodServicePort
+	PodGroupPorts                []PodGroupPort
+	PodIngresses                 []PodIngress
+	PodIngressRules              []PodIngressRule
+	PodIngressRuleBackends       []PodIngressRuleBackend
+	ConfigMaps                   []ConfigMap
+	PodGroupConfigMapConnections []PodGroupConfigMapConnection
+	Processes                    []Process
+	SubDomainResources           map[string]SubDomainResource
 }
 
 type AdditionalResource struct {
