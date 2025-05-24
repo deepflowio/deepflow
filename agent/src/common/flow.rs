@@ -1611,7 +1611,7 @@ fn get_direction(
             _ => {
                 // 采集器类型不正确，不应该发生
                 error!("invalid agent type, deepflow-agent restart...");
-                crate::utils::notify_exit(1);
+                crate::utils::clean_and_exit(1);
             }
         }
         (Direction::None, Direction::None)

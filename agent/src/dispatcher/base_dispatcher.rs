@@ -958,7 +958,7 @@ impl BaseDispatcherListener {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
-            crate::utils::notify_exit(1);
+            crate::utils::clean_and_exit(1);
         }
     }
 }

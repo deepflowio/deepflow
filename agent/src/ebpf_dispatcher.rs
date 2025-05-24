@@ -571,7 +571,7 @@ impl EbpfCollector {
                 match DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
                     Err(Terminated(a, b)) => {
                         error!("dpdk init error: {:?}, deepflow-agent restart...", (a, b));
-                        crate::utils::notify_exit(1);
+                        crate::utils::clean_and_exit(1);
                     }
                     Err(e) => {
                         warn!("meta packet send ebpf error: {:?}", e);
