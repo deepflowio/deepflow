@@ -219,7 +219,7 @@ impl FastPath {
                     "IpAddr({:?} and {:?}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
                     ip_src, ip_dst,
                 );
-                crate::utils::notify_exit(1);
+                crate::utils::clean_and_exit(1);
                 return (0, 0);
             }
         }

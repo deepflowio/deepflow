@@ -2091,7 +2091,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                                 "agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'."
                             );
                             warn!("setns error: {}, deepflow-agent restart...", e);
-                            crate::utils::notify_exit(-1);
+                            crate::utils::clean_and_exit(-1);
                             return MacAddr::ZERO;
                         }
                         let ctrl_mac = match get_ctrl_ip_and_mac(ip) {
@@ -2101,14 +2101,14 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                                     "get_ctrl_ip_and_mac error: {}, deepflow-agent restart...",
                                     e
                                 );
-                                crate::utils::notify_exit(-1);
+                                crate::utils::clean_and_exit(-1);
                                 return MacAddr::ZERO;
                             }
                         };
                         #[cfg(target_os = "linux")]
                         if let Err(e) = public::netns::reset_netns() {
                             warn!("reset setns error: {}, deepflow-agent restart...", e);
-                            crate::utils::notify_exit(-1);
+                            crate::utils::clean_and_exit(-1);
                             return MacAddr::ZERO;
                         };
                         ctrl_mac
@@ -2390,7 +2390,7 @@ impl ConfigHandler {
                 "query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...",
                 old_netns, new_netns
             );
-            crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+            crate::utils::clean_and_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
             return;
         }
 
@@ -2405,7 +2405,7 @@ impl ConfigHandler {
                 .switch_recv_engine(&handler.candidate_config.dispatcher)
             {
                 log::error!("switch RecvEngine error: {}, deepflow-agent restart...", e);
-                crate::utils::notify_exit(-1);
+                crate::utils::clean_and_exit(-1);
                 return;
             }
         }
@@ -2853,7 +2853,7 @@ impl ConfigHandler {
             if let Some(c) = components.as_mut() {
                 if packet_fanout_count > 1 {
                     info!("capture_mode changes and fanout is enabled, deepflow-agent restart...");
-                    crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                    crate::utils::clean_and_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
                     return vec![];
                 } else {
                     info!("capture_mode changes, dispatcher restart...");
@@ -5202,7 +5202,7 @@ impl ConfigHandler {
                 "Configurations from {:#?} to {:#?}",
                 candidate_config, new_config
             );
-            crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+            crate::utils::clean_and_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
             return vec![];
         }
 
@@ -5224,7 +5224,7 @@ impl ConfigHandler {
 
         if restart_agent {
             warn!("Change configuration and restart agent...");
-            crate::utils::notify_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+            crate::utils::clean_and_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
             return vec![];
         }
 

@@ -17,17 +17,38 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
-use log::trace;
+use log::{debug, trace};
 use nix::{sys::signal::kill, unistd::Pid};
 
-pub struct PidFile {
+static HANDLE: OnceLock<Mutex<Option<PidFile>>> = OnceLock::new();
+
+pub fn open<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    let file = PidFile::open(path)?;
+    if let Err(_) = HANDLE.set(Mutex::new(Some(file))) {
+        debug!("pid file already opened");
+    }
+    Ok(())
+}
+
+pub fn close() {
+    match HANDLE.get() {
+        Some(h) => {
+            // drop PidFile
+            h.lock().unwrap().take();
+        }
+        None => debug!("pid file not set"),
+    }
+}
+
+struct PidFile {
     path: PathBuf,
     fp: Option<File>,
 }
 
 impl PidFile {
-    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+    fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let path = path.as_ref();
         trace!("check {} for existing pid file", path.display());
         match fs::read_to_string(path) {
