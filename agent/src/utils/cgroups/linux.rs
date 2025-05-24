@@ -149,7 +149,7 @@ impl Cgroups {
                                 "apply cgroups resource failed, {}, deepflow-agent restart...",
                                 e
                             );
-                            crate::utils::notify_exit(1);
+                            crate::utils::clean_and_exit(1);
                             break;
                         }
                     }

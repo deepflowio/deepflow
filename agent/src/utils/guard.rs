@@ -303,7 +303,7 @@ impl Guard {
                     "current system {:?} memory percentage is less than the 70% of sys_memory_limit, current system memory percentage={}%, sys_memory_limit={}%, deepflow-agent restart...",
                     sys_memory_metric, current_memory_percentage, sys_memory_limit
                 );
-                crate::utils::notify_exit(-1);
+                crate::utils::clean_and_exit(-1);
             } else if current_memory_percentage < sys_memory_limit {
                 *last_exceeded = get_timestamp(0);
                 exception_handler.set(Exception::FreeMemExceeded);
@@ -409,7 +409,7 @@ impl Guard {
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
                                     error!("cpu usage over cpu limit twice, deepflow-agent restart...");
-                                    crate::utils::notify_exit(-1);
+                                    crate::utils::clean_and_exit(-1);
                                     break;
                                 } else {
                                     warn!("cpu usage over cpu limit");
@@ -423,7 +423,7 @@ impl Guard {
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
-                                crate::utils::notify_exit(-1);
+                                crate::utils::clean_and_exit(-1);
                                 break;
                             } else {
                                 warn!("cpu usage over cpu limit");
@@ -462,7 +462,7 @@ impl Guard {
                                     "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
                                     ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
                                     );
-                                        crate::utils::notify_exit(-1);
+                                        crate::utils::clean_and_exit(-1);
                                         break;
                                     } else {
                                         warn!(
@@ -492,7 +492,7 @@ impl Guard {
                             );
                             if thread_num > thread_limit * 2 {
                                 error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
-                                crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                                 break;
                             }
                             exception_handler.set(Exception::ThreadThresholdExceeded);
@@ -532,7 +532,7 @@ impl Guard {
                                 Some(last) if last.elapsed() > config.max_sockets_tolerate_interval => {
                                     warn!("the number of socket exceeds the limit longer than {:?}, deepflow-agent restart...", config.max_sockets_tolerate_interval);
                                     warn!("opened sockets:\n{}", SocketInfo { tcp, tcp6, udp, udp6 });
-                                    crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                    crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                                     break;
                                 }
                                 Some(last) => {
