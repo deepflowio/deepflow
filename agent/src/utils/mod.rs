@@ -36,16 +36,11 @@ pub mod test;
 use std::thread;
 use std::time::Duration;
 
-const WIN_ERROR_CODE_STR: &str = "please browse website(https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes) to get more detail";
-
-pub fn notify_exit(code: i32) {
+pub fn clean_and_exit(code: i32) {
     thread::sleep(Duration::from_secs(1));
+
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    if let Err(_) =
-        nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM)
-    {
-        std::process::exit(code);
-    }
-    #[cfg(target_os = "windows")]
+    pid_file::close();
+
     std::process::exit(code);
 }

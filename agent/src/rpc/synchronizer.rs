@@ -1041,7 +1041,7 @@ impl Synchronizer {
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
                         // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
-                        crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                        crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                         return;
                     }
                 }
@@ -1076,7 +1076,7 @@ impl Synchronizer {
                     let diff = ntp_diff.load(Ordering::Relaxed);
                     if diff > max_interval {
                         warn!("Closing NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", diff/NANOS_IN_SECOND);
-                        crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                        crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                         return;
                     }
                     ntp_diff.store(0, Ordering::Relaxed);
@@ -1161,7 +1161,7 @@ impl Synchronizer {
                     Ok(last_offset) => {
                         if !first && (last_offset - offset).abs() >= max_interval {
                             warn!("Openning NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", offset/ NANOS_IN_SECOND);
-                            crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                            crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                             return;
                         }
                     }
@@ -1573,7 +1573,7 @@ impl Synchronizer {
                             Ok(true) => {
                                 agent_state.terminate();
                                 warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
-                                crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
+                                crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                                 return;
                             },
                             Ok(false) => (), // upgrade terminated

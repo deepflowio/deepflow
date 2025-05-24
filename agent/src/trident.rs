@@ -432,8 +432,6 @@ impl SenderEncoder {
 pub struct Trident {
     state: Arc<AgentState>,
     handle: Option<JoinHandle<()>>,
-    #[cfg(target_os = "linux")]
-    pid_file: Option<crate::utils::pid_file::PidFile>,
 }
 
 impl Trident {
@@ -473,13 +471,10 @@ impl Trident {
             }
         };
         #[cfg(target_os = "linux")]
-        let pid_file = if !config.pid_file.is_empty() {
-            match crate::utils::pid_file::PidFile::open(&config.pid_file) {
-                Ok(file) => Some(file),
-                Err(e) => return Err(anyhow!("Create pid file {} failed: {}", config.pid_file, e)),
+        if !config.pid_file.is_empty() {
+            if let Err(e) = crate::utils::pid_file::open(&config.pid_file) {
+                return Err(anyhow!("Create pid file {} failed: {}", config.pid_file, e));
             }
-        } else {
-            None
         };
 
         let controller_ip: IpAddr = config.controller_ips[0].parse()?;
@@ -616,24 +611,19 @@ impl Trident {
                         "Launching deepflow-agent failed: {}, deepflow-agent restart...",
                         e
                     );
-                    crate::utils::notify_exit(1);
+                    crate::utils::clean_and_exit(1);
                 }
             });
         let handle = match main_loop {
             Ok(h) => Some(h),
             Err(e) => {
                 error!("Failed to create main-loop thread: {}", e);
-                crate::utils::notify_exit(1);
+                crate::utils::clean_and_exit(1);
                 None
             }
         };
 
-        Ok(Trident {
-            state,
-            handle,
-            #[cfg(target_os = "linux")]
-            pid_file,
-        })
+        Ok(Trident { state, handle })
     }
 
     fn run(
@@ -1181,10 +1171,9 @@ impl Trident {
     }
 
     pub fn stop(&mut self) {
-        info!("Gracefully stopping");
         self.state.terminate();
-        self.handle.take().unwrap().join().unwrap();
-        info!("Gracefully stopped");
+        info!("Agent stopping");
+        crate::utils::clean_and_exit(0);
     }
 }
 
@@ -1322,7 +1311,7 @@ fn component_on_config_change(
                             "build dispatcher_component failed: {}, deepflow-agent restart...",
                             e
                         );
-                        crate::utils::notify_exit(1);
+                        crate::utils::clean_and_exit(1);
                     }
                 }
             }
@@ -1442,7 +1431,7 @@ fn component_on_config_change(
                             "build dispatcher_component failed: {}, deepflow-agent restart...",
                             e
                         );
-                        crate::utils::notify_exit(1);
+                        crate::utils::clean_and_exit(1);
                     }
                 }
             }
@@ -1576,7 +1565,7 @@ impl DomainNameListener {
                                 Ok(tuple) => tuple,
                                 Err(e) => {
                                     warn!("get ctrl ip and mac failed with error: {}, deepflow-agent restart...", e);
-                                    crate::utils::notify_exit(1);
+                                    crate::utils::clean_and_exit(1);
                                     continue;
                                 }
                             };
@@ -1592,20 +1581,20 @@ impl DomainNameListener {
                                 if let Err(e) = netns::NsFile::Root.open_and_setns() {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}, deepflow-agent restart...", e);
-                                    crate::utils::notify_exit(1);
+                                    crate::utils::clean_and_exit(1);
                                     continue;
                                 }
                                 let (ip, mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
                                     Ok(tuple) => tuple,
                                     Err(e) => {
                                         warn!("get ctrl ip and mac failed with error: {}, deepflow-agent restart...", e);
-                                        crate::utils::notify_exit(1);
+                                        crate::utils::clean_and_exit(1);
                                         continue;
                                     }
                                 };
                                 if let Err(e) = netns::reset_netns() {
                                     warn!("reset setns error: {}, deepflow-agent restart...", e);
-                                    crate::utils::notify_exit(1);
+                                    crate::utils::clean_and_exit(1);
                                     continue;
                                 }
                                 AgentId { ip, mac, ..Default::default() }
