@@ -213,6 +213,7 @@ type VTapCache struct {
 	exceptions         int64
 	vTapLcuuid         *string
 	vTapGroupLcuuid    *string
+	vTapGroupShortID   *string
 	cpuNum             int
 	memorySize         int64
 	arch               *string
@@ -309,6 +310,7 @@ func (c *VTapCache) String() ([]byte, error) {
 		"bootTime":                c.GetBootTime(),
 		"exceptions":              c.GetExceptions(),
 		"vTapGroupLcuuid":         c.GetVTapGroupLcuuid(),
+		"vTapGroupShortID":        c.GetVTapGroupShortID(),
 		"licenseType":             c.GetLicenseType(),
 		"tapMode":                 c.GetTapMode(),
 		"teamID":                  c.GetTeamID(),
@@ -373,6 +375,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.exceptions = vtap.Exceptions
 	vTapCache.vTapLcuuid = proto.String(vtap.VTapLcuuid)
 	vTapCache.vTapGroupLcuuid = proto.String(vtap.VtapGroupLcuuid)
+	vTapCache.vTapGroupShortID = proto.String(vTapInfo.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 	vTapCache.cpuNum = vtap.CPUNum
 	vTapCache.memorySize = vtap.MemorySize
 	vTapCache.arch = proto.String(vtap.Arch)
@@ -962,8 +965,19 @@ func (c *VTapCache) GetVTapGroupLcuuid() string {
 	return ""
 }
 
+func (c *VTapCache) GetVTapGroupShortID() string {
+	if c.vTapGroupShortID != nil {
+		return *c.vTapGroupShortID
+	}
+	return ""
+}
+
 func (c *VTapCache) updateVTapGroupLcuuid(lcuuid string) {
 	c.vTapGroupLcuuid = &lcuuid
+}
+
+func (c *VTapCache) updateVTapGroupShortID(shortID string) {
+	c.vTapGroupShortID = &shortID
 }
 
 func (c *VTapCache) getPodDomains() []string {
@@ -1495,6 +1509,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *metadbmodel.VTap) {
 	// 采集器组变化 重新生成平台数据
 	if c.GetVTapGroupLcuuid() != vtap.VtapGroupLcuuid {
 		c.updateVTapGroupLcuuid(vtap.VtapGroupLcuuid)
+		c.updateVTapGroupShortID(v.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 		v.setVTapChangedForPD()
 	}
 	c.updateVTapConfigFromDB()
