@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	tagrecorderHealer "github.com/deepflowio/deepflow/server/controller/tagrecorder/healer"
 )
 
 // 为支持domain及其sub_domain的独立刷新，将缓存拆分成对应的独立Cache
@@ -87,6 +88,8 @@ type Cache struct {
 
 	DiffBaseDataSet *diffbase.DataSet
 	ToolDataSet     *tool.DataSet
+
+	tagrecorderHealers *tagrecorderHealer.Healers // tagrecorder 的 healer，用于处理 tag 相关的资源
 }
 
 func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.Duration) *Cache {
@@ -101,6 +104,7 @@ func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.D
 		ToolDataSet:      tool.NewDataSet(md),     // 各类资源的映射关系，用于按需进行数据转换
 	}
 	c.StartSelfHealing()
+	c.tagrecorderHealers = tagrecorderHealer.NewHealers(&md.MetadataBase)
 	return c
 }
 
@@ -199,9 +203,15 @@ func (c *Cache) TryRefresh() bool {
 
 }
 
+func (c *Cache) triggerTagrecorderHealers() {
+	c.tagrecorderHealers.Run()
+}
+
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
+
+	c.triggerTagrecorderHealers()
 
 	c.DiffBaseDataSet = diffbase.NewDataSet(c.metadata)
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
