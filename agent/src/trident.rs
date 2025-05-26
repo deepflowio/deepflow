@@ -2200,7 +2200,7 @@ impl AgentComponents {
                 .vhost_user
                 .vhost_socket_path
                 .is_empty()
-                || candidate_config.dispatcher.dpdk_source != DpdkSource::None)
+                || candidate_config.dispatcher.dpdk_source == DpdkSource::PDump)
         {
             packet_fanout_count = 1;
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
@@ -2583,20 +2583,7 @@ impl AgentComponents {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let queue_size = config_handler.ebpf().load().queue_size;
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        let queue_name = "0-ebpf-dpdk-to-dispatcher";
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let (dpdk_ebpf_sender, dpdk_ebpf_receiver, counter) =
-            queue::bounded_with_debug(queue_size, queue_name, &queue_debugger);
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        stats_collector.register_countable(
-            &stats::QueueStats {
-                id: 0,
-                module: queue_name,
-            },
-            Countable::Owned(Box::new(counter)),
-        );
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let mut dpdk_ebpf_receiver = Some(dpdk_ebpf_receiver);
+        let mut dpdk_ebpf_senders = vec![];
 
         let mut tap_interfaces = vec![];
         for (i, entry) in interfaces_and_ns.into_iter().enumerate() {
@@ -2607,6 +2594,23 @@ impl AgentComponents {
             tap_interfaces.extend(links.clone());
             #[cfg(target_os = "linux")]
             let netns = entry.1;
+
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            let queue_name = "0-ebpf-dpdk-to-dispatcher";
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            let (dpdk_ebpf_sender, dpdk_ebpf_receiver, counter) =
+                queue::bounded_with_debug(queue_size, queue_name, &queue_debugger);
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            stats_collector.register_countable(
+                &stats::QueueStats {
+                    id: i,
+                    module: queue_name,
+                },
+                Countable::Owned(Box::new(counter)),
+            );
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            dpdk_ebpf_senders.push(dpdk_ebpf_sender);
+
             let dispatcher_component = build_dispatchers(
                 i,
                 links,
@@ -2637,7 +2641,7 @@ impl AgentComponents {
                 #[cfg(target_os = "linux")]
                 libvirt_xml_extractor.clone(),
                 #[cfg(target_os = "linux")]
-                dpdk_ebpf_receiver.take(),
+                Some(dpdk_ebpf_receiver),
                 #[cfg(target_os = "linux")]
                 {
                     packet_fanout_count > 1
@@ -2869,7 +2873,7 @@ impl AgentComponents {
                 config_handler.flow(),
                 config_handler.collector(),
                 policy_getter,
-                dpdk_ebpf_sender,
+                dpdk_ebpf_senders,
                 log_sender,
                 l7_stats_sender,
                 proc_event_sender,
