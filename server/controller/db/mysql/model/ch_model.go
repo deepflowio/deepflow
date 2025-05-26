@@ -46,24 +46,20 @@ type ChRegion struct {
 type ChAZ struct {
 	ChIDBase        `gorm:"embedded"`
 	ChUpdatedAtBase `gorm:"embedded"`
-	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name     string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
-	IconID   int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	Name            string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 }
 
 type ChVPC struct {
 	ChIDBase        `gorm:"embedded"`
 	ChUpdatedAtBase `gorm:"embedded"`
-	// ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name     string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
-	IconID   int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	UID      string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
-	TeamID   int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	// UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	Name            string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	UID             string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 }
 
 func (ChVPC) TableName() string {
