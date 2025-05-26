@@ -99,9 +99,9 @@ func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber 
 	return ss
 }
 
-func (m *SubscriberManager) GetSubscriber(resourceType string) Subscriber {
+func (m *SubscriberManager) GetSubscriber(subResourceType, resourceType string) Subscriber {
 	for _, s := range m.subscribers {
-		if s.GetSubResourceType() == resourceType {
+		if s.GetResourceType() == resourceType && s.GetSubResourceType() == subResourceType {
 			return s
 		}
 	}
@@ -167,6 +167,7 @@ type Subscriber interface {
 	Subscribe()
 	SetConfig(config.ControllerConfig)
 	GetSubResourceType() string
+	GetResourceType() string // 获取CH表资源类型
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
@@ -232,6 +233,10 @@ func newSubscriberComponent[
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) GetSubResourceType() string {
 	return s.subResourceTypeName
+}
+
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) GetResourceType() string {
+	return s.resourceTypeName
 }
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) initDBOperator() {
