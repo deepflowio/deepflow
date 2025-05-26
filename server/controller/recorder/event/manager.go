@@ -89,10 +89,10 @@ func (e *ManagerComponent) enqueue(md *message.Metadata, resourceLcuuid string, 
 	if rt == "" {
 		rt = common.DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
 	}
-	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event, md.LogPrefixORGID)
+	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event, md.LogPrefixes)
 	err := e.Queue.Put(event)
 	if err != nil {
-		log.Error(putEventIntoQueueFailed(rt, err), md.LogPrefixORGID)
+		log.Error(putEventIntoQueueFailed(rt, err), md.LogPrefixes)
 	}
 }
 
@@ -110,7 +110,7 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 	e.fillEvent(md, event, eventType, instanceName, instanceType, instanceID, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
-		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), md.LogPrefixORGID)
+		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), md.LogPrefixes)
 	} else {
 		dbItem := metadbmodel.ResourceEvent{
 			Domain:  domainLcuuid,
@@ -118,9 +118,9 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 		}
 		err = md.GetDB().Create(&dbItem).Error
 		if err != nil {
-			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), md.LogPrefixORGID)
+			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), md.LogPrefixes)
 		} else {
-			log.Infof("create resource_event (detail: %#v) success", dbItem, md.LogPrefixORGID)
+			log.Infof("create resource_event (detail: %#v) success", dbItem, md.LogPrefixes)
 			return
 		}
 	}
