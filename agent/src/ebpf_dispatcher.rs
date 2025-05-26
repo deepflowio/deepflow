@@ -543,7 +543,11 @@ pub unsafe fn string_from_null_terminated_c_str(ptr: *const u8) -> String {
 }
 
 impl EbpfCollector {
-    extern "C" fn ebpf_l7_callback(_: *mut c_void, sd: *mut ebpf::SK_BPF_DATA) {
+    extern "C" fn ebpf_l7_callback(
+        _: *mut c_void,
+        #[allow(unused)] queue_id: c_int,
+        sd: *mut ebpf::SK_BPF_DATA,
+    ) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
@@ -567,7 +571,7 @@ impl EbpfCollector {
                 match DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
                     Err(Terminated(a, b)) => {
                         error!("dpdk init error: {:?}, deepflow-agent restart...", (a, b));
-                        crate::utils::notify_exit(1);
+                        crate::utils::clean_and_exit(1);
                     }
                     Err(e) => {
                         warn!("meta packet send ebpf error: {:?}", e);
@@ -617,6 +621,7 @@ impl EbpfCollector {
 
     extern "C" fn ebpf_profiler_callback(
         #[allow(unused)] ctx: *mut c_void,
+        #[allow(unused)] queue_id: c_int,
         data: *mut ebpf::stack_profile_data,
     ) {
         unsafe {

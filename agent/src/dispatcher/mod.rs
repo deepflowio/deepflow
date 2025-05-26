@@ -1341,7 +1341,7 @@ impl DispatcherBuilder {
                             "Create dpdk with {:?} again, restart agent ...",
                             options.dpdk_source
                         );
-                        crate::utils::notify_exit(1);
+                        crate::utils::clean_and_exit(1);
                         return Err(Error::ConfigInvalid("Restart agent...".into()));
                     }
                     info!(

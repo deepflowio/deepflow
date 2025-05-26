@@ -16,6 +16,7 @@
 
 use std::{mem::size_of, path::PathBuf, process};
 
+use log::debug;
 use windows::Win32::{
     Foundation::{CloseHandle, GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
@@ -28,12 +29,9 @@ use windows::Win32::{
     },
 };
 
-use log::debug;
+use public::utils::WIN_ERROR_CODE_STR;
 
-use crate::{
-    error::{Error, Result},
-    utils::WIN_ERROR_CODE_STR,
-};
+use crate::error::{Error, Result};
 
 //返回当前进程占用内存RSS单位（字节）
 pub fn get_memory_rss() -> Result<u64> {

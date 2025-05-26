@@ -102,6 +102,7 @@ func (e *AgentEvent) generateDynamicConfig(clusterID string, c *vtap.VTapCache) 
 		Enabled:              proto.Bool(c.GetVTapEnabled() != 0),
 		KubernetesApiEnabled: proto.Bool(false),
 		Hostname:             proto.String(c.GetVTapHost()),
+		GroupId:              proto.String(c.GetVTapGroupShortID()),
 		RegionId:             proto.Uint32(uint32(c.GetRegionID())),
 		PodClusterId:         proto.Uint32(uint32(c.GetPodClusterID())),
 		VpcId:                proto.Uint32(uint32(c.GetVPCID())),
