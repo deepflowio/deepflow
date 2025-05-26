@@ -528,7 +528,7 @@ pub struct EbpfCollector {
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
-static mut DPDK_SENDER: Option<DebugSender<Box<packet::Packet>>> = None;
+static mut DPDK_SENDERS: Option<Vec<DebugSender<Box<packet::Packet>>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut POLICY_GETTER: Option<PolicyGetter> = None;
@@ -556,6 +556,7 @@ impl EbpfCollector {
             let sd = &mut sd.read_unaligned();
             #[cfg(feature = "extended_observability")]
             if sd.source == ebpf::DATA_SOURCE_DPDK {
+                let queue_id = queue_id as usize;
                 let mut temp =
                     slice::from_raw_parts_mut(sd.cap_data as *mut u8, sd.cap_len as usize).to_vec();
                 let ptr = temp.as_mut_ptr();
@@ -568,7 +569,7 @@ impl EbpfCollector {
                     data: slice::from_raw_parts_mut(ptr, sd.cap_len as usize),
                     raw: Some(ptr),
                 };
-                match DPDK_SENDER.as_mut().unwrap().send(Box::new(packet)) {
+                match DPDK_SENDERS.as_mut().unwrap()[queue_id].send(Box::new(packet)) {
                     Err(Terminated(a, b)) => {
                         error!("dpdk init error: {:?}, deepflow-agent restart...", (a, b));
                         crate::utils::clean_and_exit(1);
@@ -708,7 +709,7 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
-        dpdk_sender: DebugSender<Box<packet::Packet<'static>>>,
+        dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         policy_getter: PolicyGetter,
@@ -722,7 +723,7 @@ impl EbpfCollector {
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
-            DPDK_SENDER = Some(dpdk_sender);
+            DPDK_SENDERS = Some(dpdk_senders);
             PROC_EVENT_SENDER = Some(proc_event_sender);
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             POLICY_GETTER = Some(policy_getter);
@@ -1217,7 +1218,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
-        dpdk_sender: DebugSender<Box<packet::Packet<'static>>>,
+        dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         output: DebugSender<AppProto>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
@@ -1247,7 +1248,7 @@ impl EbpfCollector {
         let config_handle = Self::ebpf_init(
             &ebpf_config,
             sender,
-            dpdk_sender,
+            dpdk_senders,
             proc_event_output,
             ebpf_profile_sender,
             policy_getter,

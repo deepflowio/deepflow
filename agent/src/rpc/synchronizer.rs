@@ -824,6 +824,7 @@ impl Synchronizer {
                 _ => (),
             }
         }
+        user_config.adjust();
 
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
