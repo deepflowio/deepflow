@@ -2769,7 +2769,9 @@ is greater than 1, multiple dispatcher threads will be launched, consuming more 
 memory. Increasing the `packet_fanout_count` helps to reduce the operating system's
 software interrupts on multi-core CPU servers.
 
-Attention: only valid for `inputs.cbpf.common.capture_mode` = `Local`
+Attention:
+- only valid for `inputs.cbpf.common.capture_mode` = `Local`
+- When `self.inputs.cbpf.special_network.dpdk.source` is `eBPF`, this configuration value is forced to be `self.inputs.ebpf.tunning.userspace_worker_threads`
 
 ##### Packet Fanout Mode {#inputs.cbpf.af_packet.tunning.packet_fanout_mode}
 

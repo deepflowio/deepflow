@@ -2714,7 +2714,9 @@ inputs:
 线程并行处理，弹性扩展 dispatcher 以优化网络应用的处理性能。增大此配置可以降低
 多核服务器的操作系统软中断数量，但会消耗更多的 CPU 和内存。
 
-注意：参数仅在`inputs.cbpf.common.capture_mode`为 `本地流量`，且`inputs.cbpf.af_packet.extra_netns_regex`为空时有效。
+注意：
+- 参数仅在`inputs.cbpf.common.capture_mode`为 `本地流量`，且`inputs.cbpf.af_packet.extra_netns_regex`为空时有效。
+- 当`self.inputs.cbpf.special_network.dpdk.source`为`eBPF`时，这个配置值会被强制置为`self.inputs.ebpf.tunning.userspace_worker_threads`
 
 ##### Packet Fanout 模式 {#inputs.cbpf.af_packet.tunning.packet_fanout_mode}
 
