@@ -356,6 +356,8 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 	metricHasSkipped := false
 	var l *prompb.Label
 	tsLen, extraLen := len(ts.Labels), len(extraLabels)
+	instanceCount := 0
+	var instance0, instance1, instance2 string
 	for i := 0; i < tsLen+extraLen; i++ {
 		if i < tsLen {
 			l = &ts.Labels[i]
@@ -365,6 +367,19 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 		if !metricHasSkipped && l.Name == model.MetricNameLabel {
 			metricHasSkipped = true
 			continue
+		}
+		if l.Name == model.InstanceLabel {
+			if instanceCount == 0 {
+				instance0 = l.Value
+			} else if instanceCount == 1 {
+				instance1 = l.Value
+			} else {
+				instance2 = l.Value
+			}
+			instanceCount++
+			if instanceCount >= 2 {
+				log.Infof("lizf count %d %d %d %d  instance0: %s 1:%s 2:%s", instanceCount, i, tsLen, extraLen, instance0, instance1, instance2)
+			}
 		}
 		b.counter.LabelCount++
 		nameID, ok := b.labelTable.QueryLabelNameID(orgId, l.Name)
@@ -411,6 +426,10 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 		return false, fmt.Errorf("prometheum metric name(%s) is empty", metricName)
 	}
 
+	if metricName == "container_memory_working_set_bytes" && strings.Contains(podName, "deepflow-byconity-fdb-log-4") {
+		log.Infof("lizf1 get prometheus data instance=%s podname=%s %v %+v", instance, podName, ts, extraLabels)
+	}
+
 	b.appLabelValueIDsBuffer = append(b.appLabelValueIDsBuffer,
 		// aligned by b.appLabelColumnAlign
 		appLableValueIDsMaxBuffer[:(int(maxColumnIndex)+(b.appLabelColumnAlign-1))/b.appLabelColumnAlign*b.appLabelColumnAlign+1]...)
@@ -451,6 +470,9 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			if i == 0 {
 				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
 				universalTag = &m.UniversalTag
+				if strings.Contains(podName, "deepflow-byconity-fdb-log-4") && strings.Contains(instance, "10.233.101.81") {
+					log.Infof("lizf2 pod name: %s podnameid: %v universalTag %+v  %v %v", podName, podNameID, m.UniversalTag, ts, extraLabels)
+				}
 			} else {
 				if universalTag != nil {
 					// all samples share the same universal tag
@@ -466,6 +488,8 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 	}
 	return false, nil
 }
+
+var a uint64
 
 func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, podNameID, instanceID uint32, fillWithVtapId bool) {
 	// fast path
@@ -500,6 +524,9 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 
 	// slow path
 	b.fillUniversalTagSlow(m, vtapID, podName, instance, fillWithVtapId)
+	if podName == "deepflow-byconity-fdb-log-4" {
+		log.Infof("lizf3 slow podNameID=%d  instance=%s UniversalTag=%s ", podNameID, instance, m.UniversalTag)
+	}
 
 	// update fast path
 	if podName != "" && podNameID != 0 {
