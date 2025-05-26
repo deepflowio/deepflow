@@ -17,6 +17,8 @@
 package message
 
 import (
+	"fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -30,7 +32,7 @@ type Metadata struct {
 	SubDomainID     int
 	SubDomainLcuuid string
 
-	LogPrefixes
+	LogPrefixes        []logger.Prefix
 	AdditionalMetadata // Additional metadata for specific message types
 }
 
@@ -62,28 +64,33 @@ func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
 	md := &Metadata{
 		ORGID: orgID,
 	}
+	md.LogPrefixes = []logger.Prefix{logger.NewORGPrefix(orgID)}
 	for _, option := range options {
 		option(md)
 	}
-	md.SetLogORGIDPrefix(orgID)
 	return md
 }
 
 func MetadataSubDomainID(id int) func(*Metadata) {
 	return func(m *Metadata) {
 		m.SubDomainID = id
+		if m.SubDomainID != 0 {
+			m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(id))
+		}
 	}
 }
 
 func MetadataTeamID(id int) func(*Metadata) {
 	return func(m *Metadata) {
 		m.TeamID = id
+		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(id))
 	}
 }
 
 func MetadataDomainID(id int) func(*Metadata) {
 	return func(m *Metadata) {
 		m.DomainID = id
+		m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(id))
 	}
 }
 
@@ -135,15 +142,26 @@ func (m *AdditionalMetadata) GetDB() *metadb.DB {
 	return m.DB
 }
 
-type LogPrefixes struct {
-	LogPrefixORGID  logger.Prefix
-	LogPrefixTeamID logger.Prefix
+type DomainIDLogPrefix struct {
+	ID int
 }
 
-func (l *LogPrefixes) SetLogORGIDPrefix(id int) {
-	l.LogPrefixORGID = logger.NewORGPrefix(id)
+func NewDomainPrefix(id int) logger.Prefix {
+	return &DomainIDLogPrefix{id}
 }
 
-func (l *LogPrefixes) SetLogPrefixTeamID(id int) {
-	l.LogPrefixTeamID = logger.NewTeamPrefix(id)
+func (p *DomainIDLogPrefix) Prefix() string {
+	return fmt.Sprintf("[DomainID-%d]", p.ID)
+}
+
+type SubDomainIDLogPrefix struct {
+	ID int
+}
+
+func NewSubDomainPrefix(id int) logger.Prefix {
+	return &SubDomainIDLogPrefix{id}
+}
+
+func (p *SubDomainIDLogPrefix) Prefix() string {
+	return fmt.Sprintf("[SubDomainID-%d]", p.ID)
 }

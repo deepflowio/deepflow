@@ -62,7 +62,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 		}
 		podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(item.PodGroupID)
 		if !ok {
-			log.Errorf("db pod_group type(id: %d) not found", item.PodGroupID, md.LogPrefixORGID)
+			log.Errorf("db pod_group type(id: %d) not found", item.PodGroupID, md.LogPrefixes)
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{
@@ -113,12 +113,12 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 
 		oldPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetOld())
 		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixORGID)
+			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixes)
 		}
 
 		newPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetNew())
 		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixORGID)
+			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixes)
 		}
 
 		nIDs, ips := p.getIPNetworksByID(md, id)
