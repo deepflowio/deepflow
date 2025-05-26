@@ -950,6 +950,7 @@ CREATE TABLE IF NOT EXISTS process (
 );
 TRUNCATE TABLE process;
 COMMENT ON COLUMN process.os_app_tags IS 'separated by ,';
+CREATE INDEX process_gid_update_index ON process (gid, updated_at);
 
 CREATE TABLE IF NOT EXISTS genesis_vpc (
     lcuuid          VARCHAR(64),
@@ -2431,7 +2432,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, key)
 );
-CREATE INDEX ch_pod_k8s_label_updated_at_index ON ch_pod_k8s_label(updated_at);
+CREATE INDEX ch_pod_k8s_label_id_updated_at_index ON ch_pod_k8s_label(id, updated_at);
 TRUNCATE TABLE ch_pod_k8s_label;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
@@ -2456,6 +2457,7 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_chost_cloud_tag;
+CREATE INDEX ch_chost_cloud_tag_id_updated_at_index ON ch_chost_cloud_tag(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     id                      INTEGER NOT NULL,
@@ -2468,6 +2470,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_pod_ns_cloud_tag;
+CREATE INDEX ch_pod_ns_cloud_tag_id_updated_at_index ON ch_pod_ns_cloud_tag(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2536,6 +2539,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_pod_service_k8s_label;
+CREATE INDEX ch_pod_service_k8s_label_id_updated_at_index ON ch_pod_service_k8s_label(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2562,6 +2566,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_pod_k8s_annotation;
+CREATE INDEX ch_pod_k8s_annotation_id_updated_at_index ON ch_pod_k8s_annotation(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2588,6 +2593,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_pod_service_k8s_annotation;
+CREATE INDEX ch_pod_service_k8s_annotation_id_updated_at_index ON ch_pod_service_k8s_annotation(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2614,6 +2620,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_pod_k8s_env;
+CREATE INDEX ch_pod_k8s_env_id_updated_at_index ON ch_pod_k8s_env(id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
     id                      INTEGER NOT NULL PRIMARY KEY,

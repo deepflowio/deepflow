@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS process (
     container_id        CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
+    deleted_at          DATETIME DEFAULT NULL,
+    INDEX gid_updated_at_index(id, updated_at)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
 
@@ -1999,7 +2000,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`),
-    INDEX updated_at_index(`updated_at`)
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_label;
 
@@ -2292,7 +2293,8 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
     `team_id`       INTEGER,
     `domain_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost_cloud_tag;
 
@@ -2304,7 +2306,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tag;
 
@@ -2372,7 +2375,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_label;
 
@@ -2398,7 +2402,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
@@ -2424,7 +2429,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
@@ -2525,7 +2531,8 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    PRIMARY KEY (`id`, `key`),
+    INDEX id_updated_at_index(id, updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_env;
 
