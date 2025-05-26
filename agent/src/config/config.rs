@@ -25,7 +25,7 @@ use std::time::Duration;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use envmnt::{ExpandOptions, ExpansionType};
-use log::{error, info};
+use log::{debug, error, info};
 use md5::{Digest, Md5};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use procfs::process::Process;
@@ -2601,6 +2601,19 @@ impl UserConfig {
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
     const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
+
+    pub fn adjust(&mut self) {
+        // DPDK from eBPF
+        if self.inputs.ebpf.tunning.userspace_worker_threads as usize
+            != self.inputs.cbpf.af_packet.tunning.packet_fanout_count
+            && self.inputs.cbpf.special_network.dpdk.source == DpdkSource::Ebpf
+        {
+            debug!("Update inputs.cbpf.af_packet.tunning.packet_fanout_count with self.inputs.ebpf.tunning.userspace_worker_threads({}) when self.inputs.cbpf.special_network.dpdk.source is {:?}",
+                self.inputs.ebpf.tunning.userspace_worker_threads, self.inputs.cbpf.special_network.dpdk.source);
+            self.inputs.cbpf.af_packet.tunning.packet_fanout_count =
+                self.inputs.ebpf.tunning.userspace_worker_threads as usize;
+        }
+    }
 
     pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
         if self.processors.packet.policy.fast_path_map_size > 0 {
