@@ -343,6 +343,10 @@ type PodNamespace struct {
 type PodService struct {
 	Lcuuid             string `json:"lcuuid" binding:"required"`
 	Name               string `json:"name" binding:"required"`
+	Metadata           string `json:"-"`
+	MetadataHash       string `json:"metadata_hash"`
+	Spec               string `json:"-"`
+	SpecHash           string `json:"spec_hash"`
 	Label              string `json:"label"`
 	Annotation         string `json:"annotation"`
 	Type               int    `json:"type" binding:"required"`
@@ -372,6 +376,10 @@ type PodServicePort struct {
 type PodGroup struct {
 	Lcuuid             string `json:"lcuuid" binding:"required"`
 	Name               string `json:"name" binding:"required"`
+	Metadata           string `json:"-"`
+	MetadataHash       string `json:"metadata_hash"`
+	Spec               string `json:"-"`
+	SpecHash           string `json:"spec_hash"`
 	Label              string `json:"label"`
 	Type               int    `json:"type" binding:"required"`
 	PodNum             int    `json:"pod_num" binding:"required"`
@@ -458,7 +466,8 @@ type Pod struct {
 type ConfigMap struct {
 	Lcuuid             string    `json:"lcuuid" binding:"required"`
 	Name               string    `json:"name" binding:"required"`
-	Data               string    `json:"data"` // TODO @kangxiang confirm
+	Data               string    `json:"-"`
+	DataHash           string    `json:"data_hash"`
 	PodNamespaceLcuuid string    `json:"pod_namespace_lcuuid" binding:"required"`
 	PodClusterLcuuid   string    `json:"pod_cluster_lcuuid" binding:"required"`
 	VPCLcuuid          string    `json:"vpc_lcuuid" binding:"required"`
