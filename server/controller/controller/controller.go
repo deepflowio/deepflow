@@ -142,7 +142,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
-	err := event.GetSubscriberManager().Start(shared.ResourceEventQueue)
+	err := event.GetSubscriberManager().Start(cfg.ManagerCfg.TaskCfg.RecorderCfg.EventCfg, shared.ResourceEventQueue)
 	if err != nil {
 		log.Errorf("resource event subscriber manager start failed: %s", err.Error())
 		time.Sleep(time.Second)

@@ -18,7 +18,6 @@ package event
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -26,58 +25,28 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-type PodService struct {
+type PodGroup struct {
 	ManagerComponent
 	CUDSubscriberComponent
-	cfg        config.Config
-	deviceType int
+	cfg config.Config
 }
 
-func NewPodService(cfg config.Config, q *queue.OverwriteQueue) *PodService {
-	mng := &PodService{
+func NewPodGroup(cfg config.Config, q *queue.OverwriteQueue) *PodGroup {
+	mng := &PodGroup{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, q),
 		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
 		cfg,
-		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE,
 	}
 	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *PodService) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*metadbmodel.PodService) {
-		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetPodServiceInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
-		} else {
-			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
-			}...)
-		}
-		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(item.ID),
-			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagL3DeviceType(p.deviceType),
-			eventapi.TagL3DeviceID(item.ID),
-			eventapi.TagPodClusterID(item.PodClusterID),
-			eventapi.TagPodNSID(item.PodNamespaceID),
-		}...)
-
-		p.createInstanceAndEnqueue(md,
-			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			item.Name,
-			p.deviceType,
-			item.ID,
-			opts...,
-		)
-	}
+func (p *PodGroup) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	// TODO remove
 }
 
-func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.PodServiceFieldsUpdate)
+func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
+	fields := msg.(*message.PodGroupFieldsUpdate)
 	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
 		return
 	}
@@ -94,15 +63,13 @@ func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
 
 		opts = []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(fields.GetID()),
+			eventapi.TagPodGroupID(fields.GetID()),
 			eventapi.TagAttributes([]string{eventapi.AttributeNameConfig}, []string{diff}),
 		}
 	}
 	c.createAndEnqueue(md, fields.GetLcuuid(), eventType, opts...)
 }
 
-func (p *PodService) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*metadbmodel.PodService) {
-		p.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
-	}
+func (p *PodGroup) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	// TODO remove
 }

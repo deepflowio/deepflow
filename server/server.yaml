@@ -282,6 +282,9 @@ controller:
           #  - all
           #  - vpc
         mysql_batch_size: 2500
+        event:
+          # context lines count for config diff
+          config_diff_context: 3
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
