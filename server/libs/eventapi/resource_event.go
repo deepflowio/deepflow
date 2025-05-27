@@ -19,14 +19,19 @@ package eventapi
 import "github.com/deepflowio/deepflow/server/libs/pool"
 
 const (
-	RESOURCE_EVENT_TYPE_CREATE        = "create"
-	RESOURCE_EVENT_TYPE_DELETE        = "delete"
-	RESOURCE_EVENT_TYPE_UPDATE_STATE  = "update-state"
-	RESOURCE_EVENT_TYPE_MIGRATE       = "migrate"
-	RESOURCE_EVENT_TYPE_RECREATE      = "recreate"
-	RESOURCE_EVENT_TYPE_ADD_IP        = "add-ip"
-	RESOURCE_EVENT_TYPE_REMOVE_IP     = "remove-ip"
-	RESOURCE_EVENT_TYPE_UPDATE_CONFIG = "update-config"
+	RESOURCE_EVENT_TYPE_CREATE            = "create"
+	RESOURCE_EVENT_TYPE_DELETE            = "delete"
+	RESOURCE_EVENT_TYPE_UPDATE_STATE      = "update-state"
+	RESOURCE_EVENT_TYPE_MIGRATE           = "migrate"
+	RESOURCE_EVENT_TYPE_RECREATE          = "recreate"
+	RESOURCE_EVENT_TYPE_ADD_IP            = "add-ip"
+	RESOURCE_EVENT_TYPE_REMOVE_IP         = "remove-ip"
+	RESOURCE_EVENT_TYPE_ADD_CONFIG        = "add-config"
+	RESOURCE_EVENT_TYPE_UPDATE_CONFIG     = "update-config"
+	RESOURCE_EVENT_TYPE_DELETE_CONFIG     = "delete-config"
+	RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP    = "add-config-map"
+	RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP = "update-config-map"
+	RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP = "delete-config-map"
 )
 
 type ResourceEvent struct {
@@ -42,25 +47,23 @@ type ResourceEvent struct {
 	GProcessID         uint32 // if this value is set, InstanceType and InstanceID are empty
 	GProcessName       string // if this value is set, InstanceName is empty
 
-	IfNeedTagged   bool // if need ingester set tag
-	RegionID       uint32
-	AZID           uint32
-	VPCID          uint32
-	L3DeviceType   uint32
-	L3DeviceID     uint32
-	HostID         uint32
-	PodClusterID   uint32
-	PodNSID        uint32
-	PodNodeID      uint32
-	PodServiceID   uint32
-	PodGroupID     uint32
-	PodGroupType   uint8
-	PodID          uint32
-	SubnetID       uint32
-	IP             string
-	PodConfigMapID uint32
-	ConfigDiff     string
-	Config         string
+	IfNeedTagged bool // if need ingester set tag
+	RegionID     uint32
+	AZID         uint32
+	VPCID        uint32
+	L3DeviceType uint32
+	L3DeviceID   uint32
+	HostID       uint32
+	PodClusterID uint32
+	PodNSID      uint32
+	PodNodeID    uint32
+	PodServiceID uint32
+	PodGroupID   uint32
+	PodGroupType uint8
+	PodID        uint32
+	SubnetID     uint32
+	IP           string
+	ConfigMapID  uint32
 
 	AttributeNames  []string
 	AttributeValues []string
@@ -69,7 +72,42 @@ type ResourceEvent struct {
 	TeamID uint16
 }
 
+const (
+	AttributeNameConfig = "config"
+)
+
 type TagFieldOption func(opts *ResourceEvent)
+
+func TagConfigMapID(id uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.ConfigMapID = id
+	}
+}
+
+func TagAttributes(names, values []string) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.AttributeNames = names
+		r.AttributeValues = values
+	}
+}
+
+func TagInstanceType(instanceType uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.InstanceType = instanceType
+	}
+}
+
+func TagInstanceID(instanceID uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.InstanceID = instanceID
+	}
+}
+
+func TagInstanceName(instanceName string) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.InstanceName = instanceName
+	}
+}
 
 func TagAttributeSubnetIDs(netIDs []uint32) TagFieldOption {
 	return func(r *ResourceEvent) {

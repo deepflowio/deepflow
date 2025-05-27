@@ -58,7 +58,7 @@ func (n *NATGateway) OnResourceBatchAdded(md *message.Metadata, msg interface{})
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		n.createAndEnqueue(md,
+		n.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -71,6 +71,6 @@ func (n *NATGateway) OnResourceBatchAdded(md *message.Metadata, msg interface{})
 
 func (n *NATGateway) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.NATGateway) {
-		n.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, n.deviceType, item.ID)
+		n.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, n.deviceType, item.ID)
 	}
 }

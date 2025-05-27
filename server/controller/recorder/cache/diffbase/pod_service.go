@@ -38,6 +38,10 @@ func (b *DataSet) AddPodService(dbItem *metadbmodel.PodService, seq int, toolDat
 		Annotation:       dbItem.Annotation,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
+		Metadata:         dbItem.Metadata,
+		MetadataHash:     dbItem.MetadataHash,
+		Spec:             dbItem.Spec,
+		SpecHash:         dbItem.SpecHash,
 		PodIngressLcuuid: podIngressLcuuid,
 		RegionLcuuid:     dbItem.Region,
 		AZLcuuid:         dbItem.AZ,
@@ -59,6 +63,10 @@ type PodService struct {
 	Selector         string `json:"selector"`
 	ExternalIP       string `json:"external_ip"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
+	Metadata         string `json:"metadata"`
+	MetadataHash     string `json:"metadata_hash"`
+	Spec             string `json:"spec"`
+	SpecHash         string `json:"spec_hash"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
 	RegionLcuuid     string `json:"region_lcuuid"`
 	AZLcuuid         string `json:"az_lcuuid"`
@@ -71,6 +79,10 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.Annotation = cloudItem.Annotation
 	p.Selector = cloudItem.Selector
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
+	p.Metadata = cloudItem.Metadata
+	p.MetadataHash = cloudItem.MetadataHash
+	p.Spec = cloudItem.Spec
+	p.SpecHash = cloudItem.SpecHash
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid

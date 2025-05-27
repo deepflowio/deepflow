@@ -129,7 +129,7 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagGProcessName(item.Name), // TODO @weiqiang why use name
 		}...)
 
-		p.createAndEnqueue(
+		p.createInstanceAndEnqueue(
 			md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
@@ -147,7 +147,7 @@ func (p *Process) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) 
 			eventapi.TagGProcessID(uint32(item.ID)),
 			eventapi.TagGProcessName(item.Name),
 		}
-		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID, opts...)
+		p.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID, opts...)
 	}
 }
 
