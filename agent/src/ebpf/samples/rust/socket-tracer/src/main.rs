@@ -256,10 +256,10 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}\n{}", 
+            println!("{} <{}> BATCHLAST {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
-                     (*sd).need_reconfirm,
+                     (*sd).batch_last_data,
                      (*sd).direction,
                      (*sd).msg_type,
                      (*sd).process_id,
@@ -281,10 +281,10 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}",
+            println!("{} <{}> BATCHLAST {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
-                     (*sd).need_reconfirm,
+                     (*sd).batch_last_data,
                      (*sd).direction,
                      (*sd).msg_type,
                      (*sd).process_id,
