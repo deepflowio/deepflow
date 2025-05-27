@@ -69,7 +69,7 @@ func (r *VRouter) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndEnqueue(md,
+		r.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -82,6 +82,6 @@ func (r *VRouter) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (r *VRouter) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.VRouter) {
-		r.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, r.deviceType, item.ID)
+		r.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, r.deviceType, item.ID)
 	}
 }

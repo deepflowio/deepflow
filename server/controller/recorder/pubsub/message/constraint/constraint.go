@@ -38,8 +38,8 @@ type Add interface {
 		message.PeerConnectionAdd | message.RDSInstanceAdd | message.RedisInstanceAdd | message.PodClusterAdd |
 		message.PodNodeAdd | message.VMPodNodeConnectionAdd | message.PodNamespaceAdd | message.PodIngressAdd |
 		message.PodIngressRuleAdd | message.PodIngressRuleBackendAdd | message.PodServiceAdd |
-		message.PodServicePortAdd | message.PodGroupAdd | message.PodGroupPortAdd | message.PodReplicaSetAdd |
-		message.PodAdd | message.ProcessAdd | message.VIPAdd | message.CustomServiceAdd
+		message.PodServicePortAdd | message.PodGroupAdd | message.ConfigMapAdd | message.PodGroupConfigMapConnectionAdd |
+		message.PodGroupPortAdd | message.PodReplicaSetAdd | message.PodAdd | message.ProcessAdd | message.VIPAdd | message.CustomServiceAdd
 }
 
 type UpdatePtr[T Update] interface {
@@ -65,8 +65,8 @@ type Update interface {
 		message.PeerConnectionUpdate | message.RDSInstanceUpdate | message.RedisInstanceUpdate | message.PodClusterUpdate |
 		message.PodNodeUpdate | message.VMPodNodeConnectionUpdate | message.PodNamespaceUpdate | message.PodIngressUpdate |
 		message.PodIngressRuleUpdate | message.PodIngressRuleBackendUpdate | message.PodServiceUpdate |
-		message.PodServicePortUpdate | message.PodGroupUpdate | message.PodGroupPortUpdate | message.PodReplicaSetUpdate |
-		message.PodUpdate | message.ProcessUpdate | message.VIPUpdate | message.CustomServiceUpdate
+		message.PodServicePortUpdate | message.PodGroupUpdate | message.ConfigMapUpdate | message.PodGroupConfigMapConnectionUpdate |
+		message.PodGroupPortUpdate | message.PodReplicaSetUpdate | message.PodUpdate | message.ProcessUpdate | message.VIPUpdate | message.CustomServiceUpdate
 }
 
 type FieldsUpdatePtr[T FieldsUpdate] interface {
@@ -88,7 +88,8 @@ type FieldsUpdate interface {
 		message.PeerConnectionFieldsUpdate | message.RDSInstanceFieldsUpdate | message.RedisInstanceFieldsUpdate | message.PodClusterFieldsUpdate |
 		message.PodNodeFieldsUpdate | message.VMPodNodeConnectionFieldsUpdate | message.PodNamespaceFieldsUpdate | message.PodIngressFieldsUpdate |
 		message.PodIngressRuleFieldsUpdate | message.PodIngressRuleBackendFieldsUpdate | message.PodServiceFieldsUpdate |
-		message.PodServicePortFieldsUpdate | message.PodGroupFieldsUpdate | message.PodGroupPortFieldsUpdate | message.PodReplicaSetFieldsUpdate |
+		message.PodServicePortFieldsUpdate | message.PodGroupFieldsUpdate | message.ConfigMapFieldsUpdate |
+		message.PodGroupConfigMapConnectionFieldsUpdate | message.PodGroupPortFieldsUpdate | message.PodReplicaSetFieldsUpdate |
 		message.PodFieldsUpdate | message.ProcessFieldsUpdate | message.VIPFieldsUpdate | message.CustomServiceFieldsUpdate
 }
 
@@ -112,6 +113,6 @@ type Delete interface {
 		message.PeerConnectionDelete | message.RDSInstanceDelete | message.RedisInstanceDelete | message.PodClusterDelete |
 		message.PodNodeDelete | message.VMPodNodeConnectionDelete | message.PodNamespaceDelete | message.PodIngressDelete |
 		message.PodIngressRuleDelete | message.PodIngressRuleBackendDelete | message.PodServiceDelete |
-		message.PodServicePortDelete | message.PodGroupDelete | message.PodGroupPortDelete | message.PodReplicaSetDelete |
-		message.PodDelete | message.ProcessDelete | message.VIPDelete | message.CustomServiceDelete
+		message.PodServicePortDelete | message.PodGroupDelete | message.ConfigMapDelete | message.PodGroupConfigMapConnectionDelete |
+		message.PodGroupPortDelete | message.PodReplicaSetDelete | message.PodDelete | message.ProcessDelete | message.VIPDelete | message.CustomServiceDelete
 }

@@ -59,3 +59,7 @@ func NewSubDomainPrefix(name string) logger.Prefix {
 func (p *SubDomainNameLogPrefix) Prefix() string {
 	return fmt.Sprintf("[SubDomainName-%s]", p.Name)
 }
+
+func ResourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string) string {
+	return fmt.Sprintf("%s (lcuuid: %s) for %s (lcuuid: %s) not found", resourceA, lcuuidA, resourceB, lcuuidB)
+}

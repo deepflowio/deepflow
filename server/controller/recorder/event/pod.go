@@ -79,7 +79,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, item.PodNodeID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
-			p.createAndEnqueue(md,
+			p.createInstanceAndEnqueue(md,
 				item.Lcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
@@ -88,7 +88,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 				opts...,
 			)
 		} else {
-			p.enqueueIfInsertIntoMySQLFailed(
+			p.enqueueInstanceIfInsertIntoMySQLFailed(
 				md,
 				item.Lcuuid,
 				domainLcuuid,
@@ -140,7 +140,7 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		if len(ips) > 0 {
 			opts = append(opts, eventapi.TagIP(ips[0]))
 		}
-		p.enqueueIfInsertIntoMySQLFailed(
+		p.enqueueInstanceIfInsertIntoMySQLFailed(
 			md,
 			updatedFields.GetLcuuid(),
 			domainLcuuid,
@@ -155,7 +155,7 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 
 func (p *Pod) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, lcuuid := range msg.([]*metadbmodel.Pod) {
-		p.createAndEnqueue(md, lcuuid.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, lcuuid.Name, p.deviceType, lcuuid.ID)
+		p.createInstanceAndEnqueue(md, lcuuid.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, lcuuid.Name, p.deviceType, lcuuid.ID)
 	}
 }
 

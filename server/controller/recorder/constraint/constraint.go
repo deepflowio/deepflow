@@ -46,8 +46,8 @@ type MySQLModel interface {
 		metadbmodel.PeerConnection | metadbmodel.RDSInstance | metadbmodel.RedisInstance | metadbmodel.PodCluster |
 		metadbmodel.PodNode | metadbmodel.VMPodNodeConnection | metadbmodel.PodNamespace | metadbmodel.PodIngress |
 		metadbmodel.PodIngressRule | metadbmodel.PodIngressRuleBackend | metadbmodel.PodService |
-		metadbmodel.PodServicePort | metadbmodel.PodGroup | metadbmodel.PodGroupPort | metadbmodel.PodReplicaSet |
-		metadbmodel.Pod | metadbmodel.Process | metadbmodel.VIP | metadbmodel.CustomService
+		metadbmodel.PodServicePort | metadbmodel.PodGroup | metadbmodel.ConfigMap | metadbmodel.PodGroupConfigMapConnection |
+		metadbmodel.PodGroupPort | metadbmodel.PodReplicaSet | metadbmodel.Pod | metadbmodel.Process | metadbmodel.VIP | metadbmodel.CustomService
 
 	GetID() int
 	GetUpdatedAt() time.Time
@@ -63,8 +63,8 @@ type CloudModel interface {
 		cloudmodel.PeerConnection | cloudmodel.RDSInstance | cloudmodel.RedisInstance | cloudmodel.PodCluster |
 		cloudmodel.PodNode | cloudmodel.VMPodNodeConnection | cloudmodel.PodNamespace | cloudmodel.PodIngress |
 		cloudmodel.PodIngressRule | cloudmodel.PodIngressRuleBackend | cloudmodel.PodService |
-		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet |
-		cloudmodel.Pod | cloudmodel.Process | cloudmodel.VIP
+		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.ConfigMap | cloudmodel.PodGroupConfigMapConnection |
+		cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet | cloudmodel.Pod | cloudmodel.Process | cloudmodel.VIP
 }
 
 // 资源用于比对的缓存对象
@@ -77,8 +77,8 @@ type DiffBase interface {
 		*diffbase.PeerConnection | *diffbase.RDSInstance | *diffbase.RedisInstance | *diffbase.PodCluster |
 		*diffbase.PodNode | *diffbase.VMPodNodeConnection | *diffbase.PodNamespace | *diffbase.PodIngress |
 		*diffbase.PodIngressRule | *diffbase.PodIngressRuleBackend | *diffbase.PodService |
-		*diffbase.PodServicePort | *diffbase.PodGroup | *diffbase.PodGroupPort | *diffbase.PodReplicaSet |
-		*diffbase.Pod | *diffbase.Process | *diffbase.VIP
+		*diffbase.PodServicePort | *diffbase.PodGroup | *diffbase.ConfigMap | *diffbase.PodGroupConfigMapConnection |
+		*diffbase.PodGroupPort | *diffbase.PodReplicaSet | *diffbase.Pod | *diffbase.Process | *diffbase.VIP
 
 	GetSequence() int
 	SetSequence(sequence int)
@@ -91,8 +91,8 @@ type MySQLSoftDeleteModel interface {
 		metadbmodel.VRouter | metadbmodel.DHCPPort | metadbmodel.NATGateway |
 		metadbmodel.LB | metadbmodel.LBListener | metadbmodel.CEN | metadbmodel.PeerConnection | metadbmodel.RDSInstance |
 		metadbmodel.RedisInstance | metadbmodel.PodCluster | metadbmodel.PodNode | metadbmodel.PodNamespace |
-		metadbmodel.PodIngress | metadbmodel.PodService | metadbmodel.PodGroup | metadbmodel.PodReplicaSet | metadbmodel.Pod |
-		metadbmodel.Process
+		metadbmodel.PodIngress | metadbmodel.PodService | metadbmodel.PodGroup | metadbmodel.ConfigMap |
+		metadbmodel.PodReplicaSet | metadbmodel.Pod | metadbmodel.Process
 
 	GetDomainLcuuid() string
 	GetSubDomainLcuuid() string

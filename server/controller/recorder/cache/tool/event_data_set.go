@@ -63,6 +63,7 @@ type IPKey struct {
 	Lcuuid string
 }
 
+// TODO remove unused structs because event using subscriber framework now
 type hostInfo struct {
 	Name     string
 	RegionID int

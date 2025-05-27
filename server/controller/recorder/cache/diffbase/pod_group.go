@@ -32,6 +32,10 @@ func (b *DataSet) AddPodGroup(dbItem *metadbmodel.PodGroup, seq int) {
 		Label:           dbItem.Label,
 		PodNum:          dbItem.PodNum,
 		Type:            dbItem.Type,
+		Metadata:        dbItem.Metadata,
+		MetadataHash:    dbItem.MetadataHash,
+		Spec:            dbItem.Spec,
+		SpecHash:        dbItem.SpecHash,
 		RegionLcuuid:    dbItem.Region,
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
@@ -50,6 +54,10 @@ type PodGroup struct {
 	Label           string `json:"label"`
 	PodNum          int    `json:"pod_num"`
 	Type            int    `json:"type"`
+	Metadata        string `json:"metadata"`
+	MetadataHash    string `json:"metadata_hash"`
+	Spec            string `json:"spec"`
+	SpecHash        string `json:"spec_hash"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
@@ -60,6 +68,10 @@ func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup) {
 	p.Label = cloudItem.Label
 	p.PodNum = cloudItem.PodNum
 	p.Type = cloudItem.Type
+	p.Metadata = cloudItem.Metadata
+	p.MetadataHash = cloudItem.MetadataHash
+	p.Spec = cloudItem.Spec
+	p.SpecHash = cloudItem.SpecHash
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, p))
