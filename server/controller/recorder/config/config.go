@@ -16,6 +16,10 @@
 
 package config
 
+import (
+	eventConfig "github.com/deepflowio/deepflow/server/controller/recorder/event/config"
+)
+
 var cfg *RecorderConfig
 
 type RecorderConfig struct {
@@ -28,6 +32,7 @@ type RecorderConfig struct {
 	MySQLBatchSize               int    `default:"2500" yaml:"mysql_batch_size"`
 
 	LogDebug LogDebugConfig `yaml:"log_debug"`
+	EventCfg eventConfig.Config
 }
 
 func Get() *RecorderConfig {

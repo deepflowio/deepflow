@@ -57,7 +57,7 @@ func (l *LB) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		l.createAndEnqueue(md,
+		l.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -70,6 +70,6 @@ func (l *LB) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (l *LB) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.LB) {
-		l.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, l.deviceType, item.ID)
+		l.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, l.deviceType, item.ID)
 	}
 }
