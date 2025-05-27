@@ -18,8 +18,10 @@ package common
 
 import (
 	"bufio"
+	"crypto/md5"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -750,4 +752,12 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 	}
 
 	return vtapIDToSubDomain, nil
+}
+
+func GenerateMD5Sum(data string) string {
+	if data == "" {
+		return ""
+	}
+	hash := md5.Sum([]byte(data))
+	return hex.EncodeToString(hash[:])
 }

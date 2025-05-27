@@ -28,6 +28,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -68,6 +69,7 @@ type KubernetesGather struct {
 	serviceLcuuidToIngressLcuuid map[string]string
 	k8sInfo                      map[string][]string
 	pgLcuuidToPSLcuuids          map[string][]string
+	configMapToLcuuid            map[[2]string]string
 	podLcuuidToPGInfo            map[string][2]string
 	nsLabelToGroupLcuuids        map[string]mapset.Set
 	pgLcuuidTopodTargetPorts     map[string]map[string]int
@@ -207,6 +209,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mys
 		serviceLcuuidToIngressLcuuid: map[string]string{},
 		k8sInfo:                      map[string][]string{},
 		pgLcuuidToPSLcuuids:          map[string][]string{},
+		configMapToLcuuid:            map[[2]string]string{},
 		podLcuuidToPGInfo:            map[string][2]string{},
 		nsLabelToGroupLcuuids:        map[string]mapset.Set{},
 		pgLcuuidTopodTargetPorts:     map[string]map[string]int{},
@@ -249,6 +252,76 @@ func (k *KubernetesGather) GetLabel(labelMap map[string]interface{}) string {
 	return strings.Join(labelSlice, ", ")
 }
 
+func (k *KubernetesGather) simpleJsonMarshal(json *simplejson.Json) string {
+	bytes, err := json.MarshalJSON()
+	if err != nil {
+		log.Infof("simplejson (%s) marshal failed: %s", json, err.Error(), logger.NewORGPrefix(k.orgID))
+		return ""
+	}
+	return string(bytes)
+}
+
+func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid string, mainSpec *simplejson.Json) []cloudmodel.PodGroupConfigMapConnection {
+	var connections []cloudmodel.PodGroupConfigMapConnection
+
+	existSet := map[string]bool{}
+	spec := mainSpec.GetPath("template", "spec")
+	containers := spec.Get("containers")
+	for c := range containers.MustArray() {
+		envs := containers.GetIndex(c).Get("env")
+		for e := range envs.MustArray() {
+			env := envs.GetIndex(e)
+			ref, ok := env.Get("valueFrom").CheckGet("configMapKeyRef")
+			if !ok {
+				continue
+			}
+			cmName := ref.Get("Name").MustString()
+			cmLcuuid, ok := k.configMapToLcuuid[[2]string{nsName, cmName}]
+			if !ok {
+				log.Infof("pod group (%s) imported env config map (%s) not found", pgName, cmName, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			if _, ok := existSet[pgLcuuid+cmLcuuid]; ok {
+				log.Debugf("env pod group (%s) and config map (%s) connections already exists", pgName, cmName, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			connections = append(connections, cloudmodel.PodGroupConfigMapConnection{
+				Lcuuid:          common.GetUUIDByOrgID(k.orgID, pgLcuuid+cmLcuuid),
+				PodGroupLcuuid:  pgLcuuid,
+				ConfigMapLcuuid: cmLcuuid,
+			})
+			existSet[pgLcuuid+cmLcuuid] = false
+		}
+	}
+
+	volumes := spec.Get("volumes")
+	for v := range volumes.MustArray() {
+		volume := volumes.GetIndex(v)
+		cm, ok := volume.CheckGet("configMap")
+		if !ok {
+			continue
+		}
+		cmName := cm.Get("name").MustString()
+		cmLcuuid, ok := k.configMapToLcuuid[[2]string{nsName, cmName}]
+		if !ok {
+			log.Infof("pod group (%s) imported volumes config map (%s) not found", pgName, cmName, logger.NewORGPrefix(k.orgID))
+			continue
+		}
+		if _, ok := existSet[pgLcuuid+cmLcuuid]; ok {
+			log.Debugf("volumes pod group (%s) and config map (%s) connections already exists", pgName, cmName, logger.NewORGPrefix(k.orgID))
+			continue
+		}
+		connections = append(connections, cloudmodel.PodGroupConfigMapConnection{
+			Lcuuid:          common.GetUUIDByOrgID(k.orgID, pgLcuuid+cmLcuuid),
+			PodGroupLcuuid:  pgLcuuid,
+			ConfigMapLcuuid: cmLcuuid,
+		})
+		existSet[pgLcuuid+cmLcuuid] = false
+	}
+
+	return connections
+}
+
 func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherResource, error) {
 	// 任务循环的是同一个实例，所以这里要对关联关系进行初始化
 	k.azLcuuid = ""
@@ -263,6 +336,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.serviceLcuuidToIngressLcuuid = map[string]string{}
 	k.nsLabelToGroupLcuuids = map[string]mapset.Set{}
 	k.pgLcuuidToPSLcuuids = map[string][]string{}
+	k.configMapToLcuuid = map[[2]string]string{}
 	k.podLcuuidToPGInfo = map[string][2]string{}
 	k.pgLcuuidTopodTargetPorts = map[string]map[string]int{}
 	k.namespaceToExLabels = map[string]map[string]interface{}{}
@@ -309,24 +383,31 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		return model.KubernetesGatherResource{}, err
 	}
 
-	podGroups, err := k.getPodGroups()
+	configMaps, err := k.getConfigMaps()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
 
-	podRCs, err := k.getPodReplicationControllers()
+	podGroups, podGroupConfigMapConnections, err := k.getPodGroups()
+	if err != nil {
+		return model.KubernetesGatherResource{}, err
+	}
+
+	podRCs, podRCsConfigMapConnections, err := k.getPodReplicationControllers()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
 
 	podGroups = append(podGroups, podRCs...)
+	podGroupConfigMapConnections = append(podGroupConfigMapConnections, podRCsConfigMapConnections...)
 
-	replicaSets, podRSCs, err := k.getReplicaSetsAndReplicaSetControllers()
+	replicaSets, podRSCs, podRSCsConfigMapConnections, err := k.getReplicaSetsAndReplicaSetControllers()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
 
 	podGroups = append(podGroups, podRSCs...)
+	podGroupConfigMapConnections = append(podGroupConfigMapConnections, podRSCsConfigMapConnections...)
 
 	podServices, servicePorts, podGroupPorts, serviceNetworks, serviceSubnets, serviceVinterfaces, serviceIPs, err := k.getPodServices()
 	if err != nil {
@@ -354,33 +435,35 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	}
 
 	resource := model.KubernetesGatherResource{
-		Region:                 region,
-		AZ:                     az,
-		VPC:                    vpc,
-		PodNodes:               podNodes,
-		PodCluster:             podCluster,
-		PodServices:            podServices,
-		PodNamespaces:          podNamespaces,
-		PodNetwork:             podNetwork,
-		PodSubnets:             podSubnets,
-		PodVInterfaces:         podVInterfaces,
-		PodIPs:                 podIPs,
-		PodNodeNetwork:         nodeNetwork,
-		PodNodeSubnets:         nodeSubnets,
-		PodNodeVInterfaces:     nodeVInterfaces,
-		PodNodeIPs:             nodeIPs,
-		PodServiceNetwork:      serviceNetworks,
-		PodServiceSubnets:      serviceSubnets,
-		PodServiceVInterfaces:  serviceVinterfaces,
-		PodServiceIPs:          serviceIPs,
-		PodServicePorts:        servicePorts,
-		PodGroupPorts:          podGroupPorts,
-		PodIngresses:           ingresses,
-		PodIngressRules:        ingressRules,
-		PodIngressRuleBackends: ingressRuleBackends,
-		PodReplicaSets:         replicaSets,
-		PodGroups:              podGroups,
-		Pods:                   pods,
+		Region:                       region,
+		AZ:                           az,
+		VPC:                          vpc,
+		PodNodes:                     podNodes,
+		PodCluster:                   podCluster,
+		PodServices:                  podServices,
+		PodNamespaces:                podNamespaces,
+		PodNetwork:                   podNetwork,
+		PodSubnets:                   podSubnets,
+		PodVInterfaces:               podVInterfaces,
+		PodIPs:                       podIPs,
+		PodNodeNetwork:               nodeNetwork,
+		PodNodeSubnets:               nodeSubnets,
+		PodNodeVInterfaces:           nodeVInterfaces,
+		PodNodeIPs:                   nodeIPs,
+		PodServiceNetwork:            serviceNetworks,
+		PodServiceSubnets:            serviceSubnets,
+		PodServiceVInterfaces:        serviceVinterfaces,
+		PodServiceIPs:                serviceIPs,
+		PodServicePorts:              servicePorts,
+		PodGroupPorts:                podGroupPorts,
+		PodGroupConfigMapConnections: podGroupConfigMapConnections,
+		PodIngresses:                 ingresses,
+		PodIngressRules:              ingressRules,
+		PodIngressRuleBackends:       ingressRuleBackends,
+		PodReplicaSets:               replicaSets,
+		PodGroups:                    podGroups,
+		ConfigMaps:                   configMaps,
+		Pods:                         pods,
 	}
 
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
