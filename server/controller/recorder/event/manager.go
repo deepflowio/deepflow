@@ -40,41 +40,37 @@ func newManagerComponent(rt string, q *queue.OverwriteQueue) ManagerComponent {
 	}
 }
 
-func (e *ManagerComponent) createAndEnqueue(
+// TODO remove
+func (e *ManagerComponent) createInstanceAndEnqueue(
 	md *message.Metadata,
 	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
-	// use interface in eventapi to create ResourceEvent instance which will be enqueued, because we need to manually free instance memory
-	event := eventapi.AcquireResourceEvent()
-	e.fillEvent(md, event, eventType, instanceName, instanceType, instanceID, options...)
-	e.enqueue(md, resourceLcuuid, event)
+	options = append(
+		options,
+		eventapi.TagInstanceType(uint32(instanceType)),
+		eventapi.TagInstanceID(uint32(instanceID)),
+		eventapi.TagInstanceName(instanceName))
+
+	e.createAndEnqueue(md, resourceLcuuid, eventType, options...)
 }
 
-// TODO delete this method
-func (e *ManagerComponent) createProcessAndEnqueue(
-	md *message.Metadata,
-	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
+func (e *ManagerComponent) createAndEnqueue(
+	md *message.Metadata, resourceLcuuid, eventType string, options ...eventapi.TagFieldOption) {
 	// use interface in eventapi to create ResourceEvent instance which will be enqueued, because we need to manually free instance memory
 	event := eventapi.AcquireResourceEvent()
-	e.fillEvent(md, event, eventType, instanceName, instanceType, instanceID, options...)
-	// add process info
-	event.GProcessID = uint32(instanceID)
-	event.GProcessName = instanceName
+	e.fillEvent(md, event, eventType, options...)
 	e.enqueue(md, resourceLcuuid, event)
 }
 
 func (e ManagerComponent) fillEvent(
 	md *message.Metadata,
 	event *eventapi.ResourceEvent,
-	eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+	eventType string, options ...eventapi.TagFieldOption,
 ) {
 	event.ORGID = uint16(md.GetORGID())
 	event.TeamID = uint16(md.GetTeamID())
 	event.Time = time.Now().Unix()
 	event.TimeMilli = time.Now().UnixMilli()
 	event.Type = eventType
-	event.InstanceType = uint32(instanceType)
-	event.InstanceID = uint32(instanceID)
-	event.InstanceName = instanceName
 	event.IfNeedTagged = true
 	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
 		event.IfNeedTagged = false
@@ -96,18 +92,33 @@ func (e *ManagerComponent) enqueue(md *message.Metadata, resourceLcuuid string, 
 	}
 }
 
+func (e *ManagerComponent) enqueueInstanceIfInsertIntoMySQLFailed(
+	md *message.Metadata,
+	resourceLcuuid, domainLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+) {
+	options = append(
+		options,
+		eventapi.TagInstanceType(uint32(instanceType)),
+		eventapi.TagInstanceID(uint32(instanceID)),
+		eventapi.TagInstanceName(instanceName))
+
+	e.enqueueIfInsertIntoMySQLFailed(md, resourceLcuuid, domainLcuuid, eventType, options...)
+}
+
 // Due to the fixed sequence of resource learning, some data required by resource change events can only be obtained after the completion of subsequent resource learning.
-// Therefore, we need to store the change event temporarily until all resources are learned and the required data is filled before the queue is added
+// Therefore, we need to store the change event temporarily until all resources are learned and the required data is filled before the queue is added.
 // Such change events include:
 // - PodNode's/POD's create event, PodNode's/POD's add-ip event, fill in the L3Device information and HostID as required
 // - POD's recreate event, requires real-time IPs information
+// - ConfigMap's create event, ConfigMap's update event, ConfigMap's delete event, requires real-time PodGroup-ConfigMap connection information
+// If the event is not stored in MySQL, it will be directly enqueued.
 func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 	md *message.Metadata,
-	resourceLcuuid, domainLcuuid string, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+	resourceLcuuid, domainLcuuid, eventType string, options ...eventapi.TagFieldOption,
 ) {
 	// use struct to create ResourceEvent instance if it will be stored in MySQL
 	event := &eventapi.ResourceEvent{}
-	e.fillEvent(md, event, eventType, instanceName, instanceType, instanceID, options...)
+	e.fillEvent(md, event, eventType, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
 		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), md.LogPrefixes)
@@ -116,13 +127,11 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 			Domain:  domainLcuuid,
 			Content: string(content),
 		}
-		err = md.GetDB().Create(&dbItem).Error
-		if err != nil {
-			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), md.LogPrefixes)
-		} else {
+		if err = md.GetDB().Create(&dbItem).Error; err == nil {
 			log.Infof("create resource_event (detail: %#v) success", dbItem, md.LogPrefixes)
 			return
 		}
+		log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), md.LogPrefixes)
 	}
 
 	e.convertAndEnqueue(md, resourceLcuuid, event)
