@@ -96,7 +96,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
 		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
-		return retGenesisSyncData, err
+		return common.GenesisSyncDataResponse{}, err
 	}
 
 	var controllers []mmodel.Controller
@@ -148,7 +148,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
 			log.Error(msg, logger.NewORGPrefix(orgID))
-			return retGenesisSyncData, errors.New(msg)
+			return common.GenesisSyncDataResponse{}, errors.New(msg)
 		}
 		defer conn.Close()
 
@@ -161,7 +161,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		if err != nil {
 			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
 			log.Warning(msg, logger.NewORGPrefix(orgID))
-			return retGenesisSyncData, errors.New(msg)
+			return common.GenesisSyncDataResponse{}, errors.New(msg)
 		}
 
 		genesisSyncData := ret.GetData()
