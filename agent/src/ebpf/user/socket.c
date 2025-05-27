@@ -843,14 +843,6 @@ static struct tracer_sockopts datadump_sockopts = {
 	.get = datadump_sockopt_get,
 };
 
-// TODO : 标记上层是否需要重新确认协议准确性
-// 目前上层没有实现协议再次确认的功能,对需要重新确认的包直接丢弃,这里临时设置数据包不需要重新确认
-// 上层实现重新确认功能后再使用
-static inline bool need_proto_reconfirm(uint16_t l7_proto)
-{
-	return false;
-}
-
 static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
@@ -1216,11 +1208,10 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
 		submit_data->l7_protocal_hint = sd->data_type;
+		submit_data->batch_last_data = false;
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
-			submit_data->need_reconfirm =
-			    need_proto_reconfirm(sd->data_type);
 			submit_data->process_id = sd->tgid;
 			submit_data->thread_id = sd->pid;
 			submit_data->coroutine_id = sd->coroutine_id;
@@ -1305,6 +1296,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	}
 
 	submit_data = burst_data[nr - 1];
+	submit_data->batch_last_data = true;
 	block_head = (struct mem_block_head *)submit_data - 1;
 	block_head->is_last = 1;
 

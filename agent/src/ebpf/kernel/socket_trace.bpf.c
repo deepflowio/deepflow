@@ -3116,9 +3116,13 @@ skip_copy:
 	v_buff->len +=
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
+
 	/*
-	 * If the delay of the periodic push event exceeds the threshold, it
-	 * will be pushed immediately.
+	 * Batch data will be sent immediately if any of the following conditions are met:
+	 *
+	 * 1. The delay of the periodic push event exceeds the threshold (typically 50 milliseconds).
+	 * 2. The number of events exceeds the maximum batch size (MAX_EVENTS_BURST, typically 32).
+	 * 3. The data buffer is full (not enough space for another struct __socket_data).
 	 */
 	__u64 curr_time = bpf_ktime_get_ns();
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;

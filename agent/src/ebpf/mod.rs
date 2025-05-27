@@ -117,12 +117,6 @@ pub const FEATURE_SOCKET_TRACER: c_int = 7;
 #[allow(dead_code)]
 pub const FEATURE_DWARF_UNWINDING: c_int = 8;
 
-//L7层协议是否需要重新核实
-#[allow(dead_code)]
-pub const L7_PROTO_NOT_RECONFIRM: u8 = 0;
-#[allow(dead_code)]
-pub const L7_PROTO_NEED_RECONFIRM: u8 = 1;
-
 //追踪器当前状态
 #[allow(dead_code)]
 pub const TRACER_INIT: u8 = 0;
@@ -262,7 +256,7 @@ pub struct SK_BPF_DATA {
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
     // 目前只有 source=EBPF_TYPE_GO_HTTP2_UPROBE 时,msg_type的判断是准确的.
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
-    pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
+    pub batch_last_data: bool, // true: Indicates the last data item in the batch.
     // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
     pub is_tls: bool,
 
