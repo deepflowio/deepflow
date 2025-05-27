@@ -23,35 +23,37 @@ import (
 )
 
 type KubernetesGatherResource struct {
-	ErrorState             int
-	ErrorMessage           string
-	Region                 model.Region
-	AZ                     model.AZ
-	VPC                    model.VPC
-	PodCluster             model.PodCluster
-	PodNodes               []model.PodNode
-	PodNamespaces          []model.PodNamespace
-	PodGroups              []model.PodGroup
-	PodReplicaSets         []model.PodReplicaSet
-	Pods                   []model.Pod
-	PodServices            []model.PodService
-	PodServicePorts        []model.PodServicePort
-	PodGroupPorts          []model.PodGroupPort
-	PodIngresses           []model.PodIngress
-	PodIngressRules        []model.PodIngressRule
-	PodIngressRuleBackends []model.PodIngressRuleBackend
-	PodNodeNetwork         model.Network
-	PodNodeSubnets         []model.Subnet
-	PodNodeVInterfaces     []model.VInterface
-	PodNodeIPs             []model.IP
-	PodServiceNetwork      model.Network
-	PodServiceSubnets      []model.Subnet
-	PodServiceVInterfaces  []model.VInterface
-	PodServiceIPs          []model.IP
-	PodNetwork             model.Network
-	PodSubnets             []model.Subnet
-	PodVInterfaces         []model.VInterface
-	PodIPs                 []model.IP
+	ErrorState                   int
+	ErrorMessage                 string
+	Region                       model.Region
+	AZ                           model.AZ
+	VPC                          model.VPC
+	PodCluster                   model.PodCluster
+	PodNodes                     []model.PodNode
+	PodNamespaces                []model.PodNamespace
+	PodGroups                    []model.PodGroup
+	PodGroupConfigMapConnections []model.PodGroupConfigMapConnection
+	PodReplicaSets               []model.PodReplicaSet
+	ConfigMaps                   []model.ConfigMap
+	Pods                         []model.Pod
+	PodServices                  []model.PodService
+	PodServicePorts              []model.PodServicePort
+	PodGroupPorts                []model.PodGroupPort
+	PodIngresses                 []model.PodIngress
+	PodIngressRules              []model.PodIngressRule
+	PodIngressRuleBackends       []model.PodIngressRuleBackend
+	PodNodeNetwork               model.Network
+	PodNodeSubnets               []model.Subnet
+	PodNodeVInterfaces           []model.VInterface
+	PodNodeIPs                   []model.IP
+	PodServiceNetwork            model.Network
+	PodServiceSubnets            []model.Subnet
+	PodServiceVInterfaces        []model.VInterface
+	PodServiceIPs                []model.IP
+	PodNetwork                   model.Network
+	PodSubnets                   []model.Subnet
+	PodVInterfaces               []model.VInterface
+	PodIPs                       []model.IP
 }
 
 type KubernetesGatherBasicInfo struct {
