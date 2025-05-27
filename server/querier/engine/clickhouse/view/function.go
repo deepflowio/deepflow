@@ -605,25 +605,10 @@ func (f *PerSecondFunction) Init() {
 		}
 	}
 	if aggFuncName == FUNCTION_SUM || aggFuncName == FUNCTION_UNIQ_EXACT || aggFuncName == FUNCTION_UNIQ || aggFuncName == FUNCTION_COUNT {
-		if f.Time.Interval > 0 {
-			if f.Time.DatasourceInterval > f.Time.Interval {
-				interval = f.Time.DatasourceInterval
-			} else {
-				interval = f.Time.Interval
-			}
-		} else {
-			alignInterval := int(f.Time.TimeEnd)/f.Time.DatasourceInterval*f.Time.DatasourceInterval - int(f.Time.TimeStart)/f.Time.DatasourceInterval*f.Time.DatasourceInterval
-			if f.Time.DatasourceInterval > alignInterval {
-				interval = f.Time.DatasourceInterval
-			} else {
-				// not line chart
-				interval = alignInterval
-			}
-		}
+		interval = GetInterval(f.Time.Interval, f.Time.DatasourceInterval, int(f.Time.TimeStart), int(f.Time.TimeEnd), f.Time.WindowSize)
 	} else {
-		interval = f.Time.DatasourceInterval
+		interval = f.Time.DatasourceInterval * f.Time.WindowSize
 	}
-	interval = interval * f.Time.WindowSize
 	f.Fields = append(f.Fields, &Field{Value: strconv.Itoa(interval)})
 	f.divFunction = &DivFunction{
 		DefaultFunction: DefaultFunction{
@@ -860,12 +845,8 @@ func (f *MinFunction) GetWiths() []Node {
 	if !f.FillNullAsZero {
 		return f.DefaultFunction.GetWiths()
 	} else {
-		var count int
-		if f.Time.Interval > 0 {
-			count = f.Time.WindowSize * f.Time.Interval / f.Time.DatasourceInterval
-		} else {
-			count = int(f.Time.TimeEnd-f.Time.TimeStart)/f.Time.DatasourceInterval + 1
-		}
+		interval := GetInterval(f.Time.Interval, f.Time.DatasourceInterval, int(f.Time.TimeStart), int(f.Time.TimeEnd), f.Time.WindowSize)
+		count := interval / f.Time.DatasourceInterval
 		with := fmt.Sprintf(
 			"if(count(%s)=%d, min(%s), 0)",
 			f.Fields[0].ToString(), count, f.Fields[0].ToString(),
@@ -882,23 +863,27 @@ type CounterAvgFunction struct {
 	DefaultFunction
 }
 
-func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
+func GetInterval(displayInterval, datasourceInterval, timeStart, timeEnd, windowSize int) int {
 	var interval int
-	if f.Time.Interval > 0 {
-		if f.Time.DatasourceInterval > f.Time.Interval {
-			interval = f.Time.DatasourceInterval
+	if displayInterval > 0 {
+		if datasourceInterval > displayInterval {
+			interval = datasourceInterval
 		} else {
-			interval = f.Time.Interval
+			interval = displayInterval
 		}
 	} else {
-		alignInterval := int(f.Time.TimeEnd)/f.Time.DatasourceInterval*f.Time.DatasourceInterval - int(f.Time.TimeStart)/f.Time.DatasourceInterval*f.Time.DatasourceInterval
-		if f.Time.DatasourceInterval > alignInterval {
-			interval = f.Time.DatasourceInterval
-		} else {
-			// not line chart
-			interval = alignInterval
+		// not line chart
+		alignStart := int(timeStart)
+		if int(timeStart)%datasourceInterval != 0 {
+			alignStart = int(timeStart)/datasourceInterval*datasourceInterval + datasourceInterval
 		}
+		interval = int(timeEnd)/datasourceInterval*datasourceInterval - alignStart + datasourceInterval
 	}
+	interval = interval * windowSize
+	return interval
+}
+func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
+	interval := GetInterval(f.Time.Interval, f.Time.DatasourceInterval, int(f.Time.TimeStart), int(f.Time.TimeEnd), f.Time.WindowSize)
 	buf.WriteString(fmt.Sprintf("sum(%s)/(%d/%d)", f.Fields[0].ToString(), interval, f.Time.DatasourceInterval))
 	buf.WriteString(f.Math)
 	if f.Alias != "" {
