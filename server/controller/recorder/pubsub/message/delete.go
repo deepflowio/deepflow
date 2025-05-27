@@ -33,7 +33,7 @@ func (d *Lcuuids) SetLcuuids(lcuuids []string) {
 	d.data = lcuuids
 }
 
-// TODO rename to metadb
+// TODO rename to mysql
 type MySQLItems[T constraint.MySQLModel] struct {
 	data []*T
 }
@@ -265,6 +265,18 @@ type PodServicePortDelete struct {
 type PodGroupDelete struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodGroup]
+	addition[DeleteNoneAddition]
+}
+
+type ConfigMapDelete struct {
+	Lcuuids
+	MySQLItems[mysqlmodel.ConfigMap]
+	addition[DeleteNoneAddition]
+}
+
+type PodGroupConfigMapConnectionDelete struct {
+	Lcuuids
+	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
 	addition[DeleteNoneAddition]
 }
 

@@ -221,6 +221,10 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 			listener.NewPodReplicaSet(s.cache)),
 		updater.NewPod(s.cache, cloudData.Pods).RegisterListener(
 			listener.NewPod(s.cache, s.eventQueue)).BuildStatsd(s.statsd),
+		updater.NewConfigMap(s.cache, cloudData.ConfigMaps).RegisterListener(
+			listener.NewConfigMap(s.cache, d.eventQueue)),
+		updater.NewPodGroupConfigMapConnection(s.cache, cloudData.PodGroupConfigMapConnections).RegisterListener(
+			listener.NewPodGroupConfigMapConnection(s.cache, d.eventQueue)),
 		updater.NewNetwork(s.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(s.cache)),
 		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(

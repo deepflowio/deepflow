@@ -19,6 +19,8 @@ package event
 import (
 	"fmt"
 
+	"github.com/pmezard/go-difflib/difflib"
+
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -395,4 +397,16 @@ func findFromAllByID[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, id int) *
 		return nil
 	}
 	return item
+}
+
+func CompareConfig(old, new string, context int) string {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(old),
+		B:        difflib.SplitLines(new),
+		FromFile: "Old",
+		ToFile:   "New",
+		Context:  context,
+	}
+	text, _ := difflib.GetUnifiedDiffString(diff)
+	return text
 }

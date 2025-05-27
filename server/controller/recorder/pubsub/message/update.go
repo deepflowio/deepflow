@@ -97,7 +97,7 @@ func (d *fieldDetail[T]) SetOld(old T) {
 	d.old = old
 }
 
-// TODO rename to metadb
+// TODO rename to mysql
 type MySQLData[MT constraint.MySQLModel] struct {
 	new *MT
 	old *MT
@@ -641,6 +641,8 @@ type PodServiceFieldsUpdate struct {
 	Selector         fieldDetail[string]
 	ExternalIP       fieldDetail[string]
 	ServiceClusterIP fieldDetail[string]
+	Metadata         fieldDetail[string]
+	Spec             fieldDetail[string]
 	PodIngressID     fieldDetail[int]
 	PodIngressLcuuid fieldDetail[string]
 	AZLcuuid         fieldDetail[string]
@@ -673,6 +675,8 @@ type PodGroupFieldsUpdate struct {
 	Label          fieldDetail[string]
 	Type           fieldDetail[int]
 	PodNum         fieldDetail[int]
+	Metadata       fieldDetail[string]
+	Spec           fieldDetail[string]
 	AZLcuuid       fieldDetail[string]
 	RegionLcuuid   fieldDetail[string]
 	PodClusterID   fieldDetail[int]
@@ -683,6 +687,30 @@ type PodGroupUpdate struct {
 	CloudItem[cloudmodel.PodGroup]
 	DiffBase[*diffbase.PodGroup]
 	MySQLData[mysqlmodel.PodGroup]
+}
+
+type ConfigMapFieldsUpdate struct {
+	Key
+	Name fieldDetail[string]
+	Data fieldDetail[string]
+}
+
+type ConfigMapUpdate struct {
+	Fields[ConfigMapFieldsUpdate]
+	CloudItem[cloudmodel.ConfigMap]
+	DiffBase[*diffbase.ConfigMap]
+	MySQLData[mysqlmodel.ConfigMap]
+}
+
+type PodGroupConfigMapConnectionFieldsUpdate struct {
+	Key
+}
+
+type PodGroupConfigMapConnectionUpdate struct {
+	Fields[PodGroupConfigMapConnectionFieldsUpdate]
+	CloudItem[cloudmodel.PodGroupConfigMapConnection]
+	DiffBase[*diffbase.PodGroupConfigMapConnection]
+	MySQLData[mysqlmodel.PodGroupConfigMapConnection]
 }
 
 type PodGroupPortFieldsUpdate struct {

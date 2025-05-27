@@ -260,6 +260,8 @@ func (c *Cache) Refresh() {
 	c.refreshPodGroupPorts(podServiceIDs)
 	c.refreshPodReplicaSets()
 	c.refreshPods()
+	c.refreshConfigMaps()
+	c.refreshPodGroupConfigMapConnections()
 	networkIDs := c.refreshNetworks()
 	c.refreshSubnets(networkIDs)
 	c.refreshVInterfaces()
@@ -1431,6 +1433,55 @@ func (c *Cache) refreshPods() {
 	}
 
 	c.AddPods(pods)
+}
+
+func (c *Cache) AddConfigMaps(items []*mysqlmodel.ConfigMap) {
+	for _, item := range items {
+		c.DiffBaseDataSet.AddConfigMap(item, c.Sequence)
+		c.ToolDataSet.AddConfigMap(item)
+	}
+}
+
+func (c *Cache) DeleteConfigMaps(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.DeleteConfigMap(lcuuid)
+		c.ToolDataSet.DeleteConfigMap(lcuuid)
+	}
+}
+
+func (c *Cache) refreshConfigMaps() {
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN), c.metadata.LogPrefixes)
+	configMaps, err := rcommon.PageWhereFind[mysqlmodel.ConfigMap](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid)
+	if err != nil {
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, err), c.metadata.LogPrefixes)
+		return
+	}
+	c.AddConfigMaps(configMaps)
+}
+
+func (c *Cache) AddPodGroupConfigMapConnections(items []*mysqlmodel.PodGroupConfigMapConnection) {
+	for _, item := range items {
+		c.DiffBaseDataSet.AddPodGroupConfigMapConnection(item, c.Sequence)
+		c.ToolDataSet.AddPodGroupConfigMapConnection(item)
+	}
+}
+
+func (c *Cache) DeletePodGroupConfigMapConnections(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.DeletePodGroupConfigMapConnection(lcuuid)
+		c.ToolDataSet.DeletePodGroupConfigMapConnection(lcuuid)
+	}
+}
+
+func (c *Cache) refreshPodGroupConfigMapConnections() {
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN), c.metadata.LogPrefixes)
+	var podGroupConfigMapConnections []*mysqlmodel.PodGroupConfigMapConnection
+	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podGroupConfigMapConnections).Error
+	if err != nil {
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, err), c.metadata.LogPrefixes)
+		return
+	}
+	c.AddPodGroupConfigMapConnections(podGroupConfigMapConnections)
 }
 
 func (c *Cache) AddProcesses(items []*mysqlmodel.Process) {

@@ -205,6 +205,16 @@ type PodGroupAdd struct {
 	addition[AddNoneAddition]
 }
 
+type ConfigMapAdd struct {
+	MySQLItems[mysqlmodel.ConfigMap]
+	addition[AddNoneAddition]
+}
+
+type PodGroupConfigMapConnectionAdd struct {
+	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
+	addition[AddNoneAddition]
+}
+
 type PodGroupPortAdd struct {
 	MySQLItems[mysqlmodel.PodGroupPort]
 	addition[AddNoneAddition]

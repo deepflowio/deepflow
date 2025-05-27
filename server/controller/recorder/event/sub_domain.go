@@ -18,6 +18,7 @@ package event
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -66,10 +67,19 @@ func (r *SubDomain) ProduceFromMySQL() {
 
 		if event.Type == eventapi.RESOURCE_EVENT_TYPE_RECREATE {
 			r.fillRecreatePodEvent(event)
+			r.convertAndEnqueue(item.ResourceLcuuid, event)
 		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ADD_IP}, event.Type) {
 			r.fillL3DeviceInfo(event)
+			r.convertAndEnqueue(item.ResourceLcuuid, event)
+		} else if slices.Contains([]string{
+			eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP}, event.Type) {
+			for _, podGroupID := range r.metadata.ToolDataSet.GetPodGroupIDsByConfigMapID(int(event.ConfigMapID)) {
+				event.PodGroupID = uint32(podGroupID)
+				r.convertAndEnqueue(item.ResourceLcuuid, event)
+			}
 		}
-		r.convertAndEnqueue(item.ResourceLcuuid, event)
 		r.metadata.DB.Delete(&item)
 	}
 }

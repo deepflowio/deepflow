@@ -61,7 +61,7 @@ func (r *RedisInstance) ProduceByAdd(items []*mysqlmodel.RedisInstance) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndEnqueue(
+		r.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -90,6 +90,6 @@ func (r *RedisInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }
