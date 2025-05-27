@@ -61,7 +61,7 @@ func (p *DHCPPort) ProduceByAdd(items []*mysqlmodel.DHCPPort) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		p.createAndEnqueue(
+		p.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -90,6 +90,6 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

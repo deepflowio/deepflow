@@ -68,7 +68,7 @@ func (p *PodNode) ProduceByAdd(items []*mysqlmodel.PodNode) {
 		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(item.ID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
-			p.createAndEnqueue(
+			p.createInstanceAndEnqueue(
 				item.Lcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
@@ -77,7 +77,7 @@ func (p *PodNode) ProduceByAdd(items []*mysqlmodel.PodNode) {
 				opts...,
 			)
 		} else {
-			p.enqueueIfInsertIntoMySQLFailed(
+			p.enqueueInstanceIfInsertIntoMySQLFailed(
 				item.Lcuuid,
 				domainLcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
@@ -105,6 +105,6 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

@@ -73,7 +73,7 @@ func (v *VM) ProduceByAdd(items []*mysqlmodel.VM) {
 			eventapi.TagVPCID(item.VPCID),
 		}...)
 
-		v.createAndEnqueue(
+		v.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -116,7 +116,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) {
 	if len(ips) > 0 {
 		opts = append(opts, eventapi.TagIP(ips[0]))
 	}
-	v.createAndEnqueue(
+	v.createInstanceAndEnqueue(
 		cloudItem.Lcuuid,
 		eType,
 		name,
@@ -133,7 +133,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err, v.metadata.LogPrefixes)
 		}
 
-		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
+		v.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 

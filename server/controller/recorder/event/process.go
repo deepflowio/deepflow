@@ -126,7 +126,7 @@ func (p *Process) ProduceByAdd(items []*mysqlmodel.Process) {
 			log.Error("cannot support type: %s", t)
 		}
 
-		p.createProcessAndEnqueue(
+		p.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -152,7 +152,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 			name = processInfo.Name
 		}
 
-		p.createProcessAndEnqueue(
+		p.createInstanceAndEnqueue(
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_DELETE,
 			name,
