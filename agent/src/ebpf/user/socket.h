@@ -75,7 +75,7 @@ struct socket_bpf_data {
 	uint16_t l7_protocal_hint;	// 应用数据（cap_data）的协议类型，枚举如下：1 SOCK_DATA_HTTP1, 2 SOCK_DATA_DNS, 3 ...
 	// 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
 	uint8_t msg_type;	// 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	bool need_reconfirm;	// 是否需要上层再确认
+	bool batch_last_data;   // Indicates the last data item in the batch.
 	bool is_tls;
 
 	/* trace info */
