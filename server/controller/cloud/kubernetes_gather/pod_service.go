@@ -68,19 +68,20 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				log.Infof("service (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			selector := sData.Get("spec").Get("selector").MustMap()
+			spec := sData.Get("spec")
+			selector := spec.Get("selector").MustMap()
 			if len(selector) == 0 {
 				log.Infof("service (%s) selector not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			selectorSlice := cloudcommon.GenerateCustomTag(selector, nil, 0, ":")
-			specTypeString := sData.Get("spec").Get("type").MustString()
+			specTypeString := spec.Get("type").MustString()
 			specType, ok := serviceTypes[specTypeString]
 			if !ok {
 				log.Infof("service (%s) type (%s) not support", name, specTypeString, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			clusterIP := sData.Get("spec").Get("clusterIP").MustString()
+			clusterIP := spec.Get("clusterIP").MustString()
 			if clusterIP == "None" {
 				clusterIP = ""
 			}
@@ -102,11 +103,16 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				ingress := svcIngress.GetIndex(i)
 				externalIPs = append(externalIPs, ingress.Get("ip").MustString())
 			}
-
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
+			metaDataStr := k.simpleJsonMarshal(metaData)
+			specStr := k.simpleJsonMarshal(spec)
 			service := model.PodService{
 				Lcuuid:             uLcuuid,
 				Name:               name,
+				Metadata:           metaDataStr,
+				MetadataHash:       cloudcommon.GenerateMD5Sum(metaDataStr),
+				Spec:               specStr,
+				SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
 				Label:              k.GetLabel(labels),
 				Annotation:         annotationString,
 				Type:               specType,

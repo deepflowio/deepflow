@@ -120,7 +120,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	)
 
 	// podGroups
-	podGroups, podGroupPorts := c.getSubDomainPodGroups(lcuuid, &kubernetesGatherResource, azLcuuid)
+	podGroups, podGroupPorts, podGroupConfigMapConnections := c.getSubDomainPodGroups(lcuuid, &kubernetesGatherResource, azLcuuid)
 
 	// podReplicaSets
 	podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
@@ -145,29 +145,34 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	// networks
 	networks := c.getSubDomainNetworks(lcuuid, &kubernetesGatherResource, azLcuuid)
 
+	// configmap
+	configMaps := c.getSubDomainConfigMaps(lcuuid, &kubernetesGatherResource, azLcuuid)
+
 	// 生成SubDomainResource
 	return model.SubDomainResource{
-		Verified:               true,
-		SyncAt:                 time.Now(),
-		ErrorState:             kubernetesGatherResource.ErrorState,
-		ErrorMessage:           kubernetesGatherResource.ErrorMessage,
-		PodClusters:            podClusters,
-		PodNodes:               podNodes,
-		VMPodNodeConnections:   vmPodNodeConnections,
-		PodNamespaces:          podNamespaces,
-		PodIngresses:           podIngresses,
-		PodIngressRules:        podIngressRules,
-		PodIngressRuleBackends: podIngressRuleBackends,
-		PodServices:            podServices,
-		PodServicePorts:        podServicePorts,
-		PodGroups:              podGroups,
-		PodGroupPorts:          podGroupPorts,
-		PodReplicaSets:         podReplicaSets,
-		Pods:                   pods,
-		Networks:               networks,
-		Subnets:                subnets,
-		VInterfaces:            vinterfaces,
-		IPs:                    ips,
+		Verified:                     true,
+		SyncAt:                       time.Now(),
+		ErrorState:                   kubernetesGatherResource.ErrorState,
+		ErrorMessage:                 kubernetesGatherResource.ErrorMessage,
+		PodClusters:                  podClusters,
+		PodNodes:                     podNodes,
+		VMPodNodeConnections:         vmPodNodeConnections,
+		PodNamespaces:                podNamespaces,
+		PodIngresses:                 podIngresses,
+		PodIngressRules:              podIngressRules,
+		PodIngressRuleBackends:       podIngressRuleBackends,
+		PodServices:                  podServices,
+		PodServicePorts:              podServicePorts,
+		PodGroups:                    podGroups,
+		PodGroupConfigMapConnections: podGroupConfigMapConnections,
+		PodGroupPorts:                podGroupPorts,
+		PodReplicaSets:               podReplicaSets,
+		Pods:                         pods,
+		ConfigMaps:                   configMaps,
+		Networks:                     networks,
+		Subnets:                      subnets,
+		VInterfaces:                  vinterfaces,
+		IPs:                          ips,
 	}
 }
 
@@ -553,6 +558,10 @@ func (c *Cloud) getSubDomainPodServices(
 		retPodServices = append(retPodServices, model.PodService{
 			Lcuuid:             podService.Lcuuid,
 			Name:               podService.Name,
+			Metadata:           podService.Metadata,
+			MetadataHash:       podService.MetadataHash,
+			Spec:               podService.Spec,
+			SpecHash:           podService.SpecHash,
 			Label:              podService.Label,
 			Annotation:         podService.Annotation,
 			Type:               podService.Type,
@@ -585,15 +594,20 @@ func (c *Cloud) getSubDomainPodServices(
 
 func (c *Cloud) getSubDomainPodGroups(
 	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, azLcuuid string,
-) ([]model.PodGroup, []model.PodGroupPort) {
+) ([]model.PodGroup, []model.PodGroupPort, []model.PodGroupConfigMapConnection) {
 	var retPodGroups []model.PodGroup
 	var retPodGroupPorts []model.PodGroupPort
+	var retPodGroupConfigMapConnections []model.PodGroupConfigMapConnection
 
 	// 遍历PodGroups，更新az信息；并添加到Cloud的Resource中
 	for _, podGroup := range resource.PodGroups {
 		retPodGroups = append(retPodGroups, model.PodGroup{
 			Lcuuid:             podGroup.Lcuuid,
 			Name:               podGroup.Name,
+			Metadata:           podGroup.Metadata,
+			MetadataHash:       podGroup.MetadataHash,
+			Spec:               podGroup.Spec,
+			SpecHash:           podGroup.SpecHash,
 			Label:              podGroup.Label,
 			Type:               podGroup.Type,
 			PodNum:             podGroup.PodNum,
@@ -615,7 +629,15 @@ func (c *Cloud) getSubDomainPodGroups(
 			SubDomainLcuuid:  subDomainLcuuid,
 		})
 	}
-	return retPodGroups, retPodGroupPorts
+	for _, connection := range resource.PodGroupConfigMapConnections {
+		retPodGroupConfigMapConnections = append(retPodGroupConfigMapConnections, model.PodGroupConfigMapConnection{
+			Lcuuid:          connection.Lcuuid,
+			PodGroupLcuuid:  connection.PodGroupLcuuid,
+			ConfigMapLcuuid: connection.ConfigMapLcuuid,
+			SubDomainLcuuid: subDomainLcuuid,
+		})
+	}
+	return retPodGroups, retPodGroupPorts, retPodGroupConfigMapConnections
 }
 
 func (c *Cloud) getSubDomainPodReplicaSets(
@@ -875,4 +897,28 @@ func (c *Cloud) getSubDomainNetworks(
 	}
 
 	return retNetworks
+}
+
+func (c *Cloud) getSubDomainConfigMaps(
+	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, azLcuuid string,
+) []model.ConfigMap {
+	var retConfigMaps []model.ConfigMap
+
+	// 遍历PodReplicaSets，更新az信息；并添加到Cloud的Resource中
+	for _, configMap := range resource.ConfigMaps {
+		retConfigMaps = append(retConfigMaps, model.ConfigMap{
+			Data:               configMap.Data,
+			DataHash:           configMap.DataHash,
+			Lcuuid:             configMap.Lcuuid,
+			Name:               configMap.Name,
+			PodNamespaceLcuuid: configMap.PodNamespaceLcuuid,
+			CreatedAt:          configMap.CreatedAt,
+			VPCLcuuid:          configMap.VPCLcuuid,
+			AZLcuuid:           azLcuuid,
+			RegionLcuuid:       configMap.RegionLcuuid,
+			PodClusterLcuuid:   configMap.PodClusterLcuuid,
+			SubDomainLcuuid:    subDomainLcuuid,
+		})
+	}
+	return retConfigMaps
 }
