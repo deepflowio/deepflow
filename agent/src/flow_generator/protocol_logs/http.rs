@@ -26,7 +26,9 @@ use serde::Serialize;
 
 use super::{
     consts::*,
-    pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+    pb_adapter::{
+        ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal, TraceInfo,
+    },
     value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
 };
 
@@ -34,8 +36,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         enums::IpProtocol,
-        flow::PacketDirection,
-        flow::{L7PerfStats, L7Protocol},
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
@@ -47,8 +48,15 @@ use crate::{
     utils::bytes::{read_u32_be, read_u32_le},
 };
 
+#[cfg(feature = "enterprise")]
+use enterprise_utils::l7::plugin::custom_field_policy::{
+    field_type_support_protocol, format_payload, set_from_tag, ExtraCustomFieldPolicy, ExtraField,
+};
+
+// priority: base field < custom policy < plugin
 const PLUGIN_FIELD_PRIORITY: u8 = 0;
-const BASE_FIELD_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
+const CUSTOM_FIELD_POLICY_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
+const BASE_FIELD_PRIORITY: u8 = CUSTOM_FIELD_POLICY_PRIORITY + 1;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -282,6 +290,9 @@ pub struct HttpInfo {
     attributes: Vec<KeyVal>,
 
     #[serde(skip)]
+    metrics: Vec<MetricKeyVal>,
+
+    #[serde(skip)]
     is_on_blacklist: bool,
 
     #[serde(skip)]
@@ -354,6 +365,76 @@ impl HttpInfo {
         // extend attribute
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_policy_tags_to_http(&mut self, tags: &mut HashMap<&'static str, String>) {
+        if tags.is_empty() {
+            return;
+        }
+        if let Some(version) = tags.remove(ExtraField::VERSION) {
+            self.version = Version::try_from(version.as_str()).unwrap_or_default();
+        }
+        // req
+        if let Some(req_type) = tags.remove(ExtraField::REQUEST_TYPE) {
+            if self.method.is_none() {
+                self.method = Method::try_from(req_type.as_str()).unwrap_or_default();
+            }
+        }
+        set_from_tag!(self.host, tags, ExtraField::REQUEST_DOMAIN);
+        set_from_tag!(self.path, tags, ExtraField::REQUEST_RESOURCE);
+        self.endpoint = tags.remove(ExtraField::ENDPOINT);
+
+        if let Some(req_id) = tags.remove(ExtraField::REQUEST_ID) {
+            self.stream_id = req_id.parse::<u32>().map_or(None, Some);
+        }
+        if let Some(resp_code) = tags.remove(ExtraField::RESPONSE_CODE) {
+            self.status_code = resp_code.parse::<u16>().unwrap_or_default();
+        }
+
+        // res
+        if let Some(resp_status) = tags.remove(ExtraField::RESPONSE_STATUS) {
+            self.status = L7ResponseStatus::from(resp_status.as_str());
+        }
+        self.custom_exception = tags.remove(ExtraField::RESPONSE_EXCEPTION);
+        self.custom_result = tags.remove(ExtraField::RESPONSE_RESULT);
+
+        // trace info
+        if CUSTOM_FIELD_POLICY_PRIORITY < self.trace_id.prio {
+            if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
+                self.trace_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
+            }
+        }
+
+        if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
+            if let Some(span_id) = tags.remove(ExtraField::SPAN_ID) {
+                self.span_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id);
+            }
+        }
+
+        match self.client_ip.as_ref() {
+            Some(client_ip) => {
+                if CUSTOM_FIELD_POLICY_PRIORITY < client_ip.prio {
+                    if let Some(proxy_client) = tags.remove(ExtraField::HTTP_PROXY_CLIENT) {
+                        self.client_ip =
+                            Some(PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, proxy_client));
+                    }
+                }
+            }
+            _ => (),
+        };
+
+        let x_req_id = match self.msg_type {
+            LogMessageType::Request => &mut self.x_request_id_0,
+            LogMessageType::Response => &mut self.x_request_id_1,
+            _ => return,
+        };
+
+        if CUSTOM_FIELD_POLICY_PRIORITY < x_req_id.prio {
+            if let Some(x_request_id) = tags.remove(ExtraField::X_REQUEST_ID) {
+                *x_req_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id)
+            }
         }
     }
 }
@@ -631,6 +712,13 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                         None
                     } else {
                         Some(f.attributes)
+                    }
+                },
+                metrics: {
+                    if f.metrics.is_empty() {
+                        None
+                    } else {
+                        Some(f.metrics)
                     }
                 },
                 ..Default::default()
@@ -986,6 +1074,10 @@ impl HttpLog {
 
         (info.is_req_end, info.is_resp_end) = (p.is_req_end, p.is_resp_end);
         let direction = param.direction;
+        let port = match direction {
+            PacketDirection::ClientToServer => param.port_dst,
+            PacketDirection::ServerToClient => param.port_src,
+        };
 
         let stream_id = read_u32_le(&payload[4..8]);
         let key_len = read_u32_le(&payload[8..12]) as usize;
@@ -1003,7 +1095,7 @@ impl HttpLog {
         let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
         let key = &payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset];
         let val = &payload[val_offset..val_offset + val_len];
-        self.on_header(config, key, val, direction, info)?;
+        self.on_header(config, key, val, direction, port, info)?;
         let content_length = if key == b"content-length" {
             Some(val.parse_to().unwrap_or_default())
         } else {
@@ -1042,6 +1134,10 @@ impl HttpLog {
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
         );
+        let port = match direction {
+            PacketDirection::ServerToClient => param.port_src,
+            PacketDirection::ClientToServer => param.port_dst,
+        };
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
@@ -1078,12 +1174,14 @@ impl HttpLog {
             info.method = method;
             info.path = path.to_owned();
             info.version = get_http_request_version(version)?;
-
             info.msg_type = LogMessageType::Request;
+
+            #[cfg(feature = "enterprise")]
+            self.on_http_url(config, info, direction, param.port_dst);
         }
 
         let mut content_length: Option<u32> = None;
-        for body_line in headers {
+        for body_line in headers.by_ref() {
             let col_index = body_line.find(':');
             if col_index.is_none() {
                 continue;
@@ -1102,6 +1200,7 @@ impl HttpLog {
                 lower_key.as_bytes(),
                 value.trim().as_bytes(),
                 direction,
+                port,
                 info,
             )?;
             if &lower_key == "content-length" {
@@ -1116,6 +1215,16 @@ impl HttpLog {
         } else {
             info.req_content_length = content_length;
         }
+
+        #[cfg(feature = "enterprise")]
+        self.on_payload(
+            config,
+            direction,
+            port,
+            headers.remaining_buf().trim_ascii_start(),
+            info,
+        );
+
         Ok(())
     }
 
@@ -1207,6 +1316,10 @@ impl HttpLog {
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
         );
+        let port = match direction {
+            PacketDirection::ClientToServer => param.port_dst,
+            PacketDirection::ServerToClient => param.port_src,
+        };
         let mut content_length: Option<u32> = None;
         let mut header_frame_parsed = false;
         let mut is_httpv2 = false;
@@ -1267,7 +1380,7 @@ impl HttpLog {
                 let result = decoder.decode_with_cb(header_frame_payload, |key, val| {
                     let key: &[u8] = &key;
                     let val: &[u8] = &val;
-                    let _ = self.on_header(config, key, val, direction, info);
+                    let _ = self.on_header(config, key, val, direction, port, info);
                     if key == b"content-length" {
                         content_length = Some(val.parse_to().unwrap_or_default())
                     }
@@ -1380,12 +1493,140 @@ impl HttpLog {
         Ok(())
     }
 
+    #[cfg(feature = "enterprise")]
+    fn on_http_url(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        info: &mut HttpInfo,
+        direction: PacketDirection,
+        port: u16,
+    ) {
+        if let Some(policies) = match info.proto {
+            L7Protocol::Http2 | L7Protocol::Grpc => {
+                config.extra_field_policies.get(&L7Protocol::Http2)
+            }
+            _ => config.extra_field_policies.get(&info.proto),
+        } {
+            let query_pairs = info
+                .path
+                .split(&['?', '&', '='])
+                .skip(1)
+                .collect::<Vec<_>>()
+                .chunks_exact(2)
+                .map(|chunk| (chunk[0].to_ascii_lowercase(), (chunk[0], chunk[1])))
+                .collect::<HashMap<_, _>>();
+
+            let mut tags = HashMap::new();
+            for policy in policies {
+                if let Some(port_bitmap) = &policy.port_bitmap {
+                    if !port_bitmap.get(port as usize).is_ok_and(|r| r) {
+                        continue;
+                    }
+                }
+                let field_policy = match direction {
+                    PacketDirection::ClientToServer => &policy.from_req,
+                    PacketDirection::ServerToClient => &policy.from_resp,
+                };
+                let Some(fields) = field_policy.get(&public::enums::FieldType::HttpUrl) else {
+                    continue;
+                };
+
+                for field in fields {
+                    query_pairs
+                        .get(&field.field_match_keyword.to_ascii_lowercase())
+                        .map(|(k, v)| {
+                            // 这里先用 key (lowercase) 找到对应的 chunk，再用 chunk[0] 判断是否忽略大小写匹配，不遍历所有 key
+                            if field.match_key(k) && !v.is_empty() {
+                                let Some(value) = field.set_value(v, &mut tags) else {
+                                    return;
+                                };
+                                if let Some(attr_name) = field.attribute_name.clone() {
+                                    info.attributes.push(KeyVal {
+                                        key: attr_name,
+                                        val: value.clone(),
+                                    });
+                                }
+
+                                if let Some(metric_name) = field.metric_name.clone() {
+                                    info.metrics.push(MetricKeyVal {
+                                        key: metric_name,
+                                        val: value.parse::<f32>().unwrap_or(0.0),
+                                    });
+                                }
+                            }
+                        });
+                }
+            }
+            info.merge_policy_tags_to_http(&mut tags);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn on_payload(
+        &mut self,
+        config: &L7LogDynamicConfig,
+        direction: PacketDirection,
+        port: u16,
+        payload: &[u8],
+        info: &mut HttpInfo,
+    ) {
+        if payload.len() == 0 {
+            return;
+        }
+        let Some(policies) = config.extra_field_policies.get(&info.proto) else {
+            return;
+        };
+        let mut tags = HashMap::new();
+        for policy in policies {
+            if let Some(port_bitmap) = &policy.port_bitmap {
+                if !port_bitmap.get(port as usize).is_ok_and(|r| r) {
+                    continue;
+                }
+            }
+            let field_policy = match direction {
+                PacketDirection::ClientToServer => &policy.from_req,
+                PacketDirection::ServerToClient => &policy.from_resp,
+            };
+            for (field_type, fields) in field_policy {
+                if field_type_support_protocol(&field_type, info.proto) {
+                    if let Some(payload_entry) = format_payload(field_type, payload) {
+                        for field in fields {
+                            let Some(extract_field) = field.get_value_from_payload(&payload_entry)
+                            else {
+                                continue;
+                            };
+                            let Some(value) = field.set_value(&extract_field, &mut tags) else {
+                                continue;
+                            };
+                            if let Some(attr_name) = field.attribute_name.clone() {
+                                info.attributes.push(KeyVal {
+                                    key: attr_name,
+                                    val: value.clone(),
+                                });
+                            }
+
+                            if let Some(metric_name) = field.metric_name.clone() {
+                                info.metrics.push(MetricKeyVal {
+                                    key: metric_name,
+                                    val: value.parse::<f32>().unwrap_or(0.0),
+                                });
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        info.merge_policy_tags_to_http(&mut tags);
+    }
+
     fn on_header(
         &mut self,
         config: &L7LogDynamicConfig,
         key: &[u8],
         val: &[u8],
         direction: PacketDirection,
+        #[allow(unused)] port: u16,
         info: &mut HttpInfo,
     ) -> Result<()> {
         // key must be valid utf8
@@ -1404,7 +1645,12 @@ impl HttpLog {
                 info.status_code = code;
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
-            ":path" => info.path = String::from_utf8_lossy(val).into_owned(),
+            ":path" => {
+                info.path = String::from_utf8_lossy(val).into_owned();
+                // :path means url in http2
+                #[cfg(feature = "enterprise")]
+                self.on_http_url(config, info, direction, port);
+            }
             "grpc-status" => {
                 info.msg_type = LogMessageType::Response;
                 let code = val.parse_to().unwrap_or_default();
@@ -1490,6 +1736,8 @@ impl HttpLog {
         fn process_attributes(
             config: &L7LogDynamicConfig,
             info: &mut HttpInfo,
+            #[cfg(feature = "enterprise")] direction: PacketDirection,
+            #[cfg(feature = "enterprise")] port: u16,
             key: &str,
             val: &str,
         ) {
@@ -1509,9 +1757,69 @@ impl HttpLog {
                     None
                 }
             }));
+
+            #[cfg(feature = "enterprise")]
+            {
+                let Some(policies) = (match info.proto {
+                    L7Protocol::Http2 | L7Protocol::Grpc => {
+                        config.extra_field_policies.get(&L7Protocol::Http2)
+                    }
+                    _ => config.extra_field_policies.get(&info.proto),
+                }) else {
+                    return;
+                };
+                let mut tags = HashMap::new();
+                'outer: for policy in policies {
+                    if let Some(port_bitmap) = &policy.port_bitmap {
+                        if !port_bitmap.get(port as usize).is_ok_and(|r| r) {
+                            continue;
+                        }
+                    }
+                    let field_policy = match direction {
+                        PacketDirection::ClientToServer => &policy.from_req,
+                        PacketDirection::ServerToClient => &policy.from_resp,
+                    };
+                    let Some(fields) = field_policy.get(&public::enums::FieldType::Header) else {
+                        continue;
+                    };
+
+                    for field in fields {
+                        if field.match_key(key) {
+                            let Some(value) = field.set_value(val, &mut tags) else {
+                                break 'outer;
+                            };
+                            if let Some(attr_name) = field.attribute_name.clone() {
+                                info.attributes.push(KeyVal {
+                                    key: attr_name,
+                                    val: value.clone(),
+                                });
+                            }
+
+                            if let Some(metric_name) = field.metric_name.clone() {
+                                info.metrics.push(MetricKeyVal {
+                                    key: metric_name,
+                                    val: value.parse::<f32>().unwrap_or(0.0),
+                                });
+                            }
+
+                            break 'outer;
+                        }
+                    }
+                }
+                info.merge_policy_tags_to_http(&mut tags);
+            }
         }
 
-        process_attributes(config, info, key, val);
+        process_attributes(
+            config,
+            info,
+            #[cfg(feature = "enterprise")]
+            direction,
+            #[cfg(feature = "enterprise")]
+            port,
+            key,
+            val,
+        );
 
         Ok(())
     }
@@ -1728,6 +2036,12 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(Version, u16)> {
 
 pub struct V1HeaderIterator<'a>(&'a [u8]);
 
+impl<'a> V1HeaderIterator<'a> {
+    pub fn remaining_buf(&self) -> &'a [u8] {
+        self.0
+    }
+}
+
 impl<'a> Iterator for V1HeaderIterator<'a> {
     type Item = &'a str;
 
@@ -1812,6 +2126,13 @@ mod tests {
     use std::slice::from_raw_parts;
     use std::time::Duration;
 
+    cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+            use enterprise_utils::l7::plugin::custom_field_policy::{ExtraCustomFieldPolicy, ExtraField};
+            use public::enums::{FieldType, MatchType};
+        }
+    }
+
     use super::*;
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
@@ -1832,6 +2153,8 @@ mod tests {
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
             ExtraLogFields::default(),
+            #[cfg(feature = "enterprise")]
+            HashMap::new(),
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
@@ -2350,6 +2673,8 @@ mod tests {
             vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
             vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
             ExtraLogFields::default(),
+            #[cfg(feature = "enterprise")]
+            HashMap::new(),
         );
 
         // check field overwritten by higher priority field but not backwards
@@ -2358,6 +2683,7 @@ mod tests {
             b"Client",
             b"172.1.23.41",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.41");
@@ -2366,6 +2692,7 @@ mod tests {
             b"X_Forwarded_For",
             b"172.1.23.42",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
@@ -2374,6 +2701,7 @@ mod tests {
             b"Client",
             b"172.1.23.41",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
@@ -2383,6 +2711,7 @@ mod tests {
             b"x-request-id",
             b"123",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.x_request_id_0.field, "123");
@@ -2391,6 +2720,7 @@ mod tests {
             b"X_Request_ID",
             b"456",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.x_request_id_0.field, "456");
@@ -2399,6 +2729,7 @@ mod tests {
             b"x-request-id",
             b"123",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.x_request_id_0.field, "456");
@@ -2408,6 +2739,7 @@ mod tests {
             b"traceparent",
             b"00-trace-span-01",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         let _ = parser.on_header(
@@ -2415,6 +2747,7 @@ mod tests {
             b"x-b3-traceid",
             b"b3traceid",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.trace_id.field, "b3traceid");
@@ -2423,6 +2756,7 @@ mod tests {
             b"traceparent",
             b"00-trace-span-01",
             PacketDirection::ClientToServer,
+            0,
             &mut info,
         );
         assert_eq!(info.trace_id.field, "b3traceid");
@@ -2449,5 +2783,126 @@ mod tests {
             &param
         ));
         assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extra_field_policy() {
+        let mut parser = HttpLog::new_v1();
+        let mut info = HttpInfo::default();
+        info.proto = L7Protocol::Http1;
+        info.msg_type = LogMessageType::Request;
+
+        let rewrite_header_fields = vec![
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "x-request-id".into(),
+                rewrite_native_tag: ExtraField::X_REQUEST_ID.into(),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "trace_id".into(),
+                rewrite_native_tag: ExtraField::TRACE_ID.into(),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "span_id".into(),
+                rewrite_native_tag: ExtraField::SPAN_ID.into(),
+                ..Default::default()
+            },
+        ];
+
+        let rewrite_url_fields = vec![
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "client".into(),
+                rewrite_native_tag: ExtraField::HTTP_PROXY_CLIENT.into(),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(true),
+                field_match_keyword: "SPAN_ID".into(),
+                rewrite_native_tag: ExtraField::SPAN_ID.into(),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "user_id".into(),
+                rewrite_native_tag: ExtraField::REQUEST_ID.into(),
+                attribute_name: Some("user_id".into()),
+                ..Default::default()
+            },
+        ];
+
+        let config = L7LogDynamicConfig::new(
+            vec![],
+            vec!["x-request-id".into()],
+            vec!["trace_id".into()],
+            vec!["span_id".into()],
+            ExtraLogFields::default(),
+            [(
+                L7Protocol::Http1,
+                vec![ExtraCustomFieldPolicy {
+                    custom_protocol_name: Some("".into()),
+                    port_bitmap: None,
+                    from_resp: HashMap::new(),
+                    from_req: [
+                        (FieldType::Header, rewrite_header_fields),
+                        (FieldType::HttpUrl, rewrite_url_fields),
+                    ]
+                    .into_iter()
+                    .collect(),
+                }],
+            )]
+            .into_iter()
+            .collect(),
+        );
+
+        info.path = "/getuser?user_id=456789&client=192.168.1.1&span_id=01".into();
+        parser.on_http_url(&config, &mut info, PacketDirection::ClientToServer, 0);
+        assert_eq!(info.span_id.field, "");
+        assert_eq!(info.stream_id, Some(456789));
+        assert_eq!(
+            info.client_ip
+                .as_ref()
+                .unwrap_or(&PrioField::default())
+                .field,
+            "192.168.1.1"
+        );
+        for attr in info.attributes.iter() {
+            if attr.key == "user_id" {
+                assert_eq!(attr.val, "456789");
+            }
+        }
+
+        let _ = parser.on_header(
+            &config,
+            b"X-Request-Id",
+            b"xreqid",
+            PacketDirection::ClientToServer,
+            0,
+            &mut info,
+        );
+        assert_eq!(info.x_request_id_0.field, "xreqid");
+        let _ = parser.on_header(
+            &config,
+            b"TRacE_Id",
+            b"test_parse_trace_id",
+            PacketDirection::ClientToServer,
+            0,
+            &mut info,
+        );
+        assert_eq!(info.trace_id.field, "test_parse_trace_id");
+        let _ = parser.on_header(
+            &config,
+            b"sPAn_id",
+            b"test_parse_span_id",
+            PacketDirection::ClientToServer,
+            0,
+            &mut info,
+        );
+        assert_eq!(info.span_id.field, "test_parse_span_id");
     }
 }

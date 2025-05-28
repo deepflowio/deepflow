@@ -154,6 +154,7 @@ impl From<&String> for L7Protocol {
 pub enum CustomProtocol {
     Wasm(u8, String),
     So(u8, String),
+    CustomPolicy(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]

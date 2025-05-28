@@ -87,6 +87,11 @@ use public::l7_protocol::L7Protocol;
 use public::proto::agent::{self, AgentType, PacketCaptureType};
 use public::utils::net::MacAddr;
 
+#[cfg(feature = "enterprise")]
+use enterprise_utils::l7::plugin::custom_field_policy::{
+    ExtraCustomFieldPolicy, ExtraCustomProtocolConfig,
+};
+
 const MB: u64 = 1048576;
 
 type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
@@ -1012,6 +1017,8 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
     pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
     pub mysql_decompress_payload: bool,
+    #[cfg(feature = "enterprise")]
+    pub custom_protocol_config: Vec<(String, ExtraCustomProtocolConfig)>,
 }
 
 impl Default for LogParserConfig {
@@ -1032,6 +1039,8 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_response_suffixes: vec![],
             unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
             mysql_decompress_payload: true,
+            #[cfg(feature = "enterprise")]
+            custom_protocol_config: vec![],
         }
     }
 }
@@ -1426,6 +1435,8 @@ pub struct L7LogDynamicConfig {
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
     pub extra_log_fields: ExtraLogFields,
+    #[cfg(feature = "enterprise")]
+    pub extra_field_policies: HashMap<L7Protocol, Vec<ExtraCustomFieldPolicy>>,
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1469,6 +1480,10 @@ impl L7LogDynamicConfig {
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
+        #[cfg(feature = "enterprise")] extra_field_policies: HashMap<
+            L7Protocol,
+            Vec<ExtraCustomFieldPolicy>,
+        >,
     ) -> Self {
         let mut expected_headers_set = get_expected_headers();
         let mut dup_checker = HashSet::new();
@@ -1512,7 +1527,38 @@ impl L7LogDynamicConfig {
         extra_log_fields.deduplicate();
 
         for f in extra_log_fields.http2.iter() {
+            dup_checker.insert(f.field_name.to_owned());
             expected_headers_set.insert(f.field_name.as_bytes().to_vec());
+        }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(policies) = extra_field_policies.get(&L7Protocol::Http2) {
+            for f in policies.iter() {
+                for req_field in f
+                    .from_req
+                    .get(&public::enums::FieldType::Header)
+                    .into_iter()
+                    .flatten()
+                {
+                    if dup_checker.contains(&req_field.field_match_keyword) {
+                        continue;
+                    }
+                    dup_checker.insert(req_field.field_match_keyword.to_owned());
+                    expected_headers_set.insert(req_field.field_match_keyword.as_bytes().to_vec());
+                }
+                for resp_field in f
+                    .from_resp
+                    .get(&public::enums::FieldType::Header)
+                    .into_iter()
+                    .flatten()
+                {
+                    if dup_checker.contains(&resp_field.field_match_keyword) {
+                        continue;
+                    }
+                    dup_checker.insert(resp_field.field_match_keyword.to_owned());
+                    expected_headers_set.insert(resp_field.field_match_keyword.as_bytes().to_vec());
+                }
+            }
         }
 
         Self {
@@ -1524,6 +1570,8 @@ impl L7LogDynamicConfig {
             span_set,
             expected_headers_set: Arc::new(expected_headers_set),
             extra_log_fields,
+            #[cfg(feature = "enterprise")]
+            extra_field_policies,
         }
     }
 
@@ -1978,6 +2026,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
                             .unwrap_or(vec![]),
                     },
+                    #[cfg(feature = "enterprise")]
+                    conf.get_extra_field_policies(),
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
@@ -2042,6 +2092,15 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .decompress_payload,
+                #[cfg(feature = "enterprise")]
+                custom_protocol_config: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .custom_protocols
+                    .iter()
+                    .map(|p| (p.protocol_name.clone(), ExtraCustomProtocolConfig::from(p)))
+                    .collect(),
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -4785,6 +4844,13 @@ impl ConfigHandler {
             app.protocol_special_config = new_app.protocol_special_config;
             restart_agent = !first_run;
         }
+        if app.custom_protocols != new_app.custom_protocols {
+            info!(
+                "Update processors.request_log.application_protocol_inference.custom_protocols from {:?} to {:?}.",
+                app.custom_protocols, new_app.custom_protocols
+            );
+            app.custom_protocols = new_app.custom_protocols.clone();
+        }
         let filters = &mut request_log.filters;
         let new_filters = &mut new_request_log.filters;
         if filters.port_number_prefilters != new_filters.port_number_prefilters {
@@ -4881,6 +4947,14 @@ impl ConfigHandler {
                 tag_extraction.tracing_tag, new_tag_extraction.tracing_tag
             );
             tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
+        }
+        if tag_extraction.custom_field_policies != new_tag_extraction.custom_field_policies {
+            info!(
+                "Update processors.request_log.tag_extraction.custom_field_policies from {:?} to {:?}.",
+                tag_extraction.custom_field_policies, new_tag_extraction.custom_field_policies
+            );
+            tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
+            restart_agent = !first_run;
         }
 
         let tunning = &mut request_log.tunning;
