@@ -967,6 +967,7 @@ impl Default for GpidEntry {
     }
 }
 
+#[inline]
 pub fn gpid_key(ip: u32, epc_id: i32, port: u16) -> u64 {
     let epc_id = (epc_id & 0xffff) as u64;
     (ip as u64) << 32 | epc_id << 16 | port as u64
