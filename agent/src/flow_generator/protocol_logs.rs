@@ -96,6 +96,33 @@ pub enum L7ResponseStatus {
     ParseFailed = 6,
 }
 
+impl L7ResponseStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Timeout => "timeout",
+            Self::ServerError => "server_error",
+            Self::ClientError => "client_error",
+            Self::ParseFailed => "parse_failed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl From<&str> for L7ResponseStatus {
+    fn from(s: &str) -> Self {
+        match s {
+            "ok" => L7ResponseStatus::Ok,
+            "timeout" => L7ResponseStatus::Timeout,
+            "server_error" => L7ResponseStatus::ServerError,
+            "client_error" => L7ResponseStatus::ClientError,
+            "parse_failed" => L7ResponseStatus::ParseFailed,
+            "unknown" => L7ResponseStatus::Unknown,
+            _ => L7ResponseStatus::Unknown,
+        }
+    }
+}
+
 #[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
 #[repr(u8)]
 pub enum LogMessageType {
