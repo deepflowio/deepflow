@@ -1673,6 +1673,8 @@ mod tests {
             ],
             vec![TraceType::TraceParent],
             ExtraLogFields::default(),
+            #[cfg(feature = "enterprise")]
+            std::collections::HashMap::new(),
         );
         for (input, tid, sid) in testcases {
             info.trace_id = None;
