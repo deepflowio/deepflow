@@ -31,14 +31,20 @@ use crate::{
             consts::*,
             decode_base64_to_string,
             pb_adapter::{
-                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
+                TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType,
+            L7ResponseStatus, LogMessageType, PrioField,
         },
     },
     plugin::{wasm::WasmData, CustomInfo},
     utils::bytes::{read_u32_be, read_u64_be},
+};
+
+#[cfg(feature = "enterprise")]
+use enterprise_utils::l7::plugin::custom_field_policy::{
+    set_from_tag, ExtraField, PushAttr, PushMetric,
 };
 
 const TRACE_ID_MAX_LEN: usize = 1024;
@@ -59,6 +65,11 @@ const PROTOBUF_SERIALIZATION_ID: u8 = 22;
 const FASTJSON2_SERIALIZATION_ID: u8 = 23;
 const KRYO_SERIALIZATION2_ID: u8 = 25;
 const CUSTOM_MESSAGE_PACK_ID: u8 = 31;
+
+// priority: base field < custom policy < plugin
+const PLUGIN_FIELD_PRIORITY: u8 = 0;
+const CUSTOM_FIELD_POLICY_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
+const BASE_FIELD_PRIORITY: u8 = CUSTOM_FIELD_POLICY_PRIORITY + 1;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
@@ -89,9 +100,13 @@ pub struct DubboInfo {
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub method_name: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_id: PrioField<String>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub span_id: String,
+    pub span_id: PrioField<String>,
+    #[serde(rename = "x_request_id_0", skip_serializing_if = "Option::is_none")]
+    pub x_request_id_0: Option<PrioField<String>>,
+    #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
+    pub client_ip: Option<String>,
 
     // resp
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
@@ -100,6 +115,8 @@ pub struct DubboInfo {
     pub resp_status: L7ResponseStatus,
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
+    #[serde(rename = "x_request_id_1", skip_serializing_if = "Option::is_none")]
+    pub x_request_id_1: Option<PrioField<String>>,
 
     captured_request_byte: u32,
     captured_response_byte: u32,
@@ -112,6 +129,9 @@ pub struct DubboInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip)]
+    metrics: Vec<MetricKeyVal>,
 
     #[serde(skip)]
     is_on_blacklist: bool,
@@ -150,8 +170,8 @@ impl DubboInfo {
         swap_if!(self, status_code, is_none, other);
         swap_if!(self, custom_result, is_none, other);
         swap_if!(self, custom_exception, is_none, other);
-        swap_if!(self, trace_id, is_empty, other);
-        swap_if!(self, span_id, is_empty, other);
+        swap_if!(self, trace_id, is_default, other);
+        swap_if!(self, span_id, is_default, other);
         self.attributes.append(&mut other.attributes);
         if other.captured_request_byte > 0 {
             self.captured_request_byte = other.captured_request_byte;
@@ -165,47 +185,56 @@ impl DubboInfo {
     }
 
     fn set_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
-        self.trace_id = trace_id;
+        if self.trace_id.prio <= BASE_FIELD_PRIORITY {
+            return;
+        }
         match trace_type {
             TraceType::Sw3 => {
                 // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
-                if !self.trace_id.is_empty() {
-                    let segs: Vec<&str> = self.trace_id.split("|").collect();
+                if !trace_id.is_empty() {
+                    let segs: Vec<&str> = trace_id.split("|").collect();
                     if segs.len() > 7 {
-                        self.trace_id = segs[7].to_string();
+                        self.trace_id = PrioField::new(BASE_FIELD_PRIORITY, segs[7].to_string());
                     }
                 }
             }
             TraceType::Sw8 => {
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
-                if !self.trace_id.is_empty() {
-                    let segs: Vec<&str> = self.trace_id.split("-").collect();
+                if !trace_id.is_empty() {
+                    let segs: Vec<&str> = trace_id.split("-").collect();
                     if segs.len() > 2 {
-                        self.trace_id = segs[1].to_string();
+                        self.trace_id = PrioField::new(BASE_FIELD_PRIORITY, segs[1].to_string());
+                        // self.trace_id = segs[1].to_string();
                     }
                 }
-                self.trace_id = decode_base64_to_string(&self.trace_id);
+                self.trace_id = PrioField::new(
+                    BASE_FIELD_PRIORITY,
+                    decode_base64_to_string(trace_id.as_str()),
+                );
             }
             TraceType::CloudWise => {
                 if let Some(trace_id) =
-                    cloud_platform::cloudwise::decode_trace_id(self.trace_id.as_str())
+                    cloud_platform::cloudwise::decode_trace_id(trace_id.as_str())
                 {
-                    self.trace_id = trace_id.to_string();
+                    self.trace_id = PrioField::new(BASE_FIELD_PRIORITY, trace_id.to_string());
                 }
             }
-            _ => return,
+            _ => self.trace_id = PrioField::new(BASE_FIELD_PRIORITY, trace_id),
         };
     }
 
     fn set_span_id(&mut self, span_id: String, trace_type: &TraceType) {
-        self.span_id = span_id;
+        if self.span_id.prio <= BASE_FIELD_PRIORITY {
+            return;
+        }
         match trace_type {
             TraceType::Sw3 => {
                 // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
-                if self.span_id.len() > 2 {
-                    let segs: Vec<&str> = self.span_id.split("|").collect();
+                if span_id.len() > 2 {
+                    let segs: Vec<&str> = span_id.split("|").collect();
                     if segs.len() > 3 {
-                        self.span_id = format!("{}-{}", segs[0], segs[1]);
+                        self.span_id =
+                            PrioField::new(BASE_FIELD_PRIORITY, format!("{}-{}", segs[0], segs[1]));
                     }
                 }
             }
@@ -213,18 +242,24 @@ impl DubboInfo {
                 // Format:
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
                 let mut skip = false;
-                if self.span_id.len() > 2 {
-                    let segs: Vec<&str> = self.span_id.split("-").collect();
+                if span_id.len() > 2 {
+                    let segs: Vec<&str> = span_id.split("-").collect();
                     if segs.len() > 4 {
-                        self.span_id = format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]);
+                        self.span_id = PrioField::new(
+                            0,
+                            format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]),
+                        );
                         skip = true;
                     }
                 }
                 if !skip {
-                    self.span_id = decode_base64_to_string(&self.span_id);
+                    self.span_id = PrioField::new(
+                        BASE_FIELD_PRIORITY,
+                        decode_base64_to_string(span_id.as_str()),
+                    );
                 }
             }
-            _ => return,
+            _ => self.span_id = PrioField::new(BASE_FIELD_PRIORITY, span_id),
         };
     }
 
@@ -257,10 +292,10 @@ impl DubboInfo {
 
         //trace info rewrite
         if custom.trace.trace_id.is_some() {
-            self.trace_id = custom.trace.trace_id.unwrap();
+            self.trace_id = PrioField::new(PLUGIN_FIELD_PRIORITY, custom.trace.trace_id.unwrap());
         }
         if custom.trace.span_id.is_some() {
-            self.span_id = custom.trace.span_id.unwrap();
+            self.span_id = PrioField::new(PLUGIN_FIELD_PRIORITY, custom.trace.span_id.unwrap());
         }
 
         // extend attribute
@@ -279,6 +314,77 @@ impl DubboInfo {
                     .as_ref()
                     .map(|p| t.endpoint.is_on_blacklist(p))
                     .unwrap_or_default();
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_policy_tags_to_dubbo(&mut self, tags: std::collections::HashMap<String, String>) {
+        if tags.is_empty() {
+            return;
+        }
+        set_from_tag!(self.dubbo_version, tags, ExtraField::VERSION);
+        // req
+        // request_resource > request_type, ignore request_type setting
+        // set_from_tag!(self.method_name, tags, ExtraField::REQUEST_TYPE);
+        set_from_tag!(self.service_name, tags, ExtraField::REQUEST_DOMAIN);
+        set_from_tag!(self.method_name, tags, ExtraField::REQUEST_RESOURCE);
+        self.endpoint = tags.get(ExtraField::ENDPOINT).cloned();
+
+        if let Some(req_id) = tags.get(ExtraField::REQUEST_ID) {
+            self.request_id = req_id.parse::<i64>().unwrap_or_default();
+        }
+        if let Some(resp_code) = tags.get(ExtraField::RESPONSE_CODE) {
+            self.status_code = Some(resp_code.parse::<i32>().unwrap_or_default());
+        }
+
+        // res
+        if let Some(resp_status) = tags.get(ExtraField::RESPONSE_STATUS) {
+            self.resp_status = L7ResponseStatus::from(resp_status.as_str());
+        }
+        self.custom_exception = tags.get(ExtraField::RESPONSE_EXCEPTION).cloned();
+        self.custom_result = tags.get(ExtraField::RESPONSE_RESULT).cloned();
+
+        // trace info
+        if let Some(trace_id) = tags.get(ExtraField::TRACE_ID) {
+            if CUSTOM_FIELD_POLICY_PRIORITY < self.trace_id.prio {
+                self.trace_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id.to_owned());
+            }
+        }
+        if let Some(span_id) = tags.get(ExtraField::SPAN_ID) {
+            if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
+                self.span_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id.to_owned());
+            }
+        }
+        self.client_ip = tags.get(ExtraField::HTTP_PROXY_CLIENT).cloned();
+
+        if let Some(x_request_id) = tags.get(ExtraField::X_REQUEST_ID) {
+            match self.msg_type {
+                LogMessageType::Request => {
+                    let prio_check = match self.x_request_id_0.as_ref() {
+                        Some(p) => CUSTOM_FIELD_POLICY_PRIORITY < p.prio,
+                        _ => true,
+                    };
+                    if prio_check {
+                        self.x_request_id_0 = Some(PrioField::new(
+                            CUSTOM_FIELD_POLICY_PRIORITY,
+                            x_request_id.to_owned(),
+                        ));
+                    }
+                }
+                LogMessageType::Response => {
+                    let prio_check = match self.x_request_id_1.as_ref() {
+                        Some(p) => CUSTOM_FIELD_POLICY_PRIORITY < p.prio,
+                        _ => true,
+                    };
+                    if prio_check {
+                        self.x_request_id_1 = Some(PrioField::new(
+                            CUSTOM_FIELD_POLICY_PRIORITY,
+                            x_request_id.to_owned(),
+                        ));
+                    }
+                }
+                _ => (),
+            }
         }
     }
 }
@@ -381,18 +487,44 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
-                span_id: Some(f.span_id),
+                trace_id: Some(f.trace_id.into_inner()),
+                span_id: Some(f.span_id.into_inner()),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
                 request_id: Some(f.request_id as u32),
+                x_request_id_0: match f.x_request_id_0 {
+                    Some(id) => Some(id.into_inner()),
+                    None => None,
+                },
+                x_request_id_1: match f.x_request_id_1 {
+                    Some(id) => Some(id.into_inner()),
+                    None => None,
+                },
+                client_ip: f.client_ip.clone(),
                 attributes: Some(attrs),
+                metrics: Some(f.metrics),
                 ..Default::default()
             }),
             flags,
             ..Default::default()
+        }
+    }
+}
+
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        impl PushAttr for DubboInfo {
+            fn push_attr(&mut self, key: String, val: String) {
+                self.attributes.push(KeyVal { key, val: val });
+            }
+        }
+
+        impl PushMetric for DubboInfo {
+            fn push_metric(&mut self, key: String, val: f32) {
+                self.metrics.push(MetricKeyVal { key, val });
+            }
         }
     }
 }
@@ -477,10 +609,575 @@ impl L7ProtocolParserInterface for DubboLog {
 
 mod hessian2 {
     use nom::FindSubstring;
+    use std::collections::HashMap;
 
     use super::{DubboInfo, BODY_PARAM_MAX, BODY_PARAM_MIN};
     use crate::config::handler::{L7LogDynamicConfig, TraceType};
     use crate::flow_generator::protocol_logs::consts::*;
+
+    cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+            use enterprise_utils::l7::plugin::custom_field_policy::ExtraField;
+            use public::enums::{FieldType, MatchType};
+            use crate::common::flow::{L7Protocol, PacketDirection};
+        }
+    }
+
+    #[derive(Debug)]
+    enum HessianValue {
+        Bool(bool),
+        Int(i32),
+        Long(i64),
+        DateTime(i64),
+        Double(f64),
+        Binary(Vec<u8>),
+        String(String),
+        Map(HashMap<String, HessianValue>),
+    }
+
+    impl HessianValue {
+        fn get_string_value(&self) -> Option<String> {
+            match self {
+                HessianValue::Bool(b) => Some(b.to_string()),
+                HessianValue::Int(i) => Some(i.to_string()),
+                HessianValue::Long(l) => Some(l.to_string()),
+                HessianValue::DateTime(d) => Some(d.to_string()),
+                HessianValue::Double(d) => Some(d.to_string()),
+                HessianValue::Binary(b) => Some(String::from_utf8_lossy(b).to_string()),
+                HessianValue::String(s) => Some(s.clone()),
+                _ => None,
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct Hessian2Decoder {
+        class_field_info: Vec<Vec<String>>,
+    }
+
+    impl Hessian2Decoder {
+        // 返回具体值和读了多少长度，注意 长度返回 1 表示读取了 start 索引
+        fn decode_field(&mut self, bytes: &[u8], start: usize) -> (Option<HessianValue>, usize) {
+            if start >= bytes.len() {
+                return (None, 0);
+            }
+
+            match bytes[start] {
+                BC_END | BC_NULL => (None, 1),
+                BC_TRUE => (Some(HessianValue::Bool(true)), 1),
+                BC_FALSE => (Some(HessianValue::Bool(false)), 1),
+                BC_REF => {
+                    // ref 意为通过索引号获取一个指向 list/map 的指针
+                    let (_, len) = Self::decode_i32(bytes, start);
+                    (None, len)
+                }
+                // int
+                0x80..=0xbf | 0xc0..=0xcf | 0xd0..=0xd7 | BC_INT => {
+                    let (value, len) = Self::decode_i32(bytes, start);
+                    (Some(HessianValue::Int(value)), len)
+                }
+                // long
+                0xd8..=0xef | 0xf0..=0xff | 0x38..=0x3f | BC_LONG_INT | BC_LONG => {
+                    let (value, len) = Self::decode_i64(bytes, start);
+                    (Some(HessianValue::Long(value)), len)
+                }
+                // date
+                BC_DATE | BC_DATE_MINUTE => {
+                    let (value, len) = Self::decode_datetime(bytes, start);
+                    (Some(HessianValue::DateTime(value)), len)
+                }
+                // double
+                BC_DOUBLE_ZERO | BC_DOUBLE_ONE | BC_DOUBLE_BYTE | BC_DOUBLE_SHORT
+                | BC_DOUBLE_MILL | BC_DOUBLE => {
+                    let (value, len) = Self::decode_f64(bytes, start);
+                    (Some(HessianValue::Double(value)), len)
+                }
+                // binary
+                BC_BINARY_DIRECT..=INT_DIRECT_MAX
+                | BC_BINARY_SHORT..=0x37
+                | BC_BINARY_CHUNK
+                | BC_BINARY => {
+                    let (value, len) = Self::decode_binary(bytes, start);
+                    (Some(HessianValue::Binary(value)), len)
+                }
+                // string
+                BC_STRING_SHORT..=BC_STRING_SHORT_MAX
+                | BC_STRING_DIRECT..=STRING_DIRECT_MAX
+                | BC_STRING_CHUNK
+                | BC_STRING => {
+                    if let (Some(value), len) = Self::decode_string(bytes, start) {
+                        (Some(HessianValue::String(value)), len)
+                    } else {
+                        (None, 0)
+                    }
+                }
+                // list: 没有实用意义，因为无法按 key 提取数据，但要跳过 list 的长度继续解析
+                BC_LIST_DIRECT..=0x77
+                | BC_LIST_DIRECT_UNTYPED..=0x7f
+                | BC_LIST_FIXED
+                | BC_LIST_VARIABLE
+                | BC_LIST_FIXED_UNTYPED
+                | BC_LIST_VARIABLE_UNTYPED => {
+                    let len = self.decode_list(bytes, start);
+                    (None, len)
+                }
+                // hashmap
+                BC_MAP | BC_MAP_UNTYPED => {
+                    let (value, len) = self.decode_map(bytes, start);
+                    (Some(HessianValue::Map(value)), len)
+                }
+                // object，只能处理为 hashmap
+                BC_OBJECT_DEF | BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
+                    let (value, len) = self.decode_obj(bytes, start);
+                    (Some(HessianValue::Map(value)), len)
+                }
+                _ => (None, 0), // 如果不符合任何一种，表示这个 tag 没有意义，没有被消费返回0
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/map.go#L240
+        fn decode_map(
+            &mut self,
+            payload: &[u8],
+            index: usize,
+        ) -> (HashMap<String, HessianValue>, usize) {
+            let mut tag = payload[index];
+            let mut start = index + 1;
+            let mut map = HashMap::new();
+            if start >= payload.len() {
+                return (map, 0);
+            }
+            if tag == BC_MAP {
+                // 即使是 typedmap(标示了类型的 map)，也只能处理成 hashmap<string, string>, 这里忽略实际类型，只跳过读取长度
+                let (_, len) = Self::decode_string(payload, start);
+                if len == 0 {
+                    start += len;
+                    if start >= payload.len() {
+                        return (map, 0);
+                    }
+                    let (_, len) = Self::decode_i32(payload, start);
+                    start += len;
+                }
+            }
+            while tag != BC_END {
+                let (key, len) = self.decode_field(payload, start);
+                start += len;
+                let (value, len) = self.decode_field(payload, start);
+                start += len;
+                match key {
+                    Some(HessianValue::String(k)) => {
+                        if value.is_some() {
+                            map.insert(k, value.unwrap());
+                        }
+                    }
+                    _ => {}
+                };
+                if start >= payload.len() {
+                    break;
+                }
+                tag = payload[start]
+            }
+            // 读取完后这里会丢弃下一个 byte，所以 +1
+            // ref: https://github.com/apache/dubbo-go-hessian2/blob/master/map.go#L320
+            (map, start - index + 1)
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/list.go#L280
+        // 注意：这里 list 具体的值没有用，只是为了解出要读多少 len
+        fn decode_list(&mut self, payload: &[u8], index: usize) -> usize {
+            let tag = payload[index];
+            let mut start = index + 1;
+            if start >= payload.len() {
+                return 0;
+            }
+            let arr_len = match tag {
+                BC_LIST_FIXED => {
+                    let (_, len) = Self::decode_string(payload, start);
+                    start += len;
+                    if start >= payload.len() {
+                        return 0;
+                    }
+                    let (arr_len, len) = Self::decode_i32(payload, start);
+                    start += len;
+                    arr_len as usize
+                }
+                BC_LIST_VARIABLE => {
+                    let (_, len) = Self::decode_string(payload, start);
+                    start += len;
+                    if start >= payload.len() {
+                        return start - index;
+                    }
+                    // 遇到这种情况意味着是未知长度 list，内容一直到第一个 BC_END 为止（也有可能剩下的所有内容都是这个 list）
+                    return payload[start..]
+                        .iter()
+                        .position(|&b| b == BC_END)
+                        .unwrap_or(payload.len() - 1)
+                        + 1
+                        - index;
+                }
+                BC_LIST_FIXED_TYPED_LEN_TAG_MIN..=BC_LIST_FIXED_TYPED_LEN_TAG_MAX => {
+                    let (_, len) = Self::decode_string(payload, start);
+                    start += len;
+                    tag.overflowing_sub(BC_LIST_FIXED_TYPED_LEN_TAG_MAX).0 as usize
+                }
+                BC_LIST_FIXED_UNTYPED => {
+                    let (arr_len, len) = Self::decode_i32(payload, start);
+                    start += len;
+                    arr_len as usize
+                }
+                BC_LIST_VARIABLE_UNTYPED => {
+                    return payload[start..]
+                        .iter()
+                        .position(|&b| b == BC_END)
+                        .unwrap_or(payload.len() - 1)
+                        + 1
+                        - index;
+                }
+                BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN..=BC_LIST_FIXED_UNTYPED_LEN_TAG_MAX => {
+                    tag.overflowing_sub(BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN).0 as usize
+                }
+                _ => 0,
+            };
+            for _ in 0..arr_len {
+                if start >= payload.len() {
+                    break;
+                }
+                let (_, len) = self.decode_field(payload, start);
+                start += len;
+            }
+            start - index
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/object.go#L567
+        fn decode_obj(
+            &mut self,
+            payload: &[u8],
+            index: usize,
+        ) -> (HashMap<String, HessianValue>, usize) {
+            let tag = payload[index];
+            let mut start = index + 1;
+            let mut object_map = HashMap::new();
+            // object 类型的消息一般是 BC_OBJECT_DEF 携带对象定义，紧接着一个 BC_OBJECT/BC_OBJECT_DIRECT 携带实例数据
+            match tag {
+                BC_OBJECT_DEF => {
+                    let (_, len) = Self::decode_string(payload, start);
+                    start += len;
+                    if start >= payload.len() {
+                        return (object_map, 0);
+                    }
+                    let (field_num, len) = Self::decode_i32(payload, start);
+                    start += len;
+                    let mut field_list = Vec::with_capacity(field_num as usize);
+                    for _ in 0..field_num {
+                        if start >= payload.len() {
+                            break;
+                        }
+                        if let (Some(field_name), len) = Self::decode_string(payload, start) {
+                            start += len;
+                            field_list.push(field_name);
+                        } else {
+                            break;
+                        }
+                    }
+                    // 需要先把 BC_OBJECT_DEF 的解析加入索引中
+                    self.class_field_info.push(field_list);
+                    // 这里会跳到 BC_OBJECT 继续解析
+                    let (value, len) = self.decode_field(payload, start);
+                    match value {
+                        Some(HessianValue::Map(map)) => {
+                            return (map, start + len - index);
+                        }
+                        _ => {
+                            return (object_map, start + len - index);
+                        }
+                    }
+                }
+                BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
+                    let class_index = if tag == BC_OBJECT {
+                        let (idx, len) = Self::decode_i32(payload, start);
+                        start += len;
+                        idx as usize
+                    } else {
+                        tag.overflowing_sub(BC_OBJECT_DIRECT).0 as usize
+                    };
+                    // 无论 object type 是什么类型，都需要解析为 hashmap (field_name => value)
+                    // 但如果是 java 内置类型或自定义类型，都无法解析，如果遇到了会导致后续解析失败
+                    if class_index >= self.class_field_info.len() {
+                        return (object_map, 0);
+                    }
+                    let field_list = self.class_field_info[class_index].clone();
+                    for i in 0..field_list.len() {
+                        let field_name = &field_list[i];
+                        let (value, len) = self.decode_field(payload, start);
+                        if value.is_some() {
+                            object_map.insert(field_name.to_string(), value.unwrap());
+                        }
+                        start += len;
+                    }
+                    (object_map, start - index)
+                }
+                _ => (object_map, 0),
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/int.go#L60
+        pub fn decode_i32(payload: &[u8], index: usize) -> (i32, usize) {
+            let tag = payload[index];
+            match tag {
+                0x80..=0xbf => ((tag.overflowing_sub(BC_INT_ZERO).0) as i32, 1),
+                0xc0..=0xcf if index + 1 < payload.len() => (
+                    u16::from_be_bytes([
+                        tag.overflowing_sub(BC_INT_BYTE_ZERO).0,
+                        payload[index + 1],
+                    ]) as i32,
+                    2,
+                ),
+                0xd0..=0xd7 if index + 2 < payload.len() => {
+                    let mut buf = [
+                        0,
+                        tag.overflowing_sub(BC_INT_SHORT_ZERO).0,
+                        payload[index + 1],
+                        payload[index + 2],
+                    ];
+                    if buf[1] & 0x80 != 0 {
+                        buf[0] = 0xff;
+                    }
+                    (u32::from_be_bytes(buf) as i32, 3)
+                }
+                BC_INT if index + 4 < payload.len() => (
+                    i32::from_be_bytes(
+                        payload[index + 1..index + 5].try_into().unwrap_or_default(),
+                    ),
+                    5,
+                ),
+                _ => (0, 0),
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/long.go#L63
+        pub fn decode_i64(payload: &[u8], index: usize) -> (i64, usize) {
+            let tag = payload[index];
+            match tag {
+                0xd8..=0xef => ((tag.overflowing_sub(BC_LONG_ZERO).0) as i64, 1),
+                0xf0..=0xff if index + 1 < payload.len() => {
+                    let buf = [tag.overflowing_sub(BC_LONG_BYTE_ZERO).0, payload[index + 1]];
+                    (u16::from_be_bytes(buf) as i64, 2)
+                }
+                0x38..=0x3f if index + 2 < payload.len() => {
+                    let mut buf = [
+                        0,
+                        tag.overflowing_sub(BC_LONG_SHORT_ZERO).0,
+                        payload[index + 1],
+                        payload[index + 2],
+                    ];
+                    if buf[1] & 0x80 != 0 {
+                        buf[0] = 0xff;
+                    }
+                    (u32::from_be_bytes(buf) as i64, 3)
+                }
+                BC_LONG_INT if index + 4 < payload.len() => (
+                    i32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
+                        as i64,
+                    5,
+                ),
+                BC_LONG if index + 8 < payload.len() => (
+                    i64::from_be_bytes(
+                        payload[index + 1..index + 9].try_into().unwrap_or_default(),
+                    ),
+                    9,
+                ),
+                _ => (0, 0),
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/date.go#L60
+        fn decode_datetime(payload: &[u8], index: usize) -> (i64, usize) {
+            let tag = payload[index];
+            match tag {
+                BC_DATE if index + 8 < payload.len() => (
+                    u64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default())
+                        as i64,
+                    9,
+                ),
+                BC_DATE_MINUTE if index + 4 < payload.len() => (
+                    (u32::from_be_bytes(
+                        payload[index + 1..index + 5].try_into().unwrap_or_default(),
+                    ) * 60) as i64,
+                    5,
+                ),
+                _ => (0, 0),
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/double.go#L109
+        fn decode_f64(payload: &[u8], index: usize) -> (f64, usize) {
+            let tag = payload[index];
+            match tag {
+                BC_DOUBLE_ZERO => (0.0, 1),
+                BC_DOUBLE_ONE => (1.0, 1),
+                BC_DOUBLE_BYTE if index + 1 < payload.len() => (
+                    u8::from_be_bytes(payload[index + 1..index + 2].try_into().unwrap_or_default())
+                        as f64,
+                    2,
+                ),
+                BC_DOUBLE_SHORT if index + 2 < payload.len() => (
+                    u16::from_be_bytes(payload[index + 1..index + 3].try_into().unwrap_or_default())
+                        as f64,
+                    3,
+                ),
+                BC_DOUBLE_MILL if index + 4 < payload.len() => (
+                    u32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
+                        as f64,
+                    5,
+                ),
+                BC_DOUBLE if index + 8 < payload.len() => (
+                    f64::from_be_bytes(
+                        payload[index + 1..index + 9].try_into().unwrap_or_default(),
+                    ),
+                    9,
+                ),
+                _ => (0.0, 0),
+            }
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/binary.go#L124
+        fn decode_binary(payload: &[u8], index: usize) -> (Vec<u8>, usize) {
+            let mut result = Vec::new();
+            let mut start = index;
+            let mut tag = payload[start];
+            loop {
+                let len = match tag {
+                    BC_BINARY_DIRECT..=INT_DIRECT_MAX => {
+                        start += 1;
+                        (tag.overflowing_sub(BC_BINARY_DIRECT).0) as usize
+                    }
+                    BC_BINARY_SHORT..=0x37 if start + 1 < payload.len() => {
+                        start += 2;
+                        ((tag.overflowing_sub(BC_BINARY_SHORT).0) as usize)
+                            << 8 + payload[start - 1] as usize
+                    }
+                    BC_BINARY_CHUNK | BC_BINARY if start + 2 < payload.len() => {
+                        start += 3;
+                        ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
+                    }
+                    _ => return (result, 0),
+                };
+                if start >= payload.len() || start + len > payload.len() {
+                    break;
+                }
+                result.extend_from_slice(&payload[start..start + len]);
+                start += len;
+                if tag != BC_BINARY_CHUNK {
+                    // tag == BC_BINARY_CHUNK, continue to read
+                    break;
+                }
+                if start >= payload.len() {
+                    break;
+                }
+                tag = payload[start];
+            }
+            return (result, start - index);
+        }
+
+        // https://github.com/apache/dubbo-go-hessian2/blob/master/string.go#L204
+        fn decode_string(payload: &[u8], index: usize) -> (Option<String>, usize) {
+            let mut result = Vec::new();
+            let mut start = index;
+            let mut tag = payload[start];
+            loop {
+                let len = match tag {
+                    BC_STRING_DIRECT..=STRING_DIRECT_MAX => {
+                        start += 1;
+                        // 这里应该是 tag-BC_STRNG_DIRECT，但 BC_STRING_DIRECT 刚好等于 0x00，故省略
+                        tag as usize
+                    }
+                    BC_STRING_SHORT..=BC_STRING_SHORT_MAX if start + 1 < payload.len() => {
+                        start += 2;
+                        (((payload[start - 2] - BC_STRING_SHORT) as usize) << 8)
+                            + payload[start - 1] as usize
+                    }
+                    BC_STRING_CHUNK | BC_STRING if start + 2 < payload.len() => {
+                        start += 3;
+                        ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
+                    }
+                    _ => return (None, 0),
+                };
+                if start >= payload.len() || start + len > payload.len() {
+                    break;
+                }
+                result.extend_from_slice(&payload[start..start + len]);
+                start += len;
+                if tag != BC_STRING_CHUNK {
+                    // 非 BC_STRING_CHUNK 直接跳出，BC_STRING_CHUNK 则继续读下一个 CHUNK
+                    break;
+                }
+                if start >= payload.len() {
+                    break;
+                }
+                tag = payload[start];
+            }
+            if check_ascii(&result, 0, result.len()) {
+                return (None, 0);
+            }
+            return (
+                Some(String::from_utf8_lossy(&result).into_owned()),
+                start - index,
+            );
+        }
+
+        fn parse_args(
+            &mut self,
+            payload: &[u8],
+            start: usize,
+        ) -> (Option<HashMap<String, HessianValue>>, usize) {
+            let payload_len = payload.len();
+            let mut start_index = start;
+            let (value, read_len) = self.decode_field(&payload, start_index);
+            if start_index + read_len > payload_len {
+                return (None, start);
+            }
+            start_index += read_len;
+            let arg_types = match value {
+                Some(HessianValue::String(arg_types)) => arg_types,
+                _ => return (None, start),
+            };
+            let re = regex::Regex::new(REGEX_ARG_TYPES).unwrap();
+            let mut args_count = re.find_iter(&arg_types).count() as u8;
+            let mut args = HashMap::new();
+            while args_count > 0 {
+                let (value, read_len) = self.decode_field(&payload, start_index);
+                if start_index + read_len > payload_len {
+                    return (None, start_index);
+                }
+                start_index += read_len;
+                match value {
+                    Some(HessianValue::Map(map)) => {
+                        args.extend(map);
+                    }
+                    _ => (),
+                }
+                args_count -= 1;
+            }
+            log::debug!(
+                "read hessian payload end, final index: {}, payload len: {}",
+                start + read_len,
+                payload.len()
+            );
+            return (Some(args), start_index);
+        }
+
+        fn parse_attachments(
+            &mut self,
+            payload: &[u8],
+            start: usize,
+        ) -> (Option<HashMap<String, HessianValue>>, usize) {
+            let (value, read_len) = self.decode_field(&payload, start);
+            match value {
+                Some(HessianValue::Map(attachments)) => (Some(attachments), start + read_len),
+                _ => (None, start),
+            }
+        }
+    }
 
     fn check_ascii(payload: &[u8], start: usize, end: usize) -> bool {
         let mut invalid = false;
@@ -492,72 +1189,6 @@ mod hessian2 {
             }
         }
         return invalid;
-    }
-
-    fn decode_field(bytes: &[u8], mut start: usize) -> Option<String> {
-        if start >= bytes.len() {
-            return None;
-        }
-
-        match bytes[start] {
-            BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
-                if start + 2 >= bytes.len() {
-                    return None;
-                }
-                let field_len =
-                    (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
-                start += 2;
-
-                if check_ascii(bytes, start, start + field_len) {
-                    return None;
-                }
-
-                if start + field_len < bytes.len() {
-                    return Some(
-                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
-                    );
-                } else {
-                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
-                }
-            }
-            0..=STRING_DIRECT_MAX => {
-                let field_len = bytes[start] as usize;
-                start += 1;
-
-                if check_ascii(&bytes, start, start + field_len) {
-                    return None;
-                }
-
-                if start + field_len < bytes.len() {
-                    return Some(
-                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
-                    );
-                } else {
-                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
-                }
-            }
-            b'S' => {
-                if start + 3 >= bytes.len() {
-                    return None;
-                }
-                let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
-                start += 3;
-
-                if check_ascii(&bytes, start, start + field_len) {
-                    return None;
-                }
-
-                if start + field_len < bytes.len() {
-                    return Some(
-                        String::from_utf8_lossy(&bytes[start..start + field_len]).into_owned(),
-                    );
-                } else {
-                    return Some(String::from_utf8_lossy(&bytes[start..]).into_owned());
-                }
-            }
-            _ => {}
-        };
-        return None;
     }
 
     fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
@@ -582,7 +1213,9 @@ mod hessian2 {
                 continue;
             }
 
-            if let Some(context) = decode_field(payload, start + index + tag.len()) {
+            if let (Some(context), _) =
+                Hessian2Decoder::decode_string(payload, start + index + tag.len())
+            {
                 return Some(context);
             }
             start += index + tag.len();
@@ -604,6 +1237,7 @@ mod hessian2 {
     }
 
     // 参考开源代码解析：https://github.com/apache/dubbo-go-hessian2/blob/master/decode.go#L289
+    // https://github.com/apache/dubbo-go-hessian2/blob/v2.0.0/string.go#L169
     // 返回offset和数据length
     pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
         let tag = payload[0];
@@ -620,7 +1254,14 @@ mod hessian2 {
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
-    pub fn get_req_body_info(config: &L7LogDynamicConfig, payload: &[u8], info: &mut DubboInfo) {
+    // 解析逻辑：https://github.com/apache/dubbo-go/blob/v3.3.0/protocol/dubbo/impl/hessian.go
+    pub fn get_req_body_info(
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        info: &mut DubboInfo,
+        #[cfg(feature = "enterprise")] direction: PacketDirection,
+        #[cfg(feature = "enterprise")] port: u16,
+    ) {
         let mut n = BODY_PARAM_MIN;
         let mut para_index = 0;
         let payload_len = payload.len();
@@ -673,7 +1314,7 @@ mod hessian2 {
             }
 
             decode_trace_id(&payload[para_index..], &trace_type, info);
-            if info.trace_id.len() != 0 {
+            if info.trace_id.field.len() != 0 {
                 break;
             }
         }
@@ -683,8 +1324,97 @@ mod hessian2 {
             }
 
             decode_span_id(&payload[para_index..], &span_type, info);
-            if info.span_id.len() != 0 {
+            if info.span_id.field.len() != 0 {
                 break;
+            }
+        }
+
+        #[cfg(feature = "enterprise")]
+        on_payload_and_header(config, direction, port, payload, para_index, info);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn on_payload_and_header(
+        config: &L7LogDynamicConfig,
+        direction: PacketDirection,
+        port: u16,
+        payload: &[u8],
+        start: usize,
+        info: &mut DubboInfo,
+    ) {
+        fn process_hessian_map(
+            policies: &Vec<ExtraField>,
+            values_map: &Option<HashMap<String, HessianValue>>,
+            info: &mut DubboInfo,
+        ) {
+            let mut tags = HashMap::new();
+            let map = match values_map {
+                Some(headers) => headers,
+                _ => return,
+            };
+
+            for field in policies {
+                let value = map
+                    .keys()
+                    .find(|&key| {
+                        if field.field_match_type == MatchType::String(true) {
+                            key.eq_ignore_ascii_case(&field.field_match_keyword)
+                        } else {
+                            key.eq(&field.field_match_keyword)
+                        }
+                    })
+                    .and_then(|key| map.get(key).clone());
+
+                match value {
+                    Some(v) => match v.get_string_value() {
+                        Some(string_value) => {
+                            field.set_value(&string_value, &mut tags, info);
+                        }
+                        None => continue,
+                    },
+                    None => continue,
+                };
+            }
+            info.merge_policy_tags_to_dubbo(tags);
+        }
+
+        // 如果配置了需要读取 dubbo header 或 hessian2 payload，则需要解 hessian2 消息
+        let Some(policies) = config.extra_field_policies.get(&L7Protocol::Dubbo) else {
+            return;
+        };
+
+        let mut hessian_decoder = Hessian2Decoder::default();
+        let mut hessian_payload = None;
+        let mut attachments = None;
+        let mut args_end_index: usize = 0;
+
+        for policy in policies {
+            if let Some(port_bitmap) = &policy.port_bitmap {
+                if !port_bitmap.get(port as usize).is_ok_and(|r| r) {
+                    continue;
+                }
+            }
+            let field_policy = match direction {
+                PacketDirection::ClientToServer => &policy.from_req,
+                PacketDirection::ServerToClient => &policy.from_resp,
+            };
+
+            if let Some(policies) = field_policy.get(&FieldType::Header) {
+                // attachmetns 依赖于 payload 的 last index 才能解析，所以不管是否配置 hessian2 payload，只要配置了 dubbo+header 都要尝试解一下
+                if hessian_payload.is_none() {
+                    (hessian_payload, args_end_index) = hessian_decoder.parse_args(payload, start);
+                }
+                if attachments.is_none() {
+                    (attachments, _) = hessian_decoder.parse_attachments(payload, args_end_index);
+                }
+                process_hessian_map(policies, &attachments, info);
+            }
+
+            if let Some(policies) = field_policy.get(&FieldType::PayloadHessian2) {
+                if hessian_payload.is_none() {
+                    (hessian_payload, args_end_index) = hessian_decoder.parse_args(payload, start);
+                }
+                process_hessian_map(policies, &hessian_payload, info);
             }
         }
     }
@@ -795,7 +1525,7 @@ mod kryo {
             }
 
             decode_trace_id(&payload[offset..], &trace_type, info);
-            if info.trace_id.len() != 0 {
+            if info.trace_id.field.len() != 0 {
                 break;
             }
         }
@@ -805,7 +1535,7 @@ mod kryo {
             }
 
             decode_span_id(&payload[offset..], &span_type, info);
-            if info.span_id.len() != 0 {
+            if info.span_id.field.len() != 0 {
                 break;
             }
         }
@@ -998,7 +1728,7 @@ mod fastjson2 {
             }
 
             decode_trace_id(&payload[offset..], &trace_type, info);
-            if info.trace_id.len() != 0 {
+            if info.trace_id.field.len() != 0 {
                 break;
             }
         }
@@ -1008,7 +1738,7 @@ mod fastjson2 {
             }
 
             decode_span_id(&payload[offset..], &span_type, info);
-            if info.span_id.len() != 0 {
+            if info.span_id.field.len() != 0 {
                 break;
             }
         }
@@ -1016,9 +1746,23 @@ mod fastjson2 {
 }
 
 impl DubboLog {
-    fn decode_body(config: &L7LogDynamicConfig, payload: &[u8], info: &mut DubboInfo) {
+    fn decode_body(
+        config: &L7LogDynamicConfig,
+        payload: &[u8],
+        info: &mut DubboInfo,
+        #[cfg(feature = "enterprise")] direction: PacketDirection,
+        #[cfg(feature = "enterprise")] port: u16,
+    ) {
         match info.serial_id {
-            HESSIAN2_SERIALIZATION_ID => hessian2::get_req_body_info(config, payload, info),
+            HESSIAN2_SERIALIZATION_ID => hessian2::get_req_body_info(
+                config,
+                payload,
+                info,
+                #[cfg(feature = "enterprise")]
+                direction,
+                #[cfg(feature = "enterprise")]
+                port,
+            ),
             KRYO_SERIALIZATION2_ID => kryo::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION_ID => kryo::get_req_body_info(config, payload, info),
             FASTJSON2_SERIALIZATION_ID => fastjson2::get_req_body_info(config, payload, info),
@@ -1032,6 +1776,8 @@ impl DubboLog {
         payload: &[u8],
         dubbo_header: &DubboHeader,
         info: &mut DubboInfo,
+        #[cfg(feature = "enterprise")] direction: PacketDirection,
+        #[cfg(feature = "enterprise")] port: u16,
     ) {
         info.msg_type = LogMessageType::Request;
         info.event = dubbo_header.event;
@@ -1040,7 +1786,15 @@ impl DubboLog {
         info.serial_id = dubbo_header.serial_id;
         info.request_id = dubbo_header.request_id;
 
-        Self::decode_body(config, &payload[DUBBO_HEADER_LEN..], info);
+        Self::decode_body(
+            config,
+            &payload[DUBBO_HEADER_LEN..],
+            info,
+            #[cfg(feature = "enterprise")]
+            direction,
+            #[cfg(feature = "enterprise")]
+            port,
+        );
     }
 
     fn set_status(&mut self, status_code: u8, info: &mut DubboInfo) {
@@ -1083,7 +1837,16 @@ impl DubboLog {
 
         match direction {
             PacketDirection::ClientToServer => {
-                self.request(&config, payload, &dubbo_header, info);
+                self.request(
+                    &config,
+                    payload,
+                    &dubbo_header,
+                    info,
+                    #[cfg(feature = "enterprise")]
+                    param.direction,
+                    #[cfg(feature = "enterprise")]
+                    param.port_dst,
+                );
             }
             PacketDirection::ServerToClient => {
                 self.response(&dubbo_header, info);
@@ -1177,6 +1940,15 @@ mod tests {
         utils::test::Capture,
     };
 
+    cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+            use enterprise_utils::l7::plugin::custom_field_policy::{ExtraCustomFieldPolicy, ExtraField};
+            use public::enums::{FieldType, MatchType};
+            use std::collections::HashMap;
+            use crate::flow_generator::protocol_logs::LogMessageType;
+        }
+    }
+
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 
     fn run(name: &str) -> String {
@@ -1213,6 +1985,8 @@ mod tests {
                         TraceType::Sw8,
                     ],
                     ExtraLogFields::default(),
+                    #[cfg(feature = "enterprise")]
+                    HashMap::new(),
                 ),
                 ..Default::default()
             };
@@ -1309,6 +2083,8 @@ mod tests {
                 vec![TraceType::Sw8],
                 vec![TraceType::Sw8],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };
@@ -1339,7 +2115,7 @@ mod tests {
 
         assert_eq!(is_dubbo, true);
         assert_eq!(
-            info.trace_id,
+            info.trace_id.field,
             "189d38354fc240ea804c15395b2d5baf.175.17394983574777353"
         );
     }
@@ -1409,6 +2185,8 @@ mod tests {
                 vec![TraceType::CloudWise],
                 vec![],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };
@@ -1439,7 +2217,7 @@ mod tests {
 
         assert_eq!(is_dubbo, true);
         // EE: assert_eq!(info.trace_id, "00000000-332d-351f-ffff-ffff84afb1ba");
-        assert_eq!(info.trace_id, "JAVA:0:6904424666057469:6865509588089802:3363838533311866:00000000-332d-351f-ffff-ffff84afb1ba:7502612320163056:00000000-39d7-c9b2-ffff-ffff93cf32e0:ffffffff-df3a-bfff-0000-000001c43ef4:dilinkapp_dilinkapp-vehicle-provide-test:-1:-1");
+        assert_eq!(info.trace_id.field, "JAVA:0:6904424666057469:6865509588089802:3363838533311866:00000000-332d-351f-ffff-ffff84afb1ba:7502612320163056:00000000-39d7-c9b2-ffff-ffff93cf32e0:ffffffff-df3a-bfff-0000-000001c43ef4:dilinkapp_dilinkapp-vehicle-provide-test:-1:-1");
     }
 
     #[test]
@@ -1511,6 +2289,8 @@ mod tests {
                     TraceType::Sw8,
                 ],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };
@@ -1537,5 +2317,200 @@ mod tests {
             }
         }
         dubbo.perf_stats.unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_parse_hessian2_payload() {
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join("dubbo-sw8.pcap"));
+        let mut packets = capture.collect::<Vec<_>>();
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        let rewrite_header_fields = vec![
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "path".into(),
+                rewrite_native_tag: ExtraField::ENDPOINT.into(),
+                attribute_name: Some("path".into()),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "remote.application".into(),
+                rewrite_native_tag: ExtraField::REQUEST_DOMAIN.into(),
+                attribute_name: Some("remote.appliaction".into()),
+                ..Default::default()
+            },
+        ]
+        .into_iter()
+        .collect();
+        let config = L7LogDynamicConfig::new(
+            vec![],
+            vec!["x-request-id".into()],
+            vec!["trace_id".into()],
+            vec!["span_id".into()],
+            ExtraLogFields::default(),
+            [(
+                L7Protocol::Dubbo,
+                vec![ExtraCustomFieldPolicy {
+                    custom_protocol_name: Some("".into()),
+                    port_bitmap: None,
+                    from_resp: HashMap::new(),
+                    from_req: [(FieldType::Header, rewrite_header_fields)]
+                        .into_iter()
+                        .collect(),
+                }],
+            )]
+            .into_iter()
+            .collect(),
+        );
+
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+            let tcp_payload = packet.get_l4_payload().unwrap_or_default();
+            let mut info = DubboInfo::default();
+            hessian2::get_req_body_info(
+                &config,
+                &tcp_payload[DUBBO_HEADER_LEN..],
+                &mut info,
+                PacketDirection::ClientToServer,
+                20080,
+            );
+            assert_eq!(info.service_name, "shop-web", "get service_name failed");
+            assert_eq!(
+                info.endpoint,
+                Some("my.demo.service.ItemService".into()),
+                "get endpoint failed"
+            );
+
+            assert!(info.attributes.len() > 0, "get attrs failed");
+            for i in 0..info.attributes.len() {
+                match info.attributes[i].key.as_str() {
+                    "path" => assert_eq!(
+                        "my.demo.service.ItemService", info.attributes[i].val,
+                        "get path failed"
+                    ),
+                    "remote.application" => {
+                        assert_eq!("shop-web", info.attributes[i].val, "get app failed")
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_parse_hessian2_payload_with_args() {
+        let hessian_payload = vec![
+            0xda, 0xbb, 0xc2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+            0x01, 0x7e, 0x05, 0x32, 0x2e, 0x30, 0x2e, 0x32, 0x30, 0x24, 0x6f, 0x72, 0x67, 0x2e,
+            0x61, 0x70, 0x61, 0x63, 0x68, 0x65, 0x2e, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x2e, 0x73,
+            0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x50, 0x72, 0x6f, 0x76,
+            0x69, 0x64, 0x65, 0x72, 0x09, 0x6d, 0x79, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e,
+            0x07, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x1e, 0x4c, 0x6f, 0x72, 0x67, 0x2f,
+            0x61, 0x70, 0x61, 0x63, 0x68, 0x65, 0x2f, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x2f, 0x73,
+            0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x55, 0x73, 0x65, 0x72, 0x3b, 0x43, 0x1c, 0x6f,
+            0x72, 0x67, 0x2e, 0x61, 0x70, 0x61, 0x63, 0x68, 0x65, 0x2e, 0x64, 0x75, 0x62, 0x62,
+            0x6f, 0x2e, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x95,
+            0x02, 0x69, 0x64, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x03, 0x61, 0x67, 0x65, 0x04, 0x74,
+            0x69, 0x6d, 0x65, 0x03, 0x73, 0x65, 0x78, 0x60, 0x03, 0x30, 0x30, 0x33, 0x08, 0x54,
+            0x65, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0xc8, 0x63, 0x4a, 0x00, 0x00, 0x01, 0x97,
+            0x3d, 0xf0, 0xad, 0x8d, 0x43, 0x1e, 0x6f, 0x72, 0x67, 0x2e, 0x61, 0x70, 0x61, 0x63,
+            0x68, 0x65, 0x2e, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x2e, 0x73, 0x61, 0x6d, 0x70, 0x6c,
+            0x65, 0x2e, 0x47, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x91, 0x04, 0x6e, 0x61, 0x6d, 0x65,
+            0x61, 0x03, 0x4d, 0x41, 0x4e, 0x48, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x66, 0x61,
+            0x63, 0x65, 0x30, 0x24, 0x6f, 0x72, 0x67, 0x2e, 0x61, 0x70, 0x61, 0x63, 0x68, 0x65,
+            0x2e, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x2e, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e,
+            0x55, 0x73, 0x65, 0x72, 0x50, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x05, 0x67,
+            0x72, 0x6f, 0x75, 0x70, 0x0a, 0x6d, 0x79, 0x41, 0x70, 0x70, 0x47, 0x72, 0x6f, 0x75,
+            0x70, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x09, 0x6d, 0x79, 0x76, 0x65,
+            0x72, 0x73, 0x69, 0x6f, 0x6e, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x04,
+            0x33, 0x30, 0x30, 0x30, 0x05, 0x61, 0x73, 0x79, 0x6e, 0x63, 0x05, 0x66, 0x61, 0x6c,
+            0x73, 0x65, 0x0b, 0x65, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e, 0x74,
+            0x03, 0x70, 0x72, 0x6f, 0x04, 0x70, 0x61, 0x74, 0x68, 0x30, 0x24, 0x6f, 0x72, 0x67,
+            0x2e, 0x61, 0x70, 0x61, 0x63, 0x68, 0x65, 0x2e, 0x64, 0x75, 0x62, 0x62, 0x6f, 0x2e,
+            0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x50, 0x72, 0x6f,
+            0x76, 0x69, 0x64, 0x65, 0x72, 0x5a,
+        ];
+        let rewrite_hessian2_payload = vec![
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "id".into(),
+                rewrite_native_tag: ExtraField::REQUEST_RESOURCE.into(),
+                attribute_name: Some("id".into()),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "name".into(),
+                rewrite_native_tag: ExtraField::ENDPOINT.into(),
+                attribute_name: Some("name".into()),
+                ..Default::default()
+            },
+            ExtraField {
+                field_match_type: MatchType::String(false),
+                field_match_keyword: "age".into(),
+                rewrite_native_tag: ExtraField::X_REQUEST_ID.into(),
+                attribute_name: Some("age".into()),
+                ..Default::default()
+            },
+        ]
+        .into_iter()
+        .collect();
+        let config = L7LogDynamicConfig::new(
+            vec![],
+            vec!["x-request-id".into()],
+            vec!["trace_id".into()],
+            vec!["span_id".into()],
+            ExtraLogFields::default(),
+            [(
+                L7Protocol::Dubbo,
+                vec![ExtraCustomFieldPolicy {
+                    custom_protocol_name: Some("".into()),
+                    port_bitmap: None,
+                    from_resp: HashMap::new(),
+                    from_req: [(FieldType::PayloadHessian2, rewrite_hessian2_payload)]
+                        .into_iter()
+                        .collect(),
+                }],
+            )]
+            .into_iter()
+            .collect(),
+        );
+
+        let mut info = DubboInfo::default();
+        info.msg_type = LogMessageType::Request;
+        hessian2::get_req_body_info(
+            &config,
+            &hessian_payload[DUBBO_HEADER_LEN..],
+            &mut info,
+            PacketDirection::ClientToServer,
+            20000,
+        );
+        assert_eq!(
+            info.endpoint,
+            Some("TestUser".into()),
+            "get endpoint failed"
+        );
+        assert_eq!(
+            info.x_request_id_0.as_ref().unwrap().field,
+            "99",
+            "get x_request_id_0 failed"
+        );
+        assert_eq!(info.method_name, "003", "get method_name failed");
+
+        assert!(info.attributes.len() > 0, "get attrs failed");
+        for i in 0..info.attributes.len() {
+            match info.attributes[i].key.as_str() {
+                "id" => assert_eq!("003", info.attributes[i].val, "get id failed"),
+                "name" => assert_eq!("TestUser", info.attributes[i].val, "get name failed"),
+                "age" => assert_eq!("99", info.attributes[i].val, "get age failed"),
+                _ => (),
+            }
+        }
     }
 }

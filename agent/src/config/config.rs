@@ -47,9 +47,20 @@ use crate::{
 };
 
 use public::{
-    bitmap::Bitmap, l7_protocol::L7Protocol, proto::agent,
+    bitmap::Bitmap,
+    enums::{Charset, FieldType, MatchType, TrafficDirection},
+    l7_protocol::L7Protocol,
+    proto::agent,
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
+
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        use enterprise_utils::l7::plugin::custom_field_policy::{
+            ExtraCustomFieldPolicy, ExtraCustomProtocolConfig, ExtraField, KeywordMatcher,
+        };
+    }
+}
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -1576,6 +1587,7 @@ pub struct ApplicationProtocolInference {
     pub inference_result_ttl: Duration,
     pub enabled_protocols: Vec<String>,
     pub protocol_special_config: ProtocolSpecialConfig,
+    pub custom_protocols: Vec<CustomProtocolConfig>,
 }
 
 impl Default for ApplicationProtocolInference {
@@ -1593,6 +1605,7 @@ impl Default for ApplicationProtocolInference {
                 "TLS".to_string(),
             ],
             protocol_special_config: ProtocolSpecialConfig::default(),
+            custom_protocols: vec![],
         }
     }
 }
@@ -1767,6 +1780,293 @@ impl Default for HttpEndpoint {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PortFilter {
+    pub port_list: String,
+}
+
+fn to_match_type<'de, D>(deserializer: D) -> Result<MatchType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.to_lowercase().as_str() {
+        "string" => Ok(MatchType::String(false)),
+        "hex" => Ok(MatchType::Hex),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"[string|hex]",
+        )),
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Matcher {
+    pub match_keyword: String,
+    #[serde(deserialize_with = "to_match_type")]
+    pub match_type: MatchType,
+    pub match_ignore_case: bool,
+    pub match_from_begining: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Character {
+    pub character: Vec<Matcher>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CustomProtocolConfig {
+    pub protocol_name: String,
+    pub pre_filter: PortFilter,
+    pub request_characters: Vec<Character>,
+    pub response_characters: Vec<Character>,
+}
+
+fn to_traffic_direction<'de, D>(deserializer: D) -> Result<TrafficDirection, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.to_lowercase().as_str() {
+        "request" => Ok(TrafficDirection::Request),
+        "response" => Ok(TrafficDirection::Response),
+        "both" => Ok(TrafficDirection::Both),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"[request|response|both]",
+        )),
+    }
+}
+
+fn to_charset_arr<'de, D>(deserializer: D) -> Result<Vec<Charset>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let charset: Vec<String> = Vec::deserialize(deserializer)?;
+    let mut charsets = Vec::with_capacity(charset.len());
+    for c in charset {
+        match c.to_lowercase().as_str() {
+            "digits" => charsets.push(Charset::Digits),
+            "alphabets" => charsets.push(Charset::Alphabets),
+            "chinese" => charsets.push(Charset::Chinese),
+            other => {
+                return Err(de::Error::invalid_value(
+                    Unexpected::Str(other),
+                    &"[digits|alphabets|chinese]",
+                ))
+            }
+        }
+    }
+    Ok(charsets)
+}
+
+fn to_rewrite_native_tag<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let deserialize_str = String::deserialize(deserializer)?.to_lowercase();
+    match deserialize_str.as_str() {
+        "version" | "request_type" | "request_domain" | "request_resource" | "request_id"
+        | "endpoint" | "response_code" | "response_exception" | "response_result" | "trace_id"
+        | "span_id" | "x_request_id" | "http_proxy_client" => Ok(deserialize_str.clone()),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &format!(
+                "[{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}]",
+                "version",
+                "request_type",
+                "request_domain",
+                "request_resource",
+                "request_id",
+                "endpoint",
+                "response_code",
+                "response_exception",
+                "response_result",
+                "trace_id",
+                "span_id",
+                "x_request_id",
+                "http_proxy_client"
+            )
+            .as_str(),
+        )),
+    }
+}
+
+fn to_field_type<'de, D>(deserializer: D) -> Result<FieldType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.to_lowercase().as_str() {
+        "header_field" => Ok(FieldType::Header),
+        "http_url_field" => Ok(FieldType::HttpUrl),
+        "payload_json_value" => Ok(FieldType::PayloadJson),
+        "payload_xml_value" => Ok(FieldType::PayloadXml),
+        "payload_hessian2_value" => Ok(FieldType::PayloadHessian2),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"[header_field|http_url_field|payload_json_value|payload_xml_value|payload_hessian2_value]"
+        )),
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RewriteResponseStatus {
+    pub success_value: Vec<String>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Field {
+    pub field_name: String,
+    #[serde(deserialize_with = "to_match_type")]
+    pub field_match_type: MatchType,
+    pub field_match_keyword: String,
+    pub field_match_ignore_case: bool,
+    pub subfield_match_keyword: Option<String>,
+    pub separator_between_subfield_kv_pair: Option<String>,
+    pub separator_between_subfield_key_and_value: Option<String>,
+    #[serde(deserialize_with = "to_field_type")]
+    pub field_type: FieldType,
+    #[serde(deserialize_with = "to_traffic_direction")]
+    pub traffic_direction: TrafficDirection,
+    pub check_value_charset: bool,
+    #[serde(deserialize_with = "to_charset_arr")]
+    pub value_primary_charset: Vec<Charset>,
+    pub value_special_charset: String,
+    pub attribute_name: Option<String>,
+    #[serde(deserialize_with = "to_rewrite_native_tag")]
+    pub rewrite_native_tag: String,
+    pub rewrite_response_status: RewriteResponseStatus,
+    pub metric_name: Option<String>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CustomFieldPolicy {
+    pub policy_name: String,
+    pub protocol_name: String,
+    // only for custom protocol
+    pub custom_protocol_name: Option<String>,
+    pub port_list: String,
+    pub fields: Vec<Field>,
+}
+
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        impl From<&Field> for ExtraField {
+            fn from(v: &Field) -> ExtraField {
+                ExtraField {
+                    // default: match string with case sensitive
+                    field_match_type: match v.field_match_type {
+                        _ => MatchType::String(v.field_match_ignore_case),
+                    },
+                    field_match_keyword: v.field_match_keyword.clone(),
+                    subfield_match_keyword: v.subfield_match_keyword.clone(),
+                    separator_between_subfield_kv_pair: v.separator_between_subfield_kv_pair.clone(),
+                    separator_between_subfield_key_and_value: v
+                        .separator_between_subfield_key_and_value
+                        .clone(),
+                    check_value_charset: v.check_value_charset,
+                    value_primary_charset: v.value_primary_charset.clone(),
+                    value_special_charset: v.value_special_charset.clone(),
+                    attribute_name: v.attribute_name.clone(),
+                    rewrite_native_tag: v.rewrite_native_tag.clone(),
+                    response_success_value: v.rewrite_response_status.success_value.clone(),
+                    metric_name: v.metric_name.clone(),
+                }
+            }
+        }
+
+        impl From<Matcher> for KeywordMatcher {
+            fn from(value: Matcher) -> KeywordMatcher {
+                let match_keyword_bytes = match value.match_type {
+                    MatchType::String(_) => value.match_keyword.as_bytes().to_vec(),
+                    MatchType::Hex => match hex::decode(&value.match_keyword) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!(
+                                "custom protocol match hex string: {} failed. error: {}",
+                                value.match_keyword, e,
+                            );
+                            vec![]
+                        }
+                    },
+                };
+                let match_type = match value.match_type {
+                    MatchType::String(_) => MatchType::String(value.match_ignore_case),
+                    MatchType::Hex => MatchType::Hex,
+                };
+                KeywordMatcher {
+                    match_type: match_type,
+                    match_from_begining: value.match_from_begining,
+                    match_keyword_bytes: match_keyword_bytes,
+                }
+            }
+        }
+
+        impl From<&CustomProtocolConfig> for ExtraCustomProtocolConfig {
+            fn from(v: &CustomProtocolConfig) -> ExtraCustomProtocolConfig {
+                ExtraCustomProtocolConfig {
+                    protocol_name: v.protocol_name.clone(),
+                    port_bitmap: parse_u16_range_list_to_bitmap(&v.pre_filter.port_list, false),
+                    request_characters: v
+                        .request_characters
+                        .iter()
+                        .map(|r| {
+                            r.character
+                                .iter()
+                                .map(|c| KeywordMatcher::from(c.clone()))
+                                .collect()
+                        })
+                        .collect(),
+                    response_characters: v
+                        .response_characters
+                        .iter()
+                        .map(|r| {
+                            r.character
+                                .iter()
+                                .map(|c| KeywordMatcher::from(c.clone()))
+                                .collect()
+                        })
+                        .collect(),
+                }
+            }
+        }
+
+        impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
+            fn from(v: &CustomFieldPolicy) -> ExtraCustomFieldPolicy {
+                let mut from_req = HashMap::new();
+                let mut from_resp = HashMap::new();
+                for f in &v.fields {
+                    // build double config for TrafficDirection::Both, so that we can directly get config by flow direction
+                    if f.traffic_direction & TrafficDirection::Request == TrafficDirection::Request {
+                        from_req
+                            .entry(f.field_type)
+                            .and_modify(|v: &mut Vec<ExtraField>| v.push(f.into()))
+                            .or_insert_with(|| vec![f.into()]);
+                    }
+
+                    if f.traffic_direction & TrafficDirection::Response == TrafficDirection::Response {
+                        from_resp
+                            .entry(f.field_type)
+                            .and_modify(|v: &mut Vec<ExtraField>| v.push(f.into()))
+                            .or_insert_with(|| vec![f.into()]);
+                    }
+                }
+                Self {
+                    custom_protocol_name: v.custom_protocol_name.clone(),
+                    port_bitmap: parse_u16_range_list_to_bitmap(v.port_list.as_str(), false),
+                    from_req,
+                    from_resp,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CustomFields {
@@ -1778,8 +2078,9 @@ pub struct CustomFields {
 pub struct RequestLogTagExtraction {
     pub tracing_tag: TracingTag,
     pub http_endpoint: HttpEndpoint,
-    pub custom_fields: HashMap<String, Vec<CustomFields>>,
     pub obfuscate_protocols: Vec<String>,
+    pub custom_fields: HashMap<String, Vec<CustomFields>>,
+    pub custom_field_policies: Vec<CustomFieldPolicy>,
 }
 
 impl Default for RequestLogTagExtraction {
@@ -1792,6 +2093,7 @@ impl Default for RequestLogTagExtraction {
                 ("HTTP2".to_string(), vec![]),
             ]),
             obfuscate_protocols: vec!["Redis".to_string()],
+            custom_field_policies: vec![],
         }
     }
 }
@@ -2701,6 +3003,29 @@ impl UserConfig {
             );
         }
 
+        #[cfg(feature = "enterprise")]
+        {
+            let custom_str = L7ProtocolParser::Custom(
+                crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog::default(),
+            )
+            .as_str();
+            let custom_ports = self
+                .processors
+                .request_log
+                .application_protocol_inference
+                .custom_protocols
+                .iter()
+                .map(|p| p.pre_filter.port_list.clone())
+                .collect::<Vec<String>>()
+                .join(",");
+
+            if !custom_ports.is_empty() {
+                new.entry(custom_str.to_string())
+                    .and_modify(|v| *v = format!("{},{}", v, custom_ports))
+                    .or_insert(custom_ports);
+            }
+        }
+
         new
     }
 
@@ -2723,6 +3048,31 @@ impl UserConfig {
         }
         port_bitmap.sort_unstable_by_key(|p| p.0.clone());
         port_bitmap
+    }
+
+    #[cfg(feature = "enterprise")]
+    pub fn get_extra_field_policies(&self) -> HashMap<L7Protocol, Vec<ExtraCustomFieldPolicy>> {
+        let mut policies = HashMap::new();
+        {
+            for p in &self
+                .processors
+                .request_log
+                .tag_extraction
+                .custom_field_policies
+            {
+                let protocol = L7Protocol::from(p.protocol_name.clone());
+                if protocol == L7Protocol::Unknown {
+                    continue;
+                }
+                policies
+                    .entry(protocol)
+                    .and_modify(|v: &mut Vec<ExtraCustomFieldPolicy>| {
+                        v.push(ExtraCustomFieldPolicy::from(p))
+                    })
+                    .or_insert_with(|| vec![ExtraCustomFieldPolicy::from(p)]);
+            }
+        }
+        policies
     }
 
     pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
