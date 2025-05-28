@@ -77,6 +77,12 @@ type BuilderCounter struct {
 	Sample            int64 `statsd:"sample-out"`
 }
 
+type UniversalTagKey struct {
+	L3EpcID    int32
+	PodNameID  uint32
+	InstanceID uint32
+}
+
 type PrometheusSamplesBuilder struct {
 	name                string
 	labelTable          *PrometheusLabelTable
@@ -95,9 +101,7 @@ type PrometheusSamplesBuilder struct {
 	appLabelValueIDsBuffer  []uint32
 
 	// universal tag cache
-	podNameIDToUniversalTag  [grpc.MAX_ORG_COUNT]map[uint32]flow_metrics.UniversalTag
-	instanceIPToUniversalTag [grpc.MAX_ORG_COUNT]map[uint32]flow_metrics.UniversalTag
-	vtapIDToUniversalTag     [grpc.MAX_ORG_COUNT]map[uint16]flow_metrics.UniversalTag
+	cacheUniversalTags [grpc.MAX_ORG_COUNT]map[UniversalTagKey]flow_metrics.UniversalTag
 
 	counter *BuilderCounter
 	utils.Closable
@@ -120,9 +124,7 @@ func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.Plat
 	}
 
 	for i := 0; i < grpc.MAX_ORG_COUNT; i++ {
-		p.podNameIDToUniversalTag[i] = make(map[uint32]flow_metrics.UniversalTag)
-		p.instanceIPToUniversalTag[i] = make(map[uint32]flow_metrics.UniversalTag)
-		p.vtapIDToUniversalTag[i] = make(map[uint16]flow_metrics.UniversalTag)
+		p.cacheUniversalTags[i] = make(map[UniversalTagKey]flow_metrics.UniversalTag)
 	}
 
 	common.RegisterCountableForIngester("decoder", p, stats.OptionStatTags{
@@ -468,7 +470,6 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 }
 
 func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, podNameID, instanceID uint32, fillWithVtapId bool) {
-	// fast path
 	platformDataVersion := b.platformData.Version(m.OrgId)
 	if platformDataVersion != b.platformDataVersion[m.OrgId] {
 		if b.platformDataVersion[m.OrgId] != 0 {
@@ -476,39 +477,28 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 				b.platformDataVersion[m.OrgId], platformDataVersion)
 		}
 		b.platformDataVersion[m.OrgId] = platformDataVersion
-		b.podNameIDToUniversalTag[m.OrgId] = make(map[uint32]flow_metrics.UniversalTag)
-		b.instanceIPToUniversalTag[m.OrgId] = make(map[uint32]flow_metrics.UniversalTag)
-		b.vtapIDToUniversalTag[m.OrgId] = make(map[uint16]flow_metrics.UniversalTag)
+		b.cacheUniversalTags[m.OrgId] = make(map[UniversalTagKey]flow_metrics.UniversalTag)
 	} else {
-		if podNameID != 0 {
-			if universalTag, ok := b.podNameIDToUniversalTag[m.OrgId][podNameID]; ok {
-				m.UniversalTag = universalTag
-				return
-			}
-		} else if instanceID != 0 {
-			if universalTag, ok := b.instanceIPToUniversalTag[m.OrgId][instanceID]; ok {
-				m.UniversalTag = universalTag
-				return
-			}
-		} else if fillWithVtapId {
-			if universalTag, ok := b.vtapIDToUniversalTag[m.OrgId][vtapID]; ok {
-				m.UniversalTag = universalTag
-				return
-			}
+		// fast path
+		l3EpcID := b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
+		if universalTag, ok := b.cacheUniversalTags[m.OrgId][UniversalTagKey{
+			L3EpcID:    l3EpcID,
+			PodNameID:  podNameID,
+			InstanceID: instanceID,
+		}]; ok {
+			m.UniversalTag = universalTag
+			return
 		}
 	}
 
 	// slow path
 	b.fillUniversalTagSlow(m, vtapID, podName, instance, fillWithVtapId)
-
 	// update fast path
-	if podName != "" && podNameID != 0 {
-		b.podNameIDToUniversalTag[m.OrgId][podNameID] = m.UniversalTag
-	} else if instanceID != 0 {
-		b.instanceIPToUniversalTag[m.OrgId][instanceID] = m.UniversalTag
-	} else if fillWithVtapId {
-		b.vtapIDToUniversalTag[m.OrgId][vtapID] = m.UniversalTag
-	}
+	b.cacheUniversalTags[m.OrgId][UniversalTagKey{
+		L3EpcID:    m.UniversalTag.L3EpcID,
+		PodNameID:  podNameID,
+		InstanceID: instanceID,
+	}] = m.UniversalTag
 }
 
 func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, fillWithVtapId bool) {
