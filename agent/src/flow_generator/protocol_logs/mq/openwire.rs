@@ -2323,6 +2323,8 @@ mod tests {
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),
                 false,
+                #[cfg(feature = "enterprise")]
+                std::collections::HashMap::new(),
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),
@@ -2403,6 +2405,8 @@ mod tests {
             vec![TraceType::Sw8, TraceType::TraceParent],
             ExtraLogFields::default(),
             false,
+            #[cfg(feature = "enterprise")]
+            std::collections::HashMap::new(),
         );
         let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
         assert_eq!(trace_id, Some("TRACEID".to_string()));
