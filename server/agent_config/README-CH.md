@@ -7056,6 +7056,51 @@ processors:
 
 开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
 
+#### 自定义协议解析 {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义协议解析配置，支持通过简单的规则识别用户自定义的 L7 协议。
+示例：
+```yaml
+- protorol_name: "your_protocol_name" # 协议名称，对应 l7_flow_log.l7_protocol_str，注意：必须存在一个 `processors.request_log.tag_extraction.custom_field_policies` 配置，否则无法上报识别结果
+  pre_filter:
+    port_list: 1-65535 # 预过滤端口，可以提高解析性能
+  request_characters:  # 多个特征之间是 OR 的关系
+    - character: # 多个 match_keyword 之间是 AND 的关系
+      - match_keyword: abc  # 特征字符串
+        match_type: "string" # 取值："string", "hex"
+        match_ignore_case: false # 匹配特征字符串是否忽略大小写，当 match_type == string 时生效，默认值: false
+        match_from_begining: false # 是否需要从 Payload 头部开始匹配
+  response_characters:
+    - character:
+      - match_keyword: 0123af
+        match_type: "hex"
+        match_from_begining: false
+```
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
@@ -8002,6 +8047,67 @@ processors:
 **详细描述**:
 
 字段名
+
+#### 自定义字段提取策略 {#processors.request_log.tag_extraction.custom_field_policies}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义字段提取策略，用于通过简单的规则提取 L7 协议中可能存在的自定义字段
+示例：
+```yaml
+- policy_name: "my_policy" # 策略名称
+  protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
+  custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
+  port_list: 1-65535
+  fields:
+  - field_name: "my_field" # 配置的字段
+    field_match_type: "string" # 可选值："string"
+    field_match_ignore_case: "false" # 当匹配 field 时是否忽略大小写，默认值：false
+    field_match_keyword: "abc" # 可以填写额外的字符以提升匹配准确率，例如 `"\"abc\": \""`
+
+    subfield_match_keyword: "y" # 有些情况下，我们需要提取一个子字段，例如 HTTP 的 Cookie 字段中，我们仅仅只需要提取其中的一部分，例如，我们要从 `abc: x=1,y=2,z=3` 的 Value（`x=1,y=2,z=3`）中提取 y 对应的值
+    separator_between_subfield_kv_pair: "," # 用于分割 key-value 键值对的分隔符，默认值：空
+    separator_between_subfield_key_and_value: "=" # 用于分割 key 和 value 的分隔符，默认值：空
+
+    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value，默认值为 `header_field`，含义见下方说明
+    traffic_direction: request # 可以限定仅在请求（或仅在响应）中搜索，默认值为 both，可选值：request/response/both
+    check_value_charset: false # 可用于检查提取结果是否合法
+    value_primary_charset: ["digits", "alphabets", "chinese"] # 提取结果校验字符集，可选值：digits/alphabets/chinese
+    value_special_charset: ".-_" # 提取结果校验字符集，额外校验这些特殊字符
+    attribute_name: "xyz" # 此时该字段将会出现在调用日志的 attribute.xyz 中，默认值为空，为空时该字段不会加入到 attribute 内
+    rewrite_native_tag: version # rewrite 可以填写以下几种字段之一，用于覆写对应字段的值：version/request_type/request_domain/request_resource/request_id/endpoint/response_code/response_exception/response_result/trace_id/span_id/x_request_id/http_proxy_client
+    rewrite_response_status: # rewrite response_status 字段，当 response_code 在 success_values 数组中时，会将 response_status 设置为 success，否则设置为 server_error
+      success_values: []
+    metric_name: "xyz" # 此时该字段将会出现在调用日志的 metrics.xyz 中，默认值为空
+```
+注意，其中 field_type 的不同值会影响到该字段的提取方式，具体如下：
+- `http_url_field`：从 HTTP URL 末尾的参数中提取字段，URL 末尾形如：`?key=value&key2=value2`
+- `header_field`：从 HTTP/Dubbo/SofaRPC/...等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`
+- `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
+- `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
+- `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 

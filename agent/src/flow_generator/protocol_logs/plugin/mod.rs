@@ -35,11 +35,20 @@ pub mod custom_wrap;
 pub mod shared_obj;
 pub mod wasm;
 
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        pub mod custom_protocol_policy;
+        pub use custom_protocol_policy::{get_policy_parser, CustomPolicyLog};
+    }
+}
+
 #[enum_dispatch(L7ProtocolParserInterface)]
 pub enum CustomLog {
     WasmLog(WasmLog),
     #[cfg(any(target_os = "linux", target_os = "android"))]
     SoLog(SoLog),
+    #[cfg(feature = "enterprise")]
+    CustomPolicyLog(CustomPolicyLog),
 }
 
 pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
@@ -49,22 +58,22 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             CustomProtocol::So(p, s) => CustomLog::SoLog(get_so_parser(p, s)),
             #[cfg(target_os = "windows")]
-            CustomProtocol::So(_, _) => todo!(),
+            CustomProtocol::So(_, _) => unimplemented!(),
+            #[cfg(feature = "enterprise")]
+            CustomProtocol::CustomPolicy(s) => CustomLog::CustomPolicyLog(get_policy_parser(s)),
+            #[cfg(not(feature = "enterprise"))]
+            CustomProtocol::CustomPolicy(_) => unimplemented!(),
         }),
     })
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 #[inline(always)]
-fn all_plugin_log_parser() -> [CustomLog; 2] {
-    [
+fn all_plugin_log_parser() -> Vec<CustomLog> {
+    vec![
         CustomLog::WasmLog(WasmLog::default()),
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         CustomLog::SoLog(SoLog::default()),
+        #[cfg(feature = "enterprise")]
+        CustomLog::CustomPolicyLog(CustomPolicyLog::default()),
     ]
-}
-
-#[cfg(target_os = "windows")]
-#[inline(always)]
-fn all_plugin_log_parser() -> [CustomLog; 1] {
-    [CustomLog::WasmLog(WasmLog::default())]
 }
