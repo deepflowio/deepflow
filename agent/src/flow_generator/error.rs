@@ -91,6 +91,8 @@ pub enum Error {
     SoReturnUnexpectVal,
     #[error("so plugin parse fail")]
     SoParseFail,
+    #[error("custom protocol policy parse fail")]
+    CustomPolicyParseFail,
     #[error("{proto:?} log parse failed: {reason}")]
     L7LogParseFailed {
         proto: L7Protocol,

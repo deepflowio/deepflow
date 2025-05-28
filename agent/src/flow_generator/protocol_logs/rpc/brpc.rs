@@ -412,6 +412,8 @@ mod tests {
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),
                 false,
+                #[cfg(feature = "enterprise")]
+                std::collections::HashMap::new(),
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),
