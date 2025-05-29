@@ -62,6 +62,9 @@ type ResourceEvent struct {
 	ConfigDiff     string
 	Config         string
 
+	AttributeNames  []string
+	AttributeValues []string
+
 	ORGID  uint16
 	TeamID uint16
 }
