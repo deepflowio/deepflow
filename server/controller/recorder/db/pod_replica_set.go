@@ -26,12 +26,12 @@ type PodReplicaSet struct {
 }
 
 func NewPodReplicaSet() *PodReplicaSet {
-	operater := &PodReplicaSet{
+	operator := &PodReplicaSet{
 		newOperatorBase[*metadbmodel.PodReplicaSet](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

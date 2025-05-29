@@ -42,7 +42,7 @@ func GetMasterGRPCConn() (*grpc.ClientConn, error) {
 func (s *GRPCURL) Sync(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
-		log.Errorf("create grpc connection faild: %s", err.Error())
+		log.Errorf("create grpc connection failed: %s", err.Error())
 		return nil, err
 	}
 
