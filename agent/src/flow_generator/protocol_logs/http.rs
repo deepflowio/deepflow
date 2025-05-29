@@ -1735,48 +1735,20 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
         if self.0.len() < 2 {
             return None;
         }
-        const SEP: &'static str = "\r\n";
-        let mut end = 0;
-        let mut is_ascii = true;
-        loop {
-            // handle the case len is odd (such as "HTTP/1.0 200 OK\r\n" where encounter in istio),
-            if end == self.0.len() - 1
-                && self.0[end] == b'\n'
-                && end >= 1
-                && self.0[end - 1] == b'\r'
-            {
-                end -= 1;
-                break;
-            }
 
-            if end + SEP.len() > self.0.len() {
-                return None;
-            }
-            match &self.0[end] {
-                b'\r' if self.0[end + 1] == b'\n' => break,
-                b'\n' if end >= 1 && self.0[end - 1] == b'\r' => {
-                    end -= 1;
-                    break;
+        const SEP: &[u8] = b"\r\n";
+        match self.0.windows(2).position(|w| w == SEP) {
+            Some(end) if end != 0 => match str::from_utf8(&self.0[..end]) {
+                Ok(s) => {
+                    self.0 = &self.0[end + 2..];
+                    return Some(s);
                 }
-                c if !c.is_ascii() => is_ascii = false,
                 _ => (),
-            }
-            // the length of SEP is 2 so step 2 is ok
-            end += 2;
+            },
+            _ => (),
         }
-        if end == 0 {
-            None
-        } else {
-            let result = if is_ascii {
-                // this is safe because all bytes are checked to be ascii
-                unsafe { Some(str::from_utf8_unchecked(&self.0[..end])) }
-            } else {
-                str::from_utf8(&self.0[..end]).ok()
-            };
-            self.0 = &self.0[end + 2..];
-
-            result
-        }
+        self.0 = &self.0[self.0.len()..];
+        None
     }
 }
 
@@ -2161,6 +2133,29 @@ mod tests {
             }
             assert_eq!(None, iter.next());
         }
+    }
+
+    #[test]
+    fn panic_caused_by_invalid_header() {
+        let packet = MetaPacket::empty();
+        let mut param = ParseParam::new(
+            &packet,
+            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        let parse_config = LogParserConfig::default();
+        param.l4_protocol = IpProtocol::TCP;
+        param.set_log_parser_config(&parse_config);
+
+        let mut payload = "GET / HTTP/1.1\r\naccepd:  */*\r\n".as_bytes().to_vec();
+        // change one of the bytes to simulate corrupted header
+        payload[23] = 155;
+
+        let _ = HttpLog::new_v1().parse_http_v1(&payload, &param, &mut HttpInfo::default());
     }
 
     #[test]
