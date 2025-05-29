@@ -1093,6 +1093,11 @@ impl HttpLog {
                 continue;
             }
 
+            // Some special HTTP headers have non-ascii characters in this byte
+            if !body_line.is_char_boundary(col_index + 1) {
+                continue;
+            }
+
             let key = &body_line[..col_index];
             let value = &body_line[col_index + 1..];
 
@@ -2454,5 +2459,32 @@ mod tests {
             &param
         ));
         assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
+    }
+
+    #[test]
+    fn panic_char_boundary() {
+        let packet = MetaPacket::empty();
+        let mut param = ParseParam::new(
+            &packet,
+            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            true,
+            true,
+        );
+        let parse_config = LogParserConfig::default();
+        param.l4_protocol = IpProtocol::TCP;
+        param.set_log_parser_config(&parse_config);
+
+        let mut parser = HttpLog::new_v1();
+        let mut info = HttpInfo::default();
+        let mut payload = "GET / HTTP/1.1\r\naccepd:  */*\r\n".to_string();
+
+        unsafe {
+            payload.as_bytes_mut()[23] = 155;
+        }
+
+        let _ = parser.parse_http_v1(payload.as_bytes(), &param, &mut info);
     }
 }
