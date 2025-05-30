@@ -17,7 +17,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, RwLock,
+    Arc,
 };
 
 use ahash::AHashMap;
@@ -91,7 +91,9 @@ pub struct Policy {
     table: FirstPath,
     forward: Forward,
 
-    nat: RwLock<Vec<AHashMap<u128, GpidEntry>>>,
+    nats: [Vec<AHashMap<u128, GpidEntry>>; super::MAX_QUEUE_COUNT],
+    nats_flags: [AtomicBool; super::MAX_QUEUE_COUNT],
+    nats_caches: [Option<Vec<AHashMap<u128, GpidEntry>>>; super::MAX_QUEUE_COUNT],
 
     first_hit: usize,
     fast_hit: usize,
@@ -102,6 +104,9 @@ pub struct Policy {
 }
 
 impl Policy {
+    const ARRAY_REPEAT_NONE: Option<Vec<AHashMap<u128, GpidEntry>>> = None;
+    const ARRAY_REPEAT_FALSE: AtomicBool = AtomicBool::new(false);
+
     pub fn new(
         queue_count: usize,
         level: usize,
@@ -113,7 +118,8 @@ impl Policy {
         if memory_check_disable {
             info!("The policy module does not check the memory.");
         }
-
+        let nats: [Vec<AHashMap<u128, GpidEntry>>; super::MAX_QUEUE_COUNT] =
+            std::array::from_fn(|_| vec![AHashMap::new(), AHashMap::new()]);
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
             table: FirstPath::new(
@@ -124,7 +130,9 @@ impl Policy {
                 memory_check_disable,
             ),
             forward: Forward::new(queue_count, forward_capacity),
-            nat: RwLock::new(vec![AHashMap::new(), AHashMap::new()]),
+            nats,
+            nats_flags: [Self::ARRAY_REPEAT_FALSE; super::MAX_QUEUE_COUNT],
+            nats_caches: [Self::ARRAY_REPEAT_NONE; super::MAX_QUEUE_COUNT],
             first_hit: 0,
             fast_hit: 0,
             monitor: None,
@@ -372,7 +380,7 @@ impl Policy {
     // NOTE: This function has insufficient performance and is only used in low PPS scenarios.
     // Currently, only the Integration collector is calling this function.
     pub fn lookup_all_by_epc(
-        &self,
+        &mut self,
         key: &mut LookupKey,
         local_epc_id: i32,
     ) -> (EndpointData, GpidEntry) {
@@ -490,34 +498,39 @@ impl Policy {
     }
 
     #[inline]
-    fn lookup_gpid_entry(&self, key: &mut LookupKey, _endpoints: &EndpointData) -> GpidEntry {
-        if !key.is_ipv4() || (key.proto != IpProtocol::UDP && key.proto != IpProtocol::TCP) {
+    fn lookup_gpid_entry(
+        &mut self,
+        packet: &mut LookupKey,
+        _endpoints: &EndpointData,
+    ) -> GpidEntry {
+        if !packet.is_ipv4() || (packet.proto != IpProtocol::UDP && packet.proto != IpProtocol::TCP)
+        {
             return GpidEntry::default();
         }
-        let protocol = u8::from(GpidProtocol::try_from(key.proto).unwrap()) as usize;
+        let protocol = u8::from(GpidProtocol::try_from(packet.proto).unwrap()) as usize;
         // FIXME: Support epc id
         let epc_id_0 = 0;
         let epc_id_1 = 0;
 
-        let (ip_0, port_0) = if TapPort::NAT_SOURCE_TOA == key.src_nat_source {
-            if let IpAddr::V4(addr) = key.src_nat_ip {
-                (u32::from(addr), key.src_nat_port)
+        let (ip_0, port_0) = if TapPort::NAT_SOURCE_TOA == packet.src_nat_source {
+            if let IpAddr::V4(addr) = packet.src_nat_ip {
+                (u32::from(addr), packet.src_nat_port)
             } else {
-                (0, key.src_nat_port)
+                (0, packet.src_nat_port)
             }
-        } else if let IpAddr::V4(addr) = key.src_ip {
-            (u32::from(addr), key.src_port)
+        } else if let IpAddr::V4(addr) = packet.src_ip {
+            (u32::from(addr), packet.src_port)
         } else {
             (0, 0)
         };
-        let (ip_1, port_1) = if TapPort::NAT_SOURCE_TOA == key.dst_nat_source {
-            if let IpAddr::V4(addr) = key.dst_nat_ip {
-                (u32::from(addr), key.dst_nat_port)
+        let (ip_1, port_1) = if TapPort::NAT_SOURCE_TOA == packet.dst_nat_source {
+            if let IpAddr::V4(addr) = packet.dst_nat_ip {
+                (u32::from(addr), packet.dst_nat_port)
             } else {
-                (0, key.dst_nat_port)
+                (0, packet.dst_nat_port)
             }
-        } else if let IpAddr::V4(addr) = key.dst_ip {
-            (u32::from(addr), key.dst_port)
+        } else if let IpAddr::V4(addr) = packet.dst_ip {
+            (u32::from(addr), packet.dst_port)
         } else {
             (0, 0)
         };
@@ -525,7 +538,13 @@ impl Policy {
         let key_0 = gpid_key(ip_0, epc_id_0, port_0);
         let key_1 = gpid_key(ip_1, epc_id_1, port_1);
         let key = (key_0 as u128) << 64 | key_1 as u128;
-        *self.nat.read().unwrap()[protocol]
+
+        if self.nats_flags[packet.fast_index].load(Ordering::Acquire) {
+            self.nats[packet.fast_index] = self.nats_caches[packet.fast_index].take().unwrap();
+            self.nats_flags[packet.fast_index].store(false, Ordering::Release)
+        }
+
+        *self.nats[packet.fast_index][protocol]
             .get(&key)
             .unwrap_or(&GpidEntry::default())
     }
@@ -551,7 +570,13 @@ impl Policy {
             let key = (key_1 as u128) << 64 | key_0 as u128;
             table[protocol].insert(key, gpid_entry.clone());
         }
-        *self.nat.write().unwrap() = table;
+
+        for i in 0..super::MAX_QUEUE_COUNT {
+            if !self.nats_flags[i].load(Ordering::Acquire) {
+                self.nats_caches[i] = Some(table.clone());
+                self.nats_flags[i].store(true, Ordering::Release);
+            }
+        }
     }
 
     pub fn get_acls(&self) -> &Vec<Arc<Acl>> {
