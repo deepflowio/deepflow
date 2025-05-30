@@ -1320,7 +1320,7 @@ u64 kallsyms_lookup_name(const char *name)
 	void *addr;
 
 	if (!f)
-		return -ENOENT;
+		return 0;
 
 	while (!feof(f)) {
 		if (!fgets(buf, sizeof(buf), f))
