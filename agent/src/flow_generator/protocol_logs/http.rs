@@ -1738,15 +1738,13 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
 
         const SEP: &[u8] = b"\r\n";
         match self.0.windows(2).position(|w| w == SEP) {
-            Some(end) if end != 0 => {
-                match str::from_utf8(&self.0[..end]) {
-                    Ok(s) => {
-                        self.0 = &self.0[end + 2..];
-                        return Some(s);
-                    },
-                    _ => (),
+            Some(end) if end != 0 => match str::from_utf8(&self.0[..end]) {
+                Ok(s) => {
+                    self.0 = &self.0[end + 2..];
+                    return Some(s);
                 }
-            }
+                _ => (),
+            },
             _ => (),
         }
         self.0 = &self.0[self.0.len()..];
