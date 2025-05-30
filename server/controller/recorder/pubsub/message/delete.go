@@ -268,6 +268,18 @@ type PodGroupDelete struct {
 	addition[DeleteNoneAddition]
 }
 
+type ConfigMapDelete struct {
+	Lcuuids
+	MySQLItems[metadbmodel.ConfigMap]
+	addition[DeleteNoneAddition]
+}
+
+type PodGroupConfigMapConnectionDelete struct {
+	Lcuuids
+	MySQLItems[metadbmodel.PodGroupConfigMapConnection]
+	addition[DeleteNoneAddition]
+}
+
 type PodGroupPortDelete struct {
 	Lcuuids
 	MySQLItems[metadbmodel.PodGroupPort]

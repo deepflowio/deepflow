@@ -58,7 +58,7 @@ func (p *DHCPPort) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		p.createAndEnqueue(md,
+		p.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -71,6 +71,6 @@ func (p *DHCPPort) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (p *DHCPPort) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.DHCPPort) {
-		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
+		p.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
 	}
 }

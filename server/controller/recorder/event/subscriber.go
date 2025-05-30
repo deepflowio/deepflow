@@ -19,6 +19,7 @@ package event
 import (
 	"sync"
 
+	"github.com/deepflowio/deepflow/server/controller/recorder/event/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -30,6 +31,7 @@ var (
 )
 
 type SubscriberManager struct {
+	cfg         config.Config
 	subscribers []Subscriber
 }
 
@@ -40,8 +42,9 @@ func GetSubscriberManager() *SubscriberManager {
 	return subscriberManager
 }
 
-func (c *SubscriberManager) Start(q *queue.OverwriteQueue) (err error) {
+func (c *SubscriberManager) Start(cfg config.Config, q *queue.OverwriteQueue) (err error) {
 	log.Info("resource event subscriber manager started")
+	c.cfg = cfg
 	c.subscribers = c.getSubscribers(q)
 	for _, subscriber := range c.subscribers {
 		subscriber.Subscribe()
@@ -65,8 +68,10 @@ func (c *SubscriberManager) getSubscribers(q *queue.OverwriteQueue) []Subscriber
 		NewRDSInstance(q),
 		NewRedisInstance(q),
 		NewPodNode(q),
-		NewPodService(q),
+		NewPodService(c.cfg, q),
+		NewPodGroup(c.cfg, q),
 		NewPod(q),
+		NewConfigMap(c.cfg, q),
 		NewProcess(q),
 	}
 	return subscribers

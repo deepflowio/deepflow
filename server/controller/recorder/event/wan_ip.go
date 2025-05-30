@@ -108,7 +108,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMySQLFailed(
 						md,
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
@@ -130,7 +130,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMySQLFailed(
 						md,
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
@@ -145,7 +145,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 			}
 		}
 
-		i.createAndEnqueue(md,
+		i.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
@@ -202,7 +202,7 @@ func (i *WANIP) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 			log.Errorf("%s lcuuid (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, md.LogPrefixes)
 		}
 
-		i.createAndEnqueue(md,
+		i.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,

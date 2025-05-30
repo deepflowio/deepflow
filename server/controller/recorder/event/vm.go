@@ -71,7 +71,7 @@ func (v *VM) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagVPCID(item.VPCID),
 		}...)
 
-		v.createAndEnqueue(md,
+		v.createInstanceAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -115,7 +115,7 @@ func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	if len(ips) > 0 {
 		opts = append(opts, eventapi.TagIP(ips[0]))
 	}
-	v.createAndEnqueue(
+	v.createInstanceAndEnqueue(
 		md,
 		lcuuid,
 		eType,
@@ -128,7 +128,7 @@ func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 
 func (v *VM) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.VM) {
-		v.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, v.deviceType, item.ID)
+		v.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, v.deviceType, item.ID)
 	}
 }
 

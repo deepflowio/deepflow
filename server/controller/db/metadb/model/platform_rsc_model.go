@@ -1052,11 +1052,12 @@ func (p ConfigMap) GetSubDomainLcuuid() string {
 }
 
 type PodGroupConfigMapConnection struct {
-	Base        `gorm:"embedded" mapstructure:",squash"`
-	PodGroupID  int    `gorm:"column:pod_group_id;type:int;not null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
-	ConfigMapID int    `gorm:"column:config_map_id;type:int;not null" json:"CONFIG_MAP_ID" mapstructure:"CONFIG_MAP_ID"`
-	SubDomain   string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain      string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	PodGroupID   int    `gorm:"column:pod_group_id;type:int;not null" json:"POD_GROUP_ID" mapstructure:"POD_GROUP_ID"`
+	ConfigMapID  int    `gorm:"column:config_map_id;type:int;not null" json:"CONFIG_MAP_ID" mapstructure:"CONFIG_MAP_ID"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (p PodGroupConfigMapConnection) GetDomainLcuuid() string {
