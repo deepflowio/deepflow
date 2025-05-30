@@ -604,6 +604,7 @@ mod hessian2 {
     }
 
     // 参考开源代码解析：https://github.com/apache/dubbo-go-hessian2/blob/master/decode.go#L289
+    // https://github.com/apache/dubbo-go-hessian2/blob/v2.0.0/string.go#L169
     // 返回offset和数据length
     pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
         let tag = payload[0];
@@ -620,6 +621,7 @@ mod hessian2 {
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
+    // 解析逻辑：https://github.com/apache/dubbo-go/blob/v3.3.0/protocol/dubbo/impl/hessian.go
     pub fn get_req_body_info(config: &L7LogDynamicConfig, payload: &[u8], info: &mut DubboInfo) {
         let mut n = BODY_PARAM_MIN;
         let mut para_index = 0;
@@ -1160,6 +1162,7 @@ impl DubboHeader {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::collections::HashMap;
     use std::path::Path;
     use std::time::Duration;
     use std::{fs, rc::Rc};
@@ -1213,6 +1216,8 @@ mod tests {
                         TraceType::Sw8,
                     ],
                     ExtraLogFields::default(),
+                    #[cfg(feature = "enterprise")]
+                    HashMap::new(),
                 ),
                 ..Default::default()
             };
@@ -1309,6 +1314,8 @@ mod tests {
                 vec![TraceType::Sw8],
                 vec![TraceType::Sw8],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };
@@ -1409,6 +1416,8 @@ mod tests {
                 vec![TraceType::CloudWise],
                 vec![],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };
@@ -1511,6 +1520,8 @@ mod tests {
                     TraceType::Sw8,
                 ],
                 ExtraLogFields::default(),
+                #[cfg(feature = "enterprise")]
+                HashMap::new(),
             ),
             ..Default::default()
         };

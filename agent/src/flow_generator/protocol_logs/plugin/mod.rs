@@ -35,11 +35,20 @@ pub mod custom_wrap;
 pub mod shared_obj;
 pub mod wasm;
 
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        pub mod custom_protocol_policy;
+        pub use custom_protocol_policy::{get_policy_parser, CustomPolicyLog};
+    }
+}
+
 #[enum_dispatch(L7ProtocolParserInterface)]
 pub enum CustomLog {
     WasmLog(WasmLog),
     #[cfg(any(target_os = "linux", target_os = "android"))]
     SoLog(SoLog),
+    #[cfg(feature = "enterprise")]
+    CustomPolicyLog(CustomPolicyLog),
 }
 
 pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
@@ -50,11 +59,18 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
             CustomProtocol::So(p, s) => CustomLog::SoLog(get_so_parser(p, s)),
             #[cfg(target_os = "windows")]
             CustomProtocol::So(_, _) => todo!(),
+            #[cfg(feature = "enterprise")]
+            CustomProtocol::CustomPolicy(s) => CustomLog::CustomPolicyLog(get_policy_parser(s)),
+            #[cfg(not(feature = "enterprise"))]
+            CustomProtocol::CustomPolicy(_) => todo!(),
         }),
     })
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    not(feature = "enterprise")
+))]
 #[inline(always)]
 fn all_plugin_log_parser() -> [CustomLog; 2] {
     [
@@ -63,8 +79,30 @@ fn all_plugin_log_parser() -> [CustomLog; 2] {
     ]
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", not(feature = "enterprise")))]
 #[inline(always)]
 fn all_plugin_log_parser() -> [CustomLog; 1] {
     [CustomLog::WasmLog(WasmLog::default())]
+}
+
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    feature = "enterprise"
+))]
+#[inline(always)]
+fn all_plugin_log_parser() -> [CustomLog; 3] {
+    [
+        CustomLog::WasmLog(WasmLog::default()),
+        CustomLog::SoLog(SoLog::default()),
+        CustomLog::CustomPolicyLog(CustomPolicyLog::default()),
+    ]
+}
+
+#[cfg(all(target_os = "windows", feature = "enterprise"))]
+#[inline(always)]
+fn all_plugin_log_parser() -> [CustomLog; 1] {
+    [
+        CustomLog::WasmLog(WasmLog::default()),
+        CustomLog::CustomPolicyLog(CustomPolicyLog::default()),
+    ]
 }
