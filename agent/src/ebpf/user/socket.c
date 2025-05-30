@@ -176,6 +176,24 @@ static bool fentry_can_attach(const char *name)
 	const char *vmlinux_path = "/sys/kernel/btf/vmlinux";
 	if (access(vmlinux_path, R_OK))
 		return false;
+
+	/*
+	 * There is a known bug in the fentry/fexit mechanism, detailed and fixed in
+	 * the following commit:
+	 * https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=e21d2b92354b3cd25dd774ebb0f0e52ff04a7861
+	 *
+	 * This bug poses a risk of system crash when attaching or detaching hooks on
+	 * certain interfaces. To ensure the current kernel has been patched, we check
+	 * for the presence of the function "__bpf_tramp_image_put_rcu", which was
+	 * introduced as part of the bug fix. The existence of this function indicates
+	 * that the kernel includes the necessary fix. 
+	 */ 
+	if (kallsyms_lookup_name("__bpf_tramp_image_put_rcu") <= 0) {
+		ebpf_info("The current kernel is missing the fix for the fentry/fe"
+			  "xit-related bug, will not use fentry/fexit bytecode.\n");
+		return false;
+	}
+
 	return fentry_try_attach(name);
 }
 
