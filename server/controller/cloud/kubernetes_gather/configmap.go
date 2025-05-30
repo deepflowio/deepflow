@@ -67,7 +67,7 @@ func (k *KubernetesGather) getConfigMaps() (configMaps []model.ConfigMap, err er
 		}
 		configMaps = append(configMaps, model.ConfigMap{
 			Data:               c,
-			DataHash:           cloudcommon.GenerateMD5Sum(k.simpleJsonMarshal(cData)),
+			DataHash:           cloudcommon.GenerateMD5Sum(c),
 			Lcuuid:             uLcuuid,
 			Name:               name,
 			PodNamespaceLcuuid: namespaceLcuuid,
