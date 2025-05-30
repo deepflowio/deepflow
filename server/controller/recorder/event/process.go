@@ -69,7 +69,7 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			} else {
 				podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(info.PodGroupID)
 				if !ok {
-					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, md.LogPrefixORGID)
+					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, md.LogPrefixes)
 				}
 
 				opts = append(opts, []eventapi.TagFieldOption{

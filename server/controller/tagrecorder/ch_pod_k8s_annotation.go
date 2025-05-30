@@ -33,7 +33,7 @@ type ChPodK8sAnnotation struct {
 		message.PodDelete,
 		metadbmodel.Pod,
 		metadbmodel.ChPodK8sAnnotation,
-		K8sAnnotationKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 			message.PodDelete,
 			metadbmodel.Pod,
 			metadbmodel.ChPodK8sAnnotation,
-			K8sAnnotationKey,
+			IDKeyKey,
 		](
-			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATION,
+			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ANNOTATION,
 		),
 	}
 	mng.subscriberDG = mng
@@ -59,51 +59,50 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *metadb.DB) {
-	keysToAdd := make([]K8sAnnotationKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChPodK8sAnnotation, 0)
-	keysToDelete := make([]K8sAnnotationKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodK8sAnnotation, 0)
-	var chItem metadbmodel.ChPodK8sAnnotation
-	var updateKey K8sAnnotationKey
-	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		_, old := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
 
 		for k, v := range new {
+			targetKey := NewIDKeyKey(sourceID, k)
 			oldV, ok := old[k]
 			if !ok {
-				keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sAnnotation{
-					ID:    sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
 				})
-			} else {
-				if oldV != v {
-					updateKey = K8sAnnotationKey{ID: sourceID, Key: k}
-					updateInfo["value"] = v
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sAnnotation{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem metadbmodel.ChPodK8sAnnotation
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sAnnotation{
+						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, K8sAnnotationKey{ID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, metadbmodel.ChPodK8sAnnotation{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -117,13 +116,13 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []K8sAnnotationKey, targets []metadbmodel.ChPodK8sAnnotation) {
+func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKeyKey, targets []metadbmodel.ChPodK8sAnnotation) {
 	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
 
 	for k, v := range annotationMap {
-		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, metadbmodel.ChPodK8sAnnotation{
-			ID:          source.ID,
+			ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,

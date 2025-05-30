@@ -73,7 +73,7 @@ func (c *ChPodNode) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, metadbmodel.ChPodNode{
-		ID:           source.ID,
+		ChIDBase:     metadbmodel.ChIDBase{ID: source.ID},
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		IconID:       iconID,
@@ -91,11 +91,7 @@ func (c *ChPodNode) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNod
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChPodNode
-		db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
-	}
+	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

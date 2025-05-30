@@ -33,7 +33,7 @@ type ChPodServiceK8sLabels struct {
 		message.PodServiceDelete,
 		metadbmodel.PodService,
 		metadbmodel.ChPodServiceK8sLabels,
-		K8sLabelsKey,
+		IDKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 			message.PodServiceDelete,
 			metadbmodel.PodService,
 			metadbmodel.ChPodServiceK8sLabels,
-			K8sLabelsKey,
+			IDKey,
 		](
-			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABELS,
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS,
 		),
 	}
 	mng.subscriberDG = mng
@@ -66,32 +66,32 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 			updateInfo["labels"] = labels
 		}
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChPodServiceK8sLabels
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sLabelsKey{{ID: sourceID}},
+				[]IDKey{targetKey},
 				[]metadbmodel.ChPodServiceK8sLabels{{
-					ID:     sourceID,
-					Labels: updateInfo["labels"].(string),
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Labels:   updateInfo["labels"].(string),
 				}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, item *metadbmodel.PodService) (keys []K8sLabelsKey, targets []metadbmodel.ChPodServiceK8sLabels) {
-	if item.Label == "" {
+func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []IDKey, targets []metadbmodel.ChPodServiceK8sLabels) {
+	if source.Label == "" {
 		return
 	}
-	labels, _ := common.StrToJsonAndMap(item.Label)
-	return []K8sLabelsKey{{ID: item.ID}}, []metadbmodel.ChPodServiceK8sLabels{{
-		ID:          item.ID,
+	labels, _ := common.StrToJsonAndMap(source.Label)
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sLabels{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

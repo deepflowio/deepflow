@@ -31,9 +31,11 @@ pub mod pwd;
 pub mod queue;
 pub mod rpc;
 pub mod sender;
+pub mod throttle;
 pub mod utils;
 
 #[cfg(target_os = "linux")]
 pub mod netns;
 
 pub use leaky_bucket::LeakyBucket;
+pub use throttle::Throttle;

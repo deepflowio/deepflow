@@ -67,29 +67,29 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 			updateInfo["os_app_tags"] = osAppTags
 		}
 	}
+	targetKey := OSAPPTagsKey{PID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChOSAppTags
 		db.Where("pid = ?", sourceID).First(&chItem)
 		if chItem.PID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]OSAPPTagsKey{{PID: sourceID}},
+				[]OSAPPTagsKey{targetKey},
 				[]metadbmodel.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, OSAPPTagsKey{PID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, item *metadbmodel.Process) (keys []OSAPPTagsKey, targets []metadbmodel.ChOSAppTags) {
-	if item.OSAPPTags == "" {
+func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []OSAPPTagsKey, targets []metadbmodel.ChOSAppTags) {
+	if source.OSAPPTags == "" {
 		return
 	}
-	osAppTags, _ := common.StrToJsonAndMap(item.OSAPPTags)
-	return []OSAPPTagsKey{{PID: item.ID}}, []metadbmodel.ChOSAppTags{{
-		PID:         item.ID,
+	osAppTags, _ := common.StrToJsonAndMap(source.OSAPPTags)
+	return []OSAPPTagsKey{{PID: source.ID}}, []metadbmodel.ChOSAppTags{{
+		PID:         source.ID,
 		OSAPPTags:   osAppTags,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

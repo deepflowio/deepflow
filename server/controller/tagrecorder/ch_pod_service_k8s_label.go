@@ -33,7 +33,7 @@ type ChPodServiceK8sLabel struct {
 		message.PodServiceDelete,
 		metadbmodel.PodService,
 		metadbmodel.ChPodServiceK8sLabel,
-		K8sLabelKey,
+		IDKeyKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 			message.PodServiceDelete,
 			metadbmodel.PodService,
 			metadbmodel.ChPodServiceK8sLabel,
-			K8sLabelKey,
+			IDKeyKey,
 		](
-			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABEL,
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL,
 		),
 	}
 	mng.subscriberDG = mng
@@ -59,9 +59,9 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
-	keysToAdd := make([]K8sLabelKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChPodServiceK8sLabel, 0)
-	keysToDelete := make([]K8sLabelKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodServiceK8sLabel, 0)
 
 	if fieldsUpdate.Label.IsDifferent() {
@@ -69,41 +69,43 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 		_, newMap := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 
 		for k, v := range newMap {
+			targetKey := NewIDKeyKey(sourceID, k)
 			oldV, ok := oldMap[k]
 			if !ok {
-				keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sLabel{
-					ID:      sourceID,
-					Key:     k,
-					Value:   v,
-					L3EPCID: fieldsUpdate.VPCID.GetNew(),
-					PodNsID: fieldsUpdate.PodNamespaceID.GetNew(),
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
+					Value:    v,
+					L3EPCID:  fieldsUpdate.VPCID.GetNew(),
+					PodNsID:  fieldsUpdate.PodNamespaceID.GetNew(),
 				})
-			} else {
-				if oldV != v {
-					key := K8sLabelKey{ID: sourceID, Key: k}
-					var chItem metadbmodel.ChPodServiceK8sLabel
-					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-					if chItem.ID == 0 {
-						keysToAdd = append(keysToAdd, key)
-						targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sLabel{
-							ID:    sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else {
-						c.SubscriberComponent.dbOperator.update(chItem, map[string]interface{}{"value": v}, key, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem metadbmodel.ChPodServiceK8sLabel
+				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+				if chItem.ID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sLabel{
+						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+						Key:      k,
+						Value:    v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 
 		for k := range oldMap {
 			if _, ok := newMap[k]; !ok {
-				keysToDelete = append(keysToDelete, K8sLabelKey{ID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, metadbmodel.ChPodServiceK8sLabel{
-					ID:  sourceID,
-					Key: k,
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+					Key:      k,
 				})
 			}
 		}
@@ -117,13 +119,13 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []K8sLabelKey, targets []metadbmodel.ChPodServiceK8sLabel) {
+func (c *ChPodServiceK8sLabel) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []IDKeyKey, targets []metadbmodel.ChPodServiceK8sLabel) {
 	_, labelMap := common.StrToJsonAndMap(source.Label)
 
 	for k, v := range labelMap {
-		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
+		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, metadbmodel.ChPodServiceK8sLabel{
-			ID:          source.ID,
+			ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,
