@@ -1012,7 +1012,7 @@ impl HttpLog {
 
         if self.proto == L7Protocol::Grpc {
             info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
-            Self::modify_http2_and_grpc(direction, content_length, stream_id, info)
+            Self::modify_http2_and_grpc(direction, content_length, stream_id, false, info)
         } else {
             info.version = Version::V2;
             info.stream_id = Some(stream_id);
@@ -1130,6 +1130,7 @@ impl HttpLog {
         direction: PacketDirection,
         content_length: Option<u32>,
         stream_id: u32,
+        is_unary: bool,
         info: &mut HttpInfo,
     ) -> Result<()> {
         info.version = Version::V2;
@@ -1152,7 +1153,7 @@ impl HttpLog {
                     }
                 }
                 (PacketDirection::ServerToClient, Method::_ResponseHeader) => {
-                    if info.grpc_status_code.is_none() {
+                    if info.grpc_status_code.is_none() && !is_unary {
                         if info.status_code == 0 {
                             return Err(Error::HttpHeaderParseFailed);
                         }
@@ -1362,6 +1363,7 @@ impl HttpLog {
                 direction,
                 content_length,
                 httpv2_header.stream_id,
+                httpv2_header.is_stream_end(),
                 info,
             );
         }
