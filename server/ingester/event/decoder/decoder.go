@@ -332,6 +332,8 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			strings.Join(event.AttributeIPs, SEPARATOR))
 
 	}
+	s.AttributeNames = append(s.AttributeNames, event.AttributeNames...)
+	s.AttributeValues = append(s.AttributeValues, event.AttributeValues...)
 
 	podGroupType := uint8(0)
 	if event.IfNeedTagged {
