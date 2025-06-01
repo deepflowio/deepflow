@@ -192,7 +192,7 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 	}
 	formatStr, err := common.JsonFormat(respByte)
 	if err != nil {
-		fmt.Println("format json str faild: " + err.Error())
+		fmt.Println("format json str failed: " + err.Error())
 		return
 	}
 	fmt.Println(formatStr)
@@ -240,7 +240,7 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 		}
 		formatStr, err := common.JsonFormat(respByte)
 		if err != nil {
-			fmt.Println("format json str faild: " + err.Error())
+			fmt.Println("format json str failed: " + err.Error())
 			return
 		}
 		fmt.Println(formatStr)
@@ -278,7 +278,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 		}
 		formatStr, err := common.JsonFormat(respByte)
 		if err != nil {
-			fmt.Println("format json str faild: " + err.Error())
+			fmt.Println("format json str failed: " + err.Error())
 			return
 		}
 		fmt.Println(formatStr)

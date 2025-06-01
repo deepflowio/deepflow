@@ -26,12 +26,12 @@ type PodService struct {
 }
 
 func NewPodService() *PodService {
-	operater := &PodService{
+	operator := &PodService{
 		newOperatorBase[*metadbmodel.PodService](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

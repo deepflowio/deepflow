@@ -26,12 +26,12 @@ type VRouter struct {
 }
 
 func NewVRouter() *VRouter {
-	operater := &VRouter{
+	operator := &VRouter{
 		newOperatorBase[*metadbmodel.VRouter](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }
