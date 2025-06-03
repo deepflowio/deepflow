@@ -780,8 +780,8 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"outputs.flow_metrics.filters.second_metrics",
 		"outputs.npb.traffic_global_dedup",
 
-		"inputs.epbf.profile.on_cpu.aggregate_by_cpu",
-		"inputs.epbf.profile.off_cpu.aggregate_by_cpu",
+		"inputs.ebpf.profile.on_cpu.aggregate_by_cpu",
+		"inputs.ebpf.profile.off_cpu.aggregate_by_cpu",
 	}
 	p.lowerVersionIntToSecondKeys = []string{
 		"bandwidth_probe_interval",
@@ -800,7 +800,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"inputs.resources.push_interval",
 		"inputs.proc.sync_interval",
 		"inputs.proc.min_lifetime",
-		"inputs.epbf.socket.uprobe.golang.tracing_timeout",
+		"inputs.ebpf.socket.uprobe.golang.tracing_timeout",
 		"processors.request_log.application_protocol_inference.inference_result_ttl",
 	}
 	p.lowerVersionIntToDayKeys = []string{
