@@ -30,7 +30,10 @@ use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 #[cfg(target_os = "linux")]
-use crate::utils::{cgroups, environment::SocketInfo};
+use crate::utils::{
+    cgroups,
+    environment::{get_disk_usage, SocketInfo},
+};
 use crate::{
     config::handler::EnvironmentAccess,
     error::{Error, Result},
@@ -227,7 +230,8 @@ impl RefCountable for SysStatusBroker {
             CounterValue::Unsigned(current_sys_available_memory_percentage as u64),
         ));
 
-        let sys_memory_limit = self.config.load().sys_memory_limit as f64;
+        let config = self.config.load();
+        let sys_memory_limit = config.sys_memory_limit as f64;
 
         let (sys_free_memory_limit_ratio, sys_available_memory_limit_ratio) =
             if sys_memory_limit > 0.0 {
@@ -266,6 +270,7 @@ impl RefCountable for SysStatusBroker {
                 warn!("get file and size sum failed: {:?}", e);
             }
         }
+
         match system_guard.process(self.pid) {
             Some(process) => {
                 let cpu_usage = process.cpu_usage() as f64;
@@ -279,7 +284,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "max_millicpus_ratio",
                     CounterType::Gauged,
-                    CounterValue::Float(cpu_usage * 10.0 / self.config.load().max_millicpus as f64),
+                    CounterValue::Float(cpu_usage * 10.0 / config.max_millicpus as f64),
                 ));
                 metrics.push((
                     "memory",
@@ -289,7 +294,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "max_memory_ratio",
                     CounterType::Gauged,
-                    CounterValue::Float(mem_used as f64 / self.config.load().max_memory as f64),
+                    CounterValue::Float(mem_used as f64 / config.max_memory as f64),
                 ));
                 metrics.push((
                     "create_time",
@@ -373,6 +378,44 @@ impl stats::Module for NetStats<'_> {
     }
 }
 
+struct FreeDiskUsage {
+    directory: String,
+}
+
+impl stats::Module for FreeDiskUsage {
+    fn name(&self) -> &'static str {
+        "free_disk"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![StatsOption::Tag("directory", self.directory.clone())]
+    }
+}
+
+impl RefCountable for FreeDiskUsage {
+    fn get_counters(&self) -> Vec<Counter> {
+        let mut metrics = vec![];
+        match get_disk_usage(&self.directory) {
+            Ok((total, free)) => {
+                metrics.push((
+                    "free_disk_percentage",
+                    CounterType::Gauged,
+                    CounterValue::Float(free as f64 * 100.0 / total as f64),
+                ));
+                metrics.push((
+                    "free_disk_absolute",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(free as u64),
+                ));
+            }
+            Err(e) => {
+                warn!("get disk free usage failed: {:?}", e);
+            }
+        }
+        metrics
+    }
+}
+
 pub struct Monitor {
     stats: Arc<Collector>,
     running: AtomicBool,
@@ -380,6 +423,9 @@ pub struct Monitor {
     sys_load: Arc<SysLoad>,
     link_map: Arc<Mutex<HashMap<String, Arc<LinkStatusBroker>>>>,
     system: Arc<Mutex<System>>,
+    config: EnvironmentAccess,
+    free_disks_config: Arc<Mutex<Vec<String>>>,
+    free_disk_counters: Arc<Mutex<Vec<Arc<FreeDiskUsage>>>>,
 }
 
 impl Monitor {
@@ -399,6 +445,9 @@ impl Monitor {
             sys_load: Arc::new(SysLoad(system.clone())),
             link_map: Arc::new(Mutex::new(HashMap::new())),
             system,
+            config: config.clone(),
+            free_disks_config: Arc::new(Mutex::new(vec![])),
+            free_disk_counters: Arc::new(Mutex::new(vec![])),
         })
     }
 
@@ -518,6 +567,42 @@ impl Monitor {
             &stats::NoTagModule("system"),
             Countable::Ref(Arc::downgrade(&self.sys_load) as Weak<dyn RefCountable>),
         );
+
+        let config = self.config.clone();
+        let stats_collector = self.stats.clone();
+        let free_disks_config = self.free_disks_config.clone();
+        let free_disk_counters = self.free_disk_counters.clone();
+        self.stats.register_pre_hook(Box::new(move || {
+            let config_load = config.load();
+            let mut free_disks_config = free_disks_config.lock().unwrap();
+            if config_load.free_disk_circuit_breaker_directories == *free_disks_config {
+                return;
+            }
+
+            let mut locked_counters = free_disk_counters.lock().unwrap();
+            let old_data = std::mem::take(&mut *locked_counters);
+            stats_collector
+                .deregister_countables(old_data.iter().map(|c| c.as_ref() as &dyn stats::Module));
+
+            for free_disk in &config_load.free_disk_circuit_breaker_directories {
+                let free_disk_counter = Arc::new(FreeDiskUsage {
+                    directory: free_disk.clone(),
+                });
+                stats_collector.register_countable(
+                    &FreeDiskUsage {
+                        directory: free_disk.clone(),
+                    },
+                    Countable::Ref(Arc::downgrade(&free_disk_counter) as Weak<dyn RefCountable>),
+                );
+                locked_counters.push(free_disk_counter);
+            }
+
+            info!(
+                "update free disk monitor from {:?} to {:?}",
+                free_disks_config, config_load.free_disk_circuit_breaker_directories
+            );
+            *free_disks_config = config_load.free_disk_circuit_breaker_directories.clone();
+        }));
 
         info!("monitor started");
     }

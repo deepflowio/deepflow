@@ -977,6 +977,7 @@ dependencies = [
  "envmnt",
  "flate2",
  "flexi_logger",
+ "fs2",
  "futures",
  "grpc",
  "hex",
@@ -1373,6 +1374,16 @@ dependencies = [
  "io-lifetimes 2.0.2",
  "rustix 0.38.21",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
