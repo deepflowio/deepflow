@@ -201,6 +201,8 @@ var VTapExceptionChinese = map[int64]string{
 	1 << 19:                                "CGROUPS配置错误",
 	1 << 20:                                "系统负载超限触发熔断",
 	1 << 21:                                "数据流量达到限速",
+	1 << 22:                                "磁盘空闲空间触发熔断",
+	1 << 23:                                "内核版本触发熔断",
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED:   "分配数据节点失败",
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED: "分配控制器失败",
 	VTAP_EXCEPTION_PRODUCT_NOT_SUPPORTED:   "当前产品不支持此类采集器",
