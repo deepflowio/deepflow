@@ -240,7 +240,7 @@ global:
       #     观测内存比率是由 `global.circuit_breakers.sys_memory_percentage.metric` 决定.
       #     1. 当系统`观测内存比率`低于 `trigger_threshold` * 70% 时，
       #        采集器将自动重启。
-      #     2. 当系统`观测内存比率低于 `trigger_threshold` 但高于 70% 时，
+      #     2. 当系统`观测内存比率`低于 `trigger_threshold` 但高于 70% 时，
       #        采集器设置为 `FREE_MEM_EXCEEDED` 的异常状态，并上报采集器异常告警。
       #     3. 当系统`观测内存比率`持续高于 `trigger_threshold` * 110% 时，
       #        采集器将从异常状态恢复。
@@ -382,6 +382,76 @@ global:
       #     deepflow-agent 对流量分发所使用网络接口的出方向吞吐量指标的监控周期。
       # upgrade_from: bandwidth_probe_interval
       throughput_monitoring_interval: 10s
+    # type: section
+    # name:
+    #   en: Free Disk
+    #   ch: 空闲磁盘
+    # description:
+    free_disk:
+      # type: int
+      # name:
+      #   en: Percentage Trigger Threshold
+      #   ch: 百分比触发阈值
+      # unit: '%'
+      # range: [0, 100]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     This configuration is only valid when the Agent runs in a non-container environment. Configuring to 0 means disabling the threshold.
+      #     The observed disks are the disks where the `global.circuit_breakers.free_disk.directories` are located.
+      #     1. When the system `free disk ratio` is lower than `this threshold`, the Agent enters the fuse disabled state,
+      #        and sets the `FREE_DISK_CIRCUIT_BREAKER` abnormal state, and reports the Agent abnormal alarm.
+      #     2. When the system `free disk ratio` is higher than `this threshold * 110%`, the Agent recovers from the abnormal state.
+      #   ch: |-
+      #     仅当采集器运行在非容器环境中时该配置有效。配置为 0 表示禁用该阈值。
+      #     观测磁盘为`global.circuit_breakers.free_disk.directories`目录所在磁盘。
+      #     1. 当系统`空闲磁盘比率`低于`该阈值`时，采集器进入熔断禁用状态，
+      #        并设置`磁盘空闲空间触发熔断`异常状态，同时上报采集器异常告警。
+      #     2. 当系统`空闲磁盘比率`高于`该阈值 * 110%` 时，采集器从异常状态恢复。
+      percentage_trigger_threshold: 15
+      # type: int
+      # name:
+      #   en: Absolute_Trigger Threshold
+      #   ch: 绝对值触发阈值
+      # unit: GB
+      # range: [0, 100000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     This configuration is only valid when the Agent runs in a non-container environment. Configuring to 0 means disabling the threshold.
+      #     The observed disks are the disks where the `global.circuit_breakers.free_disk.directories` is located.
+      #     1. When the system `free disk size` is lower than `this threshold`, the Agent enters the fuse disabled state,
+      #        and sets the `FREE_DISK_CIRCUIT_BREAKER` abnormal state, and reports the Agent abnormal alarm.
+      #     2. When the system `free disk size` is higher than `this threshold * 110%`, the Agent recovers from the abnormal state.
+      #   ch: |-
+      #     仅当采集器运行在非容器环境中时该配置有效。配置为 0 表示禁用该阈值。
+      #     观测磁盘为`global.circuit_breakers.free_disk.directories`目录所在磁盘。
+      #     1. 当系统`空闲磁盘大小`低于`该阈值`时，采集器进入熔断禁用状态，
+      #        并设置`磁盘空闲空间触发熔断`异常状态，同时上报采集器异常告警。
+      #     2. 当系统`空闲磁盘大小`高于`该阈值 * 110%` 时，采集器从异常状态恢复。
+      absolute_trigger_threshold: 10
+      # type: string
+      # name:
+      #   en: Directories
+      #   ch: 观测目录
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Observe the disk space where the directories is located.
+      #     For the `windows` operating system, the default value is `c:\`.
+      #   ch: |-
+      #     观测目录所在磁盘的空间。
+      #     对于`windows`操作系统，默认值则是`c:\`
+      directories: [/]
+
   # type: section
   # name:
   #   en: Tunning

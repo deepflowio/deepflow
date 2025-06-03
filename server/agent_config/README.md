@@ -571,6 +571,103 @@ global:
 
 Monitoring interval for outbound traffic rate of NPB interface.
 
+### Free Disk {#global.circuit_breakers.free_disk}
+
+#### Percentage Trigger Threshold {#global.circuit_breakers.free_disk.percentage_trigger_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.percentage_trigger_threshold`
+
+**Default value**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      percentage_trigger_threshold: 15
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | % |
+| Range | [0, 100] |
+
+**Description**:
+
+This configuration is only valid when the Agent runs in a non-container environment. Configuring to 0 means disabling the threshold.
+The observed disks are the disks where the `global.circuit_breakers.free_disk.directories` are located.
+1. When the system `free disk ratio` is lower than `this threshold`, the Agent enters the fuse disabled state,
+   and sets the `FREE_DISK_CIRCUIT_BREAKER` abnormal state, and reports the Agent abnormal alarm.
+2. When the system `free disk ratio` is higher than `this threshold * 110%`, the Agent recovers from the abnormal state.
+
+#### Absolute_Trigger Threshold {#global.circuit_breakers.free_disk.absolute_trigger_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.absolute_trigger_threshold`
+
+**Default value**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      absolute_trigger_threshold: 10
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | GB |
+| Range | [0, 100000] |
+
+**Description**:
+
+This configuration is only valid when the Agent runs in a non-container environment. Configuring to 0 means disabling the threshold.
+The observed disks are the disks where the `global.circuit_breakers.free_disk.directories` is located.
+1. When the system `free disk size` is lower than `this threshold`, the Agent enters the fuse disabled state,
+   and sets the `FREE_DISK_CIRCUIT_BREAKER` abnormal state, and reports the Agent abnormal alarm.
+2. When the system `free disk size` is higher than `this threshold * 110%`, the Agent recovers from the abnormal state.
+
+#### Directories {#global.circuit_breakers.free_disk.directories}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.directories`
+
+**Default value**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      directories:
+      - /
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Observe the disk space where the directories is located.
+For the `windows` operating system, the default value is `c:\`.
+
 ## Tunning {#global.tunning}
 
 Tune the runtime of deepflow-agent.
