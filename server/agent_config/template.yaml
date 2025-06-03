@@ -1641,6 +1641,7 @@ inputs:
         #     deepflow-agent 将所有的 Java 符号表文件存放在'/tmp'目录下，该参数用于限制每一个 Java 符号表文件的
         #     大小上限，以避免占用过多的节点磁盘空间。
         # upgrade_from: static_config.ebpf.java-symbol-file-max-space-limit
+        # deprecated: true
         max_symbol_file_size: 10
   # type: section
   # name: cBPF
