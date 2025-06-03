@@ -2182,6 +2182,7 @@ inputs:
 **标签**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 

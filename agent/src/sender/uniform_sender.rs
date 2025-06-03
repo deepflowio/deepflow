@@ -744,7 +744,9 @@ impl<T: Sendable> UniformSender<T> {
                         );
 
                         let result = match socket_type {
-                            SocketType::File => self.handle_target_file(send_item, &mut kv_string),
+                            SocketType::File => {
+                                self.handle_target_file(send_item, &mut kv_string, &config)
+                            }
                             _ => self.handle_target_server(send_item, &config),
                         };
                         if let Err(e) = result {
@@ -790,6 +792,7 @@ impl<T: Sendable> UniformSender<T> {
         &mut self,
         send_item: T,
         kv_string: &mut String,
+        config: &SenderConfig,
     ) -> std::io::Result<()> {
         send_item.to_kv_string(kv_string);
         if kv_string.is_empty() {
@@ -821,7 +824,7 @@ impl<T: Sendable> UniformSender<T> {
         self.written_size += kv_string.len() as u64;
         kv_string.truncate(0);
 
-        if self.written_size > (self.config.load().standalone_data_file_size as u64) << 20 {
+        if self.written_size > config.standalone_data_file_size {
             self.buf_writer.as_mut().unwrap().flush()?;
             self.buf_writer.take();
             rename(&self.file_path, &self.pre_file_path)?;
