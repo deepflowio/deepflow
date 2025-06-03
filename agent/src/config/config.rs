@@ -527,15 +527,12 @@ impl Default for GolangSpecific {
 pub struct Java {
     #[serde(with = "humantime_serde")]
     pub refresh_defer_duration: Duration,
-    #[serde(deserialize_with = "deser_usize_with_mega_unit")]
-    pub max_symbol_file_size: usize,
 }
 
 impl Default for Java {
     fn default() -> Self {
         Self {
             refresh_defer_duration: Duration::from_secs(60),
-            max_symbol_file_size: 10 << 20,
         }
     }
 }
@@ -1946,8 +1943,8 @@ pub struct Limits {
     #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub max_memory: u64,
     pub max_log_backhaul_rate: u32,
-    #[serde(deserialize_with = "deser_u32_with_mega_unit")]
-    pub max_local_log_file_size: u32,
+    #[serde(deserialize_with = "deser_u64_with_mega_unit")]
+    pub max_local_log_file_size: u64,
     #[serde(with = "humantime_serde")]
     pub local_log_retention: Duration,
     pub max_sockets: usize,
@@ -2253,8 +2250,8 @@ impl Default for SelfMonitoring {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct StandaloneMode {
-    #[serde(deserialize_with = "deser_u32_with_mega_unit")]
-    pub max_data_file_size: u32,
+    #[serde(deserialize_with = "deser_u64_with_mega_unit")]
+    pub max_data_file_size: u64,
     pub data_file_dir: String,
 }
 
@@ -3310,13 +3307,6 @@ where
 {
     let s = String::deserialize(deserializer)?;
     Ok(L7Protocol::from(s))
-}
-
-fn deser_u32_with_mega_unit<'de, D>(deserializer: D) -> Result<u32, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(u32::deserialize(deserializer)? << 20)
 }
 
 fn deser_u64_with_mega_unit<'de, D>(deserializer: D) -> Result<u64, D::Error>

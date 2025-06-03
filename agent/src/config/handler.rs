@@ -204,7 +204,7 @@ pub struct EnvironmentConfig {
     pub thread_threshold: u32,
     pub sys_memory_limit: u32,
     pub sys_memory_metric: agent::SysMemoryMetric,
-    pub log_file_size: u32,
+    pub log_file_size: u64,
     pub capture_mode: PacketCaptureType,
     pub guard_interval: Duration,
     pub max_sockets: usize,
@@ -234,7 +234,7 @@ pub struct SenderConfig {
     pub max_throughput_to_ingester: u64, // unit: Mbps
     pub ingester_traffic_overflow_action: TrafficOverflowAction,
     pub collector_socket_type: agent::SocketType,
-    pub standalone_data_file_size: u32,
+    pub standalone_data_file_size: u64,
     pub standalone_data_file_dir: String,
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
