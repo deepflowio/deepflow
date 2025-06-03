@@ -65,7 +65,7 @@ func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, item.ID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
-			p.createAndEnqueue(md,
+			p.createInstanceAndEnqueue(md,
 				item.Lcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
@@ -74,7 +74,7 @@ func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 				opts...,
 			)
 		} else {
-			p.enqueueIfInsertIntoMySQLFailed(
+			p.enqueueInstanceIfInsertIntoMySQLFailed(
 				md,
 				item.Lcuuid,
 				domainLcuuid,
@@ -90,6 +90,6 @@ func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (p *PodNode) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.PodNode) {
-		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
+		p.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
 	}
 }

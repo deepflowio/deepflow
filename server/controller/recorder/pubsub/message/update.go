@@ -637,6 +637,8 @@ type PodServiceFieldsUpdate struct {
 	Selector         fieldDetail[string]
 	ExternalIP       fieldDetail[string]
 	ServiceClusterIP fieldDetail[string]
+	Metadata         fieldDetail[string]
+	Spec             fieldDetail[string]
 	PodIngressID     fieldDetail[int]
 	PodIngressLcuuid fieldDetail[string]
 	AZLcuuid         fieldDetail[string]
@@ -669,6 +671,8 @@ type PodGroupFieldsUpdate struct {
 	Label          fieldDetail[string]
 	Type           fieldDetail[int]
 	PodNum         fieldDetail[int]
+	Metadata       fieldDetail[string]
+	Spec           fieldDetail[string]
 	AZLcuuid       fieldDetail[string]
 	RegionLcuuid   fieldDetail[string]
 	PodClusterID   fieldDetail[int]
@@ -679,6 +683,30 @@ type PodGroupUpdate struct {
 	CloudItem[cloudmodel.PodGroup]
 	DiffBase[*diffbase.PodGroup]
 	MySQLData[metadbmodel.PodGroup]
+}
+
+type ConfigMapFieldsUpdate struct {
+	Key
+	Name fieldDetail[string]
+	Data fieldDetail[string]
+}
+
+type ConfigMapUpdate struct {
+	Fields[ConfigMapFieldsUpdate]
+	CloudItem[cloudmodel.ConfigMap]
+	DiffBase[*diffbase.ConfigMap]
+	MySQLData[metadbmodel.ConfigMap]
+}
+
+type PodGroupConfigMapConnectionFieldsUpdate struct {
+	Key
+}
+
+type PodGroupConfigMapConnectionUpdate struct {
+	Fields[PodGroupConfigMapConnectionFieldsUpdate]
+	CloudItem[cloudmodel.PodGroupConfigMapConnection]
+	DiffBase[*diffbase.PodGroupConfigMapConnection]
+	MySQLData[metadbmodel.PodGroupConfigMapConnection]
 }
 
 type PodGroupPortFieldsUpdate struct {
