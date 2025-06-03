@@ -17,7 +17,7 @@
 use std::{
     cell::OnceCell,
     env::{self, VarError},
-    fs,
+    fs, io,
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -26,6 +26,7 @@ use std::{
 };
 
 use bytesize::ByteSize;
+use fs2::{free_space, total_space};
 use log::{error, warn};
 use sysinfo::{DiskExt, System, SystemExt};
 
@@ -424,4 +425,19 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     Err(Error::Environment(
         "failed getting control ip and mac, deepflow-agent restart...".to_owned(),
     ))
+}
+
+pub fn get_disk_usage(directory: &str) -> io::Result<(u64, u64)> {
+    let path = std::path::Path::new(directory);
+    if !path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("path does not exist: {}", path.display()),
+        ));
+    }
+
+    let total = total_space(path)?;
+    let free = free_space(path)?;
+
+    Ok((total, free))
 }

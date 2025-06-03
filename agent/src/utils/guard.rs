@@ -46,6 +46,7 @@ use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
+use crate::utils::environment::get_disk_usage;
 #[cfg(target_os = "linux")]
 use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
@@ -328,6 +329,40 @@ impl Guard {
         }
     }
 
+    fn check_free_disk(
+        percentage_trigger_threshold: u8,
+        absolute_trigger_threshold: u64,
+        directories: &Vec<String>,
+        exception_handler: &ExceptionHandler,
+    ) {
+        if percentage_trigger_threshold == 0 && absolute_trigger_threshold == 0 {
+            return;
+        }
+
+        for directory in directories {
+            match get_disk_usage(&directory) {
+                Ok((total, free)) => {
+                    let free_percentage = free as f64 * 100.0 / total as f64;
+                    if free_percentage < percentage_trigger_threshold as f64
+                        || free < absolute_trigger_threshold
+                    {
+                        exception_handler.set(Exception::FreeDiskCircuitBreaker);
+                        return;
+                    }
+
+                    if free_percentage > percentage_trigger_threshold as f64 * 1.1
+                        && free as f64 > absolute_trigger_threshold as f64 * 1.1
+                    {
+                        exception_handler.clear(Exception::FreeDiskCircuitBreaker);
+                    }
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                }
+            }
+        }
+    }
+
     pub fn start(&self) {
         {
             let (running, _) = &*self.running;
@@ -504,11 +539,19 @@ impl Guard {
                     }
                 }
 
+                if !in_container {
+                    Self::check_free_disk(config.free_disk_circuit_breaker_percentage_threshold, config.free_disk_circuit_breaker_absolute_threshold,
+                    &config.free_disk_circuit_breaker_directories, &exception_handler);
+                }
+
                 if exception_handler.has(Exception::SystemLoadCircuitBreaker) {
-                    info!("Set the state to melt_down when the system load exceeds the threshold.");
+                    warn!("Set the state to melt_down when the system load exceeds the threshold.");
                     state.melt_down();
                 } else if exception_handler.has(Exception::FreeMemExceeded) {
-                    info!("Set the state to melt_down when the free memory exceeds the threshold.");
+                    warn!("Set the state to melt_down when the free memory exceeds the threshold.");
+                    state.melt_down();
+                } else if exception_handler.has(Exception::FreeDiskCircuitBreaker) {
+                    warn!("Set the state to melt_down when the free disk exceeds the threshold.");
                     state.melt_down();
                 } else {
                     state.recover();
