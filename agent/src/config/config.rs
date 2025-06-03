@@ -2082,12 +2082,35 @@ impl Default for TxThroughput {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FreeDisk {
+    pub percentage_trigger_threshold: u8,
+    #[serde(deserialize_with = "deser_u64_with_giga_unit")]
+    pub absolute_trigger_threshold: u64,
+    pub directories: Vec<String>,
+}
+
+impl Default for FreeDisk {
+    fn default() -> Self {
+        Self {
+            percentage_trigger_threshold: 15,
+            absolute_trigger_threshold: 10 << 30,
+            #[cfg(not(target_os = "windows"))]
+            directories: vec!["/".to_string()],
+            #[cfg(target_os = "windows")]
+            directories: vec!["c:\\".to_string()],
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CircuitBreakers {
     pub sys_memory_percentage: SysMemoryPercentage,
     pub relative_sys_load: RelativeSysLoad,
     pub tx_throughput: TxThroughput,
+    pub free_disk: FreeDisk,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -3338,6 +3361,13 @@ where
     D: Deserializer<'de>,
 {
     Ok(usize::deserialize(deserializer)? << 20)
+}
+
+fn deser_u64_with_giga_unit<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(u64::deserialize(deserializer)? << 30)
 }
 
 // `humantime` will not parse "0" as Duration::ZERO
