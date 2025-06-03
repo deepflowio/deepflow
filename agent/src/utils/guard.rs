@@ -191,7 +191,7 @@ impl Guard {
         let mut file_sizes_sum = file_and_size_sum.file_sizes_sum.clone();
         // 从旧到新删除日志文件直到低于限制值
         for file_info in file_and_size_sum.file_infos.iter() {
-            if file_sizes_sum < (log_file_size << 20) {
+            if file_sizes_sum < log_file_size {
                 break;
             }
             let file_mt = file_info
@@ -376,17 +376,16 @@ impl Guard {
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
-                        let log_file_size = config.log_file_size; // Log file size limit (unit: M)
                         let file_sizes_sum = file_and_size_sum.file_sizes_sum; // Total size of current log files (unit: B)
                         debug!(
                             "current log files' size: {}B, log_file_size_limit: {}B",
                             file_sizes_sum,
-                            (log_file_size << 20)
+                            config.log_file_size,
                         );
-                        if file_sizes_sum > (log_file_size as u64) << 20 {
+                        if file_sizes_sum > config.log_file_size {
                             error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
-                               file_sizes_sum, (log_file_size << 20));
-                            Self::release_log_files(file_and_size_sum, log_file_size as u64);
+                               file_sizes_sum, config.log_file_size);
+                            Self::release_log_files(file_and_size_sum, config.log_file_size);
                             exception_handler.set(Exception::LogFileExceeded);
                         } else {
                             // exception_handler.clear(Exception::LogFileExceeded);
