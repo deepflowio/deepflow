@@ -378,9 +378,26 @@ static_config:
 `),
 			wantErr: false,
 		},
+		{
+			name: "case04",
+			args: args{
+				bytes: []byte(`inputs:
+  ebpf:
+    profile:
+      on_cpu:
+        aggregate_by_cpu: false
+`),
+			},
+			want: []byte(`static_config:
+  ebpf:
+    on-cpu-profile:
+      cpu: 0
+`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
-		if tt.name != "case03" {
+		if tt.name != "case04" {
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {
