@@ -350,7 +350,7 @@ global:
 观测内存比率是由 `global.circuit_breakers.sys_memory_percentage.metric` 决定.
 1. 当系统`观测内存比率`低于 `trigger_threshold` * 70% 时，
    采集器将自动重启。
-2. 当系统`观测内存比率低于 `trigger_threshold` 但高于 70% 时，
+2. 当系统`观测内存比率`低于 `trigger_threshold` 但高于 70% 时，
    采集器设置为 `FREE_MEM_EXCEEDED` 的异常状态，并上报采集器异常告警。
 3. 当系统`观测内存比率`持续高于 `trigger_threshold` * 110% 时，
    采集器将从异常状态恢复。
@@ -563,6 +563,103 @@ global:
 **详细描述**:
 
 deepflow-agent 对流量分发所使用网络接口的出方向吞吐量指标的监控周期。
+
+### 空闲磁盘 {#global.circuit_breakers.free_disk}
+
+#### 百分比触发阈值 {#global.circuit_breakers.free_disk.percentage_trigger_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.percentage_trigger_threshold`
+
+**默认值**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      percentage_trigger_threshold: 15
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | % |
+| Range | [0, 100] |
+
+**详细描述**:
+
+仅当采集器运行在非容器环境中时该配置有效。配置为 0 表示禁用该阈值。
+观测磁盘为`global.circuit_breakers.free_disk.directories`目录所在磁盘。
+1. 当系统`空闲磁盘比率`低于`该阈值`时，采集器进入熔断禁用状态，
+   并设置`磁盘空闲空间触发熔断`异常状态，同时上报采集器异常告警。
+2. 当系统`空闲磁盘比率`高于`该阈值 * 110%` 时，采集器从异常状态恢复。
+
+#### 绝对值触发阈值 {#global.circuit_breakers.free_disk.absolute_trigger_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.absolute_trigger_threshold`
+
+**默认值**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      absolute_trigger_threshold: 10
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | GB |
+| Range | [0, 100000] |
+
+**详细描述**:
+
+仅当采集器运行在非容器环境中时该配置有效。配置为 0 表示禁用该阈值。
+观测磁盘为`global.circuit_breakers.free_disk.directories`目录所在磁盘。
+1. 当系统`空闲磁盘大小`低于`该阈值`时，采集器进入熔断禁用状态，
+   并设置`磁盘空闲空间触发熔断`异常状态，同时上报采集器异常告警。
+2. 当系统`空闲磁盘大小`高于`该阈值 * 110%` 时，采集器从异常状态恢复。
+
+#### 观测目录 {#global.circuit_breakers.free_disk.directories}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.circuit_breakers.free_disk.directories`
+
+**默认值**:
+```yaml
+global:
+  circuit_breakers:
+    free_disk:
+      directories:
+      - /
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+观测目录所在磁盘的空间。
+对于`windows`操作系统，默认值则是`c:\`
 
 ## 调优 {#global.tunning}
 
