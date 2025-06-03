@@ -2186,6 +2186,7 @@ CPU resource consumption.
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
