@@ -33,8 +33,8 @@ type PodGroup struct {
 
 func NewPodGroup(cfg config.Config, q *queue.OverwriteQueue) *PodGroup {
 	mng := &PodGroup{
-		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
 		cfg,
 	}
 	mng.SetSubscriberSelf(mng)
