@@ -867,10 +867,10 @@ type PodService struct {
 	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR" mapstructure:"SELECTOR"`          // separated by ,
 	ExternalIP       string `gorm:"column:external_ip;type:text;default:''" json:"EXTERNAL_IP" mapstructure:"EXTERNAL_IP"` // separated by ,
 	ServiceClusterIP string `gorm:"column:service_cluster_ip;type:char(64);default:''" json:"SERVICE_CLUSTER_IP" mapstructure:"SERVICE_CLUSTER_IP"`
-	Metadata         string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"METADATA"`
-	MetadataHash     string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"METADATA_HASH"`
-	Spec             string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"SPEC"`
-	SpecHash         string `gorm:"column:spec_hash;type:char(64);default:''" json:"SPEC_HASH" mapstructure:"SPEC_HASH"`
+	Metadata         string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"-"`
+	MetadataHash     string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"-"`
+	Spec             string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"-"`
+	SpecHash         string `gorm:"column:spec_hash;type:char(64);default:''" json:"SPEC_HASH" mapstructure:"-"`
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID" mapstructure:"POD_INGRESS_ID"`
 	PodNamespaceID   int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodClusterID     int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
@@ -910,10 +910,10 @@ type PodGroup struct {
 	Type           int    `gorm:"column:type;type:int;default:null" json:"TYPE" mapstructure:"TYPE"` // 1: Deployment 2: StatefulSet 3: ReplicationController
 	PodNum         int    `gorm:"column:pod_num;type:int;default:1" json:"POD_NUM" mapstructure:"POD_NUM"`
 	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"` // separated by ,
-	Metadata       string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"METADATA"`
-	MetadataHash   string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"METADATA_HASH"`
-	Spec           string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"SPEC"`
-	SpecHash       string `gorm:"column:spec_hash;type:char(64);default:''" json:"SPEC_HASH" mapstructure:"SPEC_HASH"`
+	Metadata       string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"-"`
+	MetadataHash   string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"-"`
+	Spec           string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"-"`
+	SpecHash       string `gorm:"column:spec_hash;type:char(64);default:''" json:"SPEC_HASH" mapstructure:"-"`
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
@@ -1031,8 +1031,8 @@ type ConfigMap struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Data           string    `gorm:"column:data;type:text;default:''" json:"DATA" mapstructure:"DATA"`
-	DataHash       string    `gorm:"column:data_hash;type:char(64);default:''" json:"DATA_HASH" mapstructure:"DATA_HASH"`
+	Data           string    `gorm:"column:data;type:text;default:''" json:"DATA" mapstructure:"-"`
+	DataHash       string    `gorm:"column:data_hash;type:char(64);default:''" json:"DATA_HASH" mapstructure:"-"`
 	PodNamespaceID int       `gorm:"column:pod_namespace_id;type:int;not null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
 	PodClusterID   int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
 	VPCID          int       `gorm:"column:epc_id;type:int;not null" json:"VPC_ID" mapstructure:"EPC_ID"`
