@@ -3850,7 +3850,7 @@ impl ConfigHandler {
                 communication.grpc_buffer_size, new_communication.grpc_buffer_size
             );
             communication.grpc_buffer_size = new_communication.grpc_buffer_size;
-            restart_agent = !first_run;
+            session.set_rx_size(new_communication.grpc_buffer_size);
         }
         if communication.max_throughput_to_ingester != new_communication.max_throughput_to_ingester
         {

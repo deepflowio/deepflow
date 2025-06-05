@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 hyper = { version = "0.14", features = ["full"] }
 public = { path = "../../crates/public" }
-prost = "0.11"
+prost.workspace = true
