@@ -700,7 +700,7 @@ global:
     # unit: MiB
     # range: [5, 1024]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
