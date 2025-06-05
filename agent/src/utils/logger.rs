@@ -27,6 +27,7 @@ use arc_swap::access::Access;
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
 
 use public::{
+    exception::ExceptionHandler,
     queue,
     sender::{SendMessageType, Sendable},
     LeakyBucket,
@@ -35,7 +36,6 @@ use public::{
 use super::stats::{self, QueueStats};
 use crate::{
     config::handler::{LogAccess, LogConfig, SenderAccess},
-    exception::ExceptionHandler,
     sender::uniform_sender::{Connection, UniformSenderThread},
     trident::SenderEncoder,
 };

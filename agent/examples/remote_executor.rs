@@ -20,11 +20,11 @@ use parking_lot::RwLock;
 use tokio::runtime::Builder;
 
 use deepflow_agent::{
-    exception::ExceptionHandler,
     rpc::{Executor, Session, DEFAULT_TIMEOUT},
     trident::AgentId,
     utils::stats,
 };
+use public::exception::ExceptionHandler;
 
 fn main() {
     flexi_logger::Logger::try_with_env()
