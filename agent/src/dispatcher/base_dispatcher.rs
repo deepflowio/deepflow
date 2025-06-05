@@ -50,7 +50,6 @@ use crate::{
         VLAN_ID_MASK,
     },
     config::{handler::FlowAccess, DispatcherConfig},
-    exception::ExceptionHandler,
     flow_generator::AppProto,
     handler::PacketHandlerBuilder,
     policy::PolicyGetter,
@@ -61,6 +60,7 @@ use crate::{
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
+    exception::ExceptionHandler,
     packet::Packet,
     proto::agent::{Exception, IfMacSource, PacketCaptureType},
     queue::DebugSender,

@@ -43,7 +43,6 @@ use super::resource_watcher::{
 use crate::{
     config::{handler::PlatformAccess, ApiResources},
     error::{Error, Result},
-    exception::ExceptionHandler,
     rpc::Session,
     trident::AgentId,
     utils::{
@@ -51,9 +50,12 @@ use crate::{
         stats,
     },
 };
-use public::proto::{
-    agent::{Exception, KubernetesApiSyncRequest},
-    common::KubernetesApiInfo,
+use public::{
+    exception::ExceptionHandler,
+    proto::{
+        agent::{Exception, KubernetesApiSyncRequest},
+        common::KubernetesApiInfo,
+    },
 };
 
 /*

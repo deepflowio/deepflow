@@ -15,6 +15,7 @@ use public::{
     buffer::Allocator,
     counter::Countable,
     debug::QueueDebugger,
+    exception::ExceptionHandler,
     netns::{self, NsFile},
     proto::agent::{AgentType, IfMacSource},
     queue::{self, bounded_with_debug, DebugSender},
@@ -30,7 +31,6 @@ use super::{
 };
 use crate::{
     config::handler::DispatcherAccess,
-    exception::ExceptionHandler,
     flow_generator::{flow_map::Config, FlowMap},
     rpc::get_timestamp,
     utils::stats::QueueStats,
