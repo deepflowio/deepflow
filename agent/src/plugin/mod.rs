@@ -444,7 +444,7 @@ impl CustomInfo {
             }
             Some(pb::app_info::Info::Resp(r)) => {
                 info.resp = CustomInfoResp {
-                    status: match r.status.and_then(pb::AppRespStatus::from_i32) {
+                    status: match r.status.and_then(|s| pb::AppRespStatus::try_from(s).ok()) {
                         Some(pb::AppRespStatus::RespOk) => L7ResponseStatus::Ok,
                         Some(pb::AppRespStatus::RespTimeout) => L7ResponseStatus::Timeout,
                         Some(pb::AppRespStatus::RespServerError) => L7ResponseStatus::ServerError,
