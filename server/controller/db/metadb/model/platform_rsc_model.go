@@ -19,6 +19,7 @@ package model
 import (
 	"time"
 
+	json "github.com/bytedance/sonic"
 	"gorm.io/gorm"
 )
 
@@ -56,6 +57,28 @@ func (b Base) GetLcuuid() string {
 	return b.Lcuuid
 }
 
+type CustomDeletedAt gorm.DeletedAt
+
+func (d CustomDeletedAt) MarshalJSON() ([]byte, error) {
+	if d.Valid {
+		return json.Marshal(d.Time.Format(time.DateTime))
+	}
+	return []byte("null"), nil
+}
+
+func (d *CustomDeletedAt) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		d.Valid = false
+		return nil
+	}
+
+	err := json.Unmarshal(b, &d.Time)
+	if err == nil {
+		d.Valid = true
+	}
+	return err
+}
+
 type OperatedTime struct {
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT" mapstructure:"CREATED_AT"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
@@ -71,7 +94,7 @@ func (t OperatedTime) GetUpdatedAt() time.Time {
 
 type SoftDeleteBase struct {
 	OperatedTime `mapstructure:",squash"`
-	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
+	DeletedAt    CustomDeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
 }
 
 type Process struct {
