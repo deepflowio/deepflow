@@ -73,7 +73,6 @@ use crate::{
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    exception::ExceptionHandler,
     flow_generator::{
         protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
         TIME_UNIT,
@@ -128,6 +127,8 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
+    enums::ActionFlags,
+    exception::ExceptionHandler,
     packet::MiniPacket,
     proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
@@ -630,6 +631,17 @@ impl Trident {
         Ok(Trident { state, handle })
     }
 
+    fn kernel_version_check(state: Arc<AgentState>, exception_handler: ExceptionHandler) {
+        #[cfg(feature = "enterprise")]
+        #[allow(unused_variables)]
+        match enterprise_utils::utils::kernel_version_check(exception_handler) {
+            ActionFlags::REBOOT => crate::utils::clean_and_exit(1),
+            ActionFlags::MELTDOWN => state.melt_down(),
+            ActionFlags::NONE => (),
+            _ => warn!("unknow action"),
+        }
+    }
+
     fn run(
         state: Arc<AgentState>,
         ctrl_ip: IpAddr,
@@ -894,6 +906,9 @@ impl Trident {
         ) {
             platform_synchronizer.start();
         }
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        Trident::kernel_version_check(state.clone(), exception_handler.clone());
 
         let mut components: Option<Components> = None;
         let mut first_run = true;

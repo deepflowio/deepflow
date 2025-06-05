@@ -23,6 +23,7 @@ pub mod counter;
 pub mod debug;
 pub mod enums;
 pub mod error;
+pub mod exception;
 pub mod l7_protocol;
 pub mod leaky_bucket;
 pub mod packet;

@@ -66,7 +66,6 @@ use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::UserConfig;
-use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
 use crate::trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo};
 #[cfg(any(target_os = "linux"))]
@@ -80,6 +79,7 @@ use crate::utils::{
     stats,
 };
 use public::{
+    exception::ExceptionHandler,
     proto::agent::{
         self as pb, AgentIdentifier, AgentType, DynamicConfig, Exception, PacketCaptureType,
     },
