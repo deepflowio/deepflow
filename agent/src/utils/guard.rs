@@ -43,7 +43,6 @@ use crate::common::{
     NORMAL_EXIT_WITH_RESTART,
 };
 use crate::config::handler::EnvironmentAccess;
-use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
 use crate::utils::environment::get_disk_usage;
@@ -51,6 +50,7 @@ use crate::utils::environment::get_disk_usage;
 use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
+use public::exception::ExceptionHandler;
 use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
 
 struct SystemLoadGuard {
@@ -552,6 +552,9 @@ impl Guard {
                     state.melt_down();
                 } else if exception_handler.has(Exception::FreeDiskCircuitBreaker) {
                     warn!("Set the state to melt_down when the free disk exceeds the threshold.");
+                    state.melt_down();
+                } else if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                    warn!("Set the state to melt_down when the kernel version circuit breaker.");
                     state.melt_down();
                 } else {
                     state.recover();

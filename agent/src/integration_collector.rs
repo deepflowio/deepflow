@@ -54,7 +54,6 @@ use crate::{
         TaggedFlow, Timestamp,
     },
     config::{handler::LogParserConfig, PrometheusExtraLabels},
-    exception::ExceptionHandler,
     flow_generator::protocol_logs::{http::handle_endpoint, L7ResponseStatus},
     metric::document::{Direction, TapSide},
     policy::PolicyGetter,
@@ -66,6 +65,7 @@ use integration_skywalking::{
 use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     enums::{CaptureNetworkType, EthernetType, L4Protocol},
+    exception::ExceptionHandler,
     l7_protocol::L7Protocol,
     proto::{
         agent::Exception,

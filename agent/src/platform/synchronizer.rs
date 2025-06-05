@@ -29,9 +29,7 @@ use parking_lot::RwLock;
 
 use tokio::runtime::Runtime;
 
-use crate::{
-    config::handler::PlatformAccess, exception::ExceptionHandler, rpc::Session, trident::AgentId,
-};
+use crate::{config::handler::PlatformAccess, rpc::Session, trident::AgentId};
 #[cfg(target_os = "linux")]
 use crate::{
     platform::{
@@ -41,6 +39,7 @@ use crate::{
     utils::process::ProcessListener,
 };
 
+use public::exception::ExceptionHandler;
 use public::proto::agent::{self, Exception};
 
 use super::querier::Querier;

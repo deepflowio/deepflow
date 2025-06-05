@@ -21,11 +21,11 @@ use parking_lot::RwLock;
 use tokio::runtime::Runtime;
 
 use crate::{
-    exception::ExceptionHandler,
     rpc::{Session, StaticConfig, Status, Synchronizer},
     trident::AgentId,
 };
 use public::debug::{Error, Result};
+use public::exception::ExceptionHandler;
 use public::proto::agent;
 
 pub struct RpcDebugger {
