@@ -43,13 +43,13 @@ use crate::common::{
     NORMAL_EXIT_WITH_RESTART,
 };
 use crate::config::handler::EnvironmentAccess;
-use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
 #[cfg(target_os = "linux")]
 use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
+use public::exception::ExceptionHandler;
 use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
 
 struct SystemLoadGuard {

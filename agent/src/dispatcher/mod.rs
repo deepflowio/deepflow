@@ -84,7 +84,6 @@ use crate::{
         handler::{CollectorAccess, DispatcherAccess, FlowAccess, LogParserAccess},
         DispatcherConfig, DpdkSource,
     },
-    exception::ExceptionHandler,
     flow_generator::AppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     policy::PolicyGetter,
@@ -98,6 +97,7 @@ use crate::{
 use public::netns::NsFile;
 use public::{
     buffer::{BatchedBox, BatchedBuffer},
+    exception::ExceptionHandler,
     packet,
     proto::agent::{AgentType, IfMacSource, PacketCaptureType},
     queue::{DebugSender, Receiver},

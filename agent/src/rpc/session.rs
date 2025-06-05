@@ -28,7 +28,6 @@ use tonic::transport::Channel;
 
 use crate::{
     common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT},
-    exception::ExceptionHandler,
     trident::AgentId,
     utils::stats::{self, AtomicTimeStats},
 };
@@ -36,6 +35,7 @@ use grpc::dial as grpc_dial;
 
 use public::{
     counter::{Countable, Counter, CounterType, CounterValue, RefCountable},
+    exception::ExceptionHandler,
     proto::agent::{self, Exception, PluginType, Status},
 };
 

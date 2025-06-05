@@ -33,6 +33,7 @@ pub mod rpc;
 pub mod sender;
 pub mod throttle;
 pub mod utils;
+pub mod exception;
 
 #[cfg(target_os = "linux")]
 pub mod netns;

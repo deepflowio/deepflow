@@ -33,12 +33,12 @@ use crate::{
     common::PROCESS_NAME,
     config::K8S_CA_CRT_PATH,
     error::{Error, Result},
-    exception::ExceptionHandler,
     utils::process::get_process_num_by_name,
 };
 
 use public::{
     proto::agent::{AgentType, Exception, KubernetesWatchPolicy},
+    exception::ExceptionHandler,
     utils::net::{
         addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
         LinkFlags, MacAddr,

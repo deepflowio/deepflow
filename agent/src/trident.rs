@@ -73,7 +73,6 @@ use crate::{
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    exception::ExceptionHandler,
     flow_generator::{
         protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
         TIME_UNIT,
@@ -128,6 +127,7 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
+    exception::ExceptionHandler,
     packet::MiniPacket,
     proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
@@ -2796,6 +2796,17 @@ impl AgentComponents {
             sender_leaky_bucket.clone(),
         );
 
+        #[allow(unused_mut)]
+        let mut ebpf_kernel_check = true;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if !config_handler.ebpf().load().ebpf.disabled {
+            #[cfg(feature = "enterprise")]
+            {
+                ebpf_kernel_check =
+                    enterprise_utils::utils::ebpf_kernel_check(exception_handler.clone());
+            }
+        }
+
         let ebpf_dispatcher_id = dispatcher_components.len();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut ebpf_dispatcher_component = None;
@@ -2810,6 +2821,7 @@ impl AgentComponents {
                     .dpdk
                     .source
                     == DpdkSource::Ebpf)
+            && ebpf_kernel_check
         {
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
                 user_config

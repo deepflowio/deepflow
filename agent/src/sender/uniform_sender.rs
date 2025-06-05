@@ -42,11 +42,11 @@ use crate::config::{
     handler::{SenderAccess, SenderConfig},
     TrafficOverflowAction,
 };
-use crate::exception::ExceptionHandler;
 use crate::trident::SenderEncoder;
 use crate::utils::stats::{
     self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
 };
+use public::exception::ExceptionHandler;
 use public::proto::agent::{Exception, SocketType};
 use public::queue::{Error, Receiver};
 

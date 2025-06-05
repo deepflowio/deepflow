@@ -59,7 +59,6 @@ use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType, l7_protocol_log::L7ProtocolBitmap,
     },
-    exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
@@ -83,6 +82,7 @@ use crate::{
 use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 
 use public::bitmap::Bitmap;
+use public::exception::ExceptionHandler;
 use public::l7_protocol::L7Protocol;
 use public::proto::agent::{self, AgentType, PacketCaptureType};
 use public::utils::net::MacAddr;
