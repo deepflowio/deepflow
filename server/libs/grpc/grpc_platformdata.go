@@ -86,6 +86,7 @@ type Info struct {
 	IP4          uint32
 	IP6          net.IP
 	HitCount     *uint64
+	DupCount     uint32
 }
 
 type CidrInfo struct {
@@ -599,6 +600,8 @@ func (t *PlatformInfoTable) queryMacInfo(orgId uint16, mac uint64) *Info {
 	info, ok := t.macInfos[orgId][mac]
 	if !ok {
 		t.InfoMissStat(orgId, mac)
+	} else if info.DupCount > 0 {
+		return nil
 	} else {
 		atomic.AddUint64(info.HitCount, 1)
 	}
@@ -608,10 +611,18 @@ func (t *PlatformInfoTable) queryMacInfo(orgId uint16, mac uint64) *Info {
 func (t *PlatformInfoTable) queryMacInfosPair(orgId uint16, mac0, mac1 uint64) (info0 *Info, info1 *Info) {
 	var ok0, ok1 bool
 	if info0, ok0 = t.macInfos[orgId][mac0]; ok0 {
-		atomic.AddUint64(info0.HitCount, 1)
+		if info0.DupCount > 0 {
+			info0 = nil
+		} else {
+			atomic.AddUint64(info0.HitCount, 1)
+		}
 	}
 	if info1, ok1 = t.macInfos[orgId][mac1]; ok1 {
-		atomic.AddUint64(info1.HitCount, 1)
+		if info1.DupCount > 0 {
+			info1 = nil
+		} else {
+			atomic.AddUint64(info1.HitCount, 1)
+		}
 	}
 
 	if !ok0 {
@@ -952,13 +963,11 @@ func (t *PlatformInfoTable) OrgString(orgId uint16) string {
 	}
 
 	if len(t.macInfos[orgId]) > 0 {
-		sb.WriteString("\n5 *epcID *Mac        hit  (epcID和MAC匹配到平台信息的统计, 优先级最高)\n")
+		sb.WriteString("\n5 *epcID *Mac        hit   dup (epcID和MAC匹配到平台信息的统计, 优先级最高)\n")
 		sb.WriteString("-----------------------------\n")
 	}
 	for mac, hitCount := range t.macInfos[orgId] {
-		if *hitCount.HitCount > 0 {
-			fmt.Fprintf(sb, "  %-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount)
-		}
+		fmt.Fprintf(sb, "  %-5d  %-12x  %-5d %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount, hitCount.DupCount)
 	}
 
 	if len(t.macMissCount[orgId]) > 0 {
@@ -1599,23 +1608,27 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 	}
 	if mac != 0 {
 		l3EpcMac := mac | uint64(epcID)<<48 // 取l3EpcID的低16位和Mac组成新的Mac，防止mac跨AZ冲突
-		macInfos[l3EpcMac] = &Info{
-			EpcID:        epcID,
-			L2EpcID:      epcID,
-			DeviceType:   deviceType,
-			DeviceID:     deviceID,
-			HostID:       hostID,
-			Mac:          mac,
-			RegionID:     regionID,
-			SubnetID:     firstSubnetID,
-			PodNodeID:    podNodeID,
-			PodGroupID:   podGroupID,
-			PodGroupType: podGroupType,
-			PodID:        podID,
-			PodClusterID: podClusterID,
-			AZID:         azID,
-			VtapID:       vtapId,
-			HitCount:     new(uint64),
+		if info, exist := macInfos[l3EpcMac]; exist {
+			info.DupCount += 1
+		} else {
+			macInfos[l3EpcMac] = &Info{
+				EpcID:        epcID,
+				L2EpcID:      epcID,
+				DeviceType:   deviceType,
+				DeviceID:     deviceID,
+				HostID:       hostID,
+				Mac:          mac,
+				RegionID:     regionID,
+				SubnetID:     firstSubnetID,
+				PodNodeID:    podNodeID,
+				PodGroupID:   podGroupID,
+				PodGroupType: podGroupType,
+				PodID:        podID,
+				PodClusterID: podClusterID,
+				AZID:         azID,
+				VtapID:       vtapId,
+				HitCount:     new(uint64),
+			}
 		}
 	}
 
