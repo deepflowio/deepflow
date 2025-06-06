@@ -17,9 +17,12 @@
 package diffbase
 
 import (
+	"sigs.k8s.io/yaml"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func (b *DataSet) AddPodGroup(dbItem *metadbmodel.PodGroup, seq int) {
@@ -63,15 +66,28 @@ type PodGroup struct {
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
-func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup) {
+func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup, toolDataSet *tool.DataSet) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
 	p.PodNum = cloudItem.PodNum
 	p.Type = cloudItem.Type
-	p.Metadata = cloudItem.Metadata
+
+	yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+	if err != nil {
+		log.Errorf("failed to convert JSON metadata: %v to YAML: %s", cloudItem.Metadata, toolDataSet.GetMetadata().LogPrefixes)
+		return
+	}
+	p.Metadata = string(yamlMetadata)
 	p.MetadataHash = cloudItem.MetadataHash
-	p.Spec = cloudItem.Spec
+
+	yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+	if err != nil {
+		log.Errorf("failed to convert JSON spec: %v to YAML: %s", cloudItem.Spec, toolDataSet.GetMetadata().LogPrefixes)
+		return
+	}
+	p.Spec = string(yamlSpec)
 	p.SpecHash = cloudItem.SpecHash
+
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, p))
