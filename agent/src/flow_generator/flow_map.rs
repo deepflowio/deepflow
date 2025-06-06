@@ -908,6 +908,7 @@ impl FlowMap {
         }
         let flow_config = config.flow;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
+        let mut count = 0;
 
         if flow_config.collector_enabled {
             if let Some(tcp_segments) = node.tcp_segments.as_mut() {
@@ -919,21 +920,21 @@ impl FlowMap {
                     for packet in &mut packets {
                         let direction =
                             packet.lookup_key.direction == PacketDirection::ClientToServer;
-                        self.collect_metric(config, node, packet, direction, false);
+                        count += self.collect_metric(config, node, packet, direction, false);
                     }
                 }
             } else {
                 let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
-                self.collect_metric(config, node, meta_packet, direction, false);
+                count += self.collect_metric(config, node, meta_packet, direction, false);
             }
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF && count > 0 {
             if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
-                node.residual_request += 1;
+                node.residual_request += count;
             } else {
-                node.residual_request -= 1;
+                node.residual_request -= count;
             }
             // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
             // Considering that eBPF data may be out of order, wait for an additional 5s(default) timeout.
@@ -1693,10 +1694,11 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         is_first_packet: bool,
-    ) {
+    ) -> i32 {
         let flow_config = &config.flow;
         let log_parser_config = &config.log_parser;
         let consistent_timestamp_in_l7_metrics = config.flow.consistent_timestamp_in_l7_metrics;
+        let mut count = 0;
         if let Some(mut log) = node.meta_flow_log.take() {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
@@ -1761,8 +1763,12 @@ impl FlowMap {
                                     timestamp,
                                 );
                                 self.write_to_app_proto_log(flow_config, node, &packet, s);
+
+                                count += 1;
                             }
                             crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                                count += m.len() as i32;
+
                                 let timestamp = packet.lookup_key.timestamp.as_micros();
                                 for i in m.into_iter() {
                                     self.collect_l7_stats(
@@ -1789,6 +1795,8 @@ impl FlowMap {
             }
             node.meta_flow_log = Some(log);
         }
+
+        count
     }
 
     fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
@@ -1829,6 +1837,8 @@ impl FlowMap {
             self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
         }
 
+        let mut count = 0;
+
         if flow_config.collector_enabled {
             if let Some(tcp_segments) = node.tcp_segments.as_mut() {
                 if let Some(mut packets) = tcp_segments.inject(meta_packet.to_owned_segment()) {
@@ -1839,22 +1849,23 @@ impl FlowMap {
                     for packet in &mut packets {
                         let direction =
                             packet.lookup_key.direction == PacketDirection::ClientToServer;
-                        self.collect_metric(config, &mut node, packet, direction, false);
+                        count += self.collect_metric(config, &mut node, packet, direction, false);
                     }
                 }
             } else {
-                self.collect_metric(config, &mut node, meta_packet, !reverse, true);
+                count += self.collect_metric(config, &mut node, meta_packet, !reverse, true);
             }
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF
             && meta_packet.ebpf_type != EbpfType::SocketCloseEvent
+            && count > 0
         {
             if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
-                node.residual_request += 1;
+                node.residual_request += count;
             } else {
-                node.residual_request -= 1;
+                node.residual_request -= count;
             }
         }
 
