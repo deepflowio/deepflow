@@ -173,7 +173,7 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 			return nil, nil, false
 		}
 		mapInfo["spec"] = string(yamlSpec)
-		structInfo.Spec.Set(diffBase.Spec, cloudItem.Spec)
+		structInfo.Spec.Set(diffBase.Spec, string(yamlSpec))
 	} else {
 		structInfo.Spec.Set(diffBase.Spec, diffBase.Spec) // set for resource event, because it publish combined config of metadata and spec
 	}
