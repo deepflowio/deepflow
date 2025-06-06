@@ -137,14 +137,15 @@ func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *
 		structInfo.Name.Set(cloudItem.Name, diffBase.Name)
 	}
 	if diffBase.DataHash != cloudItem.DataHash {
+		mapInfo["data_hash"] = cloudItem.DataHash
+
 		yamlData, err := yaml.JSONToYAML([]byte(cloudItem.Data))
 		if err != nil {
 			log.Errorf("failed to convert %s JSON data: %v to YAML: %s", h.resourceType, cloudItem.Data, h.metadata.LogPrefixes)
 			return nil, nil, false
 		}
 		mapInfo["data"] = string(yamlData)
-		structInfo.Data.Set(cloudItem.Data, diffBase.DataHash)
-		mapInfo["data_hash"] = cloudItem.DataHash
+		structInfo.Data.Set(diffBase.Data, string(yamlData))
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
