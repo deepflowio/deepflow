@@ -69,6 +69,7 @@ struct AppMeterWithL7Protocol {
     time_span: u32,
     l7_protocol: L7Protocol,
     biz_type: u8,
+    time_in_second: Duration,
 }
 
 struct QuadrupleStash {
@@ -296,6 +297,7 @@ impl SubQuadGen {
                     endpoint_hash,
                     biz_type: l7_stats.biz_type,
                     time_span,
+                    time_in_second,
                 };
                 meters.push(meter);
             }
@@ -320,7 +322,7 @@ impl SubQuadGen {
                         endpoint: meter.endpoint,
                         is_active_host0,
                         is_active_host1,
-                        time_in_second: tagged_flow.flow.flow_stat_time,
+                        time_in_second: meter.time_in_second.into(),
                         biz_type: meter.biz_type,
                         time_span,
                     });
@@ -355,7 +357,7 @@ impl SubQuadGen {
                     endpoint: l7_stats.endpoint.clone(),
                     is_active_host0,
                     is_active_host1,
-                    time_in_second: tagged_flow.flow.flow_stat_time,
+                    time_in_second: l7_stats.time_in_second.into(),
                     biz_type: l7_stats.biz_type,
                     time_span,
                 });
@@ -376,6 +378,7 @@ impl SubQuadGen {
                     endpoint_hash,
                     biz_type: l7_stats.biz_type,
                     time_span,
+                    time_in_second,
                 };
                 let _ = stash.l7_stats.insert(l7_stats.flow_id, vec![meter]);
             }
