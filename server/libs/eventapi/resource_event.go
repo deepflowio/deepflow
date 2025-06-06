@@ -73,7 +73,8 @@ type ResourceEvent struct {
 }
 
 const (
-	AttributeNameConfig = "config"
+	AttributeNameConfig     = "config"
+	AttributeNameConfigDiff = "config_diff"
 )
 
 type TagFieldOption func(opts *ResourceEvent)

@@ -72,7 +72,9 @@ func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		eventapi.TagPodNSID(item.PodNamespaceID),
 		eventapi.TagPodClusterID(item.PodClusterID),
 		eventapi.TagVPCID(item.VPCID),
-		eventapi.TagAttributes([]string{eventapi.AttributeNameConfig}, []string{diff}),
+		eventapi.TagAttributes(
+			[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
+			[]string{item.Data, diff}),
 	}
 
 	c.enqueueIfInsertIntoMySQLFailed(
