@@ -2500,10 +2500,12 @@ KRETFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 
 #ifndef LINUX_VER_KFUNC
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
+					__u16 l7_proto,
 					struct member_fields_offset *offset,
 					struct syscall_comm_enter_ctx *ctx)
 #else
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
+					__u16 l7_proto,
 					struct member_fields_offset *offset,
 					unsigned long long *ctx)
 #endif
@@ -2535,6 +2537,7 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	v->syscall_len = 0;
 	v->data_seq = seq;
 	v->msg_type = MSG_COMMON;
+	v->data_type = l7_proto;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
@@ -2594,6 +2597,7 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 	delete_socket_info(conn_key, socket_info_ptr);
 	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
+			   socket_info_ptr->l7_proto,
 			   offset, ctx);
 	return 0;
 }
