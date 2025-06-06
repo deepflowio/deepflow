@@ -21,7 +21,7 @@ use tonic::transport::{Channel, Endpoint};
 
 use public::consts::{GRPC_DEFAULT_TIMEOUT, GRPC_SESSION_TIMEOUT};
 
-pub async fn dial(remote: &str, remote_port: u16, _: String) -> Result<Channel, String> {
+pub async fn dial(remote: &str, remote_port: u16, _: &str) -> Result<Channel, String> {
     let socket_address = match (remote, remote_port)
         .to_socket_addrs()
         .and_then(|mut iter| {

@@ -954,7 +954,7 @@ impl Synchronizer {
                 while running.load(Ordering::SeqCst) {
                     let message = stream.message().await;
                     if session.get_version() != version {
-                        info!("grpc server changed");
+                        info!("grpc server or config changed");
                         break;
                     }
                     if let Err(m) = message {

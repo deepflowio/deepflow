@@ -385,7 +385,7 @@ fn fill_l7_stats(
     flow.otel_service = otel_service;
     flow.otel_instance = otel_instance;
     flow.eth_type = eth_type;
-    flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
+    flow.tap_side = TapSide::from(SpanKind::try_from(span.kind).unwrap());
     if flow.tap_side == TapSide::ClientApp {
         l2_end_0 = true;
         ip0 = ip;

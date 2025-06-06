@@ -238,7 +238,7 @@ impl Interior {
 
             self.session.update_current_server().await;
             let session_version = self.session.get_version();
-            let client = match self.session.get_client() {
+            let (channel, rx_size) = match self.session.get_client() {
                 Some(c) => c,
                 None => {
                     self.session.set_request_failed(true);
@@ -246,7 +246,8 @@ impl Interior {
                     continue;
                 }
             };
-            let mut client = pb::synchronizer_client::SynchronizerClient::new(client);
+            let mut client = pb::synchronizer_client::SynchronizerClient::new(channel)
+                .max_decoding_message_size(rx_size);
 
             let now = Instant::now();
             trace!("remote_execute call");
@@ -279,15 +280,15 @@ impl Interior {
                     }
                 };
                 if session_version != self.session.get_version() {
-                    info!("grpc server changed");
+                    info!("grpc server or config changed");
                     break;
                 }
                 if message.exec_type.is_none() {
                     continue;
                 }
-                match pb::ExecutionType::from_i32(message.exec_type.unwrap()) {
-                    Some(t) => debug!("received {:?} command from server", t),
-                    None => {
+                match pb::ExecutionType::try_from(message.exec_type.unwrap()) {
+                    Ok(t) => debug!("received {:?} command from server", t),
+                    Err(_) => {
                         warn!(
                             "unsupported remote exec type id {}",
                             message.exec_type.unwrap()
@@ -560,7 +561,7 @@ impl Stream for Responser {
                 // sender closed, terminate the current stream
                 Poll::Ready(None) => return Poll::Ready(None),
                 Poll::Ready(Some(msg)) => {
-                    match pb::ExecutionType::from_i32(msg.exec_type.unwrap()).unwrap() {
+                    match pb::ExecutionType::try_from(msg.exec_type.unwrap()).unwrap() {
                         pb::ExecutionType::ListCommand => {
                             let mut commands = vec![];
                             SUPPORTED_COMMANDS.with(|cell| {

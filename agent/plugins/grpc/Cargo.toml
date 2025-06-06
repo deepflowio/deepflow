@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 public = { path = "../../crates/public"}
-tonic = "0.8.1"
+tonic.workspace = true

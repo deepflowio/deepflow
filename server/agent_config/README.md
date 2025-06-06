@@ -1029,7 +1029,7 @@ of deepflow-agent outside the cluster is 30033.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
