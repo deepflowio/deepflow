@@ -112,7 +112,11 @@ impl fmt::Display for InterfaceInfo {
 
 impl PartialEq for InterfaceInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.tap_idx.eq(&other.tap_idx) && self.mac.eq(&other.mac)
+        // In practice there are some CNI plugins that use IPVLAN and create pod interfaces with the same mac address.
+        // It's not enough to distinguish them by tap_index and mac address in this situation. Thus ns_inode is also used.
+        self.tap_idx.eq(&other.tap_idx)
+            && self.mac.eq(&other.mac)
+            && self.ns_inode.eq(&other.ns_inode)
     }
 }
 
