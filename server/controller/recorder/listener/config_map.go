@@ -39,7 +39,7 @@ func (h *ConfigMap) OnUpdaterAdded(addedDBItems []*mysqlmodel.ConfigMap) {
 }
 
 func (h *ConfigMap) OnUpdaterUpdated(cloudItem *cloudmodel.ConfigMap, diffBase *diffbase.ConfigMap) {
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, h.cache.ToolDataSet)
 }
 
 func (h *ConfigMap) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.ConfigMap) {

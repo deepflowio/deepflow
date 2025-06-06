@@ -17,9 +17,12 @@
 package diffbase
 
 import (
+	"sigs.k8s.io/yaml"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
 func (b *DataSet) AddConfigMap(dbItem *mysqlmodel.ConfigMap, seq int) {
@@ -47,9 +50,14 @@ type ConfigMap struct {
 	DataHash string `json:"data_hash"`
 }
 
-func (v *ConfigMap) Update(cloudItem *cloudmodel.ConfigMap) {
+func (v *ConfigMap) Update(cloudItem *cloudmodel.ConfigMap, toolDataSet *tool.DataSet) {
 	v.Name = cloudItem.Name
-	v.Data = cloudItem.Data
+	yamlData, err := yaml.JSONToYAML([]byte(cloudItem.Data))
+	if err != nil {
+		log.Errorf("failed to convert JSON data: %v to YAML: %s", cloudItem.Data, toolDataSet.GetMetadata().LogPrefixes)
+		return
+	}
+	v.Data = string(yamlData)
 	v.DataHash = cloudItem.DataHash
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, v))
 }

@@ -19,6 +19,7 @@ package event
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"time"
 
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -76,7 +77,13 @@ func (e EventManagerBase) fillEvent(
 	event.TimeMilli = time.Now().UnixMilli()
 	event.Type = eventType
 	event.IfNeedTagged = true
-	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
+	if slices.Contains([]string{
+		eventapi.RESOURCE_EVENT_TYPE_CREATE,
+		eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+		eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP,
+	}, eventType) {
 		event.IfNeedTagged = false
 	}
 	for _, option := range options {
