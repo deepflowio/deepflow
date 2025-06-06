@@ -2067,12 +2067,34 @@ impl Default for TxThroughput {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FreeDisk {
+    pub percentage_trigger_threshold: u8,
+    pub absolute_trigger_threshold: u32, //unit: GB
+    pub directory: String,
+}
+
+impl Default for FreeDisk {
+    fn default() -> Self {
+        Self {
+            percentage_trigger_threshold: 15,
+            absolute_trigger_threshold: 10,
+            #[cfg(not(target_os = "windows"))]
+            directory: "/".to_string(),
+            #[cfg(target_os = "windows")]
+            directory: "c:\\".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CircuitBreakers {
     pub sys_memory_percentage: SysMemoryPercentage,
     pub relative_sys_load: RelativeSysLoad,
     pub tx_throughput: TxThroughput,
+    pub free_disk: FreeDisk,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

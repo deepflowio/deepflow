@@ -30,7 +30,10 @@ use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
 #[cfg(target_os = "linux")]
-use crate::utils::{cgroups, environment::SocketInfo};
+use crate::utils::{
+    cgroups,
+    environment::{get_disk_usage, SocketInfo},
+};
 use crate::{
     config::handler::EnvironmentAccess,
     error::{Error, Result},
@@ -227,7 +230,8 @@ impl RefCountable for SysStatusBroker {
             CounterValue::Unsigned(current_sys_available_memory_percentage as u64),
         ));
 
-        let sys_memory_limit = self.config.load().sys_memory_limit as f64;
+        let config = self.config.load();
+        let sys_memory_limit = config.sys_memory_limit as f64;
 
         let (sys_free_memory_limit_ratio, sys_available_memory_limit_ratio) =
             if sys_memory_limit > 0.0 {
@@ -266,6 +270,25 @@ impl RefCountable for SysStatusBroker {
                 warn!("get file and size sum failed: {:?}", e);
             }
         }
+
+        match get_disk_usage(&config.free_disk_circuit_breaker_directory) {
+            Ok((total, free)) => {
+                metrics.push((
+                    "free_disk_percentage",
+                    CounterType::Gauged,
+                    CounterValue::Float(free as f64 * 100.0 / total as f64),
+                ));
+                metrics.push((
+                    "free_disk_absolute",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(free as u64),
+                ));
+            }
+            Err(e) => {
+                warn!("get disk free usage failed: {:?}", e);
+            }
+        }
+
         match system_guard.process(self.pid) {
             Some(process) => {
                 let cpu_usage = process.cpu_usage() as f64;
@@ -279,7 +302,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "max_millicpus_ratio",
                     CounterType::Gauged,
-                    CounterValue::Float(cpu_usage * 10.0 / self.config.load().max_millicpus as f64),
+                    CounterValue::Float(cpu_usage * 10.0 / config.max_millicpus as f64),
                 ));
                 metrics.push((
                     "memory",
@@ -289,7 +312,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "max_memory_ratio",
                     CounterType::Gauged,
-                    CounterValue::Float(mem_used as f64 / self.config.load().max_memory as f64),
+                    CounterValue::Float(mem_used as f64 / config.max_memory as f64),
                 ));
                 metrics.push((
                     "create_time",
