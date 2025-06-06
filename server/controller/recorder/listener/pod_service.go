@@ -39,7 +39,7 @@ func (ps *PodService) OnUpdaterAdded(addedDBItems []*metadbmodel.PodService) {
 }
 
 func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, ps.cache.ToolDataSet)
 	ps.cache.UpdatePodService(cloudItem)
 }
 
