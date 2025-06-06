@@ -55,10 +55,8 @@ func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 
 	old := fields.Metadata.GetOld() + "\n" + fields.Spec.GetOld()
 	new := fields.Metadata.GetNew() + "\n" + fields.Spec.GetNew()
-	if old == "\n" {
-		eventType = eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG
-	} else if new == "\n" {
-		eventType = eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG
+	if old == "\n" || new == "\n" {
+		return
 	} else {
 		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
 

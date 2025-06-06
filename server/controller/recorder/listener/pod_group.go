@@ -39,7 +39,7 @@ func (p *PodGroup) OnUpdaterAdded(addedDBItems []*metadbmodel.PodGroup) {
 }
 
 func (p *PodGroup) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroup, diffBase *diffbase.PodGroup) {
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
 func (p *PodGroup) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodGroup) {
