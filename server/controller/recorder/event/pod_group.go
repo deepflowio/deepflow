@@ -55,16 +55,18 @@ func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 
 	old := fields.Metadata.GetOld() + "\n" + fields.Spec.GetOld()
 	new := fields.Metadata.GetNew() + "\n" + fields.Spec.GetNew()
-	if old == "" {
+	if old == "\n" {
 		eventType = eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG
-	} else if new == "" {
+	} else if new == "\n" {
 		eventType = eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG
 	} else {
 		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
 
 		opts = []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(fields.GetID()),
-			eventapi.TagAttributes([]string{eventapi.AttributeNameConfig}, []string{diff}),
+			eventapi.TagAttributes(
+				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
+				[]string{new, diff}),
 		}
 	}
 	c.createAndEnqueue(md, fields.GetLcuuid(), eventType, opts...)
