@@ -491,20 +491,20 @@ func (f *LineFormatter) appendDictValueComments(start int, result []string) (end
 	return end, result, err
 }
 
-func (f *LineFormatter) convDictValueCommentToSection(start int, indentCount int, result []string) (end int, appendedResult []string, err error) {
+func (f *LineFormatter) convDictValueCommentToSection(start int, yamlIndentCount int, result []string) (end int, appendedResult []string, err error) {
 	i := start
-	dictValCommentFlagLineNum := i
-	dictValCommentLines := make([]string, 0)
-	var dictValCommentKeyLineNum int
+	commentFlagLineNum := i
+	commentLines := make([]string, 0)
+	var fieldNameLineNum int
 	for ; i < len(f.lines); i++ {
 		if !f.isCommentLine(f.lines[i]) {
 			return i - 1, result, nil
 		}
 		if f.isDictValueCommentLine(f.lines[i]) {
-			if i == dictValCommentFlagLineNum {
+			if i == commentFlagLineNum {
 				continue
 			} else {
-				dictValCommentKeyLineNum = i + 1
+				fieldNameLineNum = i + 1
 				break
 			}
 		}
@@ -512,17 +512,17 @@ func (f *LineFormatter) convDictValueCommentToSection(start int, indentCount int
 			i = f.ignoreTodoComments(i)
 			continue
 		}
-		dictValCommentLines = append(dictValCommentLines, f.indentLine(f.uncommentLine(f.lines[i]), indentCount+1))
+		commentLines = append(commentLines, f.indentLine(f.uncommentLine(f.lines[i]), yamlIndentCount+1))
 	}
 
-	dictValCommentKey, err := f.keyLineToKeyCommentLine(f.indentLine(f.uncommentLine(f.lines[dictValCommentKeyLineNum]), indentCount))
+	fieldName := f.indentLine(f.uncommentLine(f.lines[fieldNameLineNum]), yamlIndentCount)
+	fieldNameComment, err := f.keyLineToKeyCommentLine(f.indentLine(f.uncommentLine(f.lines[fieldNameLineNum]), yamlIndentCount))
 	if err != nil {
 		return 0, nil, fmt.Errorf(err.Error()+" at line: %d", i)
 	}
-	dictValCommentSection := append([]string{dictValCommentKey}, dictValCommentLines...)
-
-	result = append(result, dictValCommentSection...)
-	return f.convDictValueCommentToSection(dictValCommentKeyLineNum+1, indentCount, result)
+	commentSection := append([]string{fieldName, fieldNameComment}, commentLines...)
+	result = append(result, commentSection...)
+	return f.convDictValueCommentToSection(fieldNameLineNum+1, yamlIndentCount, result)
 }
 
 func (f *LineFormatter) ignoreTodoComments(start int) (end int) {
