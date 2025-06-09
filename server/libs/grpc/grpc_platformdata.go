@@ -399,6 +399,11 @@ func (t *PlatformInfoTable) QueryResourceInfo(orgId uint16, resourceType uint32,
 		return t.hostInfos[orgId][resourceID]
 	case trident.DeviceType_DEVICE_TYPE_VM:
 		return t.vmInfos[orgId][resourceID]
+	case trident.DeviceType_DEVICE_TYPE_PROCESS:
+		if _, podId := t.QueryGprocessInfo(orgId, resourceID); podId > 0 {
+			return t.QueryPodIdInfo(orgId, podId)
+		}
+		return nil
 	default:
 		return t.resourceInfos[orgId][uint64(resourceType)<<32|uint64(resourceID)]
 	}
