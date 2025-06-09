@@ -1085,6 +1085,7 @@ func (t *DataSet) AddProcess(item *mysqlmodel.Process) {
 	} else {
 		t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
 			ID:   item.ID,
+			GID:  item.GID,
 			Name: item.Name,
 		}
 	}
