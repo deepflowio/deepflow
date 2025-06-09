@@ -70,7 +70,7 @@ func RegisterVPCCommend() *cobra.Command {
 
 func listVPC(cmd *cobra.Command, args []string, output string) error {
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v2/epcs/", server.IP, server.Port)
+	url := fmt.Sprintf("http://%s:%d/v2/epcs", server.IP, server.Port)
 	var name string
 	if len(args) > 0 {
 		name = args[0]
