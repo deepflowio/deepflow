@@ -352,6 +352,8 @@ enum DeviceType {
     DEVICE_TYPE_POD_NODE = 14;
     DEVICE_TYPE_LOAD_BALANCE = 15;
     DEVICE_TYPE_NAT_GATEWAY = 16;
+
+    DEVICE_TYPE_PROCESS = 120;
 }
 
 enum AutoServiceType {
