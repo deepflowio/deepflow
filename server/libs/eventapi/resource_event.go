@@ -42,10 +42,10 @@ type ResourceEvent struct {
 	AttributeSubnetIDs []uint32
 	AttributeIPs       []string
 	Description        string
-	GProcessID         uint32 // if this value is set, InstanceType and InstanceID are empty
-	GProcessName       string // if this value is set, InstanceName is empty
 
 	IfNeedTagged bool // if need ingester set tag
+	GProcessID   uint32
+	GProcessName string
 	RegionID     uint32
 	AZID         uint32
 	VPCID        uint32
