@@ -152,6 +152,7 @@ type podInfo struct {
 
 type processInfo struct {
 	ID   int
+	GID  uint32
 	Name string
 }
 

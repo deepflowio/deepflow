@@ -42,10 +42,10 @@ type ResourceEvent struct {
 	AttributeSubnetIDs []uint32
 	AttributeIPs       []string
 	Description        string
-	GProcessID         uint32 // if this value is set, InstanceType and InstanceID are empty
-	GProcessName       string // if this value is set, InstanceName is empty
 
 	IfNeedTagged bool // if need ingester set tag
+	GProcessID   uint32
+	GProcessName string
 	RegionID     uint32
 	AZID         uint32
 	VPCID        uint32
@@ -213,6 +213,18 @@ func TagSubnetID(id uint32) TagFieldOption {
 func TagIP(ip string) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.IP = ip
+	}
+}
+
+func TagGProcessID(id uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.GProcessID = id
+	}
+}
+
+func TagGProcessName(name string) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.GProcessName = name
 	}
 }
 
