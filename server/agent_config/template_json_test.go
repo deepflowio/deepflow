@@ -90,6 +90,7 @@ func TestConvDictValueCommentToSection(t *testing.T) {
 				start: 4,
 			},
 			want: []string{
+				"        match_regex: ",
 				"        match_regex_comment:",
 				"          upgrade_from: static_config.os-proc-regex.match-regex",
 			},
@@ -116,8 +117,10 @@ func TestConvDictValueCommentToSection(t *testing.T) {
 				start: 4,
 			},
 			want: []string{
+				"          match_regex: ",
 				"          match_regex_comment:",
 				"            upgrade_from: static_config.os-proc-regex.match-regex",
+				"          rewrite_name: ",
 				"          rewrite_name_comment:",
 				"            type: string",
 				"            upgrade_from: static_config.os-proc-regex.rewrite-name",
@@ -134,11 +137,22 @@ func TestConvDictValueCommentToSection(t *testing.T) {
 				t.Errorf("convDictValueCommentToSection() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			for i := 0; i < len(got); i++ {
-				fmt.Printf("got[%d]: %s\n", i, got[i])
-				fmt.Printf("want[%d]: %s\n", i, tt.want[i])
-				if got[i] != tt.want[i] {
-					t.Errorf("line %d convDictValueCommentToSection() = \"%v\", want \"%v\"", i, got[i], tt.want[i])
+			var gotLines []byte
+			for _, line := range got {
+				gotLines = append(gotLines, []byte(line+"\n")...)
+			}
+			var wantLines []byte
+			for _, line := range tt.want {
+				wantLines = append(wantLines, []byte(line+"\n")...)
+			}
+			if len(gotLines) != len(wantLines) {
+				t.Errorf("convDictValueCommentToSection() = \"%v\", want \"%v\"", string(gotLines), string(wantLines))
+				os.Mkdir("test_tmp", 0755)
+				if err := os.WriteFile(fmt.Sprintf("test_tmp/dict_comments_%s_got.yaml", tt.name), gotLines, os.ModePerm); err != nil {
+					t.Fatalf("Failed to write to file: %v", err)
+				}
+				if err := os.WriteFile(fmt.Sprintf("test_tmp/dict_comments_%s_want.yaml", tt.name), wantLines, os.ModePerm); err != nil {
+					t.Fatalf("Failed to write to file: %v", err)
 				}
 			}
 		})
