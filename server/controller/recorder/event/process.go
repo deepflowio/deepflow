@@ -125,7 +125,7 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			log.Error("cannot support type: %s", t)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagGProcessID(uint32(item.ID)),
+			eventapi.TagGProcessID(item.GID),
 			eventapi.TagGProcessName(item.Name), // TODO @weiqiang why use name
 		}...)
 
@@ -135,7 +135,7 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			p.deviceType,
-			item.ID,
+			int(item.GID),
 			opts...,
 		)
 	}
@@ -144,10 +144,18 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 func (p *Process) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.Process) {
 		opts := []eventapi.TagFieldOption{
-			eventapi.TagGProcessID(uint32(item.ID)),
+			eventapi.TagGProcessID(item.GID),
 			eventapi.TagGProcessName(item.Name),
 		}
-		p.createInstanceAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID, opts...)
+		p.createInstanceAndEnqueue(
+			md,
+			item.Lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_DELETE,
+			item.Name,
+			p.deviceType,
+			int(item.GID),
+			opts...,
+		)
 	}
 }
 
