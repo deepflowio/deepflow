@@ -4800,6 +4800,26 @@ processors:
           #     设置为 false 以关闭解压，提升性能。
           #     参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
           decompress_payload: true
+        # type: section
+        # name: Grpc
+        # description:
+        grpc:
+          # type: bool
+          # name:
+          #   en: Enable Grpc stream data
+          #   ch: 开启解析 Grpc Stream 数据
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     When enabled, all grpc packets are considered to be of the `stream` type, and the `data` will be reported,
+          #     and the rrt calculation of the response will use the `grpc-status` field.
+          #   ch: |-
+          #     开启后所有 Grpc 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
+          streaming_data_enabled: false
     # type: section
     # name:
     #   en: Filters

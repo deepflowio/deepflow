@@ -1012,7 +1012,13 @@ impl HttpLog {
 
         if self.proto == L7Protocol::Grpc {
             info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
-            Self::modify_http2_and_grpc(direction, content_length, stream_id, info)
+            Self::modify_http2_and_grpc(
+                config.grpc_streaming_data_enabled,
+                direction,
+                content_length,
+                stream_id,
+                info,
+            )
         } else {
             info.version = Version::V2;
             info.stream_id = Some(stream_id);
@@ -1127,6 +1133,7 @@ impl HttpLog {
     }
 
     fn modify_http2_and_grpc(
+        grpc_streaming_data_enabled: bool,
         direction: PacketDirection,
         content_length: Option<u32>,
         stream_id: u32,
@@ -1140,12 +1147,18 @@ impl HttpLog {
         match info.proto {
             L7Protocol::Grpc => match (direction, info.method) {
                 (PacketDirection::ClientToServer, Method::_RequestData) => {
+                    if !grpc_streaming_data_enabled {
+                        return Err(Error::HttpHeaderParseFailed);
+                    }
                     info.msg_type = LogMessageType::Session;
                     if content_length.is_some() {
                         info.req_content_length = content_length;
                     }
                 }
                 (PacketDirection::ServerToClient, Method::_ResponseData) => {
+                    if !grpc_streaming_data_enabled {
+                        return Err(Error::HttpHeaderParseFailed);
+                    }
                     info.msg_type = LogMessageType::Session;
                     if content_length.is_some() {
                         info.resp_content_length = content_length;
@@ -1156,7 +1169,11 @@ impl HttpLog {
                         if info.status_code == 0 {
                             return Err(Error::HttpHeaderParseFailed);
                         }
-                        info.msg_type = LogMessageType::Session;
+                        if !grpc_streaming_data_enabled {
+                            info.msg_type = LogMessageType::Response;
+                        } else {
+                            info.msg_type = LogMessageType::Session;
+                        }
                     }
                     if content_length.is_some() {
                         info.resp_content_length = content_length;
@@ -1207,6 +1224,7 @@ impl HttpLog {
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
         );
+        let grpc_streaming_data_enabled = config.grpc_streaming_data_enabled;
         let mut content_length: Option<u32> = None;
         let mut header_frame_parsed = false;
         let mut is_httpv2 = false;
@@ -1359,6 +1377,7 @@ impl HttpLog {
                 info.msg_type = LogMessageType::from(direction);
             }
             return Self::modify_http2_and_grpc(
+                grpc_streaming_data_enabled,
                 direction,
                 content_length,
                 httpv2_header.stream_id,
@@ -1405,7 +1424,7 @@ impl HttpLog {
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
             ":path" => info.path = String::from_utf8_lossy(val).into_owned(),
-            "grpc-status" => {
+            "grpc-status" if config.grpc_streaming_data_enabled => {
                 info.msg_type = LogMessageType::Response;
                 let code = val.parse_to().unwrap_or_default();
                 info.grpc_status_code = Some(code);
@@ -1816,7 +1835,7 @@ mod tests {
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
-    fn run(name: &str) -> String {
+    fn run(name: &str, grpc_streaming_data_enabled: bool) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.collect::<Vec<_>>();
@@ -1832,6 +1851,7 @@ mod tests {
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
             ExtraLogFields::default(),
+            grpc_streaming_data_enabled,
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
@@ -1953,7 +1973,33 @@ mod tests {
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
-            let output = run(item.0);
+            let output = run(item.0, true);
+
+            if output != expected {
+                let output_path = Path::new("actual.txt");
+                fs::write(&output_path, &output).unwrap();
+                assert!(
+                    output == expected,
+                    "output different from expected {}, written to {:?}",
+                    item.1,
+                    output_path
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn check_grpc_unary() {
+        let files = vec![
+            (
+                "grpc-server-stream.pcap",
+                "grpc-server-stream-as-unary.result",
+            ),
+            ("grpc-unary.pcap", "grpc-unary.result"),
+        ];
+        for item in files.iter() {
+            let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
+            let output = run(item.0, false);
 
             if output != expected {
                 let output_path = Path::new("actual.txt");
@@ -2233,7 +2279,8 @@ mod tests {
 
         let first_dst_port = packets[0].lookup_key.dst_port;
 
-        let config = LogParserConfig::default();
+        let mut config = LogParserConfig::default();
+        config.l7_log_dynamic.grpc_streaming_data_enabled = true;
         if http.protocol() == L7Protocol::Http2 || http.protocol() == L7Protocol::Grpc {
             http.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
         }
@@ -2350,6 +2397,7 @@ mod tests {
             vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
             vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
             ExtraLogFields::default(),
+            false,
         );
 
         // check field overwritten by higher priority field but not backwards
