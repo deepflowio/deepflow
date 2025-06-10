@@ -72,6 +72,7 @@ func (c *SubscriberManager) getSubscribers(q *queue.OverwriteQueue) []Subscriber
 		NewPodGroup(c.cfg, q),
 		NewPod(q),
 		NewConfigMap(c.cfg, q),
+		NewPodGroupConfigMapConnection(q),
 		NewProcess(q),
 	}
 	return subscribers
@@ -149,6 +150,7 @@ func newCUDSubscriberComponent(
 	return s
 }
 
+// TODO remove
 func (s *CUDSubscriberComponent) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 }
 
