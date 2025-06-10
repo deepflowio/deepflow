@@ -6965,6 +6965,38 @@ Some MySQL packets have payload compressed with LZ77 algorithm. Enable this opti
 Set to false to disable decompression for better performance.
 ref: [MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
 
+##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
+
+###### Enable Grpc stream data {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        grpc:
+          streaming_data_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When enabled, all grpc packets are considered to be of the `stream` type, and the `data` will be reported,
+and the rrt calculation of the response will use the `grpc-status` field.
+
 ### Filters {#processors.request_log.filters}
 
 #### Port Number Pre-filters {#processors.request_log.filters.port_number_prefilters}

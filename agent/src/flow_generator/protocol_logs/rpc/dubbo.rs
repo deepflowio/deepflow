@@ -1213,6 +1213,7 @@ mod tests {
                         TraceType::Sw8,
                     ],
                     ExtraLogFields::default(),
+                    false,
                 ),
                 ..Default::default()
             };
@@ -1309,6 +1310,7 @@ mod tests {
                 vec![TraceType::Sw8],
                 vec![TraceType::Sw8],
                 ExtraLogFields::default(),
+                false,
             ),
             ..Default::default()
         };
@@ -1409,6 +1411,7 @@ mod tests {
                 vec![TraceType::CloudWise],
                 vec![],
                 ExtraLogFields::default(),
+                false,
             ),
             ..Default::default()
         };
@@ -1511,6 +1514,7 @@ mod tests {
                     TraceType::Sw8,
                 ],
                 ExtraLogFields::default(),
+                false,
             ),
             ..Default::default()
         };
