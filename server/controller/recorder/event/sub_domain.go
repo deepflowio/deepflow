@@ -72,10 +72,14 @@ func (r *SubDomain) ProduceFromMySQL() {
 			r.fillL3DeviceInfo(event)
 			r.convertAndEnqueue(item.ResourceLcuuid, event)
 		} else if slices.Contains([]string{
-			eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP,
-			eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP,
-			eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP}, event.Type) {
-			for _, podGroupID := range r.metadata.ToolDataSet.GetPodGroupIDsByConfigMapID(int(event.ConfigMapID)) {
+			eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP}, event.Type) {
+			podGroupIDs := r.metadata.ToolDataSet.GetPodGroupIDsByConfigMapID(int(event.ConfigMapID))
+			if len(podGroupIDs) != 0 {
+				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, md.LogPrefixes)
+			}
+			for _, podGroupID := range podGroupIDs {
 				event.PodGroupID = uint32(podGroupID)
 				r.convertAndEnqueue(item.ResourceLcuuid, event)
 			}
