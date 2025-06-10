@@ -1561,11 +1561,26 @@ impl Default for MysqlConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct GrpcConfig {
+    pub streaming_data_enabled: bool,
+}
+
+impl Default for GrpcConfig {
+    fn default() -> Self {
+        Self {
+            streaming_data_enabled: false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
     pub mysql: MysqlConfig,
+    pub grpc: GrpcConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

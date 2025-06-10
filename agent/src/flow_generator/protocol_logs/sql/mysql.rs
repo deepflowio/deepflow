@@ -1673,6 +1673,7 @@ mod tests {
             ],
             vec![TraceType::TraceParent],
             ExtraLogFields::default(),
+            false,
         );
         for (input, tid, sid) in testcases {
             info.trace_id = None;
