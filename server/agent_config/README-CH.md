@@ -6870,6 +6870,37 @@ processors:
 设置为 false 以关闭解压，提升性能。
 参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
 
+##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
+
+###### 开启解析 Grpc Stream 数据 {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        grpc:
+          streaming_data_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后所有 Grpc 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
