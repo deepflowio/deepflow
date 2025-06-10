@@ -1419,6 +1419,8 @@ pub struct L7LogDynamicConfig {
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
     pub extra_log_fields: ExtraLogFields,
+
+    pub grpc_streaming_data_enabled: bool,
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1439,6 +1441,10 @@ impl fmt::Debug for L7LogDynamicConfig {
                     .collect::<HashSet<_>>(),
             )
             .field("extra_log_fields", &self.extra_log_fields)
+            .field(
+                "grpc_streaming_data_enabled",
+                &self.grpc_streaming_data_enabled,
+            )
             .finish()
     }
 }
@@ -1450,6 +1456,7 @@ impl PartialEq for L7LogDynamicConfig {
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
             && self.extra_log_fields == other.extra_log_fields
+            && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled
     }
 }
 
@@ -1462,6 +1469,7 @@ impl L7LogDynamicConfig {
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
+        grpc_streaming_data_enabled: bool,
     ) -> Self {
         let mut expected_headers_set = get_expected_headers();
         let mut dup_checker = HashSet::new();
@@ -1517,6 +1525,7 @@ impl L7LogDynamicConfig {
             span_set,
             expected_headers_set: Arc::new(expected_headers_set),
             extra_log_fields,
+            grpc_streaming_data_enabled,
         }
     }
 
@@ -1967,6 +1976,12 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
                             .unwrap_or(vec![]),
                     },
+                    conf.processors
+                        .request_log
+                        .application_protocol_inference
+                        .protocol_special_config
+                        .grpc
+                        .streaming_data_enabled,
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
