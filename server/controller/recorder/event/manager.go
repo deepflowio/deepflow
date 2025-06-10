@@ -75,10 +75,10 @@ func (e ManagerComponent) fillEvent(
 	event.IfNeedTagged = true
 	if slices.Contains([]string{
 		eventapi.RESOURCE_EVENT_TYPE_CREATE,
-		eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
-		eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP,
-		eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP,
-		eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP,
+		eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP,
 	}, eventType) {
 		event.IfNeedTagged = false
 	}
@@ -146,7 +146,7 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 
 func (e *ManagerComponent) convertAndEnqueue(md *message.Metadata, resourceLcuuid string, ev *eventapi.ResourceEvent) {
 	event := e.convertToEventBeEnqueued(ev)
-	log.Infof("TODO: put event (lcuuid: %s): %#v into shared queue", resourceLcuuid, event, md.LogPrefixes)
+	// log.Infof("TODO: put event (lcuuid: %s): %#v into shared queue", resourceLcuuid, event, md.LogPrefixes)
 	e.enqueue(md, resourceLcuuid, event)
 }
 

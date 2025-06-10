@@ -65,14 +65,18 @@ func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 		if event.Type == eventapi.RESOURCE_EVENT_TYPE_RECREATE {
 			r.fillRecreatePodEvent(md, event)
 			r.convertAndEnqueue(md, item.ResourceLcuuid, event)
-		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ADD_IP}, event.Type) {
+		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP}, event.Type) {
 			r.fillL3DeviceInfo(md, event)
 			r.convertAndEnqueue(md, item.ResourceLcuuid, event)
 		} else if slices.Contains([]string{
-			eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP,
-			eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP,
-			eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP}, event.Type) {
-			for _, podGroupID := range md.GetToolDataSet().GetPodGroupIDsByConfigMapID(int(event.ConfigMapID)) {
+			eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
+			eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP}, event.Type) {
+			podGroupIDs := md.GetToolDataSet().GetPodGroupIDsByConfigMapID(int(event.ConfigMapID))
+			if len(podGroupIDs) != 0 {
+				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, md.LogPrefixes)
+			}
+			for _, podGroupID := range podGroupIDs {
 				event.PodGroupID = uint32(podGroupID)
 				r.convertAndEnqueue(md, item.ResourceLcuuid, event)
 			}
