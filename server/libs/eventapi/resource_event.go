@@ -24,12 +24,12 @@ const (
 	RESOURCE_EVENT_TYPE_UPDATE_STATE      = "update-state"
 	RESOURCE_EVENT_TYPE_MIGRATE           = "migrate"
 	RESOURCE_EVENT_TYPE_RECREATE          = "recreate"
-	RESOURCE_EVENT_TYPE_ADD_IP            = "attach-ip"
-	RESOURCE_EVENT_TYPE_REMOVE_IP         = "detach-ip"
-	RESOURCE_EVENT_TYPE_UPDATE_CONFIG     = "modify"
-	RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP    = "attach-config"
-	RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP = "update-config"
-	RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP = "detach-config"
+	RESOURCE_EVENT_TYPE_ATTACH_IP         = "attach-ip"
+	RESOURCE_EVENT_TYPE_DETACH_IP         = "detach-ip"
+	RESOURCE_EVENT_TYPE_MODIFY            = "modify"
+	RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP = "attach-config"
+	RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP = "modify-config"
+	RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP = "detach-config"
 )
 
 type ResourceEvent struct {
@@ -71,6 +71,7 @@ type ResourceEvent struct {
 }
 
 const (
+	AttributeNameConfigName = "config_name"
 	AttributeNameConfig     = "config"
 	AttributeNameConfigDiff = "config_diff"
 )

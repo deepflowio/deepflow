@@ -1475,13 +1475,13 @@ func (c *Cache) DeletePodGroupConfigMapConnections(lcuuids []string) {
 
 func (c *Cache) refreshPodGroupConfigMapConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN), c.metadata.LogPrefixes)
-	var podGroupConfigMapConnections []*metadbmodel.PodGroupConfigMapConnection
-	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podGroupConfigMapConnections).Error
+	var items []*metadbmodel.PodGroupConfigMapConnection
+	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&items).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
-	c.AddPodGroupConfigMapConnections(podGroupConfigMapConnections)
+	c.AddPodGroupConfigMapConnections(items)
 }
 
 func (c *Cache) AddProcesses(items []*metadbmodel.Process) {
