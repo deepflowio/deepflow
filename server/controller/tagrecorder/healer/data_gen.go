@@ -252,7 +252,6 @@ func (s *dataGeneratorComponent[GT]) getRealIDField() string {
 }
 
 func (s *dataGeneratorComponent[GT]) getIDToUpdatedAt() map[int]time.Time {
-	// log.Infof("TODO %s data: %#v", s.getResourceType(), s.idToUpdatedAt)
 	return s.idToUpdatedAt
 }
 

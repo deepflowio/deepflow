@@ -18,7 +18,6 @@ package event
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pmezard/go-difflib/difflib"
 
@@ -396,27 +395,14 @@ func CompareConfig(old, new string, context int) string {
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(old),
 		B:        difflib.SplitLines(new),
-		FromFile: "Old",
-		ToFile:   "New",
+		FromFile: "old",
+		ToFile:   "new",
 		Context:  context,
 	}
 
 	result, err := difflib.GetUnifiedDiffString(diff)
 	if err != nil {
 		log.Errorf("compare config error: %v, new: %s, old: %s", err, new, old)
-		return ""
 	}
-
-	var filtered []string
-	for _, line := range strings.Split(result, "\n") {
-		if strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
-			continue
-		}
-		if strings.HasPrefix(line, "@@ ") {
-			continue
-		}
-		filtered = append(filtered, line)
-	}
-
-	return strings.Join(filtered, "\n")
+	return result
 }
