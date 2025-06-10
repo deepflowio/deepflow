@@ -49,11 +49,13 @@ func (c *ConfigMap) OnResourceBatchAdded(md *message.Metadata, msg interface{}) 
 			eventapi.TagPodNSID(item.PodNamespaceID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagAttributes([]string{eventapi.AttributeNameConfig}, []string{item.Data}),
+			eventapi.TagAttributes(
+				[]string{eventapi.AttributeNameConfigName},
+				[]string{item.Name}),
 		}
 
 		c.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ADD_CONFIG_MAP, opts...,
+			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
 		)
 	}
 }
@@ -73,12 +75,12 @@ func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		eventapi.TagPodClusterID(item.PodClusterID),
 		eventapi.TagVPCID(item.VPCID),
 		eventapi.TagAttributes(
-			[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
-			[]string{item.Data, diff}),
+			[]string{eventapi.AttributeNameConfigName, eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
+			[]string{item.Name, item.Data, diff}),
 	}
 
 	c.enqueueIfInsertIntoMySQLFailed(
-		md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG_MAP, opts...,
+		md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP, opts...,
 	)
 }
 
@@ -89,9 +91,12 @@ func (c *ConfigMap) OnResourceBatchDeleted(md *message.Metadata, msg interface{}
 			eventapi.TagPodNSID(item.PodNamespaceID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagAttributes(
+				[]string{eventapi.AttributeNameConfigName},
+				[]string{item.Name}),
 		}
 		c.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DELETE_CONFIG_MAP, opts...,
+			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
 		)
 	}
 }

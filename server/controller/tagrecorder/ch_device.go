@@ -1315,7 +1315,6 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *mys
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChCustomServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.CustomServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
