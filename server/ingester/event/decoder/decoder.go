@@ -355,11 +355,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		s.Tagged = 0
 		s.RegionID = uint16(event.RegionID)
 		s.AZID = uint16(event.AZID)
-		if event.VPCID == 0 {
-			s.L3EpcID = -2
-		} else {
-			s.L3EpcID = int32(event.VPCID)
-		}
+		s.L3EpcID = int32(event.VPCID)
 		s.HostID = uint16(event.HostID)
 		s.PodID = event.PodID
 		s.PodNodeID = event.PodNodeID
