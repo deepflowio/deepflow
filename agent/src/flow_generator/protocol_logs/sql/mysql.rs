@@ -146,6 +146,8 @@ pub struct MysqlInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    header_offset: u32,
+
     trace_id: Option<String>,
     span_id: Option<String>,
 
@@ -188,6 +190,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     // skip parse failed response
     fn skip_send(&self) -> bool {
         self.msg_type == LogMessageType::Response && self.status == L7ResponseStatus::ParseFailed
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.header_offset
     }
 }
 
@@ -1052,16 +1058,18 @@ impl MysqlLog {
         // - the first packet in request
         // - greetings packet in response
         // - packet in response with response_code in [MYSQL_RESPONSE_CODE_OK, MYSQL_RESPONSE_CODE_ERR, MYSQL_RESPONSE_CODE_EOF]
-        let (header, payload) = if direction == PacketDirection::ClientToServer {
+        let (header, payload, offset) = if direction == PacketDirection::ClientToServer {
             match parser.try_next(decompress_buffer)? {
-                Some(frame) => frame,
+                Some((h, p)) => (h, p, 0),
                 None => return Err(Error::NoPacket),
             }
         } else {
+            let mut offset = 0;
             loop {
                 match parser.try_next(decompress_buffer)? {
                     Some((h, p)) => {
                         if h.length == 0 {
+                            offset += h.length + HEADER_LEN as u32;
                             continue;
                         }
                         trace!("mysql response frame: {h:?} payload: {p:?}");
@@ -1071,14 +1079,17 @@ impl MysqlLog {
                                 .map(|c| Self::is_interested_response(*c))
                                 .unwrap_or(false)
                         {
-                            break (h, p);
+                            break (h, p, offset);
                         }
+                        offset += h.length + HEADER_LEN as u32;
                     }
                     None => return Err(Error::Truncated(TruncationType::Packet)),
                 }
             }
         };
-
+        if self.has_compressed_header.is_none() || !self.has_compressed_header.as_ref().unwrap() {
+            info.header_offset = offset;
+        }
         let Some(mut msg_type) = Self::infer_message_type(direction, &header, payload) else {
             return Err(Error::IgnoredPacket(header));
         };
