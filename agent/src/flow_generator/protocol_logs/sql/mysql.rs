@@ -185,9 +185,9 @@ impl L7ProtocolInfoInterface for MysqlInfo {
         self.is_on_blacklist
     }
 
-    // skip parse failed response
+    // all unmerged responses are skipped because segmented responses can produce multiple OK responses
     fn skip_send(&self) -> bool {
-        self.msg_type == LogMessageType::Response && self.status == L7ResponseStatus::ParseFailed
+        self.msg_type == LogMessageType::Response
     }
 }
 
@@ -502,15 +502,21 @@ impl L7ProtocolParserInterface for MysqlLog {
                 debug!("ignored packet with header: {header:?}");
                 return Ok(L7ParseResult::None);
             }
-            Err(Error::Truncated(_) | Error::CompressedPacketNotParsed)
-                if param.direction == PacketDirection::ServerToClient =>
-            {
+            Err(Error::Truncated(_)) if param.direction == PacketDirection::ServerToClient => {
+                // We are assuming large truncated or segmented responses to be `OK`
+                // because `ERR` responses are likely to be short.
                 info.msg_type = LogMessageType::Response;
-                info.status = L7ResponseStatus::ParseFailed;
+                info.status = L7ResponseStatus::Ok;
             }
             Err(Error::Truncated(t)) => {
                 debug!("truncated: {t:?} {param:?} {payload:?}");
                 return Ok(L7ParseResult::None);
+            }
+            Err(Error::CompressedPacketNotParsed)
+                if param.direction == PacketDirection::ServerToClient =>
+            {
+                info.msg_type = LogMessageType::Response;
+                info.status = L7ResponseStatus::ParseFailed;
             }
             Err(Error::CommandNotSupported(c)) => {
                 debug!("command not supported: {c}");
