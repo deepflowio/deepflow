@@ -80,6 +80,7 @@ func (e EventManagerBase) fillEvent(
 	if slices.Contains([]string{
 		eventapi.RESOURCE_EVENT_TYPE_CREATE,
 		eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP,
+		eventapi.RESOURCE_EVENT_TYPE_MODIFY,
 		eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
 		eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
 		eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP,
