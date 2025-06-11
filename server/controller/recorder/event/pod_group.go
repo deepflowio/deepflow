@@ -53,9 +53,9 @@ func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	eventType := eventapi.RESOURCE_EVENT_TYPE_MODIFY
 	var opts []eventapi.TagFieldOption
 
-	old := fields.Metadata.GetOld() + "\n" + fields.Spec.GetOld()
-	new := fields.Metadata.GetNew() + "\n" + fields.Spec.GetNew()
-	if old == "\n" || new == "\n" {
+	old := JoinMetadataAndSpec(fields.Metadata.GetOld(), fields.Spec.GetOld())
+	new := JoinMetadataAndSpec(fields.Metadata.GetNew(), fields.Spec.GetNew())
+	if old == "" || new == "" {
 		return
 	} else {
 		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
