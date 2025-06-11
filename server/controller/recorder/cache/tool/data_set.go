@@ -112,6 +112,7 @@ type DataSet struct {
 
 	configMapLcuuidToID      map[string]int
 	configMapIDToPodGroupIDs map[int]mapset.Set[int]
+	configMapIDToName        map[int]string
 
 	connectionLcuuidToPodGroupID  map[string]int
 	connectionLcuuidToConfigMapID map[string]int
@@ -213,6 +214,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 
 		configMapLcuuidToID:      make(map[string]int),
 		configMapIDToPodGroupIDs: make(map[int]mapset.Set[int]),
+		configMapIDToName:        make(map[int]string),
 
 		connectionLcuuidToPodGroupID:  make(map[string]int),
 		connectionLcuuidToConfigMapID: make(map[string]int),
@@ -958,21 +960,29 @@ func (t *DataSet) DeletePodGroup(lcuuid string) {
 
 func (t *DataSet) AddConfigMap(item *metadbmodel.ConfigMap) {
 	t.configMapLcuuidToID[item.Lcuuid] = item.ID
+	t.configMapIDToName[item.ID] = item.Name
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 
 func (t *DataSet) DeleteConfigMap(lcuuid string) {
 	delete(t.configMapLcuuidToID, lcuuid)
+	id, exists := t.GetConfigMapIDByLcuuid(lcuuid)
+	if exists {
+		delete(t.configMapIDToName, id)
+	}
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
 func (t *DataSet) AddPodGroupConfigMapConnection(item *metadbmodel.PodGroupConfigMapConnection) {
 	t.connectionLcuuidToPodGroupID[item.Lcuuid] = item.PodGroupID
 	t.connectionLcuuidToConfigMapID[item.Lcuuid] = item.ConfigMapID
+	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
+	// log.Infof("TODO %+v", item)
 	if _, exists := t.configMapIDToPodGroupIDs[item.ConfigMapID]; !exists {
 		t.configMapIDToPodGroupIDs[item.ConfigMapID] = mapset.NewSet[int]()
 	}
 	t.configMapIDToPodGroupIDs[item.ConfigMapID].Add(item.PodGroupID)
+	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -985,6 +995,7 @@ func (t *DataSet) DeletePodGroupConfigMapConnection(lcuuid string) {
 			delete(t.configMapIDToPodGroupIDs, configMapID)
 		}
 	}
+	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
 	delete(t.connectionLcuuidToPodGroupID, lcuuid)
 	delete(t.connectionLcuuidToConfigMapID, lcuuid)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, lcuuid), t.metadata.LogPrefixes)
@@ -2617,21 +2628,44 @@ func (t *DataSet) GetConfigMapIDByLcuuid(lcuuid string) (int, bool) {
 }
 
 func (t *DataSet) GetPodGroupIDsByConfigMapID(configMapID int) []int {
+	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
 	podGroupIDs, exists := t.configMapIDToPodGroupIDs[configMapID]
 	if exists {
 		return podGroupIDs.ToSlice()
 	}
 	log.Warningf("cache %s ids (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, configMapID, t.metadata.LogPrefixes)
-	var dbItem metadbmodel.PodGroupConfigMapConnection
-	result := t.metadata.DB.Where("config_map_id = ?", configMapID).Find(&dbItem)
-	if result.RowsAffected == 1 {
-		t.AddPodGroupConfigMapConnection(&dbItem)
+	var dbItems []metadbmodel.PodGroupConfigMapConnection
+	result := t.metadata.DB.Where("config_map_id = ?", configMapID).Find(&dbItems)
+	if result.RowsAffected != 0 {
+		for _, item := range dbItems {
+			t.AddPodGroupConfigMapConnection(&item)
+		}
 		podGroupIDs, exists = t.configMapIDToPodGroupIDs[configMapID]
-		return podGroupIDs.ToSlice()
+		if exists {
+			return podGroupIDs.ToSlice()
+		}
+		return []int{}
 	} else {
 		// TODO
 		log.Warningf("db %s not found (%s id: %d)", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, configMapID, t.metadata.LogPrefixes)
 		return []int{}
+	}
+}
+
+func (t *DataSet) GetNameByConfigMapID(configMapID int) (string, bool) {
+	name, exists := t.configMapIDToName[configMapID]
+	if exists {
+		return name, true
+	}
+	log.Warningf("cache %s name (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, configMapID, t.metadata.LogPrefixes)
+	var dbItem metadbmodel.ConfigMap
+	result := t.metadata.DB.Where("id = ?", configMapID).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddConfigMap(&dbItem)
+		return dbItem.Name, true
+	} else {
+		log.Error(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, configMapID), t.metadata.LogPrefixes)
+		return "", false
 	}
 }
 

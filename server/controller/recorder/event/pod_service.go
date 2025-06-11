@@ -81,7 +81,7 @@ func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
 		return
 	}
-	eventType := eventapi.RESOURCE_EVENT_TYPE_UPDATE_CONFIG
+	eventType := eventapi.RESOURCE_EVENT_TYPE_MODIFY
 	var opts []eventapi.TagFieldOption
 
 	old := fields.Metadata.GetOld() + "\n" + fields.Spec.GetOld()
