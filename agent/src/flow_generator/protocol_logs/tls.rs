@@ -462,6 +462,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
 #[derive(Default)]
 pub struct TlsLog {
     change_cipher_spec_count: u8,
+    is_change_cipher_spec: bool,
     perf_stats: Option<L7PerfStats>,
     last_is_on_blacklist: bool,
 }
@@ -513,6 +514,11 @@ impl L7ProtocolParserInterface for TlsLog {
                     self.perf_stats.as_mut().map(|p| p.update_tls_rtt(rtt));
                 });
                 info.session_id = None;
+                // In some scenarios, the last Change cipher spec does not have a corresponding response,
+                // and this is directly set to be reported by session
+                if self.is_change_cipher_spec && info.msg_type == LogMessageType::Request {
+                    info.msg_type = LogMessageType::Session
+                }
             }
             if info.msg_type != LogMessageType::Session {
                 info.cal_rrt(param, &None).map(|(rrt, _)| {
@@ -590,10 +596,13 @@ impl TlsLog {
                     }
                     if h.is_change_cipher_spec() {
                         self.change_cipher_spec_count += 1;
+                        self.is_change_cipher_spec = true;
                         if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
                             self.change_cipher_spec_count = 0;
                             info.session_id = Some(0xff);
                         }
+                    } else {
+                        self.is_change_cipher_spec = false;
                     }
 
                     if info.handshake_protocol.is_empty() && h.handshake_headers.len() > 0 {
@@ -647,10 +656,13 @@ impl TlsLog {
 
                     if h.is_change_cipher_spec() {
                         self.change_cipher_spec_count += 1;
+                        self.is_change_cipher_spec = true;
                         if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
                             self.change_cipher_spec_count = 0;
                             info.session_id = Some(0xff);
                         }
+                    } else {
+                        self.is_change_cipher_spec = false;
                     }
 
                     if h.cipher_suite().is_some() && info.cipher_suite.is_none() {
@@ -757,6 +769,7 @@ mod tests {
             ("application.pcap", "application.result"),
             ("alert.pcap", "alert.result"),
             ("client-extension.pcap", "client-extension.result"),
+            ("tls-nocert.pcap", "tls-nocert.result"),
         ];
 
         for item in files.iter() {

@@ -930,8 +930,7 @@ impl FlowMap {
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF &&
-            count > 0 {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF && count > 0 {
             if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
                 node.residual_request += count;
             } else {
@@ -1792,7 +1791,7 @@ impl FlowMap {
                             }
                             crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
                                 count += m.len() as i32;
-                                
+
                                 let timestamp = packet.lookup_key.timestamp.as_micros();
                                 for i in m.into_iter() {
                                     self.collect_l7_stats(
