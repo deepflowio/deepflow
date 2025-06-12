@@ -523,6 +523,23 @@ global:
     #     开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
     # upgrade_from: static_config.memory-trim-disabled
     idle_memory_trimming: true
+    # type: bool
+    # name:
+    #   en: Turn off swap memory
+    #   ch: 禁用 swap 内存
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Note that disabling swap memory requires root and CAP_IPC_LOCK permissions, and disabling
+    #     swap memory may improve performance and reduce CPU usage, but memory will increase.
+    #   ch: |-
+    #     注意禁用 swap 内存需要 root 和 CAP_IPC_LOCK 权限，禁用 swap 内存后性能也许会提升并且CPU使用率会降低,
+    #     但是内存会升高。
+    swap_disabled: false
     # type: int
     # name:
     #   en: Page Cache Reclaim Percentage

@@ -2119,6 +2119,7 @@ pub struct Tunning {
     pub cpu_affinity: Vec<usize>,
     pub process_scheduling_priority: usize,
     pub idle_memory_trimming: bool,
+    pub swap_disabled: bool,
     pub page_cache_reclaim_percentage: u8,
     #[serde(with = "humantime_serde")]
     pub resource_monitoring_interval: Duration,
@@ -2130,6 +2131,7 @@ impl Default for Tunning {
             cpu_affinity: vec![],
             process_scheduling_priority: 0,
             idle_memory_trimming: true,
+            swap_disabled: false,
             page_cache_reclaim_percentage: 100,
             resource_monitoring_interval: Duration::from_secs(10),
         }
