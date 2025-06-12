@@ -32,6 +32,8 @@ use flexi_logger::{
     LoggerHandle, Naming,
 };
 use http2::get_expected_headers;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use libc::{mlockall, MCL_CURRENT, MCL_FUTURE};
 use log::{debug, error, info, warn};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::{
@@ -2332,6 +2334,19 @@ impl ConfigHandler {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    fn set_swap_disabled() {
+        unsafe {
+            if mlockall(MCL_CURRENT | MCL_FUTURE) != 0 {
+                warn!(
+                    "Failed to lock memory pages. Need CAP_IPC_LOCK capability or root privileges."
+                );
+            } else {
+                info!("All memory pages are now locked and won't be swapped out.");
+            }
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn set_cpu_affinity(cpu_affinity: &Vec<usize>, cpu_set: &mut CpuSet) {
         let mut invalid_config = false;
         let system =
@@ -4119,6 +4134,19 @@ impl ConfigHandler {
             );
             tunning.idle_memory_trimming = new_tunning.idle_memory_trimming;
             restart_agent = !first_run;
+        }
+        if tunning.swap_disabled != new_tunning.swap_disabled {
+            info!(
+                "Update global.tunning.swap_disabled from {:?} to {:?}.",
+                tunning.swap_disabled, new_tunning.swap_disabled
+            );
+            tunning.swap_disabled = new_tunning.swap_disabled;
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            if tunning.swap_disabled {
+                Self::set_swap_disabled();
+            } else {
+                restart_agent = !first_run;
+            }
         }
         if tunning.cpu_affinity != new_tunning.cpu_affinity {
             info!(
