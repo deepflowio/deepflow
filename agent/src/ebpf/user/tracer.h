@@ -540,6 +540,13 @@ struct reader_forward_info {
 	struct bpf_tracer *tracer;
 };
 
+// Structure to store kick CPU thread info
+typedef struct {
+	pid_t tid;     // Linux thread ID (TID) of the kernel thread
+	int cpu_id;    // CPU core number the thread is bound to
+	bool can_bind_cpu;
+} kick_thread_info_t;
+
 extern volatile uint32_t *tracers_lock;
 
 /*
