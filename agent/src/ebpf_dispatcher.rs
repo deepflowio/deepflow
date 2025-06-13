@@ -66,7 +66,6 @@ use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf;
-use crate::exception::ExceptionHandler;
 use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::platform::ProcessData;
@@ -80,6 +79,7 @@ use public::{
     buffer::BatchedBox,
     counter::{Countable, Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
+    exception::ExceptionHandler,
     l7_protocol::{L7Protocol, L7ProtocolChecker},
     leaky_bucket::LeakyBucket,
     packet,

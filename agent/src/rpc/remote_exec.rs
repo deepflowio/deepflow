@@ -52,9 +52,10 @@ use tokio::{
 };
 
 use super::{Session, RPC_RETRY_INTERVAL};
-use crate::{exception::ExceptionHandler, trident::AgentId};
+use crate::trident::AgentId;
 
 use public::{
+    exception::ExceptionHandler,
     netns::{reset_netns, set_netns},
     proto::agent as pb,
 };

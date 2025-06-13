@@ -25,10 +25,9 @@ use winapi::{
 
 use crate::{
     error::{Error, Result},
-    exception::ExceptionHandler,
     utils::process::get_memory_rss,
 };
-use public::proto::agent::Exception;
+use public::{exception::ExceptionHandler, proto::agent::Exception};
 
 pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) -> Result<()> {
     get_memory_rss()
