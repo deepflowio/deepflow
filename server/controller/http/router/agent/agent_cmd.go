@@ -173,7 +173,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		}
 
 		reverseProxy := fmt.Sprintf("http://%s:%d", newHost, common.GConfig.HTTPNodePort)
-		log.Infof("agnet(key: %s), node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
+		log.Infof("agent(key: %s), node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
 			key, common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP, db.LogPrefixORGID)
 
 		proxyURL, err := url.Parse(reverseProxy)
