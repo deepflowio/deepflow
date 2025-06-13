@@ -21,20 +21,25 @@ import (
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/event"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodGroupConfigMapConnection struct {
-	cache *cache.Cache
+	cache         *cache.Cache
+	eventProducer *event.PodGroupConfigMapConnection
 }
 
-func NewPodGroupConfigMapConnection(c *cache.Cache) *PodGroupConfigMapConnection {
+func NewPodGroupConfigMapConnection(c *cache.Cache, eq *queue.OverwriteQueue) *PodGroupConfigMapConnection {
 	listener := &PodGroupConfigMapConnection{
-		cache: c,
+		cache:         c,
+		eventProducer: event.NewPodGroupConfigMapConnection(c.ToolDataSet, eq),
 	}
 	return listener
 }
 
 func (h *PodGroupConfigMapConnection) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroupConfigMapConnection) {
+	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddPodGroupConfigMapConnections(addedDBItems)
 }
 

@@ -75,9 +75,9 @@ func (r *SubDomain) ProduceFromMySQL() {
 			eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
 			eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
 			eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP}, event.Type) {
-			podGroupIDs := r.metadata.ToolDataSet.GetPodGroupIDsByConfigMapID(int(event.ConfigMapID))
+			podGroupIDs := r.ToolDataSet.GetPodGroupIDsByConfigMapID(int(event.ConfigMapID))
 			if len(podGroupIDs) != 0 {
-				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, md.LogPrefixes)
+				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, r.metadata.LogPrefixes)
 			}
 			for _, podGroupID := range podGroupIDs {
 				event.PodGroupID = uint32(podGroupID)

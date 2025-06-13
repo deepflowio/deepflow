@@ -54,6 +54,8 @@ type EventDataSet struct {
 	vmPodNodeConnectionLcuuidToPodNodeID map[string]int
 	podNodeIDToVMID                      map[int]int
 
+	configMapLcuuidToInfo map[string]*configMapInfo
+
 	processLcuuidToInfo map[string]*processInfo
 }
 
@@ -149,6 +151,10 @@ type podInfo struct {
 	PodGroupID     int
 	PodNodeID      int
 }
+type configMapInfo struct {
+	ID           int
+	DomainLcuuid string
+}
 
 type processInfo struct {
 	ID   int
@@ -192,6 +198,8 @@ func NewEventDataSet() EventDataSet {
 
 		vmPodNodeConnectionLcuuidToPodNodeID: make(map[string]int),
 		podNodeIDToVMID:                      make(map[int]int),
+
+		configMapLcuuidToInfo: make(map[string]*configMapInfo),
 
 		processLcuuidToInfo: make(map[string]*processInfo),
 	}

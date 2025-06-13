@@ -45,7 +45,7 @@ func (ps *PodService) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodService) {
 
 func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
 	ps.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	diffBase.Update(cloudItem)
+	diffBase.Update(cloudItem, ps.cache.ToolDataSet)
 	ps.cache.UpdatePodService(cloudItem)
 }
 

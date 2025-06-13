@@ -21,27 +21,34 @@ import (
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/event"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type ConfigMap struct {
-	cache *cache.Cache
+	cache         *cache.Cache
+	eventProducer *event.ConfigMap
 }
 
-func NewConfigMap(c *cache.Cache) *ConfigMap {
+func NewConfigMap(c *cache.Cache, eq *queue.OverwriteQueue) *ConfigMap {
 	listener := &ConfigMap{
-		cache: c,
+		cache:         c,
+		eventProducer: event.NewConfigMap(c.ToolDataSet, eq),
 	}
 	return listener
 }
 
 func (h *ConfigMap) OnUpdaterAdded(addedDBItems []*mysqlmodel.ConfigMap) {
+	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddConfigMaps(addedDBItems)
 }
 
 func (h *ConfigMap) OnUpdaterUpdated(cloudItem *cloudmodel.ConfigMap, diffBase *diffbase.ConfigMap) {
+	h.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem, h.cache.ToolDataSet)
 }
 
 func (h *ConfigMap) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.ConfigMap) {
+	h.eventProducer.ProduceByDelete(deletedDBItems)
 	h.cache.DeleteConfigMaps(lcuuids)
 }
