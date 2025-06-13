@@ -215,6 +215,9 @@ pub struct EnvironmentConfig {
     pub system_load_circuit_breaker_recover: f32,
     pub system_load_circuit_breaker_metric: agent::SystemLoadMetric,
     pub page_cache_reclaim_percentage: u8,
+    pub free_disk_circuit_breaker_percentage_threshold: u8,
+    pub free_disk_circuit_breaker_absolute_threshold: u64,
+    pub free_disk_circuit_breaker_directories: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1668,6 +1671,22 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .relative_sys_load
                     .metric,
                 page_cache_reclaim_percentage: conf.global.tunning.page_cache_reclaim_percentage,
+                free_disk_circuit_breaker_percentage_threshold: conf
+                    .global
+                    .circuit_breakers
+                    .free_disk
+                    .percentage_trigger_threshold,
+                free_disk_circuit_breaker_absolute_threshold: conf
+                    .global
+                    .circuit_breakers
+                    .free_disk
+                    .absolute_trigger_threshold,
+                free_disk_circuit_breaker_directories: {
+                    let mut v = conf.global.circuit_breakers.free_disk.directories.clone();
+                    v.sort();
+                    v.dedup();
+                    v
+                },
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: conf.global.communication.proactive_request_interval,
@@ -4020,6 +4039,34 @@ impl ConfigHandler {
                 limits.max_sockets_tolerate_interval, new_limits.max_sockets_tolerate_interval
             );
             limits.max_sockets_tolerate_interval = new_limits.max_sockets_tolerate_interval;
+        }
+
+        let free_disk = &mut config.global.circuit_breakers.free_disk;
+        let new_free_disk = &mut new_config.user_config.global.circuit_breakers.free_disk;
+        if free_disk.percentage_trigger_threshold != new_free_disk.percentage_trigger_threshold {
+            info!(
+                "Update global.circuit_breakers.free_disk.percentage_trigger_threshold from {:?} to {:?}.",
+                free_disk.percentage_trigger_threshold, new_free_disk.percentage_trigger_threshold
+            );
+            free_disk.percentage_trigger_threshold = new_free_disk.percentage_trigger_threshold;
+        }
+
+        if free_disk.absolute_trigger_threshold != new_free_disk.absolute_trigger_threshold {
+            info!(
+                "Update global.circuit_breakers.free_disk.absolute_trigger_threshold from {:?} to {:?}.",
+                free_disk.absolute_trigger_threshold, new_free_disk.absolute_trigger_threshold
+            );
+            free_disk.absolute_trigger_threshold = new_free_disk.absolute_trigger_threshold;
+        }
+
+        new_free_disk.directories.sort();
+        new_free_disk.directories.dedup();
+        if free_disk.directories != new_free_disk.directories {
+            info!(
+                "Update global.circuit_breakers.free_disk.directories from {:?} to {:?}.",
+                free_disk.directories, new_free_disk.directories
+            );
+            free_disk.directories = new_free_disk.directories.clone();
         }
 
         let ntp = &mut config.global.ntp;
