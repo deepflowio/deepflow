@@ -22,6 +22,7 @@
 #include <sys/prctl.h>
 #include <linux/version.h>
 #include <sys/epoll.h>
+#include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
@@ -45,11 +46,23 @@
 #include "extended/extended.h"
 #include "profile/perf_profiler.h"
 
+/*
+ * Sleep duration (in seconds) before retrying CPU binding if it fails.
+ * This is used when binding fails and no event-based wakeup is implemented.
+ */
+#define KICK_BIND_RETRY_WAIT_SECS 1
+
 uint32_t k_version;
 // Linux kernel major version, minor version, revision version, and revision number.
 int major, minor, revision, rev_num;
 char linux_release[128];	// Record the contents of 'uname -r'
 
+/*
+ * Array storing kick thread information for each CPU.
+ * Each entry holds the Linux thread ID (TID) and the CPU core it is associated with.
+ * Used to manage or inspect per-CPU kick threads.
+ */
+kick_thread_info_t kick_threads[MAX_CPU_NR];
 volatile uint32_t *tracers_lock;
 extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
 volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
@@ -1601,21 +1614,26 @@ static void *kick_kern_push_data(void *arg)
 	char thread_name[NAME_LEN];
 
 	// Set a descriptive thread name
-	snprintf(thread_name, sizeof(thread_name), "kick-kern-%d", cpu_id);
+	snprintf(thread_name, sizeof(thread_name), "kick-kern.%d", cpu_id);
 	prctl(PR_SET_NAME, thread_name);
-
+	pid_t tid = syscall(SYS_gettid);
+	kick_threads[cpu_id].tid = tid;
+	kick_threads[cpu_id].cpu_id = cpu_id;
 	int tfd = -1, epfd = -1;
-	// Set CPU affinity for the thread
 	cpu_set_t cpuset;
+
+retry_bind:
+	// Set CPU affinity for the thread
 	CPU_ZERO(&cpuset);
 	CPU_SET(cpu_id, &cpuset);
-
 	if (pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset) !=
 	    0) {
-		ebpf_warning("pthread_setaffinity_np() failed: %s(%d)\n",
-			     strerror(errno), errno);
+		ebpf_warning("Kick thread %d failed to bind to CPU %d.\n", tid, cpu_id);
 		goto error;
 	}
+
+	ebpf_info("Kick thread %d successfully bound to CPU %d.\n", tid, cpu_id);
+	AO_SET(&kick_threads[cpu_id].can_bind_cpu, true);
 	// Create a timerfd for periodic notifications
 	tfd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if (tfd == -1) {
@@ -1688,10 +1706,18 @@ static void *kick_kern_push_data(void *arg)
 	}
 
 error:
+	AO_SET(&kick_threads[cpu_id].can_bind_cpu, false);
 	if (tfd > 0)
 		close(tfd);
 	if (epfd > 0)
 		close(epfd);
+
+	for(;;) {
+		sleep(KICK_BIND_RETRY_WAIT_SECS);
+		if (AO_GET(&kick_threads[cpu_id].can_bind_cpu))
+			goto retry_bind;
+	}
+
 	pthread_exit(NULL);
 }
 
