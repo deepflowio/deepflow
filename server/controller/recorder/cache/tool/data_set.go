@@ -961,6 +961,10 @@ func (t *DataSet) DeletePodGroup(lcuuid string) {
 func (t *DataSet) AddConfigMap(item *mysqlmodel.ConfigMap) {
 	t.configMapLcuuidToID[item.Lcuuid] = item.ID
 	t.configMapIDToName[item.ID] = item.Name
+	t.configMapLcuuidToInfo[item.Lcuuid] = &configMapInfo{
+		ID:           item.ID,
+		DomainLcuuid: item.Domain,
+	}
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -970,6 +974,7 @@ func (t *DataSet) DeleteConfigMap(lcuuid string) {
 	if exists {
 		delete(t.configMapIDToName, id)
 	}
+	delete(t.configMapLcuuidToInfo, lcuuid)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
@@ -2584,6 +2589,23 @@ func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
 		return t.processLcuuidToInfo[lcuuid], true
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, lcuuid), t.metadata.LogPrefixes)
+		return nil, false
+	}
+}
+
+func (t *DataSet) GetConfigMapInfoByLcuuid(lcuuid string) (*configMapInfo, bool) {
+	configMapInfo, exists := t.configMapLcuuidToInfo[lcuuid]
+	if exists {
+		return configMapInfo, true
+	}
+	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, lcuuid), t.metadata.LogPrefixes)
+	var configMap *mysqlmodel.ConfigMap
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&configMap)
+	if result.RowsAffected == 1 {
+		t.AddConfigMap(configMap)
+		return t.configMapLcuuidToInfo[lcuuid], true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, lcuuid), t.metadata.LogPrefixes)
 		return nil, false
 	}
 }

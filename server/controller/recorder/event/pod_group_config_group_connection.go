@@ -17,32 +17,35 @@
 package event
 
 import (
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodGroupConfigMapConnection struct {
-	ManagerComponent
-	CUDSubscriberComponent
+	EventManagerBase
 }
 
-func NewPodGroupConfigMapConnection(q *queue.OverwriteQueue) *PodGroupConfigMapConnection {
+func NewPodGroupConfigMapConnection(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodGroupConfigMapConnection {
 	mng := &PodGroupConfigMapConnection{
-		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN),
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
+			toolDS,
+			eq,
+		),
 	}
-	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *PodGroupConfigMapConnection) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*mysqlModel.PodGroupConfigMapConnection) {
-		configMapName, ok := md.GetToolDataSet().GetNameByConfigMapID(item.ConfigMapID)
+func (p *PodGroupConfigMapConnection) ProduceByAdd(items []*mysqlmodel.PodGroupConfigMapConnection) {
+	for _, item := range items {
+		configMapName, ok := p.ToolDataSet.GetNameByConfigMapID(item.ConfigMapID)
 		if !ok {
-			log.Errorf("config map name %d not found", item.ConfigMapID, md.LogPrefixes)
+			log.Errorf("config map name %d not found", item.ConfigMapID, p.metadata.LogPrefixes)
 		}
 
 		opts := []eventapi.TagFieldOption{
@@ -54,16 +57,19 @@ func (p *PodGroupConfigMapConnection) OnResourceBatchAdded(md *message.Metadata,
 		}
 
 		p.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
+			item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
 		)
 	}
 }
 
-func (p *PodGroupConfigMapConnection) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*mysqlModel.PodGroupConfigMapConnection) {
-		configMapName, ok := md.GetToolDataSet().GetNameByConfigMapID(item.ConfigMapID)
+func (p *PodGroupConfigMapConnection) ProduceByUpdate(cloudItem *cloudmodel.PodGroupConfigMapConnection, diffBase *diffbase.PodGroupConfigMapConnection) {
+}
+
+func (p *PodGroupConfigMapConnection) ProduceByDelete(items []*mysqlmodel.PodGroupConfigMapConnection) {
+	for _, item := range items {
+		configMapName, ok := p.ToolDataSet.GetNameByConfigMapID(item.ConfigMapID)
 		if !ok {
-			log.Errorf("config map name %d not found", item.ConfigMapID, md.LogPrefixes)
+			log.Errorf("config map name %d not found", item.ConfigMapID, p.metadata.LogPrefixes)
 		}
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(item.PodGroupID),
@@ -74,7 +80,7 @@ func (p *PodGroupConfigMapConnection) OnResourceBatchDeleted(md *message.Metadat
 		}
 
 		p.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
+			item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
 		)
 	}
 }

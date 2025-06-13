@@ -17,59 +17,74 @@
 package event
 
 import (
+	"sigs.k8s.io/yaml"
+
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event/config"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodGroup struct {
-	ManagerComponent
-	CUDSubscriberComponent
-	cfg config.Config
+	EventManagerBase
 }
 
-func NewPodGroup(cfg config.Config, q *queue.OverwriteQueue) *PodGroup {
+func NewPodGroup(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodGroup {
 	mng := &PodGroup{
-		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
-		cfg,
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
+			toolDS,
+			eq,
+		),
 	}
-	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *PodGroup) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
-	// TODO remove
+func (p *PodGroup) ProduceByAdd(items []*mysqlmodel.PodGroup) {
 }
 
-func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.PodGroupFieldsUpdate)
-	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
+func (p *PodGroup) ProduceByUpdate(cloudItem *cloudmodel.PodGroup, diffBase *diffbase.PodGroup) {
+	if cloudItem.MetadataHash == diffBase.MetadataHash && cloudItem.SpecHash == diffBase.SpecHash {
+		// no changes
 		return
 	}
-	eventType := eventapi.RESOURCE_EVENT_TYPE_MODIFY
-	var opts []eventapi.TagFieldOption
 
-	old := JoinMetadataAndSpec(fields.Metadata.GetOld(), fields.Spec.GetOld())
-	new := JoinMetadataAndSpec(fields.Metadata.GetNew(), fields.Spec.GetNew())
+	newMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+	if err != nil {
+		log.Errorf("failed to convert JSON metadata: %v to YAML: %s", cloudItem.Metadata, p.metadata.LogPrefixes)
+		return
+	}
+	newSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+	if err != nil {
+		log.Errorf("failed to convert JSON spec: %v to YAML: %s", cloudItem.Spec, p.metadata.LogPrefixes)
+		return
+	}
+
+	var opts []eventapi.TagFieldOption
+	old := JoinMetadataAndSpec(diffBase.Metadata, diffBase.Spec)
+	new := JoinMetadataAndSpec(string(newMetadata), string(newSpec))
 	if old == "" || new == "" {
 		return
 	} else {
-		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
+		diff := CompareConfig(old, new, int(p.metadata.Config.EventCfg.ConfigDiffContext))
 
+		id, ok := p.ToolDataSet.GetPodGroupIDByLcuuid(diffBase.Lcuuid)
+		if !ok {
+			log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
+			return
+		}
 		opts = []eventapi.TagFieldOption{
-			eventapi.TagPodGroupID(fields.GetID()),
+			eventapi.TagPodGroupID(id),
 			eventapi.TagAttributes(
 				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
 				[]string{new, diff}),
 		}
 	}
-	c.createAndEnqueue(fields.GetLcuuid(), eventType, opts...)
+	p.createAndEnqueue(diffBase.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_MODIFY, opts...)
 }
 
-func (p *PodGroup) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
-	// TODO remove
+func (p *PodGroup) ProduceByDelete(lcuuids []string) {
 }

@@ -17,33 +17,34 @@
 package event
 
 import (
-	ctrlCommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event/config"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"sigs.k8s.io/yaml"
+
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type ConfigMap struct {
-	ManagerComponent
-	CUDSubscriberComponent
-	cfg config.Config
+	EventManagerBase
 }
 
-func NewConfigMap(cfg config.Config, q *queue.OverwriteQueue) *ConfigMap {
+func NewConfigMap(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *ConfigMap {
 	mng := &ConfigMap{
-		newManagerComponent(ctrlCommon.RESOURCE_TYPE_CONFIG_MAP_EN, q),
-		newCUDSubscriberComponent(ctrlCommon.RESOURCE_TYPE_CONFIG_MAP_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
-		cfg,
+		newEventManagerBase(
+			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
+			toolDS,
+			eq,
+		),
 	}
-	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (c *ConfigMap) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*mysqlModel.ConfigMap) {
+func (p *ConfigMap) ProduceByAdd(items []*mysqlmodel.ConfigMap) {
+	for _, item := range items {
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagConfigMapID(uint32(item.ID)),
 			eventapi.TagPodNSID(item.PodNamespaceID),
@@ -54,38 +55,46 @@ func (c *ConfigMap) OnResourceBatchAdded(md *message.Metadata, msg interface{}) 
 				[]string{item.Name}),
 		}
 
-		c.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
+		p.enqueueIfInsertIntoMySQLFailed(
+			item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
 		)
 	}
 }
 
-func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.ConfigMapUpdate).GetFields().(*message.ConfigMapFieldsUpdate)
-	if !fields.Data.IsDifferent() {
+func (p *ConfigMap) ProduceByUpdate(cloudItem *cloudmodel.ConfigMap, diffBase *diffbase.ConfigMap) {
+	if cloudItem.DataHash == diffBase.DataHash {
 		return
 	}
-	item := msg.(*message.ConfigMapUpdate).GetNewMySQLItem().(*mysqlModel.ConfigMap)
 
-	diff := CompareConfig(fields.Data.GetOld(), fields.Data.GetNew(), int(c.cfg.ConfigDiffContext))
+	newData, err := yaml.JSONToYAML([]byte(cloudItem.Data))
+	if err != nil {
+		log.Errorf("failed to convert JSON data: %v to YAML: %s", cloudItem.Data, p.metadata.LogPrefixes)
+		return
+	}
+	diff := CompareConfig(
+		diffBase.Data, string(newData), int(p.metadata.Config.EventCfg.ConfigDiffContext),
+	)
 
-	opts := []eventapi.TagFieldOption{
-		eventapi.TagConfigMapID(uint32(item.ID)),
-		eventapi.TagPodNSID(item.PodNamespaceID),
-		eventapi.TagPodClusterID(item.PodClusterID),
-		eventapi.TagVPCID(item.VPCID),
-		eventapi.TagAttributes(
-			[]string{eventapi.AttributeNameConfigName, eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
-			[]string{item.Name, item.Data, diff}),
+	configMapInfo, ok := p.ToolDataSet.GetConfigMapInfoByLcuuid(cloudItem.Lcuuid)
+	if !ok {
+		log.Errorf("config map info not found for lcuuid: %s", cloudItem.Lcuuid, p.metadata.LogPrefixes)
+		return
 	}
 
-	c.enqueueIfInsertIntoMySQLFailed(
-		md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP, opts...,
+	opts := []eventapi.TagFieldOption{
+		eventapi.TagConfigMapID(uint32(configMapInfo.ID)),
+		eventapi.TagAttributes(
+			[]string{eventapi.AttributeNameConfigName, eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
+			[]string{diffBase.Name, diffBase.Data, diff}),
+	}
+
+	p.enqueueIfInsertIntoMySQLFailed(
+		diffBase.Lcuuid, configMapInfo.DomainLcuuid, eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP, opts...,
 	)
 }
 
-func (c *ConfigMap) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
-	for _, item := range msg.([]*mysqlModel.ConfigMap) {
+func (p *ConfigMap) ProduceByDelete(dbItems []*mysqlmodel.ConfigMap) {
+	for _, item := range dbItems {
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagConfigMapID(uint32(item.ID)),
 			eventapi.TagPodNSID(item.PodNamespaceID),
@@ -95,8 +104,9 @@ func (c *ConfigMap) OnResourceBatchDeleted(md *message.Metadata, msg interface{}
 				[]string{eventapi.AttributeNameConfigName},
 				[]string{item.Name}),
 		}
-		c.enqueueIfInsertIntoMySQLFailed(
-			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
+
+		p.enqueueIfInsertIntoMySQLFailed(
+			item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
 		)
 	}
 }
