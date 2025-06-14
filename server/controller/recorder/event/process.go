@@ -125,13 +125,17 @@ func (p *Process) ProduceByAdd(items []*mysqlmodel.Process) {
 		default:
 			log.Error("cannot support type: %s", t)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagGProcessID(item.GID),
+			eventapi.TagGProcessName(item.Name), // TODO @weiqiang why use name
+		}...)
 
-		p.createProcessAndEnqueue(
+		p.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			p.deviceType,
-			item.ID,
+			int(item.GID),
 			opts...,
 		)
 	}
@@ -142,22 +146,27 @@ func (p *Process) ProduceByUpdate(cloudItem *cloudmodel.Process, diffBase *diffb
 
 func (p *Process) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var id int
+		var gid uint32
 		var name string
 		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
 		if !exists {
 			log.Errorf("process info not fount, lcuuid: %s", lcuuid, p.metadata.LogPrefixes)
 		} else {
-			id = processInfo.ID
+			gid = processInfo.GID
 			name = processInfo.Name
 		}
 
-		p.createProcessAndEnqueue(
+		opts := []eventapi.TagFieldOption{
+			eventapi.TagGProcessID(gid),
+			eventapi.TagGProcessName(name),
+		}
+		p.createInstanceAndEnqueue(
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_DELETE,
 			name,
 			p.deviceType,
-			id,
+			int(gid),
+			opts...,
 		)
 	}
 }

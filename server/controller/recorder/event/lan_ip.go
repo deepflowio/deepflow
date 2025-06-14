@@ -111,7 +111,7 @@ func (i *LANIP) ProduceByAdd(items []*mysqlmodel.LANIP) {
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
 						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
@@ -132,7 +132,7 @@ func (i *LANIP) ProduceByAdd(items []*mysqlmodel.LANIP) {
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
 						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
@@ -146,7 +146,7 @@ func (i *LANIP) ProduceByAdd(items []*mysqlmodel.LANIP) {
 			}
 		}
 
-		i.createAndEnqueue(
+		i.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
@@ -212,7 +212,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%s (lcuuid: %s) ip not found", ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid, i.metadata.LogPrefixes)
 		}
 
-		i.createAndEnqueue(
+		i.createInstanceAndEnqueue(
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,

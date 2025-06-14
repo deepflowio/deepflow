@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	tagrecorderHealer "github.com/deepflowio/deepflow/server/controller/tagrecorder/healer"
 )
 
 // 为支持domain及其sub_domain的独立刷新，将缓存拆分成对应的独立Cache
@@ -87,6 +88,8 @@ type Cache struct {
 
 	DiffBaseDataSet *diffbase.DataSet
 	ToolDataSet     *tool.DataSet
+
+	tagrecorderHealers *tagrecorderHealer.Healers // tagrecorder 的 healer，用于处理 tag 相关的资源
 }
 
 func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.Duration) *Cache {
@@ -101,6 +104,7 @@ func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.D
 		ToolDataSet:      tool.NewDataSet(md),     // 各类资源的映射关系，用于按需进行数据转换
 	}
 	c.StartSelfHealing()
+	c.tagrecorderHealers = tagrecorderHealer.NewHealers(&md.MetadataBase)
 	return c
 }
 
@@ -199,9 +203,15 @@ func (c *Cache) TryRefresh() bool {
 
 }
 
+func (c *Cache) triggerTagrecorderHealers() {
+	c.tagrecorderHealers.Run()
+}
+
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
+
+	c.triggerTagrecorderHealers()
 
 	c.DiffBaseDataSet = diffbase.NewDataSet(c.metadata)
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
@@ -250,6 +260,8 @@ func (c *Cache) Refresh() {
 	c.refreshPodGroupPorts(podServiceIDs)
 	c.refreshPodReplicaSets()
 	c.refreshPods()
+	c.refreshConfigMaps()
+	c.refreshPodGroupConfigMapConnections()
 	networkIDs := c.refreshNetworks()
 	c.refreshSubnets(networkIDs)
 	c.refreshVInterfaces()
@@ -1421,6 +1433,55 @@ func (c *Cache) refreshPods() {
 	}
 
 	c.AddPods(pods)
+}
+
+func (c *Cache) AddConfigMaps(items []*mysqlmodel.ConfigMap) {
+	for _, item := range items {
+		c.DiffBaseDataSet.AddConfigMap(item, c.Sequence)
+		c.ToolDataSet.AddConfigMap(item)
+	}
+}
+
+func (c *Cache) DeleteConfigMaps(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.DeleteConfigMap(lcuuid)
+		c.ToolDataSet.DeleteConfigMap(lcuuid)
+	}
+}
+
+func (c *Cache) refreshConfigMaps() {
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN), c.metadata.LogPrefixes)
+	configMaps, err := rcommon.PageWhereFind[mysqlmodel.ConfigMap](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid)
+	if err != nil {
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, err), c.metadata.LogPrefixes)
+		return
+	}
+	c.AddConfigMaps(configMaps)
+}
+
+func (c *Cache) AddPodGroupConfigMapConnections(items []*mysqlmodel.PodGroupConfigMapConnection) {
+	for _, item := range items {
+		c.DiffBaseDataSet.AddPodGroupConfigMapConnection(item, c.Sequence)
+		c.ToolDataSet.AddPodGroupConfigMapConnection(item)
+	}
+}
+
+func (c *Cache) DeletePodGroupConfigMapConnections(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.DeletePodGroupConfigMapConnection(lcuuid)
+		c.ToolDataSet.DeletePodGroupConfigMapConnection(lcuuid)
+	}
+}
+
+func (c *Cache) refreshPodGroupConfigMapConnections() {
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN), c.metadata.LogPrefixes)
+	var items []*mysqlmodel.PodGroupConfigMapConnection
+	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&items).Error
+	if err != nil {
+		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, err), c.metadata.LogPrefixes)
+		return
+	}
+	c.AddPodGroupConfigMapConnections(items)
 }
 
 func (c *Cache) AddProcesses(items []*mysqlmodel.Process) {

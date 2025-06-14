@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	eventConfig "github.com/deepflowio/deepflow/server/controller/recorder/event/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
@@ -49,6 +50,7 @@ type domain struct {
 	statsd   *statsd.DomainStatsd
 
 	eventQueue *queue.OverwriteQueue
+	eventCfg   *eventConfig.Config
 	cache      *cache.Cache
 	subDomains *subDomains
 }
@@ -187,13 +189,17 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 		updater.NewPodServicePort(d.cache, cloudData.PodServicePorts).RegisterListener(
 			listener.NewPodServicePort(d.cache)),
 		updater.NewPodGroup(d.cache, cloudData.PodGroups).RegisterListener(
-			listener.NewPodGroup(d.cache)),
+			listener.NewPodGroup(d.cache, d.eventQueue)),
 		updater.NewPodGroupPort(d.cache, cloudData.PodGroupPorts).RegisterListener(
 			listener.NewPodGroupPort(d.cache)),
 		updater.NewPodReplicaSet(d.cache, cloudData.PodReplicaSets).RegisterListener(
 			listener.NewPodReplicaSet(d.cache)),
 		updater.NewPod(d.cache, cloudData.Pods).RegisterListener(
 			listener.NewPod(d.cache, d.eventQueue)).BuildStatsd(d.statsd),
+		updater.NewConfigMap(d.cache, cloudData.ConfigMaps).RegisterListener(
+			listener.NewConfigMap(d.cache, d.eventQueue)),
+		updater.NewPodGroupConfigMapConnection(d.cache, cloudData.PodGroupConfigMapConnections).RegisterListener(
+			listener.NewPodGroupConfigMapConnection(d.cache, d.eventQueue)),
 		updater.NewNetwork(d.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(d.cache)),
 		updater.NewSubnet(d.cache, cloudData.Subnets).RegisterListener(

@@ -23,6 +23,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
+const (
+	syncTriggerKeyPID = "pid"
+)
+
 type ChOSAppTag struct {
 	SubscriberComponent[
 		*message.ProcessAdd,
@@ -63,9 +67,6 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 	targetsToAdd := make([]mysqlmodel.ChOSAppTag, 0)
 	keysToDelete := make([]OSAPPTagKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChOSAppTag, 0)
-	var chItem mysqlmodel.ChOSAppTag
-	var updateKey OSAPPTagKey
-	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.OSAPPTags.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetNew())
@@ -73,34 +74,36 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 
 		for k, v := range new {
 			oldV, ok := old[k]
+			targetKey := c.newTargetKey(sourceID, k)
 			if !ok {
-				keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
+				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
 					PID:   sourceID,
 					Key:   k,
 					Value: v,
 				})
-			} else {
-				if oldV != v {
-					updateKey = OSAPPTagKey{PID: sourceID, Key: k}
-					updateInfo["value"] = v
-					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
-					if chItem.PID == 0 {
-						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
-							PID:   sourceID,
-							Key:   k,
-							Value: v,
-						})
-					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
-					}
-				}
+				continue
 			}
+			updateInfo := make(map[string]interface{})
+			if oldV != v {
+				var chItem mysqlmodel.ChOSAppTag
+				db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+				if chItem.PID == 0 {
+					keysToAdd = append(keysToAdd, targetKey)
+					targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
+						PID:   sourceID,
+						Key:   k,
+						Value: v,
+					})
+					continue
+				}
+				updateInfo["value"] = v
+			}
+			c.updateOrSync(db, targetKey, updateInfo)
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, OSAPPTagKey{PID: sourceID, Key: k})
+				keysToDelete = append(keysToDelete, c.newTargetKey(sourceID, k))
 				targetsToDelete = append(targetsToDelete, mysqlmodel.ChOSAppTag{
 					PID: sourceID,
 					Key: k,
@@ -121,7 +124,7 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
 	for k, v := range osAppTagsMap {
-		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
+		keys = append(keys, c.newTargetKey(source.ID, k))
 		targets = append(targets, mysqlmodel.ChOSAppTag{
 			PID:         source.ID,
 			Key:         k,
@@ -132,6 +135,10 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 		})
 	}
 	return
+}
+
+func (c *ChOSAppTag) newTargetKey(sourceID int, key string) OSAPPTagKey {
+	return OSAPPTagKey{PID: sourceID, Key: key}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

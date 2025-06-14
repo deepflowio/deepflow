@@ -670,6 +670,33 @@ global:
 Proactive memory trimming can effectively reduce memory usage, but there may be
 performance loss.
 
+### Turn off swap memory {#global.tunning.swap_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`global.tunning.swap_disabled`
+
+**Default value**:
+```yaml
+global:
+  tunning:
+    swap_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Note that disabling swap memory requires root and CAP_IPC_LOCK permissions, and disabling
+swap memory may improve performance and reduce CPU usage, but memory will increase.
+
 ### Page Cache Reclaim Percentage {#global.tunning.page_cache_reclaim_percentage}
 
 **Tags**:
@@ -5118,6 +5145,7 @@ inputs:
       - name: replicasets
       - name: statefulsets
       - name: ingresses
+      - name: configmaps
 ```
 
 **Schema**:
@@ -5149,6 +5177,7 @@ Agent will watch the following resources by default:
 - replicasets
 - statefulsets
 - ingresses
+- configmaps
 
 To disable a resource, add an entry to the list with `disabled: true`:
 ```yaml
@@ -5226,6 +5255,7 @@ inputs:
 | clonesets | |
 | ippools | |
 | opengaussclusters | |
+| configmaps | |
 
 **Schema**:
 | Key  | Value                        |

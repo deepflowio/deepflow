@@ -660,6 +660,33 @@ global:
 
 开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
 
+### 禁用 swap 内存 {#global.tunning.swap_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`global.tunning.swap_disabled`
+
+**默认值**:
+```yaml
+global:
+  tunning:
+    swap_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+注意禁用 swap 内存需要 root 和 CAP_IPC_LOCK 权限，禁用 swap 内存后性能也许会提升并且CPU使用率会降低,
+但是内存会升高。
+
 ### Page Cache 回收百分比 {#global.tunning.page_cache_reclaim_percentage}
 
 **标签**:
@@ -4987,6 +5014,7 @@ inputs:
       - name: replicasets
       - name: statefulsets
       - name: ingresses
+      - name: configmaps
 ```
 
 **模式**:
@@ -5018,6 +5046,7 @@ inputs:
 - replicasets
 - statefulsets
 - ingresses
+- configmaps
 
 禁用某个资源，在列表中添加 `disabled: true` 的条目：
 ```yaml
@@ -5093,6 +5122,7 @@ inputs:
 | clonesets | |
 | ippools | |
 | opengaussclusters | |
+| configmaps | |
 
 **模式**:
 | Key  | Value                        |

@@ -21,15 +21,19 @@ import (
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
+	"github.com/deepflowio/deepflow/server/controller/recorder/event"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodGroup struct {
-	cache *cache.Cache
+	cache         *cache.Cache
+	eventProducer *event.PodGroup
 }
 
-func NewPodGroup(c *cache.Cache) *PodGroup {
+func NewPodGroup(c *cache.Cache, eq *queue.OverwriteQueue) *PodGroup {
 	listener := &PodGroup{
-		cache: c,
+		cache:         c,
+		eventProducer: event.NewPodGroup(c.ToolDataSet, eq),
 	}
 	return listener
 }
@@ -39,7 +43,8 @@ func (p *PodGroup) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroup) {
 }
 
 func (p *PodGroup) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroup, diffBase *diffbase.PodGroup) {
-	diffBase.Update(cloudItem)
+	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
 func (p *PodGroup) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroup) {

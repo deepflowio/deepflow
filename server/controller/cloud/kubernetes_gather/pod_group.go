@@ -21,13 +21,14 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
+func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get podgroups starting", logger.NewORGPrefix(k.orgID))
 	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
@@ -78,6 +79,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				log.Infof("podgroup (%s) namespace id not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
+			spec := cData.Get("spec")
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 			var serviceType int
 			var label string
@@ -146,7 +148,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				groupIDsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[namespace+label] = groupIDsSet
 			}
-			mLabels := cData.GetPath("spec", "template", "metadata", "labels").MustMap()
+			mLabels := spec.GetPath("template", "metadata", "labels").MustMap()
 			for key, v := range mLabels {
 				vString, ok := v.(string)
 				if !ok {
@@ -179,7 +181,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				}
 			}
 
-			containers := cData.Get("spec").Get("template").Get("spec").Get("containers")
+			containers := spec.GetPath("template", "spec", "containers")
 			for i := range containers.MustArray() {
 				container := containers.GetIndex(i)
 				cPorts, ok := container.CheckGet("ports")
@@ -195,12 +197,18 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 				}
 			}
+			metaDataStr := k.simpleJsonMarshal(metaData)
+			specStr := k.simpleJsonMarshal(spec)
 			podGroup := model.PodGroup{
 				Lcuuid:             uLcuuid,
 				Name:               name,
+				Metadata:           metaDataStr,
+				MetadataHash:       cloudcommon.GenerateMD5Sum(metaDataStr),
+				Spec:               specStr,
+				SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
 				Label:              k.GetLabel(labels),
 				Type:               serviceType,
-				PodNum:             cData.Get("spec").Get("replicas").MustInt(),
+				PodNum:             spec.Get("replicas").MustInt(),
 				PodNamespaceLcuuid: namespaceLcuuid,
 				AZLcuuid:           k.azLcuuid,
 				RegionLcuuid:       k.RegionUUID,
@@ -209,13 +217,14 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			podGroups = append(podGroups, podGroup)
 			k.podGroupLcuuids.Add(uLcuuid)
 			k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
+			podGroupConfigMapConnections = append(podGroupConfigMapConnections, k.pgSpecGenerateConnections(namespace, name, uLcuuid, spec)...)
 		}
 	}
 	log.Debug("get podgroups complete", logger.NewORGPrefix(k.orgID))
 	return
 }
 
-func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, err error) {
+func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get replicationcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
 		podTargetPorts := map[string]int{}
@@ -240,6 +249,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			log.Infof("replicationcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
+		spec := rData.Get("spec")
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
@@ -257,7 +267,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			rcLcuuidsSet.Add(uLcuuid)
 			k.nsLabelToGroupLcuuids[namespace+label] = rcLcuuidsSet
 		}
-		labels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
+		labels := spec.GetPath("template", "metadata", "labels").MustMap()
 		for key, v := range labels {
 			vString, ok := v.(string)
 			if !ok {
@@ -273,7 +283,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 				k.nsLabelToGroupLcuuids[nsLabel] = nsRCLcuuidsSet
 			}
 		}
-		containers := rData.Get("spec").Get("template").Get("spec").Get("containers")
+		containers := spec.GetPath("template", "spec", "containers")
 		for i := range containers.MustArray() {
 			container := containers.GetIndex(i)
 			cPorts, ok := container.CheckGet("ports")
@@ -289,13 +299,18 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 				podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 			}
 		}
-
+		metaDataStr := k.simpleJsonMarshal(metaData)
+		specStr := k.simpleJsonMarshal(spec)
 		podRC := model.PodGroup{
 			Lcuuid:             uLcuuid,
 			Name:               name,
+			Metadata:           metaDataStr,
+			MetadataHash:       cloudcommon.GenerateMD5Sum(metaDataStr),
+			Spec:               specStr,
+			SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
 			Label:              k.GetLabel(labels),
 			Type:               serviceType,
-			PodNum:             rData.Get("spec").Get("replicas").MustInt(),
+			PodNum:             spec.Get("replicas").MustInt(),
 			RegionLcuuid:       k.RegionUUID,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,
@@ -304,6 +319,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		podRCs = append(podRCs, podRC)
 		k.podGroupLcuuids.Add(uLcuuid)
 		k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
+		podGroupConfigMapConnections = append(podGroupConfigMapConnections, k.pgSpecGenerateConnections(namespace, name, uLcuuid, spec)...)
 	}
 	log.Debug("get replicationcontrollers complete", logger.NewORGPrefix(k.orgID))
 	return

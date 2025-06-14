@@ -63,15 +63,15 @@ func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChLBL
 		}
 		if lbListener.DeletedAt.Valid {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysqlmodel.ChLBListener{
-				ID:     lbListener.ID,
-				Name:   lbListener.Name + " (deleted)",
-				TeamID: DomainToTeamID[lbListener.Domain],
+				ChIDBase: mysqlmodel.ChIDBase{ID: lbListener.ID},
+				Name:     lbListener.Name + " (deleted)",
+				TeamID:   DomainToTeamID[lbListener.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysqlmodel.ChLBListener{
-				ID:     lbListener.ID,
-				Name:   lbListener.Name,
-				TeamID: DomainToTeamID[lbListener.Domain],
+				ChIDBase: mysqlmodel.ChIDBase{ID: lbListener.ID},
+				Name:     lbListener.Name,
+				TeamID:   DomainToTeamID[lbListener.Domain],
 			}
 		}
 	}

@@ -17,6 +17,8 @@
 package event
 
 import (
+	"sigs.k8s.io/yaml"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -64,7 +66,7 @@ func (p *PodService) ProduceByAdd(items []*mysqlmodel.PodService) {
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
 
-		p.createAndEnqueue(
+		p.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -76,6 +78,43 @@ func (p *PodService) ProduceByAdd(items []*mysqlmodel.PodService) {
 }
 
 func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *diffbase.PodService) {
+	if cloudItem.MetadataHash == diffBase.MetadataHash && cloudItem.SpecHash == diffBase.SpecHash {
+		// no changes
+		return
+	}
+
+	newMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+	if err != nil {
+		log.Errorf("failed to convert JSON metadata: %v to YAML: %s", cloudItem.Metadata, p.metadata.LogPrefixes)
+		return
+	}
+	newSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+	if err != nil {
+		log.Errorf("failed to convert JSON spec: %v to YAML: %s", cloudItem.Spec, p.metadata.LogPrefixes)
+		return
+	}
+
+	var opts []eventapi.TagFieldOption
+	old := JoinMetadataAndSpec(diffBase.Metadata, diffBase.Spec)
+	new := JoinMetadataAndSpec(string(newMetadata), string(newSpec))
+	if old == "" || new == "" {
+		return
+	} else {
+		diff := CompareConfig(old, new, int(p.metadata.Config.EventCfg.ConfigDiffContext))
+
+		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(diffBase.Lcuuid)
+		if !ok {
+			log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
+			return
+		}
+		opts = []eventapi.TagFieldOption{
+			eventapi.TagPodServiceID(id),
+			eventapi.TagAttributes(
+				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
+				[]string{new, diff}),
+		}
+	}
+	p.createAndEnqueue(diffBase.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_MODIFY, opts...)
 }
 
 func (p *PodService) ProduceByDelete(lcuuids []string) {
@@ -93,6 +132,6 @@ func (p *PodService) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

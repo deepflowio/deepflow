@@ -60,7 +60,7 @@ func (l *LB) ProduceByAdd(items []*mysqlmodel.LB) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		l.createAndEnqueue(
+		l.createInstanceAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -89,6 +89,6 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		l.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
+		l.createInstanceAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
 	}
 }

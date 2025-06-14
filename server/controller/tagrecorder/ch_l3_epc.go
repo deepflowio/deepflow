@@ -73,7 +73,7 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *mysqlmodel.VPC) (ke
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysqlmodel.ChVPC{
-		ID:       source.ID,
+		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID},
 		Name:     sourceName,
 		UID:      source.UID,
 		IconID:   iconID,

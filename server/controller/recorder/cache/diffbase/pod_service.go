@@ -17,6 +17,8 @@
 package diffbase
 
 import (
+	"sigs.k8s.io/yaml"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -38,6 +40,10 @@ func (b *DataSet) AddPodService(dbItem *mysqlmodel.PodService, seq int, toolData
 		Annotation:       dbItem.Annotation,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
+		Metadata:         dbItem.Metadata,
+		MetadataHash:     dbItem.MetadataHash,
+		Spec:             dbItem.Spec,
+		SpecHash:         dbItem.SpecHash,
 		PodIngressLcuuid: podIngressLcuuid,
 		RegionLcuuid:     dbItem.Region,
 		AZLcuuid:         dbItem.AZ,
@@ -59,18 +65,39 @@ type PodService struct {
 	Selector         string `json:"selector"`
 	ExternalIP       string `json:"external_ip"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
+	Metadata         string `json:"metadata"`
+	MetadataHash     string `json:"metadata_hash"`
+	Spec             string `json:"spec"`
+	SpecHash         string `json:"spec_hash"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
 	RegionLcuuid     string `json:"region_lcuuid"`
 	AZLcuuid         string `json:"az_lcuuid"`
 	SubDomainLcuuid  string `json:"sub_domain_lcuuid"`
 }
 
-func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
+func (p *PodService) Update(cloudItem *cloudmodel.PodService, toolDataSet *tool.DataSet) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
 	p.Annotation = cloudItem.Annotation
 	p.Selector = cloudItem.Selector
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
+
+	yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+	if err != nil {
+		log.Errorf("failed to convert JSON metadata: %v to YAML: %s", cloudItem.Metadata, toolDataSet.GetMetadata().LogPrefixes)
+		return
+	}
+	p.Metadata = string(yamlMetadata)
+	p.MetadataHash = cloudItem.MetadataHash
+
+	yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+	if err != nil {
+		log.Errorf("failed to convert JSON spec: %v to YAML: %s", cloudItem.Spec, toolDataSet.GetMetadata().LogPrefixes)
+		return
+	}
+	p.Spec = string(yamlSpec)
+	p.SpecHash = cloudItem.SpecHash
+
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid

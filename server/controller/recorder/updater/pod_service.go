@@ -17,6 +17,8 @@
 package updater
 
 import (
+	"sigs.k8s.io/yaml"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -113,6 +115,16 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 			return nil, false
 		}
 	}
+	yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+	if err != nil {
+		log.Errorf("failed to convert %s metadata JSON to YAML: %s", s.resourceType, cloudItem.Metadata, s.metadata.LogPrefixes)
+		return nil, false
+	}
+	yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+	if err != nil {
+		log.Errorf("failed to convert %s spec JSON to YAML: %s", s.resourceType, cloudItem.Spec, s.metadata.LogPrefixes)
+		return nil, false
+	}
 	dbItem := &mysqlmodel.PodService{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
@@ -121,6 +133,10 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 		Selector:         cloudItem.Selector,
 		ExternalIP:       cloudItem.ExternalIP,
 		ServiceClusterIP: cloudItem.ServiceClusterIP,
+		Metadata:         string(yamlMetadata),
+		MetadataHash:     cloudItem.MetadataHash,
+		Spec:             string(yamlSpec),
+		SpecHash:         cloudItem.SpecHash,
 		PodIngressID:     podIngressID,
 		PodNamespaceID:   podNamespaceID,
 		PodClusterID:     podClusterID,
@@ -182,10 +198,32 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-	// 	mapInfo["az"] = cloudItem.AZLcuuid
-	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	// }
+	if diffBase.MetadataHash != cloudItem.MetadataHash {
+		mapInfo["metadata_hash"] = cloudItem.MetadataHash
+
+		yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+		if err != nil {
+			log.Errorf("failed to convert %s metadata JSON (data: %v) to YAML: %s", s.resourceType, cloudItem.Metadata, s.metadata.LogPrefixes)
+			return nil, nil, false
+		}
+		mapInfo["metadata"] = string(yamlMetadata)
+		structInfo.Metadata.Set(diffBase.Metadata, string(yamlMetadata))
+	} else {
+		structInfo.Metadata.Set(diffBase.Metadata, diffBase.Metadata) // set for resource event, because it publish combined config of metadata and spec
+	}
+	if diffBase.SpecHash != cloudItem.SpecHash {
+		mapInfo["spec_hash"] = cloudItem.SpecHash
+
+		yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+		if err != nil {
+			log.Errorf("failed to convert %s spec JSON (data: %v) to YAML: %s", s.resourceType, cloudItem.Spec, s.metadata.LogPrefixes)
+			return nil, nil, false
+		}
+		mapInfo["spec"] = string(yamlSpec)
+		structInfo.Spec.Set(diffBase.Spec, string(yamlSpec))
+	} else {
+		structInfo.Spec.Set(diffBase.Spec, diffBase.Spec) // set for resource event, because it publish combined config of metadata and spec
+	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

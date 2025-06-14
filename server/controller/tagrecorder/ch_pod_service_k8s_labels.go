@@ -33,7 +33,7 @@ type ChPodServiceK8sLabels struct {
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
 		mysqlmodel.ChPodServiceK8sLabels,
-		K8sLabelsKey,
+		IDKey,
 	]
 }
 
@@ -48,9 +48,9 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
 			mysqlmodel.ChPodServiceK8sLabels,
-			K8sLabelsKey,
+			IDKey,
 		](
-			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_K8S_LABELS,
+			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS,
 		),
 	}
 	mng.subscriberDG = mng
@@ -66,32 +66,32 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 			updateInfo["labels"] = labels
 		}
 	}
+	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem mysqlmodel.ChPodServiceK8sLabels
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]K8sLabelsKey{{ID: sourceID}},
+				[]IDKey{targetKey},
 				[]mysqlmodel.ChPodServiceK8sLabels{{
-					ID:     sourceID,
-					Labels: updateInfo["labels"].(string),
+					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+					Labels:   updateInfo["labels"].(string),
 				}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
+	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, item *mysqlmodel.PodService) (keys []K8sLabelsKey, targets []mysqlmodel.ChPodServiceK8sLabels) {
-	if item.Label == "" {
+func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodService) (keys []IDKey, targets []mysqlmodel.ChPodServiceK8sLabels) {
+	if source.Label == "" {
 		return
 	}
-	labels, _ := common.StrToJsonAndMap(item.Label)
-	return []K8sLabelsKey{{ID: item.ID}}, []mysqlmodel.ChPodServiceK8sLabels{{
-		ID:          item.ID,
+	labels, _ := common.StrToJsonAndMap(source.Label)
+	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodServiceK8sLabels{{
+		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,

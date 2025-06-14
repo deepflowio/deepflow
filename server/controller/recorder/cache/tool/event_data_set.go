@@ -54,6 +54,8 @@ type EventDataSet struct {
 	vmPodNodeConnectionLcuuidToPodNodeID map[string]int
 	podNodeIDToVMID                      map[int]int
 
+	configMapLcuuidToInfo map[string]*configMapInfo
+
 	processLcuuidToInfo map[string]*processInfo
 }
 
@@ -63,6 +65,7 @@ type IPKey struct {
 	Lcuuid string
 }
 
+// TODO remove unused structs because event using subscriber framework now
 type hostInfo struct {
 	Name     string
 	RegionID int
@@ -148,9 +151,14 @@ type podInfo struct {
 	PodGroupID     int
 	PodNodeID      int
 }
+type configMapInfo struct {
+	ID           int
+	DomainLcuuid string
+}
 
 type processInfo struct {
 	ID   int
+	GID  uint32
 	Name string
 }
 
@@ -190,6 +198,8 @@ func NewEventDataSet() EventDataSet {
 
 		vmPodNodeConnectionLcuuidToPodNodeID: make(map[string]int),
 		podNodeIDToVMID:                      make(map[int]int),
+
+		configMapLcuuidToInfo: make(map[string]*configMapInfo),
 
 		processLcuuidToInfo: make(map[string]*processInfo),
 	}

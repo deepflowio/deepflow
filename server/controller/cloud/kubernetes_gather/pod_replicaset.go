@@ -21,12 +21,13 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, err error) {
+func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get replicasets,replicasetcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicaSet"] {
 		rData, rErr := simplejson.NewJson([]byte(r))
@@ -50,7 +51,8 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			log.Infof("replicaset,replicasetcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		replicas := rData.Get("spec").Get("replicas").MustInt()
+		spec := rData.Get("spec")
+		replicas := spec.Get("replicas").MustInt()
 		if replicas == 0 {
 			log.Debugf("replicaset,replicasetcontroller (%s) is inactive", name, logger.NewORGPrefix(k.orgID))
 			continue
@@ -87,7 +89,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 				rscLcuuidsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[namespace+label] = rscLcuuidsSet
 			}
-			mLabels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
+			mLabels := spec.GetPath("template", "metadata", "labels").MustMap()
 			for key, v := range mLabels {
 				vString, ok := v.(string)
 				if !ok {
@@ -103,9 +105,15 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 					k.nsLabelToGroupLcuuids[nsLabel] = nsRSCLcuuidsSet
 				}
 			}
-			podRSC := model.PodGroup{
+			metaDataStr := k.simpleJsonMarshal(metaData)
+			specStr := k.simpleJsonMarshal(spec)
+			podRSCs = append(podRSCs, model.PodGroup{
 				Lcuuid:             uLcuuid,
 				Name:               nName,
+				Metadata:           metaDataStr,
+				MetadataHash:       cloudcommon.GenerateMD5Sum(metaDataStr),
+				Spec:               specStr,
+				SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
 				Label:              labelString,
 				Type:               common.POD_GROUP_REPLICASET_CONTROLLER,
 				PodNum:             replicas,
@@ -113,8 +121,8 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 				AZLcuuid:           k.azLcuuid,
 				PodNamespaceLcuuid: namespaceLcuuid,
 				PodClusterLcuuid:   k.podClusterLcuuid,
-			}
-			podRSCs = append(podRSCs, podRSC)
+			})
+			podGroupConfigMapConnections = append(podGroupConfigMapConnections, k.pgSpecGenerateConnections(namespace, name, uLcuuid, spec)...)
 		}
 		podRS := model.PodReplicaSet{
 			Lcuuid:             uLcuuid,

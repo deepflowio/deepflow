@@ -19,6 +19,7 @@ package event
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"time"
 
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -46,43 +47,44 @@ func newEventManagerBase(rt string, toolDS *tool.DataSet, q *queue.OverwriteQueu
 	}
 }
 
-type ResourceEventToMySQL struct {
-	eventapi.ResourceEvent
+// TODO remove
+func (e *EventManagerBase) createInstanceAndEnqueue(
+	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
+	options = append(
+		options,
+		eventapi.TagInstanceType(uint32(instanceType)),
+		eventapi.TagInstanceID(uint32(instanceID)),
+		eventapi.TagInstanceName(instanceName))
+
+	e.createAndEnqueue(resourceLcuuid, eventType, options...)
 }
 
 func (e *EventManagerBase) createAndEnqueue(
-	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
+	resourceLcuuid, eventType string, options ...eventapi.TagFieldOption) {
 	// use interface in eventapi to create ResourceEvent instance which will be enqueued, because we need to manually free instance memory
 	event := eventapi.AcquireResourceEvent()
-	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
-	e.enqueue(resourceLcuuid, event)
-}
-
-func (e *EventManagerBase) createProcessAndEnqueue(
-	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
-	// use interface in eventapi to create ResourceEvent instance which will be enqueued, because we need to manually free instance memory
-	event := eventapi.AcquireResourceEvent()
-	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
-	// add process info
-	event.GProcessID = uint32(instanceID)
-	event.GProcessName = instanceName
+	e.fillEvent(event, eventType, options...)
 	e.enqueue(resourceLcuuid, event)
 }
 
 func (e EventManagerBase) fillEvent(
 	event *eventapi.ResourceEvent,
-	eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+	eventType string, options ...eventapi.TagFieldOption,
 ) {
 	event.ORGID = uint16(e.metadata.GetORGID())
 	event.TeamID = uint16(e.metadata.GetTeamID())
 	event.Time = time.Now().Unix()
 	event.TimeMilli = time.Now().UnixMilli()
 	event.Type = eventType
-	event.InstanceType = uint32(instanceType)
-	event.InstanceID = uint32(instanceID)
-	event.InstanceName = instanceName
 	event.IfNeedTagged = true
-	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
+	if slices.Contains([]string{
+		eventapi.RESOURCE_EVENT_TYPE_CREATE,
+		eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+		eventapi.RESOURCE_EVENT_TYPE_MODIFY,
+		eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
+		eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP,
+	}, eventType) {
 		event.IfNeedTagged = false
 	}
 	for _, option := range options {
@@ -102,17 +104,31 @@ func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.Resour
 	}
 }
 
+func (e *EventManagerBase) enqueueInstanceIfInsertIntoMySQLFailed(
+	resourceLcuuid, domainLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+) {
+	options = append(
+		options,
+		eventapi.TagInstanceType(uint32(instanceType)),
+		eventapi.TagInstanceID(uint32(instanceID)),
+		eventapi.TagInstanceName(instanceName))
+
+	e.enqueueIfInsertIntoMySQLFailed(resourceLcuuid, domainLcuuid, eventType, options...)
+}
+
 // Due to the fixed sequence of resource learning, some data required by resource change events can only be obtained after the completion of subsequent resource learning.
-// Therefore, we need to store the change event temporarily until all resources are learned and the required data is filled before the queue is added
+// Therefore, we need to store the change event temporarily until all resources are learned and the required data is filled before the queue is added.
 // Such change events include:
 // - PodNode's/POD's create event, PodNode's/POD's add-ip event, fill in the L3Device information and HostID as required
 // - POD's recreate event, requires real-time IPs information
+// - ConfigMap's create event, ConfigMap's update event, ConfigMap's delete event, requires real-time PodGroup-ConfigMap connection information
+// If the event is not stored in MySQL, it will be directly enqueued.
 func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
-	resourceLcuuid, domainLcuuid string, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
+	resourceLcuuid, domainLcuuid, eventType string, options ...eventapi.TagFieldOption,
 ) {
 	// use struct to create ResourceEvent instance if it will be stored in MySQL
 	event := &eventapi.ResourceEvent{}
-	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
+	e.fillEvent(event, eventType, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
 		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), e.metadata.LogPrefixes)
@@ -128,6 +144,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 			log.Infof("create resource_event (detail: %#v) success", dbItem, e.metadata.LogPrefixes)
 			return
 		}
+		log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), e.metadata.LogPrefixes)
 	}
 
 	e.convertAndEnqueue(resourceLcuuid, event)

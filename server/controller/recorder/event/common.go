@@ -19,6 +19,9 @@ package event
 import (
 	"fmt"
 
+	"github.com/pmezard/go-difflib/difflib"
+	"gopkg.in/yaml.v2"
+
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
@@ -395,4 +398,58 @@ func findFromAllByID[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, id int) *
 		return nil
 	}
 	return item
+}
+
+func CompareConfig(old, new string, context int) string {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(old),
+		B:        difflib.SplitLines(new),
+		FromFile: "old",
+		ToFile:   "new",
+		Context:  context,
+	}
+
+	result, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		log.Errorf("compare config error: %v, new: %s, old: %s", err, new, old)
+	}
+	return result
+}
+
+func JoinMetadataAndSpec(metadata, spec string) string {
+	if metadata == "" && spec == "" {
+		return ""
+	}
+	if metadata == "" {
+		return spec
+	}
+	if spec == "" {
+		return metadata
+	}
+
+	metadataYAML := metadata
+	specYAML := spec
+
+	var jsonMetadata, jsonSpec map[string]interface{}
+	err := yaml.Unmarshal([]byte(metadata), &jsonMetadata)
+	if err != nil {
+		log.Errorf("failed to convert metadata YAML to JSON: %s, error: %v", metadata, err)
+	}
+	newMetadata, err := yaml.Marshal(map[string]interface{}{"metadata": jsonMetadata})
+	if err != nil {
+		log.Errorf("failed to convert metadata JSON to YAML: %s, error: %v", metadata, err)
+	} else {
+		metadataYAML = string(newMetadata)
+	}
+	err = yaml.Unmarshal([]byte(spec), &jsonSpec)
+	if err != nil {
+		log.Errorf("failed to convert spec YAML to JSON: %s, error: %v", spec, err)
+	}
+	newSpec, err := yaml.Marshal(map[string]interface{}{"spec": jsonSpec})
+	if err != nil {
+		log.Errorf("failed to convert spec JSON to YAML: %s, error: %v", spec, err)
+	} else {
+		specYAML = string(newSpec)
+	}
+	return metadataYAML + specYAML
 }
