@@ -22,7 +22,7 @@ use std::sync::{
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use cadence::{Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient};
 use log::{debug, info, warn};
@@ -37,7 +37,8 @@ use public::{
 };
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
-const TICK_CYCLE: Duration = Duration::from_secs(10);
+const TICK_CYCLE: Duration = Duration::from_secs(1);
+pub const STATS_MIN_INTERVAL: Duration = Duration::from_secs(10);
 const STATS_SENDER_QUEUE_SIZE: usize = 4096;
 
 pub enum StatsOption {
@@ -203,7 +204,7 @@ pub struct Collector {
 
 impl Collector {
     pub fn new<S: AsRef<str>>(hostname: S, ntp_diff: Arc<AtomicI64>) -> Self {
-        Self::with_min_interval(hostname, TICK_CYCLE, ntp_diff)
+        Self::with_min_interval(hostname, STATS_MIN_INTERVAL, ntp_diff)
     }
 
     pub fn with_min_interval<S: AsRef<str>>(
@@ -246,9 +247,10 @@ impl Collector {
     }
 
     pub fn register_countable(&self, module: &dyn Module, countable: Countable) {
+        let min_interval_loaded = self.min_interval.load(Ordering::Relaxed);
         let mut source = Source {
             module: module.name(),
-            interval: Duration::from_secs(self.min_interval.load(Ordering::Relaxed)),
+            interval: Duration::from_secs(min_interval_loaded),
             countable,
             tags: vec![],
             skip: 0,
@@ -279,14 +281,8 @@ impl Collector {
                 ),
             }
         }
-        if source.interval > TICK_CYCLE {
-            source.skip = ((60
-                - SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    % 60)
-                / TICK_CYCLE.as_secs()) as i64;
+        if source.interval.as_secs() > min_interval_loaded {
+            source.skip = (source.interval.as_secs() / min_interval_loaded) as i64;
         }
         let mut sources = self.sources.lock().unwrap();
         sources.retain(|s| {
@@ -397,16 +393,22 @@ impl Collector {
             thread::Builder::new()
                 .name("stats-collector".to_owned())
                 .spawn(move || {
+                    let mut last_run = 0u64;
                     loop {
+                        let min_interval_loaded = min_interval.load(Ordering::Relaxed);
+                        let now = get_timestamp(ntp_diff.load(Ordering::Relaxed)).as_secs();
+                        if now / min_interval_loaded == last_run / min_interval_loaded {
+                            continue;
+                        }
+                        last_run = now;
+
                         let host = hostname.lock().unwrap().clone();
                         {
                             pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
                         }
 
-                        let now = get_timestamp(ntp_diff.load(Ordering::Relaxed)).as_secs() as u32;
                         {
                             let mut sources = sources.lock().unwrap();
-                            let min_interval_loaded = min_interval.load(Ordering::Relaxed);
                             // TODO: use Vec::retain_mut after stablize in rust 1.61.0
                             sources.retain(|s| !s.countable.closed());
                             for source in sources.iter_mut() {
@@ -415,7 +417,7 @@ impl Collector {
                                     continue;
                                 }
                                 source.skip = (source.interval.as_secs().max(min_interval_loaded)
-                                    / TICK_CYCLE.as_secs())
+                                    / min_interval_loaded)
                                     as i64;
                                 let points = source.countable.get_counters();
                                 if !points.is_empty() {
@@ -424,7 +426,7 @@ impl Collector {
                                         hostname: host.clone(),
                                         tags: source.tags.clone(),
                                         points,
-                                        timestamp: now,
+                                        timestamp: now as u32,
                                     });
                                     if let Err(_) = sender.send(ArcBatch(batch.clone())) {
                                         debug!(
