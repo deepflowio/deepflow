@@ -24,8 +24,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
@@ -46,7 +46,7 @@ type dataGenerator interface {
 	setUnscoped(bool) dataGenerator
 }
 
-func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
+func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 	var dg dataGenerator
 	realID := "id"
 	inSubDomain := true
@@ -208,7 +208,7 @@ func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) data
 		setGroupSortOrder(useLatestUpdatedAt)
 }
 
-func newDataGeneratorComponent[GT dataGeneratorModel](md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
+func newDataGeneratorComponent[GT dataGeneratorModel](md metadata.Platform, resourceType string) dataGenerator {
 	dataGeneratorComponent := &dataGeneratorComponent[GT]{
 		md:            md,
 		resourceType:  resourceType,
@@ -221,7 +221,7 @@ func newDataGeneratorComponent[GT dataGeneratorModel](md *recorderCommon.Metadat
 }
 
 type dataGeneratorComponent[GT dataGeneratorModel] struct {
-	md *recorderCommon.MetadataBase
+	md metadata.Platform
 
 	resourceType  string
 	inSubDomain   bool // whether the resource may be in sub domain, used for query
@@ -320,14 +320,14 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 
 	appendDomainCond := func(q *gorm.DB) *gorm.DB {
 		if strings.HasPrefix(s.resourceType, "ch_") {
-			q = q.Where("domain_id = ?", s.md.Domain.ID)
+			q = q.Where("domain_id = ?", s.md.GetDomainID())
 			if s.inSubDomain {
-				q = q.Where("sub_domain_id = ?", s.md.SubDomain.ID)
+				q = q.Where("sub_domain_id = ?", s.md.GetSubDomainID())
 			}
 		} else {
-			q = q.Where("domain = ?", s.md.Domain.Lcuuid)
+			q = q.Where("domain = ?", s.md.GetDomainLcuuid())
 			if s.inSubDomain {
-				q = q.Where("sub_domain = ?", s.md.SubDomain.Lcuuid)
+				q = q.Where("sub_domain = ?", s.md.GetSubDomainLcuuid())
 			}
 		}
 		return q

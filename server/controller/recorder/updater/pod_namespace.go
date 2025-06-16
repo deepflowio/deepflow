@@ -98,7 +98,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		Name:             cloudItem.Name,
 		PodClusterID:     podClusterID,
 		SubDomain:        cloudItem.SubDomainLcuuid,
-		Domain:           n.metadata.Domain.Lcuuid,
+		Domain:           n.metadata.GetDomainLcuuid(),
 		Region:           cloudItem.RegionLcuuid,
 		AZ:               cloudItem.AZLcuuid,
 		LearnedCloudTags: cloudTags,

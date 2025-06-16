@@ -101,7 +101,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*metadbmodel
 		Netmask:   netmask,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		NetworkID: networkID,
-		Domain:    s.metadata.Domain.Lcuuid,
+		Domain:    s.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

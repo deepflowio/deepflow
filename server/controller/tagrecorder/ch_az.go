@@ -98,8 +98,8 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *metadbmodel.AZ) (keys []
 		ChIDBase: metadbmodel.ChIDBase{ID: az.ID},
 		Name:     name,
 		IconID:   iconID,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		TeamID:   md.GetTeamID(),
+		DomainID: md.GetDomainID(),
 	})
 	return
 }

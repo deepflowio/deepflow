@@ -146,15 +146,9 @@ func newUpdaterBase[
 	}
 	// use teamID from subDomain if updater is for subDomain
 	u.msgMetadata = message.NewMetadata(
-		u.metadata.GetORGID(),
-		message.MetadataTeamID(u.metadata.GetTeamID()),
-		message.MetadataDomainID(u.metadata.Domain.ID),
-		message.MetadataDomainLcuuid(u.metadata.Domain.Lcuuid),
-		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
-		message.MetadataSubDomainLcuuid(u.metadata.SubDomain.Lcuuid),
+		message.MetadataPlatform(u.metadata.Platform),
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 		message.MetadataToolDataSet(cache.ToolDataSet),
-		message.MetadataDB(cache.GetMetadata().GetDB()),
 	)
 
 	u.initPubSub()

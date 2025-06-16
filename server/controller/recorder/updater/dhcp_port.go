@@ -89,7 +89,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 	}
 	dbItem := &metadbmodel.DHCPPort{
 		Name:   cloudItem.Name,
-		Domain: p.metadata.Domain.Lcuuid,
+		Domain: p.metadata.GetDomainLcuuid(),
 		Region: cloudItem.RegionLcuuid,
 		AZ:     cloudItem.AZLcuuid,
 		VPCID:  vpcID,

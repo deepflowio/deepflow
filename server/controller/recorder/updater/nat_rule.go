@@ -112,7 +112,7 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 		FloatingIPPort: cloudItem.FloatingIPPort,
 		FixedIP:        cloudItem.FixedIP,
 		FixedIPPort:    cloudItem.FixedIPPort,
-		Domain:         r.metadata.Domain.Lcuuid,
+		Domain:         r.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
