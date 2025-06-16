@@ -100,7 +100,7 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mys
 		PodNamespaceID: podNamespaceID,
 		PodClusterID:   podClusterID,
 		SubDomain:      cloudItem.SubDomainLcuuid,
-		Domain:         i.metadata.Domain.Lcuuid,
+		Domain:         i.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
 	}

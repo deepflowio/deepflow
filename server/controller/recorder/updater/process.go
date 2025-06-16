@@ -135,7 +135,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 		UserName:    cloudItem.UserName,
 		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
-		Domain:      p.metadata.Domain.Lcuuid,
+		Domain:      p.metadata.GetDomainLcuuid(),
 		SubDomain:   cloudItem.SubDomainLcuuid,
 		NetnsID:     cloudItem.NetnsID,
 		DeviceType:  deviceType,

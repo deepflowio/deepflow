@@ -94,7 +94,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysqlmodel.LB, bool
 		UID:    cloudItem.Label,
 		Model:  cloudItem.Model,
 		VIP:    cloudItem.VIP,
-		Domain: l.metadata.Domain.Lcuuid,
+		Domain: l.metadata.GetDomainLcuuid(),
 		Region: cloudItem.RegionLcuuid,
 		VPCID:  vpcID,
 	}

@@ -122,8 +122,8 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*mysql
 		VPCID:          vpcID,
 		AZ:             cloudItem.AZLcuuid,
 		Region:         cloudItem.RegionLcuuid,
-		Domain:         h.metadata.Domain.Lcuuid,
-		SubDomain:      h.metadata.SubDomain.Lcuuid,
+		Domain:         h.metadata.GetDomainLcuuid(),
+		SubDomain:      h.metadata.GetSubDomainLcuuid(),
 		SyncedAt:       time.Now(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid

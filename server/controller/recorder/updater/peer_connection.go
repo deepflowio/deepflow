@@ -95,6 +95,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
+
 	remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -114,7 +115,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	dbItem := &mysqlmodel.PeerConnection{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
-		Domain:         c.metadata.Domain.Lcuuid,
+		Domain:         c.metadata.GetDomainLcuuid(),
 		RemoteVPCID:    remoteVPCID,
 		LocalVPCID:     localVPCID,
 		RemoteRegionID: remoteRegionID,

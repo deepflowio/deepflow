@@ -92,7 +92,7 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mys
 		Version:     cloudItem.Version,
 		ClusterName: cloudItem.ClusterName,
 		SubDomain:   cloudItem.SubDomainLcuuid,
-		Domain:      c.metadata.Domain.Lcuuid,
+		Domain:      c.metadata.GetDomainLcuuid(),
 		Region:      cloudItem.RegionLcuuid,
 		AZ:          cloudItem.AZLcuuid,
 		VPCID:       vpcID,

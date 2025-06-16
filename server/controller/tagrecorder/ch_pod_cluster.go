@@ -77,9 +77,9 @@ func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }

@@ -119,7 +119,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 		LBListenerID: lbListenerID,
 		VMID:         vmID,
 		VPCID:        vpcID,
-		Domain:       s.metadata.Domain.Lcuuid,
+		Domain:       s.metadata.GetDomainLcuuid(),
 		Type:         cloudItem.Type,
 		IP:           cloudItem.IP,
 		Port:         cloudItem.Port,

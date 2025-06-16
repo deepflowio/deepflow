@@ -36,30 +36,6 @@ func LogDelete(resourceType string) string {
 	return fmt.Sprintf("delete %s", resourceType)
 }
 
-type DomainNameLogPrefix struct {
-	Name string
-}
-
-func NewDomainPrefix(name string) logger.Prefix {
-	return &DomainNameLogPrefix{name}
-}
-
-func (p *DomainNameLogPrefix) Prefix() string {
-	return fmt.Sprintf("[DomainName-%s]", p.Name)
-}
-
-type SubDomainNameLogPrefix struct {
-	Name string
-}
-
-func NewSubDomainPrefix(name string) logger.Prefix {
-	return &SubDomainNameLogPrefix{name}
-}
-
-func (p *SubDomainNameLogPrefix) Prefix() string {
-	return fmt.Sprintf("[SubDomainName-%s]", p.Name)
-}
-
 func ResourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string) string {
 	return fmt.Sprintf("%s (lcuuid: %s) for %s (lcuuid: %s) not found", resourceA, lcuuidA, resourceB, lcuuidB)
 }

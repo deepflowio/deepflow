@@ -82,7 +82,7 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysqlmodel.VIP, b
 	dbItem := &mysqlmodel.VIP{
 		IP:     cloudItem.IP,
 		VTapID: cloudItem.VTapID,
-		Domain: p.metadata.Domain.Lcuuid,
+		Domain: p.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 
