@@ -124,9 +124,9 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
 	for k, v := range osAppTagsMap {
-		keys = append(keys, c.newTargetKey(source.ID, k))
+		keys = append(keys, c.newTargetKey(int(source.GID), k))
 		targets = append(targets, mysqlmodel.ChOSAppTag{
-			PID:         source.ID,
+			PID:         int(source.GID),
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,
