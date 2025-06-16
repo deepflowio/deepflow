@@ -98,8 +98,8 @@ func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.
 	dbItem := &metadbmodel.PodGroupConfigMapConnection{
 		PodGroupID:  podGroupID,
 		ConfigMapID: configMapID,
-		Domain:      h.metadata.Domain.Lcuuid,
-		SubDomain:   h.metadata.SubDomain.Lcuuid,
+		Domain:      h.metadata.GetDomainLcuuid(),
+		SubDomain:   h.metadata.GetSubDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

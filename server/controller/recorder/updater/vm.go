@@ -120,7 +120,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 		HType:            cloudItem.HType,
 		LaunchServer:     cloudItem.LaunchServer,
 		HostID:           hostID,
-		Domain:           m.metadata.Domain.Lcuuid,
+		Domain:           m.metadata.GetDomainLcuuid(),
 		Region:           cloudItem.RegionLcuuid,
 		AZ:               cloudItem.AZLcuuid,
 		VPCID:            vpcID,

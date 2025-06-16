@@ -97,7 +97,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 	}
 
 	dbItem := &metadbmodel.LBVMConnection{
-		Domain: c.metadata.Domain.Lcuuid,
+		Domain: c.metadata.GetDomainLcuuid(),
 		VMID:   vmID,
 		LBID:   lbID,
 	}

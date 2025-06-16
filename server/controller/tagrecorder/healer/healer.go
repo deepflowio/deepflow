@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
@@ -32,20 +32,16 @@ import (
 
 var log = logger.MustGetLogger("tagrecorder.healer")
 
-func NewHealers(md *recorderCommon.MetadataBase) *Healers {
+func NewHealers(md metadata.Platform) *Healers {
 	h := &Healers{
-		MetadataBase:             *md,
+		Platform:                 md,
 		sourceResourceTypeToData: make(map[string]dataGenerator),
 		targetResourceTypeToData: make(map[string]dataGenerator),
 	}
 
 	msgMetadata := message.NewMetadata(
-		md.GetORGID(),
-		message.MetadataTeamID(md.GetTeamID()),
-		message.MetadataDomainID(md.Domain.ID),
-		message.MetadataSubDomainID(md.SubDomain.ID),
+		message.MetadataPlatform(md),
 		message.MetadataSoftDelete(false), // no soft delete in healer
-		message.MetadataDB(md.GetDB()),
 	)
 	h.healers = []Healer{
 		newHealer[metadbModel.Host, metadbModel.ChDevice, *message.HostAdd](
@@ -231,7 +227,7 @@ func NewHealers(md *recorderCommon.MetadataBase) *Healers {
 }
 
 type Healers struct {
-	recorderCommon.MetadataBase
+	metadata.Platform
 
 	sourceResourceTypeToData map[string]dataGenerator
 	targetResourceTypeToData map[string]dataGenerator

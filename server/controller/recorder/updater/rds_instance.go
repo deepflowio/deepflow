@@ -96,7 +96,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 		Version: cloudItem.Version,
 		Series:  cloudItem.Series,
 		Model:   cloudItem.Model,
-		Domain:  r.metadata.Domain.Lcuuid,
+		Domain:  r.metadata.GetDomainLcuuid(),
 		Region:  cloudItem.RegionLcuuid,
 		AZ:      cloudItem.AZLcuuid,
 		VPCID:   vpcID,

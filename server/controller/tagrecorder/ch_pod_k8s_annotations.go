@@ -90,9 +90,9 @@ func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *metad
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sAnnotations{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 
