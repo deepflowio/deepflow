@@ -93,9 +93,9 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, source *met
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sLabels{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 

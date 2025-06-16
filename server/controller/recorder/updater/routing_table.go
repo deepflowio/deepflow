@@ -92,7 +92,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 		NexthopType: cloudItem.NexthopType,
 		Nexthop:     cloudItem.Nexthop,
 		VRouterID:   vrouterID,
-		Domain:      t.metadata.Domain.Lcuuid,
+		Domain:      t.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

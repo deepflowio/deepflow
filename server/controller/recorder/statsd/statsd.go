@@ -82,7 +82,7 @@ func (r *DomainStatsd) Start() {
 		stats.OptionStatTags{
 			optStatTagORGID:  fmt.Sprintf("%d", r.md.GetORGID()),
 			optStatTagTeamID: fmt.Sprintf("%d", r.md.GetTeamID()),
-			optStatTagDomain: r.md.Domain.Name,
+			optStatTagDomain: r.md.GetDomainInfo().Name,
 		},
 	)
 	if err != nil {
@@ -96,7 +96,7 @@ func (r *DomainStatsd) Start() {
 		stats.OptionStatTags{
 			optStatTagORGID:  fmt.Sprintf("%d", r.md.GetORGID()),
 			optStatTagTeamID: fmt.Sprintf("%d", r.md.GetTeamID()),
-			optStatTagDomain: r.md.Domain.Name,
+			optStatTagDomain: r.md.GetDomainInfo().Name,
 			optStatTagType:   resourceSyncDelayTypeChost,
 		},
 	)
@@ -111,7 +111,7 @@ func (r *DomainStatsd) Start() {
 		stats.OptionStatTags{
 			optStatTagORGID:  fmt.Sprintf("%d", r.md.GetORGID()),
 			optStatTagTeamID: fmt.Sprintf("%d", r.md.GetTeamID()),
-			optStatTagDomain: r.md.Domain.Name,
+			optStatTagDomain: r.md.GetDomainInfo().Name,
 			optStatTagType:   resourceSyncDelayTypePod,
 		},
 	)
@@ -167,8 +167,8 @@ func (r *SubDomainStatsd) Start() {
 		stats.OptionStatTags{
 			optStatTagORGID:     fmt.Sprintf("%d", r.md.GetORGID()),
 			optStatTagTeamID:    fmt.Sprintf("%d", r.md.GetTeamID()),
-			optStatTagDomain:    r.md.Domain.Name,
-			optStatTagSubDomain: r.md.SubDomain.Name,
+			optStatTagDomain:    r.md.GetDomainInfo().Name,
+			optStatTagSubDomain: r.md.GetSubDomainInfo().Name,
 			optStatTagType:      resourceSyncDelayTypePod,
 		},
 	)

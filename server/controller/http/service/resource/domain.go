@@ -747,7 +747,7 @@ func deleteDomain(domain *metadbmodel.Domain, db *metadb.DB, userInfo *httpcommo
 	db.Delete(&domain)
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, message.MetadataTeamID(domain.TeamID), message.MetadataDomainID(domain.ID))
+	metadata := message.NewMetadata(message.MetadataDB(db), message.MetadataDomain(*domain))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("domain") {
 		s.OnDomainDeleted(metadata)
 	}
@@ -932,8 +932,8 @@ func UpdateSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 	// 	dbUpdateMap["user_id"] = userID
 	// 	resourceUp["owner_user_id"] = userID
 	// }
-	teamID, ok := subDomainUpdate["TEAM_ID"]
-	if ok {
+	teamID, teamIDChanged := subDomainUpdate["TEAM_ID"]
+	if teamIDChanged {
 		dbUpdateMap["team_id"] = teamID
 		resourceUp["team_id"] = teamID
 	}
@@ -968,25 +968,16 @@ func UpdateSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 		dbUpdateMap["config"] = string(configStr)
 	}
 
-	// pub to tagrecorder
-	teamIDInt := 0
-	teamIDFloat64, ok := teamID.(float64)
-	if ok {
-		teamIDInt = int(teamIDFloat64)
-	} else {
-		teamIDInt = domain.TeamID
-	}
-	if teamIDInt != subDomain.TeamID {
-		metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID), message.MetadataTeamID(teamIDInt))
-		for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
-			s.OnSubDomainTeamIDUpdated(metadata)
-		}
-	}
-
-	// 更新domain DB
 	err = db.Model(&subDomain).Updates(dbUpdateMap).Error
 	if err != nil {
 		return nil, err
+	}
+
+	if teamIDChanged {
+		metadata := message.NewMetadata(message.MetadataDB(db), message.MetadataSubDomain(subDomain))
+		for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
+			s.OnSubDomainTeamIDUpdated(metadata)
+		}
 	}
 
 	response, _ := GetSubDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
@@ -1048,7 +1039,7 @@ func DeleteSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 	}
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID))
+	metadata := message.NewMetadata(message.MetadataDB(db), message.MetadataSubDomain(subDomain))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
 		s.OnSubDomainDeleted(metadata)
 	}
