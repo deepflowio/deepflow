@@ -67,10 +67,8 @@ func newDomain(ctx context.Context, cfg config.RecorderConfig, md *rcommon.Metad
 
 		pubsub: pubsub.GetPubSub(pubsub.PubSubTypeWholeDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
-			md.GetORGID(),
-			message.MetadataDomainLcuuid(md.GetDomainInfo().Lcuuid),
+			message.MetadataPlatform(md.Platform),
 			message.MetadataToolDataSet(cacheMng.DomainCache.ToolDataSet),
-			message.MetadataDB(md.GetDB()),
 		),
 	}
 }
@@ -108,14 +106,14 @@ func (d *domain) refreshDomainExcludeSubDomain(cloudData cloudmodel.Resource) er
 
 func (d *domain) checkLicense() error {
 	var domain *metadbmodel.Domain
-	err := d.metadata.DB.Select("state").Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	err := d.metadata.DB.Select("state").Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("failed to get domain from db: %s", err, d.metadata.LogPrefixes)
 		return err
 	}
 	if domain.State == common.RESOURCE_STATE_CODE_NO_LICENSE {
-		log.Errorf("domain %s has no license", d.metadata.Domain.Lcuuid, d.metadata.LogPrefixes)
-		return fmt.Errorf("domain %s has no license", d.metadata.Domain.Lcuuid)
+		log.Errorf("domain %s has no license", d.metadata.GetDomainLcuuid(), d.metadata.LogPrefixes)
+		return fmt.Errorf("domain %s has no license", d.metadata.GetDomainLcuuid())
 	}
 	return nil
 }
@@ -145,7 +143,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 	if cloudData.Verified {
-		if (!slices.Contains(rcommon.UNCHECK_NETWORK_DOMAINS, d.metadata.Domain.Type) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
+		if (!slices.Contains(rcommon.UNCHECK_NETWORK_DOMAINS, d.metadata.GetDomainInfo().Type) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
 			log.Info("domain has no networks or vinterfaces, does nothing", d.metadata.LogPrefixes)
 			return DataMissingError
 		}
@@ -308,7 +306,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	d.fillStatsd(syncAt)
 
 	var domain metadbmodel.Domain
-	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
 		return
@@ -326,7 +324,7 @@ func (d *domain) fillStatsd(syncAt time.Time) {
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	var domain metadbmodel.Domain
-	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
 		return

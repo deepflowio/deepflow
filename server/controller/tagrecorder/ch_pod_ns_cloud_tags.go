@@ -97,15 +97,15 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *metadbmo
 	}
 	bytes, err := json.Marshal(source.LearnedCloudTags)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(md.ORGID))
+		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 		return
 	}
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodNSCloudTags{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		CloudTags:   string(bytes),
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 

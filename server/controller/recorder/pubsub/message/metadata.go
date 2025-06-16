@@ -17,92 +17,49 @@
 package message
 
 import (
-	"fmt"
-
+	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
-	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type Metadata struct {
-	ORGID           int
-	TeamID          int
-	DomainID        int
-	DomainLcuuid    string
-	SubDomainID     int
-	SubDomainLcuuid string
-
-	LogPrefixes        []logger.Prefix
+	metadata.Platform  // Base metadata containing platform resource common fields
 	AdditionalMetadata // Additional metadata for specific message types
 }
 
-func (m *Metadata) GetORGID() int {
-	return m.ORGID
-}
-
-func (m *Metadata) GetTeamID() int {
-	return m.TeamID
-}
-
-func (m *Metadata) GetDomainID() int {
-	return m.DomainID
-}
-
-func (m *Metadata) GetSubDomainID() int {
-	return m.SubDomainID
-}
-
-func (m *Metadata) GetDomainLcuuid() string {
-	return m.DomainLcuuid
-}
-
-func (m *Metadata) GetSubDomainLcuuid() string {
-	return m.SubDomainLcuuid
-}
-
-func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
+func NewMetadata(options ...func(*Metadata)) *Metadata {
 	md := &Metadata{
-		ORGID: orgID,
+		metadata.Platform{},
+		AdditionalMetadata{},
 	}
-	md.LogPrefixes = []logger.Prefix{logger.NewORGPrefix(orgID)}
 	for _, option := range options {
 		option(md)
 	}
 	return md
 }
 
-func MetadataSubDomainID(id int) func(*Metadata) {
+func MetadataPlatform(base metadata.Platform) func(*Metadata) {
 	return func(m *Metadata) {
-		m.SubDomainID = id
-		if m.SubDomainID != 0 {
-			m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(id))
-		}
+		m.Platform = base
 	}
 }
 
-func MetadataTeamID(id int) func(*Metadata) {
+func MetadataDB(db *metadb.DB) func(*Metadata) {
 	return func(m *Metadata) {
-		m.TeamID = id
-		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(id))
+		m.SetDB(db)
 	}
 }
 
-func MetadataDomainID(id int) func(*Metadata) {
+func MetadataDomain(domain metadbModel.Domain) func(*Metadata) {
 	return func(m *Metadata) {
-		m.DomainID = id
-		m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(id))
+		m.SetDomain(domain)
 	}
 }
 
-func MetadataDomainLcuuid(lcuuid string) func(*Metadata) {
+func MetadataSubDomain(subDomain metadbModel.SubDomain) func(*Metadata) {
 	return func(m *Metadata) {
-		m.DomainLcuuid = lcuuid
-	}
-}
-
-func MetadataSubDomainLcuuid(lcuuid string) func(*Metadata) {
-	return func(m *Metadata) {
-		m.SubDomainLcuuid = lcuuid
+		m.SetSubDomain(subDomain)
 	}
 }
 
@@ -118,50 +75,15 @@ func MetadataToolDataSet(ds *tool.DataSet) func(*Metadata) {
 	}
 }
 
-func MetadataDB(db *metadb.DB) func(*Metadata) {
-	return func(m *Metadata) {
-		m.AdditionalMetadata.DB = db
-	}
-}
-
 type AdditionalMetadata struct { // TODO better
 	SoftDelete  bool          // for message type of delete action
 	ToolDataSet *tool.DataSet // for message type of resource event
-	DB          *metadb.DB    // for message type of resource event
 }
 
-func (m *AdditionalMetadata) GetSoftDelete() bool {
+func (m AdditionalMetadata) GetSoftDelete() bool {
 	return m.SoftDelete
 }
 
-func (m *AdditionalMetadata) GetToolDataSet() *tool.DataSet {
+func (m AdditionalMetadata) GetToolDataSet() *tool.DataSet {
 	return m.ToolDataSet
-}
-
-func (m *AdditionalMetadata) GetDB() *metadb.DB {
-	return m.DB
-}
-
-type DomainIDLogPrefix struct {
-	ID int
-}
-
-func NewDomainPrefix(id int) logger.Prefix {
-	return &DomainIDLogPrefix{id}
-}
-
-func (p *DomainIDLogPrefix) Prefix() string {
-	return fmt.Sprintf("[DomainID-%d]", p.ID)
-}
-
-type SubDomainIDLogPrefix struct {
-	ID int
-}
-
-func NewSubDomainPrefix(id int) logger.Prefix {
-	return &SubDomainIDLogPrefix{id}
-}
-
-func (p *SubDomainIDLogPrefix) Prefix() string {
-	return fmt.Sprintf("[SubDomainID-%d]", p.ID)
 }
