@@ -230,8 +230,8 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 	for _, orgID := range orgIDs {
 		if orgID != metaDBCommon.DEFAULT_ORG_ID {
-			sqlDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + sqlDatabaseName + "`"
-			ckDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + ckDatabaseName + "`"
+			sqlDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.source.Database + "`"
+			ckDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.ClickHouseCfg.Database + "`"
 		}
 		var databases []string
 		// 检查并创建数据库
