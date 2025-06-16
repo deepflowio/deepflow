@@ -52,11 +52,11 @@ use crate::common::{
 use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
-use crate::exception::ExceptionHandler;
 use crate::utils::stats;
 use npb_handler::{NpbHeader, NOT_SUPPORT};
 use npb_sender::ZmqSender;
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
+use public::exception::ExceptionHandler;
 use public::proto::agent::{Exception, SocketType};
 use public::queue::Receiver;
 #[cfg(unix)]

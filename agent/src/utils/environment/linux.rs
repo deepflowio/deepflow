@@ -33,13 +33,12 @@ use nix::sys::utsname::uname;
 use nom::AsBytes;
 use procfs::net::{TcpNetEntry, UdpNetEntry};
 
-use public::utils::net::get_link_enabled_features;
+use public::{exception::ExceptionHandler, utils::net::get_link_enabled_features};
 
 use super::{get_k8s_namespace, running_in_container, running_in_k8s};
 use crate::{
     common::{CONTAINER_NAME, DAEMONSET_NAME, PROCESS_NAME, PROCESS_NAME_SECONDARY},
     error::{Error, Result},
-    exception::ExceptionHandler,
 };
 
 const CORE_FILE_CONFIG: &str = "/proc/sys/kernel/core_pattern";

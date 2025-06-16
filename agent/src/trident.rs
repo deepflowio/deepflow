@@ -73,7 +73,6 @@ use crate::{
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    exception::ExceptionHandler,
     flow_generator::{
         protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
         TIME_UNIT,
@@ -128,6 +127,7 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
+    exception::ExceptionHandler,
     packet::MiniPacket,
     proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
@@ -630,6 +630,16 @@ impl Trident {
         Ok(Trident { state, handle })
     }
 
+    #[allow(unused_variables)]
+    fn kernel_version_check(state: Arc<AgentState>, exception_handler: ExceptionHandler) {
+        #[cfg(feature = "enterprise")]
+        match enterprise_utils::utils::kernel_version_check(exception_handler) {
+            public::enums::ActionFlags::MELTDOWN => state.melt_down(),
+            public::enums::ActionFlags::TERMINATE => state.terminate(),
+            _ => (),
+        }
+    }
+
     fn run(
         state: Arc<AgentState>,
         ctrl_ip: IpAddr,
@@ -895,6 +905,9 @@ impl Trident {
             platform_synchronizer.start();
         }
 
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        Trident::kernel_version_check(state.clone(), exception_handler.clone());
+
         let mut components: Option<Components> = None;
         let mut first_run = true;
         let mut config_initialized = false;
@@ -902,24 +915,36 @@ impl Trident {
         loop {
             let mut state_guard = state.state.lock().unwrap();
             if state.terminated.load(Ordering::Relaxed) {
+                info!("terminated begin1");
                 mem::drop(state_guard);
                 if let Some(mut c) = components {
+                    info!("terminated begin2");
                     c.stop();
+                    info!("terminated begin3");
                     guard.stop();
+                    info!("terminated begin4");
                     monitor.stop();
+                    info!("terminated begin5");
                     domain_name_listener.stop();
+                    info!("terminated begin6");
                     platform_synchronizer.stop();
+                    info!("terminated begin7");
                     #[cfg(target_os = "linux")]
                     {
+                        info!("terminated begin8");
                         api_watcher.stop();
+                        info!("terminated begin9");
                         libvirt_xml_extractor.stop();
                     }
                     if let Some(cg_controller) = cgroups_controller {
+                        info!("terminated begin10");
                         if let Err(e) = cg_controller.stop() {
                             info!("stop cgroups controller failed, {:?}", e);
                         }
                     }
+                    info!("terminated begin11");
                 }
+                info!("terminated return");
                 return Ok(());
             }
 
