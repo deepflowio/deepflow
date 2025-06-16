@@ -31,20 +31,16 @@ import (
 
 var log = logger.MustGetLogger("tagrecorder.healer")
 
-func NewHealers(md *recorderCommon.MetadataBase) *Healers {
+func NewHealers(md recorderCommon.MetadataBase) *Healers {
 	h := &Healers{
-		MetadataBase:             *md,
+		MetadataBase:             md,
 		sourceResourceTypeToData: make(map[string]dataGenerator),
 		targetResourceTypeToData: make(map[string]dataGenerator),
 	}
 
 	msgMetadata := message.NewMetadata(
-		md.GetORGID(),
-		message.MetadataTeamID(md.GetTeamID()),
-		message.MetadataDomainID(md.Domain.ID),
-		message.MetadataSubDomainID(md.SubDomain.ID),
+		message.MetadataBase(md),
 		message.MetadataSoftDelete(false), // no soft delete in healer
-		message.MetadataDB(md.GetDB()),
 	)
 	h.healers = []Healer{
 		newHealer[metadbModel.Host, metadbModel.ChDevice, *message.HostAdd, message.HostAdd](
