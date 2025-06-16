@@ -167,10 +167,11 @@ func (t *toolData) load(db *metadb.DB) error {
 		log.Errorf("failed to get domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
 	}
-	domainLcuuidToID := make(map[string]int)
+	lcuuidToDomain := make(map[string]*metadbmodel.Domain)
 	for _, domain := range domains {
-		domainLcuuidToID[domain.Lcuuid] = domain.ID
-		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(db.ORGID, message.MetadataTeamID(domain.TeamID), message.MetadataDomainID(domain.ID))
+		lcuuidToDomain[domain.Lcuuid] = domain
+		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(
+			message.MetadataDB(db), message.MetadataDomain(*domain))
 	}
 	var subDomains []*metadbmodel.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
@@ -179,7 +180,7 @@ func (t *toolData) load(db *metadb.DB) error {
 	}
 	for _, subDomain := range subDomains {
 		t.subDomainLcuuidToMsgMetadata[subDomain.Lcuuid] = message.NewMetadata(
-			db.ORGID, message.MetadataTeamID(subDomain.TeamID), message.MetadataDomainID(domainLcuuidToID[subDomain.Domain]), message.MetadataSubDomainID(subDomain.ID),
+			message.MetadataDB(db), message.MetadataSubDomain(*subDomain), message.MetadataDomain(*lcuuidToDomain[subDomain.Domain]),
 		)
 	}
 	return nil
