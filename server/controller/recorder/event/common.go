@@ -304,7 +304,7 @@ func (i *IPTool) getL3DeviceOptionsByPodNodeID(id int) (opts []eventapi.TagField
 func (i *IPTool) getDeviceNameFromAllByID(deviceType, deviceID int) string {
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_HOST:
-		device := findFromAllByID[mysqlmodel.Host](i.metadata.DB, deviceID)
+		device := findFromAllByID[mysqlmodel.Host](i.metadata.GetDB(), deviceID)
 		if device == nil {
 			log.Error(dbSoftDeletedResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, deviceID), i.metadata.LogPrefixes)
 		} else {

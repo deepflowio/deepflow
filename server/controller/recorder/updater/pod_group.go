@@ -120,7 +120,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		PodNamespaceID: podNamespaceID,
 		PodClusterID:   podClusterID,
 		SubDomain:      cloudItem.SubDomainLcuuid,
-		Domain:         p.metadata.Domain.Lcuuid,
+		Domain:         p.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
 	}

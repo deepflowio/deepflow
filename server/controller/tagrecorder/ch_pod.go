@@ -82,9 +82,9 @@ func (c *ChPod) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (ke
 		PodGroupID:   source.PodGroupID,
 		IconID:       iconID,
 		PodServiceID: source.PodServiceID,
-		TeamID:       md.TeamID,
-		DomainID:     md.DomainID,
-		SubDomainID:  md.SubDomainID,
+		TeamID:       md.GetTeamID(),
+		DomainID:     md.GetDomainID(),
+		SubDomainID:  md.GetSubDomainID(),
 	})
 	return
 }

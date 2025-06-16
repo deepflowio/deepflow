@@ -125,9 +125,9 @@ func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysqlmodel.Po
 			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
-			TeamID:      md.TeamID,
-			DomainID:    md.DomainID,
-			SubDomainID: md.SubDomainID,
+			TeamID:      md.GetTeamID(),
+			DomainID:    md.GetDomainID(),
+			SubDomainID: md.GetSubDomainID(),
 		})
 	}
 	return

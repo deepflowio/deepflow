@@ -122,8 +122,8 @@ func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmode
 			ChIDBase: mysqlmodel.ChIDBase{ID: source.ID},
 			Key:      k,
 			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			TeamID:   md.GetTeamID(),
+			DomainID: md.GetDomainID(),
 		})
 	}
 	return

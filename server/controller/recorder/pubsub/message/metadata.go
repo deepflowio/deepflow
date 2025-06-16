@@ -17,54 +17,49 @@
 package message
 
 import (
-	"fmt"
-
+	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
-	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type Metadata struct {
-	ORGID       int
-	TeamID      int
-	DomainID    int
-	SubDomainID int
-
-	LogPrefixes        []logger.Prefix
+	metadata.Platform  // Base metadata containing platform resource common fields
 	AdditionalMetadata // Additional metadata for specific message types
 }
 
-func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
+func NewMetadata(options ...func(*Metadata)) *Metadata {
 	md := &Metadata{
-		ORGID: orgID,
+		metadata.Platform{},
+		AdditionalMetadata{},
 	}
-	md.LogPrefixes = []logger.Prefix{logger.NewORGPrefix(orgID)}
 	for _, option := range options {
 		option(md)
 	}
 	return md
 }
 
-func MetadataSubDomainID(id int) func(*Metadata) {
+func MetadataPlatform(base metadata.Platform) func(*Metadata) {
 	return func(m *Metadata) {
-		m.SubDomainID = id
-		if m.SubDomainID != 0 {
-			m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(id))
-		}
+		m.Platform = base
 	}
 }
 
-func MetadataTeamID(id int) func(*Metadata) {
+func MetadataDB(db *mysql.DB) func(*Metadata) {
 	return func(m *Metadata) {
-		m.TeamID = id
-		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(id))
+		m.SetDB(db)
 	}
 }
 
-func MetadataDomainID(id int) func(*Metadata) {
+func MetadataDomain(domain mysqlModel.Domain) func(*Metadata) {
 	return func(m *Metadata) {
-		m.DomainID = id
-		m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(id))
+		m.SetDomain(domain)
+	}
+}
+
+func MetadataSubDomain(subDomain mysqlModel.SubDomain) func(*Metadata) {
+	return func(m *Metadata) {
+		m.SetSubDomain(subDomain)
 	}
 }
 
@@ -80,50 +75,15 @@ func MetadataToolDataSet(ds *tool.DataSet) func(*Metadata) {
 	}
 }
 
-func MetadataDB(db *mysql.DB) func(*Metadata) {
-	return func(m *Metadata) {
-		m.AdditionalMetadata.DB = db
-	}
-}
-
 type AdditionalMetadata struct { // TODO better
 	SoftDelete  bool          // for message type of delete action
 	ToolDataSet *tool.DataSet // for message type of resource event
-	DB          *mysql.DB     // for message type of resource event
 }
 
-func (m *AdditionalMetadata) GetSoftDelete() bool {
+func (m AdditionalMetadata) GetSoftDelete() bool {
 	return m.SoftDelete
 }
 
-func (m *AdditionalMetadata) GetToolDataSet() *tool.DataSet {
+func (m AdditionalMetadata) GetToolDataSet() *tool.DataSet {
 	return m.ToolDataSet
-}
-
-func (m *AdditionalMetadata) GetDB() *mysql.DB {
-	return m.DB
-}
-
-type DomainIDLogPrefix struct {
-	ID int
-}
-
-func NewDomainPrefix(id int) logger.Prefix {
-	return &DomainIDLogPrefix{id}
-}
-
-func (p *DomainIDLogPrefix) Prefix() string {
-	return fmt.Sprintf("[DomainID-%d]", p.ID)
-}
-
-type SubDomainIDLogPrefix struct {
-	ID int
-}
-
-func NewSubDomainPrefix(id int) logger.Prefix {
-	return &SubDomainIDLogPrefix{id}
-}
-
-func (p *SubDomainIDLogPrefix) Prefix() string {
-	return fmt.Sprintf("[SubDomainID-%d]", p.ID)
 }

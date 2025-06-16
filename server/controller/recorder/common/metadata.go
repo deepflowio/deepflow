@@ -17,104 +17,29 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
-	"github.com/deepflowio/deepflow/server/libs/logger"
 )
-
-type MetadataBase struct {
-	ORGID       int       // org id
-	DB          *mysql.DB // org database connection
-	Domain      *DomainInfo
-	SubDomain   *SubDomainInfo
-	LogPrefixes []logger.Prefix
-}
-
-func NewMetadataBase(orgID int) (MetadataBase, error) {
-	db, err := mysql.GetDB(orgID)
-	return MetadataBase{
-		ORGID:       orgID,
-		DB:          db,
-		Domain:      new(DomainInfo),
-		SubDomain:   new(SubDomainInfo),
-		LogPrefixes: []logger.Prefix{logger.NewORGPrefix(orgID)},
-	}, err
-}
 
 type Metadata struct {
 	Config config.RecorderConfig
-	MetadataBase
+	metadata.Platform
 }
 
 func NewMetadata(cfg config.RecorderConfig, orgID int) (*Metadata, error) {
-	db, err := mysql.GetDB(orgID)
+	platformRscMd, err := metadata.NewPlatform(orgID)
+	if err != nil {
+		return nil, err
+	}
 	return &Metadata{
-		Config: cfg,
-		MetadataBase: MetadataBase{
-			ORGID:       orgID,
-			DB:          db,
-			Domain:      new(DomainInfo),
-			SubDomain:   new(SubDomainInfo),
-			LogPrefixes: []logger.Prefix{logger.NewORGPrefix(orgID)},
-		},
+		Config:   cfg,
+		Platform: platformRscMd,
 	}, err
 }
 
-func (m *Metadata) Copy() *Metadata {
+func (m Metadata) Copy() *Metadata {
 	return &Metadata{
-		Config: m.Config,
-		MetadataBase: MetadataBase{
-			ORGID:       m.ORGID,
-			DB:          m.DB,
-			Domain:      m.Domain,
-			SubDomain:   m.SubDomain,
-			LogPrefixes: m.LogPrefixes[:],
-		},
+		Config:   m.Config,
+		Platform: m.Platform.Copy(),
 	}
-}
-
-func (m *MetadataBase) GetDB() *mysql.DB {
-	return m.DB
-}
-
-func (m *MetadataBase) GetORGID() int {
-	return m.ORGID
-}
-
-func (m *MetadataBase) GetTeamID() int {
-	if m.SubDomain.TeamID != 0 {
-		return m.SubDomain.TeamID
-	} else {
-		return m.Domain.TeamID
-	}
-}
-
-func (m *MetadataBase) GetDomainInfo() *DomainInfo {
-	return m.Domain
-}
-
-func (m *MetadataBase) GetSubDomainInfo() *SubDomainInfo {
-	return m.SubDomain
-}
-
-func (m *MetadataBase) SetDomain(domain mysqlmodel.Domain) {
-	m.Domain = &DomainInfo{domain}
-	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
-	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
-}
-
-func (m *MetadataBase) SetSubDomain(subDomain mysqlmodel.SubDomain) {
-	m.SubDomain = &SubDomainInfo{subDomain}
-	if subDomain.TeamID != 0 {
-		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
-	}
-	m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(subDomain.Name))
-}
-
-type DomainInfo struct {
-	mysqlmodel.Domain
-}
-type SubDomainInfo struct {
-	mysqlmodel.SubDomain
 }

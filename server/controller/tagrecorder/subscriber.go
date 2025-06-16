@@ -269,9 +269,9 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
 	dbItems := m.GetMySQLItems().([]*MT)
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
 	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
@@ -281,9 +281,9 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 	s.updateChTagLastUpdatedAt(md, db)
@@ -323,13 +323,13 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		if hooker, ok := hasHooker.(deletePageHooker[MT, MDT, MDPT]); ok {
 			newItems = hooker.beforeDeletePage(items, m)
 		} else {
-			log.Errorf("hooker type error", logger.NewORGPrefix(md.ORGID))
+			log.Errorf("hooker type error", logger.NewORGPrefix(md.GetORGID()))
 		}
 	}
 
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID()) // TODO use md.GetDB() instead
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
 	keys, chItems := s.generateKeyTargets(md, newItems)
 	if len(chItems) == 0 {
@@ -347,12 +347,12 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // Delete resource by domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
-	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err, logger.NewORGPrefix(md.ORGID))
+	if err := db.Where("domain_id = ?", md.GetDomainID()).Delete(&chModel).Error; err != nil {
+		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 	}
 	s.updateChTagLastUpdatedAt(md, db)
 }
@@ -360,12 +360,12 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 // Delete resource by sub domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
-	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err, logger.NewORGPrefix(md.ORGID))
+	if err := db.Where("sub_domain_id = ?", md.GetSubDomainID()).Delete(&chModel).Error; err != nil {
+		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 	}
 	s.updateChTagLastUpdatedAt(md, db)
 }
@@ -373,11 +373,11 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 // Update team_id of resource by sub domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.ORGID)
+	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
-	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
+	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.GetSubDomainID()).Update("team_id", md.GetTeamID()).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
 	s.updateChTagLastUpdatedAt(md, db)

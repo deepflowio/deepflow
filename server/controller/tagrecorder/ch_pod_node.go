@@ -78,9 +78,9 @@ func (c *ChPodNode) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodN
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		IconID:       iconID,
-		TeamID:       md.TeamID,
-		DomainID:     md.DomainID,
-		SubDomainID:  md.SubDomainID,
+		TeamID:       md.GetTeamID(),
+		DomainID:     md.GetDomainID(),
+		SubDomainID:  md.GetSubDomainID(),
 	})
 	return
 }

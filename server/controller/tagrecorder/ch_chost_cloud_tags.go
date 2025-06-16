@@ -94,11 +94,11 @@ func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmod
 	}
 	bytes, err := json.Marshal(source.LearnedCloudTags)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(md.ORGID))
+		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 		return
 	}
 	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChChostCloudTags{{
-		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID}, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
+		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID}, CloudTags: string(bytes), TeamID: md.GetTeamID(), DomainID: md.GetDomainID()}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

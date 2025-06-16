@@ -144,7 +144,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		VlanTag:    0,
 		VPCID:      vpcID,
 		SubDomain:  cloudItem.SubDomainLcuuid,
-		Domain:     i.metadata.Domain.Lcuuid,
+		Domain:     i.metadata.GetDomainLcuuid(),
 		Region:     cloudItem.RegionLcuuid,
 		NetnsID:    cloudItem.NetnsID,
 		VtapID:     cloudItem.VTapID,

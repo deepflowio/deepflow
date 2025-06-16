@@ -120,7 +120,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 	if cloudData.Verified {
-		if (!slices.Contains(rcommon.UNCHECK_NETWORK_DOMAINS, d.metadata.Domain.Type) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
+		if (!slices.Contains(rcommon.UNCHECK_NETWORK_DOMAINS, d.metadata.GetDomainInfo().Type) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
 			log.Info("domain has no networks or vinterfaces, does nothing", d.metadata.LogPrefixes)
 			return DataMissingError
 		}
@@ -144,7 +144,7 @@ func (d *domain) refresh(cloudData cloudmodel.Resource) {
 
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
-	listener := listener.NewWholeDomain(d.metadata.Domain.Lcuuid, d.cache, d.eventQueue)
+	listener := listener.NewWholeDomain(d.metadata.GetDomainLcuuid(), d.cache, d.eventQueue)
 	domainUpdatersInUpdateOrder := d.getUpdatersInOrder(cloudData)
 	d.executeUpdaters(domainUpdatersInUpdateOrder)
 	d.notifyOnResourceChanged(domainUpdatersInUpdateOrder)
@@ -284,7 +284,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	d.fillStatsd(syncAt)
 
 	var domain mysqlmodel.Domain
-	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
 		return
@@ -302,7 +302,7 @@ func (d *domain) fillStatsd(syncAt time.Time) {
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	var domain mysqlmodel.Domain
-	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
+	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
 		return

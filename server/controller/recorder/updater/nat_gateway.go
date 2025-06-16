@@ -93,7 +93,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 		Label:       cloudItem.Label,
 		UID:         cloudItem.Label,
 		FloatingIPs: cloudItem.FloatingIPs,
-		Domain:      g.metadata.Domain.Lcuuid,
+		Domain:      g.metadata.GetDomainLcuuid(),
 		Region:      cloudItem.RegionLcuuid,
 		VPCID:       vpcID,
 	}

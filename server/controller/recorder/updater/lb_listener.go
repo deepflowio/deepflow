@@ -96,7 +96,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 		Label:    cloudItem.Label,
 		Port:     cloudItem.Port,
 		Protocol: cloudItem.Protocol,
-		Domain:   l.metadata.Domain.Lcuuid,
+		Domain:   l.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

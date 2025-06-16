@@ -75,8 +75,8 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 		HostID:   source.HostID,
 		Hostname: source.Hostname,
 		IP:       source.IP,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		TeamID:   md.GetTeamID(),
+		DomainID: md.GetDomainID(),
 		SubnetID: source.NetworkID,
 	})
 	return

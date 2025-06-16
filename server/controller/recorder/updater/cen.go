@@ -95,7 +95,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysqlmodel.CEN, b
 	dbItem := &mysqlmodel.CEN{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
-		Domain: c.metadata.Domain.Lcuuid,
+		Domain: c.metadata.GetDomainLcuuid(),
 		VPCIDs: rcommon.IntSliceToString(vpcIDs),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid

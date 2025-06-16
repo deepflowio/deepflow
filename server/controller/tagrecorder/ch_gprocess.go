@@ -82,9 +82,9 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }

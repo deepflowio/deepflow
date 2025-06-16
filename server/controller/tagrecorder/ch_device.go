@@ -86,8 +86,8 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM)
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -186,8 +186,8 @@ func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.H
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -285,8 +285,8 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -368,8 +368,8 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *mysqlmod
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -452,8 +452,8 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -539,8 +539,8 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.LB)
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -624,8 +624,8 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *mysql
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -709,8 +709,8 @@ func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *mys
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -793,9 +793,9 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 
 	// service
@@ -806,9 +806,9 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -888,9 +888,9 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.Po
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -970,9 +970,9 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *mysqlmod
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1055,9 +1055,9 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 		IconID:      iconID,
 		Hostname:    source.Hostname,
 		IP:          source.IP,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1144,9 +1144,9 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1228,9 +1228,9 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 		DeviceID:    gid,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1318,8 +1318,8 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *mys
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }

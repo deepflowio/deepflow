@@ -116,7 +116,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.WANIP
 	}
 	dbItem := &mysqlmodel.WANIP{
 		IP:           ip,
-		Domain:       i.metadata.Domain.Lcuuid,
+		Domain:       i.metadata.GetDomainLcuuid(),
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
 		SubnetID:     subnetID,

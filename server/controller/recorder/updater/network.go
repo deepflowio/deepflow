@@ -96,7 +96,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysqlmode
 		Shared:         cloudItem.Shared,
 		NetType:        cloudItem.NetType,
 		SubDomain:      cloudItem.SubDomainLcuuid,
-		Domain:         n.metadata.Domain.Lcuuid,
+		Domain:         n.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
 		VPCID:          vpcID,

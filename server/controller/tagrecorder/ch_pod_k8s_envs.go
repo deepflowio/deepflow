@@ -90,9 +90,9 @@ func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodK8sEnvs{{
 		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Envs:        envs,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 

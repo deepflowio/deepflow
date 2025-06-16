@@ -79,7 +79,7 @@ func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResourc
 
 	// 遍历 subdomain 字典，删除 cloud 未返回的 subdomain 资源
 	for _, sd := range s.refreshers {
-		if _, ok := cloudData[sd.metadata.SubDomain.Lcuuid]; !ok {
+		if _, ok := cloudData[sd.metadata.GetSubDomainLcuuid()]; !ok {
 			sd.clear()
 		}
 	}
@@ -135,7 +135,7 @@ func newSubDomain(eventQueue *queue.OverwriteQueue, md *rcommon.Metadata, domain
 }
 
 func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
-	if err := s.shouldRefresh(s.metadata.SubDomain.Lcuuid, cloudData); err != nil {
+	if err := s.shouldRefresh(s.metadata.GetSubDomainLcuuid(), cloudData); err != nil {
 		return err
 	}
 
@@ -160,13 +160,13 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 	// for process
 	s.cache.RefreshVTaps()
 
-	listener := listener.NewWholeSubDomain(s.metadata.Domain.Lcuuid, s.metadata.SubDomain.Lcuuid, s.cache, s.eventQueue)
+	listener := listener.NewWholeSubDomain(s.metadata.GetDomainLcuuid(), s.metadata.GetSubDomainLcuuid(), s.cache, s.eventQueue)
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudData)
 	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
 	s.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
 	listener.OnUpdatersCompleted()
 
-	s.updateSyncedAt(s.metadata.SubDomain.Lcuuid, cloudData.SyncAt)
+	s.updateSyncedAt(s.metadata.GetSubDomainLcuuid(), cloudData.SyncAt)
 
 	log.Info("sub_domain sync refresh completed", s.metadata.LogPrefixes)
 }
@@ -285,7 +285,7 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
 func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
 	var subDomain mysqlmodel.SubDomain
-	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.SubDomain.Lcuuid).First(&subDomain).Error
+	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.GetSubDomainLcuuid()).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)
 		return
