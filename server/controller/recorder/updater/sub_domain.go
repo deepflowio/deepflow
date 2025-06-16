@@ -85,7 +85,7 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*metad
 		DisplayName: cloudItem.DisplayName,
 		ClusterID:   cloudItem.ClusterID,
 		Config:      cloudItem.Config,
-		Domain:      d.metadata.Domain.Lcuuid,
+		Domain:      d.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

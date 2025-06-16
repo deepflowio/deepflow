@@ -76,7 +76,7 @@ func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResourc
 
 	// 遍历 subdomain 字典，删除 cloud 未返回的 subdomain 资源
 	for _, sd := range s.refreshers {
-		if _, ok := cloudData[sd.metadata.SubDomain.Lcuuid]; !ok {
+		if _, ok := cloudData[sd.metadata.GetSubDomainLcuuid()]; !ok {
 			sd.clear()
 		}
 	}
@@ -131,17 +131,14 @@ func newSubDomain(md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *
 		cache:             cache,
 		pubsub:            pubsub.GetPubSub(pubsub.PubSubTypeWholeSubDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
-			md.GetORGID(),
-			message.MetadataDomainLcuuid(md.GetDomainInfo().Lcuuid),
-			message.MetadataSubDomainLcuuid(md.GetSubDomainInfo().Lcuuid),
+			message.MetadataPlatform(md.Platform),
 			message.MetadataToolDataSet(cache.ToolDataSet),
-			message.MetadataDB(md.GetDB()),
 		),
 	}
 }
 
 func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
-	if err := s.shouldRefresh(s.metadata.SubDomain.Lcuuid, cloudData); err != nil {
+	if err := s.shouldRefresh(s.metadata.GetSubDomainLcuuid(), cloudData); err != nil {
 		return err
 	}
 
@@ -171,7 +168,7 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 	s.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
 	s.pubsub.PublishChange(s.msgMetadata)
 
-	s.updateSyncedAt(s.metadata.SubDomain.Lcuuid, cloudData.SyncAt)
+	s.updateSyncedAt(s.metadata.GetSubDomainLcuuid(), cloudData.SyncAt)
 
 	log.Info("sub_domain sync refresh completed", s.metadata.LogPrefixes)
 }
@@ -290,7 +287,7 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
 func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
 	var subDomain metadbmodel.SubDomain
-	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.SubDomain.Lcuuid).First(&subDomain).Error
+	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.GetSubDomainLcuuid()).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)
 		return

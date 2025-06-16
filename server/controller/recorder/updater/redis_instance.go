@@ -95,7 +95,7 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 		Version:      cloudItem.Version,
 		InternalHost: cloudItem.InternalHost,
 		PublicHost:   cloudItem.PublicHost,
-		Domain:       r.metadata.Domain.Lcuuid,
+		Domain:       r.metadata.GetDomainLcuuid(),
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,

@@ -111,7 +111,7 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 		PodNamespaceID: podNamespaceID,
 		PodNum:         cloudItem.PodNum,
 		SubDomain:      cloudItem.SubDomainLcuuid,
-		Domain:         r.metadata.Domain.Lcuuid,
+		Domain:         r.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
 	}

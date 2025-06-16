@@ -78,8 +78,8 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *metadbmodel.VPC) (k
 		Name:     sourceName,
 		UID:      source.UID,
 		IconID:   iconID,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		TeamID:   md.GetTeamID(),
+		DomainID: md.GetDomainID(),
 	})
 	return
 }

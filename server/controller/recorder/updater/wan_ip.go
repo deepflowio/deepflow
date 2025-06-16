@@ -116,7 +116,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 	}
 	dbItem := &metadbmodel.WANIP{
 		IP:           ip,
-		Domain:       i.metadata.Domain.Lcuuid,
+		Domain:       i.metadata.GetDomainLcuuid(),
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
 		SubnetID:     subnetID,
