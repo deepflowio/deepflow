@@ -66,7 +66,10 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::environment::{free_memory_check, running_in_container},
+    utils::{
+        environment::{free_memory_check, running_in_container},
+        stats,
+    },
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
@@ -1676,7 +1679,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 max_escape: conf.global.communication.max_escape_duration,
             },
             stats: StatsConfig {
-                interval: Duration::from_secs(10), // TODO: make it configurable
+                interval: stats::STATS_MIN_INTERVAL, // TODO: make it configurable
                 host: conf.global.self_monitoring.hostname.clone(),
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.global.communication.ingester_port,
