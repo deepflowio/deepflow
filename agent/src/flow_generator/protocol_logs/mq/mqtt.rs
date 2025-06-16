@@ -562,7 +562,7 @@ impl MqttLog {
                 self.perf_stats.as_mut().map(|p| p.inc_req_err());
                 L7ResponseStatus::ServerError
             }
-            _ => L7ResponseStatus::Timeout,
+            _ => L7ResponseStatus::ParseFailed,
         }
     }
 }
