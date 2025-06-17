@@ -27,7 +27,7 @@ const (
 
 // sqls to create dict using subscriber framework
 const (
-	SQL_SOURCE = "SOURCE(MYSQL(PORT %d USER '%s' PASSWORD '%s' %sDB %s TABLE %s INVALIDATE_QUERY 'SELECT updated_at FROM ch_tag_last_updated_at WHERE table_name = %s'))\n"
+	SQL_SOURCE = "SOURCE(MYSQL(PORT %d USER '%s' PASSWORD '%s' %sDB %s TABLE %s INVALIDATE_QUERY `SELECT updated_at FROM ch_tag_last_updated_at WHERE table_name = '%s'`))\n"
 
 	CREATE_DEVICE_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
