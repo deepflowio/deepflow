@@ -39,7 +39,7 @@ type MySQLChModel interface {
 type SubscriberMetaDBChModel interface {
 	metadbmodel.ChDevice | metadbmodel.ChAZ | metadbmodel.ChChost | metadbmodel.ChVPC | metadbmodel.ChNetwork | metadbmodel.ChLBListener |
 		metadbmodel.ChPodCluster | metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChPodIngress | metadbmodel.ChPodService |
-		metadbmodel.ChPodGroup | metadbmodel.ChPod | metadbmodel.ChGProcess | metadbmodel.ChOSAppTag | metadbmodel.ChOSAppTags |
+		metadbmodel.ChPodGroup | metadbmodel.ChPod | metadbmodel.ChGProcess |
 		metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
 		metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag |
 		metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations | metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodK8sLabel |
@@ -53,11 +53,11 @@ type SubscriberMetaDBChModel interface {
 type ChModelKey interface {
 	PrometheusTargetLabelKey | PrometheusAPPLabelKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey |
 		PortIDKey | PortIPKey | PortDeviceKey | IPRelationKey | TapTypeKey | NodeTypeKey | PolicyKey |
-		IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+		IDKey | DeviceKey | IDKeyKey
 }
 
 type SubscriberChModelKey interface {
-	IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+	IDKey | DeviceKey | IDKeyKey
 
 	Map() map[string]interface{}
 }

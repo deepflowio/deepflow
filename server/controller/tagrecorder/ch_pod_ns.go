@@ -58,6 +58,7 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 

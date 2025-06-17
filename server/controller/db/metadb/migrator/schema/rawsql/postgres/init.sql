@@ -2511,19 +2511,19 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
-    pid                     INTEGER NOT NULL,
+    id                      INTEGER NOT NULL,
     key                     VARCHAR(256) NOT NULL,
     value                   VARCHAR(256),
     team_id                 INTEGER,
     domain_id               INTEGER,
     sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (pid, key)
+    PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_os_app_tag;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
-    pid                     INTEGER NOT NULL PRIMARY KEY,
+    id                      INTEGER NOT NULL PRIMARY KEY,
     os_app_tags             TEXT,
     team_id                 INTEGER,
     domain_id               INTEGER,

@@ -17,87 +17,89 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/common"
+	"encoding/json"
+	"strings"
+
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTags struct {
-	SubscriberComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
-		metadbmodel.Process,
-		metadbmodel.ChOSAppTags,
-		OSAPPTagsKey,
-	]
+	UpdaterComponent[metadbmodel.ChOSAppTags, IDKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
-	mng := &ChOSAppTags{
-		newSubscriberComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
-			metadbmodel.Process,
-			metadbmodel.ChOSAppTags,
-			OSAPPTagsKey,
-		](
-			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAGS,
+	updater := &ChOSAppTags{
+		newUpdaterComponent[metadbmodel.ChOSAppTags, IDKey](
+			RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
-	mng.subscriberDG = mng
-	return mng
+	updater.updaterDG = updater
+	return updater
 }
 
-// onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
+func (o *ChOSAppTags) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChOSAppTags, bool) {
+	var processes []metadbmodel.Process
+	keyToItem := make(map[IDKey]metadbmodel.ChOSAppTags)
+	gidToOsAppTagMap := make(map[int]map[string]string)
+
+	err := db.Find(&processes).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err), db.LogPrefixORGID)
+		return nil, false
+	}
+
+	for _, process := range processes {
+		gid := int(process.GID)
+		osAppTagsMap := map[string]string{}
+		splitOsAppTags := strings.Split(process.OSAPPTags, ", ")
+		for _, singleOsAppTag := range splitOsAppTags {
+			splitSingleTag := strings.Split(singleOsAppTag, ":")
+			if len(splitSingleTag) == 2 {
+				osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
+			}
+		}
+		if len(osAppTagsMap) > 0 {
+			osAppTagMap, ok := gidToOsAppTagMap[gid]
+			if ok {
+				for key, value := range osAppTagsMap {
+					osAppTagMap[key] = value
+				}
+			} else {
+				gidToOsAppTagMap[gid] = osAppTagsMap
+			}
+		}
+	}
+
+	for gid, osAppTagMap := range gidToOsAppTagMap {
+		osAppTagsStr, err := json.Marshal(osAppTagMap)
+		if err != nil {
+			log.Error(err)
+			return nil, false
+		}
+		key := IDKey{
+			ID: gid,
+		}
+		keyToItem[key] = metadbmodel.ChOSAppTags{
+			ID:        gid,
+			OSAPPTags: string(osAppTagsStr),
+		}
+	}
+
+	return keyToItem, true
+}
+
+func (o *ChOSAppTags) generateKey(dbItem metadbmodel.ChOSAppTags) IDKey {
+	return IDKey{ID: dbItem.ID}
+}
+
+func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem metadbmodel.ChOSAppTags) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.OSAPPTags.IsDifferent() {
-		osAppTags, _ := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetNew())
-		if osAppTags != "" {
-			updateInfo["os_app_tags"] = osAppTags
-		}
+	if oldItem.OSAPPTags != newItem.OSAPPTags {
+		updateInfo["os_app_tags"] = newItem.OSAPPTags
 	}
-	targetKey := OSAPPTagsKey{PID: sourceID}
 	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChOSAppTags
-		db.Where("pid = ?", sourceID).First(&chItem)
-		if chItem.PID == 0 {
-			c.SubscriberComponent.dbOperator.add(
-				[]OSAPPTagsKey{targetKey},
-				[]metadbmodel.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
-				db,
-			)
-		}
+		return updateInfo, true
 	}
-	c.updateOrSync(db, targetKey, updateInfo)
-}
-
-// onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []OSAPPTagsKey, targets []metadbmodel.ChOSAppTags) {
-	if source.OSAPPTags == "" {
-		return
-	}
-	osAppTags, _ := common.StrToJsonAndMap(source.OSAPPTags)
-	return []OSAPPTagsKey{{PID: source.ID}}, []metadbmodel.ChOSAppTags{{
-		PID:         source.ID,
-		OSAPPTags:   osAppTags,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
-	}}
-}
-
-// softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []metadbmodel.ChOSAppTags, db *metadb.DB) {
-
+	return nil, false
 }

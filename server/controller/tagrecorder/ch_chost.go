@@ -56,6 +56,7 @@ func NewChChost() *ChChost {
 		),
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 

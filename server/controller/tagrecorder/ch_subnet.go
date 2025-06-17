@@ -58,7 +58,7 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
-
+	mng.softDelete = true
 	return mng
 }
 

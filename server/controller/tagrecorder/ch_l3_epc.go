@@ -58,6 +58,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
