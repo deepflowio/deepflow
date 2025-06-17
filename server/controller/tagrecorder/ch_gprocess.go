@@ -61,6 +61,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	}
 	mng.subscriberDG = mng
 	mng.hookers[hookerDeletePage] = mng
+	mng.softDelete = true
 	return mng
 }
 

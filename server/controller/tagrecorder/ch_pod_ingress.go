@@ -56,6 +56,7 @@ func NewChPodIngress() *ChPodIngress {
 		),
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
