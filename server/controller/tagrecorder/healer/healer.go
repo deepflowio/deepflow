@@ -308,7 +308,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	if len(sourceIDs) == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer republish add (ids: %v)", h.targetDataGen.getResourceType(), sourceIDs, h.msgMetadata.LogPrefixes)
+	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, h.msgMetadata.LogPrefixes)
 	var dbItems []*MT
 	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.sourceDataGen.getRealIDField()), sourceIDs).Find(&dbItems).Error; err != nil {
 		log.Errorf("failed to find %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
@@ -330,9 +330,13 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 	if len(targetIDs) == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer force delete data, ids: %v", h.targetDataGen.getResourceType(), targetIDs, h.msgMetadata.LogPrefixes)
+	log.Infof("tagrecorder %s healer (source: %s) force delete data, ids: %v", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, h.msgMetadata.LogPrefixes)
 	var dbItems []*CT
-	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.targetDataGen.getRealIDField()), targetIDs).Delete(&dbItems).Error; err != nil {
+	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.targetDataGen.getRealIDField()), targetIDs)
+	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
+		delExec = delExec.Where("device_type IN ?", h.targetDataGen.getChDeviceTypes())
+	}
+	if err := delExec.Delete(&dbItems).Error; err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 		return err
 	}
