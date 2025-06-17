@@ -57,28 +57,6 @@ func (k IDKeyKey) Map() map[string]interface{} {
 	}
 }
 
-type OSAPPTagKey struct {
-	PID int    `json:"pid"`
-	Key string `json:"key"`
-}
-
-func (k OSAPPTagKey) Map() map[string]interface{} {
-	return map[string]interface{}{
-		"pid":   k.PID,
-		"`key`": k.Key,
-	}
-}
-
-type OSAPPTagsKey struct {
-	PID int `json:"pid"`
-}
-
-func (k OSAPPTagsKey) Map() map[string]interface{} {
-	return map[string]interface{}{
-		"pid": k.PID,
-	}
-}
-
 type IPResourceKey struct {
 	IP       string
 	SubnetID int

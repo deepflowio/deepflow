@@ -23,10 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
-const (
-	syncTriggerKeyPID = "pid"
-)
-
 type ChOSAppTag struct {
 	SubscriberComponent[
 		*message.ProcessAdd,
@@ -37,7 +33,7 @@ type ChOSAppTag struct {
 		message.ProcessDelete,
 		metadbmodel.Process,
 		metadbmodel.ChOSAppTag,
-		OSAPPTagKey,
+		IDKeyKey,
 	]
 }
 
@@ -52,7 +48,7 @@ func NewChOSAppTag() *ChOSAppTag {
 			message.ProcessDelete,
 			metadbmodel.Process,
 			metadbmodel.ChOSAppTag,
-			OSAPPTagKey,
+			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
@@ -63,37 +59,37 @@ func NewChOSAppTag() *ChOSAppTag {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
-	keysToAdd := make([]OSAPPTagKey, 0)
+	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChOSAppTag, 0)
-	keysToDelete := make([]OSAPPTagKey, 0)
+	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChOSAppTag, 0)
-
+	gid := int(fieldsUpdate.GID.GetNew())
 	if fieldsUpdate.OSAPPTags.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetNew())
 		_, old := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetOld())
 
 		for k, v := range new {
 			oldV, ok := old[k]
-			targetKey := c.newTargetKey(sourceID, k)
+			targetKey := NewIDKeyKey(gid, k)
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChOSAppTag{
-					PID:   sourceID,
-					Key:   k,
-					Value: v,
+					ChIDBase: metadbmodel.ChIDBase{ID: gid},
+					Key:      k,
+					Value:    v,
 				})
 				continue
 			}
 			updateInfo := make(map[string]interface{})
 			if oldV != v {
 				var chItem metadbmodel.ChOSAppTag
-				db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
-				if chItem.PID == 0 {
+				db.Where("id = ? and `key` = ?", gid, k).First(&chItem) // TODO common
+				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
 					targetsToAdd = append(targetsToAdd, metadbmodel.ChOSAppTag{
-						PID:   sourceID,
-						Key:   k,
-						Value: v,
+						ChIDBase: metadbmodel.ChIDBase{ID: gid},
+						Key:      k,
+						Value:    v,
 					})
 					continue
 				}
@@ -103,10 +99,10 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, c.newTargetKey(sourceID, k))
+				keysToDelete = append(keysToDelete, NewIDKeyKey(gid, k))
 				targetsToDelete = append(targetsToDelete, metadbmodel.ChOSAppTag{
-					PID: sourceID,
-					Key: k,
+					ChIDBase: metadbmodel.ChIDBase{ID: gid},
+					Key:      k,
 				})
 			}
 		}
@@ -120,13 +116,13 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []OSAPPTagKey, targets []metadbmodel.ChOSAppTag) {
+func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []IDKeyKey, targets []metadbmodel.ChOSAppTag) {
 	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
-
+	gid := int(source.GID)
 	for k, v := range osAppTagsMap {
-		keys = append(keys, c.newTargetKey(source.ID, k))
+		keys = append(keys, NewIDKeyKey(gid, k))
 		targets = append(targets, metadbmodel.ChOSAppTag{
-			PID:         source.ID,
+			ChIDBase:    metadbmodel.ChIDBase{ID: gid},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.TeamID,
@@ -135,10 +131,6 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 		})
 	}
 	return
-}
-
-func (c *ChOSAppTag) newTargetKey(sourceID int, key string) OSAPPTagKey {
-	return OSAPPTagKey{PID: sourceID, Key: key}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

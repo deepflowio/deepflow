@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"slices"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -33,7 +35,7 @@ type ChOSAppTags struct {
 		message.ProcessDelete,
 		metadbmodel.Process,
 		metadbmodel.ChOSAppTags,
-		OSAPPTagsKey,
+		IDKey,
 	]
 }
 
@@ -48,12 +50,13 @@ func NewChOSAppTags() *ChOSAppTags {
 			message.ProcessDelete,
 			metadbmodel.Process,
 			metadbmodel.ChOSAppTags,
-			OSAPPTagsKey,
+			IDKey,
 		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
 	mng.subscriberDG = mng
+	mng.hookers[hookerDeletePage] = mng
 	return mng
 }
 
@@ -67,14 +70,15 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 			updateInfo["os_app_tags"] = osAppTags
 		}
 	}
-	targetKey := OSAPPTagsKey{PID: sourceID}
+	gid := int(fieldsUpdate.GID.GetNew())
+	targetKey := IDKey{ID: gid}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChOSAppTags
-		db.Where("pid = ?", sourceID).First(&chItem)
-		if chItem.PID == 0 {
+		db.Where("id = ?", gid).First(&chItem)
+		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
-				[]OSAPPTagsKey{targetKey},
-				[]metadbmodel.ChOSAppTags{{PID: sourceID, OSAPPTags: updateInfo["os_app_tags"].(string)}},
+				[]IDKey{targetKey},
+				[]metadbmodel.ChOSAppTags{{ChIDBase: metadbmodel.ChIDBase{ID: gid}, OSAPPTags: updateInfo["os_app_tags"].(string)}},
 				db,
 			)
 		}
@@ -83,13 +87,14 @@ func (c *ChOSAppTags) onResourceUpdated(sourceID int, fieldsUpdate *message.Proc
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []OSAPPTagsKey, targets []metadbmodel.ChOSAppTags) {
+func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []IDKey, targets []metadbmodel.ChOSAppTags) {
 	if source.OSAPPTags == "" {
 		return
 	}
+	gid := int(source.GID)
 	osAppTags, _ := common.StrToJsonAndMap(source.OSAPPTags)
-	return []OSAPPTagsKey{{PID: source.ID}}, []metadbmodel.ChOSAppTags{{
-		PID:         source.ID,
+	return []IDKey{{ID: gid}}, []metadbmodel.ChOSAppTags{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: gid},
 		OSAPPTags:   osAppTags,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
@@ -100,4 +105,15 @@ func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.P
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChOSAppTags) softDeletedTargetsUpdated(targets []metadbmodel.ChOSAppTags, db *metadb.DB) {
 
+}
+
+func (c *ChOSAppTags) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.ProcessDelete) []*metadbmodel.Process {
+	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		if slices.Contains(gids, item.GID) {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
 }

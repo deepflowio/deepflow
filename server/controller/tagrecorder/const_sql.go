@@ -356,26 +356,26 @@ const (
 		SQL_LAYOUT_FLAT
 	CREATE_OS_APP_TAG_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
-		"    `pid` UInt64,\n" +
+		"    `id` UInt64,\n" +
 		"    `key` String,\n" +
 		"    `value` String,\n" +
 		"    `team_id` UInt64,\n" +
 		"    `domain_id` UInt64,\n" +
 		"    `sub_domain_id` UInt64\n" +
 		")\n" +
-		"PRIMARY KEY pid, key\n" +
+		"PRIMARY KEY id, key\n" +
 		SQL_SOURCE +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_OS_APP_TAGS_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
-		"    `pid` UInt64,\n" +
+		"    `id` UInt64,\n" +
 		"    `os_app_tags` String,\n" +
 		"    `team_id` UInt64,\n" +
 		"    `domain_id` UInt64,\n" +
 		"    `sub_domain_id` UInt64\n" +
 		")\n" +
-		"PRIMARY KEY pid\n" +
+		"PRIMARY KEY id\n" +
 		SQL_SOURCE +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
