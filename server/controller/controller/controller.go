@@ -181,7 +181,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	// native field
 	native_field.Refresh()
 
-	license.BuildChecker().Init(cfg.MonitorCfg.Warrant)
+	license.BuildChecker().Init(*cfg)
 
 	router.SetInitStageForHealthChecker("Register routers init")
 	httpServer.SetControllerChecker(controllerCheck)
