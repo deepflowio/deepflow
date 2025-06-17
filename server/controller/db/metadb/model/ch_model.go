@@ -436,8 +436,8 @@ func (ChPodNSCloudTags) TableName() string {
 }
 
 type ChOSAppTag struct {
+	ChIDBase        `gorm:"embedded"`
 	ChUpdatedAtBase `gorm:"embedded"`
-	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
 	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
 	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
 	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
@@ -449,13 +449,9 @@ func (ChOSAppTag) TableName() string {
 	return "ch_os_app_tag"
 }
 
-func (c ChOSAppTag) GetID() int {
-	return c.PID
-}
-
 type ChOSAppTags struct {
+	ChIDBase        `gorm:"embedded"`
 	ChUpdatedAtBase `gorm:"embedded"`
-	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
 	OSAPPTags       string `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
 	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
@@ -464,10 +460,6 @@ type ChOSAppTags struct {
 
 func (ChOSAppTags) TableName() string {
 	return "ch_os_app_tags"
-}
-
-func (c ChOSAppTags) GetID() int {
-	return c.PID
 }
 
 type ChGProcess struct {
