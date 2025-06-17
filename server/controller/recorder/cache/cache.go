@@ -204,7 +204,7 @@ func (c *Cache) TryRefresh() bool {
 }
 
 func (c *Cache) triggerTagrecorderHealers() {
-	c.tagrecorderHealers.Run()
+	// c.tagrecorderHealers.Run()
 }
 
 // 所有缓存的刷新入口
