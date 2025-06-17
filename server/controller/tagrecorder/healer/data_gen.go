@@ -32,6 +32,7 @@ type dataGenerator interface {
 	getResourceType() string
 	getRealIDField() string
 	getIDToUpdatedAt() map[int]time.Time
+	getChDeviceTypes() []int
 
 	setRealIDField(realIDField string) dataGenerator
 	setHasDuplicateID(bool) dataGenerator
@@ -253,6 +254,10 @@ func (s *dataGeneratorComponent[GT]) getRealIDField() string {
 
 func (s *dataGeneratorComponent[GT]) getIDToUpdatedAt() map[int]time.Time {
 	return s.idToUpdatedAt
+}
+
+func (s *dataGeneratorComponent[GT]) getChDeviceTypes() []int {
+	return s.chDeviceTypes
 }
 
 func (s *dataGeneratorComponent[GT]) setHasDuplicateID(has bool) dataGenerator {
