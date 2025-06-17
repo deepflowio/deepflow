@@ -104,7 +104,7 @@ func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.D
 		ToolDataSet:      tool.NewDataSet(md),     // 各类资源的映射关系，用于按需进行数据转换
 	}
 	c.StartSelfHealing()
-	c.tagrecorderHealers = tagrecorderHealer.NewHealers(&md.MetadataBase)
+	c.tagrecorderHealers = tagrecorderHealer.NewHealers(md.MetadataBase)
 	return c
 }
 

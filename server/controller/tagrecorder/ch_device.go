@@ -87,8 +87,8 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.VM
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -186,8 +186,8 @@ func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.
 		IconID:     iconID,
 		Hostname:   source.Hostname,
 		IP:         source.IP,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -284,8 +284,8 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -367,8 +367,8 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -451,8 +451,8 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *metadb
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -538,8 +538,8 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.LB
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -623,8 +623,8 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *metad
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -708,8 +708,8 @@ func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *met
 		Name:       sourceName,
 		UID:        source.UID,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
@@ -792,9 +792,9 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *metadb
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 
 	// service
@@ -805,9 +805,9 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *metadb
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -887,9 +887,9 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.P
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -969,9 +969,9 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1054,9 +1054,9 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 		IconID:      iconID,
 		Hostname:    source.Hostname,
 		IP:          source.IP,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1143,9 +1143,9 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *metadb
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1226,9 +1226,9 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	})
 	return
 }
@@ -1306,8 +1306,8 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *met
 		DeviceID:   source.ID,
 		Name:       sourceName,
 		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		TeamID:     md.GetTeamID(),
+		DomainID:   md.GetDomainID(),
 	})
 	return
 }
