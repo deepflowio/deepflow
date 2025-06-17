@@ -153,8 +153,6 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChPodK8sLabels(),
 		NewChPodK8sAnnotation(),
 		NewChPodK8sAnnotations(),
-		NewChOSAppTag(),
-		NewChOSAppTags(),
 	}
 	return subscribers
 }
@@ -207,6 +205,7 @@ type SubscriberComponent[
 	dbOperator          operator[CT, KT]
 	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
 	hookers             map[int]interface{}
+	softDelete          bool
 }
 
 func newSubscriberComponent[
@@ -226,6 +225,7 @@ func newSubscriberComponent[
 		subResourceTypeName: sourceResourceTypeName,
 		resourceTypeName:    resourceTypeName,
 		hookers:             make(map[int]interface{}),
+		softDelete:          false,
 	}
 	s.initDBOperator()
 	return s
@@ -335,7 +335,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	if len(chItems) == 0 {
 		return
 	}
-	if md.SoftDelete {
+	if md.SoftDelete && s.softDelete {
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 		log.Infof("soft delete (values: %#v) success", chItems, db.LogPrefixORGID)
 	} else {
