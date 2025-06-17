@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS domain (
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT 1,
     state               INTEGER NOT NULL DEFAULT 1,
+    exceptions          BIGINT DEFAULT 0 CHECK (exceptions >= 0 AND exceptions <= 4294967295),
     controller_ip       VARCHAR(64),
     lcuuid              VARCHAR(64) DEFAULT '',
     synced_at           TIMESTAMP DEFAULT NULL,
@@ -44,7 +45,7 @@ TRUNCATE TABLE domain;
 COMMENT ON COLUMN domain.role IS '1.BSS 2.OSS 3.OpenStack 4.VSphere';
 COMMENT ON COLUMN domain.type IS '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce';
 COMMENT ON COLUMN domain.enabled IS '0.false 1.true';
-COMMENT ON COLUMN domain.state IS '1.normal 2.deleting 3.exception';
+COMMENT ON COLUMN domain.state IS '1.normal 2.deleting 3.exception 4.warning 5.no_license';
 
 CREATE TABLE IF NOT EXISTS sub_domain (
     id                  SERIAL PRIMARY KEY,
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT 1,
     state               INTEGER NOT NULL DEFAULT 1,
+    exceptions          BIGINT DEFAULT 0 CHECK (exceptions >= 0 AND exceptions <= 4294967295),
     lcuuid              VARCHAR(64) DEFAULT '',
     synced_at           TIMESTAMP DEFAULT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -68,7 +70,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
 TRUNCATE TABLE sub_domain;
 COMMENT ON COLUMN sub_domain.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN sub_domain.enabled IS '0.false 1.true';
-COMMENT ON COLUMN sub_domain.state IS '1.normal 2.deleting 3.exception';
+COMMENT ON COLUMN sub_domain.state IS '1.normal 2.deleting 3.exception 4.warning 5.no_license';
 
 CREATE TABLE IF NOT EXISTS region (
     id                  SERIAL PRIMARY KEY,
@@ -740,9 +742,9 @@ CREATE TABLE IF NOT EXISTS pod_service (
     selector            TEXT,
     external_ip         TEXT,
     service_cluster_ip  VARCHAR(64) DEFAULT '',
-    metadata            TEXT COMMENT 'yaml',
+    metadata            TEXT,
     metadata_hash       VARCHAR(64) DEFAULT '',
-    spec                TEXT COMMENT 'yaml',
+    spec                TEXT,
     spec_hash           VARCHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
@@ -768,6 +770,8 @@ COMMENT ON COLUMN pod_service.annotation IS 'separated by ,';
 COMMENT ON COLUMN pod_service.type IS '1: ClusterIP 2: NodePort 3: LoadBalancer';
 COMMENT ON COLUMN pod_service.selector IS 'separated by ,';
 COMMENT ON COLUMN pod_service.external_ip IS 'separated by ,';
+COMMENT ON COLUMN pod_service.metadata IS 'yaml format';
+COMMENT ON COLUMN pod_service.spec IS 'yaml format';
 
 CREATE TABLE IF NOT EXISTS pod_service_port (
     id                  SERIAL PRIMARY KEY,
@@ -793,9 +797,9 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL,
     pod_num             INTEGER DEFAULT 1,
     label               TEXT,
-    metadata            TEXT COMMENT 'yaml',
+    metadata            TEXT,
     metadata_hash       VARCHAR(64) DEFAULT '',
-    spec                TEXT COMMENT 'yaml',
+    spec                TEXT,
     spec_hash           VARCHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -813,6 +817,8 @@ CREATE INDEX pod_group_pod_namespace_id_index ON pod_group (pod_namespace_id);
 CREATE INDEX pod_group_pod_cluster_id_index ON pod_group (pod_cluster_id);
 COMMENT ON COLUMN pod_group.type IS '1: Deployment 2: StatefulSet 3: ReplicationController';
 COMMENT ON COLUMN pod_group.label IS 'separated by ,';
+COMMENT ON COLUMN pod_group.metadata IS 'yaml format';
+COMMENT ON COLUMN pod_group.spec IS 'yaml format';
 
 CREATE TABLE IF NOT EXISTS pod_group_port (
     id                  SERIAL PRIMARY KEY,
@@ -897,7 +903,7 @@ COMMENT ON COLUMN pod.state IS '0.Exception 1.Running';
 CREATE TABLE IF NOT EXISTS config_map (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    data                TEXT COMMENT 'yaml',
+    data                TEXT,
     data_hash           VARCHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER NOT NULL,
     pod_cluster_id      INTEGER NOT NULL,
@@ -915,11 +921,12 @@ CREATE TABLE IF NOT EXISTS config_map (
 TRUNCATE TABLE config_map;
 CREATE INDEX config_map_data_hash_index ON config_map (data_hash);
 CREATE INDEX config_map_domain_index ON config_map (domain);
+COMMENT ON COLUMN config_map.data IS 'yaml format';
 
 CREATE TABLE IF NOT EXISTS pod_group_config_map_connection (
     id                  SERIAL PRIMARY KEY,
     pod_group_id        INTEGER NOT NULL,
-    config_map_id   INTEGER NOT NULL,
+    config_map_id       INTEGER NOT NULL,
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              CHAR(64) NOT NULL,
     lcuuid              CHAR(64) NOT NULL,
@@ -1535,6 +1542,7 @@ CREATE TABLE IF NOT EXISTS data_source (
     base_data_source_id         INTEGER,
     interval_time               INTEGER NOT NULL,
     retention_time              INTEGER NOT NULL,
+    query_time                  INTEGER NOT NULL DEFAULT 0,
     summable_metrics_operator   VARCHAR(64),
     unsummable_metrics_operator VARCHAR(64),
     updated_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1544,6 +1552,7 @@ TRUNCATE TABLE data_source;
 COMMENT ON COLUMN data_source.state IS '0: Exception 1: Normal';
 COMMENT ON COLUMN data_source.interval_time IS 'unit: s';
 COMMENT ON COLUMN data_source.retention_time IS 'unit: hour';
+COMMENT ON COLUMN data_source.query_time IS 'unit: minute';
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (1, '网络-指标（秒级）', 'flow_metrics.network*', 1, 1 * 24, gen_random_uuid());
@@ -1551,8 +1560,8 @@ VALUES (1, '网络-指标（秒级）', 'flow_metrics.network*', 1, 1 * 24, gen_
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
 VALUES (2, '网络-指标（分钟级）', 'flow_metrics.network*', 1, 60, 7 * 24, 'Sum', 'Avg', gen_random_uuid());
 
-INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
-VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3 * 24, gen_random_uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, query_time, lcuuid)
+VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3 * 24, 6 * 60, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (7, '应用-指标（秒级）', 'flow_metrics.application*', 1, 1 * 24, gen_random_uuid());
@@ -1560,8 +1569,8 @@ VALUES (7, '应用-指标（秒级）', 'flow_metrics.application*', 1, 1 * 24, 
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.application*', 7, 60, 7 * 24, 'Sum', 'Avg', gen_random_uuid());
 
-INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
-VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3 * 24, gen_random_uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, query_time, lcuuid)
+VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3 * 24, 6 * 60, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (10, '网络-TCP 时序数据', 'flow_log.l4_packet', 0, 3 * 24, gen_random_uuid());
@@ -1593,8 +1602,8 @@ VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3 * 24, gen_random_u
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3 * 24, gen_random_uuid());
 
-INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
-VALUES (20, '日志-日志数据', 'application_log.log', 1, 30 * 24, gen_random_uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, query_time, lcuuid)
+VALUES (20, '日志-日志数据', 'application_log.log', 1, 30 * 24, 6 * 60, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
 VALUES (21, '网络-指标（小时级）', 'flow_metrics.network*', 2, 3600, 30 * 24, 'Sum', 'Avg', gen_random_uuid());
@@ -1831,6 +1840,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     app_type                SMALLINT NOT NULL,
     sub_type                SMALLINT DEFAULT 1,
     deleted                 SMALLINT DEFAULT 0,
+    alert_time              BIGINT CHECK (alert_time > 0 AND alert_time <= 4294967295),
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at              TIMESTAMP DEFAULT NULL,
@@ -1855,6 +1865,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     monitoring_interval     VARCHAR(64) DEFAULT '1m',
     trigger_info_event      INTEGER DEFAULT 0,
     trigger_recovery_event  INTEGER DEFAULT 1,
+    recovery_event_levels   TEXT,
     lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE alarm_policy;
@@ -2107,7 +2118,7 @@ INSERT INTO alarm_policy (
 VALUES (
     1, '过滤项: tag.type = chost_pod_node_connection', '[{"type":"deepflow","tableName":"deepflow_server_controller_resource_relation_exception","dbName":"deepflow_tenant","metrics":[{"description":"","typeName":"counter","METRIC_CATEGORY":"metrics","METRIC":"metrics.count","METRIC_NAME":"metrics.count","isTimeUnit":false,"type":1,"unit":["data","short"],"checked":true,"operatorLv2":[],"_key":"77b0ee61-e213-4d10-9342-bb172f861f39","perOperator":"","operatorLv1":"Sum","percentile":null,"markLine":null,"diffMarkLine":null,"METRIC_LABEL":"Sum(metrics.count)","ORIGIN_METRIC_LABEL":"Sum(metrics.count)"}],"condition":[{"dbName":"deepflow_tenant","tableName":"deepflow_server_controller_resource_relation_exception","type":"simplified","RESOURCE_SETS":[{"id":"R1","condition":[{"key":"tag.type","op":"=","val":["chost_pod_node_connection"]}],"groupBy":["_","tag.domain"],"groupInfo":{"mainGroupInfo":["_"],"otherGroupInfo":["tag.domain"]},"inputMode":"free"}]}],"dataSource":""}]',
     '/v1/stats/querier/UniversalHistory', '{"DATABASE":"deepflow_tenant","TABLE":"deepflow_server_controller_resource_relation_exception","interval":60,"fill": "none","window_size":1,"QUERIES":[{"QUERY_ID":"R1","SELECT":"Sum(`metrics.count`) AS `Sum(metrics.count)`","WHERE":"`tag.type`=''chost_pod_node_connection''","GROUP_BY":"`tag.domain`","METRICS":["Sum(`metrics.count`) AS `Sum(metrics.count)`"]}]}',
-    '云资源关联关系异常 (云服务器与容器节点)',  0, 1, 1, 1, '{"displayName":"Sum(metrics.count)","unit":""}', '{"OP":">=","VALUE":1}', (SELECT gen_random_uuid()));
+    '云资源关联关系异常 (云主机与容器节点)',  0, 1, 1, 1, '{"displayName":"Sum(metrics.count)","unit":""}', '{"OP":">=","VALUE":1}', (SELECT gen_random_uuid()));
 
 INSERT INTO alarm_policy (
     user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
@@ -2115,7 +2126,7 @@ INSERT INTO alarm_policy (
 VALUES (
     1, '过滤项: N/A', '[{"type":"deepflow","tableName":"deepflow_server_controller_resource_sync_delay","dbName":"deepflow_tenant","metrics":[{"description":"","typeName":"counter","METRIC_CATEGORY":"metrics","METRIC":"metrics.max_delay","METRIC_NAME":"metrics.max_delay","isTimeUnit":false,"type":1,"unit":["data","short"],"checked":true,"operatorLv2":[],"_key":"77b0ee61-e213-4d10-9342-bb172f861f39","perOperator":"","operatorLv1":"Max","percentile":null,"markLine":null,"diffMarkLine":null,"METRIC_LABEL":"Max(metrics.max_delay)","ORIGIN_METRIC_LABEL":"Max(metrics.max_delay)"}],"condition":[{"dbName":"deepflow_tenant","tableName":"deepflow_server_controller_resource_sync_delay","type":"simplified","RESOURCE_SETS":[{"id":"R1","condition":[],"groupBy":["_","tag.domain"],"groupInfo":{"mainGroupInfo":["_"],"otherGroupInfo":["tag.domain"]},"inputMode":"free"}]}],"dataSource":""}]',
     '/v1/stats/querier/UniversalHistory', '{"DATABASE":"deepflow_tenant","TABLE":"deepflow_server_controller_resource_sync_delay","interval":60,"fill": "none","window_size":1,"QUERIES":[{"QUERY_ID":"R1","SELECT":"Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`","WHERE":"1=1","GROUP_BY":"`tag.domain`","METRICS":["Max(`metrics.max_delay`) AS `Max(metrics.max_delay)`"]}]}',
-    '云资源同步滞后 (云服务器)',  0, 1, 1, 1, '{"displayName":"Max(metrics.max_delay)","unit":""}', '{"OP":">=","VALUE":150}', (SELECT gen_random_uuid()));
+    '云资源同步滞后 (云主机)',  0, 1, 1, 1, '{"displayName":"Max(metrics.max_delay)","unit":""}', '{"OP":">=","VALUE":150}', (SELECT gen_random_uuid()));
 
 INSERT INTO alarm_policy (
     user_id, tag_conditions, query_conditions, query_url, query_params, name, level, state,
