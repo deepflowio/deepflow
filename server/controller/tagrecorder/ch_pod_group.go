@@ -58,6 +58,7 @@ func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -107,7 +108,6 @@ func (c *ChPodGroup) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGr
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodGroup) softDeletedTargetsUpdated(targets []metadbmodel.ChPodGroup, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

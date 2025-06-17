@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"slices"
+
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -24,10 +26,6 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
-)
-
-const (
-	syncTriggerKeyDeviceID = "deviceid"
 )
 
 type ChVMDevice struct {
@@ -63,6 +61,7 @@ func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -163,6 +162,7 @@ func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -264,6 +264,7 @@ func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -307,7 +308,6 @@ func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -347,6 +347,7 @@ func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -390,7 +391,6 @@ func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -430,6 +430,7 @@ func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -477,7 +478,6 @@ func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -517,6 +517,7 @@ func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -564,7 +565,6 @@ func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFie
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChLBDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -602,6 +602,7 @@ func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstance
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -649,7 +650,6 @@ func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *mess
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -687,6 +687,7 @@ func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInst
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -734,7 +735,6 @@ func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *me
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -772,6 +772,7 @@ func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -829,7 +830,6 @@ func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -867,6 +867,7 @@ func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -911,7 +912,6 @@ func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -949,6 +949,7 @@ func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -994,7 +995,6 @@ func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -1032,6 +1032,7 @@ func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -1083,7 +1084,6 @@ func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -1123,6 +1123,7 @@ func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDe
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -1166,7 +1167,6 @@ func (c *ChPodClusterDevice) onResourceUpdated(sourceID int, fieldsUpdate *messa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -1206,6 +1206,8 @@ func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.hookers[hookerDeletePage] = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -1218,12 +1220,12 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
-
+	gid := int(source.GID)
 	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-		DeviceID: source.ID})
+		DeviceID: gid})
 	targets = append(targets, metadbmodel.ChDevice{
 		DeviceType:  CH_DEVICE_TYPE_GPROCESS,
-		DeviceID:    source.ID,
+		DeviceID:    gid,
 		Name:        sourceName,
 		IconID:      iconID,
 		TeamID:      md.TeamID,
@@ -1236,25 +1238,35 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
-
+	gid := int(fieldsUpdate.GID.GetNew())
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", gid, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-			DeviceID: sourceID}, db)
+			DeviceID: gid}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
+}
+
+func (c *ChProcessDevice) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.ProcessDelete) []*metadbmodel.Process {
+	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		if slices.Contains(gids, item.GID) {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
 }
 
 type ChCustomServiceDevice struct {

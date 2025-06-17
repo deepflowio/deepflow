@@ -99,6 +99,8 @@ func (c *UpdaterManager) refresh() {
 		NewChPolicy(),
 		NewChNpbTunnel(),
 		NewChAlarmPolicy(),
+		NewChOSAppTag(),
+		NewChOSAppTags(),
 	}
 
 	if c.cfg.FPermit.Enabled {

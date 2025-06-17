@@ -59,11 +59,14 @@ const (
 	RESOURCE_TYPE_CUSTOM_SERVICE    = "custom_service"
 )
 
+// Scheduled tasks
 const (
 	RESOURCE_TYPE_CH_REGION      = "ch_region"
 	RESOURCE_TYPE_CH_IP_RELATION = "ch_ip_relation"
 	RESOURCE_TYPE_CH_IP_RESOURCE = "ch_ip_resource"
 	RESOURCE_TYPE_CH_USER        = "ch_user"
+	RESOURCE_TYPE_CH_OS_APP_TAG  = "ch_os_app_tag"
+	RESOURCE_TYPE_CH_OS_APP_TAGS = "ch_os_app_tags"
 
 	RESOURCE_TYPE_TAP_TYPE        = "ch_tap_type"
 	RESOURCE_TYPE_CH_VTAP         = "ch_vtap"
@@ -149,12 +152,9 @@ var (
 	RESOURCE_TYPE_CH_POD_K8S_ANNOTATION          = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ANNOTATION)
 	CH_DICTIONARY_POD_K8S_ANNOTATIONS            = "pod_k8s_annotations_map"
 	RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS         = chDictNameToMetaDBTableName(CH_DICTIONARY_POD_K8S_ANNOTATIONS)
-	CH_DICTIONARY_OS_APP_TAG                     = "os_app_tag_map"
-	RESOURCE_TYPE_CH_OS_APP_TAG                  = chDictNameToMetaDBTableName(CH_DICTIONARY_OS_APP_TAG)
-	CH_DICTIONARY_OS_APP_TAGS                    = "os_app_tags_map"
-	RESOURCE_TYPE_CH_OS_APP_TAGS                 = chDictNameToMetaDBTableName(CH_DICTIONARY_OS_APP_TAGS)
 )
 
+// Scheduled tasks
 const (
 	CH_DICTIONARY_REGION      = "region_map"
 	CH_DICTIONARY_VTAP_PORT   = "vtap_port_map"
@@ -162,6 +162,8 @@ const (
 	CH_DICTIONARY_VTAP        = "vtap_map"
 	CH_DICTIONARY_LB_LISTENER = "lb_listener_map"
 	CH_DICTIONARY_USER        = "user_map"
+	CH_DICTIONARY_OS_APP_TAG  = "os_app_tag_map"
+	CH_DICTIONARY_OS_APP_TAGS = "os_app_tags_map"
 
 	CH_DICTIONARY_POD_NODE_PORT  = "pod_node_port_map"
 	CH_DICTIONARY_POD_GROUP_PORT = "pod_group_port_map"
