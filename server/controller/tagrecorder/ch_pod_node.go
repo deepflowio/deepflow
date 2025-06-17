@@ -58,6 +58,7 @@ func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 

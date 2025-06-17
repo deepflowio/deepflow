@@ -436,38 +436,30 @@ func (ChPodNSCloudTags) TableName() string {
 }
 
 type ChOSAppTag struct {
-	ChUpdatedAtBase `gorm:"embedded"`
-	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
-	Key             string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
-	Value           string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
-	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key         string    `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value       string    `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChOSAppTag) TableName() string {
 	return "ch_os_app_tag"
 }
 
-func (c ChOSAppTag) GetID() int {
-	return c.PID
-}
-
 type ChOSAppTags struct {
-	ChUpdatedAtBase `gorm:"embedded"`
-	PID             int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
-	OSAPPTags       string `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
-	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
+	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID    int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChOSAppTags) TableName() string {
 	return "ch_os_app_tags"
-}
-
-func (c ChOSAppTags) GetID() int {
-	return c.PID
 }
 
 type ChGProcess struct {

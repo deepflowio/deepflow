@@ -34,7 +34,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
-	tagrecordercheck "github.com/deepflowio/deepflow/server/controller/tagrecorder/check"
 )
 
 func IsMasterRegion(cfg *config.ControllerConfig) bool {
@@ -101,8 +100,6 @@ func checkAndStartMasterFunctions(
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
 	tagRecorder := tagrecorder.GetSingleton()
-	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
-	tr := tagrecordercheck.GetSingleton()
 	deletedORGChecker := service.GetDeletedORGChecker(ctx, cfg.FPermit)
 
 	httpService := http.GetSingleton()
@@ -136,7 +133,6 @@ func checkAndStartMasterFunctions(
 
 				// 启动tagrecorder
 				tagRecorder.UpdaterManager.Start(sCtx)
-				tr.Check()
 
 				// 控制器检查
 				controllerCheck.Start(sCtx)
