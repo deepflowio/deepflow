@@ -553,6 +553,9 @@ impl Guard {
                 } else if exception_handler.has(Exception::FreeDiskCircuitBreaker) {
                     warn!("Set the state to melt_down when the free disk exceeds the threshold.");
                     state.melt_down();
+                } else if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                    warn!("Set the state to melt_down when the kernel version circuit breaker.");
+                    state.melt_down();
                 } else {
                     state.recover();
                 }

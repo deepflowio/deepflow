@@ -125,6 +125,8 @@ use integration_skywalking::SkyWalkingExtra;
 use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
+#[cfg(feature = "enterprise")]
+use enterprise_utils::utils::{kernel_version_check, ActionFlags};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
@@ -267,16 +269,6 @@ impl AgentState {
             info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
             self.notifier.notify_one();
         }
-    }
-
-    pub fn terminate(&self) {
-        if !self.terminated.swap(true, Ordering::Relaxed) {
-            // log only the first time
-            info!("Agent state changed to {:?}", State::Terminated);
-        }
-        let sg = self.state.lock().unwrap();
-        self.notifier.notify_one();
-        info!("Agent terminate with state: {:?}", State::from(sg.0));
     }
 
     pub fn update_config(&self, config: ChangedConfig) {
@@ -630,6 +622,20 @@ impl Trident {
         Ok(Trident { state, handle })
     }
 
+    #[cfg(feature = "enterprise")]
+    fn kernel_version_check(state: &AgentState, exception_handler: &ExceptionHandler) {
+        let action = kernel_version_check();
+        if action.contains(ActionFlags::TERMINATE) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            crate::utils::clean_and_exit(1);
+        } else if action.contains(ActionFlags::MELTDOWN) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            state.melt_down();
+        } else if action.contains(ActionFlags::ALARM) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+        }
+    }
+
     fn run(
         state: Arc<AgentState>,
         ctrl_ip: IpAddr,
@@ -894,6 +900,9 @@ impl Trident {
         ) {
             platform_synchronizer.start();
         }
+
+        #[cfg(feature = "enterprise")]
+        Trident::kernel_version_check(&state, &exception_handler);
 
         let mut components: Option<Components> = None;
         let mut first_run = true;
@@ -1177,7 +1186,6 @@ impl Trident {
     }
 
     pub fn stop(&mut self) {
-        self.state.terminate();
         info!("Agent stopping");
         crate::utils::clean_and_exit(0);
     }
