@@ -282,6 +282,11 @@ func CKDropNativeTag(isByConity bool, conn *sql.DB, orgId uint16, nativeTag *Nat
 		return err
 	}
 	for _, columnName := range nativeTag.ColumnNames {
+		if IndexOf(ckdb.ColumnNames, columnName) > 0 {
+			err := fmt.Errorf("'%s' is a reserved word and is not allowed as a native tag name.", columnName)
+			log.Warning(err)
+			continue
+		}
 		tableGlobal := fmt.Sprintf("ALTER TABLE %s.`%s` DROP COLUMN IF EXISTS %s",
 			ckdb.OrgDatabasePrefix(orgId)+tableId.Database(), tableId.Table(), columnName)
 		tableLocal := fmt.Sprintf("ALTER TABLE %s.`%s` DROP COLUMN IF EXISTS %s",
