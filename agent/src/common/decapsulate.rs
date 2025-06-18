@@ -199,6 +199,7 @@ pub struct TunnelInfo {
     pub mac_src: u32, // lowest 4B
     pub mac_dst: u32, // lowest 4B
     pub id: u32,
+    pub ip: u32,
     pub tunnel_type: TunnelType,
     pub tier: u8,
     pub is_ipv6: bool,
@@ -213,6 +214,7 @@ impl Default for TunnelInfo {
             mac_src: 0,
             mac_dst: 0,
             id: 0,
+            ip: 0,
             tunnel_type: TunnelType::default(),
             tier: 0,
             is_ipv6: false,
@@ -385,7 +387,7 @@ impl TunnelInfo {
         gre_protocol_type: u16,
         ip_header_size: usize,
     ) -> usize {
-        let Some((offset, id)) =
+        let Some((offset, id, ip)) =
             decapsulate_tencent_gre(packet, l2_len, flags, gre_protocol_type, ip_header_size)
         else {
             return 0;
@@ -396,6 +398,7 @@ impl TunnelInfo {
             self.decapsulate_mac(packet);
             self.tunnel_type = TunnelType::TencentGre;
             self.id = id;
+            self.ip = ip;
         }
         self.tier += 1;
 

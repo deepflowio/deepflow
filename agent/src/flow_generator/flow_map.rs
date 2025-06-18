@@ -19,7 +19,7 @@ use std::{
     cell::RefCell,
     collections::HashSet,
     mem,
-    net::Ipv4Addr,
+    net::{IpAddr, Ipv4Addr},
     num::NonZeroUsize,
     rc::Rc,
     str::FromStr,
@@ -54,6 +54,7 @@ use super::{
 
 use crate::{
     common::{
+        decapsulate::TunnelType,
         ebpf::EbpfType,
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
         enums::{CaptureNetworkType, EthernetType, HeaderType, IpProtocol, TcpFlags},
@@ -244,6 +245,8 @@ pub struct FlowMap {
     stats_collector: Arc<stats::Collector>,
 
     obfuscate_cache: Option<ObfuscateCache>,
+
+    gre_tunnel_id_maps: LruCache<u32, u8>,
 }
 
 impl FlowMap {
@@ -374,6 +377,9 @@ impl FlowMap {
             stats_collector,
             capacity: config.flow_capacity() as usize,
             size: 0,
+            gre_tunnel_id_maps: LruCache::new(
+                NonZeroUsize::new(config.hash_slots as usize).unwrap(),
+            ),
         }
     }
 
@@ -707,7 +713,38 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
     }
 
+    fn modify_meta_packet(&mut self, meta_packet: &mut MetaPacket) {
+        let Some(tunnel) = meta_packet.tunnel else {
+            return;
+        };
+
+        if tunnel.tunnel_type != TunnelType::TencentGre {
+            return;
+        }
+
+        let lookup_key = &mut meta_packet.lookup_key;
+
+        if tunnel.id > 0 && tunnel.ip > 0 && lookup_key.is_ipv4() {
+            let IpAddr::V4(src_ip) = lookup_key.src_ip else {
+                return;
+            };
+
+            let nat_ip = Ipv4Addr::from(tunnel.ip);
+            if nat_ip == src_ip {
+                self.gre_tunnel_id_maps.put(tunnel.ip, 0);
+            } else {
+                if self.gre_tunnel_id_maps.contains(&tunnel.ip) {
+                    lookup_key.dst_ip = IpAddr::V4(nat_ip);
+                }
+            }
+        }
+    }
+
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
+        if config.flow.cloud_gateway_traffic {
+            self.modify_meta_packet(meta_packet);
+        }
+
         if !self.inject_flush_ticker(config, meta_packet.lookup_key.timestamp.into()) {
             self.lookup_without_flow(config, meta_packet);
             return;
