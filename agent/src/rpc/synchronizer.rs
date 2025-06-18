@@ -1572,7 +1572,6 @@ impl Synchronizer {
                     } else {
                         match Self::upgrade(&running, &session, &revision, &id, &agent_state).await {
                             Ok(true) => {
-                                agent_state.terminate();
                                 warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
                                 crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                                 return;
