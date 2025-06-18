@@ -18,6 +18,8 @@ package healer
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -26,7 +28,6 @@ import (
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"time"
 )
 
 var log = logger.MustGetLogger("tagrecorder.healer")
@@ -201,10 +202,14 @@ func NewHealers(md *recorderCommon.MetadataBase) *Healers {
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation"),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS)),
-		// NewHealer[metadbModel.Process, metadbModel.ChOSAppTag](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG]),
-		// NewHealer[metadbModel.Process, metadbModel.ChOSAppTags](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS]),
+		newHealer[metadbModel.Process, metadbModel.ChOSAppTag, *message.ProcessAdd, message.ProcessAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN).setAdditionalSelectField("os_app_tags"),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG)),
+		newHealer[metadbModel.Process, metadbModel.ChOSAppTags, *message.ProcessAdd, message.ProcessAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN).setAdditionalSelectField("os_app_tags"),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS)),
 	}
 	return h
 }
