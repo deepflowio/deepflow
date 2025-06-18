@@ -799,8 +799,11 @@ infer_l7_class_1(struct ctx_info_s *ctx,
 		return INFER_TERMINATE;
 	}
 
+	int err_code;
 	struct protocol_message_t inferred_protocol =
-	    infer_protocol_1(ctx, args, count, conn_info, sk_type, extra);
+	    infer_protocol_1(ctx, args, count, conn_info, sk_type, extra, &err_code);
+	if (err_code == -1)
+		return INFER_TERMINATE;
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -820,6 +823,25 @@ static __inline int infer_l7_class_2(struct tail_calls_context *ctx,
 	infer_data = (struct infer_data_s *)ctx->private_data;
 	struct protocol_message_t inferred_protocol =
 	    infer_protocol_2(infer_data->data, conn_info->count, conn_info);
+	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
+	    inferred_protocol.type == MSG_UNKNOWN) {
+		conn_info->protocol = PROTO_UNKNOWN;
+		return INFER_CONTINUE;
+	}
+
+	conn_info->protocol = inferred_protocol.protocol;
+	conn_info->message_type = inferred_protocol.type;
+
+	return INFER_FINISH;
+}
+
+static __inline int infer_l7_class_3(struct tail_calls_context *ctx,
+				     struct conn_info_s *conn_info)
+{
+	struct infer_data_s *infer_data;
+	infer_data = (struct infer_data_s *)ctx->private_data;
+	struct protocol_message_t inferred_protocol =
+	    infer_protocol_3(infer_data->data, conn_info->count, conn_info);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -1800,6 +1822,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
 			       bytes_count, sock_state, extra);
 
+	if (act == INFER_TERMINATE)
+		return -1;
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)
 		return -1;
@@ -1814,14 +1838,14 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		if (extra->source == DATA_SOURCE_SYSCALL) {
 #ifdef SUPPORTS_KPROBE_ONLY
 			bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-				      PROG_PROTO_INFER_KP_IDX);
+				      PROG_PROTO_INFER_KP_2_IDX);
 #else
 			bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
-				      PROG_PROTO_INFER_TP_IDX);
+				      PROG_PROTO_INFER_TP_2_IDX);
 #endif
 		} else {
 			bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-				      PROG_PROTO_INFER_KP_IDX);
+				      PROG_PROTO_INFER_KP_2_IDX);
 		}
 	}
 #endif
@@ -3348,7 +3372,7 @@ static __inline int __proto_infer_2(void *ctx)
 	__u32 k0 = 0;
 	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
 	if (!ctx_map)
-		goto clear_args_map_2;
+		goto clear_args_map;
 
 	enum traffic_direction dir;
 	dir = ctx_map->tail_call.dir;
@@ -3364,6 +3388,46 @@ static __inline int __proto_infer_2(void *ctx)
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 	int act;
 	act = infer_l7_class_2(&ctx_map->tail_call, conn_info);
+	if (act == INFER_CONTINUE) {
+		ctx_map->tail_call.conn_info = __conn_info;
+		return INFER_CONTINUE;
+	}
+
+	// Inference successful, proceeding to DATA_SUBMIT_PROG
+	if (conn_info->protocol != PROTO_UNKNOWN ||
+	    conn_info->message_type != MSG_UNKNOWN) {
+		ctx_map->tail_call.conn_info = __conn_info;
+		return INFER_FINISH;
+	}
+
+clear_args_map:
+	active_read_args_map__delete(&id);
+	active_write_args_map__delete(&id);
+	return INFER_TERMINATE;
+}
+
+static __inline int __proto_infer_3(void *ctx)
+{
+	__u64 id = bpf_get_current_pid_tgid();
+	__u32 k0 = 0;
+	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		goto clear_args_map_2;
+
+	enum traffic_direction dir;
+	dir = ctx_map->tail_call.dir;
+	/*
+	 * Use the following method to obtain `conn_info`, otherwise an error
+	 * similar to "R1 invalid mem access 'inv'" will appear during the eBPF
+	 * loading process.
+	 */
+	struct conn_info_s *conn_info, __conn_info;
+	__conn_info = ctx_map->tail_call.conn_info;
+	conn_info = &__conn_info;
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
+	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	int act;
+	act = infer_l7_class_3(&ctx_map->tail_call, conn_info);
 	if (act != INFER_FINISH) {
 		/*
 		 * Ignore the IO event here because it has been
@@ -3377,7 +3441,7 @@ static __inline int __proto_infer_2(void *ctx)
 	if (conn_info->protocol != PROTO_UNKNOWN ||
 	    conn_info->message_type != MSG_UNKNOWN) {
 		ctx_map->tail_call.conn_info = __conn_info;
-		return 0;
+		return INFER_FINISH;
 	}
 
 clear_args_map_1:
@@ -3385,23 +3449,44 @@ clear_args_map_1:
 		active_read_args_map__delete(&id);
 	else
 		active_write_args_map__delete(&id);
-	return -1;
-
+	return INFER_TERMINATE;
 clear_args_map_2:
 	active_read_args_map__delete(&id);
 	active_write_args_map__delete(&id);
-	return -1;
+	return INFER_TERMINATE;
 }
 
 PROGTP(proto_infer_2) (void *ctx) {
-	if (__proto_infer_2(ctx) == 0)
+	int ret = __proto_infer_2(ctx);
+	if (ret == INFER_CONTINUE)
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_PROTO_INFER_TP_3_IDX);
+	else if (ret == INFER_FINISH)
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_DATA_SUBMIT_TP_IDX);
 	return 0;
 }
 
 PROGKP(proto_infer_2) (void *ctx) {
-	if (__proto_infer_2(ctx) == 0)
+	int ret = __proto_infer_2(ctx);
+	if (ret == INFER_CONTINUE)
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_PROTO_INFER_KP_3_IDX);
+	else if (ret == INFER_FINISH)
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_DATA_SUBMIT_KP_IDX);
+	return 0;
+}
+
+PROGTP(proto_infer_3) (void *ctx) {
+	if (__proto_infer_3(ctx) == INFER_FINISH)
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
+	return 0;
+}
+
+PROGKP(proto_infer_3) (void *ctx) {
+	if (__proto_infer_3(ctx) == INFER_FINISH)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
 	return 0;

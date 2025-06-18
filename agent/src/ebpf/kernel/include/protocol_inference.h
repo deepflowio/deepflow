@@ -20,26 +20,25 @@
  */
 
 /*
- * Due to the limitation of the number of eBPF instructions to 4096 in Linux
- * kernels lower than version 5.2, the protocol inference code, when augmented
- * with new protocols, easily exceeds the instruction limit. To address this
- * issue, we have split the protocol inference into two separate programs.
+ * Due to the limitation of 4096 eBPF instructions in Linux kernels below version 5.2,
+ * the protocol inference code can easily exceed this limit when more protocols are added.
+ * To address this issue, the protocol inference logic has been split into three separate programs.
  * The updated workflow is as follows:
  *
- * [openssl Uprobe] ----------------
- *                                 |
- *                                \|/
- * [syscall Kprobe/tracepoint] --> [protocol infer] --> [data submit] --> [output data]
- *       |                                                                ^
- *       |                                                                |
- *       |----general file io------> [io event] ---------------------------
+ * [openssl Uprobe] --
+ *                   |
+ *                  \|/
+ * [syscall Kprobe/tracepoint] --> [protocol inference 2] --> [protocol inference 3] --> [data submission] --> [data output]
+ *       |                                                                                                       /|\
+ *       |                                                                                                        |
+ *       |----- general file I/O -----> [I/O event handling] ------------------------------------------------------
  *
  * Explanation:
- *   `[openssl Uprobe]` and `[syscall Kprobe/tracepoint]` encompass the preparation
- *   work for eBPF probe entry and a portion of Layer 7 (L7) protocol inference.
- *   `[protocol infer]` represents the second part of L7 protocol inference, and
- *   newly added protocol inference code can be placed within the `infer_protocol_2()`
- *   interface.
+ *   `[openssl Uprobe]` and `[syscall Kprobe/tracepoint]` perform initial setup for eBPF probe entry,
+ *   and contain the first part of Layer 7 (L7) protocol inference logic.
+ *   `protocol inference 2` : part 2 of protocol inference
+ *   `protocol inference 3` : part 3 of protocol inference
+ *   Newly added protocol inference code is recommended to be placed within the `infer_protocol_3()` interface.
  */
 #ifndef DF_BPF_PROTO_INFER_H
 #define DF_BPF_PROTO_INFER_H
@@ -1628,7 +1627,7 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (count < 4)
 		return MSG_UNKNOWN;
 
-	if (!protocol_port_check_1(PROTO_MQTT, conn_info))
+	if (!protocol_port_check_2(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
@@ -3749,6 +3748,61 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 	}
 }
 
+/* Will be called by proto_infer_3 eBPF program. */
+static __inline struct protocol_message_t
+infer_protocol_3(const char *infer_buf, size_t count,
+		 struct conn_info_s *conn_info)
+{
+	struct protocol_message_t inferred_message;
+	inferred_message.protocol = PROTO_UNKNOWN;
+	inferred_message.type = MSG_UNKNOWN;
+	__u32 syscall_infer_len = conn_info->syscall_infer_len;
+	char *syscall_infer_addr = conn_info->syscall_infer_addr;
+
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	__u8 skip_proto = conn_info->skip_proto;
+	if (skip_proto != PROTO_ZMTP && (inferred_message.type =
+#else
+	if ((inferred_message.type =
+#endif
+		    infer_zmtp_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ZMTP;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_mongo_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MONGO;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_ROCKETMQ && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_rocketmq_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ROCKETMQ;
+	}
+
+	if (conn_info->enable_reasm) {
+		if (inferred_message.type == MSG_UNKNOWN) {
+			inferred_message.type = MSG_REQUEST;
+			if (conn_info->socket_info_ptr) {
+				inferred_message.protocol =
+				    conn_info->socket_info_ptr->l7_proto;
+				conn_info->socket_info_ptr->finish_reasm = true;
+			}
+			conn_info->is_reasm_seg = true;
+		}
+	}
+
+	return inferred_message;
+}
+
 /* Will be called by proto_infer_2 eBPF program. */
 static __inline struct protocol_message_t
 infer_protocol_2(const char *infer_buf, size_t count,
@@ -3772,9 +3826,17 @@ infer_protocol_2(const char *infer_buf, size_t count,
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	__u8 skip_proto = conn_info->skip_proto;
-	if (skip_proto != PROTO_DUBBO && (inferred_message.type =
+	if (skip_proto != PROTO_MQTT && (inferred_message.type =
 #else
 	if ((inferred_message.type =
+#endif
+		    infer_mqtt_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MQTT;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_DUBBO && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
 #endif
 	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DUBBO;
@@ -3862,45 +3924,13 @@ infer_protocol_2(const char *infer_buf, size_t count,
 		    infer_openwire_message(infer_buf, count,
 					   conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_OPENWIRE;
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
-	} else if (skip_proto != PROTO_ZMTP && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_zmtp_message(infer_buf, count,
-				       syscall_infer_addr,
-				       syscall_infer_len,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_ZMTP;
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
-	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_mongo_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_MONGO;
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
-	} else if (skip_proto != PROTO_ROCKETMQ && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_rocketmq_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_ROCKETMQ;
 	}
 
-	if (conn_info->enable_reasm) {
-		if (inferred_message.type == MSG_UNKNOWN) {
-			inferred_message.type = MSG_REQUEST;
-			if (conn_info->socket_info_ptr) {
-				inferred_message.protocol =
-				    conn_info->socket_info_ptr->l7_proto;
-				conn_info->socket_info_ptr->finish_reasm = true;
-			}
-			conn_info->is_reasm_seg = true;
-		}
-	}
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	if (inferred_message.protocol != MSG_UNKNOWN)
+		return inferred_message;
+	return infer_protocol_3(infer_buf, count, conn_info);
+#endif
 
 	return inferred_message;
 }
@@ -3910,17 +3940,20 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		 const struct data_args_t *args,
 		 size_t count,
 		 struct conn_info_s *conn_info,
-		 __u8 sk_state, const struct process_data_extra *extra)
+		 __u8 sk_state,
+		 const struct process_data_extra *extra,
+		 int *err_code)
 {
 	struct protocol_message_t inferred_message;
 	inferred_message.protocol = PROTO_UNKNOWN;
 	inferred_message.type = MSG_UNKNOWN;
+	*err_code = 0;
 
 	if (conn_info->sk == NULL)
-		return inferred_message;
+		goto infer_aborted;
 
 	if (conn_info->tuple.dport == 0 || conn_info->tuple.num == 0) {
-		return inferred_message;
+		goto infer_aborted;
 	}
 
 	/*
@@ -3929,7 +3962,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 */
 	if (!is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (drop_msg_by_comm())
-			return inferred_message;
+			goto infer_aborted;
 	}
 
 	const char *buf = args->buf;
@@ -4013,7 +4046,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			inferred_message.protocol = PROTO_TLS;
 			return inferred_message;
 		} else {
-			return inferred_message;
+			goto infer_aborted;
 		}
 	}
 
@@ -4043,7 +4076,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		struct proto_infer_cache_t *p;
 		p = proto_infer_cache_map__lookup(&cache_key);
 		if (p == NULL)
-			return inferred_message;
+			goto infer_aborted;
 		// https://stackoverflow.com/questions/70750259/bpf-verification-error-when-trying-to-extract-sni-from-tls-packet
 		__u8 this_proto = p->protocols[(__u16) pid];
 		switch (this_proto) {
@@ -4298,14 +4331,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
-	} else if (skip_proto != PROTO_MQTT && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_mqtt_message(infer_buf, count,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_MQTT;
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_DNS && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4373,6 +4398,10 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	return infer_protocol_2(infer_buf, count, conn_info);
 #endif
 
+	return inferred_message;
+
+infer_aborted:
+	*err_code = -1;
 	return inferred_message;
 }
 
