@@ -36,7 +36,6 @@ import (
 var log = logging.MustGetLogger("data_source")
 
 const (
-	DATASOURCE_PORT      = 20106
 	MAX_DATASOURCE_COUNT = 64
 )
 
@@ -70,7 +69,7 @@ func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManage
 		ckdbType:          cfg.CKDB.Type,
 		ckdbColdStorages:  cfg.GetCKDBColdStorages(),
 		server: &http.Server{
-			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
+			Addr:    ":" + strconv.Itoa(int(cfg.DatasourceListenPort)),
 			Handler: mux.NewRouter(),
 		},
 	}
