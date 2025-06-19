@@ -160,9 +160,9 @@ const (
 )
 
 const (
-	MESSAGE_ENCODER_RAW = iota
-	MESSAGE_ENCODER_ZLIB
-	MESSAGE_ENCODER_GZIP
+	MESSAGE_ENCODER_RAW             = iota
+	MESSAGE_ENCODER_ZLIB_DEPRECATED // don't use, only for placeholder
+	MESSAGE_ENCODER_GZIP_DEPRECATED // don't use, only for placeholder
 	MESSAGE_ENCODER_ZSTD
 )
 
