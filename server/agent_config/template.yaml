@@ -2613,10 +2613,20 @@ inputs:
           #     locate and trace packets for data collection.
           #
           #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+          #
+          #     In scenarios where DPDK acts as the vhost-user backend, data exchange between the virtual machine and the DPDK
+          #     application occurs through virtqueues (vrings). eBPF can automatically hook into the vring interface without
+          #     requiring any modifications to DPDK or the virtual machine, enabling packet capture and traffic observability
+          #     with zero additional configuration. In contrast, capturing packets on physical NICs requires explicit configuration
+          #     of the corresponding DPDK driver interfaces.
           #   ch: |-
           #     设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
           #
           #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
+          #
+          #     在 DPDK 作为 vhost-user 后端的场景中，虚拟机与 DPDK 应用之间通过 virtqueue（vring）进行数据交换。
+          #     eBPF 可以在无需修改 DPDK 或虚拟机的前提下，自动 hook 到 vring 接口，实现对传输数据包的捕获和分析，
+          #     无需额外配置即可实现流量可观测。相比之下，若要捕获物理网卡上的数据包，则需要配合 DPDK 的驱动接口进行显式配置。
           # upgrade_from:
           command: ""
           # type: string
