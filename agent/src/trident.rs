@@ -33,10 +33,6 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
-use flate2::{
-    write::{GzEncoder, ZlibEncoder},
-    Compression,
-};
 use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
@@ -386,38 +382,20 @@ pub enum SenderEncoder {
     #[num_enum(default)]
     Raw = 0,
 
-    Zlib = 1,
-    Gzip = 2,
     Zstd = 3,
 }
 
 impl SenderEncoder {
-    pub fn encode(&self, encode_buffer: &[u8]) -> std::io::Result<Option<Vec<u8>>> {
-        let result = match self {
-            Self::Raw => None,
-            Self::Zlib => {
-                let mut encoder = ZlibEncoder::new(
-                    Vec::with_capacity(encode_buffer.len()),
-                    Compression::default(),
-                );
+    pub fn encode(&self, encode_buffer: &[u8], dst_buffer: &mut Vec<u8>) -> std::io::Result<()> {
+        match self {
+            SenderEncoder::Zstd => {
+                let mut encoder = ZstdEncoder::new(dst_buffer, 0)?;
                 encoder.write_all(&encode_buffer)?;
-                Some(encoder.finish()?)
+                encoder.finish()?;
+                Ok(())
             }
-            Self::Gzip => {
-                let mut encoder = GzEncoder::new(
-                    Vec::with_capacity(encode_buffer.len()),
-                    Compression::default(),
-                );
-                encoder.write_all(&encode_buffer)?;
-                Some(encoder.finish()?)
-            }
-            Self::Zstd => {
-                let mut encoder = ZstdEncoder::new(Vec::with_capacity(encode_buffer.len()), 0)?;
-                encoder.write_all(&encode_buffer)?;
-                Some(encoder.finish()?)
-            }
-        };
-        Ok(result)
+            _ => Ok(()),
+        }
     }
 }
 
@@ -2407,7 +2385,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.l4_flow_log_compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2459,7 +2437,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.l7_flow_log_compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2532,7 +2510,7 @@ impl AgentComponents {
             exception_handler.clone(),
             Some(pcap_packet_shared_connection.clone()),
             if user_config.outputs.compression.pcap {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2733,7 +2711,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.application_log_compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2765,7 +2743,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2797,7 +2775,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },
@@ -2935,7 +2913,7 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
             if candidate_config.metric_server.compressed {
-                SenderEncoder::Zlib
+                SenderEncoder::Zstd
             } else {
                 SenderEncoder::Raw
             },

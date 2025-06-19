@@ -785,6 +785,8 @@ func (r *Receiver) decompressBuffer(encoder uint8, receiveBuffer []byte, start, 
 	encodeBuffer := bytes.NewBuffer(receiveBuffer[start:end])
 	var reader io.ReadCloser
 	var err error
+	// zlib&gzip compress for version before v7.0
+	// should only use zstd right now
 	switch encoder {
 	case datatype.MESSAGE_ENCODER_ZLIB: // zlib
 		reader, err = zlib.NewReader(encodeBuffer)
