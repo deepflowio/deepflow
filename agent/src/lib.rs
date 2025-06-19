@@ -18,7 +18,7 @@
 
 mod collector;
 pub mod common;
-mod config;
+pub mod config;
 pub mod debug;
 pub mod dispatcher;
 #[cfg(any(target_os = "linux", target_os = "android"))]
