@@ -139,6 +139,7 @@ struct Encoder<T> {
     header: Header,
 
     buffer: Vec<u8>,
+    compressed_buffer: Vec<u8>,
     _marker: PhantomData<T>,
 }
 
@@ -148,6 +149,7 @@ impl<T: Sendable> Encoder<T> {
         Self {
             id,
             buffer: Vec::with_capacity(Self::BUFFER_LEN),
+            compressed_buffer: Vec::with_capacity(Self::BUFFER_LEN),
             header: Header {
                 msg_type,
                 frame_size: 0,
@@ -211,14 +213,20 @@ impl<T: Sendable> Encoder<T> {
     }
 
     pub fn compress_buffer(&mut self) {
+        self.compressed_buffer.clear();
         let buffer_len = self.buffer_len();
-        match SenderEncoder::from(self.header.encoder).encode(&self.buffer[Header::HEADER_LEN..]) {
-            Ok(result) => {
-                if let Some(data) = result {
-                    self.buffer.truncate(Header::HEADER_LEN);
-                    self.buffer.extend_from_slice(&data);
-                    debug!("compressed from {} to {}", buffer_len, data.len());
-                }
+        match SenderEncoder::from(self.header.encoder).encode(
+            &self.buffer[Header::HEADER_LEN..],
+            &mut self.compressed_buffer,
+        ) {
+            Ok(_) => {
+                self.buffer.truncate(Header::HEADER_LEN);
+                self.buffer.extend_from_slice(&self.compressed_buffer);
+                debug!(
+                    "compressed from {} to {}",
+                    buffer_len,
+                    self.compressed_buffer.len()
+                );
             }
             Err(e) => {
                 error!("compression failed {}", e);
@@ -519,7 +527,9 @@ impl<T: Sendable> UniformSender<T> {
     fn flush_encoder(&mut self, config: &SenderConfig) {
         self.cached = true;
         if self.encoder.buffer_len() > 0 {
-            self.encoder.compress_buffer();
+            if SenderEncoder::from(self.encoder.header.encoder) != SenderEncoder::Raw {
+                self.encoder.compress_buffer();
+            }
             self.encoder.set_header_frame_size();
             self.send_buffer(config);
             self.encoder.reset_buffer();
