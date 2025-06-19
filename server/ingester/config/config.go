@@ -67,6 +67,7 @@ const (
 	// the maximum number of endpoints for a server corresponding to ClickHouse;
 	//   any endpoints beyond this limit will be ignored
 	MaxClickHouseEndpointsPerServer = 128
+	DefaultDatasourceListenPort     = 20106
 )
 
 type DatabaseTable struct {
@@ -183,6 +184,7 @@ type Config struct {
 	StatsInterval            int    `yaml:"stats-interval"`
 	FlowTagCacheFlushTimeout uint32 `yaml:"flow-tag-cache-flush-timeout"`
 	FlowTagCacheMaxSize      uint32 `yaml:"flow-tag-cache-max-size"`
+	DatasourceListenPort     uint16 `yaml:"datasource-listen-port"`
 	LogFile                  string
 	LogLevel                 string
 	MyNodeName               string
@@ -532,6 +534,7 @@ func Load(path string) *Config {
 			StatsInterval:            DefaultStatsInterval,
 			FlowTagCacheFlushTimeout: DefaultFlowTagCacheFlushTimeout,
 			FlowTagCacheMaxSize:      DefaultFlowTagCacheMaxSize,
+			DatasourceListenPort:     DefaultDatasourceListenPort,
 		},
 	}
 	if err != nil {

@@ -19,7 +19,7 @@ package license
 import (
 	"sync"
 
-	configs "github.com/deepflowio/deepflow/server/controller/config/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
@@ -42,7 +42,7 @@ func GetChecker() monitor.LicenseChecker {
 	return checker
 }
 
-func (c *Checker) Init(cfg configs.Warrant) {
+func (c *Checker) Init(cfg config.ControllerConfig) {
 }
 
 func (c *Checker) Check(function int) error {

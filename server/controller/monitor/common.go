@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	configs "github.com/deepflowio/deepflow/server/controller/config/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -31,7 +31,7 @@ import (
 var log = logger.MustGetLogger("monitor")
 
 type LicenseChecker interface {
-	Init(configs.Warrant)
+	Init(config.ControllerConfig)
 	Check(function int) error
 	CheckAgent(agent *metadbmodel.VTap, function int) error
 }

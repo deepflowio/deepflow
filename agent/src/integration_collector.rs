@@ -376,7 +376,7 @@ fn fill_l7_stats(
     };
     let mut l4_protocol = L4Protocol::Tcp;
     let mut l7_protocol = L7Protocol::Unknown;
-    let mut status = L7ResponseStatus::Timeout;
+    let mut status = L7ResponseStatus::Unknown;
     let mut is_http2 = false;
     let (mut l2_end_0, mut l2_end_1) = (false, false);
 
@@ -489,11 +489,13 @@ fn fill_l7_stats(
 
     // According to https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
     // Unset = 0, Ok = 1, Error = 2
-    if status == L7ResponseStatus::Timeout && span.status.is_some() {
-        status = match span.status.as_ref().unwrap().code {
-            1 => L7ResponseStatus::Ok,
-            2 => L7ResponseStatus::ServerError,
-            _ => L7ResponseStatus::Timeout,
+    if status == L7ResponseStatus::Unknown {
+        if let Some(s) = span.status.as_ref() {
+            match s.code {
+                1 => status = L7ResponseStatus::Ok,
+                2 => status = L7ResponseStatus::ServerError,
+                _ => (),
+            }
         }
     }
 
