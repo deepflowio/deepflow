@@ -644,7 +644,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 							log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
 							continue
 						}
-						for agentID := range agentIDs {
+						for _, agentID := range agentIDs {
 							agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
 						}
 					}
