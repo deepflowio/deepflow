@@ -499,6 +499,9 @@ ingester:
 
   ## The listening port used by Ingester to receive data
   #listen-port: 20033
+  #
+  ## The listening port used by Ingester to handle datasource API
+  #datasource-listen-port: 20106
 
   ## 遥测数据写入配置
   #metrics-ck-writer:
