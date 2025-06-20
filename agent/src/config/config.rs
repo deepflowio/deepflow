@@ -2345,6 +2345,21 @@ pub struct GlobalCommon {
     pub secret_key: String,
 }
 
+impl GlobalCommon {
+    pub fn update(&mut self, other: Self) {
+        self.kubernetes_api_enabled = other.kubernetes_api_enabled;
+        self.enabled = other.enabled;
+        self.region_id = other.region_id;
+        self.pod_cluster_id = other.pod_cluster_id;
+        self.vpc_id = other.vpc_id;
+        self.agent_id = other.agent_id;
+        self.team_id = other.team_id;
+        self.organize_id = other.organize_id;
+        self.agent_type = other.agent_type;
+        self.secret_key = other.secret_key;
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Global {
