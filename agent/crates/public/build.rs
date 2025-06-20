@@ -23,7 +23,6 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
         .out_dir("src/proto")
         .compile(
             &[
-                "../../../message/agent.proto",
                 "../../../message/common.proto",
                 "../../../message/metric.proto",
                 "../../../message/flow_log.proto",
@@ -32,6 +31,10 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
             ],
             &["../../../message"],
         )?;
+    tonic_build::configure()
+        .build_server(true)
+        .out_dir("src/proto")
+        .compile(&["../../../message/agent.proto"], &["../../../message"])?;
     tonic_build::configure()
         .build_server(false)
         .out_dir("src/proto/integration")
