@@ -52,7 +52,8 @@
 static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
-static bool kprobe_feature_disable;	// Whether to enable the kprobe feature.
+static bool kprobe_feature_disable;	// Whether to disable the kprobe feature.
+static bool unix_socket_feature_enable; // Whether to enable the kprobe feature.
 /*
  * Control whether to disable the tracing feature.
  * 'true' disables the tracing feature, and 'false' enables it.
@@ -1625,6 +1626,10 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		offset.kprobe_invalid = 1;
 	}
 
+	if (unix_socket_feature_enable) {
+		offset.enable_unix_socket = 1;
+	}
+
 	switch (kern_type) {
 	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
@@ -1825,6 +1830,10 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	memset(&offset, 0, sizeof(offset));
 	if (kprobe_feature_disable) {
 		offset.kprobe_invalid = 1;
+	}
+
+	if (unix_socket_feature_enable) {
+		offset.enable_unix_socket = 1;
 	}
 
 	offset.ready = 1;
@@ -3558,6 +3567,18 @@ void enable_kprobe_feature(void)
 {
 	kprobe_feature_disable = false;
 	ebpf_info("Kprobe feature has been enabled.\n");
+}
+
+void disable_unix_socket_feature(void)
+{
+	unix_socket_feature_enable = false;
+	ebpf_info("unix socket feature has been disabled.\n");
+}
+
+void enable_unix_socket_feature(void)
+{
+	unix_socket_feature_enable = true;
+	ebpf_info("unix socket feature has been enabled.\n");
 }
 
 bool is_pure_kprobe_ebpf(void)

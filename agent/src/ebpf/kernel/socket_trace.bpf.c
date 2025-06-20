@@ -621,8 +621,10 @@ static __inline int is_tcp_udp_data(void *sk,
 
 	switch (conn_info->skc_family) {
 	case PF_UNIX:
-		// Handle UNIX domain sockets, tracing local IPC
-		return SOCK_CHECK_TYPE_UNIX;
+		if (offset->enable_unix_socket)
+			// Handle UNIX domain sockets, tracing local IPC
+			return SOCK_CHECK_TYPE_UNIX;
+		return SOCK_CHECK_TYPE_ERROR;
 	case PF_INET:
 		break;
 	case PF_INET6:

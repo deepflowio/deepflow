@@ -743,6 +743,11 @@ extern "C" {
      */
     pub fn enable_kprobe_feature();
 
+    // Disables Unix socket tracing.
+    pub fn disable_unix_socket_feature();
+    // Enables Unix socket tracing.
+    pub fn enable_unix_socket_feature();
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;
