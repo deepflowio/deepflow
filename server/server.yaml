@@ -467,6 +467,9 @@ querier:
   # - name: skywalking
   #   addr: 127.0.0.1:12800
 
+mcp:
+  listen-port: 20080
+
 ingester:
   ## whether Ingester store metrics/flow_log... to database
   #storage-disabled: false
