@@ -3868,6 +3868,34 @@ inputs:
 
 当设置为 true 时，kprobe 功能将被禁用。
 
+##### 禁用 kprobe {#inputs.ebpf.socket.kprobe.enable_unix_socket}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.enable_unix_socket`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        enable_unix_socket: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，启用 Unix Socket 追踪。
+
 ##### 黑名单 {#inputs.ebpf.socket.kprobe.blacklist}
 
 ###### 端口号 {#inputs.ebpf.socket.kprobe.blacklist.ports}

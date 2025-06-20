@@ -150,6 +150,8 @@ pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
+#[allow(dead_code)]
+pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
 cfg_if::cfg_if! {
     if #[cfg(feature = "extended_observability")] {
         #[allow(dead_code)]
@@ -740,6 +742,11 @@ extern "C" {
      * for monitoring and tracing specific points in the kernel.
      */
     pub fn enable_kprobe_feature();
+
+    // Disables Unix socket tracing.
+    pub fn disable_unix_socket_feature();
+    // Enables Unix socket tracing.
+    pub fn enable_unix_socket_feature();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {

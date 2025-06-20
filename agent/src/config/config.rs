@@ -950,6 +950,7 @@ impl Default for EbpfSocketKprobePorts {
 #[serde(default)]
 pub struct EbpfSocketKprobe {
     pub disabled: bool,
+    pub enable_unix_socket: bool,
     pub blacklist: EbpfSocketKprobePorts,
     pub whitelist: EbpfSocketKprobePorts,
 }
