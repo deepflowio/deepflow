@@ -2795,6 +2795,21 @@ inputs:
       # name: Kprobe
       # description:
       kprobe:
+        # type: bool
+        # name:
+        #   en: Unix Socket Enabled 
+        #   ch: 启用 Unix Socket 追踪
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to true, enable tracing of Unix domain sockets.
+        #   ch: |-
+        #     当设置为 true 时，启用 Unix Socket 追踪。
+        enable_unix_socket: false
         # type: section
         # name:
         #   en: Blacklist

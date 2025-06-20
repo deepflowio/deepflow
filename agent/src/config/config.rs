@@ -950,6 +950,7 @@ impl Default for EbpfSocketKprobePorts {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketKprobe {
+    pub enable_unix_socket: bool,
     pub blacklist: EbpfSocketKprobePorts,
     pub whitelist: EbpfSocketKprobePorts,
 }
