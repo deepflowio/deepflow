@@ -19,8 +19,6 @@ package receiver
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
-	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -784,20 +782,7 @@ func (r *Receiver) decompressBuffer(encoder uint8, receiveBuffer []byte, start, 
 	}
 	encodeBuffer := bytes.NewBuffer(receiveBuffer[start:end])
 	var reader io.ReadCloser
-	var err error
 	switch encoder {
-	case datatype.MESSAGE_ENCODER_ZLIB: // zlib
-		reader, err = zlib.NewReader(encodeBuffer)
-		if err != nil {
-			return receiveBuffer, err
-		}
-		defer reader.Close()
-	case datatype.MESSAGE_ENCODER_GZIP: // gzip
-		reader, err = gzip.NewReader(encodeBuffer)
-		if err != nil {
-			return receiveBuffer, err
-		}
-		defer reader.Close()
 	case datatype.MESSAGE_ENCODER_ZSTD: // zstd
 		// zstd Reader did not implement io.ReadCloser
 		notReadCloser, err := zstd.NewReader(encodeBuffer)
