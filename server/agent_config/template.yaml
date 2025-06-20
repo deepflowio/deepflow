@@ -1337,7 +1337,7 @@ inputs:
     #     匹配类型。
     # upgrade_from: static_config.os-proc-regex.match-type
     # ---
-    # match_type: ""
+    # match_type: process_name
     # ---
     # type: string
     # name:
@@ -4800,8 +4800,8 @@ processors:
         grpc:
           # type: bool
           # name:
-          #   en: Enable Grpc stream data
-          #   ch: 开启解析 Grpc Stream 数据
+          #   en: Enable gRPC stream data
+          #   ch: 开启解析 gRPC stream 数据
           # unit:
           # range: []
           # enum_options: []
@@ -4809,10 +4809,10 @@ processors:
           # ee_feature: false
           # description:
           #   en: |-
-          #     When enabled, all grpc packets are considered to be of the `stream` type, and the `data` will be reported,
+          #     When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
           #     and the rrt calculation of the response will use the `grpc-status` field.
           #   ch: |-
-          #     开启后所有 Grpc 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
+          #     开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
           streaming_data_enabled: false
     # type: section
     # name:
