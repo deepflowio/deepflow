@@ -1425,7 +1425,7 @@ inputs:
     #     匹配类型。
     # upgrade_from: static_config.os-proc-regex.match-type
     # ---
-    # match_type: ""
+    # match_type: process_name
     # ---
     # type: string
     # name:
@@ -2898,6 +2898,21 @@ inputs:
         #   ch: |-
         #     当设置为 true 时，kprobe 功能将被禁用。
         disabled: false
+        # type: bool
+        # name:
+        #   en: Unix Socket Enabled 
+        #   ch: 启用 Unix Socket 追踪
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to true, enable tracing of Unix domain sockets.
+        #   ch: |-
+        #     当设置为 true 时，启用 Unix Socket 追踪。
+        enable_unix_socket: false
         # type: section
         # name:
         #   en: Blacklist
@@ -4903,8 +4918,8 @@ processors:
         grpc:
           # type: bool
           # name:
-          #   en: Enable Grpc stream data
-          #   ch: 开启解析 Grpc Stream 数据
+          #   en: Enable gRPC stream data
+          #   ch: 开启解析 gRPC stream 数据
           # unit:
           # range: []
           # enum_options: []
@@ -4912,10 +4927,10 @@ processors:
           # ee_feature: false
           # description:
           #   en: |-
-          #     When enabled, all grpc packets are considered to be of the `stream` type, and the `data` will be reported,
+          #     When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
           #     and the rrt calculation of the response will use the `grpc-status` field.
           #   ch: |-
-          #     开启后所有 Grpc 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
+          #     开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
           streaming_data_enabled: false
     # type: section
     # name:

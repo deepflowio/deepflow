@@ -1951,7 +1951,7 @@ Upgrade from old version: `static_config.os-proc-regex.match-type`
 inputs:
   proc:
     process_matcher:
-    - match_type: ''
+    - match_type: process_name
 ```
 
 **枚举可选值**:
@@ -3718,6 +3718,10 @@ inputs:
 
 配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
 
+在 DPDK 作为 vhost-user 后端的场景中，虚拟机与 DPDK 应用之间通过 virtqueue（vring）进行数据交换。
+eBPF 可以在无需修改 DPDK 或虚拟机的前提下，自动 hook 到 vring 接口，实现对传输数据包的捕获和分析，
+无需额外配置即可实现流量可观测。相比之下，若要捕获物理网卡上的数据包，则需要配合 DPDK 的驱动接口进行显式配置。
+
 ###### DPDK 应用数据包接收 hook 点设置 {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
 **标签**:
@@ -3867,6 +3871,34 @@ inputs:
 **详细描述**:
 
 当设置为 true 时，kprobe 功能将被禁用。
+
+##### 禁用 kprobe {#inputs.ebpf.socket.kprobe.enable_unix_socket}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.enable_unix_socket`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        enable_unix_socket: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，启用 Unix Socket 追踪。
 
 ##### 黑名单 {#inputs.ebpf.socket.kprobe.blacklist}
 
@@ -6996,7 +7028,7 @@ processors:
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 
-###### 开启解析 Grpc Stream 数据 {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
+###### 开启解析 gRPC stream 数据 {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
 
 **标签**:
 
@@ -7023,7 +7055,7 @@ processors:
 
 **详细描述**:
 
-开启后所有 Grpc 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
+开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
 
 ### 过滤器 {#processors.request_log.filters}
 

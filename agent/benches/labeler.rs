@@ -131,7 +131,7 @@ fn bench_labeler(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                labeler.get_endpoint_data_by_epc(key.src_ip, key.dst_ip, 10, 0);
+                labeler.get_endpoint_data_by_epc(key.src_ip, key.dst_ip, 10, 0, true);
             }
             start.elapsed()
         })
