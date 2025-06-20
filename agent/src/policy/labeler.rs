@@ -770,19 +770,22 @@ impl Labeler {
         dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
+        l2_end_0: bool,
     ) -> EndpointData {
+        // One end of the ebpf data l2end and l3end must be true, so only one parameter is needed here
+        // l2_end_0.
         let src_info = EndpointInfo {
             is_device: l3_epc_id_src > 0,
             l3_epc_id: l3_epc_id_src,
-            l2_end: l3_epc_id_src > 0,
-            l3_end: l3_epc_id_src > 0,
+            l2_end: l2_end_0,
+            l3_end: l2_end_0,
             ..Default::default()
         };
         let dst_info = EndpointInfo {
             is_device: l3_epc_id_dst > 0,
             l3_epc_id: l3_epc_id_dst,
-            l2_end: l3_epc_id_dst > 0,
-            l3_end: l3_epc_id_dst > 0,
+            l2_end: !l2_end_0,
+            l3_end: !l2_end_0,
             ..Default::default()
         };
         let mut endpoint = EndpointData::new(src_info, dst_info);
