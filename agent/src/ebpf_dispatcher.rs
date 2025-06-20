@@ -878,6 +878,14 @@ impl EbpfCollector {
             ebpf::enable_kprobe_feature();
         }
 
+        if config.ebpf.socket.kprobe.enable_unix_socket {
+            info!("ebpf unix socket tracing enabled");
+            ebpf::enable_unix_socket_feature();
+        } else {
+            info!("ebpf unix socket tracing disabled");
+            ebpf::disable_unix_socket_feature();
+        }
+
         let white_list = &config.ebpf.socket.kprobe.whitelist;
         if !white_list.ports.is_empty() {
             if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.ports, false) {

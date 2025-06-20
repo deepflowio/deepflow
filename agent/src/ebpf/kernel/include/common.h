@@ -104,6 +104,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
 	DATA_SOURCE_CLOSE,
 	DATA_SOURCE_DPDK,
+	DATA_SOURCE_UNIX_SOCKET,
 };
 
 struct protocol_message_t {
