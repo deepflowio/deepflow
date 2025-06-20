@@ -395,6 +395,16 @@ impl Collector {
                 .spawn(move || {
                     let mut last_run = 0u64;
                     loop {
+                        let (running, timer) = &*running;
+                        let mut running = running.lock().unwrap();
+                        if !*running {
+                            break;
+                        }
+                        running = timer.wait_timeout(running, TICK_CYCLE).unwrap().0;
+                        if !*running {
+                            break;
+                        }
+
                         let min_interval_loaded = min_interval.load(Ordering::Relaxed);
                         let now = get_timestamp(ntp_diff.load(Ordering::Relaxed)).as_secs();
                         if now / min_interval_loaded == last_run / min_interval_loaded {
@@ -435,16 +445,6 @@ impl Collector {
                                     }
                                 }
                             }
-                        }
-
-                        let (running, timer) = &*running;
-                        let mut running = running.lock().unwrap();
-                        if !*running {
-                            break;
-                        }
-                        running = timer.wait_timeout(running, TICK_CYCLE).unwrap().0;
-                        if !*running {
-                            break;
                         }
                     }
                 })
