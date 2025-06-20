@@ -294,9 +294,10 @@ impl Default for TagExtraction {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 pub enum ProcessMatchType {
     Cmd,
+    #[default]
     ProcessName,
     ParentProcessName,
     Tag,
@@ -374,7 +375,7 @@ impl Default for ProcessMatcher {
     fn default() -> Self {
         Self {
             match_regex: Regex::new("").unwrap(),
-            match_type: "".into(),
+            match_type: ProcessMatchType::ProcessName,
             match_languages: vec![],
             match_usernames: vec![],
             only_in_container: true,
