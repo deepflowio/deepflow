@@ -1979,7 +1979,7 @@ Upgrade from old version: `static_config.os-proc-regex.match-type`
 inputs:
   proc:
     process_matcher:
-    - match_type: ''
+    - match_type: process_name
 ```
 
 **Enum options**:
@@ -3788,6 +3788,12 @@ Set the command name of the DPDK application, eBPF will automatically
 locate and trace packets for data collection.
 
 Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+
+In scenarios where DPDK acts as the vhost-user backend, data exchange between the virtual machine and the DPDK
+application occurs through virtqueues (vrings). eBPF can automatically hook into the vring interface without
+requiring any modifications to DPDK or the virtual machine, enabling packet capture and traffic observability
+with zero additional configuration. In contrast, capturing packets on physical NICs requires explicit configuration
+of the corresponding DPDK driver interfaces.
 
 ###### DPDK Application RX Hooks Configuration {#inputs.ebpf.socket.uprobe.dpdk.rx_hooks}
 
@@ -7183,7 +7189,7 @@ ref: [MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-serve
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 
-###### Enable Grpc stream data {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
+###### Enable gRPC stream data {#processors.request_log.application_protocol_inference.protocol_special_config.grpc.streaming_data_enabled}
 
 **Tags**:
 
@@ -7210,7 +7216,7 @@ processors:
 
 **Description**:
 
-When enabled, all grpc packets are considered to be of the `stream` type, and the `data` will be reported,
+When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
 and the rrt calculation of the response will use the `grpc-status` field.
 
 ### Filters {#processors.request_log.filters}
