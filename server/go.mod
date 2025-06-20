@@ -1,8 +1,8 @@
 module github.com/deepflowio/deepflow/server
 
-go 1.21
+go 1.23
 
-toolchain go1.21.13
+toolchain go1.24.4
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
@@ -65,6 +65,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
+	github.com/mark3labs/mcp-go v0.32.0
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
@@ -130,6 +131,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pyroscope-io/pyroscope v0.37.1
 	github.com/volcengine/volcengine-go-sdk v1.0.141
+	github.com/yuin/gopher-lua v1.1.1
 	go.opentelemetry.io/collector/pdata v1.0.0
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	sigs.k8s.io/yaml v1.3.0
@@ -261,12 +263,13 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/smartystreets/assertions v1.2.0 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
-	github.com/yuin/gopher-lua v1.1.1
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.opentelemetry.io/otel v1.24.0
