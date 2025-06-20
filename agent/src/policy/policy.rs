@@ -366,7 +366,7 @@ impl Policy {
         // TODO：可能也需要走fast提升性能
         let endpoints = self
             .labeler
-            .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, 0);
+            .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, 0, false);
         self.send_ebpf(
             src,
             dst,
@@ -422,9 +422,13 @@ impl Policy {
             return (endpoints, entry);
         }
 
-        let endpoints =
-            self.labeler
-                .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
+        let endpoints = self.labeler.get_endpoint_data_by_epc(
+            key.src_ip,
+            key.dst_ip,
+            l3_epc_id_0,
+            l3_epc_id_1,
+            key.l2_end_0,
+        );
         let endpoints = self.table.endpoint_fast_add(
             table_type,
             key.src_ip,
