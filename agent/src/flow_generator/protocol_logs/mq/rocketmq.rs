@@ -1506,7 +1506,7 @@ impl RocketmqHeader {
 
     pub fn get_response_code_str_and_status(&self) -> (&'static str, L7ResponseStatus) {
         if self.is_request() {
-            return ("", L7ResponseStatus::Timeout);
+            return ("", L7ResponseStatus::Unknown);
         }
         // compatible for versions between v4.4.0 and v5.3.1
         match self.header_data.code {
@@ -1631,7 +1631,7 @@ impl RocketmqHeader {
             ),
             3001 => ("USER_NOT_EXIST", L7ResponseStatus::ClientError),
             3002 => ("POLICY_NOT_EXIST", L7ResponseStatus::ClientError),
-            _ => ("", L7ResponseStatus::Timeout),
+            _ => ("", L7ResponseStatus::ParseFailed),
         }
     }
 }

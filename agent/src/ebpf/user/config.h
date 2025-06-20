@@ -47,8 +47,10 @@
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"df_TP_output_data"
 #define PROG_IO_EVENT_NAME_FOR_TP	"df_TP_io_event"
 #define PROG_IO_EVENT_NAME_FOR_KP       "df_KP_io_event"
-#define PROG_PROTO_INFER_FOR_KP		"df_KP_proto_infer_2"
-#define PROG_PROTO_INFER_FOR_TP		"df_TP_proto_infer_2"
+#define PROG_PROTO_INFER_2_FOR_KP	"df_KP_proto_infer_2"
+#define PROG_PROTO_INFER_2_FOR_TP	"df_TP_proto_infer_2"
+#define PROG_PROTO_INFER_3_FOR_KP	"df_KP_proto_infer_3"
+#define PROG_PROTO_INFER_3_FOR_TP	"df_TP_proto_infer_3"
 
 // perf profiler
 #define MAP_PERF_PROFILER_BUF_A_NAME	"__profiler_output_a"
@@ -74,7 +76,8 @@
 #define PROG_MEMORY_OUTPUT_FOR_KP            "df_KP_memory_output"
 
 enum {
-	PROG_PROTO_INFER_TP_IDX,
+	PROG_PROTO_INFER_TP_2_IDX,
+	PROG_PROTO_INFER_TP_3_IDX,
 	PROG_DATA_SUBMIT_TP_IDX,
 	PROG_OUTPUT_DATA_TP_IDX,
 	PROG_IO_EVENT_TP_IDX,
@@ -82,7 +85,8 @@ enum {
 };
 
 enum {
-	PROG_PROTO_INFER_KP_IDX,
+	PROG_PROTO_INFER_KP_2_IDX,
+	PROG_PROTO_INFER_KP_3_IDX,
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
 	PROG_IO_EVENT_KP_IDX,

@@ -289,6 +289,15 @@ pub struct HttpInfo {
 }
 
 impl HttpInfo {
+    fn is_invalid_status_code(&self) -> bool {
+        !(HTTP_STATUS_CODE_MIN..=HTTP_STATUS_CODE_MAX).contains(&self.status_code)
+    }
+
+    fn is_invalid(&self) -> bool {
+        (self.msg_type == LogMessageType::Request && self.method.is_none())
+            || (self.msg_type == LogMessageType::Response && self.is_invalid_status_code())
+    }
+
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
         if dir == PacketDirection::ClientToServer {
             if let Ok(v) = Version::try_from(custom.req.version.as_str()) {
@@ -698,156 +707,83 @@ impl L7ProtocolParserInterface for HttpLog {
             return Err(Error::NoParseConfig);
         };
 
-        let mut info = HttpInfo::default();
-        info.proto = self.proto;
-        info.is_tls = param.is_tls();
-
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
         match self.proto {
             L7Protocol::Http1 => {
+                let mut info = HttpInfo::default();
+
+                info.proto = self.proto;
+                info.is_tls = param.is_tls();
+
                 self.parse_http_v1(payload, param, &mut info)?;
+                self.set_info_by_config(param, config, payload, &mut info);
+
+                if param.parse_log {
+                    Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
+                } else {
+                    Ok(L7ParseResult::None)
+                }
             }
             L7Protocol::Http2 | L7Protocol::Grpc => {
+                let mut infos = vec![];
+                let mut offset = 0;
+                let mut last_error = Err(Error::HttpHeaderParseFailed);
+
                 if self.http2_req_decoder.is_none() {
                     self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
-                match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe => {
-                        self.parse_http2_go_uprobe(
+
+                loop {
+                    if offset > payload.len() {
+                        break;
+                    }
+
+                    let mut info = HttpInfo::default();
+                    info.proto = self.proto;
+                    info.is_tls = param.is_tls();
+
+                    let ret = match param.ebpf_type {
+                        EbpfType::GoHttp2Uprobe => self.parse_http2_go_uprobe(
                             &config.l7_log_dynamic,
-                            payload,
+                            &payload[offset..],
                             param,
                             &mut info,
-                        )?;
+                        ),
+                        _ => self.parse_http_v2(&payload[offset..], param, &mut info),
+                    };
+                    let n = match ret {
+                        Err(e) => {
+                            last_error = Err(e);
+                            break;
+                        }
+                        Ok(n) => n,
+                    };
+                    self.set_info_by_config(param, config, &payload[offset..], &mut info);
+
+                    if !info.is_invalid() || info.proto == L7Protocol::Grpc {
+                        if let Some(h) = info.headers_offset.as_mut() {
+                            *h += offset as u32;
+                        }
+                        infos.push(L7ProtocolInfo::HttpInfo(info));
                     }
-                    _ => self.parse_http_v2(payload, param, &mut info)?,
+
+                    offset += n;
+                }
+
+                if param.parse_log {
+                    if !infos.is_empty() {
+                        Ok(L7ParseResult::Multi(infos))
+                    } else {
+                        last_error
+                    }
+                } else {
+                    Ok(L7ParseResult::None)
                 }
             }
             _ => unreachable!(),
-        }
-        // In uprobe mode, headers are reported in a way different from other modes:
-        // one payload contains one header.
-        // Calling wasm plugin on every payload would be wasted effort,
-        // in this condition the call to the wasm plugin will be skipped.
-        if param.ebpf_type != EbpfType::GoHttp2Uprobe {
-            self.wasm_hook(param, payload, &mut info);
-        }
-        if config
-            .obfuscate_enabled_protocols
-            .is_enabled(L7Protocol::Http1)
-            || config
-                .obfuscate_enabled_protocols
-                .is_enabled(L7Protocol::Http2)
-        {
-            if let Some(index) = info.path.find('?') {
-                info.path.truncate(index + 1); // retain `?`
-            }
-        }
-        info.service_name = info.grpc_package_service_name();
-        if !config.http_endpoint_disabled && info.path.len() > 0 {
-            // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
-            let path = match info.endpoint.as_ref() {
-                Some(p) if !p.is_empty() => p,
-                _ => &info.path,
-            };
-            info.endpoint = Some(handle_endpoint(config, path));
-        }
-        info.set_is_on_blacklist(config);
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match self.proto {
-                L7Protocol::Http1 => {
-                    match param.direction {
-                        PacketDirection::ClientToServer => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        PacketDirection::ServerToClient => {
-                            if let Some(code) = info.grpc_status_code {
-                                self.set_grpc_status(code, &mut info);
-                            } else {
-                                self.set_status(info.status_code, &mut info);
-                            }
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
-                    }
-                    if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                            info.rrt = rrt;
-                            if info.msg_type == LogMessageType::Response {
-                                info.endpoint = endpoint;
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                        });
-                    }
-                }
-                L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe => {
-                        if info.is_req_end {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        if info.is_resp_end {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
-
-                        if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt_for_multi_merge_log(param, &info.endpoint).map(
-                                |(rrt, endpoint)| {
-                                    info.rrt = rrt;
-                                    if info.msg_type == LogMessageType::Response {
-                                        info.endpoint = endpoint;
-                                    }
-                                },
-                            );
-                        }
-
-                        if info.is_req_end || info.is_resp_end {
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
-                        }
-
-                        if param.direction == PacketDirection::ServerToClient {
-                            if let Some(code) = info.grpc_status_code {
-                                self.set_grpc_status(code, &mut info);
-                            } else {
-                                self.set_status(info.status_code, &mut info);
-                            }
-                        }
-                    }
-                    _ => {
-                        match param.direction {
-                            PacketDirection::ClientToServer => {
-                                self.perf_stats.as_mut().map(|p| p.inc_req());
-                            }
-                            PacketDirection::ServerToClient => {
-                                self.perf_stats.as_mut().map(|p| p.inc_resp());
-
-                                if let Some(code) = info.grpc_status_code {
-                                    self.set_grpc_status(code, &mut info);
-                                } else {
-                                    self.set_status(info.status_code, &mut info);
-                                }
-                            }
-                        }
-                        if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                                info.rrt = rrt;
-                                if info.msg_type == LogMessageType::Response {
-                                    info.endpoint = endpoint;
-                                }
-                                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                            });
-                        }
-                    }
-                },
-                _ => unreachable!(),
-            }
-        }
-        self.last_is_on_blacklist = info.is_on_blacklist;
-        if param.parse_log {
-            Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
-        } else {
-            Ok(L7ParseResult::None)
         }
     }
 
@@ -902,6 +838,131 @@ impl HttpLog {
             proto: l7_protcol,
             ..Default::default()
         }
+    }
+
+    fn set_info_by_config(
+        &mut self,
+        param: &ParseParam,
+        config: &LogParserConfig,
+        payload: &[u8],
+        info: &mut HttpInfo,
+    ) {
+        // In uprobe mode, headers are reported in a way different from other modes:
+        // one payload contains one header.
+        // Calling wasm plugin on every payload would be wasted effort,
+        // in this condition the call to the wasm plugin will be skipped.
+        if param.ebpf_type != EbpfType::GoHttp2Uprobe {
+            self.wasm_hook(param, payload, info);
+        }
+        if config
+            .obfuscate_enabled_protocols
+            .is_enabled(L7Protocol::Http1)
+            || config
+                .obfuscate_enabled_protocols
+                .is_enabled(L7Protocol::Http2)
+        {
+            if let Some(index) = info.path.find('?') {
+                info.path.truncate(index + 1); // retain `?`
+            }
+        }
+        info.service_name = info.grpc_package_service_name();
+        if !config.http_endpoint_disabled && info.path.len() > 0 {
+            // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
+            let path = match info.endpoint.as_ref() {
+                Some(p) if !p.is_empty() => p,
+                _ => &info.path,
+            };
+            info.endpoint = Some(handle_endpoint(config, path));
+        }
+        info.set_is_on_blacklist(config);
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match self.proto {
+                L7Protocol::Http1 => {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            if let Some(code) = info.grpc_status_code {
+                                self.set_grpc_status(code, info);
+                            } else {
+                                self.set_status(info.status_code, info);
+                            }
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
+                    }
+                    if info.msg_type != LogMessageType::Session {
+                        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
+                            info.rrt = rrt;
+                            if info.msg_type == LogMessageType::Response {
+                                info.endpoint = endpoint;
+                            }
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                        });
+                    }
+                }
+                L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
+                    EbpfType::GoHttp2Uprobe => {
+                        if info.is_req_end {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        if info.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
+
+                        if info.msg_type != LogMessageType::Session {
+                            info.cal_rrt_for_multi_merge_log(param, &info.endpoint).map(
+                                |(rrt, endpoint)| {
+                                    info.rrt = rrt;
+                                    if info.msg_type == LogMessageType::Response {
+                                        info.endpoint = endpoint;
+                                    }
+                                },
+                            );
+                        }
+
+                        if info.is_req_end || info.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
+                        }
+
+                        if param.direction == PacketDirection::ServerToClient {
+                            if let Some(code) = info.grpc_status_code {
+                                self.set_grpc_status(code, info);
+                            } else {
+                                self.set_status(info.status_code, info);
+                            }
+                        }
+                    }
+                    _ => {
+                        match param.direction {
+                            PacketDirection::ClientToServer => {
+                                self.perf_stats.as_mut().map(|p| p.inc_req());
+                            }
+                            PacketDirection::ServerToClient => {
+                                self.perf_stats.as_mut().map(|p| p.inc_resp());
+
+                                if let Some(code) = info.grpc_status_code {
+                                    self.set_grpc_status(code, info);
+                                } else {
+                                    self.set_status(info.status_code, info);
+                                }
+                            }
+                        }
+                        if info.msg_type != LogMessageType::Session {
+                            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
+                                info.rrt = rrt;
+                                if info.msg_type == LogMessageType::Response {
+                                    info.endpoint = endpoint;
+                                }
+                                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                            });
+                        }
+                    }
+                },
+                _ => unreachable!(),
+            }
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
     }
 
     fn set_header_decoder(&mut self, expected_headers_set: Arc<HashSet<Vec<u8>>>) {
@@ -978,7 +1039,7 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         if payload.len() < HTTPV2_CUSTOM_DATA_MIN_LENGTH {
             return Err(Error::HttpHeaderParseFailed);
         }
@@ -1014,17 +1075,22 @@ impl HttpLog {
 
         if self.proto == L7Protocol::Grpc {
             info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
-            Self::modify_http2_and_grpc(
+            let ret = Self::modify_http2_and_grpc(
                 config.grpc_streaming_data_enabled,
                 direction,
                 content_length,
                 stream_id,
                 info,
-            )
+            );
+            if ret.is_err() || info.is_invalid() {
+                return Err(Error::HttpHeaderParseFailed);
+            }
+
+            ret
         } else {
             info.version = Version::V2;
             info.stream_id = Some(stream_id);
-            Ok(())
+            Ok(payload.len())
         }
     }
 
@@ -1034,10 +1100,10 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-    ) -> Result<()> {
-        self.check_http2_go_uprobe(config, payload, param, info)?;
+    ) -> Result<usize> {
+        let n = self.check_http2_go_uprobe(config, payload, param, info)?;
         set_captured_byte!(info, param);
-        Ok(())
+        Ok(n)
     }
 
     pub fn parse_http_v1(
@@ -1140,7 +1206,7 @@ impl HttpLog {
         content_length: Option<u32>,
         stream_id: u32,
         info: &mut HttpInfo,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         info.version = Version::V2;
         if info.stream_id.is_none() {
             info.stream_id = Some(stream_id);
@@ -1194,26 +1260,17 @@ impl HttpLog {
             },
             _ => {
                 if direction == PacketDirection::ClientToServer {
-                    if info.method.is_none() {
-                        return Err(Error::HttpHeaderParseFailed);
-                    }
                     if content_length.is_some() {
                         info.req_content_length = content_length;
                     }
                 } else {
-                    if info.status_code == 0
-                        || !(HTTP_STATUS_CODE_MIN..=HTTP_STATUS_CODE_MAX)
-                            .contains(&info.status_code)
-                    {
-                        return Err(Error::HttpHeaderParseFailed);
-                    }
                     if content_length.is_some() {
                         info.resp_content_length = content_length;
                     }
                 }
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     fn check_http_v2(
@@ -1221,7 +1278,7 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let (direction, config) = (
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
@@ -1233,11 +1290,14 @@ impl HttpLog {
         let mut frame_payload = payload;
         let mut httpv2_header = Httpv2Headers::default();
         let mut headers_offset = 0;
+        let mut stream_id = 0;
+        let mut offset = 0;
 
         while frame_payload.len() > HTTPV2_FRAME_HEADER_LENGTH {
             if Self::has_magic(frame_payload) {
                 frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
                 headers_offset += HTTPV2_MAGIC_LENGTH;
+                offset += HTTPV2_MAGIC_LENGTH;
                 continue;
             }
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
@@ -1249,15 +1309,31 @@ impl HttpLog {
                 break;
             }
 
+            offset += httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH;
+
+            if httpv2_header.stream_id == 0 {
+                // Headers和Data帧的StreamId不为0
+                // 参考协议：https://tools.ietf.org/html/rfc7540#section-6.2
+                if httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH
+                    >= frame_payload.len()
+                {
+                    break;
+                }
+                frame_payload = &frame_payload
+                    [httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH..];
+                headers_offset += httpv2_header.frame_length as usize + HTTPV2_FRAME_HEADER_LENGTH;
+                continue;
+            }
+
+            if stream_id == 0 && httpv2_header.stream_id != 0 {
+                stream_id = httpv2_header.stream_id;
+            } else if stream_id != 0 && stream_id != httpv2_header.stream_id {
+                return Ok(offset);
+            }
+
             frame_payload = &frame_payload[HTTPV2_FRAME_HEADER_LENGTH..];
 
             if !header_frame_parsed && httpv2_header.frame_type == HTTPV2_FRAME_HEADERS_TYPE {
-                if httpv2_header.stream_id == 0 {
-                    // Headers帧的StreamId不为0
-                    // 参考协议：https://tools.ietf.org/html/rfc7540#section-6.2
-                    break;
-                }
-
                 let mut l_offset = 0;
                 if httpv2_header.flags & FLAG_HEADERS_PADDED != 0 {
                     if httpv2_header.frame_length <= frame_payload[0] as u32 {
@@ -1319,11 +1395,6 @@ impl HttpLog {
             } else if (header_frame_parsed || self.proto == L7Protocol::Grpc)
                 && httpv2_header.frame_type == HTTPV2_FRAME_DATA_TYPE
             {
-                if httpv2_header.stream_id == 0 {
-                    // Data帧的StreamId不为0
-                    // 参考协议：https://tools.ietf.org/html/rfc7540#section-6.1
-                    break;
-                }
                 // HTTPv2协议中存在可以通过Headers帧中携带“Content-Length”字段，即可直接进行解析
                 // 若未在Headers帧中携带，则去解析Headers帧后的Data帧的数据长度以进行“Content-Length”解析
                 // 如grpc-go源码中，在封装FrameHeader头时，不封装“Content-Length”，需要解析其关联的Data帧进行“Content-Length”解析
@@ -1334,10 +1405,6 @@ impl HttpLog {
                         content_length =
                             Some(content_length.unwrap_or_default() - frame_payload[0] as u32);
                     }
-                }
-
-                if self.proto != L7Protocol::Grpc {
-                    break;
                 }
 
                 is_httpv2 = true;
@@ -1378,13 +1445,15 @@ impl HttpLog {
             if info.msg_type == LogMessageType::Other {
                 info.msg_type = LogMessageType::from(direction);
             }
-            return Self::modify_http2_and_grpc(
+            Self::modify_http2_and_grpc(
                 grpc_streaming_data_enabled,
                 direction,
                 content_length,
                 httpv2_header.stream_id,
                 info,
-            );
+            )?;
+
+            return Ok(offset);
         }
 
         Err(Error::HttpHeaderParseFailed)
@@ -1395,10 +1464,10 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-    ) -> Result<()> {
-        self.check_http_v2(payload, param, info)?;
+    ) -> Result<usize> {
+        let n = self.check_http_v2(payload, param, info)?;
         set_captured_byte!(info, param);
-        Ok(())
+        Ok(n)
     }
 
     fn on_header(
@@ -1922,11 +1991,23 @@ mod tests {
                 }
                 L7Protocol::Http2 | L7Protocol::Grpc => {
                     if let Ok(info) = http2.parse_payload(payload, param) {
-                        output.push_str(&format!(
-                            "{:?} is_http: {}\n",
-                            get_http_info(info.unwrap_single()),
-                            true
-                        ));
+                        match info {
+                            L7ParseResult::Multi(m) => {
+                                for i in m {
+                                    output.push_str(&format!(
+                                        "{:?} is_http: {}\n",
+                                        get_http_info(i),
+                                        true
+                                    ))
+                                }
+                            }
+                            L7ParseResult::Single(s) => output.push_str(&format!(
+                                "{:?} is_http: {}\n",
+                                get_http_info(s),
+                                true
+                            )),
+                            _ => (),
+                        };
                     } else {
                         let mut info = HttpInfo::default();
                         info.proto = protocol;
@@ -1943,11 +2024,23 @@ mod tests {
                         ));
                     } else if let Ok(info) = http2.parse_payload(payload, param) {
                         protocol = L7Protocol::Http2;
-                        output.push_str(&format!(
-                            "{:?} is_http: {}\n",
-                            get_http_info(info.unwrap_single()),
-                            true
-                        ));
+                        match info {
+                            L7ParseResult::Multi(m) => {
+                                for i in m {
+                                    output.push_str(&format!(
+                                        "{:?} is_http: {}\n",
+                                        get_http_info(i),
+                                        true
+                                    ))
+                                }
+                            }
+                            L7ParseResult::Single(s) => output.push_str(&format!(
+                                "{:?} is_http: {}\n",
+                                get_http_info(s),
+                                true
+                            )),
+                            _ => (),
+                        };
                     } else {
                         let mut info = HttpInfo::default();
                         info.proto = protocol;
@@ -1963,6 +2056,7 @@ mod tests {
     fn check() {
         let files = vec![
             ("grpc-service-name.pcap", "grpc-service-name.result"),
+            ("http2-multi.pcap", "http2-multi.result"),
             ("grpc-unknown.pcap", "grpc-unknown.result"),
             ("grpc-server-stream.pcap", "grpc-server-stream.result"),
             ("httpv1.pcap", "httpv1.result"),
