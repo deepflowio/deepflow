@@ -38,7 +38,7 @@ use dwarf::UnwindEntry;
 
 use crate::{
     maps::{get_memory_mappings, MemoryArea},
-    utils::{bpf_delete_elem, bpf_update_elem, IdGenerator, BPF_ANY},
+    utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
 
 #[derive(Default)]
@@ -416,10 +416,11 @@ impl UnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                match *libc::__errno_location() {
+                let errno = get_errno();
+                match errno {
                     libc::E2BIG => warn!("update process#{pid} shard list failed: try increasing dwarf_process_map_size"),
                     libc::ENOMEM => warn!("update process#{pid} shard list failed: cannot allocate memory"),
-                    _ => warn!("update process#{pid} shard list failed: bpf_update_elem() returned {}", *libc::__errno_location()),
+                    _ => warn!("update process#{pid} shard list failed: bpf_update_elem() returned {errno}"),
                 }
             }
         }
@@ -433,13 +434,10 @@ impl UnwindTable {
                 &pid as *const u32 as *const c_void,
             );
             if ret != 0 {
-                let errno = libc::__errno_location();
+                let errno = get_errno();
                 // ignoring non exist error
-                if *errno != libc::ENOENT {
-                    warn!(
-                        "delete process#{pid} shard list failed: bpf_delete_elem() returned {}",
-                        *libc::__errno_location()
-                    );
+                if errno != libc::ENOENT {
+                    warn!("delete process#{pid} shard list failed: bpf_delete_elem() returned {errno}");
                 }
             }
         }
@@ -459,15 +457,15 @@ impl UnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                match *libc::__errno_location() {
+                let errno = get_errno();
+                match errno {
                     libc::E2BIG => {
                         warn!("update shard#{shard_id} failed: try increasing dwarf_shard_map_size")
                     }
                     libc::ENOMEM => warn!("update shard#{shard_id} failed: cannot allocate memory"),
-                    _ => warn!(
-                        "update shard#{shard_id} failed: bpf_update_elem() returned {}",
-                        *libc::__errno_location()
-                    ),
+                    _ => {
+                        warn!("update shard#{shard_id} failed: bpf_update_elem() returned {errno}")
+                    }
                 }
             }
         }
@@ -481,13 +479,10 @@ impl UnwindTable {
                 &shard_id as *const u32 as *const c_void,
             );
             if ret != 0 {
-                let errno = libc::__errno_location();
+                let errno = get_errno();
                 // ignoring non exist error
-                if *errno != libc::ENOENT {
-                    warn!(
-                        "delete shard#{shard_id} failed: bpf_delete_elem() returned {}",
-                        *libc::__errno_location()
-                    );
+                if errno != libc::ENOENT {
+                    warn!("delete shard#{shard_id} failed: bpf_delete_elem() returned {errno}");
                 }
             }
         }
