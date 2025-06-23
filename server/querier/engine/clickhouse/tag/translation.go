@@ -1905,7 +1905,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 			ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
 			autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(tag_int_values[indexOf(tag_int_names,'%s')]),toUInt64(tag_int_values[indexOf(tag_int_names,'%s')])))", autoTypeSuffix, autoIDSuffix)
-			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", "indexOf(tag_string_names,'"+autoNameSuffix+"')]", VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, "indexOf(tag_string_names,'"+autoNameSuffix+"')]", VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
+			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", "indexOf(tag_string_names,'"+autoNameSuffix+"')", VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, "indexOf(tag_string_names,'"+autoNameSuffix+"')", VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			if suffix == "" {
 				tagResourceMap[autoNameSuffix] = map[string]*Tag{
 					"default": NewTag(
