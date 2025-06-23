@@ -496,6 +496,8 @@ impl FlowAclListener for SyncEbpfDispatcher {
         _: &Vec<Arc<crate::common::policy::PeerConnection>>,
         _: &Vec<Arc<crate::_Cidr>>,
         _: &Vec<Arc<crate::_Acl>>,
+        _: bool,
+        _: &mut bool,
     ) -> Result<(), String> {
         self.pause.store(false, Ordering::Relaxed);
         Ok(())

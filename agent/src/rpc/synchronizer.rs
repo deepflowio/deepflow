@@ -157,6 +157,7 @@ pub struct Status {
     // GRPC数据
     pub local_epc: i32,
 
+    pub last_invalid_log: Duration,
     pub version_platform_data: u64,
     pub version_acls: u64,
     pub version_groups: u64,
@@ -187,6 +188,7 @@ impl Default for Status {
             ntp_max_interval: Duration::from_secs(300),
 
             local_epc: EPC_INTERNET,
+            last_invalid_log: Duration::ZERO,
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,
@@ -200,6 +202,22 @@ impl Default for Status {
 }
 
 impl Status {
+    const INVALID_LOG_INTERVAL: Duration = Duration::from_secs(50);
+
+    pub fn enabled_invalid_log(&mut self) -> bool {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+        if self.last_invalid_log > now {
+            self.last_invalid_log = now;
+        }
+
+        now - self.last_invalid_log >= Self::INVALID_LOG_INTERVAL
+    }
+
+    pub fn update_last_invalid_log(&mut self) {
+        self.last_invalid_log = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    }
+
     fn update_platform_data(
         &mut self,
         version: u64,
@@ -243,7 +261,11 @@ impl Status {
         self.acls = acls;
     }
 
-    pub fn get_platform_data(&mut self, resp: &pb::SyncResponse) -> bool {
+    pub fn get_platform_data(
+        &mut self,
+        resp: &pb::SyncResponse,
+        enabled_invalid_log: bool,
+    ) -> (bool, bool) {
         let current_version = self.version_platform_data;
         let version = resp.version_platform_data.unwrap_or(0);
         debug!(
@@ -252,13 +274,14 @@ impl Status {
         );
         if version == 0 {
             debug!("platform data in preparation.");
-            return false;
+            return (false, false);
         }
         if version == current_version {
             debug!("platform data same version.");
-            return false;
+            return (false, false);
         }
 
+        let mut has_invalid_log = false;
         if let Some(platform_compressed) = &resp.platform_data {
             let platform = pb::PlatformData::decode(platform_compressed.as_slice());
             if platform.is_ok() {
@@ -266,12 +289,16 @@ impl Status {
                 let mut interfaces = Vec::new();
                 let mut peers = Vec::new();
                 let mut cidrs = Vec::new();
+                let mut invalid_interfaces = Vec::new();
+                let mut invalid_cidrs = Vec::new();
                 for item in &platform.interfaces {
                     let result = VInterface::try_from(item);
                     if result.is_ok() {
                         interfaces.push(Arc::new(result.unwrap()));
                     } else {
-                        warn!("{:?}: {}", item, result.unwrap_err());
+                        if enabled_invalid_log {
+                            invalid_interfaces.push(item.id());
+                        }
                     }
                 }
                 for item in &platform.peer_connections {
@@ -282,9 +309,27 @@ impl Status {
                     if result.is_ok() {
                         cidrs.push(Arc::new(result.unwrap()));
                     } else {
-                        warn!("{:?}: {}", item, result.unwrap_err());
+                        if enabled_invalid_log {
+                            invalid_cidrs.push(item.prefix());
+                        }
                     }
                 }
+
+                if enabled_invalid_log {
+                    if !invalid_interfaces.is_empty() {
+                        warn!("Invalid interfaces: {:?}, maybe it's caused by the wrong mac, ip_resource, if_type.", invalid_interfaces);
+                        has_invalid_log = true;
+                    }
+
+                    if !invalid_cidrs.is_empty() {
+                        warn!(
+                            "Invalid cidrs: {:?}, maybe it's caused by the wrong prefix.",
+                            invalid_cidrs
+                        );
+                        has_invalid_log = true;
+                    }
+                }
+
                 self.update_platform_data(version, interfaces, peers, cidrs);
             } else {
                 error!("Invalid platform data.");
@@ -293,7 +338,7 @@ impl Status {
         } else {
             self.update_platform_data(version, vec![], vec![], vec![]);
         }
-        return true;
+        return (true, has_invalid_log);
     }
 
     fn modify_platform(
@@ -333,7 +378,11 @@ impl Status {
         // TODO：bridge fdb
     }
 
-    pub fn get_flow_acls(&mut self, resp: &pb::SyncResponse) -> bool {
+    pub fn get_flow_acls(
+        &mut self,
+        resp: &pb::SyncResponse,
+        enabled_invalid_log: bool,
+    ) -> (bool, bool) {
         let version = resp.version_acls.unwrap_or(0);
         debug!(
             "get grpc FlowAcls version: {} vs current version: {}.",
@@ -341,27 +390,38 @@ impl Status {
         );
         if version == 0 {
             debug!("FlowAcls data in preparation.");
-            return false;
+            return (false, false);
         }
         if version == self.version_acls {
             debug!("FlowAcls data same version.");
-            return false;
+            return (false, false);
         }
 
+        let mut has_invalid_log = false;
         if let Some(acls_commpressed) = &resp.flow_acls {
             let acls = pb::FlowAcls::decode(acls_commpressed.as_slice());
             if let Ok(acls) = acls {
+                let mut invalid_flow_acl = Vec::new();
                 let flow_acls = acls
                     .flow_acl
                     .into_iter()
-                    .filter_map(|a| match a.try_into() {
-                        Err(e) => {
-                            warn!("{}", e);
-                            None
+                    .filter_map(|a| {
+                        let id = a.id();
+                        match a.try_into() {
+                            Err(_) => {
+                                if enabled_invalid_log {
+                                    invalid_flow_acl.push(id);
+                                }
+                                None
+                            }
+                            t => t.ok(),
                         }
-                        t => t.ok(),
                     })
                     .collect::<Vec<Acl>>();
+                if enabled_invalid_log && !invalid_flow_acl.is_empty() {
+                    warn!("Invalid flow acl: {:?}, maybe it's with the wrong port or capture_network_type.", invalid_flow_acl);
+                    has_invalid_log = true;
+                }
                 self.update_flow_acl(version, flow_acls);
             } else {
                 error!("Invalid acls.");
@@ -370,10 +430,14 @@ impl Status {
         } else {
             self.update_flow_acl(version, vec![]);
         }
-        return true;
+        return (true, has_invalid_log);
     }
 
-    pub fn get_ip_groups(&mut self, resp: &pb::SyncResponse) -> bool {
+    pub fn get_ip_groups(
+        &mut self,
+        resp: &pb::SyncResponse,
+        enabled_invalid_log: bool,
+    ) -> (bool, bool) {
         let version = resp.version_groups.unwrap_or(0);
         debug!(
             "get grpc Groups version: {} vs current version: {}.",
@@ -381,26 +445,39 @@ impl Status {
         );
         if version == 0 {
             debug!("Groups data in preparation.");
-            return false;
+            return (false, false);
         }
         if self.version_groups == version {
             debug!("Groups data same version.");
-            return false;
+            return (false, false);
         }
 
+        let mut has_invalid_log = false;
         if let Some(groups_compressed) = &resp.groups {
             let groups = pb::Groups::decode(groups_compressed.as_slice());
             if groups.is_ok() {
                 let groups = groups.unwrap();
                 let mut ip_groups = Vec::new();
+                let mut invalid_ip_groups = Vec::new();
                 for item in &groups.groups {
                     let result = IpGroupData::try_from(item);
                     if result.is_ok() {
                         ip_groups.push(Arc::new(result.unwrap()));
                     } else {
-                        warn!("{}", result.unwrap_err());
+                        if enabled_invalid_log {
+                            invalid_ip_groups.push(item.id())
+                        }
                     }
                 }
+
+                if enabled_invalid_log && !invalid_ip_groups.is_empty() {
+                    warn!(
+                        "Invalid ip groups: {:?}, maybe it doesn't come with a valid IP address",
+                        invalid_ip_groups
+                    );
+                    has_invalid_log = true;
+                }
+
                 self.update_ip_groups(version, ip_groups);
             } else {
                 error!("Invalid ip groups.");
@@ -409,7 +486,7 @@ impl Status {
         } else {
             self.update_ip_groups(version, vec![]);
         }
-        return true;
+        return (true, has_invalid_log);
     }
 
     pub fn get_blacklist(&mut self, resp: &pb::SyncResponse) -> Vec<u64> {
@@ -428,6 +505,8 @@ impl Status {
         &self,
         agent_type: AgentType,
         listener: &mut Box<dyn FlowAclListener>,
+        enabled_invalid_log: bool,
+        has_invalid_log: &mut bool,
     ) -> Result<(), String> {
         listener.flow_acl_change(
             agent_type,
@@ -437,6 +516,8 @@ impl Status {
             &self.peers,
             &self.cidrs,
             &self.acls,
+            enabled_invalid_log,
+            has_invalid_log,
         )
     }
 
@@ -446,7 +527,10 @@ impl Status {
         static_config: &StaticConfig,
         resp: &pb::SyncResponse,
         macs: &Vec<MacAddr>,
-    ) -> (bool, bool) {
+        enabled_invalid_log: bool,
+    ) -> (bool, bool, bool) {
+        let mut has_invalid_log = false;
+
         self.proxy_ip = if user_config.global.communication.proxy_controller_ip.len() > 0 {
             Some(user_config.global.communication.proxy_controller_ip.clone())
         } else {
@@ -457,7 +541,7 @@ impl Status {
         self.ntp_enabled = user_config.global.ntp.enabled;
         self.ntp_max_interval = user_config.global.ntp.max_drift;
         self.ntp_min_interval = user_config.global.ntp.min_drift;
-        let updated_platform = self.get_platform_data(resp);
+        let (updated_platform, invalid_log) = self.get_platform_data(resp, enabled_invalid_log);
         if updated_platform {
             self.modify_platform(
                 macs,
@@ -465,8 +549,16 @@ impl Status {
                 &resp.dynamic_config.clone().unwrap_or_default(),
             );
         }
-        let mut updated = self.get_ip_groups(resp) || updated_platform;
-        updated = self.get_flow_acls(resp) || updated;
+        has_invalid_log |= invalid_log;
+
+        let (mut updated, invalid_log) = self.get_ip_groups(resp, enabled_invalid_log);
+        updated |= updated_platform;
+        has_invalid_log |= invalid_log;
+
+        let (updated_acl, invalid_log) = self.get_flow_acls(resp, enabled_invalid_log);
+        updated |= updated_acl;
+        has_invalid_log |= invalid_log;
+
         updated = self.get_local_epc(&resp.dynamic_config.clone().unwrap_or(DynamicConfig {
             kubernetes_api_enabled: None,
             region_id: None,
@@ -483,7 +575,7 @@ impl Status {
         })) || updated;
         let wait_ntp = self.ntp_enabled && self.first;
 
-        (updated, wait_ntp)
+        (updated, wait_ntp, has_invalid_log)
     }
 }
 
@@ -724,53 +816,82 @@ impl Synchronizer {
     fn parse_segment(
         capture_mode: PacketCaptureType,
         resp: &pb::SyncResponse,
-    ) -> (Vec<pb::Segment>, Vec<MacAddr>, Vec<MacAddr>) {
+        enabled_invalid_log: bool,
+    ) -> (Vec<pb::Segment>, Vec<MacAddr>, Vec<MacAddr>, bool) {
         let segments = if capture_mode == PacketCaptureType::Analyzer {
             resp.remote_segments.clone()
         } else {
             resp.local_segments.clone()
         };
 
-        if segments.len() == 0 && capture_mode != PacketCaptureType::Local {
-            warn!("Segment is empty, in {:?} mode.", capture_mode);
-        }
         let mut macs = Vec::new();
         let mut gateway_vmacs = Vec::new();
+        let mut invalid_segment = Vec::new();
+        let mut invalid_mac = Vec::new();
+        let mut invalid_vmac = Vec::new();
         for segment in &segments {
             let vm_macs = &segment.mac;
             let vmacs = &segment.vmac;
             if vm_macs.len() != vmacs.len() {
-                warn!(
-                    "Invalid segment the length of vmMacs and vMacs is inconsistent: {:?}",
-                    segment
-                );
+                if enabled_invalid_log {
+                    invalid_segment.push(segment.id());
+                }
                 continue;
             }
             for (mac_str, vmac_str) in vm_macs.iter().zip(vmacs) {
                 let mac = MacAddr::from_str(mac_str.as_str());
                 if mac.is_err() {
-                    warn!(
-                        "Malformed VM mac {}, response rejected: {}",
-                        mac_str,
-                        mac.unwrap_err()
-                    );
+                    if enabled_invalid_log {
+                        invalid_mac.push(mac_str.as_str());
+                    }
                     continue;
                 }
 
                 let vmac = MacAddr::from_str(vmac_str.as_str());
                 if vmac.is_err() {
-                    warn!(
-                        "Malformed VM vmac {}, response rejected: {}",
-                        vmac_str,
-                        vmac.unwrap_err()
-                    );
+                    if enabled_invalid_log {
+                        invalid_vmac.push(vmac_str.as_str());
+                    }
                     continue;
                 }
                 macs.push(mac.unwrap());
                 gateway_vmacs.push(vmac.unwrap());
             }
         }
-        return (segments, macs, gateway_vmacs);
+
+        let mut has_invalid_log = false;
+        if enabled_invalid_log {
+            if segments.len() == 0 && capture_mode != PacketCaptureType::Local {
+                info!("Segment is empty, in {:?} mode.", capture_mode);
+                has_invalid_log = true;
+            }
+
+            if !invalid_segment.is_empty() {
+                warn!(
+                    "Invalid segment {:?}, the length of vmMacs and vMacs is inconsistent.",
+                    invalid_segment
+                );
+                has_invalid_log = true;
+            }
+            if !invalid_mac.is_empty() {
+                warn!(
+                    "Invalid mac {:?}, The mac address is invalid and cannot be resolved to MacAddr
+    .",
+                    invalid_mac
+                );
+                has_invalid_log = true;
+            }
+            if !invalid_vmac.is_empty() {
+                warn!(
+                    "Invalid vmac {:?}, The vmac address is invalid and cannot be resolved to MacAddr
+    .",
+                    invalid_vmac
+                );
+                has_invalid_log = true;
+            }
+        }
+
+        return (segments, macs, gateway_vmacs, has_invalid_log);
     }
 
     // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
@@ -842,12 +963,32 @@ impl Synchronizer {
         for listener in flow_acl_listener.lock().unwrap().iter_mut() {
             listener.containers_change(&containers);
         }
-        let (_, macs, gateway_vmac_addrs) =
-            Self::parse_segment(user_config.inputs.cbpf.common.capture_mode, &resp);
 
-        let (updated, wait_ntp) = {
+        let (updated, wait_ntp, macs, gateway_vmac_addrs, enabled_invalid_log, mut has_invalid_log) = {
             let mut status_guard = status.write();
-            status_guard.update(&user_config, static_config, &resp, &macs)
+            let enabled_invalid_log = status_guard.enabled_invalid_log();
+
+            let (_, macs, gateway_vmac_addrs, has_invalid_log) = Self::parse_segment(
+                user_config.inputs.cbpf.common.capture_mode,
+                &resp,
+                enabled_invalid_log,
+            );
+            let (updated, wait_ntp, invalid_log) = status_guard.update(
+                &user_config,
+                static_config,
+                &resp,
+                &macs,
+                enabled_invalid_log,
+            );
+
+            (
+                updated,
+                wait_ntp,
+                macs,
+                gateway_vmac_addrs,
+                enabled_invalid_log,
+                has_invalid_log || invalid_log,
+            )
         };
         if wait_ntp {
             // Here, it is necessary to wait for the NTP synchronization timestamp to start
@@ -863,9 +1004,12 @@ impl Synchronizer {
             status_guard.version_groups, status_guard.version_platform_data, status_guard.version_acls);
             let mut policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
-                if let Err(e) =
-                    status_guard.trigger_flow_acl(user_config.global.common.agent_type, listener)
-                {
+                if let Err(e) = status_guard.trigger_flow_acl(
+                    user_config.global.common.agent_type,
+                    listener,
+                    enabled_invalid_log,
+                    &mut has_invalid_log,
+                ) {
                     warn!("OnPolicyChange: {}.", e);
                     policy_error = true;
                 }
@@ -887,6 +1031,12 @@ impl Synchronizer {
                 status_guard.acls.len(),
             );
         }
+
+        if has_invalid_log {
+            let mut status_guard = status.write();
+            status_guard.update_last_invalid_log();
+        }
+
         let mut status_guard = status.write();
         let blacklist = status_guard.get_blacklist(&resp);
         status_guard.first = false;
@@ -1441,6 +1591,8 @@ impl Synchronizer {
                         &vec![],
                         &vec![],
                         &vec![],
+                        false,
+                        &mut false,
                     );
                 }
 
