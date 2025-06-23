@@ -124,6 +124,13 @@ fn all_supported_commands() -> Vec<Command> {
             ..Default::default()
         },
         Command {
+            cmdline: "netstat -tulnp",
+            output_format: OutputFormat::Text,
+            desc: "netstat",
+            command_type: CMD_TYPE_SYSTEM,
+            ..Default::default()
+        },
+        Command {
             // use "--preserve-status" to avoid timeout error
             cmdline: "timeout --preserve-status $timeout strace -f -p $pid",
             output_format: OutputFormat::Text,
