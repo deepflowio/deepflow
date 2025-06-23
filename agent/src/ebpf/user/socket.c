@@ -52,6 +52,7 @@
 static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
+static bool unix_socket_feature_enable; // Whether to enable the kprobe feature.
 /*
  * Control whether to disable the tracing feature.
  * 'true' disables the tracing feature, and 'false' enables it.
@@ -1230,6 +1231,20 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
+			if (sd->source == DATA_SOURCE_UNIX_SOCKET) {
+				submit_data->tuple.l4_protocol = IPPROTO_TCP;
+				submit_data->tuple.dport = submit_data->tuple.num = 0;
+				// 0:unkonwn 1:client(connect) 2:server(accept)
+				if (sd->socket_role == 1) {
+					submit_data->tuple.dport = 1;
+				} else if (sd->socket_role == 2) {
+					submit_data->tuple.num = 1;
+				}
+				submit_data->tuple.addr_len = 4;
+				*(in_addr_t *)submit_data->tuple.rcv_saddr = htonl(0x7F000001); 
+				*(in_addr_t *)submit_data->tuple.daddr = htonl(0x7F000001);
+			}
+
 			submit_data->process_id = sd->tgid;
 			submit_data->thread_id = sd->pid;
 			submit_data->coroutine_id = sd->coroutine_id;
@@ -1606,6 +1621,10 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	bpf_offset_param_t offset;
 	memset(&offset, 0, sizeof(offset));
 
+	if (unix_socket_feature_enable) {
+		offset.enable_unix_socket = 1;
+	}
+
 	switch (kern_type) {
 	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
@@ -1803,6 +1822,11 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_sock_common_ipv6only_offset);
 
 	bpf_offset_param_t offset;
+	memset(&offset, 0, sizeof(offset));
+	if (unix_socket_feature_enable) {
+		offset.enable_unix_socket = 1;
+	}
+
 	offset.ready = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
@@ -2589,6 +2613,8 @@ retry_load:
 		ebpf_info
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
 	}
+
+	ebpf_info("== Unix domain socket ==\n");
 
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
@@ -3520,6 +3546,18 @@ void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act)
 		golang_trace_handle(pid, act);
 	else if (feat == FEATURE_UPROBE_OPENSSL)
 		openssl_trace_handle(pid, act);
+}
+
+void disable_unix_socket_feature(void)
+{
+	unix_socket_feature_enable = false;
+	ebpf_info("unix socket feature has been disabled.\n");
+}
+
+void enable_unix_socket_feature(void)
+{
+	unix_socket_feature_enable = true;
+	ebpf_info("unix socket feature has been enabled.\n");
 }
 
 bool is_pure_kprobe_ebpf(void)

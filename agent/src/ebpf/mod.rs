@@ -148,6 +148,8 @@ pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
+#[allow(dead_code)]
+pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
 cfg_if::cfg_if! {
     if #[cfg(feature = "extended_observability")] {
         #[allow(dead_code)]
@@ -723,6 +725,10 @@ extern "C" {
     pub fn get_dwarf_shard_map_size() -> c_int;
     pub fn set_dwarf_shard_map_size(size: c_int) -> c_void;
 
+    // Disables Unix socket tracing.
+    pub fn disable_unix_socket_feature();
+    // Enables Unix socket tracing.
+    pub fn enable_unix_socket_feature();
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;

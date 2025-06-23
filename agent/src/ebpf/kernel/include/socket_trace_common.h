@@ -332,6 +332,8 @@ struct debug_data {
 
 struct member_fields_offset {
 	__u8 ready;
+	__u8 enable_unix_socket:1;		// Enable flag for Unix socket tracing
+	__u8 reserved:7;
 	__u16 struct_dentry_d_parent_offset;    // offsetof(struct dentry, d_parent)
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;

@@ -3796,6 +3796,34 @@ Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
 
+##### Unix Socket Enabled {#inputs.ebpf.socket.kprobe.enable_unix_socket}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.enable_unix_socket`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        enable_unix_socket: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, enable tracing of Unix domain sockets.
+
 ##### Blacklist {#inputs.ebpf.socket.kprobe.blacklist}
 
 ###### Port Numbers {#inputs.ebpf.socket.kprobe.blacklist.ports}
