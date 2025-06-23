@@ -332,7 +332,9 @@ struct debug_data {
 
 struct member_fields_offset {
 	__u8 ready;
-	__u8 kprobe_invalid;			// This indicates that the KPROBE feature has been disabled.
+	__u8 kprobe_invalid:1;			// This indicates that the KPROBE feature has been disabled.
+	__u8 enable_unix_socket:1;		// Enable flag for Unix socket tracing
+	__u8 reserved:6;
 	__u16 struct_dentry_d_parent_offset;    // offsetof(struct dentry, d_parent)
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;

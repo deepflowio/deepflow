@@ -618,10 +618,13 @@ static __inline int is_tcp_udp_data(void *sk,
 	bpf_probe_read_kernel(&conn_info->skc_family,
 			      sizeof(conn_info->skc_family),
 			      sk + offset->struct_sock_family_offset);
-	/*
-	 * Without thinking about PF_UNIX.
-	 */
+
 	switch (conn_info->skc_family) {
+	case PF_UNIX:
+		if (offset->enable_unix_socket)
+			// Handle UNIX domain sockets, tracing local IPC
+			return SOCK_CHECK_TYPE_UNIX;
+		return SOCK_CHECK_TYPE_ERROR;
 	case PF_INET:
 		break;
 	case PF_INET6:
@@ -691,6 +694,11 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 				     struct conn_info_s *conn_info)
 {
+	if (conn_info->sk_type == SOCK_UNIX) {
+		v->tuple.addr_len = 0;
+		return true;
+	}
+
 	if (v == NULL || sk == NULL)
 		return false;
 
@@ -732,6 +740,11 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 static __inline bool get_socket_info(struct __tuple_t *tuple, void *sk,
 				     struct conn_info_s *conn_info)
 {
+	if (conn_info->sk_type == SOCK_UNIX) {
+		tuple->addr_len = 0;
+		return true;
+	}
+
 	if (sk == NULL)
 		return false;
 
@@ -1651,7 +1664,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		v->extra_data_count = 0;
 
 	v->coroutine_id = trace_key.goid;
-	v->source = extra->source;
+
+	if (conn_info->sk_type == SOCK_UNIX)
+		v->source = DATA_SOURCE_UNIX_SOCKET;
+	else
+		v->source = extra->source;
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	__u32 cache_key = ((__u32) bpf_get_current_pid_tgid()) >> 16;
@@ -1751,7 +1768,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 #endif
 	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
-	__u8 sock_state;
+	__u8 sock_state = 0;
 	if (!(sk != NULL &&
 	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info))
 	       != SOCK_CHECK_TYPE_ERROR))) {
@@ -1773,6 +1790,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)	
 		return -1;
 #endif
+	if (sock_state == SOCK_CHECK_TYPE_UNIX)
+		conn_info->sk_type = SOCK_UNIX;
 
 	init_conn_info(id >> 32, args->fd, conn_info, sk, direction,
 		       bytes_count, offset);

@@ -3954,6 +3954,34 @@ inputs:
 
 When set to true, kprobe will be disabled.
 
+##### Unix Socket Enabled {#inputs.ebpf.socket.kprobe.enable_unix_socket}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.enable_unix_socket`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        enable_unix_socket: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, enable tracing of Unix domain sockets.
+
 ##### Blacklist {#inputs.ebpf.socket.kprobe.blacklist}
 
 ###### Port Numbers {#inputs.ebpf.socket.kprobe.blacklist.ports}
