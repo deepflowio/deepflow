@@ -38,7 +38,7 @@ use semver::{Version, VersionReq};
 use crate::{
     error::{Error, Result},
     maps::{get_memory_mappings, MemoryArea},
-    utils::{bpf_delete_elem, bpf_update_elem, IdGenerator, BPF_ANY},
+    utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
 
 fn error_not_python(pid: u32) -> Error {
@@ -538,10 +538,11 @@ impl PythonUnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                match *libc::__errno_location() {
+                let errno = get_errno();
+                match errno {
                     libc::E2BIG => warn!("update python unwind info for process#{pid} failed: try increasing python_unwind_info_map_size"),
                     libc::ENOMEM => warn!("update python unwind info for process#{pid} failed: cannot allocate memory"),
-                    _ => warn!("update python unwind info for process#{pid} failed: bpf_update_elem() returned {}", *libc::__errno_location()),
+                    _ => warn!("update python unwind info for process#{pid} failed: bpf_update_elem() returned {errno}"),
                 }
             }
             ret
@@ -553,12 +554,11 @@ impl PythonUnwindTable {
         unsafe {
             let ret = bpf_delete_elem(self.unwind_info_map_fd, &pid as *const u32 as *const c_void);
             if ret != 0 {
-                let errno = libc::__errno_location();
+                let errno = get_errno();
                 // ignoring non exist error
-                if *errno != libc::ENOENT {
+                if errno != libc::ENOENT {
                     warn!(
-                        "delete python unwind info for process#{pid} failed: bpf_delete_elem() returned {}",
-                        *libc::__errno_location()
+                        "delete python unwind info for process#{pid} failed: bpf_delete_elem() returned {errno}"
                     );
                 }
             }
@@ -580,7 +580,8 @@ impl PythonUnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                match *libc::__errno_location() {
+                let errno = get_errno();
+                match errno {
                     libc::E2BIG => warn!(
                         "update python offsets#{id} failed: try increasing python_offsets_map_size"
                     ),
@@ -588,8 +589,7 @@ impl PythonUnwindTable {
                         warn!("update python offsets#{id} failed: cannot allocate memory")
                     }
                     _ => warn!(
-                        "update python offsets#{id} failed: bpf_update_elem() returned {}",
-                        *libc::__errno_location()
+                        "update python offsets#{id} failed: bpf_update_elem() returned {errno}"
                     ),
                 }
             }

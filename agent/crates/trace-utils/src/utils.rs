@@ -16,7 +16,7 @@
 
 use std::collections::VecDeque;
 
-use libc::{__u64, c_int, c_void};
+use libc::{c_int, c_longlong, c_void};
 
 #[derive(Default)]
 pub struct IdGenerator {
@@ -38,13 +38,23 @@ impl IdGenerator {
     }
 }
 
-pub const BPF_ANY: __u64 = 0;
+pub const BPF_ANY: c_longlong = 0;
 extern "C" {
     pub fn bpf_update_elem(
         fd: c_int,
         key: *const c_void,
         value: *const c_void,
-        flags: __u64,
+        flags: c_longlong,
     ) -> c_int;
     pub fn bpf_delete_elem(fd: c_int, key: *const c_void) -> c_int;
+}
+
+pub(crate) unsafe fn get_errno() -> i32 {
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_os = "linux", target_os = "android"))] {
+            *libc::__errno_location()
+        } else {
+            unimplemented!()
+        }
+    }
 }
