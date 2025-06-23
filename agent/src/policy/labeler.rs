@@ -254,10 +254,16 @@ impl Labeler {
         return (0, 0);
     }
 
-    pub fn update_cidr_table(&mut self, cidrs: &Vec<Arc<Cidr>>) {
+    pub fn update_cidr_table(
+        &mut self,
+        cidrs: &Vec<Arc<Cidr>>,
+        enabled_invalid_log: bool,
+        has_invalid_log: &mut bool,
+    ) {
         let mut masklen_table: AHashMap<i32, (u8, u8)> = AHashMap::new();
         let mut epc_table: AHashMap<EpcNetIpKey, Arc<Cidr>> = AHashMap::new();
         let mut tunnel_table: AHashMap<u32, Vec<Arc<Cidr>>> = AHashMap::new();
+        let mut invalid_cidr = Vec::new();
 
         for item in cidrs {
             let mut epc_id = item.epc_id;
@@ -267,13 +273,11 @@ impl Labeler {
             let key = EpcNetIpKey::new(&item.ip.network(), item.ip.prefix_len(), epc_id);
 
             if let Some(old) = epc_table.insert(key, item.clone()) {
-                if (item.cidr_type == CidrType::Wan && item.epc_id != old.epc_id)
-                    || item.is_vip != old.is_vip
+                if enabled_invalid_log
+                    && ((item.cidr_type == CidrType::Wan && item.epc_id != old.epc_id)
+                        || item.is_vip != old.is_vip)
                 {
-                    warn!(
-                        "Found the same cidr, please check {:?} and {:?}.",
-                        item, old
-                    );
+                    invalid_cidr.push(item.ip)
                 }
             }
             masklen_table
@@ -294,6 +298,11 @@ impl Labeler {
                     .or_default()
                     .push(Arc::clone(item));
             }
+        }
+
+        if enabled_invalid_log && !invalid_cidr.is_empty() {
+            warn!("Invalid same cidr: {:?}", invalid_cidr);
+            *has_invalid_log = true;
         }
 
         // 排序使用降序是为了CIDR的最长前缀匹配
@@ -1082,7 +1091,7 @@ mod tests {
         let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2), Arc::new(cidr3)];
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&cidrs);
+        labeler.update_cidr_table(&cidrs, false, &mut false);
 
         labeler.set_epc_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.is_vip, true);
@@ -1104,7 +1113,7 @@ mod tests {
             ..Default::default()
         };
         let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2)];
-        labeler.update_cidr_table(&cidrs);
+        labeler.update_cidr_table(&cidrs, false, &mut false);
 
         let mut endpoint: EndpointInfo = Default::default();
         labeler.set_epc_by_cidr("10.1.2.3".parse().unwrap(), 10, &mut endpoint);
@@ -1123,7 +1132,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)], false, &mut false);
         labeler.set_epc_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.l3_epc_id, 0);
 
@@ -1147,7 +1156,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)], false, &mut false);
 
         labeler.set_epc_vip_by_tunnel("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.l3_epc_id, 10);
@@ -1165,7 +1174,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)], false, &mut false);
 
         labeler.set_vip_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.is_vip, true);
@@ -1207,7 +1216,7 @@ mod tests {
 
         labeler.update_mac_table(&list);
         labeler.update_epc_ip_table(&list);
-        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)], false, &mut false);
 
         let key: LookupKey = LookupKey {
             src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
@@ -1247,7 +1256,7 @@ mod tests {
             ..Default::default()
         };
         labeler.update_mac_table(&vec![Arc::new(interface)]);
-        labeler.update_cidr_table(&vec![Arc::new(cidr)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr)], false, &mut false);
         let mut endpoints: EndpointData = Default::default();
         endpoints.src_info.l3_epc_id = 1;
 
@@ -1302,7 +1311,7 @@ mod tests {
             is_vip: true,
             ..Default::default()
         };
-        labeler.update_cidr_table(&vec![Arc::new(cidr)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr)], false, &mut false);
 
         let mut endpoints: EndpointData = Default::default();
         endpoints.dst_info.l3_epc_id = 1;

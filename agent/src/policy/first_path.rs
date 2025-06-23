@@ -340,7 +340,6 @@ impl FirstPath {
         }
 
         if self.group_ip_map.is_none() {
-            warn!("IpGroup is nil, invalid acl: {}", acl);
             return false;
         }
 
@@ -352,7 +351,6 @@ impl FirstPath {
                 .get(&(*group as u16))
                 .is_none()
             {
-                warn!("Invalid acl by src group({}): {}", group, acl);
                 return true;
             }
         }
@@ -365,7 +363,6 @@ impl FirstPath {
                 .get(&(*group as u16))
                 .is_none()
             {
-                warn!("Invalid acl by dst group({}): {}", group, acl);
                 return true;
             }
         }
@@ -593,12 +590,22 @@ impl FirstPath {
         Ok(())
     }
 
-    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
+    pub fn update_acl(
+        &mut self,
+        acls: &Vec<Arc<Acl>>,
+        check: bool,
+        enabled_invalid_log: bool,
+        has_invalid_log: &mut bool,
+    ) -> PResult<()> {
         if !NOT_SUPPORT {
             let mut valid_acls = Vec::new();
+            let mut invalid_acls = vec![];
 
             for acl in acls {
                 if self.is_invalid_acl(acl, check) {
+                    if enabled_invalid_log {
+                        invalid_acls.push(acl.id);
+                    }
                     continue;
                 }
                 let mut valid_acl = (**acl).clone();
@@ -606,6 +613,15 @@ impl FirstPath {
                 valid_acl.reset();
                 valid_acls.push(valid_acl);
             }
+
+            if enabled_invalid_log && !invalid_acls.is_empty() {
+                warn!(
+                    "Invalid acls: {:?}, maybe the IP resource group doesn't have an IP address.",
+                    invalid_acls
+                );
+                *has_invalid_log = true;
+            }
+
             self.generate_first_table(&mut valid_acls)?;
         }
 
