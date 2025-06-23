@@ -156,7 +156,7 @@ impl RpcDebugger {
         }
 
         let mut sg = self.status.write();
-        sg.get_platform_data(&resp);
+        sg.get_platform_data(&resp, false);
         let mut res = sg
             .cidrs
             .iter()
@@ -181,7 +181,7 @@ impl RpcDebugger {
         }
 
         let mut sg = self.status.write();
-        sg.get_platform_data(&resp);
+        sg.get_platform_data(&resp, false);
         let mut res = sg
             .interfaces
             .iter()
@@ -211,7 +211,7 @@ impl RpcDebugger {
         }
 
         let mut sg = self.status.write();
-        sg.get_ip_groups(&resp);
+        sg.get_ip_groups(&resp, false);
         let mut res = sg
             .ip_groups
             .iter()
@@ -236,7 +236,7 @@ impl RpcDebugger {
         }
 
         let mut sg = self.status.write();
-        sg.get_flow_acls(&resp);
+        sg.get_flow_acls(&resp, false);
         let mut res = sg
             .acls
             .iter()
