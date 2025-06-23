@@ -11,6 +11,7 @@ RUN --mount=target=/tmp-mount \
     --no-install-suggests  --no-install-recommends -y \
     tzdata \
     iproute2 \
+    net-tools \
     strace \
     bridge-utils \
     busybox && \
