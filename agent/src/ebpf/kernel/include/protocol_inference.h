@@ -3829,20 +3829,20 @@ infer_protocol_2(const char *infer_buf, size_t count,
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	__u8 skip_proto = conn_info->skip_proto;
-	if (skip_proto != PROTO_MQTT && (inferred_message.type =
+	if (skip_proto != PROTO_DUBBO && (inferred_message.type =
 #else
 	if ((inferred_message.type =
+#endif
+	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_DUBBO;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_MQTT && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
 #endif
 		    infer_mqtt_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MQTT;
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
-	} else if (skip_proto != PROTO_DUBBO && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_DUBBO;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_AMQP && (inferred_message.type =
 #else
