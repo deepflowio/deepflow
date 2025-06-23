@@ -330,6 +330,8 @@ impl FlowAclListener for Arc<NpbBandwidthWatcher> {
         _peers: &Vec<Arc<PeerConnection>>,
         _cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
+        _: bool,
+        _: &mut bool,
     ) -> Result<(), String> {
         if NOT_SUPPORT {
             return Ok(());

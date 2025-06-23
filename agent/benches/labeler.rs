@@ -70,7 +70,7 @@ fn bench_labeler(c: &mut Criterion) {
 
             cidr_list.push(Arc::new(cidr));
         }
-        labeler.update_cidr_table(&cidr_list);
+        labeler.update_cidr_table(&cidr_list, false, &mut false);
         labeler.update_interface_table(&iface_list);
 
         let key: LookupKey = LookupKey {
@@ -118,7 +118,7 @@ fn bench_labeler(c: &mut Criterion) {
 
             cidr_list.push(Arc::new(cidr));
         }
-        labeler.update_cidr_table(&cidr_list);
+        labeler.update_cidr_table(&cidr_list, false, &mut false);
         labeler.update_interface_table(&iface_list);
 
         let key: LookupKey = LookupKey {
@@ -163,7 +163,7 @@ fn bench_policy(c: &mut Criterion) {
             Arc::new(IpGroupData::new(10, 2, "192.168.2.1/32")),
             Arc::new(IpGroupData::new(20, 20, "192.168.2.5/31")),
         ]);
-        let _ = first.update_acl(&vec![Arc::new(acl)], true);
+        let _ = first.update_acl(&vec![Arc::new(acl)], true, false, &mut false);
 
         first
     }
