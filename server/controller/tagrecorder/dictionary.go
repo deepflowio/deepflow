@@ -334,9 +334,11 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			if createSQL == checkDictSQL {
 				continue
 			}
+			logCheckSQL := strings.Replace(checkDictSQL, c.source.UserPassword, "[HIDDEN]", 1)
+			logCreateSQL := strings.Replace(createSQL, c.source.UserPassword, "[HIDDEN]", 1)
 			log.Infof("update dictionary %s", dictName, logger.NewORGPrefix(orgID))
-			log.Infof("exist dictionary %s", checkDictSQL, logger.NewORGPrefix(orgID))
-			log.Infof("wanted dictionary %s", createSQL, logger.NewORGPrefix(orgID))
+			log.Infof("exist dictionary %s", logCheckSQL, logger.NewORGPrefix(orgID))
+			log.Infof("wanted dictionary %s", logCreateSQL, logger.NewORGPrefix(orgID))
 			dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", ckDatabaseName, dictName)
 			_, err = ckDb.Exec(dropSQL)
 			if err != nil {
