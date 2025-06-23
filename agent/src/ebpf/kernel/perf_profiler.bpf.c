@@ -599,6 +599,8 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		pre_python_unwind(ctx, state, &oncpu_maps, PROG_PYTHON_UNWIND_PE_IDX);
 	}
 
+	// TODO: 如果 tgid（PID）在 lua 的 map 中，调用 lua 剖析的程序（可以参考 pre_python_unwind 的实现）
+
 	process_shard_list_t *shard_list =
 	    process_shard_list_table__lookup(&key->tgid);
 	if (shard_list != NULL) {

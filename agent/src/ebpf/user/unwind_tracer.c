@@ -229,6 +229,8 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_python_unwind_table = python_table;
     pthread_mutex_unlock(&g_python_unwind_table_lock);
 
+    // TODO: 创建 lua 剖析使用的 bpf table 并设置大小
+
     return 0;
 }
 
@@ -337,12 +339,17 @@ void unwind_events_handle(void) {
             pthread_mutex_unlock(&tracer->mutex_probes_lock);
         }
 
+        if (tracer && is_lua_process(event->pid)) {
+            // TODO: 加载 lua 剖析使用的 bpf table
+            // TODO: 如果有相关 uprobe 则注册
+        }
+
         if (g_unwind_table && requires_dwarf_unwind_table(event->pid)) {
             unwind_table_load(g_unwind_table, event->pid);
         }
 
         remove_event(&proc_events, event);
-	process_event_free(event);
+        process_event_free(event);
 
     } while (true);
     pthread_mutex_unlock(&g_python_unwind_table_lock);
@@ -383,6 +390,8 @@ void unwind_process_exit(int pid) {
         python_unwind_table_unload(g_python_unwind_table, pid);
     }
     pthread_mutex_unlock(&g_python_unwind_table_lock);
+
+    // TODO: 卸载 lua 剖析使用的 bpf table
 }
 
 // Ensure exclusive access to *unwind_table before calling this function
