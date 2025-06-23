@@ -90,6 +90,8 @@ pub unsafe extern "C" fn python_unwind_table_unload(table: *mut PythonUnwindTabl
     (*table).unload(pid);
 }
 
+// TODO: 暴露 lua 剖析相关函数给 C 部分
+
 // forwards rust demangle to C api
 // The code is from: https://github.com/rust-lang/rustc-demangle/blob/main/crates/capi/src/lib.rs
 #[no_mangle]

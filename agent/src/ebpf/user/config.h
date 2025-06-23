@@ -67,6 +67,7 @@
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
+// 增加 lua 相关的程序名
 
 #define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
 #define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"

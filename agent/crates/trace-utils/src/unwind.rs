@@ -15,6 +15,7 @@
  */
 
 pub mod dwarf;
+pub mod lua;
 pub mod python;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
