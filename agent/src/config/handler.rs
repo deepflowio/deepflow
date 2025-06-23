@@ -3249,6 +3249,14 @@ impl ConfigHandler {
 
         let kprobe = &mut ebpf.socket.kprobe;
         let new_kprobe = &mut new_ebpf.socket.kprobe;
+        if kprobe.enable_unix_socket != new_kprobe.enable_unix_socket {
+            info!(
+                "Update inputs.ebpf.socket.kprobe.enable_unix_socket from {:?} to {:?}.",
+                kprobe.enable_unix_socket, new_kprobe.enable_unix_socket
+            );
+            kprobe.enable_unix_socket = new_kprobe.enable_unix_socket;
+            restart_agent = !first_run;
+        }
         if kprobe.blacklist.ports != new_kprobe.blacklist.ports {
             info!(
                 "Update inputs.ebpf.socket.kprobe.blacklist.ports from {:?} to {:?}.",
