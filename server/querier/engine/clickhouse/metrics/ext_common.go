@@ -94,6 +94,10 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 					displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
 					description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 					fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+					state := resp.Get("DATA").GetIndex(i).Get("STATE").MustInt()
+					if state != common.NATIVE_FIELD_STATE_NORMAL {
+						continue
+					}
 					if fieldType != common.NATIVE_FIELD_TYPE_METRIC {
 						continue
 					}
