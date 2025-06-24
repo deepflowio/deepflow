@@ -47,6 +47,7 @@ const (
 	NATIVE_FIELD_TYPE_METRIC         = 2
 	NATIVE_FIELD_CATEGORY_CUSTOM_TAG = "Custom Tag"
 	NATIVE_FIELD_CATEGORY_METRICS    = "metrics"
+	NATIVE_FIELD_STATE_NORMAL        = 1
 )
 
 var DB_TABLE_MAP = map[string][]string{
