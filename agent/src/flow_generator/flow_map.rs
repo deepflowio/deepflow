@@ -1669,7 +1669,7 @@ impl FlowMap {
         let l7_timeout_count = self
             .perf_cache
             .borrow_mut()
-            .pop_timeout_count(&flow_id, false); // TODO: flow_end is most likely false, but may also be true
+            .pop_timeout_count(&flow_id, false);
         let (l7_perf_stats, l7_protocol) =
             meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
         let app_proto_head = l7_info.app_proto_head().unwrap();
@@ -2007,11 +2007,17 @@ impl FlowMap {
         &mut self,
         collect_stats: bool,
         tagged_flow: Arc<BatchedBox<TaggedFlow>>,
+        flow_end: bool,
     ) {
         if collect_stats {
             let flow = &tagged_flow.flow;
             if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
                 let mut l7_stats = L7Stats::default();
+                let l7_timeout_count = self
+                    .perf_cache
+                    .borrow_mut()
+                    .pop_timeout_count(&flow.flow_id, flow_end);
+                l7_stats.stats.err_timeout = l7_timeout_count as u32;
                 l7_stats.endpoint = None;
                 l7_stats.flow_id = flow.flow_id;
                 l7_stats.signal_source = flow.signal_source;
@@ -2086,7 +2092,6 @@ impl FlowMap {
                 collect_stats = true;
             }
         }
-        self.perf_cache.borrow_mut().remove(&flow.flow_id);
 
         self.size -= 1;
         self.stats_counter
@@ -2098,11 +2103,15 @@ impl FlowMap {
             self.tagged_flow_allocator
                 .allocate_one_with(node.tagged_flow.clone()),
         );
-        self.flush_l7_perf_stats(collect_stats, tagged_flow.clone());
+        let flow_id = tagged_flow.flow.flow_id;
+
+        self.flush_l7_perf_stats(collect_stats, tagged_flow.clone(), true);
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
+        self.perf_cache.borrow_mut().remove(&flow_id);
+
         self.flow_node_pool.put(node);
     }
 
@@ -2146,7 +2155,7 @@ impl FlowMap {
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),
             );
-            self.flush_l7_perf_stats(collect_stats, tagged_flow.clone());
+            self.flush_l7_perf_stats(collect_stats, tagged_flow.clone(), false);
             self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
