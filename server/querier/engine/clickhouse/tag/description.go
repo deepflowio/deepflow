@@ -1056,6 +1056,10 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 				displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
 				description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 				fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+				state := resp.Get("DATA").GetIndex(i).Get("STATE").MustInt()
+				if state != ckcommon.NATIVE_FIELD_STATE_NORMAL {
+					continue
+				}
 				if fieldType != ckcommon.NATIVE_FIELD_TYPE_TAG {
 					continue
 				}
@@ -1342,6 +1346,10 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQuer
 				for i := range resultArray {
 					name := resp.Get("DATA").GetIndex(i).Get("NAME").MustString()
 					fieldName := resp.Get("DATA").GetIndex(i).Get("FIELD_NAME").MustString()
+					state := resp.Get("DATA").GetIndex(i).Get("STATE").MustInt()
+					if state != ckcommon.NATIVE_FIELD_STATE_NORMAL {
+						continue
+					}
 					if name == tag {
 						newSql := strings.ReplaceAll(sql, fmt.Sprintf(" %s ", tag), fmt.Sprintf(" %s ", fieldName))
 						return GetExternalTagValues(db, table, newSql)

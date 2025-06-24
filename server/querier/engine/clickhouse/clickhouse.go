@@ -1264,6 +1264,10 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 						displayName := resp.Get("DATA").GetIndex(i).Get("DISPLAY_NAME").MustString()
 						description := resp.Get("DATA").GetIndex(i).Get("DESCRIPTION").MustString()
 						fieldType := resp.Get("DATA").GetIndex(i).Get("FIELD_TYPE").MustInt()
+						state := resp.Get("DATA").GetIndex(i).Get("STATE").MustInt()
+						if state != chCommon.NATIVE_FIELD_STATE_NORMAL {
+							continue
+						}
 						if fieldType == chCommon.NATIVE_FIELD_TYPE_METRIC {
 							metric := metrics.NewMetrics(
 								0, nativeMetric,
