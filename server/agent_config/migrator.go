@@ -798,7 +798,7 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"global.communication.proactive_request_interval",
 		"global.communication.max_escape_duration",
 		"inputs.resources.push_interval",
-		"inputs.proc.sync_interval",
+		"inputs.proc.socket_info_sync_interval",
 		"inputs.proc.min_lifetime",
 		"inputs.ebpf.socket.uprobe.golang.tracing_timeout",
 		"processors.request_log.application_protocol_inference.inference_result_ttl",
