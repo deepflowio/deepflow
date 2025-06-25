@@ -59,7 +59,8 @@ use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type
 use crate::rpc::Session;
 use crate::{
     common::{
-        decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType, l7_protocol_log::L7ProtocolBitmap,
+        decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
+        l7_protocol_log::L7ProtocolBitmap, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
     },
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
@@ -2555,7 +2556,10 @@ impl ConfigHandler {
                         .rotate(
                             Criterion::Age(Age::Day),
                             Naming::Timestamps,
-                            Cleanup::KeepLogFiles(log_retention as usize),
+                            Cleanup::KeepLogAndCompressedFiles(
+                                DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+                                log_retention as usize,
+                            ),
                         )
                         .create_symlink(log_file)
                         .append(),
