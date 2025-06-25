@@ -120,7 +120,7 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("send agent(%s team_id=%s) plugin data faild, err:%s", vtapCacheKey, teamID, err, logger.NewORGPrefix(orgID))
+			log.Errorf("send agent(%s team_id=%s) plugin data failed, err:%s", vtapCacheKey, teamID, err, logger.NewORGPrefix(orgID))
 			break
 		}
 	}

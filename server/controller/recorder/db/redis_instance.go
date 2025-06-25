@@ -26,12 +26,12 @@ type RedisInstance struct {
 }
 
 func NewRedisInstance() *RedisInstance {
-	operater := &RedisInstance{
+	operator := &RedisInstance{
 		newOperatorBase[*metadbmodel.RedisInstance](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

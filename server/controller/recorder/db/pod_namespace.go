@@ -26,12 +26,12 @@ type PodNamespace struct {
 }
 
 func NewPodNamespace() *PodNamespace {
-	operater := &PodNamespace{
+	operator := &PodNamespace{
 		newOperatorBase[*metadbmodel.PodNamespace](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

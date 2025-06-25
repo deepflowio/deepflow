@@ -96,7 +96,7 @@ func GetEncryptKey(controllerIP, grpcServerPort, key string) (string, error) {
 	grpcServer := net.JoinHostPort(controllerIP, grpcServerPort)
 	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 	if err != nil {
-		log.Error("create grpc connection faild:" + err.Error())
+		log.Error("create grpc connection failed:" + err.Error())
 		return "", err
 	}
 	defer conn.Close()

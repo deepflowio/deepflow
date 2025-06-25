@@ -27,14 +27,14 @@ type PodNode struct {
 }
 
 func NewPodNode() *PodNode {
-	operater := &PodNode{
+	operator := &PodNode{
 		newOperatorBase[*metadbmodel.PodNode](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }
 
 func (n *PodNode) DeleteBatch(lcuuids []string) ([]*metadbmodel.PodNode, bool) {

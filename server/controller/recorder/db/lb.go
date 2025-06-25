@@ -26,12 +26,12 @@ type LB struct {
 }
 
 func NewLB() *LB {
-	operater := &LB{
+	operator := &LB{
 		newOperatorBase[*metadbmodel.LB](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

@@ -37,7 +37,7 @@ var (
 
 type adapterPipeline struct {
 	config  adapter_config.ExternalAPM
-	adpater model.TraceAdapter
+	adapter model.TraceAdapter
 }
 
 func ensureAdapterConfig() {
@@ -68,10 +68,10 @@ func GetAdaptTrace(traceID string) (*model.ExTrace, error) {
 		return result, nil
 	}
 	for _, v := range pipeline {
-		if v.adpater == nil {
+		if v.adapter == nil {
 			continue
 		}
-		r, err := v.adpater.GetTrace(traceID, &v.config)
+		r, err := v.adapter.GetTrace(traceID, &v.config)
 		if err != nil {
 			log.Errorf("load %s data with traceid %s gets error: %s", v.config.Name, traceID, err)
 			continue

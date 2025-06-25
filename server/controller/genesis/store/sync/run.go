@@ -145,7 +145,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		grpcServer := net.JoinHostPort(serverIP, g.config.GrpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.config.GrpcMaxMessageLength))
 		if err != nil {
-			msg := "create grpc connection faild:" + err.Error()
+			msg := "create grpc connection failed:" + err.Error()
 			log.Error(msg, logger.NewORGPrefix(orgID))
 			return common.GenesisSyncDataResponse{}, errors.New(msg)
 		}
@@ -158,7 +158,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		}
 		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
-			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
+			msg := fmt.Sprintf("get genesis sharing sync failed (%s)", err.Error())
 			log.Warning(msg, logger.NewORGPrefix(orgID))
 			return common.GenesisSyncDataResponse{}, errors.New(msg)
 		}

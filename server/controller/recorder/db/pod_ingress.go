@@ -26,12 +26,12 @@ type PodIngress struct {
 }
 
 func NewPodIngress() *PodIngress {
-	operater := &PodIngress{
+	operator := &PodIngress{
 		newOperatorBase[*metadbmodel.PodIngress](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

@@ -26,12 +26,12 @@ type VPC struct {
 }
 
 func NewVPC() *VPC {
-	operater := &VPC{
+	operator := &VPC{
 		newOperatorBase[*metadbmodel.VPC](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			true,
 			true,
 		),
 	}
-	return operater
+	return operator
 }

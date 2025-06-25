@@ -26,12 +26,12 @@ type CEN struct {
 }
 
 func NewCEN() *CEN {
-	operater := &CEN{
+	operator := &CEN{
 		newOperatorBase[*metadbmodel.CEN](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			true,
 			false,
 		),
 	}
-	return operater
+	return operator
 }
