@@ -67,7 +67,7 @@ func (s *GrpcSession) nextServer() error {
 	} else {
 		s.ipIndex = ipIndex
 	}
-	server := fmt.Sprintf("%s:%d", s.ips[ipIndex], s.port)
+	server := net.JoinHostPort(s.ips[ipIndex].String(), fmt.Sprintf("%d", s.port))
 	if s.ips[ipIndex].To4() == nil {
 		server = fmt.Sprintf("[%s]:%d", s.ips[ipIndex], s.port)
 	}

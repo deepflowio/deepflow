@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -76,7 +77,7 @@ func (c *Client) init(query_uuid string) error {
 	}
 	if connection == nil { // FIXME: add a RWLock
 		conn, err := clickhouse.Open(&clickhouse.Options{
-			Addr: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
+			Addr: []string{net.JoinHostPort(c.Host, strconv.Itoa(c.Port))},
 			Auth: clickhouse.Auth{
 				Database: "default",
 				Username: c.UserName,

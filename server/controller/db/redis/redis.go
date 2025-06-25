@@ -19,6 +19,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ type Client struct {
 func generateAddrs(cfg Config) []string {
 	var addrs []string
 	for i := range cfg.Host {
-		addrs = append(addrs, fmt.Sprintf("%s:%d", cfg.Host[i], cfg.Port))
+		addrs = append(addrs, net.JoinHostPort(cfg.Host[i], fmt.Sprintf("%d", cfg.Port)))
 	}
 	return addrs
 }
