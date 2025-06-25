@@ -910,7 +910,7 @@ global:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '365d'] |
+| Range | ['0ns', '365d'] |
 
 **详细描述**:
 
@@ -939,7 +939,7 @@ global:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '365d'] |
+| Range | ['0ns', '365d'] |
 
 **详细描述**:
 
@@ -1675,20 +1675,20 @@ Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 ```yaml
 inputs:
   proc:
-    socket_info_sync_interval: 0
+    socket_info_sync_interval: 0ns
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1h'] |
+| Range | ['0ns', '1h'] |
 
 **详细描述**:
 
 进程 Socket 信息的同步周期。
 
-0 表示不开启，除 0 外不要配置小于 `1s` 的值。
+'0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
 
 注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
 即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
@@ -3632,11 +3632,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1d'] |
+| Range | ['0ns', '1d'] |
 
 **详细描述**:
 
-Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 0 时，Golang 程序的零侵扰追踪特性自动关闭。
+Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 '0ns' 时，Golang 程序的零侵扰追踪特性自动关闭。
 
 ##### TLS {#inputs.ebpf.socket.uprobe.tls}
 
@@ -3872,7 +3872,7 @@ inputs:
 
 当设置为 true 时，kprobe 功能将被禁用。
 
-##### 禁用 kprobe {#inputs.ebpf.socket.kprobe.enable_unix_socket}
+##### 启用 Unix Socket 追踪 {#inputs.ebpf.socket.kprobe.enable_unix_socket}
 
 **标签**:
 
@@ -4587,11 +4587,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1h'] |
+| Range | ['0ns', '1h'] |
 
 **详细描述**:
 
-低于'最小阻塞时间'的 Off-CPU 数据将被 deepflow-agent 忽略，'最小阻塞时间'设置为 '0' 表示
+低于'最小阻塞时间'的 Off-CPU 数据将被 deepflow-agent 忽略，'最小阻塞时间'设置为 '0ns' 表示
 采集所有的 Off-CPU 数据。由于 CPU 调度事件数量庞大（每秒可能超过一百万次），调小该参数将带来
 明显的资源开销，如果需要跟踪大时延的调度阻塞事件，建议调大该参数，以降低资源开销。另外，deepflow-agent
 不采集阻塞超过 1 小时的事件。
@@ -6845,7 +6845,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1d'] |
+| Range | ['0ns', '1d'] |
 
 **详细描述**:
 
