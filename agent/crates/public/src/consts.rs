@@ -37,7 +37,9 @@ pub const FREE_SPACE_REQUIREMENT: u64 = 100 << 20;
 pub const DEFAULT_MAX_CPUS: u32 = 1; // cpu限制默认值
 pub const DEFAULT_CPU_CFS_PERIOD_US: u32 = 100000; // cfs_period_us默认值
 
-pub const DEFAULT_LOG_RETENTION: u32 = 365;
+// The number of uncompressed files to keep in addition to the file currently being written.
+pub const DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT: usize = 0;
+pub const DEFAULT_LOG_RETENTION: usize = 300;
 pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
 pub const CGROUP_PROCS_PATH: &'static str = "cpu/deepflow-agent/cgroup.procs";
 pub const CGROUP_TASKS_PATH: &'static str = "cpu/deepflow-agent/tasks";
