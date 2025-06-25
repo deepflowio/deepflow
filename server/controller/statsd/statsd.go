@@ -18,6 +18,7 @@ package statsd
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strconv"
@@ -54,7 +55,7 @@ func (s *StatsdMonitor) initStatsdClient() error {
 	if dfStatsdClient == nil {
 		var err error
 		dfStatsdClient, err = stats.NewUDPClient(stats.UDPConfig{
-			Addr:        fmt.Sprintf("%s:%d", s.host, s.port),
+			Addr:        net.JoinHostPort(s.host, strconv.Itoa(s.port)),
 			PayloadSize: 1400,
 		})
 		if err != nil {
