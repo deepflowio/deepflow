@@ -19,11 +19,12 @@ package common
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
 func IsTCPActive(ip string, port int) error {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), 2*time.Second)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(port)), 2*time.Second)
 	if err != nil {
 		return err
 	} else {
