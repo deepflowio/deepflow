@@ -2,7 +2,7 @@ module github.com/deepflowio/deepflow/server
 
 go 1.24.0
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
@@ -132,7 +132,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0
 	go.opentelemetry.io/otel/trace v1.34.0
 	go.opentelemetry.io/proto/otlp v1.1.0
-	golang.org/x/net v0.40.0
+	golang.org/x/net v0.41.0
 	golang.org/x/sync v0.15.0
 	golang.org/x/sys v0.33.0
 	google.golang.org/grpc v1.62.1
@@ -294,15 +294,15 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
-	golang.org/x/arch v0.17.0 // indirect
+	golang.org/x/arch v0.18.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
-	golang.org/x/tools v0.33.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240314234333-6e1732d8331c // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
