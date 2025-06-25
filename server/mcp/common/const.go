@@ -51,8 +51,6 @@ const (
 	DEFAULT_REGION_NAME    = "系统默认"
 	PROFILE_API_URL_FORMAT = "http://127.0.0.1:%d/v1/profile/ProfileTracing"
 
-	SQL_Format = "`profile_language_type` IN ('eBPF') AND `profile_event_type` IN ('on-cpu') AND `k8s.label.git_commit_id`='%s' AND time>=%d AND time<=%d"
-
 	KNOWLEDGE_TEXT = `
 * 背景知识：
 - 节点名以 [t] 开头表示一个线程，以 [p] 开头表示一个进程, 以 [k] 开头表示一个 Linux 内核函数, 以 [l] 开头表示一个动态链接库中的函数
