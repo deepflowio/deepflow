@@ -17,7 +17,7 @@
 package common
 
 import (
-	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,14 +30,15 @@ var log = logging.MustGetLogger("http.router.common")
 
 func ForwardMasterController(c *gin.Context, masterControllerName string, port int) {
 	requestHosts := strings.Split(c.Request.Host, ":")
+	host := net.JoinHostPort(masterControllerName, strconv.Itoa(port))
 	if len(requestHosts) > 1 {
 		if requestHosts[1] != strconv.Itoa(port) {
-			c.Request.Host = fmt.Sprintf("%s:%d", masterControllerName, port)
+			c.Request.Host = host
 		} else {
 			c.Request.Host = strings.Replace(c.Request.Host, requestHosts[0], masterControllerName, 1)
 		}
 	} else {
-		c.Request.Host = fmt.Sprintf("%s:%d", masterControllerName, port)
+		c.Request.Host = host
 	}
 	c.Request.URL.Scheme = "http"
 	c.Request.URL.Host = c.Request.Host
