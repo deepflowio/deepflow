@@ -255,6 +255,8 @@ impl FlowAclListener for DispatcherListener {
         _: &Vec<Arc<crate::common::policy::PeerConnection>>,
         _: &Vec<Arc<crate::_Cidr>>,
         _: &Vec<Arc<crate::_Acl>>,
+        _: bool,
+        _: &mut bool,
     ) -> Result<(), String> {
         match self {
             DispatcherListener::Local(a) => a.flow_acl_change(),
