@@ -1811,7 +1811,7 @@ inputs:
       #   en: Interface Regex
       #   ch: 网卡名正则表达式
       # unit:
-      # range: [0, 65535]
+      # range: []
       # enum_options: []
       # modification: hot_update
       # ee_feature: false
@@ -1883,7 +1883,7 @@ inputs:
       #   en: Inner Net Namespace Interface Regex
       #   ch: 内网络命名空间网卡名正则表达式
       # unit:
-      # range: [0, 65535]
+      # range: []
       # enum_options: []
       # modification: hot_update
       # ee_feature: false

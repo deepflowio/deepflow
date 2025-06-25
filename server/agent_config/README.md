@@ -2449,7 +2449,6 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
-| Range | [0, 65535] |
 
 **Description**:
 
@@ -2525,7 +2524,6 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
-| Range | [0, 65535] |
 
 **Description**:
 
