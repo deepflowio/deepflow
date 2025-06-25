@@ -29,15 +29,15 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	"github.com/mark3labs/mcp-go/mcp"
-	logging "github.com/op/go-logging"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/mcp/common"
 	"github.com/deepflowio/deepflow/server/mcp/config"
 	"github.com/deepflowio/deepflow/server/mcp/model"
 )
 
-var log = logging.MustGetLogger("mcp.handle")
+var log = logger.MustGetLogger("mcp.handle")
 
 // fetchAndanalyzeProfileData 获取并分析profile数据的工具函数
 func FetchAndAnalyzeProfileData(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -154,7 +154,7 @@ func getProfileData(commitID string, startTime, endTime int64) (*model.ProfileDa
 		"time_start":             startTime,
 		"time_end":               endTime,
 	}
-	log.Debugf("sql %#v", apiTemplate)
+	log.Debugf("profile tracing request: %#v", apiTemplate)
 
 	profileURL := fmt.Sprintf(common.PROFILE_API_URL_FORMAT, config.MConfig.QuerierPort)
 	respJson, err := ccommon.CURLPerform("POST", profileURL, apiTemplate)

@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/deepflowio/deepflow/server/mcp/config"
-	"github.com/deepflowio/deepflow/server/mcp/handle"
-
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	logging "github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/mcp/config"
+	"github.com/deepflowio/deepflow/server/mcp/handle"
 )
 
 var defaultRegion string
-var log = logging.MustGetLogger("mcp")
+var log = logger.MustGetLogger("mcp")
 
 type MCPServer struct {
 	port   int
@@ -51,7 +51,7 @@ func NewMCPServer(configPath string) *MCPServer {
 	mcpServer.AddTool(
 		mcp.NewTool(
 			"analyzeProfileData",
-			mcp.WithDescription("分析指定 commitId 的 on-cpu profile 性能分析数据并生成报告"),
+			mcp.WithDescription("分析指定 commitId 的 on-cpu profile 性能分析数据并生成报告，commitId 是对应 git commit 的完整 ID"),
 			mcp.WithString("commit_id"),
 			mcp.WithString("start_time", mcp.DefaultString("0")),
 			mcp.WithString("end_time", mcp.DefaultString("0")),
