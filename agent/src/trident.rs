@@ -58,7 +58,8 @@ use crate::{
         proc_event::BoxedProcEvents,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::CaptureNetworkTyper,
-        FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
+        FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+        DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
     },
     config::PcapStream,
     config::{
@@ -524,7 +525,10 @@ impl Trident {
                 .rotate(
                     Criterion::Age(Age::Day),
                     Naming::Timestamps,
-                    Cleanup::KeepLogFiles(DEFAULT_LOG_RETENTION as usize),
+                    Cleanup::KeepLogAndCompressedFiles(
+                        DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+                        DEFAULT_LOG_RETENTION,
+                    ),
                 )
                 .create_symlink(&config.log_file)
                 .append()
