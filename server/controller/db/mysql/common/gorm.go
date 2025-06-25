@@ -21,6 +21,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	l "log"
+	"net"
 	"os"
 	"time"
 
@@ -57,7 +58,7 @@ func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, mult
 	config.User = cfg.UserName
 	config.Passwd = cfg.UserPassword
 	config.Net = "tcp"
-	config.Addr = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	config.Addr = net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 	config.DBName = database
 	config.AllowNativePasswords = true
 	config.Loc = location

@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 	"unicode"
@@ -218,7 +219,7 @@ func getColumnName(table string) string {
 }
 
 func decodeTrace(ip, username, password, table, traceId string, port, orgId uint16) error {
-	connect, err := common.NewCKConnection(fmt.Sprintf("%s:%d", ip, port), username, password)
+	connect, err := common.NewCKConnection(net.JoinHostPort(ip, strconv.Itoa(int(port))), username, password)
 	if err != nil {
 		return fmt.Errorf("connect to ck(%s:%d) failed. %s", ip, port, err)
 	}

@@ -19,6 +19,7 @@ package ckwriter
 import (
 	"context"
 	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"sync"
@@ -275,7 +276,7 @@ func (w *CKWriter) InitTable(queueID int, orgID uint16) error {
 	}
 
 	for _, endpoint := range endpoints {
-		err := InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.user, w.password, w.timeZone, w.table, orgID)
+		err := InitTable(net.JoinHostPort(endpoint.Host, fmt.Sprintf("%d", endpoint.Port)), w.user, w.password, w.timeZone, w.table, orgID)
 		if err != nil {
 			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
 		} else {
