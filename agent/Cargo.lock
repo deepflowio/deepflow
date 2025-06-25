@@ -1349,6 +1349,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88a5a6882b2e137c4f2664562995865084eb5a00611fba30c582ef10354c4ad8"
 dependencies = [
  "chrono",
+ "flate2",
  "log 0.4.22",
  "nu-ansi-term",
  "regex",
