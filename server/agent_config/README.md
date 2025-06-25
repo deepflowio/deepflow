@@ -925,7 +925,7 @@ global:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '365d'] |
+| Range | ['0ns', '365d'] |
 
 **Description**:
 
@@ -954,7 +954,7 @@ global:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '365d'] |
+| Range | ['0ns', '365d'] |
 
 **Description**:
 
@@ -1701,20 +1701,20 @@ Upgrade from old version: `static_config.os-proc-socket-sync-interval`
 ```yaml
 inputs:
   proc:
-    socket_info_sync_interval: 0
+    socket_info_sync_interval: 0ns
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1h'] |
+| Range | ['0ns', '1h'] |
 
 **Description**:
 
 Synchronization interval for process Socket information.
 
-0 means disabled, do not configure a value less than `1s` except for 0.
+'0ns' means disabled, do not configure a value less than `1s` except for 0.
 
 Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
 i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
@@ -3696,12 +3696,12 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1d'] |
+| Range | ['0ns', '1d'] |
 
 **Description**:
 
 The expected maximum time interval between the server receiving the request and returning
-the response, If the value is 0, this feature is disabled. Tracing only considers the
+the response, If the value is '0ns', this feature is disabled. Tracing only considers the
 thread number.
 
 ##### TLS {#inputs.ebpf.socket.uprobe.tls}
@@ -4698,11 +4698,11 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1h'] |
+| Range | ['0ns', '1h'] |
 
 **Description**:
 
-If set to 0, there will be no minimum value limitation. Scheduler events are still
+If set to '0ns', there will be no minimum value limitation. Scheduler events are still
 high-frequency events, as their rate may exceed 1 million events per second, so
 caution should still be exercised.
 
@@ -7004,7 +7004,7 @@ processors:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | duration |
-| Range | [0, '1d'] |
+| Range | ['0ns', '1d'] |
 
 **Description**:
 
