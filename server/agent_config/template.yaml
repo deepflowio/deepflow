@@ -632,7 +632,7 @@ global:
     #   en: Maximum Drift
     #   ch: 最大时钟偏差
     # unit:
-    # range: [0, 365d]
+    # range: [0ns, 365d]
     # enum_options: []
     # modification: agent_restart
     # ee_feature: false
@@ -648,7 +648,7 @@ global:
     #   en: Minimal Drift
     #   ch: 最小时钟偏差
     # unit:
-    # range: [0, 365d]
+    # range: [0ns, 365d]
     # enum_options: []
     # modification: agent_restart
     # ee_feature: false
@@ -1162,7 +1162,7 @@ inputs:
     #   en: Socket Information Synchronization Interval
     #   ch: Socket 信息同步间隔
     # unit:
-    # range: [0, 1h]
+    # range: [0ns, 1h]
     # enum_options: []
     # modification: agent_restart
     # ee_feature: false
@@ -1170,7 +1170,7 @@ inputs:
     #   en: |-
     #     Synchronization interval for process Socket information.
     #
-    #     0 means disabled, do not configure a value less than `1s` except for 0.
+    #     '0ns' means disabled, do not configure a value less than `1s` except for 0.
     #
     #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
     #     i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
@@ -1178,13 +1178,13 @@ inputs:
     #   ch: |-
     #     进程 Socket 信息的同步周期。
     #
-    #     0 表示不开启，除 0 外不要配置小于 `1s` 的值。
+    #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
     #
     #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
     #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
     #     另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
     # upgrade_from: static_config.os-proc-socket-sync-interval
-    socket_info_sync_interval: 0
+    socket_info_sync_interval: 0ns
     # type: duration
     # name:
     #   en: Minimal Lifetime
@@ -2621,17 +2621,17 @@ inputs:
           #   en: Tracing Timeout
           #   ch: 追踪超时时间
           # unit:
-          # range: [0, 1d]
+          # range: [0ns, 1d]
           # enum_options: []
           # modification: agent_restart
           # ee_feature: false
           # description:
           #   en: |-
           #     The expected maximum time interval between the server receiving the request and returning
-          #     the response, If the value is 0, this feature is disabled. Tracing only considers the
+          #     the response, If the value is '0ns', this feature is disabled. Tracing only considers the
           #     thread number.
           #   ch: |-
-          #     Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 0 时，Golang 程序的零侵扰追踪特性自动关闭。
+          #     Golang 程序追踪时请求与响应之间的最大时间间隔，设置为 '0ns' 时，Golang 程序的零侵扰追踪特性自动关闭。
           # upgrade_from: static_config.ebpf.go-tracing-timeout
           tracing_timeout: 120s
         # type: section
@@ -3378,13 +3378,13 @@ inputs:
         #   en: Minimum Blocking Time
         #   ch: 最小阻塞时间
         # unit:
-        # range: [0, 1h]
+        # range: [0ns, 1h]
         # enum_options: []
         # modification: agent_restart
         # ee_feature: true
         # description:
         #   en: |-
-        #     If set to 0, there will be no minimum value limitation. Scheduler events are still
+        #     If set to '0ns', there will be no minimum value limitation. Scheduler events are still
         #     high-frequency events, as their rate may exceed 1 million events per second, so
         #     caution should still be exercised.
         #
@@ -3394,7 +3394,7 @@ inputs:
         #     can filter out shorter blocking events, further reducing overhead. Additionally, we
         #     will not collect events with a blocking time exceeding 1 hour.
         #   ch: |-
-        #     低于'最小阻塞时间'的 Off-CPU 数据将被 deepflow-agent 忽略，'最小阻塞时间'设置为 '0' 表示
+        #     低于'最小阻塞时间'的 Off-CPU 数据将被 deepflow-agent 忽略，'最小阻塞时间'设置为 '0ns' 表示
         #     采集所有的 Off-CPU 数据。由于 CPU 调度事件数量庞大（每秒可能超过一百万次），调小该参数将带来
         #     明显的资源开销，如果需要跟踪大时延的调度阻塞事件，建议调大该参数，以降低资源开销。另外，deepflow-agent
         #     不采集阻塞超过 1 小时的事件。
@@ -4772,7 +4772,7 @@ processors:
       #   en: Inference Result TTL
       #   ch: 推断结果 TTL
       # unit:
-      # range: [0, 1d]
+      # range: [0ns, 1d]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false

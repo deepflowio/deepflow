@@ -810,6 +810,8 @@ func (p *MigrationToolData) fmtDictValKeyMap() {
 		"global.limits.local_log_retention",
 	}
 	p.lowerVersionStrToListKeys = []string{
+		"http_log_proxy_client",
+		"http_log_x_request_id",
 		"http_log_trace_id",
 		"http_log_span_id",
 	}
