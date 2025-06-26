@@ -27,7 +27,7 @@ pub mod ebpf;
 mod ebpf_dispatcher;
 mod error;
 pub mod exception;
-mod flow_generator;
+pub mod flow_generator;
 mod handler;
 mod integration_collector;
 mod metric;

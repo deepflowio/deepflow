@@ -207,7 +207,7 @@ cfg_if::cfg_if! {
                 FastCGI(FastCGILog),
                 Brpc(BrpcLog),
                 Tars(TarsLog),
-                Oracle(crate::flow_generator::protocol_logs::sql::OracleLog),
+                Oracle(crate::flow_generator::protocol_logs::OracleLog),
                 MQTT(MqttLog),
                 AMQP(AmqpLog),
                 NATS(NatsLog),
@@ -215,8 +215,8 @@ cfg_if::cfg_if! {
                 ZMTP(ZmtpLog),
                 RocketMQ(RocketmqLog),
                 OpenWire(OpenWireLog),
-                TLS(crate::flow_generator::protocol_logs::tls::TlsLog),
-                SomeIp(crate::flow_generator::protocol_logs::rpc::SomeIpLog),
+                TLS(crate::flow_generator::protocol_logs::TlsLog),
+                SomeIp(crate::flow_generator::protocol_logs::SomeIpLog),
                 Ping(PingLog),
                 // add protocol below
             }
