@@ -21,7 +21,7 @@ use crate::config::handler::LogParserConfig;
 use crate::flow_generator::{
     protocol_logs::{
         pb_adapter::{ExtendedInfo, KeyVal},
-        set_captured_byte, swap_if, L7ResponseStatus,
+        swap_if, L7ResponseStatus,
     },
     Error,
 };
@@ -38,8 +38,7 @@ use crate::{
 };
 
 use enterprise_utils::l7::sql::oracle::{
-    Body, CallId, DataFlags, DataId, OracleParseConfig, OracleParser, Request, Response,
-    TnsPacketType,
+    Body, CallId, DataFlags, DataId, OracleParseConfig, OracleParser, TnsPacketType,
 };
 use public::l7_protocol::L7Protocol;
 
