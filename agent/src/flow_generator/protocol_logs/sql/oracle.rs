@@ -17,23 +17,19 @@
 use serde::Serialize;
 
 use super::super::{value_is_default, LogMessageType};
-use crate::config::handler::LogParserConfig;
-use crate::flow_generator::{
-    protocol_logs::{
-        pb_adapter::{ExtendedInfo, KeyVal},
-        set_captured_byte, swap_if, L7ResponseStatus,
-    },
-    Error,
-};
 use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
+    config::handler::LogParserConfig,
     flow_generator::{
-        protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-        AppProtoHead, Result,
+        protocol_logs::{
+            pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
+            set_captured_byte, swap_if, L7ResponseStatus,
+        },
+        AppProtoHead, Error, Result,
     },
 };
 

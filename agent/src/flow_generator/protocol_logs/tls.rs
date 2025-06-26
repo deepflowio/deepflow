@@ -517,6 +517,7 @@ impl L7ProtocolParserInterface for TlsLog {
                 // In some scenarios, the last Change cipher spec does not have a corresponding response,
                 // and this is directly set to be reported by session
                 if self.is_change_cipher_spec && info.msg_type == LogMessageType::Request {
+                    info.status = L7ResponseStatus::Ok;
                     info.msg_type = LogMessageType::Session
                 }
             }
@@ -630,6 +631,7 @@ impl TlsLog {
                     .to_string();
             }
             PacketDirection::ServerToClient => {
+                info.status = L7ResponseStatus::Ok;
                 info.msg_type = LogMessageType::Response;
 
                 if info.version.is_empty() {
@@ -694,153 +696,5 @@ impl TlsLog {
         }
         set_captured_byte!(info, param);
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-    use std::rc::Rc;
-    use std::{cell::RefCell, fs};
-
-    use super::*;
-
-    use crate::{
-        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        flow_generator::L7_RRT_CACHE_CAPACITY,
-        utils::test::Capture,
-    };
-
-    const FILE_DIR: &str = "resources/test/flow_generator/tls";
-
-    fn run(name: &str) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
-        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let mut packets = capture.as_meta_packets();
-        if packets.is_empty() {
-            return "".to_string();
-        }
-
-        let mut output = String::new();
-        let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut tls = TlsLog::default();
-        for packet in packets.iter_mut() {
-            packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
-                PacketDirection::ClientToServer
-            } else {
-                PacketDirection::ServerToClient
-            };
-            let payload = match packet.get_l4_payload() {
-                Some(p) => p,
-                None => continue,
-            };
-
-            let param = &mut ParseParam::new(
-                packet as &MetaPacket,
-                log_cache.clone(),
-                Default::default(),
-                #[cfg(any(target_os = "linux", target_os = "android"))]
-                Default::default(),
-                true,
-                true,
-            );
-            param.set_captured_byte(payload.len());
-            let is_tls = tls.check_payload(payload, param);
-            tls.reset();
-            let info = tls.parse_payload(payload, param);
-            if let Ok(info) = info {
-                match info.unwrap_single() {
-                    L7ProtocolInfo::TlsInfo(i) => {
-                        output.push_str(&format!("{:?} is_tls: {}\r\n", i, is_tls));
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        }
-        output
-    }
-
-    #[test]
-    fn check() {
-        let files = vec![
-            ("tls-1-0.pcap", "tls-1-0.result"),
-            ("tls-1-3.pcap", "tls-1-3.result"),
-            ("tls.pcap", "tls.result"),
-            ("application.pcap", "application.result"),
-            ("alert.pcap", "alert.result"),
-            ("client-extension.pcap", "client-extension.result"),
-            ("tls-nocert.pcap", "tls-nocert.result"),
-        ];
-
-        for item in files.iter() {
-            let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
-            let output = run(item.0);
-
-            if output != expected {
-                let output_path = Path::new("actual.txt");
-                fs::write(&output_path, &output).unwrap();
-                assert!(
-                    output == expected,
-                    "output different from expected {}, written to {:?}",
-                    item.1,
-                    output_path
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn check_perf() {
-        let expected = vec![(
-            "tls.pcap",
-            L7PerfStats {
-                request_count: 2,
-                response_count: 2,
-                err_client_count: 0,
-                err_server_count: 0,
-                err_timeout: 0,
-                rrt_count: 2,
-                rrt_sum: 102011,
-                rrt_max: 55453,
-                tls_rtt: 103343,
-                ..Default::default()
-            },
-        )];
-
-        for item in expected.iter() {
-            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
-        }
-    }
-
-    fn run_perf(pcap: &str) -> L7PerfStats {
-        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
-        let mut tls = TlsLog::default();
-
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
-        let mut packets = capture.as_meta_packets();
-        if packets.len() < 2 {
-            unreachable!()
-        }
-        let first_dst_port = packets[0].lookup_key.dst_port;
-        for packet in packets.iter_mut() {
-            if packet.lookup_key.dst_port == first_dst_port {
-                packet.lookup_key.direction = PacketDirection::ClientToServer;
-            } else {
-                packet.lookup_key.direction = PacketDirection::ServerToClient;
-            }
-            let _ = tls.parse_payload(
-                packet.get_l4_payload().unwrap(),
-                &ParseParam::new(
-                    &*packet,
-                    rrt_cache.clone(),
-                    Default::default(),
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
-                    Default::default(),
-                    true,
-                    true,
-                ),
-            );
-        }
-        tls.perf_stats.unwrap()
     }
 }

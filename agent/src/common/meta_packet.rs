@@ -447,60 +447,58 @@ impl<'a> MetaPacket<'a> {
         self.next_header = next_header;
         let mut size_checker = packet.len() as isize - option_offset as isize;
         loop {
-            if let Ok(header) = IpProtocol::try_from(next_header) {
-                match header {
-                    IpProtocol::AH => {
-                        if size_checker < 2 {
-                            break;
-                        }
-                        self.offset_ipv6_last_option = option_offset as u16;
-                        next_header = packet[option_offset];
-                        let length = (packet[option_offset + 1] as usize + 2) * 4;
-                        option_offset += length;
-                        size_checker -= length as isize;
-                        if size_checker < 0 {
-                            break;
-                        }
-                        continue;
+            match IpProtocol::from(next_header) {
+                IpProtocol::AH => {
+                    if size_checker < 2 {
+                        break;
                     }
-                    IpProtocol::IPV6_DESTINATION
-                    | IpProtocol::IPV6_HOP_BY_HOP
-                    | IpProtocol::IPV6_ROUTING => {
-                        size_checker -= 8;
-                        if size_checker < 0 {
-                            break;
-                        }
-                        self.offset_ipv6_last_option = option_offset as u16;
-                        next_header = packet[option_offset];
-                        let length = packet[option_offset + 1] as usize;
-                        option_offset += length * 8 + 8;
-                        size_checker -= length as isize * 8;
-                        if size_checker < 0 {
-                            break;
-                        }
-                        continue;
+                    self.offset_ipv6_last_option = option_offset as u16;
+                    next_header = packet[option_offset];
+                    let length = (packet[option_offset + 1] as usize + 2) * 4;
+                    option_offset += length;
+                    size_checker -= length as isize;
+                    if size_checker < 0 {
+                        break;
                     }
-                    IpProtocol::IPV6_FRAGMENT => {
-                        size_checker -= 8;
-                        if size_checker < 0 {
-                            break;
-                        }
-                        self.offset_ipv6_last_option = option_offset as u16;
-                        self.offset_ipv6_fragment_option = option_offset as u16;
-                        next_header = packet[option_offset];
-                        option_offset += 8;
-                        continue;
-                    }
-                    IpProtocol::ICMPV6 => {
-                        return (next_header, option_offset - original_offset);
-                    }
-                    IpProtocol::ESP => {
-                        self.offset_ipv6_last_option = option_offset as u16;
-                        option_offset += size_checker as usize;
-                        return (next_header, option_offset - original_offset);
-                    }
-                    _ => (),
+                    continue;
                 }
+                IpProtocol::IPV6_DESTINATION
+                | IpProtocol::IPV6_HOP_BY_HOP
+                | IpProtocol::IPV6_ROUTING => {
+                    size_checker -= 8;
+                    if size_checker < 0 {
+                        break;
+                    }
+                    self.offset_ipv6_last_option = option_offset as u16;
+                    next_header = packet[option_offset];
+                    let length = packet[option_offset + 1] as usize;
+                    option_offset += length * 8 + 8;
+                    size_checker -= length as isize * 8;
+                    if size_checker < 0 {
+                        break;
+                    }
+                    continue;
+                }
+                IpProtocol::IPV6_FRAGMENT => {
+                    size_checker -= 8;
+                    if size_checker < 0 {
+                        break;
+                    }
+                    self.offset_ipv6_last_option = option_offset as u16;
+                    self.offset_ipv6_fragment_option = option_offset as u16;
+                    next_header = packet[option_offset];
+                    option_offset += 8;
+                    continue;
+                }
+                IpProtocol::ICMPV6 => {
+                    return (next_header, option_offset - original_offset);
+                }
+                IpProtocol::ESP => {
+                    self.offset_ipv6_last_option = option_offset as u16;
+                    option_offset += size_checker as usize;
+                    return (next_header, option_offset - original_offset);
+                }
+                _ => (),
             }
             // header types unknown or not matched
             return (next_header, option_offset - original_offset);
