@@ -956,7 +956,7 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 // and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
 func GetVTapPortsCount() (int, error) {
 	var vtaps []mysqlmodel.VTap
-	if err := mysql.DefaultDB.Find(&vtaps).Error; err != nil {
+	if err := mysql.DefaultDB.Select("type", "launch_server").Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
 	vtapHostIPs, vtapNodeIPs := mapset.NewSet(), mapset.NewSet()
@@ -974,7 +974,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var vms []mysqlmodel.VM
-	if err := mysql.DefaultDB.Find(&vms).Error; err != nil {
+	if err := mysql.DefaultDB.Select("id", "launch_server").Find(&vms).Error; err != nil {
 		return 0, err
 	}
 	vtapVMIDs := mapset.NewSet()
@@ -985,7 +985,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var podNodes []mysqlmodel.PodNode
-	if err := mysql.DefaultDB.Find(&podNodes).Error; err != nil {
+	if err := mysql.DefaultDB.Select("id", "ip").Find(&podNodes).Error; err != nil {
 		return 0, err
 	}
 	podNodeIDs := mapset.NewSet()
@@ -996,7 +996,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var pods []mysqlmodel.Pod
-	if err := mysql.DefaultDB.Find(&pods).Error; err != nil {
+	if err := mysql.DefaultDB.Select("id", "pod_node_id").Find(&pods).Error; err != nil {
 		return 0, err
 	}
 	vtapPodIDs := mapset.NewSet()
@@ -1007,7 +1007,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var lanIPs []mysqlmodel.LANIP
-	if err := mysql.DefaultDB.Find(&lanIPs).Error; err != nil {
+	if err := mysql.DefaultDB.Select("ip", "vifid").Find(&lanIPs).Error; err != nil {
 		return 0, err
 	}
 	pubVTapVIFs := mapset.NewSet()
@@ -1019,7 +1019,7 @@ func GetVTapPortsCount() (int, error) {
 
 	vtapVifCount := 0
 	var vinterfaces []mysqlmodel.VInterface
-	if err := mysql.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
+	if err := mysql.DefaultDB.Select("id", "deviceid", "devicetype").Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
 		Find(&vinterfaces).Error; err != nil {
 		return 0, err
 	}
