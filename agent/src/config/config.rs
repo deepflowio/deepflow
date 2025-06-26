@@ -2713,7 +2713,7 @@ impl UserConfig {
         #[cfg(feature = "enterprise")]
         {
             let tls_str =
-                L7ProtocolParser::TLS(crate::flow_generator::protocol_logs::tls::TlsLog::default())
+                L7ProtocolParser::TLS(crate::flow_generator::protocol_logs::TlsLog::default())
                     .as_str();
             // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
             if !self
@@ -2726,7 +2726,7 @@ impl UserConfig {
                 new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
             }
             let oracle_str = L7ProtocolParser::Oracle(
-                crate::flow_generator::protocol_logs::sql::OracleLog::default(),
+                crate::flow_generator::protocol_logs::OracleLog::default(),
             )
             .as_str();
             // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
