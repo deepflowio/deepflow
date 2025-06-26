@@ -124,7 +124,7 @@ fn all_supported_commands() -> Vec<Command> {
             ..Default::default()
         },
         Command {
-            cmdline: "netstat -tulnp",
+            cmdline: "netstat -tunp",
             output_format: OutputFormat::Text,
             desc: "netstat",
             command_type: CMD_TYPE_SYSTEM,
