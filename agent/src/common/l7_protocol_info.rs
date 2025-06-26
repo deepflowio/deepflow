@@ -109,10 +109,10 @@ cfg_if::cfg_if! {
             RocketmqInfo(RocketmqInfo),
             PostgreInfo(PostgreInfo),
             OpenWireInfo(OpenWireInfo),
-            OracleInfo(crate::flow_generator::protocol_logs::sql::OracleInfo),
+            OracleInfo(crate::flow_generator::protocol_logs::OracleInfo),
             SofaRpcInfo(SofaRpcInfo),
-            TlsInfo(crate::flow_generator::protocol_logs::tls::TlsInfo),
-            SomeIpInfo(crate::flow_generator::protocol_logs::rpc::SomeIpInfo),
+            TlsInfo(crate::flow_generator::protocol_logs::TlsInfo),
+            SomeIpInfo(crate::flow_generator::protocol_logs::SomeIpInfo),
             PingInfo(PingInfo),
             CustomInfo(CustomInfo),
             // add new protocol info below

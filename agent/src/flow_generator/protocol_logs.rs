@@ -47,7 +47,7 @@ pub use sql::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
-        pub(crate) mod tls;
+        pub mod tls;
 
         pub use sql::{OracleInfo, OracleLog};
         pub use rpc::{SomeIpInfo, SomeIpLog};
