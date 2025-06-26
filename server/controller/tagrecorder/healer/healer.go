@@ -334,7 +334,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 	var dbItems []*CT
 	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.targetDataGen.getRealIDField()), targetIDs)
 	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
-		delExec = delExec.Where("device_type IN ?", h.targetDataGen.getChDeviceTypes())
+		delExec = delExec.Where("devicetype IN ?", h.targetDataGen.getChDeviceTypes())
 	}
 	if err := delExec.Delete(&dbItems).Error; err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
