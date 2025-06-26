@@ -334,6 +334,7 @@ mod tests {
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),
+                false,
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),
