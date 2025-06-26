@@ -2178,18 +2178,24 @@ impl AgentComponents {
             }
         }
         #[cfg(target_os = "linux")]
-        if candidate_config.capture_mode != PacketCaptureType::Local
-            && (!user_config
+        if candidate_config.capture_mode != PacketCaptureType::Local {
+            if !user_config
                 .inputs
                 .cbpf
                 .special_network
                 .vhost_user
                 .vhost_socket_path
                 .is_empty()
-                || candidate_config.dispatcher.dpdk_source == DpdkSource::PDump)
-        {
-            packet_fanout_count = 1;
-            interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
+                || candidate_config.dispatcher.dpdk_source == DpdkSource::PDump
+            {
+                packet_fanout_count = 1;
+                interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
+            } else if candidate_config.dispatcher.dpdk_source == DpdkSource::Ebpf {
+                interfaces_and_ns = vec![];
+                for _ in 0..packet_fanout_count {
+                    interfaces_and_ns.push((vec![], netns::NsFile::Root));
+                }
+            }
         }
 
         match candidate_config.capture_mode {
