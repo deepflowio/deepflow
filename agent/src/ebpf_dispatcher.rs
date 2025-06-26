@@ -575,6 +575,11 @@ impl EbpfCollector {
                     raw: Some(ptr),
                 };
 
+                if queue_id >= DPDK_SENDER_BUFFERS.len() {
+                    error!("dpdk is not initialized, deepflow-agent restart...");
+                    crate::utils::clean_and_exit(1);
+                }
+
                 DPDK_SENDER_BUFFERS[queue_id].push(Box::new(packet));
                 if DPDK_SENDER_BUFFERS[queue_id].len() == BATCH_SIZE || sd.batch_last_data {
                     match DPDK_SENDERS.as_mut().unwrap()[queue_id]
@@ -978,6 +983,8 @@ impl EbpfCollector {
             return Err(Error::EbpfRunningError);
         }
 
+        Self::ebpf_on_config_change(config.l7_log_packet_size);
+
         let ebpf_conf = &config.ebpf;
         let on_cpu = &ebpf_conf.profile.on_cpu;
         let off_cpu = &ebpf_conf.profile.off_cpu;
@@ -1272,7 +1279,6 @@ impl EbpfCollector {
             &stats_collector,
             process_listener,
         )?;
-        Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
         info!("ebpf collector initialized.");
         Ok(Box::new(EbpfCollector {
@@ -1365,10 +1371,11 @@ impl EbpfCollector {
                 s.set_report_interval(ecfg.memory.report_interval);
                 s.set_address_lru_len(ecfg.memory.allocated_addresses_lru_len);
             }
+
+            Self::ebpf_on_config_change(config.l7_log_packet_size);
         }
         if config.l7_log_enabled() || config.dpdk_enabled {
             self.start();
-            Self::ebpf_on_config_change(config.l7_log_packet_size);
         } else {
             self.stop();
         }
