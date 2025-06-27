@@ -391,6 +391,13 @@ func idToUpdatedAt(resourceType, checkField string, data interface{}) map[int]ti
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
+	case common.RESOURCE_TYPE_PROCESS_EN:
+		for _, item := range data.([]*healerProcess) {
+			if len(item.OSAPPTags) == 0 {
+				continue
+			}
+			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
+		}
 	}
 	return idToUpdatedAt
 }

@@ -18,6 +18,8 @@ package healer
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -26,7 +28,6 @@ import (
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"time"
 )
 
 var log = logger.MustGetLogger("tagrecorder.healer")
@@ -201,10 +202,14 @@ func NewHealers(md *recorderCommon.MetadataBase) *Healers {
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation"),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS)),
-		// NewHealer[metadbModel.Process, metadbModel.ChOSAppTag](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG]),
-		// NewHealer[metadbModel.Process, metadbModel.ChOSAppTags](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS]),
+		newHealer[metadbModel.Process, metadbModel.ChOSAppTag, *message.ProcessAdd, message.ProcessAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN).setAdditionalSelectField("os_app_tags"),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG)),
+		newHealer[metadbModel.Process, metadbModel.ChOSAppTags, *message.ProcessAdd, message.ProcessAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN).setAdditionalSelectField("os_app_tags"),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS)),
 	}
 	return h
 }
@@ -334,7 +339,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 	var dbItems []*CT
 	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.targetDataGen.getRealIDField()), targetIDs)
 	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
-		delExec = delExec.Where("device_type IN ?", h.targetDataGen.getChDeviceTypes())
+		delExec = delExec.Where("devicetype IN ?", h.targetDataGen.getChDeviceTypes())
 	}
 	if err := delExec.Delete(&dbItems).Error; err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)

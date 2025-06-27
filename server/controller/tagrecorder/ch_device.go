@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"slices"
+
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -24,10 +26,6 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
-)
-
-const (
-	syncTriggerKeyDeviceID = "deviceid"
 )
 
 type ChVMDevice struct {
@@ -1206,6 +1204,7 @@ func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.hookers[hookerDeletePage] = mng
 	return mng
 }
 
@@ -1218,12 +1217,12 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
-
+	gid := int(source.GID)
 	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-		DeviceID: source.ID})
+		DeviceID: gid})
 	targets = append(targets, metadbmodel.ChDevice{
 		DeviceType:  CH_DEVICE_TYPE_GPROCESS,
-		DeviceID:    source.ID,
+		DeviceID:    gid,
 		Name:        sourceName,
 		IconID:      iconID,
 		TeamID:      md.TeamID,
@@ -1236,15 +1235,15 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
-
+	gid := int(fieldsUpdate.GID.GetNew())
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
+		db.Where("deviceid = ? and devicetype = ?", gid, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-			DeviceID: sourceID}, db)
+			DeviceID: gid}, db)
 	}
 }
 
@@ -1255,6 +1254,17 @@ func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
+}
+
+func (c *ChProcessDevice) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.ProcessDelete) []*metadbmodel.Process {
+	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
+	newDatas := []*metadbmodel.Process{}
+	for _, item := range dbData {
+		if slices.Contains(gids, item.GID) {
+			newDatas = append(newDatas, item)
+		}
+	}
+	return newDatas
 }
 
 type ChCustomServiceDevice struct {

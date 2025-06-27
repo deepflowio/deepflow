@@ -53,11 +53,11 @@ type SubscriberMetaDBChModel interface {
 type ChModelKey interface {
 	PrometheusTargetLabelKey | PrometheusAPPLabelKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey |
 		PortIDKey | PortIPKey | PortDeviceKey | IPRelationKey | TapTypeKey | NodeTypeKey | PolicyKey |
-		IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+		IDKey | DeviceKey | IDKeyKey
 }
 
 type SubscriberChModelKey interface {
-	IDKey | DeviceKey | IDKeyKey | OSAPPTagKey | OSAPPTagsKey
+	IDKey | DeviceKey | IDKeyKey
 
 	Map() map[string]interface{}
 }
