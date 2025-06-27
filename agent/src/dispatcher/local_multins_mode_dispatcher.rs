@@ -328,7 +328,11 @@ impl PktReceiver {
         move || {
             super::set_cpu_affinity(&self.options);
 
-            let ns_ino = self.netns.get_inode().unwrap() as u32;
+            let ns_ino = if self.netns == NsFile::Root {
+                0
+            } else {
+                self.netns.get_inode().unwrap() as u32
+            };
             let log_prefix = format!("pkt-rcv({}):", self.netns);
             // try to setns a few times because this can fail when process terminates
             for i in 1..=SETNS_RETRIES {
