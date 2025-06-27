@@ -203,7 +203,7 @@ impl SocketSynchronizer {
 
             // wait for config from server
             if !conf_guard.os_proc_scan_conf.os_proc_sync_enabled {
-                if !Self::wait_timeout(&running, &stop_notify, sync_interval) {
+                if !Self::wait_for_running(&running, &stop_notify, sync_interval) {
                     return;
                 }
                 continue;
@@ -223,7 +223,7 @@ impl SocketSynchronizer {
             ) {
                 Err(e) => {
                     error!("fetch socket info fail: {}", e);
-                    if !Self::wait_timeout(&running, &stop_notify, sync_interval) {
+                    if !Self::wait_for_running(&running, &stop_notify, sync_interval) {
                         return;
                     }
                     continue;
@@ -294,7 +294,7 @@ impl SocketSynchronizer {
                 }
             }
 
-            if !Self::wait_timeout(&running, &stop_notify, sync_interval) {
+            if !Self::wait_for_running(&running, &stop_notify, sync_interval) {
                 return;
             }
         }
@@ -317,12 +317,13 @@ impl SocketSynchronizer {
         info!("socket info sync stop");
     }
 
-    fn wait_timeout(running: &Mutex<bool>, stop_notify: &Condvar, timeout: Duration) -> bool {
+    // returns running status
+    fn wait_for_running(running: &Mutex<bool>, stop_notify: &Condvar, timeout: Duration) -> bool {
         let guard = running.lock().unwrap();
         if !*guard {
-            return true;
+            return *guard;
         }
-        !*stop_notify.wait_timeout(guard, timeout).unwrap().0
+        *stop_notify.wait_timeout(guard, timeout).unwrap().0
     }
 
     fn sync_toa(
