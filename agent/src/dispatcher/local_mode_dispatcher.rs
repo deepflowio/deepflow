@@ -121,23 +121,6 @@ impl LocalModeDispatcher {
 
         let tunnel_type_bitmap = is.tunnel_type_bitmap.read().unwrap().clone();
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let decap_length = match BaseDispatcher::decap_tunnel(
-            data,
-            &is.tap_type_handler,
-            &mut is.tunnel_info,
-            tunnel_type_bitmap,
-            tunnel_type_trim_bitmap,
-        ) {
-            Ok((l, _)) => l,
-            Err(e) => {
-                is.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                warn!("decap_tunnel failed: {:?}", e);
-                return None;
-            }
-        };
-
-        #[cfg(target_os = "windows")]
         let decap_length = match BaseDispatcher::decap_tunnel(
             data,
             &is.tap_type_handler,
