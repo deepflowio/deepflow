@@ -253,7 +253,7 @@ impl Synchronizer {
                 // 避免信息同步先于信息采集
                 // ====
                 // wait 5 seconds to check version change
-                if Self::wait_timeout(&args.running, &args.timer, Duration::from_secs(5)) {
+                if !Self::wait_for_running(&args.running, &args.timer, Duration::from_secs(5)) {
                     break;
                 }
                 continue;
@@ -295,8 +295,11 @@ impl Synchronizer {
                             );
                             continue;
                         } else {
-                            if Self::wait_timeout(&args.running, &args.timer, config.sync_interval)
-                            {
+                            if !Self::wait_for_running(
+                                &args.running,
+                                &args.timer,
+                                config.sync_interval,
+                            ) {
                                 break 'outer;
                             }
                             continue 'outer;
@@ -313,7 +316,8 @@ impl Synchronizer {
                             },
                             e
                         );
-                        if Self::wait_timeout(&args.running, &args.timer, config.sync_interval) {
+                        if !Self::wait_for_running(&args.running, &args.timer, config.sync_interval)
+                        {
                             break 'outer;
                         }
                         continue 'outer;
@@ -323,11 +327,12 @@ impl Synchronizer {
         }
     }
 
-    fn wait_timeout(running: &Mutex<bool>, timer: &Condvar, interval: Duration) -> bool {
+    // returns running status
+    fn wait_for_running(running: &Mutex<bool>, timer: &Condvar, interval: Duration) -> bool {
         let guard = running.lock().unwrap();
         if !*guard {
-            return true;
+            return *guard;
         }
-        !*timer.wait_timeout(guard, interval).unwrap().0
+        *timer.wait_timeout(guard, interval).unwrap().0
     }
 }
