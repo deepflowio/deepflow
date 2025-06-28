@@ -212,7 +212,7 @@ impl LocalMultinsModeDispatcher {
     pub(super) fn listener(&self) -> LocalMultinsModeDispatcherListener {
         LocalMultinsModeDispatcherListener::new(
             self.base.listener(),
-            &self.base.is.dispatcher_config.load(),
+            self.base.is.dispatcher_config.clone(),
         )
     }
 }
@@ -655,6 +655,27 @@ impl ReceiverManager {
                         Ok(inode) => !proc_cache.contains_key(&inode),
                         _ => true,
                     };
+                    let terminated = terminated || {
+                        // also check if there are matched tap interfaces
+                        let r = if *ns == NsFile::Root {
+                            netns::links_by_name_regex_in_netns(
+                                &config.tap_interface_regex,
+                                &NsFile::Root,
+                            )
+                        } else {
+                            netns::links_by_name_regex_in_netns(
+                                &config.inner_tap_interface_regex,
+                                &ns,
+                            )
+                        };
+                        match r {
+                            Err(e) => {
+                                warn!("get interfaces by name regex in {ns:?} failed: {e}");
+                                true
+                            }
+                            Ok(links) => links.is_empty(),
+                        }
+                    };
                     if terminated {
                         handle.terminated.store(true, Ordering::Relaxed);
                         let h = handle.join_handle.take().unwrap();
@@ -699,18 +720,12 @@ impl ReceiverManager {
 #[derive(Clone)]
 pub struct LocalMultinsModeDispatcherListener {
     pub(super) base: BaseDispatcherListener,
-
-    tap_interface_regex: String,
-    inner_tap_interface_regex: String,
+    config: DispatcherAccess,
 }
 
 impl LocalMultinsModeDispatcherListener {
-    pub(super) fn new(base: BaseDispatcherListener, config: &DispatcherConfig) -> Self {
-        Self {
-            base,
-            tap_interface_regex: config.tap_interface_regex.clone(),
-            inner_tap_interface_regex: config.inner_tap_interface_regex.clone(),
-        }
+    pub(super) fn new(base: BaseDispatcherListener, config: DispatcherAccess) -> Self {
+        Self { base, config }
     }
 
     pub fn netns(&self) -> &public::netns::NsFile {
@@ -719,8 +734,6 @@ impl LocalMultinsModeDispatcherListener {
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         self.base.on_config_change(config);
-        self.tap_interface_regex = config.tap_interface_regex.clone();
-        self.inner_tap_interface_regex = config.inner_tap_interface_regex.clone();
     }
 
     pub fn on_vm_change(&self, _: &[MacAddr]) {}
@@ -743,14 +756,15 @@ impl LocalMultinsModeDispatcherListener {
         _: &Vec<u64>,
     ) {
         let (mut keys, mut macs) = (vec![], vec![]);
+        let config = self.config.load();
 
         trace!(
             "tap_interface_regex = /{}/, inner_tap_interface_regex = /{}/",
-            self.tap_interface_regex,
-            self.inner_tap_interface_regex
+            config.tap_interface_regex,
+            config.inner_tap_interface_regex
         );
 
-        match netns::links_by_name_regex_in_netns(&self.tap_interface_regex, &NsFile::Root) {
+        match netns::links_by_name_regex_in_netns(&config.tap_interface_regex, &NsFile::Root) {
             Err(e) => {
                 warn!(
                     "get interfaces by name regex in {:?} failed: {e}",
@@ -761,7 +775,7 @@ impl LocalMultinsModeDispatcherListener {
                 if links.is_empty() {
                     warn!(
                         "tap-interface-regex({}) do not match any interface in {:?}",
-                        self.tap_interface_regex,
+                        config.tap_interface_regex,
                         NsFile::Root,
                     );
                 } else {
@@ -779,10 +793,10 @@ impl LocalMultinsModeDispatcherListener {
             }
         }
 
-        let Ok(inner_regex) = Regex::new(&self.inner_tap_interface_regex) else {
+        let Ok(inner_regex) = Regex::new(&config.inner_tap_interface_regex) else {
             warn!(
                 "Failed to compile inner tap interface regex /{}/",
-                self.inner_tap_interface_regex
+                config.inner_tap_interface_regex
             );
             return;
         };
