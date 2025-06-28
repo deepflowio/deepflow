@@ -1313,7 +1313,7 @@ fn component_on_config_change(
             }
         }
         PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
-            for d in components.dispatcher_components.iter() {
+            for d in components.dispatcher_components.iter_mut() {
                 let links = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
