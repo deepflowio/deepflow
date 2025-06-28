@@ -352,7 +352,7 @@ impl DispatcherListener {
     }
 
     pub fn on_tap_interface_change(
-        &self,
+        &mut self,
         interfaces: &[Link],
         if_mac_source: IfMacSource,
         agent_type: AgentType,
