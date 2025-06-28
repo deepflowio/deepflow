@@ -984,7 +984,7 @@ fn component_on_config_change(
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            for d in components.dispatcher_components.iter() {
+            for d in components.dispatcher_components.iter_mut() {
                 let interfaces = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
@@ -1001,7 +1001,7 @@ fn component_on_config_change(
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
-            for d in components.dispatcher_components.iter() {
+            for d in components.dispatcher_components.iter_mut() {
                 let links = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
