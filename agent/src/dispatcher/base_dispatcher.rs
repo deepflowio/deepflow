@@ -16,6 +16,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
+use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{
@@ -780,6 +781,22 @@ impl BaseDispatcherListener {
     }
 
     pub(super) fn on_vm_change(&self, keys: &[u64], vm_macs: &[MacAddr]) {
+        struct KeyMacs<'a>(&'a [u64], &'a [MacAddr]);
+        impl<'a> fmt::Display for KeyMacs<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                for (key, mac) in std::iter::zip(self.0, self.1) {
+                    let ns = key >> 32;
+                    let if_index = key & 0xffffffff;
+                    if ns == 0 {
+                        write!(f, "\nif_index: {if_index} mac: {mac}")?;
+                    } else {
+                        write!(f, "\nns: {ns} if_index: {if_index} mac: {mac}")?;
+                    }
+                }
+                Ok(())
+            }
+        }
+
         assert_eq!(keys.len(), vm_macs.len());
         // assert keys in assending order for bsearch
         assert!(keys.windows(2).all(|w| w[0] <= w[1]));
@@ -798,8 +815,10 @@ impl BaseDispatcherListener {
         });
         if !deleted.is_empty() {
             info!(
-                "Dispatcher{} Removing VMs: {:?} by {:?} + {:?}",
-                self.log_id, deleted, keys, vm_macs
+                "Dispatcher{} Removing VMs: {:?} changing pipelines to {}",
+                self.log_id,
+                deleted,
+                KeyMacs(keys, vm_macs)
             );
         }
         if pipelines.len() == keys.len() {
@@ -840,8 +859,10 @@ impl BaseDispatcherListener {
         }
         if !added.is_empty() {
             info!(
-                "Dispatcher{} Adding VMs: {:?} by {:?} + {:?}",
-                self.log_id, added, keys, vm_macs
+                "Dispatcher{} Adding VMs: {:?} changing pipelines to {}",
+                self.log_id,
+                added,
+                KeyMacs(keys, vm_macs)
             );
         }
     }
