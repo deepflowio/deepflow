@@ -2407,6 +2407,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
+| Range | [0, 65535] |
 
 **详细描述**:
 
@@ -2480,6 +2481,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
+| Range | [0, 65535] |
 
 **详细描述**:
 
@@ -3841,6 +3843,34 @@ inputs:
 配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
+
+##### 禁用 kprobe {#inputs.ebpf.socket.kprobe.disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，kprobe 功能将被禁用。
 
 ##### 启用 Unix Socket 追踪 {#inputs.ebpf.socket.kprobe.enable_unix_socket}
 
@@ -7027,6 +7057,51 @@ processors:
 
 开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
 
+#### 自定义协议解析 {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义协议解析配置，支持通过简单的规则识别用户自定义的 L7 协议。
+示例：
+```yaml
+- protorol_name: "your_protocol_name" # 协议名称，对应 l7_flow_log.l7_protocol_str，注意：必须存在一个 `processors.request_log.tag_extraction.custom_field_policies` 配置，否则无法上报识别结果
+  pre_filter:
+    port_list: 1-65535 # 预过滤端口，可以提高解析性能
+  request_characters:  # 多个特征之间是 OR 的关系
+    - character: # 多个 match_keyword 之间是 AND 的关系
+      - match_keyword: abc  # 特征字符串
+        match_type: "string" # 取值："string", "hex"
+        match_ignore_case: false # 匹配特征字符串是否忽略大小写，当 match_type == string 时生效，默认值: false
+        match_from_begining: false # 是否需要从 Payload 头部开始匹配
+  response_characters:
+    - character:
+      - match_keyword: 0123af
+        match_type: "hex"
+        match_from_begining: false
+```
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
@@ -7066,6 +7141,7 @@ processors:
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
+        RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
         TLS: 443,6443
@@ -7135,6 +7211,7 @@ processors:
         PostgreSQL: []
         Pulsar: []
         Redis: []
+        RocketMQ: []
         SOFARPC: []
         SomeIP: []
         TLS: []
@@ -7358,6 +7435,33 @@ processors:
 该特性用于忽略特定的 `Non-Existent Domain` 类型的 DNS 响应，比如 K8s Pod 解析外部域名时，会将
 待解析域名与 cluster 内的域名后缀做拼接并多次尝试解析，因而会产生多次的 `Non-Existent Domain`
 的响应结果，干扰数据分析。
+
+#### cBPF data disabled {#processors.request_log.filters.cbpf_disabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.filters.cbpf_disabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    filters:
+      cbpf_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+关闭后 deepflow-agent 将停止从 packet 数据生成调用日志。
 
 ### 超时设置 {#processors.request_log.timeouts}
 
@@ -7942,6 +8046,67 @@ processors:
 **详细描述**:
 
 字段名
+
+#### 自定义字段提取策略 {#processors.request_log.tag_extraction.custom_field_policies}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义字段提取策略，用于通过简单的规则提取 L7 协议中可能存在的自定义字段
+示例：
+```yaml
+- policy_name: "my_policy" # 策略名称
+  protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
+  custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
+  port_list: 1-65535
+  fields:
+  - field_name: "my_field" # 配置的字段
+    field_match_type: "string" # 可选值："string"
+    field_match_ignore_case: "false" # 当匹配 field 时是否忽略大小写，默认值：false
+    field_match_keyword: "abc" # 可以填写额外的字符以提升匹配准确率，例如 `"\"abc\": \""`
+
+    subfield_match_keyword: "y" # 有些情况下，我们需要提取一个子字段，例如 HTTP 的 Cookie 字段中，我们仅仅只需要提取其中的一部分，例如，我们要从 `abc: x=1,y=2,z=3` 的 Value（`x=1,y=2,z=3`）中提取 y 对应的值
+    separator_between_subfield_kv_pair: "," # 用于分割 key-value 键值对的分隔符，默认值：空
+    separator_between_subfield_key_and_value: "=" # 用于分割 key 和 value 的分隔符，默认值：空
+
+    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value，默认值为 `header_field`，含义见下方说明
+    traffic_direction: request # 可以限定仅在请求（或仅在响应）中搜索，默认值为 both，可选值：request/response/both
+    check_value_charset: false # 可用于检查提取结果是否合法
+    value_primary_charset: ["digits", "alphabets", "chinese"] # 提取结果校验字符集，可选值：digits/alphabets/chinese
+    value_special_charset: ".-_" # 提取结果校验字符集，额外校验这些特殊字符
+    attribute_name: "xyz" # 此时该字段将会出现在调用日志的 attribute.xyz 中，默认值为空，为空时该字段不会加入到 attribute 内
+    rewrite_native_tag: version # rewrite 可以填写以下几种字段之一，用于覆写对应字段的值：version/request_type/request_domain/request_resource/request_id/endpoint/response_code/response_exception/response_result/trace_id/span_id/x_request_id/http_proxy_client
+    rewrite_response_status: # rewrite response_status 字段，当 response_code 在 success_values 数组中时，会将 response_status 设置为 success，否则设置为 server_error
+      success_values: []
+    metric_name: "xyz" # 此时该字段将会出现在调用日志的 metrics.xyz 中，默认值为空
+```
+注意，其中 field_type 的不同值会影响到该字段的提取方式，具体如下：
+- `http_url_field`：从 HTTP URL 末尾的参数中提取字段，URL 末尾形如：`?key=value&key2=value2`
+- `header_field`：从 HTTP/Dubbo/SofaRPC/...等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`
+- `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
+- `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
+- `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9035,6 +9200,7 @@ outputs:
 Agent 会将如下类型的流标记为 `close_type = 正常结束-客户端重置`：
 - 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 RST
 - 客户端发送 SYN，服务端回复 SYN-ACK，客户端发送 ACK，客户端发送 RST
+
 此类流量是正常的负载均衡器后端主机检查检查流量，不会携带任何有意义的应用层载荷。
 
 本配置项设置为 `true` 时，Agent 会将流日志的客户端端口号重置为 0 之后再聚合输出，
@@ -9662,6 +9828,33 @@ outputs:
 开启后，deepflow-agent 将对集成的应用日志数据进行压缩处理，压缩比例在 5:1~20:1 之间。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
+### Pcap {#outputs.compression.pcap}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.pcap`
+
+**默认值**:
+```yaml
+outputs:
+  compression:
+    pcap: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对抓取的 Pcap 数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
+
 ### 调用日志 {#outputs.compression.l7_flow_log}
 
 **标签**:
@@ -9686,7 +9879,7 @@ outputs:
 
 **详细描述**:
 
-开启后，deepflow-agent 将对调用日志进行压缩处理。注意：
+开启后，deepflow-agent 将对调用日志进行压缩处理，压缩比例在 8:1 左右。注意：
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
 ### 流日志 {#outputs.compression.l4_flow_log}

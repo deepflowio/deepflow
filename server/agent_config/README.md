@@ -2449,6 +2449,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
+| Range | [0, 65535] |
 
 **Description**:
 
@@ -2524,6 +2525,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | string |
+| Range | [0, 65535] |
 
 **Description**:
 
@@ -3923,6 +3925,34 @@ to the description of `inputs.ebpf.socket.uprobe.dpdk.rx_hooks`.
 Example: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
 
 #### Kprobe {#inputs.ebpf.socket.kprobe}
+
+##### kprobe disabled {#inputs.ebpf.socket.kprobe.disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.kprobe.disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      kprobe:
+        disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, kprobe will be disabled.
 
 ##### Unix Socket Enabled {#inputs.ebpf.socket.kprobe.enable_unix_socket}
 
@@ -7189,6 +7219,51 @@ processors:
 When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
 and the rrt calculation of the response will use the `grpc-status` field.
 
+#### custom protocol parsing {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Custom protocol parsing configuration, which can be used to parse custom protocols through simple rules.
+Example:
+```yaml
+- protocol_name: "your_protocol_name" # Protocol name, corresponding to l7_flow_log.l7_protocol_str
+  pre_filter:
+    port_list: 1-65535 # Pre-filter port, which can improve parsing performance
+  request_characters:  # Multiple features are ORed
+    - character: # Multiple match_keywords are ANDed
+      - match_keyword: abc  # Feature string
+        match_type: "string" # Possible values: "string", "hex"
+        match_ignore_case: false # wheather ignore case when match keywords, when match_type == string effected, default: false
+        match_from_beginning: false # Whether to match from the beginning of the payload
+  response_characters:
+    - character:
+      - match_keyword: 0123af
+        match_type: "hex"
+        match_from_beginning: false
+```
+
 ### Filters {#processors.request_log.filters}
 
 #### Port Number Pre-filters {#processors.request_log.filters.port_number_prefilters}
@@ -7228,6 +7303,7 @@ processors:
         PostgreSQL: 1-65535
         Pulsar: 1-65535
         Redis: 1-65535
+        RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
         TLS: 443,6443
@@ -7298,6 +7374,7 @@ processors:
         PostgreSQL: []
         Pulsar: []
         Redis: []
+        RocketMQ: []
         SOFARPC: []
         SomeIP: []
         TLS: []
@@ -7530,6 +7607,33 @@ it. All these attempts will receive an NXDOMAIN reply before it finally requests
 original domain name directly, and these errors may not be of concern to you. In such
 cases, you can configure their `response_result` suffix here, so that the corresponding
 `response_status` in the l7_flow_log is forcibly set to `Success`.
+
+#### cBPF data disabled {#processors.request_log.filters.cbpf_disabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.filters.cbpf_disabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    filters:
+      cbpf_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When disabled, deepflow-agent will not generate request_log from packet data.
 
 ### Timeouts {#processors.request_log.timeouts}
 
@@ -8127,6 +8231,67 @@ processors:
 **Description**:
 
 Field name.
+
+#### Custom Fields Policies {#processors.request_log.tag_extraction.custom_field_policies}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Custom field extraction policies, used to extract custom fields from L7 protocols
+Example:
+```yaml
+- policy_name: "my_policy" # name of current policy
+  protocol_name: HTTP # protocol name, if protocol is Grpc, please set it to HTTP2, optional values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
+  custom_protocol_name: "my_protocol"  # when protocol_name is Custom are effected, and there must be a `processors.request_log.application_protocol_inference.custom_protocols` configuration with the same name, otherwise it cannot be parsed
+  port_list: 1-65535
+  fields:
+  - field_name: "my_field"
+    field_match_type: "string"  # optional values: "string"
+    field_match_ignore_case: "false" # wheather ignore case when match field, default: false
+    field_match_keyword: "abc"  # can be filled with additional characters to improve accuracy, for example `"\"abc\": \""`
+
+    subfield_match_keyword: "y" # in some cases, we need to extract a subfield, for example, in the HTTP Cookie field, we only need to extract part of it, such as extracting the value corresponding to y from `abc: x=1,y=2,z=3` (the value is `x=1,y=2,z=3`)
+    separator_between_subfield_kv_pair: "," # default: empty
+    separator_between_subfield_key_and_value: "=" # default: empty
+
+    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value, default value: header_field
+    traffic_direction: request # could be limited to search only in request (or only in response), optional values: request/response/both, default value: both
+    check_value_charset: false # used for checking whether the extracted result is legal
+    value_primary_charset: ["digits", "alphabets", "chinese"] # used for checking the character set of the extracted result, optional values: digits/alphabets/chinese
+    value_special_charset: ".-_" # used for checking the character set of the extracted result
+    attribute_name: "xyz" # this field will appear in the calling log's attribute.xyz, default value is empty, if empty, this field will not be added to attribute
+    rewrite_native_tag: version # rewrite can fill in one of the following fields to overwrite the corresponding field value: version/request_type/request_domain/request_resource/request_id/endpoint/response_code/response_exception/response_result/trace_id/span_id/x_request_id/http_proxy_client
+    rewrite_response_status: # rewrite response_status field, when response_code is in success_values array, response_status will be set to success, otherwise set to server_error
+      success_values: []
+    metric_name: "xyz"  # this field will appear in the calling log's metrics.xyz, default value is empty
+```
+notice: the different values of field_type will affect the extraction method of the field, as follows:
+- `http_url_field`: extract field from HTTP URL parameters at the end of the URL, such as `?key=value&key2=value2`
+- `header_field`: extract field from the Header part of HTTP/Dubbo/SofaRPC/... protocols, such as HTTP Header like `key: value`
+- `payload_json_value`: extract field from Json Payload, such as `"key": 1`, or `"key": "value"`, or `"key": None`, etc.
+- `payload_xml_value`: extract field from XML Payload, such as `<key attr="xxx">value</key>`
+- `payload_hessian2_value`: extract field from Payload encoded with Hessian2
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9250,6 +9415,7 @@ outputs:
 Agent will mark the following types of flows as `close_type = normal end-client reset`:
 - Client sends SYN, server replies SYN-ACK, client sends RST
 - Client sends SYN, server replies SYN-ACK, client sends ACK, client sends RST
+
 This type of traffic is normal load balancer backend host inspection traffic and does not carry any meaningful application layer payload.
 
 When this configuration item is set to `true`, Agent will reset the client port number of the flow log to 0 before aggregating the output,
@@ -9894,6 +10060,34 @@ Whether to compress the integrated application log data received by deepflow-age
 ratio is about 5:1~20:1. Turning on this feature will result in higher CPU consumption
 of deepflow-agent.
 
+### Pcap {#outputs.compression.pcap}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`outputs.compression.pcap`
+
+**Default value**:
+```yaml
+outputs:
+  compression:
+    pcap: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the captured pcap data received by deepflow-agent. The compression
+ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+of deepflow-agent.
+
 ### Request Log {#outputs.compression.l7_flow_log}
 
 **Tags**:
@@ -9918,7 +10112,8 @@ outputs:
 
 **Description**:
 
-Whether to compress the l7 flow log.
+Whether to compress the l7 flow log. The compression ratio is about 8:1.
+Turning on this feature will result in higher CPU consumption of deepflow-agent.
 
 ### Flow Log {#outputs.compression.l4_flow_log}
 
