@@ -41,6 +41,7 @@ type dataGenerator interface {
 	setInSubDomain(bool) dataGenerator
 	setChDeviceTypes(...int) dataGenerator
 	setAdditionalSelectField(string) dataGenerator
+	setUnscoped(bool) dataGenerator
 }
 
 func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
@@ -242,6 +243,7 @@ type dataGeneratorComponent[GT dataGeneratorModel] struct {
 	// TODO refactor
 	chDeviceTypes         []int  // additional query conditions, only used for ch_device query
 	additionalSelectField string // additional fields to select, used for label, env... query
+	unscoped              bool   // whether to use Unscoped() in the query, default is false
 }
 
 func (s *dataGeneratorComponent[GT]) getResourceType() string {
@@ -258,6 +260,11 @@ func (s *dataGeneratorComponent[GT]) getIDToUpdatedAt() map[int]time.Time {
 
 func (s *dataGeneratorComponent[GT]) getChDeviceTypes() []int {
 	return s.chDeviceTypes
+}
+
+func (s *dataGeneratorComponent[GT]) setUnscoped(unscoped bool) dataGenerator {
+	s.unscoped = unscoped
+	return s
 }
 
 func (s *dataGeneratorComponent[GT]) setHasDuplicateID(has bool) dataGenerator {
@@ -301,11 +308,18 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 
 	var data []*GT
 	item := new(GT)
+	query := s.md.DB.Model(&item)
+
+	if s.unscoped {
+		query = query.Unscoped()
+	}
+
 	selectFieldsStr := s.realIDField + ", updated_at"
 	if len(s.additionalSelectField) > 0 {
 		selectFieldsStr += ", " + s.additionalSelectField
 	}
-	query := s.md.DB.Model(&item).Unscoped().Select(selectFieldsStr)
+	query = query.Select(selectFieldsStr)
+
 	if s.hasDuplicateID {
 		domainCol := "domain"
 		subDomainCol := "sub_domain"
@@ -321,9 +335,11 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		subQuery = subQuery.Select(selectFieldsStr)
 		query = query.Table("(?) as t", subQuery).Where("t.rn = 1")
 	}
+
 	if len(s.chDeviceTypes) != 0 {
 		query.Where("devicetype IN (?)", s.chDeviceTypes)
 	}
+
 	if strings.HasPrefix(s.resourceType, "ch_") {
 		query = query.Where("domain_id = ?", s.md.Domain.ID)
 		if s.inSubDomain {
@@ -335,6 +351,7 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 			query = query.Where("sub_domain = ?", s.md.SubDomain.Lcuuid)
 		}
 	}
+
 	if err := query.Debug().Find(&data).Error; err != nil { // TODO remove Debug() after testing
 		log.Errorf("failed to find %s: %v", s.resourceType, err, s.md.LogPrefixes)
 		return err

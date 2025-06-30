@@ -23,10 +23,10 @@ import (
 var cfg *RecorderConfig
 
 type RecorderConfig struct {
-	CacheRefreshInterval         uint16 `default:"60" yaml:"cache_refresh_interval"`
+	CacheRefreshInterval         uint16 `default:"1440" yaml:"cache_refresh_interval"`
 	DeletedResourceCleanInterval uint16 `default:"24" yaml:"deleted_resource_clean_interval"`
 	DeletedResourceRetentionTime uint16 `default:"168" yaml:"deleted_resource_retention_time"`
-	DirtyResourceCleanInterval   uint16 `default:"99" yaml:"dirty_resource_clean_interval"`
+	DirtyResourceCleanInterval   uint16 `default:"1500" yaml:"dirty_resource_clean_interval"`
 	ResourceMaxID0               int    `default:"64000" yaml:"resource_max_id_0"`
 	ResourceMaxID1               int    `default:"499999" yaml:"resource_max_id_1"`
 	MySQLBatchSize               int    `default:"2500" yaml:"mysql_batch_size"`
