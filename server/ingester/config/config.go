@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -303,7 +304,7 @@ func (c *Config) Validate() error {
 		}
 		// in standalone mode, only supports one ClickHouse node
 		var actualAddrs []string
-		actualAddrs = append(actualAddrs, fmt.Sprintf("%s:%d", c.CKDB.Host, c.CKDB.Port))
+		actualAddrs = append(actualAddrs, net.JoinHostPort(c.CKDB.Host, strconv.Itoa(c.CKDB.Port)))
 		c.CKDB.ActualAddrs = &actualAddrs
 	} else {
 		if c.NodeIP == "" && c.ControllerIPs[0] == DefaultLocalIP {

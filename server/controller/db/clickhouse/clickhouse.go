@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/op/go-logging"
@@ -37,7 +38,7 @@ type ClickHouseConfig struct {
 }
 
 func Connect(cfg ClickHouseConfig) (*sqlx.DB, error) {
-	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s", cfg.UserName, cfg.UserPassword, cfg.Host, cfg.Port, "default")
+	url := fmt.Sprintf("clickhouse://%s:%s@%s/%s", cfg.UserName, cfg.UserPassword, net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port)), "default")
 	Db, err := sqlx.Open(
 		"clickhouse", url,
 	)

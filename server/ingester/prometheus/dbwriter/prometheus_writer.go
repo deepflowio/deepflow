@@ -18,6 +18,7 @@ package dbwriter
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -242,8 +243,7 @@ func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int,
 
 	ckdbAddrs := []string{}
 	for _, endpoint := range endpoints {
-		ckdbAddrs = append(ckdbAddrs, fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port))
-
+		ckdbAddrs = append(ckdbAddrs, net.JoinHostPort(endpoint.Host, fmt.Sprintf("%d", endpoint.Port)))
 	}
 	conn, err := common.NewCKConnections(ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
 	if err != nil {
