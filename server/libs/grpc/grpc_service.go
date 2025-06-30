@@ -103,9 +103,7 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
 	}
 
-	// when querying the podGroupIDTable and podClusterIDTable, you do not need to verify the epcID
-	// because there is a scenario where the EpcID is 0 but the podGroupID and podClusterID are not 0.
-	// Currently, you need to verify the epcID because there is no data with epcID <= 0 in the epcIDIPv6Table and epcIDIPv4Table.
+	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
 	if epcID <= 0 {
 		return 0
 	}
@@ -116,7 +114,7 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 }
 
 func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort uint16) uint32 {
-	// no CustomService with epc <= 0
+	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
 	if epcID <= 0 {
 		return 0
 	}
