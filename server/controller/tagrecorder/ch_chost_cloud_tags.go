@@ -98,7 +98,7 @@ func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *metadbmo
 		return
 	}
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChChostCloudTags{{
-		ChIDBase: metadbmodel.ChIDBase{ID: source.ID}, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
+		ChIDBase: metadbmodel.ChIDBase{ID: source.ID}, CloudTags: string(bytes), TeamID: md.GetTeamID(), DomainID: md.GetDomainID()}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

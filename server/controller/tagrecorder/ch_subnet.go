@@ -76,9 +76,9 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 		IconID: c.resourceTypeToIconID[IconKey{
 			NodeType: RESOURCE_TYPE_VL2,
 		}],
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 		L3EPCID:     source.VPCID,
 	})
 	return

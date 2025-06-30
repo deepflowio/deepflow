@@ -43,7 +43,7 @@ type dataGenerator interface {
 	setAdditionalSelectField(string) dataGenerator
 }
 
-func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
+func newDataGenerator(md recorderCommon.MetadataBase, resourceType string) dataGenerator {
 	var dg dataGenerator
 	realID := "id"
 	inSubDomain := true
@@ -211,7 +211,7 @@ func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) data
 		setGroupSortOrder(useLatestUpdatedAt)
 }
 
-func newDataGeneratorComponent[GT dataGeneratorModel](md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
+func newDataGeneratorComponent[GT dataGeneratorModel](md recorderCommon.MetadataBase, resourceType string) dataGenerator {
 	dataGeneratorComponent := &dataGeneratorComponent[GT]{
 		md:            md,
 		resourceType:  resourceType,
@@ -223,7 +223,7 @@ func newDataGeneratorComponent[GT dataGeneratorModel](md *recorderCommon.Metadat
 }
 
 type dataGeneratorComponent[GT dataGeneratorModel] struct {
-	md *recorderCommon.MetadataBase
+	md recorderCommon.MetadataBase
 
 	resourceType  string
 	inSubDomain   bool // whether the resource may be in sub domain, used for query

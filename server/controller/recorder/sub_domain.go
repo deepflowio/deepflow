@@ -131,11 +131,8 @@ func newSubDomain(md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *
 		cache:             cache,
 		pubsub:            pubsub.GetPubSub(pubsub.PubSubTypeWholeSubDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
-			md.GetORGID(),
-			message.MetadataDomainLcuuid(md.GetDomainInfo().Lcuuid),
-			message.MetadataSubDomainLcuuid(md.GetSubDomainInfo().Lcuuid),
+			message.MetadataBase(md.MetadataBase),
 			message.MetadataToolDataSet(cache.ToolDataSet),
-			message.MetadataDB(md.GetDB()),
 		),
 	}
 }

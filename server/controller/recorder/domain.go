@@ -66,10 +66,8 @@ func newDomain(ctx context.Context, cfg config.RecorderConfig, md *rcommon.Metad
 
 		pubsub: pubsub.GetPubSub(pubsub.PubSubTypeWholeDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
-			md.GetORGID(),
-			message.MetadataDomainLcuuid(md.GetDomainInfo().Lcuuid),
+			message.MetadataBase(md.MetadataBase),
 			message.MetadataToolDataSet(cacheMng.DomainCache.ToolDataSet),
-			message.MetadataDB(md.GetDB()),
 		),
 	}
 }

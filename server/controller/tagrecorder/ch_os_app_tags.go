@@ -91,9 +91,9 @@ func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, source *metadbmodel.P
 	return []OSAPPTagsKey{{PID: source.ID}}, []metadbmodel.ChOSAppTags{{
 		PID:         source.ID,
 		OSAPPTags:   osAppTags,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 
