@@ -260,9 +260,10 @@ const (
 	PodId                       // use vtapId + podId to match first
 	Mac                         // if vtapId + podId cannot be matched, finally use Mac/EpcIP to match resources
 	EpcIP
-	Peer            // Multicast, filled with peer information
-	Agent           // traffic on the 'lo' port uses the Agent's IP and Epc to match resource information.
-	None  TagSource = 0
+	Peer                // Multicast, filled with peer information
+	Agent               // traffic on the 'lo' port uses the Agent's IP and Epc to match resource information.
+	ProcessId           // If ProcessId exists and GpId does not exist, get GpId through ProcessId
+	None      TagSource = 0
 )
 
 type Field struct {
