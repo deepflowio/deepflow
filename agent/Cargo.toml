@@ -15,8 +15,8 @@ exclude = [
 
 [workspace.dependencies]
 bitflags = "1.3"
-k8s-openapi = { version = "0.16", features = ["v1_19", "schemars"] }
-kube = { version = "0.77", default-features = false }
+k8s-openapi = { version = "0.24", features = ["v1_32", "schemars"] }
+kube = { version = "0.98", default-features = false }
 prost = "0.12"
 public = { path = "crates/public" }
 regex = "1"
@@ -89,7 +89,7 @@ prost.workspace = true
 public.workspace = true
 rand = "0.8.5"
 regex.workspace = true
-ring = "0.16.20"
+ring = "0.17"
 roxmltree = "0.14.1"
 serde.workspace = true
 serde_json = "1.0.72"
@@ -125,7 +125,7 @@ kube = { workspace = true, features = [
     "runtime",
     "rustls-tls",
 ] }
-kube-derive = "0.77"
+kube-derive = "0.98"
 openshift-openapi = { version = "0.3.1", features = ["v4_5"] }
 schemars = "0.8"
 trace-utils = { path = "crates/trace-utils" }
