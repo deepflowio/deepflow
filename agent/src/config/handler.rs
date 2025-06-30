@@ -3861,7 +3861,7 @@ impl ConfigHandler {
             });
             common.enabled = new_common.enabled;
         }
-        if common.region_id != new_common.region_id {
+        if common.region_id != new_common.region_id && new_common.region_id > 0 {
             info!(
                 "Update global.common.region_id from {:?} to {:?}.",
                 common.region_id, new_common.region_id
@@ -3875,7 +3875,7 @@ impl ConfigHandler {
             );
             common.pod_cluster_id = new_common.pod_cluster_id;
         }
-        if common.vpc_id != new_common.vpc_id {
+        if common.vpc_id != new_common.vpc_id && new_common.vpc_id > 0 {
             info!(
                 "Update global.common.vpc_id from {:?} to {:?}.",
                 common.vpc_id, new_common.vpc_id
@@ -3889,14 +3889,14 @@ impl ConfigHandler {
             );
             common.agent_id = new_common.agent_id;
         }
-        if common.team_id != new_common.team_id {
+        if common.team_id != new_common.team_id && new_common.team_id > 0 {
             info!(
                 "Update global.common.team_id from {:?} to {:?}.",
                 common.team_id, new_common.team_id
             );
             common.team_id = new_common.team_id;
         }
-        if common.organize_id != new_common.organize_id {
+        if common.organize_id != new_common.organize_id && new_common.organize_id > 0 {
             info!(
                 "Update global.common.organize_id from {:?} to {:?}.",
                 common.organize_id, new_common.organize_id
