@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: ignore invalid configurations [#9975](https://github.com/deepflowio/deepflow/pull/9975) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - eBPF Fix unrecognized HTTP/2 magic [#9966](https://github.com/deepflowio/deepflow/pull/9966) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +48,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: host concatenated with port support ipv6 [#9978](https://github.com/deepflowio/deepflow/pull/9978) by [askyrie](https://github.com/askyrie)
+* feat: request log supports get gpId through processId [#9974](https://github.com/deepflowio/deepflow/pull/9974) by [lzf575](https://github.com/lzf575)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
