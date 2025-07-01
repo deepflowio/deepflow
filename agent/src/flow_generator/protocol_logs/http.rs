@@ -1086,7 +1086,7 @@ impl HttpLog {
                 return Err(Error::HttpHeaderParseFailed);
             }
 
-            ret
+            Ok(payload.len())
         } else {
             info.version = Version::V2;
             info.stream_id = Some(stream_id);
