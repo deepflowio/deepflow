@@ -530,15 +530,25 @@ pub struct EbpfCollector {
 
 const BATCH_SIZE: usize = 64;
 
+#[allow(static_mut_refs)]
 static mut SWITCH: bool = false;
+#[allow(static_mut_refs)]
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
+#[allow(static_mut_refs)]
 static mut DPDK_SENDERS: Option<Vec<DebugSender<Box<packet::Packet>>>> = None;
+#[allow(static_mut_refs)]
 static mut DPDK_SENDER_BUFFERS: Vec<Vec<Box<packet::Packet>>> = vec![];
+#[allow(static_mut_refs)]
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
+#[allow(static_mut_refs)]
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
+#[allow(static_mut_refs)]
 static mut POLICY_GETTER: Option<PolicyGetter> = None;
+#[allow(static_mut_refs)]
 static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
+#[allow(static_mut_refs)]
 static mut PROFILE_STACK_COMPRESSION: bool = true;
+#[allow(static_mut_refs)]
 static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
 
 pub unsafe fn string_from_null_terminated_c_str(ptr: *const u8) -> String {
@@ -553,6 +563,7 @@ impl EbpfCollector {
         #[allow(unused)] queue_id: c_int,
         sd: *mut ebpf::SK_BPF_DATA,
     ) {
+        #[allow(static_mut_refs)]
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
@@ -641,6 +652,7 @@ impl EbpfCollector {
         #[allow(unused)] queue_id: c_int,
         data: *mut ebpf::stack_profile_data,
     ) {
+        #[allow(static_mut_refs)]
         unsafe {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
                 return;
@@ -734,6 +746,7 @@ impl EbpfCollector {
         process_listener: &ProcessListener,
     ) -> Result<ConfigHandle> {
         // ebpf和ebpf collector通信配置初始化
+        #[allow(static_mut_refs)]
         unsafe {
             let dpdk_sender_count = dpdk_senders.len();
             let handle = Self::ebpf_core_init(process_listener, config, stats_collector);
