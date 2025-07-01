@@ -222,10 +222,14 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 			log.Errorf("%s request gids failed", gidResourceType, p.metadata.LogPrefixes)
 			return dbData, nil, false
 		}
-		log.Infof("%s use gids: %v", gidResourceType, ids, p.metadata.LogPrefixes)
+		log.Infof("%s use gids: %v, expected count: %d, true count: %d", gidResourceType, ids, len(identifierToNewGID), len(ids), p.metadata.LogPrefixes)
 
 		start := 0
 		for k := range identifierToNewGID {
+			if start >= len(ids) {
+				log.Errorf("process identifier %s out of range, max is %d", k, len(ids)-1, p.metadata.LogPrefixes)
+				break
+			}
 			identifierToNewGID[k] = uint32(ids[start])
 			createdGIDs = append(createdGIDs, identifierToNewGID[k])
 			start++
