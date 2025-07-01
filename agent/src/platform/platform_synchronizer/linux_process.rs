@@ -229,6 +229,7 @@ pub struct OsAppTag {
 }
 
 pub(super) type PidProcMap = HashMap<u32, ProcessData>;
+#[allow(static_mut_refs)]
 static mut PIDS: Option<Arc<RwLock<Vec<ProcessData>>>> = None;
 
 // get the pid and process map
@@ -260,6 +261,7 @@ pub(crate) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
 
 fn get_proc_scan_process_datas() -> Vec<ProcessData> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(pids) = PIDS.as_ref() {
             pids.read().unwrap().clone()
         } else {
@@ -270,6 +272,7 @@ fn get_proc_scan_process_datas() -> Vec<ProcessData> {
 
 pub fn set_proc_scan_process_datas(_: &Vec<u32>, process_datas: &Vec<ProcessData>) {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(last) = PIDS.as_ref() {
             *last.write().unwrap() = process_datas.clone();
         } else {
