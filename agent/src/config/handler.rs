@@ -3853,10 +3853,13 @@ impl ConfigHandler {
                 common.region_id, new_common.region_id
             );
             common.region_id = new_common.region_id;
+        } else {
+            // The old and new configurations are consistent to avoid restarts
+            new_common.region_id = common.region_id;
         }
         if common.pod_cluster_id != new_common.pod_cluster_id {
             info!(
-                "Update global.common.region_id from {:?} to {:?}.",
+                "Update global.common.pod_cluster_id from {:?} to {:?}.",
                 common.pod_cluster_id, new_common.pod_cluster_id
             );
             common.pod_cluster_id = new_common.pod_cluster_id;
@@ -3867,6 +3870,9 @@ impl ConfigHandler {
                 common.vpc_id, new_common.vpc_id
             );
             common.vpc_id = new_common.vpc_id;
+        } else {
+            // The old and new configurations are consistent to avoid restarts
+            new_common.vpc_id = common.vpc_id;
         }
         if common.agent_id != new_common.agent_id {
             info!(
@@ -3880,7 +3886,10 @@ impl ConfigHandler {
                 "Update global.common.team_id from {:?} to {:?}.",
                 common.team_id, new_common.team_id
             );
+            // The old and new configurations are consistent to avoid restarts
             common.team_id = new_common.team_id;
+        } else {
+            new_common.team_id = common.team_id;
         }
         if common.organize_id != new_common.organize_id && new_common.organize_id > 0 {
             info!(
@@ -3888,6 +3897,9 @@ impl ConfigHandler {
                 common.organize_id, new_common.organize_id
             );
             common.organize_id = new_common.organize_id;
+        } else {
+            // The old and new configurations are consistent to avoid restarts
+            new_common.organize_id = common.organize_id;
         }
         if common.agent_type != new_common.agent_type {
             info!(
