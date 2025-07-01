@@ -2550,7 +2550,7 @@ impl ConfigHandler {
         log_retention: &Duration,
         log_file: &String,
     ) -> bool {
-        let log_retention = (log_retention.as_secs() / 3600 / 24).min(1);
+        let log_retention = (log_retention.as_secs() / 3600 / 24).max(1);
         match logger_handle.as_mut() {
             Some(h) => match h.flw_config() {
                 Err(FlexiLoggerError::NoFileLogger) => {
