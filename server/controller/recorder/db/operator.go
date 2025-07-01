@@ -251,7 +251,7 @@ func (o *OperatorBase[MPT, MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 				MPT(itemsHasNoID[i]).SetID(id)
 				itemsHasID = append(itemsHasID, itemsHasNoID[i])
 			}
-			log.Infof("%s use ids: %v", o.resourceTypeName, ids, o.metadata.LogPrefixes)
+			log.Infof("%s use ids: %v, expected count: %d, true count: %d", o.resourceTypeName, ids, count, len(ids), o.metadata.LogPrefixes)
 			return itemsHasID, ids, true
 		} else {
 			log.Infof("%s not use any id", o.resourceTypeName, o.metadata.LogPrefixes)
