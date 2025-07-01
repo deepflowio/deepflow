@@ -165,8 +165,8 @@ func (e AgentEntryData) getGPIDGlobalData(p *AgentProcessInfo) []*agent.GlobalGP
 					continue
 				}
 				pid0, agentId0, pid1, agentId1 := realValue.getData()
-				gpid0 := p.agentIdAndPIDToGPID.getData(agentId0, pid0)
-				gpid1 := p.agentIdAndPIDToGPID.getData(agentId1, pid1)
+				gpid0 := p.agentIdAndPIDToGID.getData(agentId0, pid0)
+				gpid1 := p.agentIdAndPIDToGID.getData(agentId1, pid1)
 				entry := &agent.GlobalGPIDEntry{
 					Protocol:  &protocol,
 					AgentId_1: &agentId1,
@@ -374,7 +374,7 @@ type AgentProcessInfo struct {
 	sendGPIDReq            *AIDToReq
 	agentIdToLocalGPIDReq  *AIDToReq
 	agentIdToShareGPIDReq  *AIDToReq
-	agentIdAndPIDToGPID    IDToGPID
+	agentIdAndPIDToGID     IDToGID
 	rvData                 RVData
 	globalLocalEntries     AgentEntryData
 	realClientToRealServer *U128IDMap
@@ -389,7 +389,7 @@ func NewAgentProcessInfo(db *gorm.DB, cfg *config.Config, orgID int) *AgentProce
 		sendGPIDReq:            NewAIDToReq(),
 		agentIdToLocalGPIDReq:  NewAIDToReq(),
 		agentIdToShareGPIDReq:  NewAIDToReq(),
-		agentIdAndPIDToGPID:    make(IDToGPID),
+		agentIdAndPIDToGID:     make(IDToGID),
 		rvData:                 NewRVData(),
 		globalLocalEntries:     NewAgentEntryData(),
 		realClientToRealServer: NewU128IDMapNoStats("trisolaris-real-pid", CACHE_SIZE),
@@ -400,8 +400,8 @@ func NewAgentProcessInfo(db *gorm.DB, cfg *config.Config, orgID int) *AgentProce
 	}
 }
 
-func (p *AgentProcessInfo) UpdateAgentIdAndPIDToGPID(data IDToGPID) {
-	p.agentIdAndPIDToGPID = data
+func (p *AgentProcessInfo) UpdateAgentIdAndPIDToGPID(data IDToGID) {
+	p.agentIdAndPIDToGID = data
 }
 
 func (p *AgentProcessInfo) UpdateRVData(data RVData) {
@@ -633,11 +633,11 @@ func (p *AgentProcessInfo) getGPIDInfoFromDB() {
 		log.Error(p.Log(err.Error()))
 		return
 	}
-	newVtapIDAndPIDToGPID := make(IDToGPID)
+	newVtapIDAndPIDToGPID := make(IDToGID)
 	for _, process := range processes {
 		newVtapIDAndPIDToGPID.addData(process)
 	}
-	p.agentIdAndPIDToGPID = newVtapIDAndPIDToGPID
+	p.agentIdAndPIDToGID = newVtapIDAndPIDToGPID
 }
 
 func (p *AgentProcessInfo) getRIPToVIPFromDB() {
@@ -717,29 +717,29 @@ func (p *AgentProcessInfo) GetGPIDResponseByReq(req *agent.GPIDSyncRequest) *age
 		var gpid0, gpid1, gpidReal uint32
 		globalEntry := p.globalLocalEntries.getData(agentId, entry, p)
 		if entry.GetPid_0() > 0 {
-			gpid0 = p.agentIdAndPIDToGPID.getData(agentId, entry.GetPid_0())
+			gpid0 = p.agentIdAndPIDToGID.getData(agentId, entry.GetPid_0())
 		} else if globalEntry != nil {
 			pid0, agentId0 := globalEntry.getPid0Data()
 			if pid0 > 0 && agentId0 > 0 {
-				gpid0 = p.agentIdAndPIDToGPID.getData(agentId0, pid0)
+				gpid0 = p.agentIdAndPIDToGID.getData(agentId0, pid0)
 			}
 		}
 		if entry.GetPid_1() > 0 {
-			gpid1 = p.agentIdAndPIDToGPID.getData(agentId, entry.GetPid_1())
+			gpid1 = p.agentIdAndPIDToGID.getData(agentId, entry.GetPid_1())
 		} else if globalEntry != nil {
 			pid1, agentId1 := globalEntry.getPid1Data()
 			if pid1 > 0 && agentId1 > 0 {
-				gpid1 = p.agentIdAndPIDToGPID.getData(agentId1, pid1)
+				gpid1 = p.agentIdAndPIDToGID.getData(agentId1, pid1)
 			}
 		}
 
 		if entry.GetPidReal() > 0 {
-			gpid1 = p.agentIdAndPIDToGPID.getData(agentId, entry.GetPidReal())
+			gpid1 = p.agentIdAndPIDToGID.getData(agentId, entry.GetPidReal())
 		} else if entry.GetPidReal() == 0 && entry.GetIpv4Real() > 0 {
 			if globalEntry != nil {
 				pid, agentId := globalEntry.getPid0Data()
 				if pid > 0 && agentId > 0 {
-					gpidReal = p.agentIdAndPIDToGPID.getData(agentId, pid)
+					gpidReal = p.agentIdAndPIDToGID.getData(agentId, pid)
 				}
 			}
 		}
@@ -753,7 +753,7 @@ func (p *AgentProcessInfo) GetGPIDResponseByReq(req *agent.GPIDSyncRequest) *age
 				responseEntry.Ipv4Real = &ipv4Real
 				responseEntry.PortReal = &portReal
 				responseEntry.RoleReal = &role
-				gpidReal = p.agentIdAndPIDToGPID.getData(agentIdReal, pidReal)
+				gpidReal = p.agentIdAndPIDToGID.getData(agentIdReal, pidReal)
 			}
 		}
 
