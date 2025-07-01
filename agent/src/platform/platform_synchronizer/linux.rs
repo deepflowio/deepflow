@@ -62,6 +62,7 @@ static mut PIDS: Option<Arc<SysRwLock<Vec<u32>>>> = None;
 
 pub fn get_socket_pids() -> Vec<u32> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(pids) = PIDS.as_ref() {
             pids.read().unwrap().clone()
         } else {
@@ -111,6 +112,7 @@ impl SocketSynchronizer {
 
     fn set_socket_pids(pids: &Vec<u32>, _: &Vec<ProcessData>) {
         unsafe {
+            #[allow(static_mut_refs)]
             if let Some(last) = PIDS.as_ref() {
                 *last.write().unwrap() = pids.clone();
             } else {
