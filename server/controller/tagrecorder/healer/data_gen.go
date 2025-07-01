@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -296,47 +298,56 @@ func (s *dataGeneratorComponent[GT]) setAdditionalSelectField(fields string) dat
 }
 
 func (s *dataGeneratorComponent[GT]) generate() error {
+	log.Infof("gen %s data started", s.resourceType, s.md.LogPrefixes)
 	// reset idToUpdatedAt map
 	s.idToUpdatedAt = make(map[int]time.Time)
 
 	var data []*GT
 	item := new(GT)
+	query := s.md.DB.Model(&item).Unscoped()
+
 	selectFieldsStr := s.realIDField + ", updated_at"
 	if len(s.additionalSelectField) > 0 {
 		selectFieldsStr += ", " + s.additionalSelectField
 	}
-	query := s.md.DB.Model(&item).Unscoped().Select(selectFieldsStr)
-	if s.hasDuplicateID {
-		domainCol := "domain"
-		subDomainCol := "sub_domain"
-		if strings.HasPrefix(s.resourceType, "ch_") { // TODO refactor
-			domainCol = "domain_id"
-			subDomainCol = "sub_domain_id"
-		}
-		selectFieldsStr += ", " + domainCol + ", " + fmt.Sprintf("ROW_NUMBER() OVER (PARTITION BY %s ORDER BY updated_at %s) as rn", s.realIDField, s.groupSortOrder)
-		subQuery := s.md.DB.Table(s.tableName)
-		if s.inSubDomain {
-			selectFieldsStr += ", " + subDomainCol
-		}
-		subQuery = subQuery.Select(selectFieldsStr)
-		query = query.Table("(?) as t", subQuery).Where("t.rn = 1")
-	}
+	query = query.Select(selectFieldsStr)
+
 	if len(s.chDeviceTypes) != 0 {
 		query.Where("devicetype IN (?)", s.chDeviceTypes)
 	}
-	if strings.HasPrefix(s.resourceType, "ch_") {
-		query = query.Where("domain_id = ?", s.md.Domain.ID)
-		if s.inSubDomain {
-			query = query.Where("sub_domain_id = ?", s.md.SubDomain.ID)
+
+	appendDomainCond := func(q *gorm.DB) *gorm.DB {
+		if strings.HasPrefix(s.resourceType, "ch_") {
+			q = q.Where("domain_id = ?", s.md.Domain.ID)
+			if s.inSubDomain {
+				q = q.Where("sub_domain_id = ?", s.md.SubDomain.ID)
+			}
+		} else {
+			q = q.Where("domain = ?", s.md.Domain.Lcuuid)
+			if s.inSubDomain {
+				q = q.Where("sub_domain = ?", s.md.SubDomain.Lcuuid)
+			}
 		}
-	} else {
-		query = query.Where("domain = ?", s.md.Domain.Lcuuid)
-		if s.inSubDomain {
-			query = query.Where("sub_domain = ?", s.md.SubDomain.Lcuuid)
-		}
+		return q
 	}
-	if err := query.Debug().Find(&data).Error; err != nil { // TODO remove Debug() after testing
-		log.Errorf("failed to find %s: %v", s.resourceType, err, s.md.LogPrefixes)
+
+	// if hasDuplicateID is true, we need to use ROW_NUMBER() to get the latest updated_at for each id
+	if s.hasDuplicateID {
+		selectFieldsStr += ", " + fmt.Sprintf("ROW_NUMBER() OVER (PARTITION BY %s ORDER BY updated_at %s) as rn", s.realIDField, s.groupSortOrder)
+		subQuery := s.md.DB.Table(s.tableName).Select(selectFieldsStr)
+		subQuery = appendDomainCond(subQuery)
+		query = query.Table("(?) as t", subQuery).Where("t.rn = 1")
+	} else {
+		query = appendDomainCond(query)
+	}
+
+	sql := query.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Find(&data)
+	})
+	log.Infof("TODO sql: %s", sql)
+
+	if err := query.Find(&data).Error; err != nil {
+		log.Errorf("failed to get %s: %v", s.resourceType, err, s.md.LogPrefixes)
 		return err
 	}
 
@@ -344,10 +355,10 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		for _, item := range data {
 			s.idToUpdatedAt[(*item).GetID()] = (*item).GetUpdatedAt()
 		}
-
 	} else {
 		s.idToUpdatedAt = idToUpdatedAt(s.resourceType, s.additionalSelectField, data)
 	}
+	log.Infof("gen %s data finished, count: %d", s.resourceType, len(s.idToUpdatedAt), s.md.LogPrefixes)
 	return nil
 }
 
