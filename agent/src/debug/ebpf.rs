@@ -43,12 +43,14 @@ pub struct EbpfDebugger {
     receiver: Receiver<Vec<u8>>,
 }
 
+#[allow(static_mut_refs)]
 static mut EBPF_DEBUG_SENDER: Option<Sender<Vec<u8>>> = None;
 
 impl EbpfDebugger {
     const QUEUE_RECV_TIMEOUT: Duration = Duration::from_secs(1);
 
     extern "C" fn ebpf_debug(data: *mut c_char, len: c_int) {
+        #[allow(static_mut_refs)]
         unsafe {
             if let Some(sender) = EBPF_DEBUG_SENDER.as_ref() {
                 let datas = slice::from_raw_parts(data as *mut u8, len as usize).to_vec();
@@ -59,6 +61,7 @@ impl EbpfDebugger {
 
     pub fn new() -> Self {
         let (sender, receiver, _) = bounded(1024);
+        #[allow(static_mut_refs)]
         unsafe {
             EBPF_DEBUG_SENDER = Some(sender);
         }
