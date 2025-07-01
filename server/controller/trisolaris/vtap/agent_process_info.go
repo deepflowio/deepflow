@@ -628,7 +628,7 @@ func (p *AgentProcessInfo) releaseGlobalLocalEntries(data AgentEntryData) {
 }
 
 func (p *AgentProcessInfo) getGPIDInfoFromDB() {
-	processes, err := dbmgr.DBMgr[models.Process](p.db).GetFields([]string{"id", "vtap_id", "pid"})
+	processes, err := dbmgr.DBMgr[models.Process](p.db).GetFields([]string{"id", "vtap_id", "pid", "gid"})
 	if err != nil {
 		log.Error(p.Log(err.Error()))
 		return
