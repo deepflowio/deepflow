@@ -1,7 +1,7 @@
 # Value , DisplayName     , Description
-0       , Success         ,
-2       , Timeout         ,
-3       , Server Error    ,
-4       , Client Error    ,
-5       , Unknown         ,
-6       , Parse Failed    ,
+0       , Success         , Response codes are normal (including OTel data with span.status.code = STATUS_CODE_OK).
+2       , Timeout         , Requests are marked as timed out if no response is captured within a specified duration. Collector configuration `Application Session Aggregate Timeouts`: Default 15s for DNS and TLS, 120s for other protocols.
+3       , Server Error    , Response codes indicate server-side exceptions, such as HTTP 5XX (including OTel data with span.status.code = STATUS_CODE_ERROR).
+4       , Client Error    , Response codes indicate client-side exceptions, such as HTTP 4XX.
+5       , Unknown         , When concurrent requests exceed the collector’s cache capacity, the oldest requests are marked as unknown (including OTel data with span.status.code = STATUS_CODE_UNSET). Collector configuration `Session Aggregate Max Entries`: Default cache size is 64K requests.
+6       , Parse Failed    , A response was captured but could not be parsed (e.g., due to truncation or compression). Collector configuration `Payload Truncation`: Default parses the first 1024 bytes of the payload.
