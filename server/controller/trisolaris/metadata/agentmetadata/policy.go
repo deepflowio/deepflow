@@ -357,7 +357,7 @@ func (op *PolicyDataOP) generateRawData() {
 	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
-	vtapGroupLcuuidToID := map[string]int{}
+	vtapGroupLcuuidToID := make(map[string]int, len(vtapGroups))
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
@@ -646,7 +646,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 							log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
 							continue
 						}
-						for agentID := range agentIDs {
+						for _, agentID := range agentIDs {
 							agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
 						}
 					}
@@ -767,7 +767,7 @@ func (op *PolicyDataOP) generatePolicies() {
 func getSortKey(agentIDToPolicy map[int]*Policy) []int {
 	agentIDs := make([]int, 0, len(agentIDToPolicy))
 	for key, _ := range agentIDToPolicy {
-		agentIDs = append(agentIDs, 0, key)
+		agentIDs = append(agentIDs, key)
 	}
 	sort.Ints(agentIDs)
 	return agentIDs
