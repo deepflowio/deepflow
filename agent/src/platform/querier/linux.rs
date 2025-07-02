@@ -344,10 +344,22 @@ impl Querier {
         trace!("get process data with {:?}", config.os_proc_scan_conf);
         self.process_data.clear();
         get_all_process_in(&config.os_proc_scan_conf, &mut self.process_data);
-        // sort and use pid for digest
-        self.process_data.sort_by_key(|p| p.pid);
-        for p in self.process_data.iter() {
+        // sort and use pid and os_app_tags for digest
+        self.process_data.sort_unstable_by_key(|p| p.pid);
+        for p in self.process_data.iter_mut() {
             hasher.write_u64(p.pid);
+            p.os_app_tags.sort_unstable_by(|a, b| {
+                let order = a.key.cmp(&b.key);
+                if matches!(order, std::cmp::Ordering::Equal) {
+                    a.value.cmp(&b.value)
+                } else {
+                    order
+                }
+            });
+            for tag in p.os_app_tags.iter() {
+                hasher.write(tag.key.as_bytes());
+                hasher.write(tag.value.as_bytes());
+            }
         }
         debug!(
             "updated process data returned {} entries",
