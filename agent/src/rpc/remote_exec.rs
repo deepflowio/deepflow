@@ -132,7 +132,7 @@ fn all_supported_commands() -> Vec<Command> {
         },
         Command {
             // use "--preserve-status" to avoid timeout error
-            cmdline: "timeout --preserve-status $timeout strace -f -p $pid",
+            cmdline: "timeout --signal=KILL --preserve-status $timeout strace -f -p $pid",
             output_format: OutputFormat::Text,
             command_type: CMD_TYPE_SYSTEM,
             desc: "strace",
