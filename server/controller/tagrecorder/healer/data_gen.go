@@ -43,6 +43,7 @@ type dataGenerator interface {
 	setInSubDomain(bool) dataGenerator
 	setChDeviceTypes(...int) dataGenerator
 	setAdditionalSelectField(string) dataGenerator
+	setUnscoped(bool) dataGenerator
 }
 
 func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
@@ -244,6 +245,7 @@ type dataGeneratorComponent[GT dataGeneratorModel] struct {
 	// TODO refactor
 	chDeviceTypes         []int  // additional query conditions, only used for ch_device query
 	additionalSelectField string // additional fields to select, used for label, env... query
+	unscoped              bool   // whether to use Unscoped() in the query, default is false
 }
 
 func (s *dataGeneratorComponent[GT]) getResourceType() string {
@@ -297,6 +299,11 @@ func (s *dataGeneratorComponent[GT]) setAdditionalSelectField(fields string) dat
 	return s
 }
 
+func (s *dataGeneratorComponent[GT]) setUnscoped(unscoped bool) dataGenerator {
+	s.unscoped = unscoped
+	return s
+}
+
 func (s *dataGeneratorComponent[GT]) generate() error {
 	log.Infof("gen %s data started", s.resourceType, s.md.LogPrefixes)
 	// reset idToUpdatedAt map
@@ -330,15 +337,21 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		}
 		return q
 	}
+	appendUnscoped := func(q *gorm.DB) *gorm.DB {
+		if s.unscoped {
+			q = q.Unscoped()
+		}
+		return q
+	}
 
 	// if hasDuplicateID is true, we need to use ROW_NUMBER() to get the latest updated_at for each id
 	if s.hasDuplicateID {
 		selectFieldsStr += ", " + fmt.Sprintf("ROW_NUMBER() OVER (PARTITION BY %s ORDER BY updated_at %s) as rn", s.realIDField, s.groupSortOrder)
 		subQuery := s.md.DB.Table(s.tableName).Select(selectFieldsStr)
-		subQuery = appendDomainCond(subQuery)
+		subQuery = appendUnscoped(appendDomainCond(subQuery))
 		query = query.Table("(?) as t", subQuery).Where("t.rn = 1")
 	} else {
-		query = appendDomainCond(query)
+		query = appendUnscoped(appendDomainCond(query))
 	}
 
 	sql := query.ToSQL(func(tx *gorm.DB) *gorm.DB {
