@@ -378,7 +378,7 @@ func (op *PolicyDataOP) generateRawData() {
 	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
-	vtapGroupLcuuidToID := map[string]int{}
+	vtapGroupLcuuidToID := make(map[string]int, len(vtapGroups))
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
@@ -823,7 +823,7 @@ func (op *PolicyDataOP) generatePolicies() {
 func getSortKey(vtapIDToPolicy map[int]*Policy) []int {
 	vtapIDs := make([]int, 0, len(vtapIDToPolicy))
 	for key, _ := range vtapIDToPolicy {
-		vtapIDs = append(vtapIDs, 0, key)
+		vtapIDs = append(vtapIDs, key)
 	}
 	sort.Ints(vtapIDs)
 	return vtapIDs
