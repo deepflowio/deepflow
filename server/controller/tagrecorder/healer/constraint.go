@@ -34,7 +34,7 @@ type dataGeneratorModel interface {
 		mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
 		mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag |
 		mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations | mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodK8sLabel |
-		mysqlmodel.ChPodK8sLabels | mysqlmodel.ChOSAppTag | mysqlmodel.ChOSAppTags
+		mysqlmodel.ChPodK8sLabels
 
 	GetID() int
 	GetUpdatedAt() time.Time

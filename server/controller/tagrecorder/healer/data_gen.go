@@ -43,6 +43,7 @@ type dataGenerator interface {
 	setInSubDomain(bool) dataGenerator
 	setChDeviceTypes(...int) dataGenerator
 	setAdditionalSelectField(string) dataGenerator
+	setUnscoped(bool) dataGenerator
 }
 
 func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) dataGenerator {
@@ -196,12 +197,6 @@ func newDataGenerator(md *recorderCommon.MetadataBase, resourceType string) data
 		tableName = "ch_pod_k8s_annotation"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS:
 		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sAnnotations](md, resourceType)
-	case tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG:
-		dg = newDataGeneratorComponent[mysqlmodel.ChOSAppTag](md, resourceType)
-		hasDuplicateID = true
-		tableName = "ch_os_app_tag"
-	case tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChOSAppTags](md, resourceType)
 	default:
 		log.Errorf("unknown resource type: %s", resourceType, md.LogPrefixes)
 		return nil
@@ -220,6 +215,7 @@ func newDataGeneratorComponent[GT dataGeneratorModel](md *recorderCommon.Metadat
 		realIDField:   "id",
 		inSubDomain:   true, // default is true, used for query
 		idToUpdatedAt: make(map[int]time.Time),
+		unscoped:      true, // default is true, used for query
 	}
 	return dataGeneratorComponent
 }
@@ -244,6 +240,7 @@ type dataGeneratorComponent[GT dataGeneratorModel] struct {
 	// TODO refactor
 	chDeviceTypes         []int  // additional query conditions, only used for ch_device query
 	additionalSelectField string // additional fields to select, used for label, env... query
+	unscoped              bool   // whether to use Unscoped() in the query, default is true
 }
 
 func (s *dataGeneratorComponent[GT]) getResourceType() string {
@@ -297,6 +294,11 @@ func (s *dataGeneratorComponent[GT]) setAdditionalSelectField(fields string) dat
 	return s
 }
 
+func (s *dataGeneratorComponent[GT]) setUnscoped(unscoped bool) dataGenerator {
+	s.unscoped = unscoped
+	return s
+}
+
 func (s *dataGeneratorComponent[GT]) generate() error {
 	log.Infof("gen %s data started", s.resourceType, s.md.LogPrefixes)
 	// reset idToUpdatedAt map
@@ -304,7 +306,7 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 
 	var data []*GT
 	item := new(GT)
-	query := s.md.DB.Model(&item).Unscoped()
+	query := s.md.DB.Model(&item)
 
 	selectFieldsStr := s.realIDField + ", updated_at"
 	if len(s.additionalSelectField) > 0 {
@@ -330,23 +332,24 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		}
 		return q
 	}
+	appendUnscoped := func(q *gorm.DB) *gorm.DB {
+		if !s.unscoped {
+			q = q.Where("deleted_at IS NULL")
+		}
+		return q
+	}
 
 	// if hasDuplicateID is true, we need to use ROW_NUMBER() to get the latest updated_at for each id
 	if s.hasDuplicateID {
 		selectFieldsStr += ", " + fmt.Sprintf("ROW_NUMBER() OVER (PARTITION BY %s ORDER BY updated_at %s) as rn", s.realIDField, s.groupSortOrder)
 		subQuery := s.md.DB.Table(s.tableName).Select(selectFieldsStr)
-		subQuery = appendDomainCond(subQuery)
+		subQuery = appendUnscoped(appendDomainCond(subQuery))
 		query = query.Table("(?) as t", subQuery).Where("t.rn = 1")
 	} else {
-		query = appendDomainCond(query)
+		query = appendUnscoped(appendDomainCond(query))
 	}
 
-	sql := query.ToSQL(func(tx *gorm.DB) *gorm.DB {
-		return tx.Find(&data)
-	})
-	log.Infof("TODO sql: %s", sql)
-
-	if err := query.Find(&data).Error; err != nil {
+	if err := query.Debug().Unscoped().Find(&data).Error; err != nil {
 		log.Errorf("failed to get %s: %v", s.resourceType, err, s.md.LogPrefixes)
 		return err
 	}
