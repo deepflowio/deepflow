@@ -357,11 +357,13 @@ func (op *PolicyDataOP) generateRawData() {
 	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
-	vtapGroupLcuuidToID := map[string]int{}
+	vtapGroupLcuuidToID := make(map[string]int, len(vtapGroups))
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
+	log.Infof(op.Logf("TODO vtapGroupLcuuidToID: %v", vtapGroupLcuuidToID))
 	for _, vtap := range vtaps {
+		log.Infof(op.Logf("vtap: %v", vtap))
 		vtapGroupID, ok := vtapGroupLcuuidToID[vtap.VtapGroupLcuuid]
 		if !ok {
 			log.Warning(op.Logf("agent(%s) group lcuuid(%s) not found group id", vtap.Name, vtap.VtapGroupLcuuid))
@@ -369,6 +371,7 @@ func (op *PolicyDataOP) generateRawData() {
 		}
 		rawData.vtapGroupIDToAgentIDs[vtapGroupID] = append(rawData.vtapGroupIDToAgentIDs[vtapGroupID], vtap.ID)
 	}
+	log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v", rawData.vtapGroupIDToAgentIDs))
 
 	for _, npbTunnel := range npbTunnels {
 		rawData.idToNpbTunnel[npbTunnel.ID] = npbTunnel
@@ -646,7 +649,8 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 							log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
 							continue
 						}
-						for agentID := range agentIDs {
+						log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v, vtapGroupID: %d, agentIDs: %v", rawData.vtapGroupIDToAgentIDs, vtapGroupIDInt, agentIDs))
+						for _, agentID := range agentIDs {
 							agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
 						}
 					}
@@ -709,6 +713,10 @@ func (op *PolicyDataOP) generatePolicies() {
 		}
 		protocol := op.generateProtoPorts(acl, flowACL, groupIDs)
 		agentIDToNpbActions, allAgentNpbActions := op.generateProtoActions(acl)
+		for id, action := range agentIDToNpbActions {
+			log.Infof(op.Logf("TODO vtapID: %d, action: %v", id, action))
+		}
+		log.Infof(op.Logf("TODO allAgentNpbActions: %v", allAgentNpbActions))
 		if protocol == PROTOCOL_ALL && (acl.SrcPorts != "" || acl.DstPorts != "") {
 			// If the protocol is all and the port is filled in, it means that the protocol is tcp+udp,
 			// and if the protocol is empty and the port is empty, it means any
@@ -760,7 +768,10 @@ func (op *PolicyDataOP) generatePolicies() {
 			}
 		}
 	}
-
+	for id, policy := range agentIDToPolicy {
+		log.Infof(op.Logf("TODO agentID: %d, npb policy: %s", id, policy.getPolicyString(tFunction)))
+	}
+	log.Infof(op.Logf("TODO allAgentSharePolicy npb policy: %s", allAgentSharePolicy.getPolicyString(tFunction)))
 	op.checkNewPolicies(agentIDToPolicy, allAgentSharePolicy)
 }
 
