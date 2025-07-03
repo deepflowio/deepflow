@@ -1231,6 +1231,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
+			submit_data->tcp_seq = sd->tcp_seq;
 			if (sd->source == DATA_SOURCE_UNIX_SOCKET) {
 				submit_data->tuple.l4_protocol = IPPROTO_TCP;
 				submit_data->tuple.dport = submit_data->tuple.num = 0;
@@ -1243,6 +1244,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 				submit_data->tuple.addr_len = 4;
 				*(in_addr_t *)submit_data->tuple.rcv_saddr = htonl(0x7F000001); 
 				*(in_addr_t *)submit_data->tuple.daddr = htonl(0x7F000001);
+				submit_data->tcp_seq = 0;
 			}
 
 			submit_data->process_id = sd->tgid;
@@ -1253,7 +1255,6 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			    sd->source == DATA_SOURCE_OPENSSL_UPROBE)
 				submit_data->is_tls = true;
 
-			submit_data->tcp_seq = sd->tcp_seq;
 			submit_data->cap_seq = sd->data_seq;
 			submit_data->syscall_trace_id_call =
 			    sd->thread_trace_id;
