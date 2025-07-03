@@ -66,6 +66,7 @@ const (
 	DOMAIN_TYPE_VOLCENGINE        DomainType = 30 // volcengine
 	DOMAIN_TYPE_H3C               DomainType = 31 // h3c
 	DOMAIN_TYPE_FUSIONCOMPUTE     DomainType = 32 // fusioncompute
+	DOMAIN_TYPE_SCP               DomainType = 33 // scp
 )
 
 var DomainTypes []DomainType = []DomainType{
@@ -94,6 +95,7 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_VOLCENGINE,
 	DOMAIN_TYPE_H3C,
 	DOMAIN_TYPE_FUSIONCOMPUTE,
+	DOMAIN_TYPE_SCP,
 }
 
 func GetDomainTypeByName(domainTypeName string) DomainType {
