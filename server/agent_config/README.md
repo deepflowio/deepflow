@@ -3015,7 +3015,7 @@ Note: After the NIC is enabled in promiscuous mode, more traffic will be collect
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### source {#inputs.cbpf.special_network.dpdk.source}
+##### Data Source {#inputs.cbpf.special_network.dpdk.source}
 
 **Tags**:
 
@@ -3051,7 +3051,7 @@ inputs:
 
 Currently, there are two ways to collect DPDK traffic, including:
 - pdump: See details [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-- eBPF: Use eBPF Uprobe to obtain DPDK traffic
+- eBPF: Use eBPF Uprobe to obtain DPDK traffic, configuration `inputs.ebpf.socket.uprobe.dpdk` is also required.
 
 ##### reorder cache window size {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
 
@@ -3791,7 +3791,7 @@ inputs:
 Set the command name of the DPDK application, eBPF will automatically
 locate and trace packets for data collection.
 
-Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`, and set `inputs.cbpf.special_network.dpdk.source = eBPF`
 
 In scenarios where DPDK acts as the vhost-user backend, data exchange between the virtual machine and the DPDK
 application occurs through virtqueues (vrings). eBPF can automatically hook into the vring interface without
@@ -7609,7 +7609,7 @@ Upgrade from old version: `static_config.rrt-tcp-timeout`
 processors:
   request_log:
     timeouts:
-      tcp_request_timeout: 1800s
+      tcp_request_timeout: 300s
 ```
 
 **Schema**:
@@ -7622,7 +7622,8 @@ processors:
 
 The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
 calculate the sum and average and will not merge the request and response in session aggregate. the value
-must greater than session aggregate SLOT_TIME (const 10s) and less than 3600 on tcp.
+must greater than the timeout period of the TCP type in configured `processors.request_log.timeouts.session_aggregate`
+(For example, the HTTP2 default is 120s) and less than 3600s on tcp.
 
 #### UDP Request Timeout {#processors.request_log.timeouts.udp_request_timeout}
 
@@ -7654,7 +7655,8 @@ processors:
 
 The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
 calculate the sum and average and will not merge the request and response in session aggregate. the value
-must greater than session aggregate SLOT_TIME (const 10s) and less than 300 on udp.
+must greater than the timeout period of the UDP type in configured `processors.request_log.timeouts.session_aggregate`
+(For example, the DNS default is 15s) and less than 300 on udp.
 
 #### Session Aggregate Window Duration {#processors.request_log.timeouts.session_aggregate_window_duration}
 
@@ -7781,7 +7783,9 @@ processors:
 
 **Description**:
 
-Set the timeout for the application.
+Set the timeout for the application. The timeout period of TCP application protocols must be less than
+`processors.request_log.timeouts.tcp_request_timeout`, and the timeout period of UDP must be less than
+`processors.request_log.timeouts.udp_request_timeout`.
 
 ### Tag Extraction {#processors.request_log.tag_extraction}
 
