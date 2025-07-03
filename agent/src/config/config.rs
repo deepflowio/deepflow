@@ -776,7 +776,12 @@ pub struct Libpcap {
 
 impl Default for Libpcap {
     fn default() -> Self {
-        Self { enabled: false }
+        Self {
+            #[cfg(target_os = "linux")]
+            enabled: false,
+            #[cfg(target_os = "windows")]
+            enabled: true,
+        }
     }
 }
 
@@ -1715,19 +1720,23 @@ impl SessionTimeout {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Timeouts {
-    #[serde(with = "humantime_serde")]
-    pub tcp_request_timeout: Duration,
-    #[serde(with = "humantime_serde")]
-    pub udp_request_timeout: Duration,
     pub session_aggregate: Vec<SessionTimeout>,
 }
 
 impl Default for Timeouts {
     fn default() -> Self {
         Self {
-            tcp_request_timeout: Duration::from_secs(1800),
-            udp_request_timeout: Duration::from_secs(150),
             session_aggregate: vec![],
+        }
+    }
+}
+
+impl Timeouts {
+    pub fn l7_default_timeout(protocol: L7Protocol) -> Duration {
+        match protocol {
+            L7Protocol::DNS => SessionTimeout::DNS_DEFAULT,
+            L7Protocol::TLS => SessionTimeout::TLS_DEFAULT,
+            _ => SessionTimeout::DEFAULT,
         }
     }
 }

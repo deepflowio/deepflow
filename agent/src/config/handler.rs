@@ -51,7 +51,7 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        RequestLogTunning, SessionTimeout, TagFilterOperator, UserConfig,
+        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -60,7 +60,7 @@ use crate::rpc::Session;
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
-        l7_protocol_log::L7ProtocolBitmap, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+        l7_protocol_log::L7ProtocolBitmap, Timestamp, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
     },
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
@@ -497,9 +497,6 @@ pub struct FlowConfig {
 
     pub plugins: PluginConfig,
 
-    pub rrt_tcp_timeout: usize, //micro sec
-    pub rrt_udp_timeout: usize, //micro sec
-
     pub batched_buffer_size_limit: usize,
 
     pub oracle_parse_conf: OracleConfig,
@@ -645,18 +642,6 @@ impl From<&UserConfig> for FlowConfig {
                 wasm_plugins: vec![],
                 so_plugins: vec![],
             },
-            rrt_tcp_timeout: conf
-                .processors
-                .request_log
-                .timeouts
-                .tcp_request_timeout
-                .as_micros() as usize,
-            rrt_udp_timeout: conf
-                .processors
-                .request_log
-                .timeouts
-                .udp_request_timeout
-                .as_micros() as usize,
             batched_buffer_size_limit: conf.processors.flow_log.tunning.max_batched_buffer_size,
             oracle_parse_conf: conf
                 .processors
@@ -1087,6 +1072,16 @@ impl fmt::Debug for LogParserConfig {
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .finish()
+    }
+}
+
+impl LogParserConfig {
+    pub fn get_l7_timeout(&self, l7_protocol: L7Protocol) -> Timestamp {
+        match self.l7_log_session_aggr_timeout.get(&l7_protocol) {
+            Some(timeout) => *timeout,
+            None => Timeouts::l7_default_timeout(l7_protocol),
+        }
+        .into()
     }
 }
 
@@ -1947,7 +1942,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .iter()
                     .map(|app| app.timeout)
                     .max()
-                    .unwrap_or(Duration::ZERO),
+                    .unwrap_or(SessionTimeout::DEFAULT),
                 l7_log_session_aggr_timeout: conf
                     .processors
                     .request_log
@@ -4942,22 +4937,6 @@ impl ConfigHandler {
         }
         let timeouts = &mut request_log.timeouts;
         let new_timeouts = &mut new_request_log.timeouts;
-        if timeouts.tcp_request_timeout != new_timeouts.tcp_request_timeout {
-            info!(
-                "Update processors.request_log.timeouts.tcp_request_timeout from {:?} to {:?}.",
-                timeouts.tcp_request_timeout, new_timeouts.tcp_request_timeout
-            );
-            timeouts.tcp_request_timeout = new_timeouts.tcp_request_timeout;
-            restart_agent = !first_run;
-        }
-        if timeouts.udp_request_timeout != new_timeouts.udp_request_timeout {
-            info!(
-                "Update processors.request_log.timeouts.udp_request_timeout from {:?} to {:?}.",
-                timeouts.udp_request_timeout, new_timeouts.udp_request_timeout
-            );
-            timeouts.udp_request_timeout = new_timeouts.udp_request_timeout;
-            restart_agent = !first_run;
-        }
         if timeouts.session_aggregate != new_timeouts.session_aggregate {
             info!(
                 "Update processors.request_log.timeouts.session_aggregate from {:?} to {:?}.",

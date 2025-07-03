@@ -2207,7 +2207,9 @@ inputs:
       # description:
       dpdk:
         # type: string
-        # name: source
+        # name:
+        #   en: Data Source
+        #   ch: 数据源
         # unit:
         # range: []
         # enum_options: [None, eBPF, pdump]
@@ -2217,11 +2219,11 @@ inputs:
         #   en: |-
         #     Currently, there are two ways to collect DPDK traffic, including:
         #     - pdump: See details [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-        #     - eBPF: Use eBPF Uprobe to obtain DPDK traffic
+        #     - eBPF: Use eBPF Uprobe to obtain DPDK traffic, configuration inputs.ebpf.socket.uprobe.dpdk is also required.
         #   ch: |-
         #     目前支持两种采集 DPDK 流量的方式，包括：
         #     - pdump: 详情见 [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-        #     - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
+        #     - eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量，同时需要配置 inputs.ebpf.socket.uprobe.dpdk
         source: None
         # type: duration
         # name:
@@ -2700,7 +2702,7 @@ inputs:
           #     Set the command name of the DPDK application, eBPF will automatically
           #     locate and trace packets for data collection.
           #
-          #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+          #     Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`, and set inputs.cbpf.special_network.dpdk.source = eBPF
           #
           #     In scenarios where DPDK acts as the vhost-user backend, data exchange between the virtual machine and the DPDK
           #     application occurs through virtqueues (vrings). eBPF can automatically hook into the vring interface without
@@ -2710,7 +2712,7 @@ inputs:
           #   ch: |-
           #     设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
           #
-          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
+          #     配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`, 并设置 inputs.cbpf.special_network.dpdk.source = eBPF
           #
           #     在 DPDK 作为 vhost-user 后端的场景中，虚拟机与 DPDK 应用之间通过 virtqueue（vring）进行数据交换。
           #     eBPF 可以在无需修改 DPDK 或虚拟机的前提下，自动 hook 到 vring 接口，实现对传输数据包的捕获和分析，
@@ -2900,7 +2902,7 @@ inputs:
         disabled: false
         # type: bool
         # name:
-        #   en: Unix Socket Enabled 
+        #   en: Unix Socket Enabled
         #   ch: 启用 Unix Socket 追踪
         # unit:
         # range: []
@@ -5207,61 +5209,6 @@ processors:
     #   ch: 超时设置
     # description:
     timeouts:
-      # type: duration
-      # name:
-      #   en: TCP Request Timeout
-      #   ch: TCP 调用超时时间
-      # unit:
-      # range: [10s, 3600s]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
-      #     calculate the sum and average and will not merge the request and response in session aggregate. the value
-      #     must greater than session aggregate SLOT_TIME (const 10s) and less than 3600 on tcp.
-      #   ch: |-
-      #     deepflow-agent 采集 TCP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-      #     该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 3600s。
-      # upgrade_from: static_config.rrt-tcp-timeout
-      tcp_request_timeout: 1800s
-      # type: duration
-      # name:
-      #   en: UDP Request Timeout
-      #   ch: UDP 调用超时时间
-      # unit:
-      # range: [10s, 300s]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
-      #     calculate the sum and average and will not merge the request and response in session aggregate. the value
-      #     must greater than session aggregate SLOT_TIME (const 10s) and less than 300 on udp.
-      #   ch: |-
-      #     deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-      #     该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 300s。
-      # upgrade_from: static_config.rrt-udp-timeout
-      udp_request_timeout: 150s
-      # type: duration
-      # name:
-      #   en: Session Aggregate Window Duration
-      #   ch: 会话合并窗口时长
-      # unit:
-      # range: [20s, 300s]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     l7_flow_log aggregate window.
-      #   ch: |-
-      #     应用调用日志请求、响应合并的时间窗口，超出该时间窗口的响应将不与请求合并，而是单独生成一条调用日志。
-      # upgrade_from: static_config.l7-log-session-aggr-timeout
-      # deprecated: true
-      session_aggregate_window_duration: 120s
       # type: dict
       # name:
       #   en: Application Session Aggregate Timeouts

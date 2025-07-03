@@ -3011,7 +3011,7 @@ Note: After the NIC is enabled in promiscuous mode, more traffic will be collect
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### source {#inputs.cbpf.special_network.dpdk.source}
+##### Data Source {#inputs.cbpf.special_network.dpdk.source}
 
 **Tags**:
 
@@ -3047,7 +3047,7 @@ inputs:
 
 Currently, there are two ways to collect DPDK traffic, including:
 - pdump: See details [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-- eBPF: Use eBPF Uprobe to obtain DPDK traffic
+- eBPF: Use eBPF Uprobe to obtain DPDK traffic, configuration inputs.ebpf.socket.uprobe.dpdk is also required.
 
 ##### reorder cache window size {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
 
@@ -3787,7 +3787,7 @@ inputs:
 Set the command name of the DPDK application, eBPF will automatically
 locate and trace packets for data collection.
 
-Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`
+Example: In the command line `/usr/bin/mydpdk`, it can be set as `command: mydpdk`, and set inputs.cbpf.special_network.dpdk.source = eBPF
 
 In scenarios where DPDK acts as the vhost-user backend, data exchange between the virtual machine and the DPDK
 application occurs through virtqueues (vrings). eBPF can automatically hook into the vring interface without
@@ -7591,101 +7591,6 @@ processors:
 When disabled, deepflow-agent will not generate request_log from packet data.
 
 ### Timeouts {#processors.request_log.timeouts}
-
-#### TCP Request Timeout {#processors.request_log.timeouts.tcp_request_timeout}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`processors.request_log.timeouts.tcp_request_timeout`
-
-Upgrade from old version: `static_config.rrt-tcp-timeout`
-
-**Default value**:
-```yaml
-processors:
-  request_log:
-    timeouts:
-      tcp_request_timeout: 1800s
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | duration |
-| Range | ['10s', '3600s'] |
-
-**Description**:
-
-The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
-calculate the sum and average and will not merge the request and response in session aggregate. the value
-must greater than session aggregate SLOT_TIME (const 10s) and less than 3600 on tcp.
-
-#### UDP Request Timeout {#processors.request_log.timeouts.udp_request_timeout}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`processors.request_log.timeouts.udp_request_timeout`
-
-Upgrade from old version: `static_config.rrt-udp-timeout`
-
-**Default value**:
-```yaml
-processors:
-  request_log:
-    timeouts:
-      udp_request_timeout: 150s
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | duration |
-| Range | ['10s', '300s'] |
-
-**Description**:
-
-The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
-calculate the sum and average and will not merge the request and response in session aggregate. the value
-must greater than session aggregate SLOT_TIME (const 10s) and less than 300 on udp.
-
-#### Session Aggregate Window Duration {#processors.request_log.timeouts.session_aggregate_window_duration}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`processors.request_log.timeouts.session_aggregate_window_duration`
-
-Upgrade from old version: `static_config.l7-log-session-aggr-timeout`
-
-**Default value**:
-```yaml
-processors:
-  request_log:
-    timeouts:
-      session_aggregate_window_duration: 120s
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | duration |
-| Range | ['20s', '300s'] |
-
-**Description**:
-
-l7_flow_log aggregate window.
 
 #### Application Session Aggregate Timeouts {#processors.request_log.timeouts.session_aggregate}
 

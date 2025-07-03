@@ -210,7 +210,7 @@ pub struct FlowLog {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     so_plugin: Rc<RefCell<Option<Vec<SoPluginFunc>>>>,
     stats_counter: Arc<FlowMapCounter>,
-    rrt_timeout: usize,
+    rrt_timeout: u64,
 
     // the timestamp sec of accumulate fail exceed l7_protocol_inference_max_fail_count
     start_of_skip_l7_protocol_inference: Option<u64>,
@@ -265,7 +265,7 @@ impl FlowLog {
             parse_param.set_log_parser_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
             parse_param.set_counter(self.stats_counter.clone());
-            parse_param.set_rrt_timeout(self.rrt_timeout);
+            parse_param.set_rrt_timeout(self.rrt_timeout as usize);
             parse_param.set_buf_size(flow_config.l7_log_packet_size as usize);
             parse_param.set_captured_byte(packet.get_captured_byte());
             parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
@@ -301,6 +301,9 @@ impl FlowLog {
             let cached = if ret.is_ok() && self.l7_protocol_enum != parser.l7_protocol_enum() {
                 // due to http2 may be upgrade grpc, need to reset the flow node protocol
                 self.l7_protocol_enum = parser.l7_protocol_enum();
+                self.rrt_timeout = log_parser_config
+                    .get_l7_timeout(self.l7_protocol_enum.get_l7_protocol())
+                    .as_micros();
                 cache_proto(self.l7_protocol_enum.clone());
                 true
             } else {
@@ -311,6 +314,9 @@ impl FlowLog {
             if !self.l7_protocol_inference_succeed {
                 self.l7_protocol_inference_succeed = ret.is_ok();
                 if self.l7_protocol_inference_succeed && !cached {
+                    self.rrt_timeout = log_parser_config
+                        .get_l7_timeout(self.l7_protocol_enum.get_l7_protocol())
+                        .as_micros();
                     cache_proto(self.l7_protocol_enum.clone());
                 }
                 if !self.l7_protocol_inference_succeed {
@@ -360,7 +366,7 @@ impl FlowLog {
             param.set_log_parser_config(log_parser_config);
             #[cfg(any(target_os = "linux", target_os = "android"))]
             param.set_counter(self.stats_counter.clone());
-            param.set_rrt_timeout(self.rrt_timeout);
+            param.set_rrt_timeout(self.rrt_timeout as usize);
             param.set_buf_size(pkt_size);
             param.set_captured_byte(payload.len());
             param.set_oracle_conf(flow_config.oracle_parse_conf);
@@ -516,7 +522,7 @@ impl FlowLog {
             RefCell<Option<Vec<SoPluginFunc>>>,
         >,
         stats_counter: Arc<FlowMapCounter>,
-        rrt_timeout: usize,
+        rrt_timeout: u64,
         l7_protocol_inference_ttl: u64,
         last_time: Option<u64>,
         ntp_diff: Arc<AtomicI64>,
