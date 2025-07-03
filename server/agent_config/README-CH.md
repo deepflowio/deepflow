@@ -2959,7 +2959,7 @@ inputs:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### source {#inputs.cbpf.special_network.dpdk.source}
+##### 数据源 {#inputs.cbpf.special_network.dpdk.source}
 
 **标签**:
 
@@ -2995,7 +2995,7 @@ inputs:
 
 目前支持两种采集 DPDK 流量的方式，包括：
 - pdump: 详情见 [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-- eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
+- eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量，同时需要配置 `inputs.ebpf.socket.uprobe.dpdk`
 
 ##### 乱序重排缓存时间窗口大小 {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
 
@@ -3719,7 +3719,7 @@ inputs:
 
 设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
 
-配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
+配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`, 并设置 `inputs.cbpf.special_network.dpdk.source = eBPF`
 
 在 DPDK 作为 vhost-user 后端的场景中，虚拟机与 DPDK 应用之间通过 virtqueue（vring）进行数据交换。
 eBPF 可以在无需修改 DPDK 或虚拟机的前提下，自动 hook 到 vring 接口，实现对传输数据包的捕获和分析，
@@ -7436,7 +7436,7 @@ Upgrade from old version: `static_config.rrt-tcp-timeout`
 processors:
   request_log:
     timeouts:
-      tcp_request_timeout: 1800s
+      tcp_request_timeout: 300s
 ```
 
 **模式**:
@@ -7448,7 +7448,8 @@ processors:
 **详细描述**:
 
 deepflow-agent 采集 TCP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 3600s。
+该参数值，该次调用将被识别为超时。该参数需大于配置 `processors.request_log.timeouts.session_aggregate`
+中 TCP 类型的超时时间（例如 HTTP2 默认值 120s），并小于 3600s。
 
 #### UDP 调用超时时间 {#processors.request_log.timeouts.udp_request_timeout}
 
@@ -7478,8 +7479,8 @@ processors:
 
 **详细描述**:
 
-deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 300s。
+deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过该参数值，该次调用将被识别为超时。
+该参数需大于配置 `processors.request_log.timeouts.session_aggregate` 中 UDP 类型的超时时间（例如 DNS 默认值 15s），并小于 300s。
 
 #### 会话合并窗口时长 {#processors.request_log.timeouts.session_aggregate_window_duration}
 
@@ -7606,7 +7607,8 @@ processors:
 
 **详细描述**:
 
-设置应用的超时时间。
+设置应用的超时时间。TCP 类型的应用协议超时时间需要小于 `processors.request_log.timeouts.tcp_request_timeout`，
+UDP 类型的应用协议超时时间需要小于 `processors.request_log.timeouts.udp_request_timeout`。
 
 ### 标签提取 {#processors.request_log.tag_extraction}
 

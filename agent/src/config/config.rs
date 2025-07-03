@@ -776,7 +776,12 @@ pub struct Libpcap {
 
 impl Default for Libpcap {
     fn default() -> Self {
-        Self { enabled: false }
+        Self {
+            #[cfg(target_os = "linux")]
+            enabled: false,
+            #[cfg(target_os = "windows")]
+            enabled: true,
+        }
     }
 }
 
@@ -1725,9 +1730,31 @@ pub struct Timeouts {
 impl Default for Timeouts {
     fn default() -> Self {
         Self {
-            tcp_request_timeout: Duration::from_secs(1800),
+            tcp_request_timeout: Duration::from_secs(300),
             udp_request_timeout: Duration::from_secs(150),
             session_aggregate: vec![],
+        }
+    }
+}
+
+impl Timeouts {
+    pub fn max(&self) -> Duration {
+        let max = self
+            .session_aggregate
+            .iter()
+            .map(|app| app.timeout)
+            .max()
+            .unwrap_or(SessionTimeout::DEFAULT);
+
+        max.max(self.tcp_request_timeout)
+            .max(self.udp_request_timeout)
+    }
+
+    pub fn l7_default_timeout(protocol: L7Protocol) -> Duration {
+        match protocol {
+            L7Protocol::DNS => SessionTimeout::DNS_DEFAULT,
+            L7Protocol::TLS => SessionTimeout::TLS_DEFAULT,
+            _ => SessionTimeout::DEFAULT,
         }
     }
 }
