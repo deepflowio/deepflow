@@ -39,10 +39,7 @@ use crate::{
         meta_packet::ProtocolData,
         MetaPacket, TaggedFlow, Timestamp,
     },
-    config::{
-        config::SessionTimeout,
-        handler::{LogParserAccess, LogParserConfig},
-    },
+    config::handler::{LogParserAccess, LogParserConfig},
     flow_generator::{
         error::Result, protocol_logs::L7ResponseStatus, FLOW_METRICS_PEER_DST,
         FLOW_METRICS_PEER_SRC,
@@ -405,21 +402,6 @@ impl SessionQueue {
         }
     }
 
-    fn get_timeout(config: &LogParserConfig, app_proto: &MetaAppProto) -> Timestamp {
-        match config
-            .l7_log_session_aggr_timeout
-            .get(&app_proto.base_info.head.proto)
-        {
-            Some(timeout) => *timeout,
-            None => match app_proto.base_info.head.proto {
-                L7Protocol::DNS => SessionTimeout::DNS_DEFAULT,
-                L7Protocol::TLS => SessionTimeout::TLS_DEFAULT,
-                _ => SessionTimeout::DEFAULT,
-            },
-        }
-        .into()
-    }
-
     fn aggregate_session_and_send(&mut self, config: &LogParserConfig, item: AppProto) {
         if let AppProto::SocketClosed(s) = item {
             if let Some(p) = self.entries.remove(&s) {
@@ -455,7 +437,8 @@ impl SessionQueue {
             return;
         }
 
-        let timeout_time = item.base_info.start_time + Self::get_timeout(config, &item);
+        let timeout_time =
+            item.base_info.start_time + config.get_l7_timeout(item.base_info.head.proto);
         if timeout_time <= self.window_start {
             self.counter
                 .send_before_window
