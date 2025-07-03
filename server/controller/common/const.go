@@ -311,6 +311,7 @@ const (
 	VOLCENGINE        = 30
 	H3C               = 31
 	FUSIONCOMPUTE     = 32
+	SCP               = 33
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -343,6 +344,7 @@ const (
 	VOLCENGINE_EN        = "volcengine"
 	H3C_EN               = "h3c"
 	FUSIONCOMPUTE_EN     = "fusioncompute"
+	SCP_EN               = "scp"
 
 	TENCENT_CH          = "腾讯云"
 	ALIYUN_CH           = "阿里云"
@@ -365,6 +367,7 @@ const (
 	KUBERNETES_CH    = "Kubernetes"
 	CLOUD_TOWER_CH   = "CloudTower"
 	FUSIONCOMPUTE_CH = "FusionCompute"
+	SCP_CH           = "SCP"
 )
 
 var DomainTypeToIconID = map[int]int{
