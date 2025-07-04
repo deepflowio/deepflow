@@ -18,6 +18,8 @@ package healer
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -26,7 +28,6 @@ import (
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"time"
 )
 
 var log = logger.MustGetLogger("tagrecorder.healer")
