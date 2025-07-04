@@ -1309,7 +1309,7 @@ global:
 | ----- | ---------------------------- |
 | DEBUG | |
 | INFO | |
-| WARNING | |
+| WARN | |
 | ERROR | |
 
 **Schema**:

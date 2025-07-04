@@ -880,7 +880,7 @@ global:
       #   ch: 日志等级
       # unit:
       # range: []
-      # enum_options: [DEBUG, INFO, WARNING, ERROR]
+      # enum_options: [DEBUG, INFO, WARN, ERROR]
       # modification: hot_update
       # ee_feature: false
       # description:
