@@ -1504,11 +1504,10 @@ impl FlowMap {
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Rc::clone(&self.so_plugin),
                 self.stats_counter.clone(),
-                match meta_packet.lookup_key.proto {
-                    IpProtocol::TCP => flow_config.rrt_tcp_timeout,
-                    IpProtocol::UDP => flow_config.rrt_udp_timeout,
-                    _ => flow_config.rrt_udp_timeout,
-                },
+                config
+                    .log_parser
+                    .l7_log_session_aggr_max_timeout
+                    .as_micros() as u64,
                 flow_config.l7_protocol_inference_ttl as u64,
                 last,
                 self.ntp_diff.clone(),
