@@ -47,6 +47,9 @@ type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] st
 	softDelete              bool
 	allocateID              bool
 	fieldsNeededAfterCreate []string // fields needed to be used after create
+
+	// whether convert models to loggable models, default is false
+	toLoggable bool
 }
 
 func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
@@ -99,7 +102,7 @@ func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	}
 
 	for _, item := range itemsToAdd {
-		log.Infof("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item, o.metadata.LogPrefixes)
+		log.Infof("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), rcommon.ToLoggable(o.toLoggable, item), o.metadata.LogPrefixes)
 	}
 
 	return itemsToAdd, true
@@ -112,7 +115,7 @@ func (o *OperatorBase[MPT, MT]) Update(lcuuid string, updateInfo map[string]inte
 		log.Errorf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error(), o.metadata.LogPrefixes)
 		return dbItem, false
 	}
-	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, o.metadata.LogPrefixes)
+	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, rcommon.ToLoggable(o.toLoggable, updateInfo), o.metadata.LogPrefixes)
 	o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
 }

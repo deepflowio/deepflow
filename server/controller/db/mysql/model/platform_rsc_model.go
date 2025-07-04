@@ -872,6 +872,31 @@ func (p PodService) GetSubDomainLcuuid() string {
 	return p.SubDomain
 }
 
+func (p PodService) ToLoggable() interface{} {
+	return PodService{
+		Base:             p.Base,
+		SoftDeleteBase:   p.SoftDeleteBase,
+		Name:             p.Name,
+		Label:            p.Label,
+		Annotation:       p.Annotation,
+		Alias:            p.Alias,
+		Type:             p.Type,
+		Selector:         p.Selector,
+		ExternalIP:       p.ExternalIP,
+		ServiceClusterIP: p.ServiceClusterIP,
+		MetadataHash:     p.MetadataHash,
+		SpecHash:         p.SpecHash,
+		PodIngressID:     p.PodIngressID,
+		PodNamespaceID:   p.PodNamespaceID,
+		PodClusterID:     p.PodClusterID,
+		VPCID:            p.VPCID,
+		AZ:               p.AZ,
+		Region:           p.Region,
+		SubDomain:        p.SubDomain,
+		Domain:           p.Domain,
+	}
+}
+
 type PodServicePort struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
@@ -911,6 +936,26 @@ func (p PodGroup) GetDomainLcuuid() string {
 
 func (p PodGroup) GetSubDomainLcuuid() string {
 	return p.SubDomain
+}
+
+func (p PodGroup) ToLoggable() interface{} {
+	return PodGroup{
+		Base:           p.Base,
+		SoftDeleteBase: p.SoftDeleteBase,
+		Name:           p.Name,
+		Alias:          p.Alias,
+		Type:           p.Type,
+		PodNum:         p.PodNum,
+		Label:          p.Label,
+		MetadataHash:   p.MetadataHash,
+		SpecHash:       p.SpecHash,
+		PodNamespaceID: p.PodNamespaceID,
+		PodClusterID:   p.PodClusterID,
+		AZ:             p.AZ,
+		Region:         p.Region,
+		SubDomain:      p.SubDomain,
+		Domain:         p.Domain,
+	}
 }
 
 type PodGroupPort struct {
@@ -1032,6 +1077,23 @@ func (p ConfigMap) GetDomainLcuuid() string {
 
 func (p ConfigMap) GetSubDomainLcuuid() string {
 	return p.SubDomain
+}
+
+func (p ConfigMap) ToLoggable() interface{} {
+	return ConfigMap{
+		Base:           p.Base,
+		SoftDeleteBase: p.SoftDeleteBase,
+		Name:           p.Name,
+		DataHash:       p.DataHash,
+		PodNamespaceID: p.PodNamespaceID,
+		PodClusterID:   p.PodClusterID,
+		VPCID:          p.VPCID,
+		AZ:             p.AZ,
+		Region:         p.Region,
+		SubDomain:      p.SubDomain,
+		Domain:         p.Domain,
+		SyncedAt:       p.SyncedAt,
+	}
 }
 
 type PodGroupConfigMapConnection struct {

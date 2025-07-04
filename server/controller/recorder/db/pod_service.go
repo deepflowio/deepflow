@@ -33,5 +33,6 @@ func NewPodService() *PodService {
 			true,
 		),
 	}
+	operater.toLoggable = true
 	return operater
 }
