@@ -63,3 +63,35 @@ func (p *SubDomainNameLogPrefix) Prefix() string {
 func ResourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string) string {
 	return fmt.Sprintf("%s (lcuuid: %s) for %s (lcuuid: %s) not found", resourceA, lcuuidA, resourceB, lcuuidB)
 }
+
+type Loggable interface {
+	ToLoggable() interface{}
+}
+
+func ToLoggable(do bool, data interface{}) interface{} {
+	if !do {
+		return data
+	}
+	if loggable, ok := data.(Loggable); ok {
+		return loggable.ToLoggable()
+	}
+	if dict, ok := data.(map[string]interface{}); ok {
+		// copy dict except for these keys
+		keysToRemove := []string{"data", "metadata", "spec"}
+		newDict := make(map[string]interface{})
+		for k, v := range dict {
+			skip := false
+			for _, key := range keysToRemove {
+				if k == key {
+					skip = true
+					break
+				}
+			}
+			if !skip {
+				newDict[k] = v
+			}
+		}
+		return newDict
+	}
+	return data
+}

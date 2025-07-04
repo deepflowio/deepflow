@@ -72,6 +72,7 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 		),
 	}
 	updater.dataGenerator = updater
+	updater.toLoggable = true
 	return updater
 }
 
