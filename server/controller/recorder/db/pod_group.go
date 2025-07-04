@@ -33,5 +33,6 @@ func NewPodGroup() *PodGroup {
 			true,
 		),
 	}
+	operater.toLoggable = true
 	return operater
 }

@@ -111,6 +111,9 @@ type UpdaterBase[
 	// Set Changed to true if the resource database and cache are updated,
 	// used for cache update notifications to trisolaris module.
 	Changed bool
+
+	// whether convert models to loggable models, default is false
+	toLoggable bool
 }
 
 func newUpdaterBase[
@@ -150,7 +153,6 @@ func newUpdaterBase[
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 	)
 
-	// log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
 	u.initPubSub()
 	return u
 }
@@ -191,7 +193,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem, u.metadata.LogPrefixes)
+			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), common.ToLoggable(u.toLoggable, cloudItem), u.metadata.LogPrefixes)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -200,7 +202,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 			diffBase.SetSequence(u.cache.GetSequence())
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase, u.metadata.LogPrefixes)
+				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), common.ToLoggable(u.toLoggable, cloudItem), common.ToLoggable(u.toLoggable, diffBase), u.metadata.LogPrefixes)
 				u.update(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
