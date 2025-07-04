@@ -33,5 +33,6 @@ func NewConfigMap() *ConfigMap {
 			false,
 		),
 	}
+	operater.toLoggable = true
 	return operater
 }
