@@ -380,7 +380,7 @@ func (op *PolicyDataOP) generateRawData() {
 	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
-	vtapGroupLcuuidToID := map[string]int{}
+	vtapGroupLcuuidToID := make(map[string]int, len(vtapGroups))
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
@@ -392,6 +392,7 @@ func (op *PolicyDataOP) generateRawData() {
 		}
 		rawData.vtapGroupIDToVtapIDs[vtapGroupID] = append(rawData.vtapGroupIDToVtapIDs[vtapGroupID], vtap.ID)
 	}
+	log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v", rawData.vtapGroupIDToVtapIDs))
 
 	for _, npbTunnel := range npbTunnels {
 		rawData.idToNpbTunnel[npbTunnel.ID] = npbTunnel
@@ -669,6 +670,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 							log.Errorf(op.Logf("not found vtap in vtap group id(%d)", vtapGroupIDInt))
 							continue
 						}
+						log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v, vtapGroupID: %d, agentIDs: %v", rawData.vtapGroupIDToVtapIDs, vtapGroupIDInt, vtapIDs))
 						for _, vtapID := range vtapIDs {
 							vtapIDToNpbActions[vtapID] = append(vtapIDToNpbActions[vtapID], npbAction)
 						}
@@ -704,7 +706,6 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 			}
 		}
 	}
-
 	return vtapIDToNpbActions, allVTapNpbActions
 }
 
@@ -767,6 +768,10 @@ func (op *PolicyDataOP) generatePolicies() {
 		}
 		protocol := op.generateProtoPorts(acl, flowACL, groupIDs)
 		vtapIDToNpbActions, allVTapNpbActions := op.generateProtoActions(acl)
+		for id, action := range vtapIDToNpbActions {
+			log.Infof(op.Logf("TODO vtapID: %d, action: %v", id, action))
+		}
+		log.Infof(op.Logf("TODO allVTapNpbActions: %v", allVTapNpbActions))
 		if protocol == PROTOCOL_ALL && (acl.SrcPorts != "" || acl.DstPorts != "") {
 			// If the protocol is all and the port is filled in, it means that the protocol is tcp+udp,
 			// and if the protocol is empty and the port is empty, it means any
