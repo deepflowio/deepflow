@@ -362,6 +362,28 @@ type PodService struct {
 	SubDomainLcuuid    string `json:"sub_domain_lcuuid" binding:"required"`
 }
 
+func (p PodService) ToLoggable() interface{} {
+	return PodService{
+		Lcuuid:             p.Lcuuid,
+		Name:               p.Name,
+		MetadataHash:       p.MetadataHash,
+		SpecHash:           p.SpecHash,
+		Label:              p.Label,
+		Annotation:         p.Annotation,
+		Type:               p.Type,
+		Selector:           p.Selector,
+		ExternalIP:         p.ExternalIP,
+		ServiceClusterIP:   p.ServiceClusterIP,
+		PodIngressLcuuid:   p.PodIngressLcuuid,
+		PodNamespaceLcuuid: p.PodNamespaceLcuuid,
+		PodClusterLcuuid:   p.PodClusterLcuuid,
+		VPCLcuuid:          p.VPCLcuuid,
+		AZLcuuid:           p.AZLcuuid,
+		RegionLcuuid:       p.RegionLcuuid,
+		SubDomainLcuuid:    p.SubDomainLcuuid,
+	}
+}
+
 type PodServicePort struct {
 	Lcuuid           string `json:"lcuuid" binding:"required"`
 	Name             string `json:"name" binding:"required"`
@@ -388,6 +410,23 @@ type PodGroup struct {
 	AZLcuuid           string `json:"az_lcuuid" binding:"required"`
 	RegionLcuuid       string `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid    string `json:"sub_domain_lcuuid" binding:"required"`
+}
+
+func (p PodGroup) ToLoggable() interface{} {
+	return PodGroup{
+		Lcuuid:             p.Lcuuid,
+		Name:               p.Name,
+		MetadataHash:       p.MetadataHash,
+		SpecHash:           p.SpecHash,
+		Label:              p.Label,
+		Type:               p.Type,
+		PodNum:             p.PodNum,
+		PodNamespaceLcuuid: p.PodNamespaceLcuuid,
+		PodClusterLcuuid:   p.PodClusterLcuuid,
+		AZLcuuid:           p.AZLcuuid,
+		RegionLcuuid:       p.RegionLcuuid,
+		SubDomainLcuuid:    p.SubDomainLcuuid,
+	}
 }
 
 type PodGroupPort struct {
@@ -475,6 +514,21 @@ type ConfigMap struct {
 	RegionLcuuid       string    `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid    string    `json:"sub_domain_lcuuid" binding:"required"`
 	CreatedAt          time.Time `json:"created_at"`
+}
+
+func (c ConfigMap) ToLoggable() interface{} {
+	return ConfigMap{
+		Lcuuid:             c.Lcuuid,
+		Name:               c.Name,
+		DataHash:           c.DataHash,
+		PodNamespaceLcuuid: c.PodNamespaceLcuuid,
+		PodClusterLcuuid:   c.PodClusterLcuuid,
+		VPCLcuuid:          c.VPCLcuuid,
+		AZLcuuid:           c.AZLcuuid,
+		RegionLcuuid:       c.RegionLcuuid,
+		SubDomainLcuuid:    c.SubDomainLcuuid,
+		CreatedAt:          c.CreatedAt,
+	}
 }
 
 type PodGroupConfigMapConnection struct {
