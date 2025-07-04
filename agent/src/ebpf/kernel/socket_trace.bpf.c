@@ -2233,7 +2233,7 @@ KRETFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 // System call recvfrom() entry point
-static __inline int do_sys_enter_recvfrom(int sockfd, char *buf)
+static __inline int do_sys_enter_recvfrom(int sockfd, const char *buf, struct sockaddr __user *u_addr)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	// Stash arguments.
@@ -2247,6 +2247,9 @@ static __inline int do_sys_enter_recvfrom(int sockfd, char *buf)
 	    socket_info_map__lookup(&conn_key);
 	read_args.tcp_seq =
 	    get_tcp_read_seq(sockfd, &read_args.sk, socket_info_ptr);
+	if (u_addr) {
+		read_args.ipaddr_ptr = (void *)u_addr;
+	}
 	active_read_args_map__update(&id, &read_args);
 	return 0;
 }
@@ -2257,7 +2260,8 @@ KPROG(__sys_recvfrom) (struct pt_regs *ctx) {
 		return 0;
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
-	return do_sys_enter_recvfrom(sockfd, buf);
+	struct sockaddr *src_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
+	return do_sys_enter_recvfrom(sockfd, buf, src_addr);
 }
 
 KPROG(sys_recvfrom) (struct pt_regs *ctx) {
@@ -2265,7 +2269,8 @@ KPROG(sys_recvfrom) (struct pt_regs *ctx) {
 		return 0;
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
-	return do_sys_enter_recvfrom(sockfd, buf);
+	struct sockaddr *src_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
+	return do_sys_enter_recvfrom(sockfd, buf, src_addr);
 }
 #else
 #ifndef LINUX_VER_KFUNC
@@ -2278,6 +2283,10 @@ TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 		return 0;
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
+
+	struct sockaddr *u_addr = NULL;
+	struct syscall_sendto_enter_ctx *sendto_ctx = (struct syscall_sendto_enter_ctx *)ctx;
+	u_addr = sendto_ctx->addr;
 #else
 //int __sys_recvfrom(int fd, void __user *ubuf, size_t size, unsigned int flags,
 //                   struct sockaddr __user *addr, int __user *addr_len)
@@ -2289,8 +2298,9 @@ KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 		return 0;
 	int sockfd = fd;
 	char *buf = (char *)ubuf;
+	struct sockaddr *u_addr = addr;
 #endif /* LINUX_VER_KFUNC */
-	return do_sys_enter_recvfrom(sockfd, buf);
+	return do_sys_enter_recvfrom(sockfd, buf, u_addr);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
 
@@ -2301,6 +2311,11 @@ static __inline int do_sys_exit_recvfrom(void *ctx, ssize_t bytes_count) {
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
+		if (read_args->ipaddr_ptr) {
+			void *ptr = read_args->ipaddr_ptr;
+			read_args->ipaddr_ptr = NULL;
+			extract_network_address_info(read_args, ptr);
+		}
 		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS,
 				     read_args, bytes_count);
 		active_read_args_map__delete(&id);
