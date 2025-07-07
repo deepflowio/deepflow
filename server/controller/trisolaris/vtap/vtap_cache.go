@@ -869,6 +869,18 @@ func (c *VTapCache) updateVTapID(vtapID int) {
 }
 
 func (c *VTapCache) GetFunctions() mapset.Set {
+	if c.GetOwner() == common.VTAP_OWNER_DEEPFLOW {
+		functionSet := mapset.NewSet()
+		for _, functionStr := range strings.Split(common.AGENT_ALL_LICENSE_FUNCTIONS, ",") {
+			function, err := strconv.Atoi(functionStr)
+			if err != nil {
+				log.Warningf("const lincense function (%s) substring (%s) to int failed, err: %s", common.AGENT_ALL_LICENSE_FUNCTIONS, functionStr, err)
+				continue
+			}
+			functionSet.Add(function)
+		}
+		return functionSet
+	}
 	return c.licenseFunctionSet
 }
 
