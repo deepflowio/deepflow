@@ -246,7 +246,9 @@ global:
 
 **Description**:
 
-Maximum number of threads that deepflow-agent is allowed to launch.
+The maximum number of threads deepflow-agent is allowed to create.
+- When the number of threads exceeds this limit, an exception alert will be triggered.
+- When the number of threads exceeds twice this limit value, a deepflow-agent restart will be triggered.
 
 ### Process Limit {#global.alerts.process_threshold}
 
@@ -275,7 +277,9 @@ global:
 
 **Description**:
 
-Maximum number of processes that deepflow-agent is allowed to launch.
+The maximum number of processes named `deepflow-agent` is allowed to launch.
+If the number of processes named `deepflow-agent` in the current system reaches this limit,
+subsequent processes named `deepflow-agent` will fail to start.
 
 ### Core File Checker {#global.alerts.check_core_file_disabled}
 
