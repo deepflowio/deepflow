@@ -586,6 +586,9 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			Fields:    []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			Condition: f.Metrics.Condition,
 		}
+		// uniq function has withs
+		innerFunction.Withs = f.Withs
+
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
 		innerFunction.Init()
@@ -684,10 +687,12 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	outFunc.SetFlag(view.METRICS_FLAG_OUTER)
 	outFunc.SetTime(m.Time)
 	outFunc.Init()
-	// uniq function has withs
-	defaultFunc, ok := outFunc.(*view.DefaultFunction)
-	if ok {
-		defaultFunc.Withs = f.Withs
+	if m.MetricsLevelFlag != view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+		// uniq function has withs
+		defaultFunc, ok := outFunc.(*view.DefaultFunction)
+		if ok {
+			defaultFunc.Withs = f.Withs
+		}
 	}
 	return outFunc
 }
