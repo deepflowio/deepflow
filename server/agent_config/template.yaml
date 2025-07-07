@@ -152,9 +152,13 @@ global:
     # ee_feature: false
     # description:
     #   en: |-
-    #     Maximum number of threads that deepflow-agent is allowed to launch.
+    #     The maximum number of threads deepflow-agent is allowed to create.
+    #     - When the number of threads exceeds this limit, an exception alert will be triggered.
+    #     - When the number of threads exceeds twice this limit value, a deepflow-agent restart will be triggered.
     #   ch: |-
     #     用于控制 deepflow-agent 创建的线程数量。
+    #     - 当线程数量超过该限制值，会触发采集器异常告警。
+    #     - 当线程数量超过该限制值的2倍，会触发采集器重启。
     # upgrade_from: thread_threshold
     thread_threshold: 500
     # type: int
@@ -168,9 +172,12 @@ global:
     # ee_feature: false
     # description:
     #   en: |-
-    #     Maximum number of processes that deepflow-agent is allowed to launch.
+    #     The maximum number of processes named `deepflow-agent` is allowed to launch.
+    #     If the number of processes named `deepflow-agent` in the current system reaches this limit,
+    #     subsequent processes named `deepflow-agent` will fail to start.
     #   ch: |-
-    #     用于控制 deepflow-agent 创建的进程数量。
+    #     用于控制名称为`deepflow-agent`的进程数量。
+    #     若当前系统中名为`deepflow-agent`的进程数达到该限制值，则之后名为`deepflow-agent`的进程将会启动失败。
     # upgrade_from: process_threshold
     process_threshold: 10
     # type: bool
