@@ -40,7 +40,7 @@ type DomainType int
 
 const (
 	// attention: following line comments are used by `stringer`
-	DOMAIN_TYPE_UNKNOWN           DomainType = -1
+	DOMAIN_TYPE_UNKNOWN           DomainType = -1 // unknown
 	DOMAIN_TYPE_OPENSTACK         DomainType = 1  // openstack
 	DOMAIN_TYPE_VSPHERE           DomainType = 2  // vsphere
 	DOMAIN_TYPE_TENCENT           DomainType = 4  // tencent
