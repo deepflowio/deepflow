@@ -188,6 +188,11 @@ impl NsFile {
         }
         r
     }
+
+    pub fn from_pid_with_root(root: &str, pid: u32) -> Result<Self> {
+        let path: PathBuf = [root, &pid.to_string(), "ns", "net"].iter().collect();
+        Ok(Self::Proc(fs::metadata(path)?.ino()))
+    }
 }
 
 impl fmt::Display for NsFile {
