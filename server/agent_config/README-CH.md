@@ -246,6 +246,8 @@ global:
 **详细描述**:
 
 用于控制 deepflow-agent 创建的线程数量。
+- 当线程数量超过该限制值，会触发采集器异常告警。
+- 当线程数量超过该限制值的2倍，会触发采集器重启。
 
 ### 进程数限制 {#global.alerts.process_threshold}
 
@@ -274,7 +276,8 @@ global:
 
 **详细描述**:
 
-用于控制 deepflow-agent 创建的进程数量。
+用于控制名称为`deepflow-agent`的进程数量。
+若当前系统中名为`deepflow-agent`的进程数达到该限制值，则之后名为`deepflow-agent`的进程将会启动失败。
 
 ### Core File 检查 {#global.alerts.check_core_file_disabled}
 
