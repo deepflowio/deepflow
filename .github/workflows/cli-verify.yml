@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'cli/**'
+      - 'cli1/**'
 
 jobs:
   verify_cli:
