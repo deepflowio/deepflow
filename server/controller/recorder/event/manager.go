@@ -73,6 +73,7 @@ func (e ManagerComponent) fillEvent(
 	event.TimeMilli = time.Now().UnixMilli()
 	event.Type = eventType
 	event.IfNeedTagged = true
+	// 以下情况需要 server 自己打标签，其他情况由 ingester 打标签
 	if slices.Contains([]string{
 		eventapi.RESOURCE_EVENT_TYPE_CREATE,
 		eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP,
