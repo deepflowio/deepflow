@@ -197,14 +197,14 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 
 func (e *RemoteExecute) handleRespErrmsg(key string, resp *api.RemoteExecResponse, cmdResp *service.CMDResp) {
 	log.Errorf("[remote-exec] agent(key: %s) run command error: %s", key, *resp.Errmsg)
-	service.AppendErrorMessage(key, *resp.RequestId, resp.Errmsg)
+	service.AppendErrorMessageWithoutLock(key, *resp.RequestId, resp.Errmsg)
 
 	result := resp.CommandResult
 	if result == nil || result.Content == nil {
 		cmdResp.ExecDoneCH <- struct{}{}
 		return
 	}
-	service.AppendContent(key, *resp.RequestId, result.Content)
+	service.AppendContentWithoutLock(key, *resp.RequestId, result.Content)
 
 	if result.Md5 != nil {
 		cmdResp.ExecDoneCH <- struct{}{}
@@ -214,18 +214,18 @@ func (e *RemoteExecute) handleRespErrmsg(key string, resp *api.RemoteExecRespons
 
 func (e *RemoteExecute) handleRespLinuxNamespaces(key string, resp *api.RemoteExecResponse, cmdResp *service.CMDResp) {
 	if len(service.GetNamespacesWithoutLock(key, *resp.RequestId)) > 0 {
-		service.InitNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
+		service.InitNamespacesWithoutLock(key, *resp.RequestId, resp.LinuxNamespaces)
 	} else {
-		service.AppendNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
+		service.AppendNamespacesWithoutLock(key, *resp.RequestId, resp.LinuxNamespaces)
 	}
 	cmdResp.LinuxNamespaceDoneCH <- struct{}{}
 }
 
 func (e *RemoteExecute) handleRespCommands(key string, resp *api.RemoteExecResponse, cmdResp *service.CMDResp) {
 	if len(service.GetCommandsWithoutLock(key, *resp.RequestId)) > 0 {
-		service.InitCommands(key, *resp.RequestId, resp.Commands)
+		service.InitCommandsWithoutLock(key, *resp.RequestId, resp.Commands)
 	} else {
-		service.AppendCommands(key, *resp.RequestId, resp.Commands)
+		service.AppendCommandsWithoutLock(key, *resp.RequestId, resp.Commands)
 	}
 	cmdResp.RemoteCMDDoneCH <- struct{}{}
 }
@@ -237,7 +237,7 @@ func (e *RemoteExecute) handleRespCommandResult(key string, resp *api.RemoteExec
 	}
 
 	if result.Content != nil {
-		service.AppendContent(key, *resp.RequestId, result.Content)
+		service.AppendContentWithoutLock(key, *resp.RequestId, result.Content)
 	}
 	if result.Md5 != nil {
 		cmdResp.ExecDoneCH <- struct{}{}
