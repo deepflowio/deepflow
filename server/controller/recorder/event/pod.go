@@ -71,7 +71,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagPodGroupID(item.PodGroupID),
 			eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
-			eventapi.TagPodServiceID(item.PodServiceID),
+			eventapi.TagPodServiceID(item.PodServiceID), // TODO 此字段在 ingester 中并未被使用，待删除
 			eventapi.TagPodNodeID(item.PodNodeID),
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
