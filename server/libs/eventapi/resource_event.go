@@ -55,7 +55,7 @@ type ResourceEvent struct {
 	PodClusterID uint32
 	PodNSID      uint32
 	PodNodeID    uint32
-	PodServiceID uint32
+	PodServiceID uint32 // TODO 此字段在 ingester 中并未被使用，待删除
 	PodGroupID   uint32
 	PodGroupType uint8
 	PodID        uint32
@@ -183,7 +183,7 @@ func TagPodNodeID(id int) TagFieldOption {
 
 func TagPodServiceID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
-		r.PodServiceID = uint32(id)
+		r.PodServiceID = uint32(id) // TODO 此字段在 ingester 中并未被使用，待删除
 	}
 }
 

@@ -249,7 +249,7 @@ func (i *IPTool) getPodServiceOptionsByID(md *message.Metadata, id int) ([]event
 		eventapi.TagL3DeviceID(id),
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNamespaceID),
-		eventapi.TagPodServiceID(id),
+		eventapi.TagPodServiceID(id), // TODO 此字段在 ingester 中并未被使用，待删除
 	}...)
 	return opts, nil
 }
