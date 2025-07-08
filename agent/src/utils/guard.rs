@@ -336,6 +336,7 @@ impl Guard {
         exception_handler: &ExceptionHandler,
     ) {
         if percentage_trigger_threshold == 0 && absolute_trigger_threshold == 0 {
+            exception_handler.clear(Exception::FreeDiskCircuitBreaker);
             return;
         }
 
