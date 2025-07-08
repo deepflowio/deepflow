@@ -945,7 +945,40 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	return ETR_OK;
 }
 
-static u32 copy_regular_file_data(void *dst, void *src, int len)
+/*
+ * Replace the longest suffix of str1 (that is a prefix of str2) with new_prefix.
+ * Result is written to 'out' with a maximum size of 'out_size'.
+ * e.g.:
+ *    const char *str1 = "/srv/nfs/data";
+ *    const char *str2 = "/nfs/data/ddd";
+ *    const char *new_prefix = "/mnt/nfs";
+ * target: "/mnt/nfs/ddd"
+ *
+ */
+static int replace_suffix_prefix(const char *str1, const char *str2, const char *new_prefix,
+				 char *out, size_t out_size)
+{
+	size_t len1 = strlen(str1);
+	size_t len2 = strlen(str2);
+
+	// Try all possible suffixes of str1
+	for (size_t i = 0; i < len1; ++i) {
+		const char *suffix = str1 + i;
+		size_t suffix_len = len1 - i;
+
+		// Check if this suffix matches the prefix of str2
+		if (suffix_len <= len2 && strncmp(suffix, str2, suffix_len) == 0) {
+			// Match found: replace the suffix with new_prefix
+			return snprintf(out, out_size, "%s%s", new_prefix, str2 + suffix_len);
+		}
+	}
+
+	// No match found: copy str2 as-is
+	return snprintf(out, out_size, "%s", str2);
+}
+
+static u32 copy_regular_file_data(int pid, void *dst, void *src, int len, const char *mount_point,
+				  const char *mount_source, bool is_nfs)
 {
 	if (len <= 0)
 		return 0;
@@ -1002,7 +1035,12 @@ static u32 copy_regular_file_data(void *dst, void *src, int len)
 
 copy_event:
 	buffer = u_event.filename;
-	memcpy(buffer, temp, temp_index + 1);
+	if (is_nfs)
+		temp_index = replace_suffix_prefix(mount_source, temp, mount_point,
+						   buffer, sizeof(event.filename));
+	else
+		temp_index = snprintf(buffer, sizeof(event.filename), "%s%s",
+				      mount_point, temp);
 	buffer_len = temp_index + 1;
 	u_event.bytes_count = event.bytes_count;
 	u_event.operation = event.operation;
@@ -1013,38 +1051,6 @@ copy_event:
 	safe_buf_copy(dst, len, &u_event, event_len);
 
 	return event_len;
-}
-
-static void set_cid_and_name(struct socket_bpf_data *submit_data,
-			     struct __socket_data *sd)
-{
-	int ret;
-	ret = get_cid_and_name_from_cache(sd->tgid, submit_data->container_id,
-					  sizeof(submit_data->container_id),
-					  submit_data->process_kname,
-					  sizeof(submit_data->process_kname));
-
-	// Not found in the process cache, attempting to retrieve from procfs.
-	if (ret) {
-		fetch_container_id_from_proc(sd->tgid,
-					     (char *)submit_data->container_id,
-					     sizeof(submit_data->container_id));
-	}
-
-	if (submit_data->process_kname[0] == '\0') {
-		if (fetch_process_name_from_proc(sd->tgid,
-						 (char *)submit_data->process_kname,
-						 sizeof(submit_data->process_kname))) {
-			safe_buf_copy(submit_data->process_kname,
-				      sizeof(submit_data->process_kname),
-				      sd->comm, sizeof(sd->comm));
-		}
-	}
-
-	submit_data->process_kname[sizeof(submit_data->process_kname) -
-				   1] = '\0';
-	submit_data->container_id[sizeof(submit_data->container_id) -
-				   1] = '\0';
 }
 
 // Read datas from perf ring-buffer and dispatch.
@@ -1190,6 +1196,8 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	struct socket_bpf_data *submit_data;
 	int len;
 	void *data_buf_ptr;
+	char mount_point[MAX_PATH_LENGTH], mount_source[MAX_PATH_LENGTH];
+	bool is_nfs = false;
 
 	// 所有载荷的数据总大小（去掉头）
 	int alloc_len = buf->len - offsetof(typeof(struct __socket_data),
@@ -1258,7 +1266,38 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			submit_data->cap_seq = sd->data_seq;
 			submit_data->syscall_trace_id_call =
 			    sd->thread_trace_id;
-			set_cid_and_name(submit_data, sd);
+			int ret = 0;
+			kern_dev_t s_dev = DEV_INVALID;
+			if (sd->source == DATA_SOURCE_IO_EVENT)
+				s_dev = sd->s_dev;
+			ret = get_proc_info_from_cache(sd->tgid, submit_data->container_id,
+						       sizeof(submit_data->container_id),
+						       submit_data->process_kname,
+						       sizeof(submit_data->process_kname),
+						       s_dev, mount_point, mount_source,
+						       sizeof(mount_point), &is_nfs);
+
+			// Not found in the process cache, attempting to retrieve from procfs.
+			if (ret) {
+				fetch_container_id_from_proc(sd->tgid,
+							     (char *)submit_data->container_id,
+							     sizeof(submit_data->container_id));
+			}
+
+			if (submit_data->process_kname[0] == '\0') {
+				if (fetch_process_name_from_proc(sd->tgid,
+								 (char *)submit_data->process_kname,
+								 sizeof(submit_data->process_kname))) {
+					safe_buf_copy(submit_data->process_kname,
+						      sizeof(submit_data->process_kname),
+						      sd->comm, sizeof(sd->comm));
+				}
+			}
+
+			submit_data->process_kname[sizeof(submit_data->process_kname) -
+						   1] = '\0';
+			submit_data->container_id[sizeof(submit_data->container_id) -
+						   1] = '\0';
 			submit_data->msg_type = sd->msg_type;
 			submit_data->socket_role = sd->socket_role;
 		} else {
@@ -1292,9 +1331,10 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			}
 			if (sd->source == DATA_SOURCE_IO_EVENT) {
 				len =
-				    copy_regular_file_data(submit_data->cap_data
+				    copy_regular_file_data(sd->tgid, submit_data->cap_data
 							   + offset, sd->data,
-							   len);
+							   len, mount_point,
+							   mount_source, is_nfs);
 			} else {
 				memcpy_fast(submit_data->cap_data + offset,
 					    sd->data, len);
@@ -1658,6 +1698,8 @@ static int update_offset_map_default(struct bpf_tracer *t,
 
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
+	offset.struct_inode_i_sb_offset = 0x28;
+	offset.struct_super_block_s_dev_offset = 0x10;
 	offset.struct_file_dentry_offset = 0x18;
 	offset.struct_dentry_d_parent_offset = 0x18;
 	offset.struct_dentry_name_offset = 0x28;
@@ -1728,6 +1770,10 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    kernel_struct_field_offset(obj, "file", "f_pos");
 	int struct_inode_i_mode_offset =
 	    kernel_struct_field_offset(obj, "inode", "i_mode");
+	int struct_inode_i_sb_offset =
+	    kernel_struct_field_offset(obj, "inode", "i_sb");
+	int struct_super_block_s_dev_offset =
+	    kernel_struct_field_offset(obj, "super_block", "s_dev");
 	int struct_file_dentry_offset_1 =
 	    kernel_struct_field_offset(obj, "file", "f_path");
 	int struct_file_dentry_offset_2 =
@@ -1771,7 +1817,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
 	    struct_files_private_data_offset < 0 ||
 	    struct_file_f_inode_offset < 0 || struct_inode_i_mode_offset < 0 ||
-	    struct_inode_i_mode_offset < 0 || struct_file_dentry_offset < 0 ||
+	    struct_inode_i_sb_offset < 0 || 
+	    struct_super_block_s_dev_offset < 0 || struct_file_dentry_offset < 0 ||
 	    struct_dentry_name_offset < 0 || struct_sock_family_offset < 0 ||
 	    struct_sock_saddr_offset < 0 || struct_sock_daddr_offset < 0 ||
 	    struct_sock_ip6saddr_offset < 0 ||
@@ -1799,6 +1846,10 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_inode_i_mode_offset);
 	ebpf_info("    struct_file_dentry_offset: 0x%x\n",
 		  struct_file_dentry_offset);
+	ebpf_info("    struct_inode_i_sb_offset: 0x%x\n",
+		  struct_inode_i_sb_offset);
+	ebpf_info("    struct_super_block_s_dev_offset: 0x%x\n",
+		  struct_super_block_s_dev_offset);
 	ebpf_info("    struct_dentry_name_offset: 0x%x\n",
 		  struct_dentry_name_offset);
 	ebpf_info("    struct_dentry_d_parent_offset: 0x%x\n",
@@ -3117,9 +3168,18 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 	return bytes;
 }
 
-int print_io_event_info(const char *data, int len, char *buf, int buf_len)
+static int get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize);
+int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf, int buf_len)
 {
+	char *mount_file_tag;
+	char file_path[128], path[MAX_PATH_LENGTH];
+	snprintf(file_path, sizeof(file_path), "/proc/%d/mountinfo", pid);
+ 	if (access(file_path, F_OK) == 0)
+		mount_file_tag = "exist";
+	else
+		mount_file_tag = "not exist";
 
+	get_fd_path(pid, fd, path, sizeof(path));
 	int bytes = 0;
 	struct user_io_event_buffer *event =
 	    (struct user_io_event_buffer *)data;
@@ -3128,16 +3188,16 @@ int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-				 "latency=[%lu]\nfilename=[%s](len %d)\n",
+				 "latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s path=[%s]\n",
 				 event->bytes_count, event->operation,
 				 event->offset, event->latency, event->filename,
-				 path_len);
+				 path_len, mount_file_tag, path);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-			"latency=[%lu]\nfilename=[%s](len %d)\n",
+			"latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s path=[%s]\n",
 			event->bytes_count, event->operation, event->offset,
-			event->latency, event->filename, path_len);
+			event->latency, event->filename, path_len, mount_file_tag, path);
 
 		fflush(stdout);
 	}
@@ -3330,6 +3390,19 @@ static bool allow_datadump(struct socket_bpf_data *sd)
 	return output;
 }
 
+static int get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
+{
+	char link_path[64];
+	snprintf(link_path, sizeof(link_path), "/proc/%d/fd/%u", pid, fd);
+	ssize_t len = readlink(link_path, buf, bufsize - 1);
+	if (len < 0) {
+		return -1;
+	}
+
+	buf[len] = '\0';
+	return 0;
+}
+
 #define DATADUMP_FORMAT							\
 	"%s [datadump] SEQ %" PRIu64 " <%s> DIR %s TYPE %s(%d) PID %u "	\
 	"THREAD_ID %u COROUTINE_ID %" PRIu64 " ROLE %s"			\
@@ -3405,8 +3478,8 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 					    buff + len, sizeof(buff) - len);
 	} else if (sd->source == DATA_SOURCE_IO_EVENT) {
 		len +=
-		    print_io_event_info(sd->cap_data, sd->cap_len, buff + len,
-					sizeof(buff) - len);
+		    print_io_event_info(sd->process_id, (__u32)sd->cap_seq, sd->cap_data,
+					sd->cap_len, buff + len, sizeof(buff) - len);
 	} else if (sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
 		len +=
 		    print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len,

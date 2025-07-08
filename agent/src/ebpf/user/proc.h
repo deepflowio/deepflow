@@ -41,6 +41,15 @@
 #define symbol_caches_hash_free     clib_bihash_free_8_8
 #define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
 #define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
+typedef u32 kern_dev_t;
+#define DEV_INVALID ((kern_dev_t)-1)
+struct mount_entry {
+	struct list_head list;              // Linked list node for chaining multiple mount entries
+	kern_dev_t s_dev;                   // Device ID (major:minor) where the mount resides
+	bool is_nfs;                        // True if the mount source is an NFS (Network File System)
+	char mount_point[MAX_PATH_LENGTH];  // Path where the filesystem is mounted (e.g., "/mnt/data")
+	char mount_source[MAX_PATH_LENGTH]; // Source of the mount (e.g., "/dev/sda1" or "server:/export")
+};
 
 struct symbol_cache_pids {
 	struct symbolizer_cache_kvp *exec_pids_cache;
@@ -105,6 +114,8 @@ struct symbolizer_proc_info {
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
+	/* Mount information of the process */
+	struct list_head mount_head;
 };
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
@@ -194,26 +205,40 @@ void symbolizer_kernel_unlock(void);
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 /**
- * @brief Retrieve container ID and process name from the cache based on a PID.
+ * @brief Retrieve container ID, process name, and mount point from the cache based on a PID.
  *
- * This function looks up the given PID in the symbolizer cache to retrieve
- * the associated container ID (`cid`) and process name (`name`). If no entry
- * is found, both output buffers will be zeroed.
+ * This function looks up the given PID in the symbolizer/process cache to retrieve:
+ *   - the associated container ID (`cid`),
+ *   - the process name (`name`, i.e., comm),
+ *   - and optionally the mount point corresponding to a given `s_dev` value.
  *
- * @param pid        The process ID to look up.
- * @param cid        Output buffer to store the container ID.
- * @param cid_size   Size of the `cid` buffer in bytes.
- * @param name       Output buffer to store the process name (comm).
- * @param name_size  Size of the `name` buffer in bytes.
+ * If the process is not found in the cache, all output buffers (`cid`, `name`, `mount_point`)
+ * will be zeroed.
+ *
+ * @param pid          The process ID to look up.
+ * @param cid          Output buffer to store the container ID.
+ * @param cid_size     Size of the `cid` buffer in bytes.
+ * @param name         Output buffer to store the process name (comm).
+ * @param name_size    Size of the `name` buffer in bytes.
+ * @param s_dev        Device number to be resolved into a mount point path.
+ * @param mount_point  Output buffer to store the mount point path matching `s_dev`.
+ * @param mount_source Output buffer to store the mount source path.
+ * @param mount_size   Size of the `mount_point` buffer in bytes.
+ * @param is_nfs       Is it an NFS file system?
+ *
  * @return
- *    0 : In process cache, successfully obtained.
- *   -1 : Not in process cache, failed to obtain.
- * @note If the process entry is found, its reference count is incremented
- *       before use and decremented after, ensuring thread safety.
- * @note If no valid data is found, `cid` and `name` will remain zero-filled.
+ *    0 : Successfully found process info in cache and retrieved data.
+ *   -1 : Process not found in cache; output buffers may be zero-filled or unchanged.
+ *
+ * @note If the process entry is found, its reference count is safely managed
+ *       (incremented before use and decremented after).
+ * @note If no valid data is found, `cid`, `name`, and `mount_point` will be
+ *       zeroed.
  */
-int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				uint8_t *name, int name_size);
+int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+			     uint8_t *name, int name_size, kern_dev_t s_dev,
+			     char *mount_point, char *mount_source,
+			     int mount_size, bool *is_nfs);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers
@@ -245,5 +270,60 @@ char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
 				   struct tracer_probes_conf *conf,
 				   struct symbol symbols[], size_t n_symbols);
+/**
+ * @brief Build a mount cache for the specified process ID.
+ *
+ * This function reads `/proc/<pid>/mountinfo`, parses each mount entry,
+ * and appends (s_dev, mount_point) pairs into a linked list provided by
+ * the caller via `mount_head`.
+ *
+ * Each node in the list should typically contain:
+ *   - The device number (`kern_dev_t`)
+ *   - The mount point path
+ *
+ * The list must be initialized before calling this function.
+ *
+ * @param pid         The PID of the process whose mount info is to be parsed.
+ * @param mount_head  Pointer to the head of a linked list that will hold
+ *                    parsed mount entries (s_dev and mount path).
+ *
+ * @return 0 on success, -1 on failure (e.g., file open error or parsing issue).
+ */
+int build_mount_cache_for_pid(pid_t pid, struct list_head *mount_head);
 
+/**
+ * @brief Free the mount information list for a process.
+ *
+ * This function frees all nodes in the linked list `mount_head`, which
+ * should contain elements of type `struct mount_entry`. Each node is removed
+ * from the list and its memory is released.
+ *
+ * It is typically used to clean up the mount information parsed from
+ * `/proc/<pid>/mountinfo` and stored using a function like
+ * `build_mount_cache_for_pid()`.
+ *
+ * @param mount_head Pointer to the head of the mount entry list to be freed.
+ */
+void proc_mount_info_free(struct list_head *mount_head);
+
+/**
+ * @brief Find the mount point path corresponding to a given device ID.
+ *
+ * This function iterates over a list of parsed mount entries and looks
+ * for the first entry whose `s_dev` matches the specified device ID.
+ * If found, it copies the corresponding mount point path into the provided buffer.
+ *
+ * @param mount_head   Pointer to the head of the mount entry list (linked list of mount_entry).
+ * @param s_dev        Device ID (kern_dev_t) to match against entries in the list.
+ * @param mount_point  Output buffer to receive the matching mount point path.
+ * @param mount_source Output buffer to receive the matching mount source path.
+ * @param mount_size   Size of the output buffer `mount_path`.
+ * @param is_nfs       Whether it is an NFS file system.
+ *
+ * @note If multiple entries match the same `s_dev`, the last one found will overwrite previous ones.
+ *       If no match is found, `mount_path` will remain unchanged.
+ */
+void find_mount_point_path(struct list_head *mount_head, kern_dev_t s_dev,
+			   char *mount_path, char *mount_source,
+			   int mount_size, bool *is_nfs);
 #endif /* _USER_PROC_H_ */

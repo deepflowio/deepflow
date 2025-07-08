@@ -179,6 +179,7 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 	vec_free(p->thread_names);
 	p->thread_names = NULL;
 	p->syms_cache = 0;
+	proc_mount_info_free(&p->mount_head);
 	clib_mem_free((void *)p);
 }
 
@@ -319,8 +320,10 @@ static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 	return 0;
 }
 
-int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				uint8_t *name, int name_size)
+int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+			     uint8_t *name, int name_size, kern_dev_t s_dev,
+			     char *mount_point, char *mount_source,
+			     int mount_size, bool *is_nfs)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
@@ -328,6 +331,8 @@ int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 	kv.v.proc_info_p = 0;
 	memset(cid, 0, cid_size);
 	memset(name, 0, name_size);
+	memset(mount_point, 0, mount_size);
+	memset(mount_source, 0, mount_size);
 	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
@@ -342,6 +347,9 @@ int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 			memcpy_s_inline((void *)name, name_size, p->comm,
 					sizeof(p->comm));
 		}
+		if (s_dev != DEV_INVALID)
+			find_mount_point_path(&p->mount_head, s_dev, mount_point,
+					      mount_source, mount_size, is_nfs);
 		AO_DEC(&p->use);
 		return 0;
 	}
@@ -529,6 +537,117 @@ u64 get_pid_stime(pid_t pid)
 	return 0;
 }
 
+static bool has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
+{
+	struct list_head *p, *n;
+	struct mount_entry *e;
+	if (!mount_head->next)
+		return false;
+	list_for_each_safe(p, n, mount_head) {
+		e = container_of(p, struct mount_entry, list);
+		if (e && e->s_dev == s_dev)
+			return true;
+	}
+
+	return false;
+}
+
+void find_mount_point_path(struct list_head *mount_head, kern_dev_t s_dev,
+			   char *mount_path, char *mount_source,
+			   int mount_size, bool *is_nfs)
+{
+	struct list_head *p, *n;
+	struct mount_entry *e;
+	if (!mount_head->next)
+		return;
+	list_for_each_safe(p, n, mount_head) {
+		e = container_of(p, struct mount_entry, list);
+		if (e && e->s_dev == s_dev) {
+			snprintf(mount_path, mount_size, "%s", e->mount_point);
+			snprintf(mount_source, mount_size, "%s", e->mount_source);
+			*is_nfs = e->is_nfs;
+		}
+	}
+}
+
+void proc_mount_info_free(struct list_head *mount_head)
+{
+	struct list_head *p, *n;
+	struct mount_entry *e;
+	if (!mount_head->next)
+		return;
+	list_for_each_safe(p, n, mount_head) {
+		e = container_of(p, struct mount_entry, list);
+		if (e) {
+			list_head_del(&e->list);
+                	free(e);
+		}
+        }
+}
+
+int build_mount_cache_for_pid(pid_t pid, struct list_head *mount_head)
+{
+	char path[64];
+	memset(mount_head, 0, sizeof(*mount_head));
+	snprintf(path, sizeof(path), "/proc/%d/mountinfo", pid);
+	FILE *fp = fopen(path, "r");
+	if (!fp) {
+		ebpf_warning("fopen '%s' failed with %s(%d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	init_list_head(mount_head);
+	char line[PATH_MAX];
+	while (fgets(line, sizeof(line), fp)) {
+		// mountinfo format ref: https://man7.org/linux/man-pages/man5/proc.5.html
+		int id, parent, major, minor;
+		char root[MAX_PATH_LENGTH], mount_point[MAX_PATH_LENGTH];
+		char fs_type[64], mount_source[MAX_PATH_LENGTH];
+		// [ID] [ParentID] [major:minor] [fs_root] [mount_point] [options] - [fs_type] [mount_source] [fs_options]
+		// Example: 44 32 0:36 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+		int matched = sscanf(line, "%d %d %d:%d %s %s %*[^-] - %s %s",
+				     &id, &parent, &major, &minor, root,
+				     mount_point, fs_type, mount_source);
+		if (matched != 8)
+			continue;
+
+		bool is_nfs = strncmp("nfs", fs_type, 3) == 0;
+		/*
+		 * Filter out bind mounts, because for bind mounts, the data obtained via eBPF starts from
+		 * `[fs_root]`, which is already a path on the host. There's no need to translate it into
+		 * the mount point path inside the container.
+		 * For example, a path like `/var/lib/mysql/xxxx.data` is already a host path and does not
+		 * need to be translated into `/bitnami/mysql/xxxx.data` (which is the container path).
+		 * e.g.: 1729 1710 253:0 /var/lib/mysql /bitnami/mysql rw,relatime - xfs /dev/mapper/centos-root rw,attr2,inode64,noquota
+		 */
+		if (!(root[0] == '/' && root[1] == '\0') && !is_nfs)
+			continue;
+
+		kern_dev_t s_dev = ((major & 0xfff) << 20) | (minor & 0xfffff);
+		if (has_mount_entry(mount_head, s_dev))
+			continue;
+		struct mount_entry *entry = calloc(1, sizeof(struct mount_entry));
+		if (entry == NULL) {
+			ebpf_warning("calloc failed with %s(%d)\n",
+				     strerror(errno), errno);
+			return -1;
+		}
+
+		entry->s_dev = s_dev;
+		entry->is_nfs = is_nfs;
+		snprintf(entry->mount_point, sizeof(entry->mount_point),
+			 "%s", mount_point);
+		snprintf(entry->mount_source, sizeof(entry->mount_source),
+			 "%s", mount_source);
+		list_add_tail(&entry->list, mount_head);
+	}
+
+	fflush(stdout);
+	fclose(fp);
+	return 0;
+}
+
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 {
 	memset(p, 0, sizeof(*p));
@@ -567,6 +686,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 		p->verified = false;
 	}
 
+	build_mount_cache_for_pid(pid, &p->mount_head);
 	p->use = 1;
 
 	return ETR_OK;
@@ -996,11 +1116,16 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	return;
 }
 
-int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				uint8_t *name, int name_size)
+int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+			     uint8_t *name, int name_size, kern_dev_t s_dev,
+			     char *mount_point, char *mount_source,
+			     int mount_size, bool *is_nfs)
 {
 	memset(cid, 0, cid_size);
 	memset(name, 0, name_size);
+	memset(mount_point, 0, mount_size);
+	memset(mount_source, 0, mount_size);
+	*is_nfs = false;
 	return -1;
 }
 

@@ -257,7 +257,7 @@ static void exec_clear_residual_probes(const char *events_file,
 		if ((lf = strchr(line, '\n')))
 			*lf = '\0';
 
-		pe = (struct probe_elem *)calloc(sizeof(*pe), 1);
+		pe = (struct probe_elem *)calloc(1, sizeof(*pe));
 		if (pe == NULL) {
 			ebpf_warning("calloc() failed.\n");
 			break;
