@@ -313,28 +313,28 @@ pub(super) fn get_all_socket(
             let mut tcp = match process.tcp() {
                 Ok(tcp) => tcp,
                 Err(e) => {
-                    debug!("get process #{pid} tcp failed: {e}");
+                    debug!("get netns {ns} tcp from process #{pid} failed: {e}");
                     continue;
                 }
             };
             match process.tcp6() {
                 Ok(mut tcp6) => tcp.append(&mut tcp6),
                 Err(e) => {
-                    debug!("get process #{pid} tcp6 failed: {e}");
+                    debug!("get netns {ns} tcp6 from process #{pid} failed: {e}");
                     continue;
                 }
             };
             let udp = match process.udp() {
                 Ok(udp) => udp,
                 Err(e) => {
-                    debug!("get process #{pid} udp failed: {e}");
+                    debug!("get netns {ns} udp from process #{pid} failed: {e}");
                     continue;
                 }
             };
             let udp6 = match process.udp6() {
                 Ok(udp6) => udp6,
                 Err(e) => {
-                    debug!("get process #{pid} udp6 failed: {e}");
+                    debug!("get netns {ns} udp6 from process #{pid} failed: {e}");
                     continue;
                 }
             };
@@ -370,7 +370,7 @@ pub(super) fn get_all_socket(
                 let pid = match socket_inode_to_pid.get(&tcp.inode) {
                     Some(pid) => *pid,
                     None => {
-                        debug!("process #{pid} tcp entry {tcp:?} ignored because inode not found or too recent");
+                        debug!("netns {ns} tcp entry {tcp:?} ignored because inode not found or too recent");
                         continue;
                     }
                 };
@@ -380,7 +380,7 @@ pub(super) fn get_all_socket(
                 local_addr.set_ip(local_addr.ip().to_canonical());
                 remote_addr.set_ip(remote_addr.ip().to_canonical());
                 if !(local_addr.is_ipv4() && remote_addr.is_ipv4()) {
-                    debug!("process #{pid} tcp entry {tcp:?} ignored because not ipv4");
+                    debug!("netns {ns} tcp entry {tcp:?} ignored because not ipv4");
                     continue;
                 }
 
@@ -418,7 +418,7 @@ pub(super) fn get_all_socket(
                 let pid = match socket_inode_to_pid.get(&udp.inode) {
                     Some(pid) => *pid,
                     None => {
-                        debug!("process #{pid} udp entry {udp:?} ignored because inode not found or too recent");
+                        debug!("netns {ns} udp entry {udp:?} ignored because inode not found or too recent");
                         continue;
                     }
                 };
@@ -433,7 +433,7 @@ pub(super) fn get_all_socket(
                 local_addr.set_ip(local_addr.ip().to_canonical());
                 remote_addr.set_ip(remote_addr.ip().to_canonical());
                 if !(local_addr.is_ipv4() && remote_addr.is_ipv4()) {
-                    debug!("process #{pid} udp entry {udp:?} ignored because not ipv4");
+                    debug!("netns {ns} udp entry {udp:?} ignored because not ipv4");
                     continue;
                 }
 
