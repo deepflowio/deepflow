@@ -18,10 +18,6 @@ package event
 
 import (
 	"fmt"
-	"slices"
-	"strings"
-
-	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -51,18 +47,19 @@ func NewProcess(q *queue.OverwriteQueue) *Process {
 
 func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	items := msg.([]*metadbmodel.Process)
-	processData, err := p.GetProcessData(md, items)
-	if err != nil {
-		log.Error(err)
-	}
 	for _, item := range items {
+		vtapName, ok := md.GetToolDataSet().GetVTapNameByID(int(item.VTapID))
+		if !ok {
+			log.Errorf("vtap name not found for vtap id %d", item.VTapID, md.LogPrefixes)
+		}
 		description := fmt.Sprintf("agent %s report process %s cmdline %s",
-			processData[item.ID].VTapName, item.ProcessName, item.CommandLine)
+			vtapName, item.ProcessName, item.CommandLine)
+
 		opts := []eventapi.TagFieldOption{eventapi.TagDescription(description)}
 
-		switch t := processData[item.ID].ResourceType; t {
+		switch t := item.DeviceType; t {
 		case common.VIF_DEVICE_TYPE_POD:
-			podID := processData[item.ID].ResourceID
+			podID := item.DeviceID
 			info, err := md.GetToolDataSet().GetPodInfoByID(podID)
 			if err != nil {
 				log.Error(err)
@@ -89,7 +86,7 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			}
 
 		case common.VIF_DEVICE_TYPE_POD_NODE:
-			podNodeID := processData[item.ID].ResourceID
+			podNodeID := item.DeviceID
 			info, err := md.GetToolDataSet().GetPodNodeInfoByID(podNodeID)
 			if err != nil {
 				log.Error(err)
@@ -107,13 +104,13 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			}
 
 		case common.VIF_DEVICE_TYPE_VM:
-			vmID := processData[item.ID].ResourceID
+			vmID := item.DeviceID
 			info, err := md.GetToolDataSet().GetVMInfoByID(vmID)
 			if err != nil {
 				log.Error(err)
 			} else {
 				opts = append(opts, []eventapi.TagFieldOption{
-					eventapi.TagL3DeviceType(processData[item.ID].ResourceType),
+					eventapi.TagL3DeviceType(item.DeviceType),
 					eventapi.TagL3DeviceID(vmID),
 					eventapi.TagAZID(info.AZID),
 					eventapi.TagRegionID(info.RegionID),
@@ -147,6 +144,12 @@ func (p *Process) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) 
 			eventapi.TagGProcessID(item.GID),
 			eventapi.TagGProcessName(item.Name),
 		}
+		// 当 pod 内的 container 重启并伴随进程删除时，pod 会关联上新的 container，
+		// 而进程删除时无法使用其旧的 container 找到对应的 pod 信息，所以由 server 打 pod id。
+		// 仅在 pod 内的进程删除时，才会打上 pod id， 并且其他 tag 还是由 ingester 打上。
+		if item.DeviceType == common.VIF_DEVICE_TYPE_POD {
+			opts = append(opts, eventapi.TagPodID(item.DeviceID))
+		}
 		p.createInstanceAndEnqueue(
 			md,
 			item.Lcuuid,
@@ -157,109 +160,4 @@ func (p *Process) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) 
 			opts...,
 		)
 	}
-}
-
-type ProcessData struct {
-	ResourceType int
-	ResourceName string
-	ResourceID   int
-	VTapName     string
-}
-
-func (p *Process) GetProcessData(md *message.Metadata, processes []*metadbmodel.Process) (map[int]ProcessData, error) {
-	// store vtap info
-	vtapIDs := mapset.NewSet[uint32]()
-	for _, item := range processes {
-		vtapIDs.Add(item.VTapID)
-	}
-	var vtaps []metadbmodel.VTap
-	if err := md.GetDB().Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
-		return nil, err
-	}
-	type vtapInfo struct {
-		Name           string
-		Type           int
-		LaunchServerID int
-	}
-	vtapIDToInfo := make(map[int]vtapInfo, len(vtaps))
-	vmLaunchServerIDs := mapset.NewSet[int]()
-	podNodeLaunchServerIDs := mapset.NewSet[int]()
-	for _, vtap := range vtaps {
-		vtapIDToInfo[vtap.ID] = vtapInfo{
-			Name:           vtap.Name,
-			Type:           vtap.Type,
-			LaunchServerID: vtap.LaunchServerID,
-		}
-		if slices.Contains([]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P}, vtap.Type) {
-			vmLaunchServerIDs.Add(vtap.LaunchServerID)
-		} else if slices.Contains([]int{common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtap.Type) {
-			podNodeLaunchServerIDs.Add(vtap.LaunchServerID)
-		}
-	}
-
-	// store vm info
-	var vms []metadbmodel.VM
-	if err := md.GetDB().Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
-		return nil, err
-	}
-	vmIDToName := make(map[int]string, len(vms))
-	for _, vm := range vms {
-		vmIDToName[vm.ID] = vm.Name
-	}
-
-	// store pod node info
-	var podNodes []metadbmodel.PodNode
-	if err := md.GetDB().Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
-		return nil, err
-	}
-	podNodeIDToName := make(map[int]string, len(podNodes))
-	for _, podNode := range podNodes {
-		podNodeIDToName[podNode.ID] = podNode.Name
-	}
-
-	// store pod info
-	var pods []metadbmodel.Pod
-	if err := md.GetDB().Find(&pods).Error; err != nil {
-		return nil, err
-	}
-	podIDToName := make(map[int]string, len(pods))
-	containerIDToPodID := make(map[string]int)
-	for _, pod := range pods {
-		podIDToName[pod.ID] = pod.Name
-		var containerIDs []string
-		if len(pod.ContainerIDs) > 0 {
-			containerIDs = strings.Split(pod.ContainerIDs, ", ")
-		}
-		for _, id := range containerIDs {
-			containerIDToPodID[id] = pod.ID
-		}
-	}
-
-	resp := make(map[int]ProcessData, len(processes))
-	for _, process := range processes {
-		var deviceType, resourceID int
-		var resourceName string
-
-		pVTapID := int(process.VTapID)
-		if podID, ok := containerIDToPodID[process.ContainerID]; ok {
-			deviceType = common.VIF_DEVICE_TYPE_POD
-			resourceName = podIDToName[podID]
-			resourceID = podID
-		} else {
-			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[pVTapID].Type]
-			if deviceType == common.VIF_DEVICE_TYPE_VM {
-				resourceName = vmIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
-			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-				resourceName = podNodeIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
-			}
-			resourceID = vtapIDToInfo[pVTapID].LaunchServerID
-		}
-		resp[process.ID] = ProcessData{
-			ResourceType: deviceType,
-			ResourceID:   resourceID,
-			ResourceName: resourceName,
-			VTapName:     vtapIDToInfo[pVTapID].Name,
-		}
-	}
-	return resp, nil
 }
