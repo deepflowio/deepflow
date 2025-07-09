@@ -445,6 +445,9 @@ func (p *PlatformDataOP) generateGProcessInfo() {
 	processes := dbDataCache.GetProcesses()
 	gprocessData := newGProcessInfoProto(len(processes))
 	for _, process := range processes {
+		// 存在问题：当 pod 内的 container 重启并伴随进程删除时，pod 会关联上新的 container，
+		// 而进程删除时无法使用其旧的 container 找到对应的 pod 信息，从而下发 pod id 0，
+		// 因此，这里的下发数据停止为进程删除事件打 tag 使用。
 		podId := rawData.containerIdToPodId[process.ContainerID]
 		p := &trident.GProcessInfo{
 			GprocessId: proto.Uint32(process.GID),

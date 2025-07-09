@@ -124,6 +124,7 @@ type DataSet struct {
 	podIDToLcuuid map[int]string
 
 	vtapIDToType           map[int]int
+	vtapIDToName           map[int]string
 	vtapIDToLaunchServerID map[int]int
 
 	processIdentifierToGID       map[ProcessIdentifier]uint32
@@ -226,6 +227,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		podIDToLcuuid: make(map[int]string),
 
 		vtapIDToType:           make(map[int]int),
+		vtapIDToName:           make(map[int]string),
 		vtapIDToLaunchServerID: make(map[int]int),
 
 		processIdentifierToGID:       make(map[ProcessIdentifier]uint32),
@@ -1142,14 +1144,35 @@ func (t *DataSet) IsProcessGIDSoftDeleted(gid uint32) bool {
 	return t.processGIDToSoftDeletedCount[gid] == t.processGIDToTotalCount[gid]
 }
 
-func (t *DataSet) RefreshVTaps(v []*metadbmodel.VTap) {
+func (t *DataSet) RefreshVTaps(vtaps []*metadbmodel.VTap) {
 	t.vtapIDToType = make(map[int]int)
+	t.vtapIDToName = make(map[int]string)
 	t.vtapIDToLaunchServerID = make(map[int]int)
-	for _, item := range v {
+	for _, item := range vtaps {
 		t.vtapIDToType[item.ID] = item.Type
+		t.vtapIDToName[item.ID] = item.Name
 		t.vtapIDToLaunchServerID[item.ID] = item.LaunchServerID
 	}
-	log.Infof("refreshed %s count: %d", ctrlrcommon.RESOURCE_TYPE_VTAP_EN, len(v))
+	log.Infof("refreshed %s count: %d", ctrlrcommon.RESOURCE_TYPE_VTAP_EN, len(vtaps))
+}
+
+func (t *DataSet) GetVTapNameByID(id int) (string, bool) {
+	name, exists := t.vtapIDToName[id]
+	if exists {
+		return name, true
+	}
+	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VTAP_EN, id), t.metadata.LogPrefixes)
+	var vtap metadbmodel.VTap
+	result := t.metadata.DB.Where("id = ?", id).Find(&vtap)
+	if result.RowsAffected == 1 {
+		t.vtapIDToType[vtap.ID] = vtap.Type
+		t.vtapIDToName[vtap.ID] = vtap.Name
+		t.vtapIDToLaunchServerID[vtap.ID] = vtap.LaunchServerID
+		return vtap.Name, true
+	} else {
+		log.Error(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VTAP_EN, id), t.metadata.LogPrefixes)
+		return name, false
+	}
 }
 
 func (t *DataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
