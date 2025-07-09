@@ -53,7 +53,8 @@ func (s *Tags) WriteTo(buf *bytes.Buffer) {
 	first := true
 	for _, tag := range s.tags {
 		node, ok := tag.(*Tag)
-		if ok && node.NoReturn {
+		// remove auto ip tag
+		if ok && (strings.HasPrefix(node.Value, "auto_instance_ip") || strings.HasPrefix(node.Value, "auto_service_ip")) {
 			continue
 		}
 		if !first {
@@ -75,11 +76,10 @@ func (s *Tags) GetWiths() []Node {
 }
 
 type Tag struct {
-	Value    string
-	Alias    string
-	Flag     int
-	Withs    []Node
-	NoReturn bool
+	Value string
+	Alias string
+	Flag  int
+	Withs []Node
 	NodeBase
 }
 
