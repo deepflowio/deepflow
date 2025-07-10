@@ -433,11 +433,6 @@ impl PktReceiver {
                         continue;
                     }
 
-                    self.counter.rx.fetch_add(1, Ordering::Relaxed);
-                    self.counter
-                        .rx_bytes
-                        .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
-
                     let buffer = allocator.allocate_with(&packet.data);
                     let info = Packet {
                         timestamp,
