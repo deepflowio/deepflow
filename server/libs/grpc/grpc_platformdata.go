@@ -389,7 +389,7 @@ func (t *PlatformInfoTable) QueryCustomService(orgId uint16, epcID int32, isIPv6
 	return t.ServiceTable[orgId].QueryCustomService(epcID, isIPv6, ipv4, ipv6, serverPort)
 }
 
-func (t *PlatformInfoTable) QueryResourceInfo(orgId uint16, resourceType uint32, resourceID uint32) *Info {
+func (t *PlatformInfoTable) QueryResourceInfo(orgId uint16, resourceType, resourceID, podID uint32) *Info {
 	switch trident.DeviceType(resourceType) {
 	case trident.DeviceType_DEVICE_TYPE_POD:
 		return t.podIDInfos[orgId][resourceID]
@@ -400,6 +400,9 @@ func (t *PlatformInfoTable) QueryResourceInfo(orgId uint16, resourceType uint32,
 	case trident.DeviceType_DEVICE_TYPE_VM:
 		return t.vmInfos[orgId][resourceID]
 	case trident.DeviceType_DEVICE_TYPE_PROCESS:
+		if podID > 0 {
+			return t.QueryPodIdInfo(orgId, podID)
+		}
 		if _, podId := t.QueryGprocessInfo(orgId, resourceID); podId > 0 {
 			return t.QueryPodIdInfo(orgId, podId)
 		}
