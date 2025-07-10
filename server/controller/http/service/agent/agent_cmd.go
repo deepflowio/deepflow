@@ -112,7 +112,7 @@ func RemoveAllFromCMDManager(key string) {
 
 	for requestID, cmdResp := range manager.requestIDToResp {
 		errMessage := fmt.Sprintf("agent(key: %s) disconnected from the server", key)
-		AppendErrorMessage(key, requestID, &errMessage)
+		AppendErrorMessageWithoutLock(key, requestID, &errMessage)
 		log.Error(errMessage)
 		close(cmdResp.ExecDoneCH)
 		close(cmdResp.RemoteCMDDoneCH)
@@ -171,8 +171,8 @@ func GetAgentCMDRespWithoutLock(key string, requestID uint64) *CMDResp {
 }
 
 func RemoveAgentCMDResp(key string, requestID uint64) {
-	agentCMDMutex.RLock()
-	defer agentCMDMutex.RUnlock()
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		delete(manager.requestIDToResp, requestID)
 	}
@@ -187,7 +187,7 @@ func GetRequestID(key string) uint64 {
 	return 0
 }
 
-func AppendCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
+func AppendCommandsWithoutLock(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = append(resp.data.RemoteCommand, data...)
@@ -195,7 +195,7 @@ func AppendCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand)
 	}
 }
 
-func InitCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
+func InitCommandsWithoutLock(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = data
@@ -203,7 +203,7 @@ func InitCommands(key string, requestID uint64, data []*grpcapi.RemoteCommand) {
 	}
 }
 
-func AppendNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
+func AppendNamespacesWithoutLock(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = append(resp.data.LinuxNamespace, data...)
@@ -211,7 +211,7 @@ func AppendNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespa
 	}
 }
 
-func InitNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
+func InitNamespacesWithoutLock(key string, requestID uint64, data []*grpcapi.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = data
@@ -219,7 +219,7 @@ func InitNamespaces(key string, requestID uint64, data []*grpcapi.LinuxNamespace
 	}
 }
 
-func AppendContent(key string, requestID uint64, data []byte) {
+func AppendContentWithoutLock(key string, requestID uint64, data []byte) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.Content += string(data)
@@ -227,7 +227,7 @@ func AppendContent(key string, requestID uint64, data []byte) {
 	}
 }
 
-func AppendErrorMessage(key string, requestID uint64, data *string) {
+func AppendErrorMessageWithoutLock(key string, requestID uint64, data *string) {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.ErrorMessage = *data
