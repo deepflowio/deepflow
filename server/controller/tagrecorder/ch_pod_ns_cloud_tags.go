@@ -103,9 +103,9 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *metadbmo
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodNSCloudTags{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		CloudTags:   string(bytes),
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		TeamID:      md.GetTeamID(),
+		DomainID:    md.GetDomainID(),
+		SubDomainID: md.GetSubDomainID(),
 	}}
 }
 
