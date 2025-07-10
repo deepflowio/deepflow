@@ -23,6 +23,7 @@
 #include "vec.h"
 #include "bihash_8_8.h"
 #include "list.h"
+#include "mount.h"
 
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
@@ -41,15 +42,6 @@
 #define symbol_caches_hash_free     clib_bihash_free_8_8
 #define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
 #define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
-typedef u32 kern_dev_t;
-#define DEV_INVALID ((kern_dev_t)-1)
-struct mount_entry {
-	struct list_head list;              // Linked list node for chaining multiple mount entries
-	kern_dev_t s_dev;                   // Device ID (major:minor) where the mount resides
-	bool is_nfs;                        // True if the mount source is an NFS (Network File System)
-	char mount_point[MAX_PATH_LENGTH];  // Path where the filesystem is mounted (e.g., "/mnt/data")
-	char mount_source[MAX_PATH_LENGTH]; // Source of the mount (e.g., "/dev/sda1" or "server:/export")
-};
 
 struct symbol_cache_pids {
 	struct symbolizer_cache_kvp *exec_pids_cache;
@@ -114,8 +106,8 @@ struct symbolizer_proc_info {
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
-	/* Mount information of the process */
-	struct list_head mount_head;
+	/* Used to look up mount information from the mount cache. */
+	u64 mntns_id;
 };
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
@@ -270,60 +262,4 @@ char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
 				   struct tracer_probes_conf *conf,
 				   struct symbol symbols[], size_t n_symbols);
-/**
- * @brief Build a mount cache for the specified process ID.
- *
- * This function reads `/proc/<pid>/mountinfo`, parses each mount entry,
- * and appends (s_dev, mount_point) pairs into a linked list provided by
- * the caller via `mount_head`.
- *
- * Each node in the list should typically contain:
- *   - The device number (`kern_dev_t`)
- *   - The mount point path
- *
- * The list must be initialized before calling this function.
- *
- * @param pid         The PID of the process whose mount info is to be parsed.
- * @param mount_head  Pointer to the head of a linked list that will hold
- *                    parsed mount entries (s_dev and mount path).
- *
- * @return 0 on success, -1 on failure (e.g., file open error or parsing issue).
- */
-int build_mount_cache_for_pid(pid_t pid, struct list_head *mount_head);
-
-/**
- * @brief Free the mount information list for a process.
- *
- * This function frees all nodes in the linked list `mount_head`, which
- * should contain elements of type `struct mount_entry`. Each node is removed
- * from the list and its memory is released.
- *
- * It is typically used to clean up the mount information parsed from
- * `/proc/<pid>/mountinfo` and stored using a function like
- * `build_mount_cache_for_pid()`.
- *
- * @param mount_head Pointer to the head of the mount entry list to be freed.
- */
-void proc_mount_info_free(struct list_head *mount_head);
-
-/**
- * @brief Find the mount point path corresponding to a given device ID.
- *
- * This function iterates over a list of parsed mount entries and looks
- * for the first entry whose `s_dev` matches the specified device ID.
- * If found, it copies the corresponding mount point path into the provided buffer.
- *
- * @param mount_head   Pointer to the head of the mount entry list (linked list of mount_entry).
- * @param s_dev        Device ID (kern_dev_t) to match against entries in the list.
- * @param mount_point  Output buffer to receive the matching mount point path.
- * @param mount_source Output buffer to receive the matching mount source path.
- * @param mount_size   Size of the output buffer `mount_path`.
- * @param is_nfs       Whether it is an NFS file system.
- *
- * @note If multiple entries match the same `s_dev`, the last one found will overwrite previous ones.
- *       If no match is found, `mount_path` will remain unchanged.
- */
-void find_mount_point_path(struct list_head *mount_head, kern_dev_t s_dev,
-			   char *mount_path, char *mount_source,
-			   int mount_size, bool *is_nfs);
 #endif /* _USER_PROC_H_ */

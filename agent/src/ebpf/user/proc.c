@@ -163,9 +163,9 @@ static bool inline enable_proc_info_cache(void)
 
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
+	int pid = (int)p->pid;
 	if (p->is_java) {
 		/* Delete target ns Java files */
-		int pid = (int)p->pid;
 		if (pid > 0) {
 			clean_local_java_symbols_files(pid);
 		}
@@ -179,7 +179,7 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 	vec_free(p->thread_names);
 	p->thread_names = NULL;
 	p->syms_cache = 0;
-	proc_mount_info_free(&p->mount_head);
+	mount_info_cache_remove(pid, p->mntns_id);
 	clib_mem_free((void *)p);
 }
 
@@ -279,6 +279,11 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 								  *kv)
 {
 	pid_t pid = (pid_t) kv->k.pid;
+	if (kv->v.proc_info_p) {
+		free_symbolizer_cache_kvp(kv);
+		kv->k.pid = pid;
+		kv->v.proc_info_p = 0;
+	}
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_proc_info *p = NULL;
 	p = clib_mem_alloc_aligned("sym_proc_info",
@@ -309,6 +314,8 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 		return NULL;
 	} else {
 		__sync_fetch_and_add(&h->hash_elems_count, 1);
+		// Associate mount information when a new process starts.
+		mount_info_cache_add_if_absent(pid, p->mntns_id);
 	}
 
 	return p;
@@ -316,7 +323,37 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 
 static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
-	free_symbolizer_cache_kvp(kv);
+	pid_t pid = (pid_t) kv->k.pid;
+	if (kv->v.proc_info_p) {
+		free_symbolizer_cache_kvp(kv);
+		kv->k.pid = pid;
+		kv->v.proc_info_p = 0;
+	}
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) kv,
+				      (symbol_caches_hash_kv *) kv) == 0) {
+		struct symbolizer_proc_info *p;
+		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		if (p != NULL) {
+			AO_INC(&p->use);
+			p->is_exit = 1;
+			AO_DEC(&p->use);
+			CLIB_MEMORY_STORE_BARRIER();
+		}
+
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) kv, 0 /* delete */ )) {
+			ebpf_warning("failed.(pid %d)\n", (pid_t) kv->k.pid);
+			return;
+		} else {
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
+		}
+
+		if (p)
+			free_symbolizer_cache_kvp(kv);
+	}
+
 	return 0;
 }
 
@@ -348,7 +385,7 @@ int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 					sizeof(p->comm));
 		}
 		if (s_dev != DEV_INVALID)
-			find_mount_point_path(&p->mount_head, s_dev, mount_point,
+			find_mount_point_path(p->mntns_id, s_dev, mount_point,
 					      mount_source, mount_size, is_nfs);
 		AO_DEC(&p->use);
 		return 0;
@@ -380,6 +417,61 @@ static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
 	return 0;
 }
 
+static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv = {};
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	if (type == PROC_EXEC) {
+		__sync_fetch_and_add(&proc_exec_event_count, 1);
+	} else {
+		__sync_fetch_and_add(&proc_exit_event_count, 1);
+	}
+
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		struct symbolizer_proc_info *p;
+		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		if (p != NULL) {
+			AO_INC(&p->use);
+			p->is_exit = 1;
+			AO_DEC(&p->use);
+			CLIB_MEMORY_STORE_BARRIER();
+		}
+
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) & kv, 0 /* delete */ )) {
+			ebpf_warning("failed.(pid %d)\n", (pid_t) kv.k.pid);
+			return;
+		} else {
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
+		}
+	}
+
+	if (add_proc_ev_info_to_ring(type, &kv) < 0) {
+		int ret = VEC_OK;
+		symbol_cache_pids_lock();
+		if (type == PROC_EXEC) {
+			if (is_existed_in_exec_cache(&kv)) {
+				symbol_cache_pids_unlock();
+				return;
+			}
+			vec_add1(pids_cache.exec_pids_cache, kv, ret);
+		} else {
+			if (is_existed_in_exit_cache(&kv)) {
+				symbol_cache_pids_unlock();
+				return;
+			}
+			vec_add1(pids_cache.exit_pids_cache, kv, ret);
+		}
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed.\n");
+		}
+		symbol_cache_pids_unlock();
+	}
+}
+
 /*
  * When a process exits, synchronize and update its corresponding
  * symbol cache. In addition, updating the Java process symbol t-
@@ -394,63 +486,7 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		return;
 	}
 
-	symbol_caches_hash_t *h = &syms_cache_hash;
-	struct symbolizer_cache_kvp kv = {};
-	kv.k.pid = (u64) pid;
-	kv.v.proc_info_p = 0;
-
-	if (type == PROC_EXEC) {
-		__sync_fetch_and_add(&proc_exec_event_count, 1);
-		if (add_proc_ev_info_to_ring(type, &kv) < 0) {
-			int ret = VEC_OK;
-			symbol_cache_pids_lock();
-			if (is_existed_in_exec_cache(&kv)) {
-				symbol_cache_pids_unlock();
-				return;
-			}
-
-			vec_add1(pids_cache.exec_pids_cache, kv, ret);
-			if (ret != VEC_OK) {
-				ebpf_warning("vec add failed.\n");
-			}
-			symbol_cache_pids_unlock();
-		}
-	} else
-		__sync_fetch_and_add(&proc_exit_event_count, 1);
-
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		int ret = VEC_OK;
-		struct symbolizer_proc_info *p;
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		if (p != NULL) {
-			AO_INC(&p->use);
-			p->is_exit = 1;
-			AO_DEC(&p->use);
-			CLIB_MEMORY_STORE_BARRIER();
-		}
-		if (add_proc_ev_info_to_ring(type, &kv) < 0) {
-			symbol_cache_pids_lock();
-			if (is_existed_in_exit_cache(&kv)) {
-				symbol_cache_pids_unlock();
-				return;
-			}
-
-			vec_add1(pids_cache.exit_pids_cache, kv, ret);
-			if (ret != VEC_OK) {
-				ebpf_warning("vec add failed.\n");
-			}
-			symbol_cache_pids_unlock();
-		}
-
-		if (symbol_caches_hash_add_del
-		    (h, (symbol_caches_hash_kv *) & kv, 0 /* delete */ )) {
-			ebpf_warning("failed.(pid %d)\n", (pid_t) kv.k.pid);
-			return;
-		} else {
-			__sync_fetch_and_add(&h->hash_elems_count, -1);
-		}
-	}
+	add_proc_event_to_queue(pid, type);
 }
 
 void exec_proc_info_cache_update(void)
@@ -477,17 +513,16 @@ void exec_proc_info_cache_update(void)
 	} while (nr > 0);
 
 vector_handle:
-	symbol_cache_pids_lock();
-	vec_foreach(kv, pids_cache.exit_pids_cache) {
-		del_proc_info_from_cache(kv);
-	}
-	vec_free(pids_cache.exit_pids_cache);
-
+	symbol_cache_pids_lock();	
 	vec_foreach(kv, pids_cache.exec_pids_cache) {
 		add_proc_info_to_cache(kv);
 	}
 	vec_free(pids_cache.exec_pids_cache);
 
+	vec_foreach(kv, pids_cache.exit_pids_cache) {
+		del_proc_info_from_cache(kv);
+	}
+	vec_free(pids_cache.exit_pids_cache);
 	symbol_cache_pids_unlock();
 }
 
@@ -537,117 +572,6 @@ u64 get_pid_stime(pid_t pid)
 	return 0;
 }
 
-static bool has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
-{
-	struct list_head *p, *n;
-	struct mount_entry *e;
-	if (!mount_head->next)
-		return false;
-	list_for_each_safe(p, n, mount_head) {
-		e = container_of(p, struct mount_entry, list);
-		if (e && e->s_dev == s_dev)
-			return true;
-	}
-
-	return false;
-}
-
-void find_mount_point_path(struct list_head *mount_head, kern_dev_t s_dev,
-			   char *mount_path, char *mount_source,
-			   int mount_size, bool *is_nfs)
-{
-	struct list_head *p, *n;
-	struct mount_entry *e;
-	if (!mount_head->next)
-		return;
-	list_for_each_safe(p, n, mount_head) {
-		e = container_of(p, struct mount_entry, list);
-		if (e && e->s_dev == s_dev) {
-			snprintf(mount_path, mount_size, "%s", e->mount_point);
-			snprintf(mount_source, mount_size, "%s", e->mount_source);
-			*is_nfs = e->is_nfs;
-		}
-	}
-}
-
-void proc_mount_info_free(struct list_head *mount_head)
-{
-	struct list_head *p, *n;
-	struct mount_entry *e;
-	if (!mount_head->next)
-		return;
-	list_for_each_safe(p, n, mount_head) {
-		e = container_of(p, struct mount_entry, list);
-		if (e) {
-			list_head_del(&e->list);
-                	free(e);
-		}
-        }
-}
-
-int build_mount_cache_for_pid(pid_t pid, struct list_head *mount_head)
-{
-	char path[64];
-	memset(mount_head, 0, sizeof(*mount_head));
-	snprintf(path, sizeof(path), "/proc/%d/mountinfo", pid);
-	FILE *fp = fopen(path, "r");
-	if (!fp) {
-		ebpf_warning("fopen '%s' failed with %s(%d)\n", path,
-			     strerror(errno), errno);
-		return -1;
-	}
-
-	init_list_head(mount_head);
-	char line[PATH_MAX];
-	while (fgets(line, sizeof(line), fp)) {
-		// mountinfo format ref: https://man7.org/linux/man-pages/man5/proc.5.html
-		int id, parent, major, minor;
-		char root[MAX_PATH_LENGTH], mount_point[MAX_PATH_LENGTH];
-		char fs_type[64], mount_source[MAX_PATH_LENGTH];
-		// [ID] [ParentID] [major:minor] [fs_root] [mount_point] [options] - [fs_type] [mount_source] [fs_options]
-		// Example: 44 32 0:36 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
-		int matched = sscanf(line, "%d %d %d:%d %s %s %*[^-] - %s %s",
-				     &id, &parent, &major, &minor, root,
-				     mount_point, fs_type, mount_source);
-		if (matched != 8)
-			continue;
-
-		bool is_nfs = strncmp("nfs", fs_type, 3) == 0;
-		/*
-		 * Filter out bind mounts, because for bind mounts, the data obtained via eBPF starts from
-		 * `[fs_root]`, which is already a path on the host. There's no need to translate it into
-		 * the mount point path inside the container.
-		 * For example, a path like `/var/lib/mysql/xxxx.data` is already a host path and does not
-		 * need to be translated into `/bitnami/mysql/xxxx.data` (which is the container path).
-		 * e.g.: 1729 1710 253:0 /var/lib/mysql /bitnami/mysql rw,relatime - xfs /dev/mapper/centos-root rw,attr2,inode64,noquota
-		 */
-		if (!(root[0] == '/' && root[1] == '\0') && !is_nfs)
-			continue;
-
-		kern_dev_t s_dev = ((major & 0xfff) << 20) | (minor & 0xfffff);
-		if (has_mount_entry(mount_head, s_dev))
-			continue;
-		struct mount_entry *entry = calloc(1, sizeof(struct mount_entry));
-		if (entry == NULL) {
-			ebpf_warning("calloc failed with %s(%d)\n",
-				     strerror(errno), errno);
-			return -1;
-		}
-
-		entry->s_dev = s_dev;
-		entry->is_nfs = is_nfs;
-		snprintf(entry->mount_point, sizeof(entry->mount_point),
-			 "%s", mount_point);
-		snprintf(entry->mount_source, sizeof(entry->mount_source),
-			 "%s", mount_source);
-		list_add_tail(&entry->list, mount_head);
-	}
-
-	fflush(stdout);
-	fclose(fp);
-	return 0;
-}
-
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 {
 	memset(p, 0, sizeof(*p));
@@ -686,7 +610,8 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 		p->verified = false;
 	}
 
-	build_mount_cache_for_pid(pid, &p->mount_head);
+	get_mount_ns_id(pid, &p->mntns_id);
+	mount_info_cache_add_if_absent(pid, p->mntns_id);
 	p->use = 1;
 
 	return ETR_OK;
@@ -950,6 +875,9 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 
 int create_and_init_proc_info_caches(void)
 {
+	// Initialize the mount information cache.
+	mount_info_cache_init("mount-info-cache");
+
 	/*
 	 * Building a 'proc_event_ring' for handling process events.
 	 * Enabling a multi-producer, single-consumer (MPSC) model.
