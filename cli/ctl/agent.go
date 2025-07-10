@@ -428,21 +428,21 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	controllerArray := response.Get("DATA").MustArray()
 	hosts := map[string]struct{}{
 		server.IP: struct{}{},
 	}
-	if len(controllerArray) > 0 {
-		for index, _ := range controllerArray {
-			nodeType := response.Get("DATA").GetIndex(index).Get("NODE_TYPE").MustInt()
-			ip := response.Get("DATA").GetIndex(index).Get("IP").MustString()
-			if nodeType == 1 && ip != "" {
-				hosts[ip] = struct{}{}
-			}
-		}
-	} else {
-		fmt.Printf("get server info failed, url: %s\n", serverURL)
+	controllerArray := response.Get("DATA").MustArray()
+	if len(controllerArray) == 0 {
+		fmt.Printf("get controller info failed, url: %s\n", serverURL)
 		return
+	}
+	for index := range controllerArray {
+		controller := response.Get("DATA").GetIndex(index)
+		ip := controller.Get("IP").MustString()
+		if controller.Get("NODE_TYPE").MustInt() != 1 || ip == "" {
+			continue
+		}
+		hosts[ip] = struct{}{}
 	}
 
 	vtapURL := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
@@ -453,24 +453,21 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	var (
-		vtapController string
-		vtapLcuuid     string
-	)
-
-	if len(response.Get("DATA").MustArray()) > 0 {
-		vtapLcuuid = response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
-		vtapController = response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
-	} else {
-		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+	if len(response.Get("DATA").MustArray()) == 0 {
+		fmt.Printf("get agent (%s) info failed, url: %s\n", vtapName, vtapURL)
 		return
 	}
+	vtapLcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+	vtapController := response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
 	if vtapController == "" || vtapLcuuid == "" {
-		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		fmt.Printf("get agent(%s) controller ip failed, url: %s\n", vtapName, vtapURL)
 		return
 	}
-
 	hosts[vtapController] = struct{}{}
+	vtapCurrentController := response.Get("DATA").GetIndex(0).Get("CUR_CONTROLLER_IP").MustString()
+	if vtapCurrentController != "" {
+		hosts[vtapCurrentController] = struct{}{}
+	}
 	url_format := "http://%s:%d/v1/upgrade/vtap/%s/"
 	body := map[string]interface{}{
 		"image_name": imageName,
@@ -483,9 +480,8 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Printf("upgrade agent %s server %s failed, response: %s\n", vtapName, host, response)
 			continue
-		} else {
-			fmt.Printf("set agent %s upgrate image(%s) to server(%s) success\n", vtapName, imageName, host)
 		}
+		fmt.Printf("set agent %s upgrate image(%s) to server(%s) success\n", vtapName, imageName, host)
 	}
 }
 
