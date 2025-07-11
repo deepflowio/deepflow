@@ -76,7 +76,7 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
 	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}, []string{}},
 	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
-	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
+	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process", "in_process.1s_agg"}, []string{}},
 	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
 	DEEPFLOW_TENANT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
 	DEEPFLOW_ADMIN:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 14, "deepflow_admin", []string{"deepflow_server"}, []string{}},
@@ -527,10 +527,14 @@ func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, db, table 
 	return nil
 }
 
+func isAggTable(table string) bool {
+	return strings.HasSuffix(table, "_agg")
+}
+
 func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {
-	ttlTable := fmt.Sprintf("%s.%s_%s", db, table, LOCAL)
-	if m.ckdbType == ckdb.CKDBTypeByconity {
-		ttlTable = fmt.Sprintf("%s.%s", db, table)
+	ttlTable := fmt.Sprintf("%s.`%s_%s`", db, table, LOCAL)
+	if m.ckdbType == ckdb.CKDBTypeByconity || isAggTable(table) {
+		ttlTable = fmt.Sprintf("%s.`%s`", db, table)
 	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		ttlTable, m.makeTTLString("time", db, table, duration))
