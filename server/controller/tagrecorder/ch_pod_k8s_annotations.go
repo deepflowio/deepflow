@@ -62,7 +62,7 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *mess
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
+		annotations, _ := StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		updateInfo["annotations"] = annotations
 	}
 	targetKey := IDKey{ID: sourceID}
@@ -86,7 +86,7 @@ func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *metad
 	if source.Annotation == "" {
 		return
 	}
-	annotations, _ := common.StrToJsonAndMap(source.Annotation)
+	annotations, _ := StrToJsonAndMap(source.Annotation)
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sAnnotations{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
