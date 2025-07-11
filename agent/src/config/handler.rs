@@ -51,7 +51,7 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        RequestLogTunning, SessionTimeout, TagFilterOperator, UserConfig,
+        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -60,7 +60,7 @@ use crate::rpc::Session;
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
-        l7_protocol_log::L7ProtocolBitmap, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+        l7_protocol_log::L7ProtocolBitmap, Timestamp, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
     },
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
@@ -1090,6 +1090,16 @@ impl fmt::Debug for LogParserConfig {
     }
 }
 
+impl LogParserConfig {
+    pub fn get_l7_timeout(&self, l7_protocol: L7Protocol) -> Timestamp {
+        match self.l7_log_session_aggr_timeout.get(&l7_protocol) {
+            Some(timeout) => *timeout,
+            None => Timeouts::l7_default_timeout(l7_protocol),
+        }
+        .into()
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DebugConfig {
     pub agent_id: u16,
@@ -1939,15 +1949,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             flow: (&conf).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l7_throttle,
-                l7_log_session_aggr_max_timeout: conf
-                    .processors
-                    .request_log
-                    .timeouts
-                    .session_aggregate
-                    .iter()
-                    .map(|app| app.timeout)
-                    .max()
-                    .unwrap_or(Duration::ZERO),
+                l7_log_session_aggr_max_timeout: conf.processors.request_log.timeouts.max(),
                 l7_log_session_aggr_timeout: conf
                     .processors
                     .request_log
