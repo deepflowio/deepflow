@@ -68,7 +68,7 @@ require (
 	github.com/mark3labs/mcp-go v0.32.0
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/pebbe/zmq4 v1.2.9
 	github.com/pkg/errors v0.9.1

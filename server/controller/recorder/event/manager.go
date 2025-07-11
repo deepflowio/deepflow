@@ -98,7 +98,7 @@ func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.Resour
 	if rt == "" {
 		rt = common.DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
 	}
-	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, toLoggableEvent(event), e.metadata.LogPrefixes)
+	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", e.resourceType, resourceLcuuid, toLoggableEvent(event), e.metadata.LogPrefixes)
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(rt, err))
@@ -142,7 +142,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 		if err != nil {
 			log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), e.metadata.LogPrefixes)
 		} else {
-			log.Infof("create resource_event (detail: %#v) success", dbItem, e.metadata.LogPrefixes)
+			log.Infof("create resource_event (detail: %#v, %+v) success", dbItem.ToLoggable(), toLoggableEvent(event), e.metadata.LogPrefixes)
 			return
 		}
 		log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), e.metadata.LogPrefixes)
@@ -194,7 +194,7 @@ func toLoggableEvent(e *eventapi.ResourceEvent) eventapi.ResourceEvent {
 	if configIndex >= 0 && configIndex < len(loggableEvent.AttributeValues) {
 		loggableEvent.AttributeValues = make([]string, len(e.AttributeValues))
 		copy(loggableEvent.AttributeValues, e.AttributeValues)
-		loggableEvent.AttributeValues[configIndex] = ""
+		loggableEvent.AttributeValues[configIndex] = "**HIDDEN**"
 	}
 
 	return loggableEvent

@@ -216,7 +216,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase, u.metadata.LogPrefixes)
+			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), common.ToLoggable(u.toLoggable, diffBase), u.metadata.LogPrefixes)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}

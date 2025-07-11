@@ -43,7 +43,7 @@ func (b *DataSet) AddPodGroup(dbItem *mysqlmodel.PodGroup, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]), b.metadata.LogPrefixes)
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodGroup(lcuuid string) {
@@ -64,6 +64,14 @@ type PodGroup struct {
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+}
+
+// ToLoggable converts PodGroup to a loggable format, excluding fields Spec and Metadata
+func (p PodGroup) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup, toolDataSet *tool.DataSet) {
@@ -90,5 +98,5 @@ func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup, toolDataSet *tool.Data
 
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, p.ToLoggable()))
 }
