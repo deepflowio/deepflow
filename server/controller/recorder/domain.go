@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -119,7 +120,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 	if cloudData.Verified {
-		if ((d.metadata.Domain.Type != common.CLOUD_TOWER && d.metadata.Domain.Type != common.FUSIONCOMPUTE) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
+		if (!slices.Contains(rcommon.UNCHECK_NETWORK_DOMAINS, d.metadata.Domain.Type) && len(cloudData.Networks) == 0) || len(cloudData.VInterfaces) == 0 {
 			log.Info("domain has no networks or vinterfaces, does nothing", d.metadata.LogPrefixes)
 			return DataMissingError
 		}
