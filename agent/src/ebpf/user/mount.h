@@ -153,5 +153,19 @@ void find_mount_point_path(u64 mntns_id, kern_dev_t s_dev,
 uint32_t copy_regular_file_data(int pid, void *dst, void *src, int len,
 				const char *mount_point,
 				const char *mount_source, bool is_nfs);
-
+/**
+ * @brief Check for changes in the host root mount namespace's mount information.
+ *
+ * This function periodically computes the hash of `/proc/1/mountinfo` to detect
+ * changes in the host root's mount namespace. If a change is detected, the old
+ * cached mount information is removed and the updated data is re-added to the cache.
+ *
+ * It uses PID 1 (usually the init process) as a reference for the host root mount namespace.
+ *
+ * @param output_log       Should a log be output?
+ *
+ * @note This function assumes `host_root_mountinfo_hash` and `host_root_mntns_id`
+ *       are globally defined and initialized appropriately.
+ */
+void check_root_mount_info(bool output_log);
 #endif /* DF_USER_MOUNT_H */

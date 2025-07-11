@@ -23,6 +23,7 @@
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
+#include "config.h"
 #include "symbol.h"
 #include "proc.h"
 #include "tracer.h"
@@ -1516,13 +1517,29 @@ static void check_datadump_timeout(void)
 	pthread_mutex_unlock(&datadump_mutex);
 }
 
+static inline u64 monotonic_ns()
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (u64)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+}
+
 // Manage process start or exit events.
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
 	thread_index = THREAD_PROC_EVENTS_HANDLE_IDX;
 	struct bpf_tracer *t = arg;
+	u64 proc_last_ts, mnt_last_ts, now_ts;
+	proc_last_ts = mnt_last_ts = monotonic_ns();
+	const u64 proc_intv_ns = PROCESS_CACHE_UPDATE_INTERVAL_NS;
+	const u64 mnt_intv_ns = MOUNT_CACHE_UPDATE_INTERVAL_NS;
+	const u32 log_intv = OUTPUT_LOG_INTERVAL_NS / PROCESS_CACHE_UPDATE_INTERVAL_NS;
+	u64 count = 0;
+	bool output_log;
+
 	for (;;) {
+		output_log = false;
 		/*
 		 * Will attach/detach all probes in the following cases:
 		 *
@@ -1544,6 +1561,19 @@ static void process_events_handle_main(__unused void *arg)
 		check_datadump_timeout();
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();
+		now_ts = monotonic_ns();
+		if (now_ts - proc_last_ts >= proc_intv_ns) {
+			proc_last_ts = now_ts;
+			if (++count % log_intv == 0)
+				output_log = true;
+			check_and_update_proc_info(output_log);
+		}
+
+		if (now_ts - mnt_last_ts >= mnt_intv_ns) {
+			mnt_last_ts = now_ts;
+			check_root_mount_info(output_log);
+		}
+		
 		usleep(LOOP_DELAY_US);
 	}
 }
@@ -1782,6 +1812,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
 	offset.struct_file_f_pos_offset = struct_file_f_pos_offset;
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
+	offset.struct_inode_i_sb_offset = struct_inode_i_sb_offset;	
+	offset.struct_super_block_s_dev_offset = struct_super_block_s_dev_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
 	offset.struct_dentry_name_offset = struct_dentry_name_offset;
 	offset.struct_dentry_d_parent_offset = struct_dentry_d_parent_offset;

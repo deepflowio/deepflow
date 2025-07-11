@@ -43,12 +43,6 @@
 #define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
 #define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
 
-struct symbol_cache_pids {
-	struct symbolizer_cache_kvp *exec_pids_cache;
-	struct symbolizer_cache_kvp *exit_pids_cache;
-	volatile u32 *lock;
-};
-
 /*
  * The information used to record the names of threads or processes obtained in
  * the process currently mainly includes the name and its corresponding index
@@ -262,4 +256,18 @@ char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
 				   struct tracer_probes_conf *conf,
 				   struct symbol symbols[], size_t n_symbols);
+/**
+ * @brief Check and update process information in the symbol cache.
+ *
+ * This function iterates over all key-value pairs in the process symbol cache
+ * and calls the `check_proc_kvp_cb()` callback for each pair. It is used to 
+ * validate or update cached process information, such as detecting whether a 
+ * process has exited or its metadata has changed.
+ *
+ * @param output_log       Should a log be output?
+ *
+ * This helps ensure the consistency and accuracy of the cached symbol data 
+ * associated with active processes.
+ */
+void check_and_update_proc_info(bool output_log);
 #endif /* _USER_PROC_H_ */

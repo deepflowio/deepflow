@@ -35,9 +35,51 @@
 #define MOUNT_INFO_INVAL     ((struct mount_info *)(intptr_t)-1)
 #define IS_MOUNT_INFO_ERR(ptr) (ptr == MOUNT_INFO_NULL || ptr == MOUNT_INFO_INVAL)
 mount_info_hash_t mount_info_hash;
+// Stores the mount namespace ID of the host root
+static u64 host_root_mntns_id = 0;
+
+// Stores the hash value of the host root's mountinfo data
+static u32 host_root_mountinfo_hash = 0;
+
 static bool inline enable_mount_info_cache(void)
 {
 	return (mount_info_hash.buckets != NULL);
+}
+
+static int hash_mountinfo_file(pid_t pid, u32 * out_hash)
+{
+	if (!out_hash)
+		return -1;
+
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/%d/mountinfo", pid);
+
+	FILE *fp = fopen(path, "rb");
+	if (!fp) {
+		perror("Failed to open mountinfo");
+		return -1;
+	}
+
+	const u32 seed = 0;
+	u32 hash = seed;
+
+	unsigned char buffer[4096];
+	size_t read_len;
+
+	while ((read_len = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+		hash = murmurhash(buffer, read_len, hash);
+	}
+
+	if (ferror(fp)) {
+		perror("Error reading mountinfo");
+		fclose(fp);
+		return -1;
+	}
+
+	fclose(fp);
+
+	*out_hash = hash;
+	return 0;
 }
 
 int get_mount_ns_id(pid_t pid, u64 * mntns_id)
@@ -54,9 +96,9 @@ int get_mount_ns_id(pid_t pid, u64 * mntns_id)
 
 	// Use stat() to retrieve inode number (which is the mount namespace ID)
 	if (stat(path, &st) == -1) {
-		ebpf_warning("The stat() call failed with error "
-			     "message: \"%s\", and error number: %d.",
-			     strerror(errno), errno);
+		ebpf_debug("The stat() call failed with error "
+			   "message: \"%s\", and error number: %d.",
+			   strerror(errno), errno);
 		return -1;	// errno is set by stat()
 	}
 
@@ -109,6 +151,10 @@ void find_mount_point_path(u64 mntns_id, kern_dev_t s_dev,
 
 int mount_info_cache_init(const char *name)
 {
+	// Get the mount namespace ID of the host root.
+	get_mount_ns_id(1, &host_root_mntns_id);
+	// Get host root's mountinfo data
+	hash_mountinfo_file(1, &host_root_mountinfo_hash);
 	mount_info_hash_t *h = &mount_info_hash;
 	memset(h, 0, sizeof(*h));
 	u32 nbuckets = SYMBOLIZER_CACHES_HASH_BUCKETS_NUM;
@@ -169,6 +215,8 @@ exit:
 
 static int delete_mount_info_from_cache(pid_t pid, struct mount_info *m)
 {
+	if (m->mntns_id == host_root_mntns_id)
+		return -1;
 	mount_info_hash_t *h = &mount_info_hash;
 	struct mount_cache_kvp kv;
 	kv.k.mntns_id = m->mntns_id;
@@ -299,9 +347,10 @@ int mount_info_cache_add_if_absent(pid_t pid, u64 mntns_id)
 
 		if (add_mount_info_to_cache(pid, m))
 			goto err;
-		ebpf_info("Create mount information: pid %d mntns_id %lu entry_count "
-			  "%d proc_count %d refcount %d\n",
-			  pid, m->mntns_id, m->entry_count, m->proc_count, m->refcount);
+		ebpf_info
+		    ("Create mount information: pid %d mntns_id %lu entry_count "
+		     "%d proc_count %d refcount %d\n", pid, m->mntns_id,
+		     m->entry_count, m->proc_count, m->refcount);
 	} else {
 		// It already exists in the cache; the process count needs to be incremented.
 		AO_INC(&m->proc_count);
@@ -327,11 +376,44 @@ int mount_info_cache_remove(pid_t pid, u64 mntns_id)
 	if (AO_SUB_F(&m->proc_count, 1) == 0) {
 		if (delete_mount_info_from_cache(pid, m) == 0)
 			free_mount_info(m);
+		else
+			AO_DEC(&m->refcount);
 		return 0;
 	}
 
 	AO_DEC(&m->refcount);
 	return 0;
+}
+
+// Periodically check whether the host node's mount information has changed.
+void check_root_mount_info(bool output_log)
+{
+	u32 new_hash = 0;
+	hash_mountinfo_file(1, &new_hash);
+	if (new_hash != 0 && new_hash != host_root_mountinfo_hash) {
+		u64 tmp_mntns_id = host_root_mntns_id;
+		struct mount_info *m =
+		    mount_info_cache_lookup(1, host_root_mntns_id);
+		if (!IS_MOUNT_INFO_ERR(m)) {
+			// Ensure that the root mount point can be cleaned up.
+			host_root_mntns_id = 0;
+			if (delete_mount_info_from_cache(1, m) == 0)
+				free_mount_info(m);
+			else
+				AO_DEC(&m->refcount);
+			host_root_mntns_id = tmp_mntns_id;
+		}
+
+		ebpf_info
+		    ("The mount information of the host root namespace has changed; updating the mount info.\n");
+		/*
+		 * Both process management and mount information management are
+		 * handled within the same thread in `process_events_handle_main()`,
+		 * so there is no race condition, and this is safe.
+		 */
+		mount_info_cache_add_if_absent(1, host_root_mntns_id);
+		host_root_mountinfo_hash = new_hash;
+	}
 }
 
 /*
