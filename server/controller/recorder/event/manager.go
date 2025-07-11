@@ -23,7 +23,6 @@ import (
 	"time"
 
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -90,14 +89,10 @@ func (e ManagerComponent) fillEvent(
 }
 
 func (e *ManagerComponent) enqueue(md *message.Metadata, resourceLcuuid string, event *eventapi.ResourceEvent) {
-	rt := e.resourceType
-	if rt == "" {
-		rt = common.DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
-	}
-	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, toLoggableEvent(event), md.LogPrefixes)
+	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", e.resourceType, resourceLcuuid, toLoggableEvent(event), md.LogPrefixes)
 	err := e.Queue.Put(event)
 	if err != nil {
-		log.Error(putEventIntoQueueFailed(rt, err), md.LogPrefixes)
+		log.Error(putEventIntoQueueFailed(e.resourceType, err), md.LogPrefixes)
 	}
 }
 
@@ -130,14 +125,16 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 	e.fillEvent(md, event, eventType, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
-		log.Errorf("json marshal event (detail: %#v) failed: %s", toLoggableEvent(event), err.Error(), md.LogPrefixes)
+		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), md.LogPrefixes)
 	} else {
 		dbItem := metadbmodel.ResourceEvent{
-			Domain:  domainLcuuid,
-			Content: string(content),
+			Domain:         domainLcuuid,
+			SubDomain:      md.GetSubDomainLcuuid(),
+			ResourceLcuuid: resourceLcuuid,
+			Content:        string(content),
 		}
 		if err = md.GetDB().Create(&dbItem).Error; err == nil {
-			log.Infof("create resource_event (detail: %#v) success", dbItem, md.LogPrefixes)
+			log.Infof("create resource_event (detail: %#v, %+v) success", dbItem.ToLoggable(), toLoggableEvent(event), md.LogPrefixes)
 			return
 		}
 		log.Errorf("add resource_event (detail: %#v) failed: %s", dbItem, err.Error(), md.LogPrefixes)
@@ -148,7 +145,6 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 
 func (e *ManagerComponent) convertAndEnqueue(md *message.Metadata, resourceLcuuid string, ev *eventapi.ResourceEvent) {
 	event := e.convertToEventBeEnqueued(ev)
-	// log.Infof("TODO: put event (lcuuid: %s): %#v into shared queue", resourceLcuuid, event, md.LogPrefixes)
 	e.enqueue(md, resourceLcuuid, event)
 }
 
@@ -190,7 +186,7 @@ func toLoggableEvent(e *eventapi.ResourceEvent) eventapi.ResourceEvent {
 	if configIndex >= 0 && configIndex < len(loggableEvent.AttributeValues) {
 		loggableEvent.AttributeValues = make([]string, len(e.AttributeValues))
 		copy(loggableEvent.AttributeValues, e.AttributeValues)
-		loggableEvent.AttributeValues[configIndex] = ""
+		loggableEvent.AttributeValues[configIndex] = "**HIDDEN**"
 	}
 
 	return loggableEvent
