@@ -132,60 +132,60 @@ type InProcessProfile struct {
 func ProfileColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		// profile information
-		ckdb.NewColumn("time", ckdb.DateTime),
-		ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta),
-		ckdb.NewColumn("ip4", ckdb.IPv4).SetComment("IPv4地址"),
-		ckdb.NewColumn("ip6", ckdb.IPv6).SetComment("IPV6地址"),
-		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax),
+		ckdb.NewColumn("time", ckdb.DateTime).SetGroupBy(),
+		ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta).SetIgnoredInAggrTable(),
+		ckdb.NewColumn("ip4", ckdb.IPv4).SetComment("IPv4地址").SetAggrLast(),
+		ckdb.NewColumn("ip6", ckdb.IPv6).SetComment("IPV6地址").SetAggrLast(),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax).SetAggrLast(),
 
-		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("应用名称, 用户配置上报"),
-		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("单次 profile 堆栈"),
-		ckdb.NewColumn("profile_value", ckdb.Int64).SetComment("profile self value"),
-		ckdb.NewColumn("profile_value_unit", ckdb.LowCardinalityString).SetComment("profile value 的单位"),
-		ckdb.NewColumn("profile_event_type", ckdb.LowCardinalityString).SetComment("剖析类型"),
-		ckdb.NewColumn("profile_create_timestamp", ckdb.DateTime64us).SetIndex(ckdb.IndexSet).SetComment("client 端聚合时间"),
-		ckdb.NewColumn("profile_in_timestamp", ckdb.DateTime64us).SetComment("DeepFlow 的写入时间，同批上报的批次数据具备相同的值"),
-		ckdb.NewColumn("profile_language_type", ckdb.LowCardinalityString).SetComment("语言类型"),
-		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id"),
-		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
-		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
-		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("应用实例名称, 用户上报"),
-		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("profile 上报的 tagnames"),
-		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues"),
-		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
-		ckdb.NewColumn("process_id", ckdb.UInt32).SetComment("进程 id"),
-		ckdb.NewColumn("process_start_time", ckdb.DateTime64ms).SetComment("进程启动时间"),
-		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Process"),
+		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("应用名称, 用户配置上报").SetGroupBy(),
+		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("单次 profile 堆栈").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("profile_value", ckdb.Int64).SetComment("profile self value").SetAggrLastAndSumProfileValue(),
+		ckdb.NewColumn("profile_value_unit", ckdb.LowCardinalityString).SetComment("profile value 的单位").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("profile_event_type", ckdb.LowCardinalityString).SetComment("剖析类型").SetGroupBy(),
+		ckdb.NewColumn("profile_create_timestamp", ckdb.DateTime64us).SetIndex(ckdb.IndexSet).SetComment("client 端聚合时间").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("profile_in_timestamp", ckdb.DateTime64us).SetComment("DeepFlow 的写入时间，同批上报的批次数据具备相同的值").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("profile_language_type", ckdb.LowCardinalityString).SetComment("语言类型").SetGroupBy(),
+		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("应用实例名称, 用户上报").SetAggrLast(),
+		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("profile 上报的 tagnames").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("process_id", ckdb.UInt32).SetComment("进程 id").SetGroupBy(),
+		ckdb.NewColumn("process_start_time", ckdb.DateTime64ms).SetComment("进程启动时间").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Process").SetAggrLast(),
 
 		// universal tag
-		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
-		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
-		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID"),
-		ckdb.NewColumn("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID"),
-		ckdb.NewColumn("host_id", ckdb.UInt16).SetComment("宿主机ID"),
-		ckdb.NewColumn("pod_id", ckdb.UInt32).SetComment("容器ID"),
-		ckdb.NewColumn("pod_node_id", ckdb.UInt32).SetComment("容器节点ID"),
-		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID"),
-		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID"),
-		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID"),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetIndex(ckdb.IndexSet).SetGroupBy(),
+		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID").SetAggrLast(),
+		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID").SetAggrLast(),
+		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID").SetAggrLast(),
+		ckdb.NewColumn("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID").SetAggrLast(),
+		ckdb.NewColumn("host_id", ckdb.UInt16).SetComment("宿主机ID").SetAggrLast(),
+		ckdb.NewColumn("pod_id", ckdb.UInt32).SetComment("容器ID").SetAggrLast(),
+		ckdb.NewColumn("pod_node_id", ckdb.UInt32).SetComment("容器节点ID").SetAggrLast(),
+		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID").SetAggrLast(),
+		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID").SetAggrLast(),
+		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID").SetAggrLast(),
 
-		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
-		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
-		ckdb.NewColumn("auto_service_id", ckdb.UInt32),
-		ckdb.NewColumn("auto_service_type", ckdb.UInt8),
+		ckdb.NewColumn("auto_instance_id", ckdb.UInt32).SetAggrLast(),
+		ckdb.NewColumn("auto_instance_type", ckdb.UInt8).SetAggrLast(),
+		ckdb.NewColumn("auto_service_id", ckdb.UInt32).SetAggrLast(),
+		ckdb.NewColumn("auto_service_type", ckdb.UInt8).SetAggrLast(),
 
-		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
-		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
-		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
-		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("团队ID"),
+		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型").SetAggrLast(),
+		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID").SetAggrLast(),
+		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID").SetAggrLast(),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("团队ID").SetAggrLast(),
 	}
 }
 
 func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"app_service", "profile_language_type", timeKey, "ip4", "ip6"}
+	orderKeys := []string{"app_service", "profile_language_type", timeKey}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -203,6 +203,7 @@ func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType strin
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
+		Aggr1S:          true,
 	}
 }
 
