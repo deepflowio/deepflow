@@ -18,6 +18,7 @@ package huawei
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -169,7 +170,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 				FixedIPPort:      fixedIPPort,
 			},
 		)
-		if !common.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
+		if !slices.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
 			h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
 		}
 	}
@@ -216,7 +217,7 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 				FixedIP:          fixedIP,
 			},
 		)
-		if !common.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
+		if !slices.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
 			h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
 		}
 	}

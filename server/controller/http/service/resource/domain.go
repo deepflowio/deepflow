@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1132,7 +1133,7 @@ func (c *DomainChecker) checkAndAllocateController(db *metadb.DB) {
 		json.Unmarshal([]byte(domain.Config), &config)
 		regionLcuuid := config["region_uuid"].(string)
 		healthyControllerIPs := regionLcuuidToHealthyControllerIPs[regionLcuuid]
-		if !common.Contains(healthyControllerIPs, domain.ControllerIP) {
+		if !slices.Contains(healthyControllerIPs, domain.ControllerIP) {
 			length := len(healthyControllerIPs)
 			if length > 0 {
 				ip := healthyControllerIPs[rand.Intn(length)]

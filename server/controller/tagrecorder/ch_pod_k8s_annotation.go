@@ -65,8 +65,8 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 	targetsToDelete := make([]metadbmodel.ChPodK8sAnnotation, 0)
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		_, new := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
-		_, old := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
+		_, new := StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
+		_, old := StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
 
 		for k, v := range new {
 			targetKey := NewIDKeyKey(sourceID, k)
@@ -117,7 +117,7 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKeyKey, targets []metadbmodel.ChPodK8sAnnotation) {
-	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
+	_, annotationMap := StrToJsonAndMap(source.Annotation)
 
 	for k, v := range annotationMap {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
