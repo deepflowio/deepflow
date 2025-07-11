@@ -19,6 +19,7 @@ package tagrecorder
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -261,7 +262,7 @@ func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
 				}
-			} else if !common.Contains(nameSlice, "lo") {
+			} else if !slices.Contains(nameSlice, "lo") {
 				vTapPort.Name = strings.Join([]string{"lo", vTapPort.Name}, ", ")
 			}
 			if len(vTapPort.Name) > vTapPortNameLength {

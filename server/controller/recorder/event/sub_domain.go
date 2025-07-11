@@ -65,7 +65,7 @@ func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 		if event.Type == eventapi.RESOURCE_EVENT_TYPE_RECREATE {
 			r.fillRecreatePodEvent(md, event)
 			r.convertAndEnqueue(md, item.ResourceLcuuid, event)
-		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP}, event.Type) {
+		} else if slices.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP}, event.Type) {
 			r.fillL3DeviceInfo(md, event)
 			r.convertAndEnqueue(md, item.ResourceLcuuid, event)
 		} else if slices.Contains([]string{

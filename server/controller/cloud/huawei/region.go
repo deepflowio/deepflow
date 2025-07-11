@@ -18,6 +18,7 @@ package huawei
 
 import (
 	"fmt"
+	"slices"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -42,7 +43,7 @@ func (h *HuaWei) getRegions() ([]model.Region, error) {
 			continue
 		}
 		id := jr.Get("id").MustString()
-		if len(includedRegionIDs) > 0 && !common.Contains(includedRegionIDs, id) {
+		if len(includedRegionIDs) > 0 && !slices.Contains(includedRegionIDs, id) {
 			log.Infof("exclude region: %s, not included", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}

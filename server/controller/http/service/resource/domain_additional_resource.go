@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -217,13 +218,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 				fmt.Sprintf("subnet (name: %s) domain (uuid: %s) not found", subnet.Name, subnet.DomainUUID),
 			)
 		}
-		if subnet.AZUUID != "" && !common.Contains(toolDS.azUUIDs, subnet.AZUUID) {
+		if subnet.AZUUID != "" && !slices.Contains(toolDS.azUUIDs, subnet.AZUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) az (uuid: %s) not found", subnet.Name, subnet.AZUUID),
 			)
 		}
-		if !common.Contains(toolDS.vpcUUIDs, subnet.VPCUUID) {
+		if !slices.Contains(toolDS.vpcUUIDs, subnet.VPCUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) vpc (uuid: %s) not found", subnet.Name, subnet.VPCUUID),
@@ -264,7 +265,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 				fmt.Sprintf("host (name: %s) domain (uuid: %s) not found", host.Name, host.DomainUUID),
 			)
 		}
-		if !common.Contains(toolDS.azUUIDs, host.AZUUID) {
+		if !slices.Contains(toolDS.azUUIDs, host.AZUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("host (name: %s) az (uuid: %s) not found", host.Name, host.AZUUID),
@@ -308,13 +309,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 				fmt.Sprintf("chost (name: %s) domain (uuid: %s) not found", chost.Name, chost.DomainUUID),
 			)
 		}
-		if !common.Contains(toolDS.azUUIDs, chost.AZUUID) {
+		if !slices.Contains(toolDS.azUUIDs, chost.AZUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) az (uuid: %s) not found", chost.Name, chost.AZUUID),
 			)
 		}
-		if !common.Contains(toolDS.vpcUUIDs, chost.VPCUUID) {
+		if !slices.Contains(toolDS.vpcUUIDs, chost.VPCUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", chost.Name, chost.VPCUUID),
@@ -351,7 +352,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 				fmt.Sprintf("lb (name: %s) domain (uuid: %s) region(: %s) not found", lb.Name, lb.DomainUUID, lb.RegionUUID),
 			)
 		}
-		if !common.Contains(toolDS.vpcUUIDs, lb.VPCUUID) {
+		if !slices.Contains(toolDS.vpcUUIDs, lb.VPCUUID) {
 			return nil, response.ServiceError(
 				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", lb.Name, lb.VPCUUID),
@@ -486,14 +487,14 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 				fmt.Sprintf("domain (uuid: %s) cannot be associated region", peerConn.DomainUUID),
 			)
 		}
-		if !common.Contains[string](regionUUIDs, peerConn.LocalRegionUUID) {
+		if !slices.Contains(regionUUIDs, peerConn.LocalRegionUUID) {
 			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated with local region (uuid: %s), support regions: %#v",
 					peerConn.DomainUUID, peerConn.LocalRegionUUID, regionUUIDs),
 			)
 		}
-		if !common.Contains[string](regionUUIDs, peerConn.RemoteRegionUUID) {
+		if !slices.Contains(regionUUIDs, peerConn.RemoteRegionUUID) {
 			return nil, response.ServiceError(
 				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("domain (uuid: %s) cannot be associated with remote region (uuid: %s), support regions: %#v",

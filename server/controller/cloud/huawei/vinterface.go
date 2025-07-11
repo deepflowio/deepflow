@@ -18,6 +18,7 @@ package huawei
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -73,7 +74,7 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 
 			h.formatVInterfaceRelatedToolDataSet(jPort, deviceID, deviceOwner, network.VPCLcuuid)
 
-			if !common.Contains([]string{DEVICE_OWNER_DHCP, DEVICE_OWNER_ROUTER_GW, DEVICE_OWNER_VM, DEVICE_OWNER_ROUTER_IFACE}, deviceOwner) && !strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
+			if !slices.Contains([]string{DEVICE_OWNER_DHCP, DEVICE_OWNER_ROUTER_GW, DEVICE_OWNER_VM, DEVICE_OWNER_ROUTER_IFACE}, deviceOwner) && !strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
 				log.Infof("exclude vinterface: %s, %s", mac, deviceOwner, logger.NewORGPrefix(h.orgID))
 				continue
 			}

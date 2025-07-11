@@ -21,19 +21,6 @@ import (
 	"strings"
 )
 
-type Comparable interface {
-	~int | ~string
-}
-
-func Contains[T Comparable](slice []T, val T) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
-}
-
 // a:b,c:d -> {"a":"b","c":"d"}, map[string]string{"a":"b","c":"d"}
 func StrToJsonAndMap(str string) (resJson string, resMap map[string]string) {
 	if str == "" {
