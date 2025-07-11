@@ -274,9 +274,5 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		structInfo.CreatedAt.Set(diffBase.CreatedAt, cloudItem.CreatedAt)
 	}
 
-	if len(mapInfo) > 0 {
-		structInfo.Name.SetNew(cloudItem.Name)
-	}
-
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
