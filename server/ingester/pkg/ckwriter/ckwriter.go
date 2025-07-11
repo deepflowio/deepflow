@@ -285,6 +285,22 @@ func initTable(conn *ch.Client, timeZone string, t *ckdb.Table, orgID uint16) er
 		}
 	}
 
+	if t.Aggr1S {
+		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1S(orgID)); err != nil {
+			log.Warningf("create 1h agg table failed: %s", err)
+		}
+		if err := ExecSQL(conn, t.MakeAggrMVTableCreateSQL1S(orgID)); err != nil {
+			log.Warningf("create 1h mv table failed: %s", err)
+		}
+		if err := ExecSQL(conn, t.MakeAggrLocalTableCreateSQL1S(orgID)); err != nil {
+			log.Warningf("create 1h local table failed: %s", err)
+		}
+		if err := ExecSQL(conn, t.MakeAggrGlobalTableCreateSQL1S(orgID)); err != nil {
+			log.Warningf("create 1h global table failed: %s", err)
+		}
+
+	}
+
 	// ByConity not support modify timezone
 	if t.DBType == ckdb.CKDBTypeByconity {
 		return nil
