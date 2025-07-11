@@ -184,4 +184,39 @@ strcpy_s_inline(void *__restrict__ dest, rsize_t dmax,
 	return err;
 }
 
+/**
+ * @brief Concatenates two strings into a destination buffer with truncation protection.
+ *
+ * This function copies `s1` and `s2` into `dst` sequentially,
+ * ensuring that the total length does not exceed `dst_len - 1`
+ * (reserving space for the null terminator).
+ *
+ * If the combined length of `s1` and `s2` exceeds `dst_len - 1`,
+ * the result will be truncated safely and always null-terminated.
+ *
+ * @param s1       First input string (null-terminated).
+ * @param s2       Second input string (null-terminated).
+ * @param dst      Destination buffer to write concatenated result.
+ * @param dst_len  Size of the destination buffer (including null terminator).
+ *
+ * @return The number of characters written to `dst`, excluding the null terminator.
+ */
+static_always_inline int fast_strncat_trunc(const char *s1, const char *s2, char *dst,
+					    size_t dst_len)
+{
+	const char *p1 = s1, *p2 = s2;
+	char *d = dst;
+	char *end = dst + dst_len - 1;	// leave room for '\0'
+
+	// Copy s1
+	while (*p1 && d < end)
+		*d++ = *p1++;
+
+	// Copy s2
+	while (*p2 && d < end)
+		*d++ = *p2++;
+
+	*d = '\0';
+	return (int)(d - dst);
+}
 #endif /* included_string_h */

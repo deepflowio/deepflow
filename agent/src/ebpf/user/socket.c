@@ -23,6 +23,7 @@
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
+#include "config.h"
 #include "symbol.h"
 #include "proc.h"
 #include "tracer.h"
@@ -1516,13 +1517,29 @@ static void check_datadump_timeout(void)
 	pthread_mutex_unlock(&datadump_mutex);
 }
 
+static inline u64 monotonic_ns()
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (u64)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+}
+
 // Manage process start or exit events.
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
 	thread_index = THREAD_PROC_EVENTS_HANDLE_IDX;
 	struct bpf_tracer *t = arg;
+	u64 proc_last_ts, mnt_last_ts, now_ts;
+	proc_last_ts = mnt_last_ts = monotonic_ns();
+	const u64 proc_intv_ns = PROCESS_CACHE_UPDATE_INTERVAL_NS;
+	const u64 mnt_intv_ns = MOUNT_CACHE_UPDATE_INTERVAL_NS;
+	const u32 log_intv = OUTPUT_LOG_INTERVAL_NS / PROCESS_CACHE_UPDATE_INTERVAL_NS;
+	u64 count = 0;
+	bool output_log;
+
 	for (;;) {
+		output_log = false;
 		/*
 		 * Will attach/detach all probes in the following cases:
 		 *
@@ -1544,6 +1561,20 @@ static void process_events_handle_main(__unused void *arg)
 		check_datadump_timeout();
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();
+		now_ts = monotonic_ns();
+		if (now_ts - proc_last_ts >= proc_intv_ns) {
+			proc_last_ts = now_ts;
+			if (++count % log_intv == 0)
+				output_log = true;
+			check_and_update_proc_info(output_log);
+			collect_mount_info_stats(output_log);
+		}
+
+		if (now_ts - mnt_last_ts >= mnt_intv_ns) {
+			mnt_last_ts = now_ts;
+			check_root_mount_info(output_log);
+		}
+		
 		usleep(LOOP_DELAY_US);
 	}
 }
@@ -1782,6 +1813,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
 	offset.struct_file_f_pos_offset = struct_file_f_pos_offset;
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
+	offset.struct_inode_i_sb_offset = struct_inode_i_sb_offset;	
+	offset.struct_super_block_s_dev_offset = struct_super_block_s_dev_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
 	offset.struct_dentry_name_offset = struct_dentry_name_offset;
 	offset.struct_dentry_d_parent_offset = struct_dentry_d_parent_offset;
@@ -3060,18 +3093,18 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 	return bytes;
 }
 
-static int get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize);
 int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf, int buf_len)
 {
 	char *mount_file_tag;
-	char file_path[128], path[MAX_PATH_LENGTH];
+	char file_path[128];
 	snprintf(file_path, sizeof(file_path), "/proc/%d/mountinfo", pid);
  	if (access(file_path, F_OK) == 0)
 		mount_file_tag = "exist";
 	else
 		mount_file_tag = "not exist";
 
-	get_fd_path(pid, fd, path, sizeof(path));
+	//char path[MAX_PATH_LENGTH];
+	//get_fd_path(pid, fd, path, sizeof(path));
 	int bytes = 0;
 	struct user_io_event_buffer *event =
 	    (struct user_io_event_buffer *)data;
@@ -3080,16 +3113,16 @@ int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf,
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-				 "latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s path=[%s]\n",
+				 "latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
 				 event->bytes_count, event->operation,
 				 event->offset, event->latency, event->filename,
-				 path_len, mount_file_tag, path);
+				 path_len, mount_file_tag);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-			"latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s path=[%s]\n",
+			"latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
 			event->bytes_count, event->operation, event->offset,
-			event->latency, event->filename, path_len, mount_file_tag, path);
+			event->latency, event->filename, path_len, mount_file_tag);
 
 		fflush(stdout);
 	}
@@ -3282,7 +3315,7 @@ static bool allow_datadump(struct socket_bpf_data *sd)
 	return output;
 }
 
-static int get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
+static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
 {
 	char link_path[64];
 	snprintf(link_path, sizeof(link_path), "/proc/%d/fd/%u", pid, fd);
