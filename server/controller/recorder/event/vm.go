@@ -45,7 +45,7 @@ type VM struct {
 func NewVM(q *queue.OverwriteQueue) *VM {
 	mng := &VM{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
 		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 	}
 	mng.SetSubscriberSelf(mng)
@@ -83,20 +83,20 @@ func (v *VM) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 }
 
 func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	updatedFields := msg.(*message.VMFieldsUpdate)
+	updateMsg := msg.(*message.VMUpdate)
+	dbItemNew := updateMsg.GetNewMySQLItem().(*metadbmodel.VM)
+	updatedFields := updateMsg.GetFields().(*message.VMFieldsUpdate)
 	id := updatedFields.GetID()
-	lcuuid := updatedFields.GetLcuuid()
-	name := updatedFields.Name.GetNew()
 
 	var eType string
 	var description string
 	if updatedFields.LaunchServer.IsDifferent() {
 		eType = eventapi.RESOURCE_EVENT_TYPE_MIGRATE
-		description = fmt.Sprintf(DESCMigrateFormat, name, updatedFields.LaunchServer.GetOld(), updatedFields.LaunchServer.GetNew())
+		description = fmt.Sprintf(DESCMigrateFormat, dbItemNew.Name, updatedFields.LaunchServer.GetOld(), updatedFields.LaunchServer.GetNew())
 	}
 	if updatedFields.State.IsDifferent() {
 		eType = eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE
-		description = fmt.Sprintf(DESCStateChangeFormat, name,
+		description = fmt.Sprintf(DESCStateChangeFormat, dbItemNew.Name,
 			VMStateToString[updatedFields.State.GetOld()], VMStateToString[updatedFields.State.GetNew()])
 	}
 	if eType == "" {
@@ -117,9 +117,9 @@ func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	}
 	v.createInstanceAndEnqueue(
 		md,
-		lcuuid,
+		updatedFields.GetLcuuid(),
 		eType,
-		name,
+		dbItemNew.Name,
 		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 		id,
 		opts...,

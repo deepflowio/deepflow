@@ -28,6 +28,13 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
+var (
+	podStateToString = map[int]string{
+		ctrlrcommon.POD_STATE_RUNNING:   "running",
+		ctrlrcommon.POD_STATE_EXCEPTION: "exception",
+	}
+)
+
 type Pod struct {
 	ManagerComponent
 	CUDSubscriberComponent
@@ -38,7 +45,7 @@ type Pod struct {
 func NewPod(q *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD,
 		newTool(),
 	}
@@ -103,54 +110,53 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 }
 
 func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	updatedFields := msg.(*message.PodFieldsUpdate)
-	if updatedFields.CreatedAt.IsDifferent() && updatedFields.PodNodeID.IsDifferent() {
-		var (
-			err error
-		)
-		id := updatedFields.GetID()
-		name := updatedFields.Name.GetNew()
+	updateMsg := msg.(*message.PodUpdate)
+	dbItemNew := updateMsg.GetNewMySQLItem().(*metadbmodel.Pod)
+	updatedFields := updateMsg.GetFields().(*message.PodFieldsUpdate)
 
+	var eType string
+	var description string
+	if updatedFields.State.IsDifferent() {
+		eType = eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE
+		description = fmt.Sprintf(DESCStateChangeFormat, dbItemNew.Name,
+			podStateToString[updatedFields.State.GetOld()], podStateToString[updatedFields.State.GetNew()])
+	}
+	if updatedFields.CreatedAt.IsDifferent() && updatedFields.PodNodeID.IsDifferent() {
+		eType = eventapi.RESOURCE_EVENT_TYPE_RECREATE
 		oldPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetOld())
 		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixes)
+			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
 		}
-
 		newPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetNew())
 		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, id), err, md.LogPrefixes)
+			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
 		}
-
-		nIDs, ips := p.getIPNetworksByID(md, id)
-		var domainLcuuid string
-		info, err := md.GetToolDataSet().GetPodInfoByID(id)
-		if err != nil {
-			log.Error(err)
-		} else {
-			domainLcuuid = info.DomainLcuuid
-		}
-		opts := []eventapi.TagFieldOption{
-			eventapi.TagDescription(fmt.Sprintf(DESCRecreateFormat, name, oldPodNodeName, newPodNodeName)),
-			eventapi.TagAttributeSubnetIDs(nIDs),
-			eventapi.TagAttributeIPs(ips),
-		}
-		if len(nIDs) > 0 {
-			opts = append(opts, eventapi.TagSubnetID(nIDs[0]))
-		}
-		if len(ips) > 0 {
-			opts = append(opts, eventapi.TagIP(ips[0]))
-		}
-		p.enqueueInstanceIfInsertIntoMySQLFailed(
-			md,
-			updatedFields.GetLcuuid(),
-			domainLcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_RECREATE,
-			name,
-			p.deviceType,
-			id,
-			opts...,
-		)
+		description = fmt.Sprintf(DESCRecreateFormat, dbItemNew.Name, oldPodNodeName, newPodNodeName)
 	}
+
+	nIDs, ips := p.getIPNetworksByID(md, updatedFields.GetID()) // TODO 用途
+	opts := []eventapi.TagFieldOption{
+		eventapi.TagDescription(description),
+		eventapi.TagAttributeSubnetIDs(nIDs),
+		eventapi.TagAttributeIPs(ips),
+	}
+	if len(nIDs) > 0 {
+		opts = append(opts, eventapi.TagSubnetID(nIDs[0]))
+	}
+	if len(ips) > 0 {
+		opts = append(opts, eventapi.TagIP(ips[0]))
+	}
+
+	p.enqueueInstanceIfInsertIntoMySQLFailed(
+		md,
+		updatedFields.GetLcuuid(),
+		dbItemNew.Domain,
+		eType,
+		dbItemNew.Name,
+		p.deviceType,
+		updatedFields.GetID(),
+		opts...,
+	)
 }
 
 func (p *Pod) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
