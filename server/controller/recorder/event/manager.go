@@ -94,7 +94,7 @@ func (e *ManagerComponent) enqueue(md *message.Metadata, resourceLcuuid string, 
 	if rt == "" {
 		rt = common.DEVICE_TYPE_INT_TO_STR[int(event.InstanceType)]
 	}
-	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, event, md.LogPrefixes)
+	log.Infof("put %s event (lcuuid: %s): %+v into shared queue", rt, resourceLcuuid, toLoggableEvent(event), md.LogPrefixes)
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(rt, err), md.LogPrefixes)
@@ -130,7 +130,7 @@ func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
 	e.fillEvent(md, event, eventType, options...)
 	content, err := json.Marshal(event)
 	if err != nil {
-		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), md.LogPrefixes)
+		log.Errorf("json marshal event (detail: %#v) failed: %s", toLoggableEvent(event), err.Error(), md.LogPrefixes)
 	} else {
 		dbItem := metadbmodel.ResourceEvent{
 			Domain:  domainLcuuid,
@@ -165,4 +165,33 @@ func (e *ManagerComponent) convertToEventBeEnqueued(ev *eventapi.ResourceEvent) 
 	}
 
 	return event
+}
+
+// toLoggableEvent 隐藏配置事件中的 config 信息，避免泄露、打印过多日志
+func toLoggableEvent(e *eventapi.ResourceEvent) eventapi.ResourceEvent {
+	if e == nil {
+		return eventapi.ResourceEvent{}
+	}
+
+	loggableEvent := *e
+
+	if len(loggableEvent.AttributeNames) == 0 || len(loggableEvent.AttributeValues) == 0 {
+		return loggableEvent
+	}
+
+	configIndex := -1
+	for i, name := range loggableEvent.AttributeNames {
+		if name == eventapi.AttributeNameConfig {
+			configIndex = i
+			break
+		}
+	}
+
+	if configIndex >= 0 && configIndex < len(loggableEvent.AttributeValues) {
+		loggableEvent.AttributeValues = make([]string, len(e.AttributeValues))
+		copy(loggableEvent.AttributeValues, e.AttributeValues)
+		loggableEvent.AttributeValues[configIndex] = ""
+	}
+
+	return loggableEvent
 }
