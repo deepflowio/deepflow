@@ -31,6 +31,12 @@ type ResourceEvent struct {
 	CreatedAt      time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
 
+func (e ResourceEvent) ToLoggable() interface{} {
+	copied := e
+	copied.Content = "**HIDDEN**" // Hide content in logs
+	return copied
+}
+
 type DomainAdditionalResource struct {
 	ID                int             `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
 	Domain            string          `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
@@ -890,28 +896,10 @@ func (p PodService) GetSubDomainLcuuid() string {
 }
 
 func (p PodService) ToLoggable() interface{} {
-	return PodService{
-		Base:             p.Base,
-		SoftDeleteBase:   p.SoftDeleteBase,
-		Name:             p.Name,
-		Label:            p.Label,
-		Annotation:       p.Annotation,
-		Alias:            p.Alias,
-		Type:             p.Type,
-		Selector:         p.Selector,
-		ExternalIP:       p.ExternalIP,
-		ServiceClusterIP: p.ServiceClusterIP,
-		MetadataHash:     p.MetadataHash,
-		SpecHash:         p.SpecHash,
-		PodIngressID:     p.PodIngressID,
-		PodNamespaceID:   p.PodNamespaceID,
-		PodClusterID:     p.PodClusterID,
-		VPCID:            p.VPCID,
-		AZ:               p.AZ,
-		Region:           p.Region,
-		SubDomain:        p.SubDomain,
-		Domain:           p.Domain,
-	}
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodServicePort struct {
@@ -956,23 +944,10 @@ func (p PodGroup) GetSubDomainLcuuid() string {
 }
 
 func (p PodGroup) ToLoggable() interface{} {
-	return PodGroup{
-		Base:           p.Base,
-		SoftDeleteBase: p.SoftDeleteBase,
-		Name:           p.Name,
-		Alias:          p.Alias,
-		Type:           p.Type,
-		PodNum:         p.PodNum,
-		Label:          p.Label,
-		MetadataHash:   p.MetadataHash,
-		SpecHash:       p.SpecHash,
-		PodNamespaceID: p.PodNamespaceID,
-		PodClusterID:   p.PodClusterID,
-		AZ:             p.AZ,
-		Region:         p.Region,
-		SubDomain:      p.SubDomain,
-		Domain:         p.Domain,
-	}
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupPort struct {
@@ -1097,20 +1072,9 @@ func (p ConfigMap) GetSubDomainLcuuid() string {
 }
 
 func (p ConfigMap) ToLoggable() interface{} {
-	return ConfigMap{
-		Base:           p.Base,
-		SoftDeleteBase: p.SoftDeleteBase,
-		Name:           p.Name,
-		DataHash:       p.DataHash,
-		PodNamespaceID: p.PodNamespaceID,
-		PodClusterID:   p.PodClusterID,
-		VPCID:          p.VPCID,
-		AZ:             p.AZ,
-		Region:         p.Region,
-		SubDomain:      p.SubDomain,
-		Domain:         p.Domain,
-		SyncedAt:       p.SyncedAt,
-	}
+	copied := p
+	copied.Data = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupConfigMapConnection struct {
