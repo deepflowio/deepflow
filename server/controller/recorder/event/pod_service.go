@@ -94,11 +94,11 @@ func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase 
 		return
 	}
 
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(diffBase.Lcuuid)
-		if !ok {
-			log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
-			return
-		}
+	id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(diffBase.Lcuuid)
+	if !ok {
+		log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
+		return
+	}
 
 	var opts []eventapi.TagFieldOption
 	old := JoinMetadataAndSpec(diffBase.Metadata, diffBase.Spec)
