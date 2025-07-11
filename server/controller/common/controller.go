@@ -85,9 +85,3 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 	}
 	return
 }
-
-func CheckSelfAndGetMasterControllerHostPort() (ok bool, masterCtrlIP string, httpPort, grpcPort int, err error) {
-	curCtrlIP := GetPodIP()
-	masterCtrlIP, httpPort, grpcPort, err = GetMasterControllerHostPort()
-	return curCtrlIP == masterCtrlIP, masterCtrlIP, httpPort, grpcPort, err
-}

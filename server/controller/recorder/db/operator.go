@@ -17,9 +17,9 @@
 package db
 
 import (
+	"slices"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -163,7 +163,7 @@ func (o OperatorBase[MPT, MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[st
 	lcuuidToItem := make(map[string]*MT)
 	for _, item := range items {
 		lcuuid := MPT(item).GetLcuuid()
-		if common.Contains(lcuuids, lcuuid) {
+		if slices.Contains(lcuuids, lcuuid) {
 			log.Infof("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid, o.metadata.LogPrefixes)
 		} else {
 			dedupItems = append(dedupItems, item)
@@ -193,7 +193,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 				if !exists {
 					continue
 				}
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
 					dupItemIDs = append(dupItemIDs, id)
 				}
@@ -210,7 +210,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 			dupLcuuids := []string{}
 			for _, dupItem := range dupItems {
 				lcuuid := MPT(dupItem).GetLcuuid()
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
 				}
 			}
@@ -220,7 +220,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 			dedupItems := make([]*MT, 0, count)
 			dedupLcuuids := make([]string, 0, count)
 			for lcuuid, dbItem := range lcuuidToItem {
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dedupItems = append(dedupItems, dbItem)
 					dedupLcuuids = append(dedupLcuuids, lcuuid)
 				}

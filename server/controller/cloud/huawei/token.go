@@ -18,10 +18,10 @@ package huawei
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -139,7 +139,7 @@ func (h *HuaWei) refreshTokenMap() error {
 	}
 
 	for p, t := range h.projectTokenMap {
-		if !common.Contains(projectIDs, p.id) {
+		if !slices.Contains(projectIDs, p.id) {
 			log.Infof("exclude project: %+v, not in project list: %+v", p, jProjects, logger.NewORGPrefix(h.orgID))
 			delete(h.projectTokenMap, p)
 			continue
