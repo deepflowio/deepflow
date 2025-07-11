@@ -355,7 +355,7 @@ func (op *PolicyDataOP) generateRawData() {
 	vtapGroups := dbDataCache.GetVTapGroupsIDAndLcuuid()
 
 	rawData := newPolicyRawData()
-	vtapGroupLcuuidToID := map[string]int{}
+	vtapGroupLcuuidToID := make(map[string]int, len(vtapGroups))
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
@@ -367,6 +367,7 @@ func (op *PolicyDataOP) generateRawData() {
 		}
 		rawData.vtapGroupIDToAgentIDs[vtapGroupID] = append(rawData.vtapGroupIDToAgentIDs[vtapGroupID], vtap.ID)
 	}
+	log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v", rawData.vtapGroupIDToAgentIDs))
 
 	for _, npbTunnel := range npbTunnels {
 		rawData.idToNpbTunnel[npbTunnel.ID] = npbTunnel
@@ -644,6 +645,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*agent.
 							log.Errorf(op.Logf("not found agent in vtap group id(%d)", vtapGroupIDInt))
 							continue
 						}
+						log.Infof(op.Logf("TODO vtapGroupIDToAgentIDs: %v, vtapGroupID: %d, agentIDs: %v", rawData.vtapGroupIDToAgentIDs, vtapGroupIDInt, agentIDs))
 						for _, agentID := range agentIDs {
 							agentIDToNpbActions[agentID] = append(agentIDToNpbActions[agentID], npbAction)
 						}
