@@ -401,7 +401,7 @@ var changeSensitiveResourceTypes = []string{
 func isPlatformDataChanged(updaters []updater.ResourceUpdater) bool {
 	changed := false
 	for _, updater := range updaters {
-		if common.Contains(changeSensitiveResourceTypes, updater.GetResourceType()) {
+		if slices.Contains(changeSensitiveResourceTypes, updater.GetResourceType()) {
 			changed = changed || updater.GetChanged()
 		}
 	}
