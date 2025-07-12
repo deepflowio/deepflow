@@ -582,7 +582,7 @@ struct clear_list_elem {
 static bool inline insert_list(void *elt, uint32_t len, struct list_head *h)
 {
 	struct clear_list_elem *cle;
-	cle = calloc(sizeof(*cle) + len, 1);
+	cle = calloc(1, sizeof(*cle) + len);
 	if (cle == NULL) {
 		ebpf_warning("calloc() failed.\n");
 		return false;
