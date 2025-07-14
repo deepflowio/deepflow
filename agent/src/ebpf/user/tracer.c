@@ -573,6 +573,7 @@ int load_ebpf_object(struct ebpf_object *obj)
 			     obj->name, strerror(errno), errno);
 		if (!strcmp(obj->name, "socket-trace-bpf-linux-kfunc")) {
 			ebpf_info("Try other eBPF bytecode binaries ...\n");
+			release_object(obj);
 			return ret;
 		}
 
@@ -599,6 +600,7 @@ int load_ebpf_object(struct ebpf_object *obj)
 
 		ebpf_warning("eBPF load failed, If you want to run normally, "
 			     "you can disable the eBPF feature.\n");
+		release_object(obj);
 	}
 
 	return ret;
