@@ -1,77 +1,76 @@
-config:
-  secret:
-    kube_token:
-      type: directory
-      path: /var/run/secrets/kubernetes.io/serviceaccount
-  sources:
-    cadvisor_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
-      auth:
-        strategy: bearer
-        token: SECRET[kube_token.token]
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-      tls:
-        verify_certificate: false
-    kubelet_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
-      auth:
-        strategy: bearer
-        token: SECRET[kube_token.token]
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-      tls:
-        verify_certificate: false
-    kube_state_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - http://opensource-kube-state-metrics:8080/metrics
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-  transforms:
-    cadvisor_relabel_filter:
-      type: filter
-      inputs:
-      - cadvisor_metrics
-      condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
-    kubelet_relabel_filter:
-      type: filter
-      inputs:
-      - kubelet_metrics
-      condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
-    kube_state_relabel_filter:
-      type: filter
-      inputs:
-      - kube_state_metrics
-      condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
-    common_relabel_config:
-      type: remap
-      inputs:
-      - cadvisor_relabel_filter
-      - kubelet_relabel_filter
-      - kube_state_relabel_filter
-      source: |-
-        if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
-        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
-        }
-  sinks:
-    prometheus_remote_write:
-      type: prometheus_remote_write
-      inputs:
-      - common_relabel_config
-      endpoint: http://127.0.0.1:38086/api/v1/prometheus
-      healthcheck:
-        enabled: false
+secret:
+  kube_token:
+    type: directory
+    path: /var/run/secrets/kubernetes.io/serviceaccount
+sources:
+  cadvisor_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
+    auth:
+      strategy: bearer
+      token: SECRET[kube_token.token]
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+    tls:
+      verify_certificate: false
+  kubelet_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+    auth:
+      strategy: bearer
+      token: SECRET[kube_token.token]
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+    tls:
+      verify_certificate: false
+  kube_state_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://opensource-kube-state-metrics:8080/metrics
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+transforms:
+  cadvisor_relabel_filter:
+    type: filter
+    inputs:
+    - cadvisor_metrics
+    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+  kubelet_relabel_filter:
+    type: filter
+    inputs:
+    - kubelet_metrics
+    condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
+  kube_state_relabel_filter:
+    type: filter
+    inputs:
+    - kube_state_metrics
+    condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
+  common_relabel_config:
+    type: remap
+    inputs:
+    - cadvisor_relabel_filter
+    - kubelet_relabel_filter
+    - kube_state_relabel_filter
+    source: |-
+      if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
+      .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
+      }
+sinks:
+  prometheus_remote_write:
+    type: prometheus_remote_write
+    inputs:
+    - common_relabel_config
+    endpoint: http://127.0.0.1:38086/api/v1/prometheus
+    healthcheck:
+      enabled: false
