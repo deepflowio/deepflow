@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: agent - eBPF Fix the error when handling eBPF load failure [#10090](https://github.com/deepflowio/deepflow/pull/10090) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -71,8 +72,8 @@
 * feature: adds system alarm of recorder cleaner [#8588](https://github.com/deepflowio/deepflow/pull/8588) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 
 #### Documentation
+* docs: remove first level config [#10086](https://github.com/deepflowio/deepflow/pull/10086) by [taloric](https://github.com/taloric)
 * docs: update agent config doc [#8661](https://github.com/deepflowio/deepflow/pull/8661) by [sharang](https://github.com/sharang)
-
 
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
