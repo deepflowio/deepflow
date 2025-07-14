@@ -93,7 +93,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*metadbmodel.Hos
 		State:      ctrlrcommon.HOST_STATE_COMPLETE,
 		AZ:         cloudItem.AZLcuuid,
 		Region:     cloudItem.RegionLcuuid,
-		Domain:     h.metadata.Domain.Lcuuid,
+		Domain:     h.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

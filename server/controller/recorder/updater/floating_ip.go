@@ -112,7 +112,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*met
 		return nil, false
 	}
 	dbItem := &metadbmodel.FloatingIP{
-		Domain:    f.metadata.Domain.Lcuuid,
+		Domain:    f.metadata.GetDomainLcuuid(),
 		Region:    cloudItem.RegionLcuuid,
 		IP:        ip,
 		NetworkID: networkID,

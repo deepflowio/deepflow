@@ -89,7 +89,7 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 	}
 
 	dbItem := &metadbmodel.VMPodNodeConnection{
-		Domain:    c.metadata.Domain.Lcuuid,
+		Domain:    c.metadata.GetDomainLcuuid(),
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
 		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),

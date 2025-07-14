@@ -93,7 +93,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmod
 		Label:          cloudItem.Label,
 		State:          rcommon.VROUTER_STATE_RUNNING,
 		GWLaunchServer: cloudItem.GWLaunchServer,
-		Domain:         r.metadata.Domain.Lcuuid,
+		Domain:         r.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		VPCID:          vpcID,
 	}

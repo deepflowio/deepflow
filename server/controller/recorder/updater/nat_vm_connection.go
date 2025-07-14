@@ -97,7 +97,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 	}
 
 	dbItem := &metadbmodel.NATVMConnection{
-		Domain:       c.metadata.Domain.Lcuuid,
+		Domain:       c.metadata.GetDomainLcuuid(),
 		VMID:         vmID,
 		NATGatewayID: natID,
 	}

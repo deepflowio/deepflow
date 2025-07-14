@@ -80,9 +80,9 @@ func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *metadbmodel.Po
 		PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
-		TeamID:       md.TeamID,
-		DomainID:     md.DomainID,
-		SubDomainID:  md.SubDomainID,
+		TeamID:       md.GetTeamID(),
+		DomainID:     md.GetDomainID(),
+		SubDomainID:  md.GetSubDomainID(),
 	})
 	return
 }
