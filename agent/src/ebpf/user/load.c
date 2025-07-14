@@ -939,6 +939,5 @@ int ebpf_obj_load(struct ebpf_object *obj)
 
 failed:
 	ebpf_warning("eBPF load programs failed. (errno %d)\n", errno);
-	release_object(obj);
 	return ETR_INVAL;
 }
