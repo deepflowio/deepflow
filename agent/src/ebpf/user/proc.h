@@ -23,6 +23,7 @@
 #include "vec.h"
 #include "bihash_8_8.h"
 #include "list.h"
+#include "mount.h"
 
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
@@ -41,12 +42,6 @@
 #define symbol_caches_hash_free     clib_bihash_free_8_8
 #define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
 #define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
-
-struct symbol_cache_pids {
-	struct symbolizer_cache_kvp *exec_pids_cache;
-	struct symbolizer_cache_kvp *exit_pids_cache;
-	volatile u32 *lock;
-};
 
 /*
  * The information used to record the names of threads or processes obtained in
@@ -105,6 +100,8 @@ struct symbolizer_proc_info {
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
+	/* Used to look up mount information from the mount cache. */
+	u64 mntns_id;
 };
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
@@ -194,26 +191,40 @@ void symbolizer_kernel_unlock(void);
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 /**
- * @brief Retrieve container ID and process name from the cache based on a PID.
+ * @brief Retrieve container ID, process name, and mount point from the cache based on a PID.
  *
- * This function looks up the given PID in the symbolizer cache to retrieve
- * the associated container ID (`cid`) and process name (`name`). If no entry
- * is found, both output buffers will be zeroed.
+ * This function looks up the given PID in the symbolizer/process cache to retrieve:
+ *   - the associated container ID (`cid`),
+ *   - the process name (`name`, i.e., comm),
+ *   - and optionally the mount point corresponding to a given `s_dev` value.
  *
- * @param pid        The process ID to look up.
- * @param cid        Output buffer to store the container ID.
- * @param cid_size   Size of the `cid` buffer in bytes.
- * @param name       Output buffer to store the process name (comm).
- * @param name_size  Size of the `name` buffer in bytes.
+ * If the process is not found in the cache, all output buffers (`cid`, `name`, `mount_point`)
+ * will be zeroed.
+ *
+ * @param pid          The process ID to look up.
+ * @param cid          Output buffer to store the container ID.
+ * @param cid_size     Size of the `cid` buffer in bytes.
+ * @param name         Output buffer to store the process name (comm).
+ * @param name_size    Size of the `name` buffer in bytes.
+ * @param s_dev        Device number to be resolved into a mount point path.
+ * @param mount_point  Output buffer to store the mount point path matching `s_dev`.
+ * @param mount_source Output buffer to store the mount source path.
+ * @param mount_size   Size of the `mount_point` buffer in bytes.
+ * @param is_nfs       Is it an NFS file system?
+ *
  * @return
- *    0 : In process cache, successfully obtained.
- *   -1 : Not in process cache, failed to obtain.
- * @note If the process entry is found, its reference count is incremented
- *       before use and decremented after, ensuring thread safety.
- * @note If no valid data is found, `cid` and `name` will remain zero-filled.
+ *    0 : Successfully found process info in cache and retrieved data.
+ *   -1 : Process not found in cache; output buffers may be zero-filled or unchanged.
+ *
+ * @note If the process entry is found, its reference count is safely managed
+ *       (incremented before use and decremented after).
+ * @note If no valid data is found, `cid`, `name`, and `mount_point` will be
+ *       zeroed.
  */
-int get_cid_and_name_from_cache(pid_t pid, uint8_t *cid, int cid_size,
-				uint8_t *name, int name_size);
+int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
+			     uint8_t *name, int name_size, kern_dev_t s_dev,
+			     char *mount_point, char *mount_source,
+			     int mount_size, bool *is_nfs);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers
@@ -245,5 +256,18 @@ char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
 				   struct tracer_probes_conf *conf,
 				   struct symbol symbols[], size_t n_symbols);
-
+/**
+ * @brief Check and update process information in the symbol cache.
+ *
+ * This function iterates over all key-value pairs in the process symbol cache
+ * and calls the `check_proc_kvp_cb()` callback for each pair. It is used to 
+ * validate or update cached process information, such as detecting whether a 
+ * process has exited or its metadata has changed.
+ *
+ * @param output_log       Should a log be output?
+ *
+ * This helps ensure the consistency and accuracy of the cached symbol data 
+ * associated with active processes.
+ */
+void check_and_update_proc_info(bool output_log);
 #endif /* _USER_PROC_H_ */
