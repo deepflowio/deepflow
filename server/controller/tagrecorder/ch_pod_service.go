@@ -56,6 +56,7 @@ func NewChPodService() *ChPodService {
 		),
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 
@@ -97,7 +98,6 @@ func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodService) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodService, db *mysql.DB) {
-
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

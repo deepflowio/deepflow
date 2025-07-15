@@ -58,7 +58,7 @@ func (p *PodService) ProduceByAdd(items []*mysqlmodel.PodService) {
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(item.ID),
+			eventapi.TagPodServiceID(item.ID), // TODO 此字段在 ingester 中并未被使用，待删除
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagL3DeviceType(p.deviceType),
 			eventapi.TagL3DeviceID(item.ID),
@@ -94,6 +94,12 @@ func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase 
 		return
 	}
 
+	id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(diffBase.Lcuuid)
+	if !ok {
+		log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
+		return
+	}
+
 	var opts []eventapi.TagFieldOption
 	old := JoinMetadataAndSpec(diffBase.Metadata, diffBase.Spec)
 	new := JoinMetadataAndSpec(string(newMetadata), string(newSpec))
@@ -102,19 +108,16 @@ func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase 
 	} else {
 		diff := CompareConfig(old, new, int(p.metadata.Config.EventCfg.ConfigDiffContext))
 
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(diffBase.Lcuuid)
-		if !ok {
-			log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
-			return
-		}
 		opts = []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(id),
+			eventapi.TagPodServiceID(id), // TODO 此字段在 ingester 中并未被使用，待删除
+			eventapi.TagL3DeviceType(p.deviceType),
+			eventapi.TagL3DeviceID(id),
 			eventapi.TagAttributes(
 				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
 				[]string{new, diff}),
 		}
 	}
-	p.createAndEnqueue(diffBase.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_MODIFY, opts...)
+	p.createInstanceAndEnqueue(diffBase.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_MODIFY, diffBase.Name, p.deviceType, id, opts...)
 }
 
 func (p *PodService) ProduceByDelete(lcuuids []string) {

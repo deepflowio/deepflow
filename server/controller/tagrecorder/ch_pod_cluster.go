@@ -58,6 +58,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 		resourceTypeToIconID,
 	}
 	mng.subscriberDG = mng
+	mng.softDelete = true
 	return mng
 }
 

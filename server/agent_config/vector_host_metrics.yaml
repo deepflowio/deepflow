@@ -1,45 +1,44 @@
-config:
-  sources:
-    host_metrics:
-      type: host_metrics
-      scrape_interval_secs: 10
-      namespace: node
-  transforms:
-    host_metrics_relabel:
-      type: remap
-      inputs:
-      - host_metrics
-      source: |
-        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
-        .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
-        metrics_map = {
-          "boot_time": "boot_time_seconds",
-          "memory_active_bytes": "memory_Active_bytes",
-          "memory_available_bytes": "memory_MemAvailable_bytes",
-          "memory_buffers_bytes": "memory_Buffers_bytes",
-          "memory_cached_bytes": "memory_Cached_bytes",
-          "memory_free_bytes": "memory_MemFree_bytes",
-          "memory_swap_free_bytes": "memory_SwapFree_bytes",
-          "memory_swap_total_bytes": "memory_SwapTotal_bytes",
-          "memory_swap_used_bytes": "memory_SwapCached_bytes",
-          "memory_total_bytes": "memory_MemTotal_bytes",
-          "network_transmit_packets_drop_total": "network_transmit_drop_total",
-          "uptime": "uname_info",
-          "filesystem_total_bytes": "filesystem_size_bytes",
-        }
-        metric_name = get!(value: metrics_map, path: [.name])
-        if !is_null(metric_name) {
-          .name = metric_name
-        }
-        if .tags.collector == "filesystem" {
-          .tags.fstype = .tags.filesystem
-          del(.tags.filesystem)
-        }
-  sinks:
-    prometheus_remote_write:
-      type: prometheus_remote_write
-      inputs:
-      - host_metrics_relabel
-      endpoint: http://127.0.0.1:38086/api/v1/prometheus
-      healthcheck:
-        enabled: false
+sources:
+  host_metrics:
+    type: host_metrics
+    scrape_interval_secs: 10
+    namespace: node
+transforms:
+  host_metrics_relabel:
+    type: remap
+    inputs:
+    - host_metrics
+    source: |
+      .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+      .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+      metrics_map = {
+        "boot_time": "boot_time_seconds",
+        "memory_active_bytes": "memory_Active_bytes",
+        "memory_available_bytes": "memory_MemAvailable_bytes",
+        "memory_buffers_bytes": "memory_Buffers_bytes",
+        "memory_cached_bytes": "memory_Cached_bytes",
+        "memory_free_bytes": "memory_MemFree_bytes",
+        "memory_swap_free_bytes": "memory_SwapFree_bytes",
+        "memory_swap_total_bytes": "memory_SwapTotal_bytes",
+        "memory_swap_used_bytes": "memory_SwapCached_bytes",
+        "memory_total_bytes": "memory_MemTotal_bytes",
+        "network_transmit_packets_drop_total": "network_transmit_drop_total",
+        "uptime": "uname_info",
+        "filesystem_total_bytes": "filesystem_size_bytes",
+      }
+      metric_name = get!(value: metrics_map, path: [.name])
+      if !is_null(metric_name) {
+        .name = metric_name
+      }
+      if .tags.collector == "filesystem" {
+        .tags.fstype = .tags.filesystem
+        del(.tags.filesystem)
+      }
+sinks:
+  prometheus_remote_write:
+    type: prometheus_remote_write
+    inputs:
+    - host_metrics_relabel
+    endpoint: http://127.0.0.1:38086/api/v1/prometheus
+    healthcheck:
+      enabled: false

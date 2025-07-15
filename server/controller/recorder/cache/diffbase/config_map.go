@@ -35,7 +35,7 @@ func (b *DataSet) AddConfigMap(dbItem *mysqlmodel.ConfigMap, seq int) {
 		Data:     dbItem.Data,
 		DataHash: dbItem.DataHash,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, b.ConfigMaps[dbItem.Lcuuid]), b.metadata.LogPrefixes)
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, b.ConfigMaps[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteConfigMap(lcuuid string) {
@@ -50,6 +50,13 @@ type ConfigMap struct {
 	DataHash string `json:"data_hash"`
 }
 
+// ToLoggable converts the ConfigMap to a loggable format, excluding the Data field.
+func (v ConfigMap) ToLoggable() interface{} {
+	copied := v
+	copied.Data = "**HIDDEN**"
+	return copied
+}
+
 func (v *ConfigMap) Update(cloudItem *cloudmodel.ConfigMap, toolDataSet *tool.DataSet) {
 	v.Name = cloudItem.Name
 	yamlData, err := yaml.JSONToYAML([]byte(cloudItem.Data))
@@ -59,5 +66,5 @@ func (v *ConfigMap) Update(cloudItem *cloudmodel.ConfigMap, toolDataSet *tool.Da
 	}
 	v.Data = string(yamlData)
 	v.DataHash = cloudItem.DataHash
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, v))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, v.ToLoggable()))
 }

@@ -31,6 +31,12 @@ type ResourceEvent struct {
 	CreatedAt      time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
 
+func (e ResourceEvent) ToLoggable() interface{} {
+	copied := e
+	copied.Content = "**HIDDEN**" // Hide content in logs
+	return copied
+}
+
 type DomainAdditionalResource struct {
 	ID                int             `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
 	Domain            string          `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
@@ -872,6 +878,13 @@ func (p PodService) GetSubDomainLcuuid() string {
 	return p.SubDomain
 }
 
+func (p PodService) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
+}
+
 type PodServicePort struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
@@ -911,6 +924,13 @@ func (p PodGroup) GetDomainLcuuid() string {
 
 func (p PodGroup) GetSubDomainLcuuid() string {
 	return p.SubDomain
+}
+
+func (p PodGroup) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupPort struct {
@@ -1032,6 +1052,12 @@ func (p ConfigMap) GetDomainLcuuid() string {
 
 func (p ConfigMap) GetSubDomainLcuuid() string {
 	return p.SubDomain
+}
+
+func (p ConfigMap) ToLoggable() interface{} {
+	copied := p
+	copied.Data = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupConfigMapConnection struct {

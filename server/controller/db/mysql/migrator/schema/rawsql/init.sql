@@ -831,9 +831,9 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL COMMENT '1: Deployment 2: StatefulSet 3: ReplicationController',
     pod_num             INTEGER DEFAULT 1,
     label               TEXT COMMENT 'separated by ,',
-    metadata            TEXT COMMENT 'yaml',
+    metadata            MEDIUMTEXT COMMENT 'yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                TEXT COMMENT 'yaml',
+    spec                MEDIUMTEXT COMMENT 'yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -877,9 +877,9 @@ CREATE TABLE IF NOT EXISTS pod_service (
     selector            TEXT COMMENT 'separated by ,',
     external_ip         TEXT COMMENT 'separated by ,',
     service_cluster_ip  CHAR(64) DEFAULT '',
-    metadata            TEXT COMMENT 'yaml',
+    metadata            MEDIUMTEXT COMMENT 'yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                TEXT COMMENT 'yaml',
+    spec                MEDIUMTEXT COMMENT 'yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
@@ -2334,19 +2334,19 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
-    `pid`              INTEGER NOT NULL,
+    `id`               INTEGER NOT NULL,
     `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
     `value`            VARCHAR(256),
     `team_id`          INTEGER,
     `domain_id`        INTEGER,
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`pid`, `key`)
+    PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tag;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
-    `pid`              INTEGER NOT NULL PRIMARY KEY,
+    `id`               INTEGER NOT NULL PRIMARY KEY,
     `os_app_tags`      TEXT,
     `team_id`          INTEGER,
     `domain_id`        INTEGER,
@@ -2681,7 +2681,7 @@ TRUNCATE TABLE custom_service;
 CREATE TABLE IF NOT EXISTS config_map (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    data                TEXT COMMENT 'yaml',
+    data                MEDIUMTEXT COMMENT 'yaml',
     data_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER NOT NULL,
     pod_cluster_id      INTEGER NOT NULL,

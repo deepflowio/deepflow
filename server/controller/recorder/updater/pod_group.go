@@ -72,6 +72,7 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		),
 	}
 	updater.dataGenerator = updater
+	updater.toLoggable = true
 	return updater
 }
 

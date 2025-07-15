@@ -362,6 +362,13 @@ type PodService struct {
 	SubDomainLcuuid    string `json:"sub_domain_lcuuid" binding:"required"`
 }
 
+func (p PodService) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
+}
+
 type PodServicePort struct {
 	Lcuuid           string `json:"lcuuid" binding:"required"`
 	Name             string `json:"name" binding:"required"`
@@ -388,6 +395,13 @@ type PodGroup struct {
 	AZLcuuid           string `json:"az_lcuuid" binding:"required"`
 	RegionLcuuid       string `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid    string `json:"sub_domain_lcuuid" binding:"required"`
+}
+
+func (p PodGroup) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupPort struct {
@@ -475,6 +489,12 @@ type ConfigMap struct {
 	RegionLcuuid       string    `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid    string    `json:"sub_domain_lcuuid" binding:"required"`
 	CreatedAt          time.Time `json:"created_at"`
+}
+
+func (c ConfigMap) ToLoggable() interface{} {
+	copied := c
+	copied.Data = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupConfigMapConnection struct {

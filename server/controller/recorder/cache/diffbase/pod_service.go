@@ -49,7 +49,7 @@ func (b *DataSet) AddPodService(dbItem *mysqlmodel.PodService, seq int, toolData
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]), b.metadata.LogPrefixes)
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodService(lcuuid string) {
@@ -73,6 +73,14 @@ type PodService struct {
 	RegionLcuuid     string `json:"region_lcuuid"`
 	AZLcuuid         string `json:"az_lcuuid"`
 	SubDomainLcuuid  string `json:"sub_domain_lcuuid"`
+}
+
+// ToLoggable converts PodService to a loggable format, excluding fields Spec and Metadata
+func (p PodService) ToLoggable() interface{} {
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 func (p *PodService) Update(cloudItem *cloudmodel.PodService, toolDataSet *tool.DataSet) {
@@ -101,5 +109,5 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService, toolDataSet *tool.
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, p.ToLoggable()))
 }

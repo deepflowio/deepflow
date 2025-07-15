@@ -74,6 +74,7 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 		),
 	}
 	updater.dataGenerator = updater
+	updater.toLoggable = true
 	return updater
 }
 

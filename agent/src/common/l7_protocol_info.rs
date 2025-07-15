@@ -392,6 +392,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         }
     }
 
+    // This is not required for UNIX socket data at this time
     fn tcp_seq_offset(&self) -> u32 {
         return 0;
     }

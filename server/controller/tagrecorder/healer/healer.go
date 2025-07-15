@@ -18,6 +18,8 @@ package healer
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	recorderCommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -26,7 +28,6 @@ import (
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"time"
 )
 
 var log = logger.MustGetLogger("tagrecorder.healer")
@@ -47,55 +48,55 @@ func NewHealers(md *recorderCommon.MetadataBase) *Healers {
 		message.MetadataDB(md.GetDB()),
 	)
 	h.healers = []Healer{
-		newHealer[mysqlmodel.Host, mysqlmodel.ChDevice, *message.HostAdd, message.HostAdd](
+		newHealer[mysqlmodel.Host, mysqlmodel.ChDevice, *message.HostAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_HOST_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_HOST)),
-		newHealer[mysqlmodel.VM, mysqlmodel.ChDevice, *message.VMAdd, message.VMAdd](
+		newHealer[mysqlmodel.VM, mysqlmodel.ChDevice, *message.VMAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VM)),
-		newHealer[mysqlmodel.VRouter, mysqlmodel.ChDevice, *message.VRouterAdd, message.VRouterAdd](
+		newHealer[mysqlmodel.VRouter, mysqlmodel.ChDevice, *message.VRouterAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VROUTER_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VROUTER)),
-		newHealer[mysqlmodel.DHCPPort, mysqlmodel.ChDevice, *message.DHCPPortAdd, message.DHCPPortAdd](
+		newHealer[mysqlmodel.DHCPPort, mysqlmodel.ChDevice, *message.DHCPPortAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_DHCP_PORT_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_DHCP_PORT)),
-		newHealer[mysqlmodel.NATGateway, mysqlmodel.ChDevice, *message.NATGatewayAdd, message.NATGatewayAdd](
+		newHealer[mysqlmodel.NATGateway, mysqlmodel.ChDevice, *message.NATGatewayAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_NAT_GATEWAY_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_NAT_GATEWAY)),
-		newHealer[mysqlmodel.LB, mysqlmodel.ChDevice, *message.LBAdd, message.LBAdd](
+		newHealer[mysqlmodel.LB, mysqlmodel.ChDevice, *message.LBAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_LB_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_LB)),
-		newHealer[mysqlmodel.RDSInstance, mysqlmodel.ChDevice, *message.RDSInstanceAdd, message.RDSInstanceAdd](
+		newHealer[mysqlmodel.RDSInstance, mysqlmodel.ChDevice, *message.RDSInstanceAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_RDS_INSTANCE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_RDS_INSTANCE)),
-		newHealer[mysqlmodel.RedisInstance, mysqlmodel.ChDevice, *message.RedisInstanceAdd, message.RedisInstanceAdd](
+		newHealer[mysqlmodel.RedisInstance, mysqlmodel.ChDevice, *message.RedisInstanceAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_REDIS_INSTANCE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_REDIS_INSTANCE)),
-		newHealer[mysqlmodel.PodNode, mysqlmodel.ChDevice, *message.PodNodeAdd, message.PodNodeAdd](
+		newHealer[mysqlmodel.PodNode, mysqlmodel.ChDevice, *message.PodNodeAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_NODE)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChDevice, *message.PodServiceAdd, message.PodServiceAdd](
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChDevice, *message.PodServiceAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_SERVICE)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChDevice, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChDevice, *message.PodAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD)),
-		newHealer[mysqlmodel.PodCluster, mysqlmodel.ChDevice, *message.PodClusterAdd, message.PodClusterAdd](
+		newHealer[mysqlmodel.PodCluster, mysqlmodel.ChDevice, *message.PodClusterAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_CLUSTER)),
-		newHealer[mysqlmodel.PodGroup, mysqlmodel.ChDevice, *message.PodGroupAdd, message.PodGroupAdd](
+		newHealer[mysqlmodel.PodGroup, mysqlmodel.ChDevice, *message.PodGroupAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(
@@ -107,104 +108,124 @@ func NewHealers(md *recorderCommon.MetadataBase) *Healers {
 				common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
 			),
 		),
-		newHealer[mysqlmodel.Process, mysqlmodel.ChDevice, *message.ProcessAdd, message.ProcessAdd](
+		newHealer[mysqlmodel.Process, mysqlmodel.ChDevice, *message.ProcessAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_GPROCESS)),
-		newHealer[mysqlmodel.CustomService, mysqlmodel.ChDevice, *message.CustomServiceAdd, message.CustomServiceAdd](
+		newHealer[mysqlmodel.CustomService, mysqlmodel.ChDevice, *message.CustomServiceAdd](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_CUSTOM_SERVICE)),
 
-		newHealer[mysqlmodel.AZ, mysqlmodel.ChAZ, *message.AZAdd, message.AZAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
-
-		newHealer[mysqlmodel.VM, mysqlmodel.ChChost, *message.VMAdd, message.VMAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_VM_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
-
-		newHealer[mysqlmodel.VPC, mysqlmodel.ChVPC, *message.VPCAdd, message.VPCAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
-		newHealer[mysqlmodel.Network, mysqlmodel.ChNetwork, *message.NetworkAdd, message.NetworkAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_NETWORK_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_NETWORK)),
-
-		newHealer[mysqlmodel.PodCluster, mysqlmodel.ChPodCluster, *message.PodClusterAdd, message.PodClusterAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_CLUSTER)),
-		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNamespace, *message.PodNamespaceAdd, message.PodNamespaceAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NAMESPACE)),
-		newHealer[mysqlmodel.PodNode, mysqlmodel.ChPodNode, *message.PodNodeAdd, message.PodNodeAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NODE)),
-		newHealer[mysqlmodel.PodIngress, mysqlmodel.ChPodIngress, *message.PodIngressAdd, message.PodIngressAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_INGRESS_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_INGRESS)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodService, *message.PodServiceAdd, message.PodServiceAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE)),
-		newHealer[mysqlmodel.PodGroup, mysqlmodel.ChPodGroup, *message.PodGroupAdd, message.PodGroupAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_GROUP)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPod, *message.PodAdd, message.PodAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_POD_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD)),
-
-		newHealer[mysqlmodel.Process, mysqlmodel.ChGProcess, *message.ProcessAdd, message.ProcessAdd](
-			msgMetadata, newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN), newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_GPROCESS)),
-
-		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTag, *message.VMAdd, message.VMAdd](
+		newHealer[mysqlmodel.AZ, mysqlmodel.ChAZ, *message.AZAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags"),
+			newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
+
+		newHealer[mysqlmodel.VM, mysqlmodel.ChChost, *message.VMAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
+
+		newHealer[mysqlmodel.VPC, mysqlmodel.ChVPC, *message.VPCAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
+		newHealer[mysqlmodel.Network, mysqlmodel.ChNetwork, *message.NetworkAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_NETWORK_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_NETWORK)),
+
+		newHealer[mysqlmodel.PodCluster, mysqlmodel.ChPodCluster, *message.PodClusterAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_CLUSTER)),
+		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNamespace, *message.PodNamespaceAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NAMESPACE)),
+		newHealer[mysqlmodel.PodNode, mysqlmodel.ChPodNode, *message.PodNodeAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NODE)),
+		newHealer[mysqlmodel.PodIngress, mysqlmodel.ChPodIngress, *message.PodIngressAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_INGRESS_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_INGRESS)),
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodService, *message.PodServiceAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE)),
+		newHealer[mysqlmodel.PodGroup, mysqlmodel.ChPodGroup, *message.PodGroupAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_GROUP)),
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPod, *message.PodAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD)),
+
+		newHealer[mysqlmodel.Process, mysqlmodel.ChGProcess, *message.ProcessAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_GPROCESS)),
+
+		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTag, *message.VMAdd](
+			msgMetadata,
+			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
-		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTags, *message.VMAdd, message.VMAdd](
+		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTags, *message.VMAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags"),
+			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),
-		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, *message.PodNamespaceAdd, message.PodNamespaceAdd](
+		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, *message.PodNamespaceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG)),
-		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTags, *message.PodNamespaceAdd, message.PodNamespaceAdd](
+		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTags, *message.PodNamespaceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabel, *message.PodServiceAdd, message.PodServiceAdd](
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabel, *message.PodServiceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabels, *message.PodServiceAdd, message.PodServiceAdd](
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabels, *message.PodServiceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotation, *message.PodServiceAdd, message.PodServiceAdd](
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotation, *message.PodServiceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATION)),
-		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotations, *message.PodServiceAdd, message.PodServiceAdd](
+		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sAnnotations, *message.PodServiceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sEnv, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sEnv, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENV)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sEnvs, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sEnvs, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENVS)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sLabel, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sLabel, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABEL)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sLabels, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sLabels, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABELS)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotation, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotation, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATION)),
-		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotations, *message.PodAdd, message.PodAdd](
+		newHealer[mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotations, *message.PodAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation"),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS)),
-		// NewHealer[mysqlmodel.Process, mysqlmodel.ChOSAppTag](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAG]),
-		// NewHealer[mysqlmodel.Process, mysqlmodel.ChOSAppTags](
-		// 	msgMetadata, h.sourceResourceTypeToData[common.RESOURCE_TYPE_PROCESS_EN], h.targetResourceTypeToData[tagrecorder.RESOURCE_TYPE_CH_OS_APP_TAGS]),
 	}
 	return h
 }
