@@ -40,10 +40,9 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater.updaterDG = updater
 	return updater
 }
-
 func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, bool) {
 	var vTaps []mysqlmodel.VTap
-	err := db.Unscoped().Find(&vTaps).Error
+	err := db.Unscoped().Select("id", "type", "team_id", "name").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false

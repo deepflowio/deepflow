@@ -54,7 +54,6 @@ func NewChVTapPort() *ChVTapPort {
 	updater.updaterDG = updater
 	return updater
 }
-
 func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.ChVTapPort, bool) {
 	var vTaps []mysqlmodel.VTap
 	err := db.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Find(&vTaps).Error
@@ -367,7 +366,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 		return vTapIDToDeviceInfo, false
 	}
 	var vTaps []mysqlmodel.VTap
-	err = db.Unscoped().Find(&vTaps).Error
+	err = db.Unscoped().Select("launch_server_id", "id", "type").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false

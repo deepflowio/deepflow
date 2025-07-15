@@ -198,7 +198,7 @@ func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interfa
 	}
 
 	var vtaps []mysqlmodel.VTap
-	if err = orgDB.Find(&vtaps).Error; err != nil {
+	if err = orgDB.Select("ctrl_ip", "ctrl_mac", "name").Find(&vtaps).Error; err != nil {
 		return response, err
 	}
 	valueToVtap := map[string]mysqlmodel.VTap{}
