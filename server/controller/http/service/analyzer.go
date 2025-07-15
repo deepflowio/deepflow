@@ -69,7 +69,7 @@ func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyz
 	db.Find(&regions)
 	db.Find(&azs)
 	db.Find(&azAnalyzerconns)
-	db.Find(&vtaps)
+	db.Select("analyzer_ip", "cur_analyzer_ip").Find(&vtaps)
 
 	lcuuidToRegion := make(map[string]*metadbmodel.Region)
 	for i, region := range regions {
