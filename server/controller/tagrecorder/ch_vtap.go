@@ -43,7 +43,7 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 
 func (v *ChVTap) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChVTap, bool) {
 	var vTaps []metadbmodel.VTap
-	err := db.Unscoped().Find(&vTaps).Error
+	err := db.Unscoped().Select("id", "type", "team_id", "name").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
