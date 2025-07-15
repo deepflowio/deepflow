@@ -246,7 +246,7 @@ func (s *SyncStorage) refreshDatabase() {
 			vTapIDs := map[int]bool{}
 			storages := []model.GenesisStorage{}
 			invalidStorages := []model.GenesisStorage{}
-			db.Find(&vTaps)
+			db.Select("id").Find(&vTaps)
 			db.Where("node_ip = ?", s.nodeIP).Find(&storages)
 			for _, v := range vTaps {
 				vTapIDs[v.ID] = false

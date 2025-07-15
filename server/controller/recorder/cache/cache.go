@@ -1538,7 +1538,7 @@ func (c *Cache) refreshVIP() {
 // RefreshVTaps refreshes vtap data for every regular domain synchronization
 func (c *Cache) RefreshVTaps() {
 	var vtaps []*mysqlmodel.VTap
-	if err := c.metadata.DB.Find(&vtaps).Error; err != nil {
+	if err := c.metadata.DB.Select("id", "name", "launch_server_id", "type").Find(&vtaps).Error; err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VTAP_EN, err))
 		return
 	}
