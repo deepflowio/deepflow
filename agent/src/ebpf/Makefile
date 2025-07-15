@@ -92,6 +92,7 @@ OBJS := user/elf.o \
 	user/mem.o \
 	user/vec.o \
 	user/bihash.o \
+	user/mount.o \
 	user/profile/profile_common.o \
 	$(patsubst %.c,%.o,$(wildcard user/extended/*.c)) \
 	$(patsubst %.c,%.o,$(wildcard user/extended/profile/*.c)) \
