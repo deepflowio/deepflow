@@ -61,7 +61,7 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Label.IsDifferent() {
-		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		labels, _ := StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		if labels != "" {
 			updateInfo["labels"] = labels
 		}
@@ -89,7 +89,7 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, source *met
 	if source.Label == "" {
 		return
 	}
-	labels, _ := common.StrToJsonAndMap(source.Label)
+	labels, _ := StrToJsonAndMap(source.Label)
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sLabels{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,

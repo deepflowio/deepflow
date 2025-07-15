@@ -18,6 +18,7 @@ package huawei
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,7 +59,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VInterface, []model.IP, error) {
 			var vpcLcuuid string
 			for key := range addrs {
 				keyLcuuid := common.IDGenerateUUID(h.orgID, key)
-				if common.Contains(h.toolDataSet.vpcLcuuids, keyLcuuid) {
+				if slices.Contains(h.toolDataSet.vpcLcuuids, keyLcuuid) {
 					vpcLcuuid = keyLcuuid
 					break
 				}
