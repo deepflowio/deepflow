@@ -50,7 +50,12 @@ use kube::{
 use log::{debug, info, trace, warn};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
-use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
+use tokio::{
+    runtime::Handle,
+    sync::{Mutex, Semaphore},
+    task::JoinHandle,
+    time,
+};
 
 use super::crd::{
     calico::IpPool,
@@ -634,10 +639,15 @@ pub struct ResourceWatcher<K> {
     stats_counter: Arc<WatcherCounter>,
     config: WatcherConfig,
 
-    listing: Arc<AtomicBool>,
+    listing: Arc<Semaphore>,
 }
 
 struct Context<K> {
+    state: ContextState<K>,
+    listing: Arc<Semaphore>,
+}
+
+struct ContextState<K> {
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     version: Arc<AtomicU64>,
     api: Api<K>,
@@ -647,8 +657,6 @@ struct Context<K> {
     stats_counter: Arc<WatcherCounter>,
     config: WatcherConfig,
     resource_version: Option<String>,
-
-    listing: Arc<AtomicBool>,
 }
 
 impl<K> Watcher for ResourceWatcher<K>
@@ -657,15 +665,17 @@ where
 {
     fn start(&self) -> Option<JoinHandle<()>> {
         let ctx = Context {
-            entries: self.entries.clone(),
-            version: self.version.clone(),
-            kind: self.kind.clone(),
-            err_msg: self.err_msg.clone(),
-            ready: self.ready.clone(),
-            api: self.api.clone(),
-            stats_counter: self.stats_counter.clone(),
-            config: self.config.clone(),
-            resource_version: None,
+            state: ContextState {
+                entries: self.entries.clone(),
+                version: self.version.clone(),
+                kind: self.kind.clone(),
+                err_msg: self.err_msg.clone(),
+                ready: self.ready.clone(),
+                api: self.api.clone(),
+                stats_counter: self.stats_counter.clone(),
+                config: self.config.clone(),
+                resource_version: None,
+            },
             listing: self.listing.clone(),
         };
 
@@ -708,7 +718,7 @@ where
         kind: Resource,
         runtime: Handle,
         config: &WatcherConfig,
-        listing: Arc<AtomicBool>,
+        listing: Arc<Semaphore>,
     ) -> Self {
         Self {
             api,
@@ -725,7 +735,7 @@ where
     }
 
     // returns true if re-listing is required
-    async fn watch(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
+    async fn watch(ctx: &mut ContextState<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
         loop {
             let mut stream = match ctx
                 .api
@@ -796,22 +806,22 @@ where
         while !Self::serialized_get_list_entry(&mut ctx, &mut encoder).await {
             time::sleep(SLEEP_INTERVAL).await;
         }
-        ctx.ready.store(true, Ordering::Relaxed);
-        info!("{} watcher initial list ready", ctx.kind);
+        ctx.state.ready.store(true, Ordering::Relaxed);
+        info!("{} watcher initial list ready", ctx.state.kind);
 
         let mut last_update = SystemTime::now();
 
-        info!("{} watcher start watching", ctx.kind);
+        info!("{} watcher start watching", ctx.state.kind);
         loop {
-            let need_relist = Self::watch(&mut ctx, &mut encoder).await;
+            let need_relist = Self::watch(&mut ctx.state, &mut encoder).await;
             time::sleep(SLEEP_INTERVAL).await;
             let now = SystemTime::now();
             // list and rewatch
             if need_relist
                 || now < last_update
-                || last_update.elapsed().unwrap() >= ctx.config.list_interval
+                || last_update.elapsed().unwrap() >= ctx.state.config.list_interval
             {
-                debug!("{} watcher relisting", ctx.kind);
+                debug!("{} watcher relisting", ctx.state.kind);
                 Self::full_sync(&mut ctx, &mut encoder).await;
                 last_update = now;
             }
@@ -821,30 +831,37 @@ where
     async fn full_sync(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
         let now = Instant::now();
         Self::serialized_get_list_entry(ctx, encoder).await;
-        ctx.stats_counter
+        ctx.state
+            .stats_counter
             .list_cost_time_sum
             .fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
-        ctx.stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
+        ctx.state
+            .stats_counter
+            .list_count
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     async fn serialized_get_list_entry(
         ctx: &mut Context<K>,
         encoder: &mut ZlibEncoder<Vec<u8>>,
     ) -> bool {
-        while let Err(_) =
-            ctx.listing
-                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        {
-            time::sleep(SPIN_INTERVAL).await;
-        }
-        let r = Self::get_list_entry(ctx, encoder).await;
-        ctx.listing.store(false, Ordering::SeqCst);
+        let _permit = match ctx.listing.acquire().await {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(
+                    "{} listing failed: semaphore closed: {:?}",
+                    ctx.state.kind, e
+                );
+                return false;
+            }
+        };
+        let r = Self::get_list_entry(&mut ctx.state, encoder).await;
         r
     }
 
     // calling list on multiple resources simultaneously may consume a lot of memory
     // use serialized_get_list_entry to avoid oom
-    async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
+    async fn get_list_entry(ctx: &mut ContextState<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
         info!(
             "list {} entries with limit {}",
             ctx.kind, ctx.config.list_limit,
@@ -978,7 +995,7 @@ where
     }
 
     async fn resolve_event(
-        ctx: &Context<K>,
+        ctx: &ContextState<K>,
         encoder: &mut ZlibEncoder<Vec<u8>>,
         event: WatchEvent<K>,
     ) {
@@ -1267,7 +1284,7 @@ pub struct ResourceWatcherFactory {
     runtime: Handle,
 
     // serialize list operation
-    listing: Arc<AtomicBool>,
+    listing: Arc<Semaphore>,
 }
 
 impl ResourceWatcherFactory {
@@ -1275,7 +1292,7 @@ impl ResourceWatcherFactory {
         Self {
             client,
             runtime,
-            listing: Default::default(),
+            listing: Arc::new(Semaphore::new(1)),
         }
     }
 
@@ -1312,7 +1329,7 @@ impl ResourceWatcherFactory {
         &self,
         kind: Resource,
         stats_collector: &stats::Collector,
-        namespace: &str,
+        namespace: Option<&str>,
         config: &WatcherConfig,
     ) -> ResourceWatcher<K>
     where
@@ -1324,8 +1341,12 @@ impl ResourceWatcherFactory {
             + Trimmable,
         <K as KubeResource>::DynamicType: Default,
     {
+        let api = match namespace {
+            Some(ns) if !ns.is_empty() => Api::namespaced(self.client.clone(), ns),
+            _ => Api::all(self.client.clone()),
+        };
         let watcher = ResourceWatcher::new(
-            Api::namespaced(self.client.clone(), namespace),
+            api,
             kind,
             self.runtime.clone(),
             config,
@@ -1345,7 +1366,6 @@ impl ResourceWatcherFactory {
         stats_collector: &stats::Collector,
         config: &WatcherConfig,
     ) -> Option<GenericResourceWatcher> {
-        let namespace = namespace.unwrap_or("");
         let watcher = match resource.name {
             "configmaps" => GenericResourceWatcher::ConfigMap(self.new_namespace_resource(
                 resource,
