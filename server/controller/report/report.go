@@ -115,7 +115,7 @@ func (r *ReportServer) report() {
 	var controllerCount int64
 	var vtaps []metadbmodel.VTap
 	r.db.Model(&metadbmodel.Controller{}).Count(&controllerCount)
-	r.db.Find(&vtaps)
+	r.db.Select("type", "revision").Find(&vtaps)
 	agentDataMap := make(map[AgentDataKey]int)
 	for _, vtap := range vtaps {
 		agentDataKey := AgentDataKey{
