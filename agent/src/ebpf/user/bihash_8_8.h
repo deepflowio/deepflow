@@ -45,9 +45,6 @@
 #ifndef __included_bihash_8_8_h__
 #define __included_bihash_8_8_h__
 
-#define __u32 u32
-#define __u64 u64
-#define __u8  u8
 #include "xxhash.h"
 
 /** 8 octet key, 8 octet key value pair */
