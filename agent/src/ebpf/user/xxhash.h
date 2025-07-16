@@ -71,24 +71,24 @@
 #define PRIME64_5  2870177450012600261ULL
 #define XXH_rotl64(x,r) ((x << r) | (x >> (64 - r)))
 
-static inline __u64 xxhash(__u64 key)
+static inline u64 xxhash(u64 key)
 {
-        __u64 k1, h64;
+	u64 k1, h64;
 
-        k1 = key;
-        h64 = 0x9e3779b97f4a7c13LL + PRIME64_5 + 8;
-        k1 *= PRIME64_2;
-        k1 = XXH_rotl64(k1, 31);
-        k1 *= PRIME64_1;
-        h64 ^= k1;
-        h64 = XXH_rotl64(h64, 27) * PRIME64_1 + PRIME64_4;
+	k1 = key;
+	h64 = 0x9e3779b97f4a7c13LL + PRIME64_5 + 8;
+	k1 *= PRIME64_2;
+	k1 = XXH_rotl64(k1, 31);
+	k1 *= PRIME64_1;
+	h64 ^= k1;
+	h64 = XXH_rotl64(h64, 27) * PRIME64_1 + PRIME64_4;
 
-        h64 ^= h64 >> 33;
-        h64 *= PRIME64_2;
-        h64 ^= h64 >> 29;
-        h64 *= PRIME64_3;
-        h64 ^= h64 >> 32;
-        return h64;
+	h64 ^= h64 >> 33;
+	h64 *= PRIME64_2;
+	h64 ^= h64 >> 29;
+	h64 *= PRIME64_3;
+	h64 ^= h64 >> 32;
+	return h64;
 }
 
 #endif /* __included_xxhash_h__ */
