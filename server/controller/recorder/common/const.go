@@ -35,6 +35,12 @@ const (
 	PUBLIC_NETWORK_LCUUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 )
 
+var UNCHECK_NETWORK_DOMAINS = []int{
+	ctrlrcommon.CLOUD_TOWER,
+	ctrlrcommon.FUSIONCOMPUTE,
+	ctrlrcommon.SCP,
+}
+
 var DEVICE_TYPE_INT_TO_STR = map[int]string{
 	ctrlrcommon.VIF_DEVICE_TYPE_HOST:           ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 	ctrlrcommon.VIF_DEVICE_TYPE_VM:             ctrlrcommon.RESOURCE_TYPE_VM_EN,
