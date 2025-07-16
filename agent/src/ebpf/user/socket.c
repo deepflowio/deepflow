@@ -1188,6 +1188,13 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 				}
 			}
 
+			if (s_dev != DEV_INVALID && mount_point[0] == '\0') {
+				u64 mntns_id = 0;
+                        	find_mount_point_path(sd->tgid, &mntns_id, s_dev,
+						      mount_point, mount_source,
+						      sizeof(mount_point), &is_nfs);
+			}
+
 			submit_data->process_kname[sizeof(submit_data->process_kname) -
 						   1] = '\0';
 			submit_data->container_id[sizeof(submit_data->container_id) -
@@ -3121,15 +3128,15 @@ int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf,
 	int path_len = strlen(event->filename) + 1;
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
-				 "bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-				 "latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+				 "bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
+				 "latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
 				 event->bytes_count, event->operation,
 				 event->offset, event->latency, event->filename,
 				 path_len, mount_file_tag);
 	} else {
 		fprintf(stdout,
-			"bytes_count=[%u]\noperation=[%u]\noffset=[%lu]\n"
-			"latency=[%lu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+			"bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
+			"latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
 			event->bytes_count, event->operation, event->offset,
 			event->latency, event->filename, path_len, mount_file_tag);
 
