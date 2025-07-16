@@ -62,7 +62,7 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
-		envs, _ := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
+		envs, _ := StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
 		updateInfo["envs"] = envs
 	}
 	targetKey := IDKey{ID: sourceID}
@@ -86,7 +86,7 @@ func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, source *metadbmodel.
 	if source.ENV == "" {
 		return
 	}
-	envs, _ := common.StrToJsonAndMap(source.ENV)
+	envs, _ := StrToJsonAndMap(source.ENV)
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sEnvs{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Envs:        envs,

@@ -19,6 +19,7 @@ package tagrecorder
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,7 +58,7 @@ func NewChVTapPort() *ChVTapPort {
 
 func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel.ChVTapPort, bool) {
 	var vTaps []metadbmodel.VTap
-	err := db.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Find(&vTaps).Error
+	err := db.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Select("type", "id", "region", "az").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
@@ -69,7 +70,7 @@ func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel
 		return nil, false
 	}
 	var vInterfaces []metadbmodel.VInterface
-	err = db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&vInterfaces).Error
+	err = db.Select("deviceid", "mac", "name").Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&vInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
@@ -261,7 +262,7 @@ func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
 				}
-			} else if !common.Contains(nameSlice, "lo") {
+			} else if !slices.Contains(nameSlice, "lo") {
 				vTapPort.Name = strings.Join([]string{"lo", vTapPort.Name}, ", ")
 			}
 			if len(vTapPort.Name) > vTapPortNameLength {
@@ -367,7 +368,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *metadb.DB) (map[int]DeviceInfo, 
 		return vTapIDToDeviceInfo, false
 	}
 	var vTaps []metadbmodel.VTap
-	err = db.Unscoped().Find(&vTaps).Error
+	err = db.Unscoped().Select("launch_server_id", "id", "type").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false

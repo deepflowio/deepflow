@@ -1160,8 +1160,8 @@ void show_collect_pool(void)
 			continue;
 		task_thread = &g_collect_pool->threads[i];
 		task = task_thread->task;
-		fprintf(stdout, "Thread %ld Task %p JavaPID %d\n",
-			task_thread->thread, task, task->pid);
+		fprintf(stdout, "Thread %p Task %p JavaPID %d\n",
+			(void *)task_thread->thread, task, task->pid);
 		online_task_cnt++;
 	}
 	fprintf(stdout,

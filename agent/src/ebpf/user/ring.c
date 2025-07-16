@@ -196,7 +196,7 @@ struct ring *ring_create(const char *name, unsigned count,
 	/* reserve a memory zone for this ring. If we can't get config or
 	 * we are secondary process, the memzone_reserve function will set
 	 * errno for us appropriately - hence no check in this this function */
-	r = calloc(ring_size, 1);
+	r = calloc(1, ring_size);
 	if (r != NULL) {
 		/* no need to check return value here, we already checked the
 		 * arguments above */

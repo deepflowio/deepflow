@@ -62,7 +62,7 @@ func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Label.IsDifferent() {
-		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		labels, _ := StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		updateInfo["labels"] = labels
 	}
 	targetKey := IDKey{ID: sourceID}
@@ -86,7 +86,7 @@ func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, source *metadbmode
 	if source.Label == "" {
 		return
 	}
-	labels, _ := common.StrToJsonAndMap(source.Label)
+	labels, _ := StrToJsonAndMap(source.Label)
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sLabels{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,

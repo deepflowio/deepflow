@@ -329,6 +329,19 @@ u32 djb2_32bit(const char *str);
  * @return None. The result is written to `ret_str`.
  */
 void format_port_ranges(uint16_t *ports, size_t size, char *ret_str, int str_sz);
+
+/**
+ * @brief Compute 32-bit MurmurHash3 of the given data buffer.
+ *
+ * MurmurHash3 is a non-cryptographic hash function known for good distribution and speed.
+ *
+ * @param[in] key   Pointer to the input data buffer to hash.
+ * @param[in] len   Length in bytes of the input data.
+ * @param[in] seed  Initial seed value for the hash; can be zero or any 32-bit integer.
+ *
+ * @return 32-bit hash value computed over the input data.
+ */
+uint32_t murmurhash(const void *key, size_t len, uint32_t seed);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
