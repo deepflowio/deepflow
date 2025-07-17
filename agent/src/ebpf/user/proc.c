@@ -1013,6 +1013,10 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	return;
 }
 
+void check_and_update_proc_info(bool output_log)
+{
+}
+
 int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     uint8_t * name, int name_size, kern_dev_t s_dev,
 			     char *mount_point, char *mount_source,
