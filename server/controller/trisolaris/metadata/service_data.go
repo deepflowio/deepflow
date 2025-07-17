@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
@@ -35,19 +36,24 @@ type ServiceRawData struct {
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
 	podGroupIDToPodServiceID      map[int]int
 	lbIDToVPCID                   map[int]int
-	customServiceIDToIPs          map[int]mapset.Set[string]
-	customServiceIPKeyToPorts     map[customServiceIPKey]mapset.Set[uint32]
+	customServiceIDToIPPorts      map[int]mapset.Set[customServiceIPPortKey]
 }
 
-type customServiceIPKey struct {
+type customServiceIPPortKey struct {
 	vpcID int
 	ip    string
+	port  uint32 // 0 表示无端口
 }
 
-func newCustomServiceIPKey(vpcID int, ip string) customServiceIPKey {
-	return customServiceIPKey{
+func (k customServiceIPPortKey) ipKey() string {
+	return fmt.Sprintf("%d:%s", k.vpcID, k.ip)
+}
+
+func newCustomServiceIPPortKey(vpcID int, ip string, port uint32) customServiceIPPortKey {
+	return customServiceIPPortKey{
 		vpcID: vpcID,
 		ip:    ip,
+		port:  port,
 	}
 }
 
@@ -57,6 +63,7 @@ func newServiceRawData() *ServiceRawData {
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
 		podGroupIDToPodServiceID:      make(map[int]int),
 		lbIDToVPCID:                   make(map[int]int),
+		customServiceIDToIPPorts:      make(map[int]mapset.Set[customServiceIPPortKey]),
 	}
 }
 
@@ -132,69 +139,90 @@ func (r *ServiceRawData) ConvertDBData(md *MetaData) {
 	}
 	r.podGroupIDToPodServiceID = podGroupIDToPodServiceID
 
-	// VPC 范围内合并自定义服务：
-	// 1. 去重 ip，ip 绑定第一个遍历到的服务
-	// 2. 合并 ip 的端口，如果存在相同 ip 中的某个没有端口，那么端口全部丢弃
-	customServiceIDToIPs := make(map[int]mapset.Set[string])
-	customServiceIPKeyToPorts := make(map[customServiceIPKey]mapset.Set[uint32])
-	for _, cs := range dbDataCache.GetCustomServices() {
-		var ips []string
-		var ports []uint32
+	r.customServiceIDToIPPorts = r.mergeCustomServices(md, dbDataCache.GetCustomServices())
+}
+
+// VPC 内去重规则：
+// 1. 按照 ip-port 元素去重后，ip-port 绑定第一个遍历到的服务
+// 2. 如果存在 ip-port 的 port 为空，则其他 ip-port 都丢弃，只保留这一个值
+// mergeCustomServices merges custom services according to the following rules:
+// 1. Deduplicate by ip-port, binding each ip-port to the first encountered service.
+// 2. If any ip has an empty port, discard all other ports for that ip and keep only the empty-port entry.
+func (r *ServiceRawData) mergeCustomServices(md *MetaData, customServices []*models.CustomService) map[int]mapset.Set[customServiceIPPortKey] {
+	customServiceIDToIPPorts := make(map[int]mapset.Set[customServiceIPPortKey])
+	ipPortKeyToServiceID := make(map[customServiceIPPortKey]int) // 记录每个 ip-port 绑定的服务ID
+	hasEmptyPortForIP := make(map[string]bool)                   // 记录每个 VPC 内的 IP 是否有空端口，key格式为 "vpcID:ip"
+
+	for _, cs := range customServices {
+		var ipPorts []customServiceIPPortKey
+
 		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
-			ips = strings.Split(cs.Resource, ",")
+			ips := strings.Split(cs.Resource, ",")
+			for _, ip := range ips {
+				ip = strings.TrimSpace(ip)
+				if ip == "" {
+					continue
+				}
+				ipPortKey := newCustomServiceIPPortKey(cs.VPCID, ip, 0)
+				hasEmptyPortForIP[ipPortKey.ipKey()] = true
+				ipPorts = append(ipPorts, ipPortKey)
+			}
 		} else {
-			ipPorts := strings.Split(cs.Resource, ",")
-			for _, ipPort := range ipPorts {
-				ipPort = strings.TrimSpace(ipPort)
-				separatorIndex := strings.LastIndex(ipPort, ":")
+			ipPortStrs := strings.Split(cs.Resource, ",")
+			for _, ipPortStr := range ipPortStrs {
+				ipPortStr = strings.TrimSpace(ipPortStr)
+				if ipPortStr == "" {
+					continue
+				}
+				separatorIndex := strings.LastIndex(ipPortStr, ":")
 				if separatorIndex == -1 {
-					log.Warningf("[ORG-%s] invalid ip port format: %s", md.ORGID, ipPort)
+					log.Warningf("[ORG-%s] invalid ip port format: %s", md.ORGID, ipPortStr)
 					continue
 				}
-				port, err := strconv.Atoi(ipPort[separatorIndex+1:])
+				ip := ipPortStr[:separatorIndex]
+				portStr := ipPortStr[separatorIndex+1:]
+				port, err := strconv.Atoi(portStr)
 				if err != nil {
-					log.Warningf("[ORG-%s] invalid port format: %s", md.ORGID, ipPort[separatorIndex+1:])
+					log.Warningf("[ORG-%s] invalid port format: %s", md.ORGID, portStr)
 					continue
 				}
-				ips = append(ips, ipPort[:separatorIndex])
-				ports = append(ports, uint32(port))
+				ipPorts = append(ipPorts, newCustomServiceIPPortKey(cs.VPCID, ip, uint32(port)))
 			}
 		}
 
-		for i, ip := range ips {
-			ipKey := newCustomServiceIPKey(cs.VPCID, ip)
-			if existedPorts, ok := customServiceIPKeyToPorts[ipKey]; ok {
-				// 该 ip 已经存在，那么 ip 不会跟本服务绑定
-				// 已存在的 ip 没有端口，那么直接跳过
-				if existedPorts.Cardinality() == 0 {
-					continue
-				}
-				// 已存在的 ip 有端口，该 ip 没有端口，清空端口
-				if len(ports) == 0 {
-					customServiceIPKeyToPorts[ipKey] = mapset.NewSet[uint32]()
-					continue
-				}
-				// 已存在的 ip 有端口，该 ip 有端口，合并端口
-				customServiceIPKeyToPorts[ipKey].Add(ports[i])
-			} else {
-				// 该 ip 不存在，则 ip 会跟本服务绑定
-				if _, ok := customServiceIDToIPs[cs.ID]; ok {
-					customServiceIDToIPs[cs.ID].Add(ip)
+		for _, ipPort := range ipPorts {
+			// 检查该 ip-port 是否已经被其他服务绑定
+			if _, exists := ipPortKeyToServiceID[ipPort]; !exists {
+				// 该 ip-port 不存在，绑定到当前服务
+				ipPortKeyToServiceID[ipPort] = cs.ID
+				if _, ok := customServiceIDToIPPorts[cs.ID]; ok {
+					customServiceIDToIPPorts[cs.ID].Add(ipPort)
 				} else {
-					customServiceIDToIPs[cs.ID] = mapset.NewSet[string](ip)
+					customServiceIDToIPPorts[cs.ID] = mapset.NewSet[customServiceIPPortKey](ipPort)
 				}
-				customServiceIPKeyToPorts[ipKey] = mapset.NewSet[uint32]()
-				// 该 ip 没有端口，那么跳过
-				if len(ports) == 0 {
-					continue
-				}
-				// 该 ip 有端口
-				customServiceIPKeyToPorts[ipKey].Add(ports[i])
 			}
+			// 如果已经存在，则跳过（按照规则1：绑定第一个遍历到的服务）
 		}
 	}
-	r.customServiceIDToIPs = customServiceIDToIPs
-	r.customServiceIPKeyToPorts = customServiceIPKeyToPorts
+
+	// 按照规则2：如果某个 ip 存在空端口，则该 ip 的其他端口都丢弃，只保留空端口
+	for serviceID, ipPorts := range customServiceIDToIPPorts {
+		newIPPorts := mapset.NewSet[customServiceIPPortKey]()
+		for ipPort := range ipPorts.Iter() {
+			if hasEmptyPortForIP[ipPort.ipKey()] {
+				// 该 ip 有空端口，只保留空端口的记录
+				if ipPort.port == 0 {
+					newIPPorts.Add(ipPort)
+				}
+			} else {
+				// 该 ip 没有空端口，保留所有端口
+				newIPPorts.Add(ipPort)
+			}
+		}
+		customServiceIDToIPPorts[serviceID] = newIPPorts
+	}
+
+	return customServiceIDToIPPorts
 }
 
 func (s *ServiceDataOP) updateServiceRawData(serviceRawData *ServiceRawData) {
@@ -422,26 +450,38 @@ func (s *ServiceDataOP) generateService() {
 		services = append(services, service)
 	}
 
+	services = append(services, s.mergeCustomServices(dbDataCache)...)
+
+	s.services = services
+	log.Debugf(s.Logf("service have %d", len(s.services)))
+}
+
+func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []*trident.ServiceInfo {
+	var services []*trident.ServiceInfo
 	serviceTypeCustomService := trident.ServiceType_CUSTOM_SERVICE
+
 	for _, customService := range dbDataCache.GetCustomServices() {
-		ips, ok := s.serviceRawData.customServiceIDToIPs[customService.ID]
+		ipPorts, ok := s.serviceRawData.customServiceIDToIPPorts[customService.ID]
 		if !ok {
 			continue
 		}
-		for ip := range ips.Iter() {
+		for ipPort := range ipPorts.Iter() {
+			var serverPorts []uint32
+			if ipPort.port != 0 {
+				serverPorts = []uint32{ipPort.port}
+			}
 			service := &trident.ServiceInfo{
 				Type:        &serviceTypeCustomService,
 				Id:          proto.Uint32(uint32(customService.ID)),
 				EpcId:       proto.Uint32(uint32(customService.VPCID)),
-				Ips:         []string{ip},
-				ServerPorts: s.serviceRawData.customServiceIPKeyToPorts[newCustomServiceIPKey(customService.VPCID, ip)].ToSlice(),
+				Ips:         []string{ipPort.ip},
+				ServerPorts: serverPorts,
 			}
 			services = append(services, service)
 		}
 	}
 
-	s.services = services
-	log.Debugf(s.Logf("service have %d", len(s.services)))
+	return services
 }
 
 func (s *ServiceDataOP) GetServiceData() []*trident.ServiceInfo {
