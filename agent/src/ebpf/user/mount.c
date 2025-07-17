@@ -591,14 +591,19 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 copy_event:
 	u_event = (struct user_io_event_buffer *)dst;
 	buffer = u_event->filename;
-	if (is_nfs)
+	if (is_nfs) {
 		temp_index =
 		    replace_suffix_prefix(mount_source, temp, mount_point,
 					  buffer, sizeof(event->filename));
-	else
+	} else {
+		const char *point = mount_point;
+		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
+		if (mount_point[0] == '/' && mount_point[1] == '\0')
+			point = "";
 		temp_index =
-		    fast_strncat_trunc(mount_point, temp, buffer,
+		    fast_strncat_trunc(point, temp, buffer,
 				       sizeof(event->filename));
+	}
 
 	buffer_len = temp_index + 1;
 	u_event->bytes_count = event->bytes_count;
