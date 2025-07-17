@@ -39,6 +39,7 @@ func (b *DataSet) AddPodService(dbItem *metadbmodel.PodService, seq int, toolDat
 		Label:            dbItem.Label,
 		Annotation:       dbItem.Annotation,
 		Selector:         dbItem.Selector,
+		ExternalIP:       dbItem.ExternalIP,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
 		Metadata:         dbItem.Metadata,
 		MetadataHash:     dbItem.MetadataHash,
@@ -88,6 +89,7 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService, toolDataSet *tool.
 	p.Label = cloudItem.Label
 	p.Annotation = cloudItem.Annotation
 	p.Selector = cloudItem.Selector
+	p.ExternalIP = cloudItem.ExternalIP
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
 
 	yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
