@@ -295,6 +295,11 @@ func (d *DBDataCache) GetCustomServices() []*models.CustomService {
 	return d.customServices
 }
 
+// SetCustomServices sets the custom services for testing purposes
+func (d *DBDataCache) SetCustomServices(services []*models.CustomService) {
+	d.customServices = services
+}
+
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
 	tapTypes, err := dbmgr.DBMgr[models.TapType](db).Gets()
 	if err != nil {
