@@ -775,6 +775,7 @@ async fn handler(
         }
         // profile integration
         (&Method::POST, "/api/v1/profile/ingest") => {
+            info!("receive profile");
             if external_profile_integration_disabled {
                 return Ok(Response::builder().body(Body::empty()).unwrap());
             }
@@ -815,6 +816,7 @@ async fn handler(
                 profile.content_type = content_type.as_bytes().to_vec();
             }
 
+            info!("send profile {:?}", profile.name);
             if let Err(e) = profile_sender.send(Profile(profile)) {
                 warn!("profile_sender failed to send data, because {:?}", e);
             }
