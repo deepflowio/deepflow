@@ -816,7 +816,10 @@ async fn handler(
                 profile.content_type = content_type.as_bytes().to_vec();
             }
 
-            info!("send profile {:?}", profile.name);
+            info!(
+                "send profile {:?} {:?} {:?}",
+                profile.name, profile.from, profile.until
+            );
             if let Err(e) = profile_sender.send(Profile(profile)) {
                 warn!("profile_sender failed to send data, because {:?}", e);
             }
