@@ -214,6 +214,7 @@ func checkAndStartAllRegionMasterFunctions(ctx context.Context) {
 				thisIsMasterController = true
 				log.Infof("I am the master controller now, previous master controller is %s", masterController)
 				go tr.Dictionary.Start(sCtx)
+				go tr.Dictionary.Reload(sCtx)
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)

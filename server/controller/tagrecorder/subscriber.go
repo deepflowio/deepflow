@@ -306,12 +306,9 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updat
 		}
 		return
 	}
-	if len(updateInfo) == 0 {
-		updateInfo = map[string]interface{}{
-			"updated_at": time.Now(), // use update_at as synchronize time
-		}
+	if len(updateInfo) > 0 {
+		s.dbOperator.update(chItem, updateInfo, key, db)
 	}
-	s.dbOperator.update(chItem, updateInfo, key, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
