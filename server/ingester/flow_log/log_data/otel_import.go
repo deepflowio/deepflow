@@ -251,6 +251,9 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				h.ParentSpanId = getValueString(value)
 			case "sw8.segment_id":
 				sw8SegmentId = getValueString(value)
+			case "sw8.trace_id":
+				h.TraceId = getValueString(value)
+				h.TraceIdIndex = ParseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 			case "http.request_content_length":
 				h.requestLength = value.GetIntValue()
 				h.RequestLength = &h.requestLength
