@@ -3163,7 +3163,7 @@ static __inline int trace_io_event_common(void *ctx,
 					  enum traffic_direction direction,
 					  __u64 pid_tgid)
 {
-	__u64 latency = 0;
+	__u64 latency = 0, curr_ts;
 	__u64 trace_id = 0;
 	__u32 k0 = 0;
 	__u32 tgid = pid_tgid >> 32;
@@ -3198,9 +3198,19 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
-	latency = bpf_ktime_get_ns() - data_args->enter_ts;
+	curr_ts = bpf_ktime_get_ns();
+	latency = curr_ts - data_args->enter_ts;
 	if (latency < tracer_ctx->io_event_minimal_duration) {
 		return -1;
+	}
+
+	/*
+	 * When using `bpf_ktime_get_ns()` to calculate latency, set `latency`
+	 * to 0 if a time rollback (non-monotonic behavior) is detected. This
+	 * is commonly observed on CentOS with the 3.10 kernel.
+	 */
+	if (unlikely(curr_ts < data_args->enter_ts)) {
+		latency = 0;
 	}
 
 	char *name = fd_to_name(data_args->fd, offset);
