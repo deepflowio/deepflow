@@ -27,10 +27,12 @@ use serde::Serialize;
 use crate::{
     common::flow::PacketDirection,
     common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+    config::handler::LogParserConfig,
     flow_generator::{
         protocol_logs::{
             pb_adapter::{
-                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
+                TraceInfo,
             },
             swap_if, L7ResponseStatus, LogMessageType,
         },
@@ -99,7 +101,13 @@ pub struct CustomInfo {
     #[serde(skip)]
     pub attributes: Vec<KeyVal>,
 
+    #[serde(skip)]
+    pub metrics: Vec<MetricKeyVal>,
+
     pub biz_type: u8,
+
+    #[serde(skip)]
+    pub is_on_blacklist: bool,
 }
 
 impl CustomInfo {
@@ -482,6 +490,15 @@ impl CustomInfo {
         }
         Ok(info)
     }
+
+    pub fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Custom) {
+            self.is_on_blacklist = t.request_type.is_on_blacklist(&self.req.req_type)
+                || t.request_resource.is_on_blacklist(&self.req.resource)
+                || t.endpoint.is_on_blacklist(&self.req.endpoint)
+                || t.request_domain.is_on_blacklist(&self.req.domain);
+        }
+    }
 }
 
 impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
@@ -580,7 +597,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        None
+        return Some(self.req.endpoint.clone());
     }
 
     fn get_biz_type(&self) -> u8 {
@@ -624,6 +641,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 request_id: w.request_id,
                 attributes: Some(w.attributes),
                 protocol_str: Some(w.proto_str),
+                client_ip: w.trace.http_proxy_client,
                 x_request_id_0: w.trace.x_request_id_0,
                 x_request_id_1: w.trace.x_request_id_1,
                 ..Default::default()
