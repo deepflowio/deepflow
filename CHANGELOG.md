@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Opensource arm64 compile [#10145](https://github.com/deepflowio/deepflow/pull/10145) by [rvql](https://github.com/rvql)
+* fix: select not exist field in vinterface table [#10140](https://github.com/deepflowio/deepflow/pull/10140) by [SongZhen0704](https://github.com/SongZhen0704)
+* fix: incorrect handshaking rtt [#10139](https://github.com/deepflowio/deepflow/pull/10139) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8817](https://github.com/deepflowio/deepflow/pull/8817) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8816](https://github.com/deepflowio/deepflow/pull/8816) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8814](https://github.com/deepflowio/deepflow/pull/8814) by [lzf575](https://github.com/lzf575)
