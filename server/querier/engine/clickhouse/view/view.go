@@ -245,6 +245,10 @@ func (v *View) trans() {
 		group := node.(*Group)
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
+			// remove auto ip group
+			if strings.HasPrefix(group.Value, "auto_instance_ip") || strings.HasPrefix(group.Value, "auto_service_ip") {
+				continue
+			}
 			// 外层group
 			metricGroup := &Group{}
 			if group.Alias != "" {
