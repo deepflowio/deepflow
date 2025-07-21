@@ -17,13 +17,15 @@
 package sync
 
 import (
-	"os"
-	"reflect"
-	"sync"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
-	ccommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/patrickmn/go-cache"
+
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -33,7 +35,7 @@ type GenesisSyncDataOperation struct {
 	IPlastseens *GenesisSyncTypeOperation[model.GenesisIP]
 	VIPs        *GenesisSyncTypeOperation[model.GenesisVIP]
 	VMs         *GenesisSyncTypeOperation[model.GenesisVM]
-	VPCs        *GenesisSyncTypeOperation[model.GenesisVpc]
+	VPCs        *GenesisSyncTypeOperation[model.GenesisVPC]
 	Hosts       *GenesisSyncTypeOperation[model.GenesisHost]
 	Lldps       *GenesisSyncTypeOperation[model.GenesisLldp]
 	Ports       *GenesisSyncTypeOperation[model.GenesisPort]
@@ -43,339 +45,205 @@ type GenesisSyncDataOperation struct {
 }
 
 type GenesisSyncTypeOperation[T common.GenesisSyncType] struct {
-	mutex     sync.Mutex
-	lastSeen  map[int]map[string]time.Time
-	dataStore map[int]map[string]T
+	nodeIP string
+	store  *cache.Cache
 }
 
-func (g *GenesisSyncTypeOperation[T]) Fetch() map[int][]T {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
+func (gs *GenesisSyncTypeOperation[T]) formatKey(orgID int, vtapID uint32, vtapKey string) string {
+	return fmt.Sprintf("%d-%d-%s", orgID, vtapID, vtapKey)
+}
 
+func (gs *GenesisSyncTypeOperation[T]) Fetch() map[int][]T {
 	result := map[int][]T{}
-	for orgID, dataMap := range g.dataStore {
-		data := []T{}
-		for _, d := range dataMap {
-			data = append(data, d)
+	for key, item := range gs.store.Items() {
+		orgID, err := strconv.Atoi(strings.Split(key, "-")[0])
+		if err != nil {
+			log.Error(err.Error())
+			continue
 		}
-		result[orgID] = data
+		result[orgID] = append(result[orgID], item.Object.([]T)...)
 	}
 
 	return result
 }
 
-func (g *GenesisSyncTypeOperation[T]) Renew(orgID int, timestamp time.Time, items []T) {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
+func (gs *GenesisSyncTypeOperation[T]) Renew(orgID int, vtapID uint32, vtapKey string, items []T) {
+	gs.store.SetDefault(gs.formatKey(orgID, vtapID, vtapKey), items)
+}
 
-	for _, item := range items {
-		tData := reflect.ValueOf(&item).Elem()
-		itemLcuuid := tData.FieldByName("Lcuuid").String()
-		if oLastSeen, ok := g.lastSeen[orgID]; ok {
-			oLastSeen[itemLcuuid] = timestamp
-		}
+func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey string, items []T) {
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		return
+	}
 
-		dataLastTime := tData.FieldByName("LastSeen")
-		if dataLastTime.IsValid() && dataLastTime.CanSet() {
-			dataLastTime.Set(reflect.ValueOf(timestamp))
-			if odataStore, ok := g.dataStore[orgID]; ok {
-				odataStore[itemLcuuid] = item
-			}
-		}
+	gs.store.SetDefault(gs.formatKey(orgID, vtapID, vtapKey), items)
+
+	if vtapID == 0 {
+		return
+	}
+
+	var toDelete T
+	err = db.Where("vtap_id = ?", vtapID).Where("node_ip = ?", gs.nodeIP).Delete(&toDelete).Error
+	if err != nil {
+		log.Warningf("delete vtap (%d) old data failed: %s", vtapID, err.Error(), logger.NewORGPrefix(orgID))
+	}
+
+	if len(items) == 0 {
+		return
+	}
+
+	err = db.CreateInBatches(items, 100).Error
+	if err != nil {
+		log.Warningf("create vtap (%s) new data failed: %s", vtapKey, err.Error(), logger.NewORGPrefix(orgID))
 	}
 }
 
-func (g *GenesisSyncTypeOperation[T]) Update(orgID int, timestamp time.Time, items []T) {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	for _, item := range items {
-		tData := reflect.ValueOf(&item).Elem()
-		itemLcuuid := tData.FieldByName("Lcuuid").String()
-		if oLastSeen, ok := g.lastSeen[orgID]; ok {
-			oLastSeen[itemLcuuid] = timestamp
-		} else {
-			g.lastSeen[orgID] = map[string]time.Time{itemLcuuid: timestamp}
-		}
-		if odataStore, ok := g.dataStore[orgID]; ok {
-			odataStore[itemLcuuid] = item
-		} else {
-			g.dataStore[orgID] = map[string]T{itemLcuuid: item}
-		}
-	}
-}
-
-func (g *GenesisSyncTypeOperation[T]) Age(timestamp time.Time, timeout time.Duration) bool {
-	ageTimestamp := timestamp.Add(-timeout)
-	removed := false
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-	for orgID := range g.dataStore {
-		for dataLcuuid := range g.dataStore[orgID] {
-			if ageTimestamp.After(g.lastSeen[orgID][dataLcuuid]) {
-				removed = true
-				delete(g.dataStore[orgID], dataLcuuid)
-				delete(g.lastSeen[orgID], dataLcuuid)
-			}
-		}
-	}
-
-	return removed
-}
-
-func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Duration) {
-	ageTimestamp := timestamp.Add(-timeout)
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	var items []T
+func (gs *GenesisSyncTypeOperation[T]) Load() {
 	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error("get org ids failed")
 		return
 	}
-	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 	for _, orgID := range orgIDs {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
-		db.Where("node_ip = ?", nodeIP).Find(&items)
-		dataStore := map[string]T{}
-		lastSeen := map[string]time.Time{}
-		for _, data := range items {
-			iData := reflect.ValueOf(&data).Elem()
-			dataLcuuid := iData.FieldByName("Lcuuid").String()
-			var lastTime time.Time
-			dataTime := iData.FieldByName("LastSeen")
-			if dataTime.IsValid() {
-				lastTime = dataTime.Interface().(time.Time)
-			} else {
-				lastTime = time.Now()
-			}
-			if ageTimestamp.After(lastTime) {
-				continue
-			}
-			dataStore[dataLcuuid] = data
-			lastSeen[dataLcuuid] = lastTime
-		}
-		g.dataStore[db.ORGID] = dataStore
-		g.lastSeen[db.ORGID] = lastSeen
-	}
-
-}
-
-func (g *GenesisSyncTypeOperation[T]) Save() {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	nIP := os.Getenv(ccommon.NODE_IP_KEY)
-	for orgID, dataMaps := range g.dataStore {
-		db, err := metadb.GetDB(orgID)
+		storages := []model.GenesisStorage{}
+		err = db.Where("node_ip = ?", gs.nodeIP).Find(&storages).Error
 		if err != nil {
-			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+			log.Errorf("get node (%s) storage failed:%s", gs.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
 			continue
 		}
 
-		// delete db old data
-		var dataType T
-		db.Where("node_ip = ?", nIP).Delete(&dataType)
-
-		// get effective vtap ids in current controller
-		var storages []model.GenesisStorage
-		db.Where("node_ip = ?", nIP).Find(&storages)
-		vtapIDMap := map[uint32]int{0: 0}
+		activeVtapIDs := []uint32{}
 		for _, storage := range storages {
-			vtapIDMap[storage.VtapID] = 0
-		}
-
-		// write current memory data
-		var items []T
-		for _, data := range dataMaps {
-			tData := reflect.ValueOf(&data).Elem()
-			vtapID := tData.FieldByName("VtapID").Uint()
-			if _, ok := vtapIDMap[uint32(vtapID)]; !ok {
+			var items []T
+			err = db.Where("node_ip = ?", gs.nodeIP).Where("vtap_id = ?", storage.VtapID).Find(&items).Error
+			if err != nil {
+				log.Errorf("get vtap (%d) data failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
 				continue
 			}
-			items = append(items, data)
+			var vtap metadbmodel.VTap
+			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
+			if err != nil {
+				log.Errorf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
+				continue
+			}
+			gs.store.SetDefault(gs.formatKey(orgID, storage.VtapID, vtap.CtrlIP+"-"+vtap.CtrlMac), items)
+			activeVtapIDs = append(activeVtapIDs, storage.VtapID)
 		}
-
-		if len(items) > 0 {
-			db.CreateInBatches(items, 100)
+		var inactive T
+		err = db.Where("node_ip = ?", gs.nodeIP).Where("vtap_id NOT IN (?)", activeVtapIDs).Delete(&inactive).Error
+		if err != nil {
+			log.Errorf("delete (%s) inactive data failed:%s", gs.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
 		}
 	}
-
 }
 
-func NewHostPlatformDataOperation(orgID int, dataList []model.GenesisHost) *GenesisSyncTypeOperation[model.GenesisHost] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisHost{}
-	vMap := map[string]model.GenesisHost{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func (gs *GenesisSyncTypeOperation[T]) SetOnEvicted(f func(k string, v interface{})) {
+	gs.store.OnEvicted(f)
+}
+
+func NewHostPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisHost] {
 	return &GenesisSyncTypeOperation[model.GenesisHost]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewVMPlatformDataOperation(orgID int, dataList []model.GenesisVM) *GenesisSyncTypeOperation[model.GenesisVM] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisVM{}
-	vMap := map[string]model.GenesisVM{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewVMPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVM] {
 	return &GenesisSyncTypeOperation[model.GenesisVM]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewVIPPlatformDataOperation(orgID int, dataList []model.GenesisVIP) *GenesisSyncTypeOperation[model.GenesisVIP] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisVIP{}
-	vMap := map[string]model.GenesisVIP{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewVIPPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVIP] {
 	return &GenesisSyncTypeOperation[model.GenesisVIP]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewVpcPlatformDataOperation(orgID int, dataList []model.GenesisVpc) *GenesisSyncTypeOperation[model.GenesisVpc] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisVpc{}
-	vMap := map[string]model.GenesisVpc{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
-	return &GenesisSyncTypeOperation[model.GenesisVpc]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+func NewVpcPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVPC] {
+	return &GenesisSyncTypeOperation[model.GenesisVPC]{
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewPortPlatformDataOperation(orgID int, dataList []model.GenesisPort) *GenesisSyncTypeOperation[model.GenesisPort] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisPort{}
-	vMap := map[string]model.GenesisPort{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewPortPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisPort] {
 	return &GenesisSyncTypeOperation[model.GenesisPort]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewNetworkPlatformDataOperation(orgID int, dataList []model.GenesisNetwork) *GenesisSyncTypeOperation[model.GenesisNetwork] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisNetwork{}
-	vMap := map[string]model.GenesisNetwork{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewNetworkPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisNetwork] {
 	return &GenesisSyncTypeOperation[model.GenesisNetwork]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewVinterfacePlatformDataOperation(orgID int, dataList []model.GenesisVinterface) *GenesisSyncTypeOperation[model.GenesisVinterface] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisVinterface{}
-	vMap := map[string]model.GenesisVinterface{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewVinterfacePlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVinterface] {
 	return &GenesisSyncTypeOperation[model.GenesisVinterface]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewIPLastSeenPlatformDataOperation(orgID int, dataList []model.GenesisIP) *GenesisSyncTypeOperation[model.GenesisIP] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisIP{}
-	vMap := map[string]model.GenesisIP{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewIPLastSeenPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisIP] {
 	return &GenesisSyncTypeOperation[model.GenesisIP]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewLldpInfoPlatformDataOperation(orgID int, dataList []model.GenesisLldp) *GenesisSyncTypeOperation[model.GenesisLldp] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisLldp{}
-	vMap := map[string]model.GenesisLldp{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewLldpInfoPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisLldp] {
 	return &GenesisSyncTypeOperation[model.GenesisLldp]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
 
-func NewProcessPlatformDataOperation(orgID int, dataList []model.GenesisProcess) *GenesisSyncTypeOperation[model.GenesisProcess] {
-	lastSeen := map[int]map[string]time.Time{}
-	tMap := map[string]time.Time{}
-	lastSeen[orgID] = tMap
-	dataStore := map[int]map[string]model.GenesisProcess{}
-	vMap := map[string]model.GenesisProcess{}
-	for _, data := range dataList {
-		vMap[data.Lcuuid] = data
-	}
-	dataStore[orgID] = vMap
+func NewProcessPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisProcess] {
 	return &GenesisSyncTypeOperation[model.GenesisProcess]{
-		mutex:     sync.Mutex{},
-		lastSeen:  lastSeen,
-		dataStore: dataStore,
+		nodeIP: nodeIP,
+		store: cache.New(
+			time.Duration(expired)*time.Second,
+			time.Duration(interval)*time.Second,
+		),
 	}
 }
