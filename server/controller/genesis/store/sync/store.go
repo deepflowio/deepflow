@@ -19,14 +19,14 @@ package sync
 import (
 	"context"
 	"os"
-	"sync"
+	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm/clause"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
@@ -35,43 +35,37 @@ import (
 )
 
 type SyncStorage struct {
-	cfg             config.GenesisConfig
-	sCtx            context.Context
-	sCancel         context.CancelFunc
-	channel         chan common.GenesisSyncData
-	dirty           bool
-	mutex           sync.Mutex
-	genesisSyncInfo GenesisSyncDataOperation
+	nodeIP  string
+	cfg     config.GenesisConfig
+	sCtx    context.Context
+	sCancel context.CancelFunc
+	data    GenesisSyncDataOperation
+	channel chan common.GenesisSyncData
 }
 
 func NewSyncStorage(ctx context.Context, cfg config.GenesisConfig, sChan chan common.GenesisSyncData) *SyncStorage {
 	sCtx, sCancel := context.WithCancel(ctx)
 	return &SyncStorage{
-		cfg:             cfg,
-		sCtx:            sCtx,
-		sCancel:         sCancel,
-		channel:         sChan,
-		dirty:           false,
-		mutex:           sync.Mutex{},
-		genesisSyncInfo: GenesisSyncDataOperation{},
+		nodeIP:  os.Getenv(ccommon.NODE_IP_KEY),
+		cfg:     cfg,
+		sCtx:    sCtx,
+		sCancel: sCancel,
+		channel: sChan,
+		data:    GenesisSyncDataOperation{},
 	}
 }
 
-func (s *SyncStorage) Renew(orgID int, vtapID uint32, refresh bool, data common.GenesisSyncDataResponse) {
-	now := time.Now()
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.genesisSyncInfo.VIPs.Renew(orgID, now, data.VIPs)
-	s.genesisSyncInfo.VMs.Renew(orgID, now, data.VMs)
-	s.genesisSyncInfo.VPCs.Renew(orgID, now, data.VPCs)
-	s.genesisSyncInfo.Hosts.Renew(orgID, now, data.Hosts)
-	s.genesisSyncInfo.Lldps.Renew(orgID, now, data.Lldps)
-	s.genesisSyncInfo.Ports.Renew(orgID, now, data.Ports)
-	s.genesisSyncInfo.Networks.Renew(orgID, now, data.Networks)
-	s.genesisSyncInfo.IPlastseens.Renew(orgID, now, data.IPLastSeens)
-	s.genesisSyncInfo.Vinterfaces.Renew(orgID, now, data.Vinterfaces)
-	s.genesisSyncInfo.Processes.Renew(orgID, now, data.Processes)
+func (s *SyncStorage) Renew(orgID int, vtapID uint32, vtapKey string, refresh bool, items common.GenesisSyncDataResponse) {
+	s.data.VIPs.Renew(orgID, vtapID, vtapKey, items.VIPs)
+	s.data.VMs.Renew(orgID, vtapID, vtapKey, items.VMs)
+	s.data.VPCs.Renew(orgID, vtapID, vtapKey, items.VPCs)
+	s.data.Hosts.Renew(orgID, vtapID, vtapKey, items.Hosts)
+	s.data.Lldps.Renew(orgID, vtapID, vtapKey, items.Lldps)
+	s.data.Ports.Renew(orgID, vtapID, vtapKey, items.Ports)
+	s.data.Networks.Renew(orgID, vtapID, vtapKey, items.Networks)
+	s.data.IPlastseens.Renew(orgID, vtapID, vtapKey, items.IPLastSeens)
+	s.data.Vinterfaces.Renew(orgID, vtapID, vtapKey, items.Vinterfaces)
+	s.data.Processes.Renew(orgID, vtapID, vtapKey, items.Processes)
 
 	if !refresh {
 		return
@@ -81,159 +75,94 @@ func (s *SyncStorage) Renew(orgID int, vtapID uint32, refresh bool, data common.
 		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return
 	}
-	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
-	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, nodeIP).Update("node_ip", nodeIP).Error
+	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
 	if err != nil {
-		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, nodeIP, err, logger.NewORGPrefix(orgID))
+		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, s.nodeIP, err, logger.NewORGPrefix(orgID))
 	}
 }
 
-func (s *SyncStorage) Update(orgID int, vtapID uint32, data common.GenesisSyncDataResponse) {
-	now := time.Now()
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items common.GenesisSyncDataResponse) {
+	s.data.VIPs.Update(orgID, vtapID, vtapKey, items.VIPs)
+	s.data.VMs.Update(orgID, vtapID, vtapKey, items.VMs)
+	s.data.VPCs.Update(orgID, vtapID, vtapKey, items.VPCs)
+	s.data.Hosts.Update(orgID, vtapID, vtapKey, items.Hosts)
+	s.data.Lldps.Update(orgID, vtapID, vtapKey, items.Lldps)
+	s.data.Ports.Update(orgID, vtapID, vtapKey, items.Ports)
+	s.data.Networks.Update(orgID, vtapID, vtapKey, items.Networks)
+	s.data.IPlastseens.Update(orgID, vtapID, vtapKey, items.IPLastSeens)
+	s.data.Vinterfaces.Update(orgID, vtapID, vtapKey, items.Vinterfaces)
+	s.data.Processes.Update(orgID, vtapID, vtapKey, items.Processes)
 
-	updateFlag := false
-	if len(data.VIPs) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.VIPs.Update(orgID, now, data.VIPs)
-	}
-	if len(data.VMs) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.VMs.Update(orgID, now, data.VMs)
-	}
-	if len(data.VPCs) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.VPCs.Update(orgID, now, data.VPCs)
-	}
-	if len(data.Hosts) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Hosts.Update(orgID, now, data.Hosts)
-	}
-	if len(data.Lldps) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Lldps.Update(orgID, now, data.Lldps)
-	}
-	if len(data.Ports) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Ports.Update(orgID, now, data.Ports)
-	}
-	if len(data.Networks) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Networks.Update(orgID, now, data.Networks)
-	}
-	if len(data.IPLastSeens) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.IPlastseens.Update(orgID, now, data.IPLastSeens)
-	}
-	if len(data.Vinterfaces) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Vinterfaces.Update(orgID, now, data.Vinterfaces)
-	}
-	if len(data.Processes) != 0 {
-		updateFlag = true
-		s.genesisSyncInfo.Processes.Update(orgID, now, data.Processes)
-	}
-	if updateFlag && vtapID != 0 {
-		// push immediately after update
-		s.fetch()
+	// push immediately after update
+	s.fetch()
 
-		db, err := metadb.GetDB(orgID)
-		if err != nil {
-			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
-			return
-		}
-		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
-		db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "vtap_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
-		}).Create(&model.GenesisStorage{
-			VtapID: vtapID,
-			NodeIP: nodeIP,
-		})
+	if vtapID == 0 {
+		return
 	}
-	s.dirty = true
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		return
+	}
+	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "vtap_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
+	}).Create(&model.GenesisStorage{
+		VtapID: vtapID,
+		NodeIP: nodeIP,
+	})
 }
 
 func (s *SyncStorage) fetch() {
 	s.channel <- common.GenesisSyncData{
-		VIPs:        s.genesisSyncInfo.VIPs.Fetch(),
-		VMs:         s.genesisSyncInfo.VMs.Fetch(),
-		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
-		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
-		Ports:       s.genesisSyncInfo.Ports.Fetch(),
-		Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
-		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
-		Networks:    s.genesisSyncInfo.Networks.Fetch(),
-		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
-		Processes:   s.genesisSyncInfo.Processes.Fetch(),
+		VIPs:        s.data.VIPs.Fetch(),
+		VMs:         s.data.VMs.Fetch(),
+		VPCs:        s.data.VPCs.Fetch(),
+		Hosts:       s.data.Hosts.Fetch(),
+		Ports:       s.data.Ports.Fetch(),
+		Lldps:       s.data.Lldps.Fetch(),
+		IPLastSeens: s.data.IPlastseens.Fetch(),
+		Networks:    s.data.Networks.Fetch(),
+		Vinterfaces: s.data.Vinterfaces.Fetch(),
+		Processes:   s.data.Processes.Fetch(),
 	}
 }
 
-func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (s *SyncStorage) loadFromDatabase() {
+	expired := int(s.cfg.AgingTime)
+	interval := int(s.cfg.DataPersistenceInterval)
+	s.data.VIPs = NewVIPPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VIPs.Load()
 
-	now := time.Now()
-	s.genesisSyncInfo = GenesisSyncDataOperation{}
-	var vips []model.GenesisVIP
-	var vms []model.GenesisVM
-	var vpcs []model.GenesisVpc
-	var hosts []model.GenesisHost
-	var ports []model.GenesisPort
-	var lldps []model.GenesisLldp
-	var ipLastSeens []model.GenesisIP
-	var networks []model.GenesisNetwork
-	var vinterfaces []model.GenesisVinterface
-	var processes []model.GenesisProcess
+	s.data.VMs = NewVMPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VMs.Load()
 
-	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vips)
-	s.genesisSyncInfo.VIPs.Load(now, ageTime)
+	s.data.VPCs = NewVpcPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VPCs.Load()
 
-	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vms)
-	s.genesisSyncInfo.VMs.Load(now, ageTime)
+	s.data.Hosts = NewHostPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Hosts.Load()
 
-	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vpcs)
-	s.genesisSyncInfo.VPCs.Load(now, ageTime)
+	s.data.Ports = NewPortPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Ports.Load()
 
-	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation(mcommon.DEFAULT_ORG_ID, hosts)
-	s.genesisSyncInfo.Hosts.Load(now, ageTime)
+	s.data.Lldps = NewLldpInfoPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Lldps.Load()
 
-	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation(mcommon.DEFAULT_ORG_ID, ports)
-	s.genesisSyncInfo.Ports.Load(now, ageTime)
+	s.data.IPlastseens = NewIPLastSeenPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.IPlastseens.Load()
 
-	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation(mcommon.DEFAULT_ORG_ID, lldps)
-	s.genesisSyncInfo.Lldps.Load(now, ageTime)
+	s.data.Networks = NewNetworkPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Networks.Load()
 
-	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(mcommon.DEFAULT_ORG_ID, ipLastSeens)
-	s.genesisSyncInfo.IPlastseens.Load(now, ageTime)
+	s.data.Vinterfaces = NewVinterfacePlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Vinterfaces.Load()
 
-	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation(mcommon.DEFAULT_ORG_ID, networks)
-	s.genesisSyncInfo.Networks.Load(now, ageTime)
-
-	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(mcommon.DEFAULT_ORG_ID, vinterfaces)
-	s.genesisSyncInfo.Vinterfaces.Load(now, ageTime)
-
-	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation(mcommon.DEFAULT_ORG_ID, processes)
-	s.genesisSyncInfo.Processes.Load(now, ageTime)
+	s.data.Processes = NewProcessPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Processes.Load()
 
 	s.fetch()
-}
-
-func (s *SyncStorage) storeToDatabase() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.genesisSyncInfo.VIPs.Save()
-	s.genesisSyncInfo.VMs.Save()
-	s.genesisSyncInfo.VPCs.Save()
-	s.genesisSyncInfo.Hosts.Save()
-	s.genesisSyncInfo.Ports.Save()
-	s.genesisSyncInfo.Lldps.Save()
-	s.genesisSyncInfo.IPlastseens.Save()
-	s.genesisSyncInfo.Networks.Save()
-	s.genesisSyncInfo.Vinterfaces.Save()
-	s.genesisSyncInfo.Processes.Save()
 }
 
 func (s *SyncStorage) refreshDatabase() {
@@ -277,37 +206,42 @@ func (s *SyncStorage) refreshDatabase() {
 				}
 			}
 		}
+	}
+}
 
-		s.dirty = true
+func (s *SyncStorage) onEvicted(k string, v interface{}) {
+	s.fetch()
+
+	keys := strings.Split(k, "-")
+	orgID, err := strconv.Atoi(keys[0])
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		return
+	}
+	err = db.Delete(&v).Error
+	if err != nil {
+		log.Errorf("delete vtap (%s) stale data failed: %s", k, err.Error(), logger.NewORGPrefix(orgID))
 	}
 }
 
 func (s *SyncStorage) run() {
-	ageTime := time.Duration(s.cfg.AgingTime) * time.Second
-	s.loadFromDatabase(ageTime)
+	s.loadFromDatabase()
 
-	for {
-		time.Sleep(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		hasChange := false
-		s.mutex.Lock()
-		hasChange = hasChange || s.genesisSyncInfo.VIPs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.VMs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.VPCs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Lldps.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Ports.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Networks.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.IPlastseens.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Processes.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, time.Duration(s.cfg.VinterfaceAgingTime)*time.Second)
-		hasChange = hasChange || s.dirty
-		s.dirty = false
-		s.mutex.Unlock()
-		if hasChange {
-			s.storeToDatabase()
-			s.fetch()
-		}
-	}
+	s.data.VMs.SetOnEvicted(s.onEvicted)
+	s.data.VIPs.SetOnEvicted(s.onEvicted)
+	s.data.VPCs.SetOnEvicted(s.onEvicted)
+	s.data.Hosts.SetOnEvicted(s.onEvicted)
+	s.data.Lldps.SetOnEvicted(s.onEvicted)
+	s.data.Ports.SetOnEvicted(s.onEvicted)
+	s.data.Networks.SetOnEvicted(s.onEvicted)
+	s.data.Processes.SetOnEvicted(s.onEvicted)
+	s.data.Vinterfaces.SetOnEvicted(s.onEvicted)
+	s.data.IPlastseens.SetOnEvicted(s.onEvicted)
 }
 
 func (s *SyncStorage) Start() {
