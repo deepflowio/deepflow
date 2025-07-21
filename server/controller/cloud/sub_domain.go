@@ -198,7 +198,7 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 	}
 
 	var vinterfaces []metadbmodel.VInterface
-	err = c.db.DB.Select("id", "lcuuid", "type", "mac", "devicetype", "deviceid", "region").Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
+	err = c.db.DB.Select("id", "lcuuid", "iftype", "mac", "devicetype", "deviceid", "region").Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
 	if err != nil {
 		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
