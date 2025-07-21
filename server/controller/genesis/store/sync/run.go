@@ -325,7 +325,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 				continue
 			}
 			syncVPCLcuuidSet[sVPCLcuuid] = false
-			retGenesisSyncData.VPCs = append(retGenesisSyncData.VPCs, model.GenesisVpc{
+			retGenesisSyncData.VPCs = append(retGenesisSyncData.VPCs, model.GenesisVPC{
 				Lcuuid: sVPCLcuuid,
 				Name:   vpc.GetName(),
 				NodeIP: vpc.GetNodeIp(),
@@ -422,7 +422,7 @@ func (g *GenesisSync) Start() {
 				if info.VtapID != 0 {
 					peerInfo, ok := genesisSyncDataByVtap[vtap]
 					if ok {
-						vStorage.Renew(info.ORGID, info.VtapID, info.StorageRefresh, peerInfo)
+						vStorage.Renew(info.ORGID, info.VtapID, info.Key, info.StorageRefresh, peerInfo)
 					}
 				}
 			} else if info.MessageType == common.TYPE_UPDATE {
@@ -445,7 +445,7 @@ func (g *GenesisSync) Start() {
 				if info.VtapID != 0 {
 					genesisSyncDataByVtap[vtap] = genesisSyncData
 				}
-				vStorage.Update(info.ORGID, info.VtapID, genesisSyncData)
+				vStorage.Update(info.ORGID, info.VtapID, info.Key, genesisSyncData)
 			}
 		}
 	}()
