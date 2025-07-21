@@ -620,14 +620,18 @@ impl TcpPerf {
         self.handshaking = false;
     }
 
-    // fpd for first packet direction
-    fn is_invalid_retrans_packet(&mut self, p: &MetaPacket, fpd: bool) -> (bool, bool) {
+    // packet_direction: true=c2s, false=s2c
+    fn is_invalid_retrans_packet(
+        &mut self,
+        p: &MetaPacket,
+        packet_direction: bool,
+    ) -> (bool, bool) {
         let tcp_data = if let ProtocolData::TcpHeader(tcp_data) = &p.protocol_data {
             tcp_data
         } else {
             unreachable!();
         };
-        let (same_dir, oppo_dir) = if fpd {
+        let (same_dir, oppo_dir) = if packet_direction {
             (&mut self.ctrl_info.0, &mut self.ctrl_info.1)
         } else {
             (&mut self.ctrl_info.1, &mut self.ctrl_info.0)
@@ -639,7 +643,7 @@ impl TcpPerf {
                 same_dir.first_handshake_timestamp = p.lookup_key.timestamp.into();
                 self.handshaking = true;
             } else if same_dir.syn_transmitted {
-                self.perf_data.calc_retrans_syn(fpd);
+                self.perf_data.calc_retrans_syn(packet_direction);
                 self.perf_data.calc_retran_syn();
             }
             same_dir.syn_transmitted = true;
@@ -658,15 +662,17 @@ impl TcpPerf {
                     oppo_dir.rtt_full_precondition = true;
                 }
             } else {
-                self.perf_data.calc_retrans_syn(fpd);
+                self.perf_data.calc_retrans_syn(packet_direction);
                 self.perf_data.calc_retrans_synack();
             }
             return (false, false);
         }
 
         if p.is_ack() {
-            // The first ACK packet sent by the server after handshake does not calculate rtt.
-            self.handshaking = fpd;
+            // The three-way handshake state terminates when the first ACK packet sent from the server to the client is observed.
+            if self.handshaking {
+                self.handshaking = packet_direction;
+            }
 
             // It is impossible to distinguish retransmission between ACK and ACK
             // keepalive. To avoid misunderstanding, retransmission of pure ACK
@@ -683,7 +689,7 @@ impl TcpPerf {
         match same_dir.assert_seq_number(tcp_data, p.payload_len) {
             PacketSeqType::Retrans => {
                 // established retrans
-                self.perf_data.calc_retrans(fpd);
+                self.perf_data.calc_retrans(packet_direction);
                 (false, true)
             }
             PacketSeqType::Error => {
