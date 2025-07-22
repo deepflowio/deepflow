@@ -19,6 +19,9 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+// Default value set when file read/write latency timestamp rollback occurs.
+#define TIME_ROLLBACK_DEFAULT_LATENCY_NS 50000
+ 
 static __inline bool is_regular_file(int fd,
 				     struct member_fields_offset *off_ptr)
 {
@@ -153,17 +156,19 @@ static __inline int trace_io_event_common(void *ctx,
 
 	curr_ts = bpf_ktime_get_ns();
 	latency = curr_ts - data_args->enter_ts;
-	if (latency < tracer_ctx->io_event_minimal_duration) {
-		return -1;
-	}
 
 	/*
 	 * When using `bpf_ktime_get_ns()` to calculate latency, set `latency`
-	 * to 0 if a time rollback (non-monotonic behavior) is detected. This
-	 * is commonly observed on CentOS with the 3.10 kernel.
+	 * to TIME_ROLLBACK_DEFAULT_LATENCY_NS (50 microseconds) if a time rollback
+	 * (non-monotonic behavior) is detected. This is commonly observed on
+	 * CentOS with the 3.10 kernel.
 	 */
 	if (unlikely(curr_ts < data_args->enter_ts)) {
-		latency = 0;
+		latency = TIME_ROLLBACK_DEFAULT_LATENCY_NS;
+	}
+
+	if (latency < tracer_ctx->io_event_minimal_duration) {
+		return -1;
 	}
 
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
