@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* fix: agnet - eBPF Set default latency to 50µs for time rollback cases [#10159](https://github.com/deepflowio/deepflow/pull/10159) by [yinjiping](https://github.com/yinjiping)
+* fix: agent - eBPF Fix NFS file path concatenation [#10155](https://github.com/deepflowio/deepflow/pull/10155) by [yinjiping](https://github.com/yinjiping)
+* fix: filter invalid cidr [#10154](https://github.com/deepflowio/deepflow/pull/10154) by [askyrie](https://github.com/askyrie)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
