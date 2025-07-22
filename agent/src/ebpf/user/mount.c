@@ -527,8 +527,8 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 		}
 	}
 
-	// No match found: copy str2 as-is
-	return fast_strncat_trunc(str2, "", out, out_size);
+	// No match found: copy str1 + str2
+	return fast_strncat_trunc(str1, str2, out, out_size);
 }
 
 u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
