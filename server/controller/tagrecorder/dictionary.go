@@ -66,11 +66,19 @@ func (c *Dictionary) Start(sCtx context.Context) {
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
 		defer ticker.Stop()
+		count := 0
+		times := c.cfg.TagRecorderCfg.DictionaryReloadInterval / c.cfg.TagRecorderCfg.Interval
 	LOOP:
 		for {
 			select {
 			case <-ticker.C:
-				c.Update()
+				count++
+				if count >= times {
+					c.Update(c.reloadDict)
+					count = 0
+				} else {
+					c.Update(c.update)
+				}
 			case <-sCtx.Done():
 				break LOOP
 			}
@@ -78,11 +86,28 @@ func (c *Dictionary) Start(sCtx context.Context) {
 	}()
 }
 
-func (c *Dictionary) Update() {
+func (c *Dictionary) reloadDict(clickHouseCfg *clickhouse.ClickHouseConfig) {
+	// reload the dictionary at all data nodes in the region
+	ckDb, err := clickhouse.Connect(*clickHouseCfg)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer ckDb.Close()
+	log.Infof("reload clickhouse dictionary in (%s: %d)", clickHouseCfg.Host, clickHouseCfg.Port)
+	reloadSql := "SYSTEM RELOAD DICTIONARIES"
+	_, err = ckDb.Exec(reloadSql)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+}
+
+func (c *Dictionary) Update(updateFunc func(*clickhouse.ClickHouseConfig)) {
 	log.Info("tagrecorder update ch dictionary")
 	if common.IsStandaloneRunningMode() {
 		// in standalone mode, only supports one ClickHouse node
-		c.update(&c.cfg.ClickHouseCfg)
+		updateFunc(&c.cfg.ClickHouseCfg)
 		return
 	}
 
@@ -136,7 +161,7 @@ func (c *Dictionary) Update() {
 				for _, port := range subset.Ports {
 					if port.Name == c.cfg.ClickHouseCfg.EndpointTcpPortName {
 						clickHouseCfg.Port = uint32(port.Port)
-						c.update(&clickHouseCfg)
+						updateFunc(&clickHouseCfg)
 					}
 				}
 			}
@@ -227,7 +252,6 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)
 	}
-
 	for _, orgID := range orgIDs {
 		if orgID != metaDBCommon.DEFAULT_ORG_ID {
 			sqlDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.source.Database + "`"
