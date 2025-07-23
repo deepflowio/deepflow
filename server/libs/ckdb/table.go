@@ -18,6 +18,7 @@ package ckdb
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -357,6 +358,41 @@ func getAggr(column *Column) string {
 	return "sum"
 }
 
+func (t *Table) OrderKeysCount() int {
+	orderKeys := t.OrderKeys
+	for _, c := range t.Columns {
+		if !c.GroupBy {
+			continue
+		}
+		if !stringSliceHas(orderKeys, c.Name) {
+			orderKeys = append(orderKeys, c.Name)
+		}
+	}
+	return len(orderKeys)
+}
+
+func (t *Table) IsAggrTableWrong(createTableSQL string) bool {
+	re := regexp.MustCompile(`(?i)ORDER BY\s*\(([^)]+)\)`)
+	match := re.FindStringSubmatch(createTableSQL)
+	if len(match) < 2 {
+		return false
+	}
+	orderKeys := strings.Split(match[1], ",")
+	return len(orderKeys) != t.OrderKeysCount()
+}
+
+func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
+	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+}
+
+func (t *Table) AggrTable1S(orgID uint16) string {
+	return t.AggrTable(orgID, AggregationSecond)
+}
+
+func (t *Table) MakeAggrTableDropSQL1S(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.AggrTable1S(orgID))
+}
+
 func (t *Table) MakeAggrTableCreateSQL1S(orgID uint16) string {
 	return t.MakeAggrTableCreateSQL(orgID, AggregationSecond, t.TTL)
 }
@@ -373,6 +409,14 @@ func (t *Table) MakeAggrGlobalTableCreateSQL1S(orgID uint16) string {
 	return t.MakeAggrGlobalTableCreateSQL(orgID, AggregationSecond)
 }
 
+func (t *Table) AggrTable1H(orgID uint16) string {
+	return t.AggrTable(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrTableDropSQL1H(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.AggrTable1H(orgID))
+}
+
 func (t *Table) MakeAggrTableCreateSQL1H(orgID uint16) string {
 	return t.MakeAggrTableCreateSQL(orgID, AggregationHour, DEFAULT_1H_TTL)
 }
@@ -387,6 +431,14 @@ func (t *Table) MakeAggrLocalTableCreateSQL1H(orgID uint16) string {
 
 func (t *Table) MakeAggrGlobalTableCreateSQL1H(orgID uint16) string {
 	return t.MakeAggrGlobalTableCreateSQL(orgID, AggregationHour)
+}
+
+func (t *Table) AggrTable1D(orgID uint16) string {
+	return t.AggrTable(orgID, AggregationDay)
+}
+
+func (t *Table) MakeAggrTableDropSQL1D(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.AggrTable1D(orgID))
 }
 
 func (t *Table) MakeAggrTableCreateSQL1D(orgID uint16) string {
@@ -412,7 +464,7 @@ func (t *Table) tablePrefix() string {
 func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInterval, ttlHour int) string {
 	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
 	columns := []string{}
-	orderKeys := t.OrderKeys
+	groupKeys := t.OrderKeys
 	for _, c := range t.Columns {
 		// ignore fields starting with '_', such as _tid, _id
 		if strings.HasPrefix(c.Name, "_") || c.IgnoredInAggrTable {
@@ -431,6 +483,9 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 			comment := ""
 			if c.Comment != "" {
 				comment = fmt.Sprintf("COMMENT '%s'", c.Comment)
+			}
+			if !stringSliceHas(groupKeys, c.Name) {
+				groupKeys = append(groupKeys, c.Name)
 			}
 			columns = append(columns, fmt.Sprintf("%s %s %s %s", c.Name, c.Type.String(), comment, codec))
 		} else {
@@ -462,8 +517,8 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 		tableAgg,
 		strings.Join(columns, ",\n"),
 		engine,
-		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
-		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
+		strings.Join(groupKeys, ","),
+		strings.Join(groupKeys, ","), // 以order by的字段排序, 相同的做聚合
 		aggrInterval.PartitionBy().String(t.TimeKey),
 		t.makeTTLString(ttlHour),
 		t.StoragePolicy)
