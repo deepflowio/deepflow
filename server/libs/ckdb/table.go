@@ -413,6 +413,7 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
 	columns := []string{}
 	orderKeys := t.OrderKeys
+	groupKeys := t.OrderKeys
 	for _, c := range t.Columns {
 		// ignore fields starting with '_', such as _tid, _id
 		if strings.HasPrefix(c.Name, "_") || c.IgnoredInAggrTable {
@@ -431,6 +432,9 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 			comment := ""
 			if c.Comment != "" {
 				comment = fmt.Sprintf("COMMENT '%s'", c.Comment)
+			}
+			if !stringSliceHas(groupKeys, c.Name) {
+				groupKeys = append(groupKeys, c.Name)
 			}
 			columns = append(columns, fmt.Sprintf("%s %s %s %s", c.Name, c.Type.String(), comment, codec))
 		} else {
@@ -462,8 +466,8 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 		tableAgg,
 		strings.Join(columns, ",\n"),
 		engine,
-		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
-		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
+		strings.Join(groupKeys, ","),
+		strings.Join(groupKeys, ","), // 以order by的字段排序, 相同的做聚合
 		aggrInterval.PartitionBy().String(t.TimeKey),
 		t.makeTTLString(ttlHour),
 		t.StoragePolicy)
