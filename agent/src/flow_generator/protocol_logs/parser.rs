@@ -580,6 +580,7 @@ impl SessionQueue {
                 .send(item.clone(), Some(L7ResponseStatus::Timeout));
             None
         });
+        self.throttle_sender.throttle.flush();
         // update timestamp
         self.window_start = time;
     }
