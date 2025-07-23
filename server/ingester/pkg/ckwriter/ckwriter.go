@@ -22,6 +22,7 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,9 +44,10 @@ import (
 var log = logging.MustGetLogger("ckwriter")
 
 const (
-	FLUSH_TIMEOUT  = 10 * time.Second
-	SQL_LOG_LENGTH = 256
-	RETRY_COUNT    = 2
+	FLUSH_TIMEOUT     = 10 * time.Second
+	SQL_LOG_LENGTH    = 256
+	SQL_RESULT_LENGTH = 1024
+	RETRY_COUNT       = 2
 )
 
 var ckwriterManager = &CKWriterManager{}
@@ -173,6 +175,57 @@ func ExecSQL(conn clickhouse.Conn, query string) error {
 	return err
 }
 
+func QuerySQLStringResult(conn clickhouse.Conn, query string) (string, error) {
+	if len(query) > SQL_LOG_LENGTH {
+		log.Infof("Query SQL: %s ...", query[:SQL_LOG_LENGTH])
+	} else {
+		log.Info("Query SQL: ", query)
+	}
+
+	rows, err := conn.Query(context.Background(), query)
+	if err != nil {
+		return "", fmt.Errorf("query failed: %v", err)
+	}
+	defer rows.Close()
+
+	columns := rows.Columns()
+	if len(columns) == 0 {
+		return "", fmt.Errorf("no columns in result")
+	}
+
+	var result strings.Builder
+	result.WriteString(strings.Join(columns, "\t") + "\n")
+
+	values := make([]interface{}, len(columns))
+	for i := range values {
+		values[i] = new(string)
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(values...); err != nil {
+			return "", fmt.Errorf("scan row failed: %v", err)
+		}
+
+		rowValues := make([]string, len(values))
+		for i, val := range values {
+			rowValues[i] = *(val.(*string))
+		}
+		result.WriteString(strings.Join(rowValues, "\t") + "\n")
+	}
+
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("rows error: %v", err)
+	}
+
+	r := result.String()
+	if len(query) > SQL_RESULT_LENGTH {
+		log.Infof("Query SQL result: %s ...", r[:SQL_RESULT_LENGTH])
+	} else {
+		log.Info("Query SQL result: ", r)
+	}
+	return r, nil
+}
+
 func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint16) error {
 	if err := ExecSQL(conn, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", t.OrgDatabase(orgID))); err != nil {
 		return err
@@ -186,6 +239,16 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 	}
 
 	if t.Aggr1H1D {
+		aggrTableCreateSQL, err := QuerySQLStringResult(conn, fmt.Sprintf("SHOW CREATE TABLE %s", t.AggrTable1H(orgID)))
+		if err != nil {
+			log.Warningf("query 1h agg table failed: %s", err)
+		}
+		if t.IsAggrTableWrong(aggrTableCreateSQL) {
+			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1H(orgID)); err != nil {
+				log.Warningf("drop 1h agg table failed: %s", err)
+			}
+		}
+
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1H(orgID)); err != nil {
 			log.Warningf("create 1h agg table failed: %s", err)
 		}
@@ -199,6 +262,15 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 			log.Warningf("create 1h global table failed: %s", err)
 		}
 
+		aggrTableCreateSQL, err = QuerySQLStringResult(conn, fmt.Sprintf("SHOW CREATE TABLE %s", t.AggrTable1D(orgID)))
+		if err != nil {
+			log.Warningf("query 1d agg table failed: %s", err)
+		}
+		if t.IsAggrTableWrong(aggrTableCreateSQL) {
+			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1D(orgID)); err != nil {
+				log.Warningf("drop 1d agg table failed: %s", err)
+			}
+		}
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1D(orgID)); err != nil {
 			log.Warningf("create 1d agg table failed: %s", err)
 		}
@@ -214,6 +286,15 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 	}
 
 	if t.Aggr1S {
+		aggrTableCreateSQL, err := QuerySQLStringResult(conn, fmt.Sprintf("SHOW CREATE TABLE %s", t.AggrTable1S(orgID)))
+		if err != nil {
+			log.Warningf("query 1s agg table failed: %s", err)
+		}
+		if t.IsAggrTableWrong(aggrTableCreateSQL) {
+			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1S(orgID)); err != nil {
+				log.Warningf("drop 1s agg table failed: %s", err)
+			}
+		}
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1S(orgID)); err != nil {
 			log.Warningf("create 1h agg table failed: %s", err)
 		}
