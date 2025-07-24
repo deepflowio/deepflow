@@ -21,4 +21,5 @@ type TagRecorderConfig struct {
 	MySQLBatchSize            int `default:"1000" yaml:"mysql_batch_size"`
 	DictionaryRefreshInterval int `default:"60" yaml:"dictionary_refresh_interval"`
 	LiveViewRefreshSecond     int `default:"60" yaml:"live_view_refresh_second"`
+	DictionaryReloadInterval  int `default:"3600" yaml:"dictionary_reload_interval"`
 }

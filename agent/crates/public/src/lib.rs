@@ -30,6 +30,7 @@ pub mod proto;
 pub mod pwd;
 pub mod queue;
 pub mod rpc;
+pub mod segment_map;
 pub mod sender;
 pub mod throttle;
 pub mod utils;

@@ -63,7 +63,7 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 	var chItem metadbmodel.ChPodServiceK8sAnnotations
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
+		annotations, _ := StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		if annotations != "" {
 			updateInfo["annotations"] = annotations
 		}
@@ -90,7 +90,7 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source
 	if source.Annotation == "" {
 		return
 	}
-	annotations, _ := common.StrToJsonAndMap(source.Annotation)
+	annotations, _ := StrToJsonAndMap(source.Annotation)
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sAnnotations{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,

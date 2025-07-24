@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -198,7 +199,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 	}
 
 	var vtaps []metadbmodel.VTap
-	if err = orgDB.Find(&vtaps).Error; err != nil {
+	if err = orgDB.Select("ctrl_ip", "ctrl_mac", "name").Find(&vtaps).Error; err != nil {
 		return response, err
 	}
 	valueToVtap := map[string]metadbmodel.VTap{}
@@ -1132,7 +1133,7 @@ func (c *DomainChecker) checkAndAllocateController(db *metadb.DB) {
 		json.Unmarshal([]byte(domain.Config), &config)
 		regionLcuuid := config["region_uuid"].(string)
 		healthyControllerIPs := regionLcuuidToHealthyControllerIPs[regionLcuuid]
-		if !common.Contains(healthyControllerIPs, domain.ControllerIP) {
+		if !slices.Contains(healthyControllerIPs, domain.ControllerIP) {
 			length := len(healthyControllerIPs)
 			if length > 0 {
 				ip := healthyControllerIPs[rand.Intn(length)]

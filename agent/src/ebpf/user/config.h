@@ -383,4 +383,18 @@ enum cfg_feature_idx {
  */
 #define PERIODIC_PUSH_DELAY_THRESHOLD_NS 50000000ULL	// 50 milliseconds
 
+/*
+ * The update interval for process information is 5 minutes in nanoseconds.
+ */
+#define PROCESS_CACHE_UPDATE_INTERVAL_NS 300000000000ULL
+
+/*
+ * The update interval for mount information is 20 secs in nanoseconds.
+ */
+#define MOUNT_CACHE_UPDATE_INTERVAL_NS 20000000000ULL
+
+/*
+ * Output to the log once every hour to prevent the log file from containing too much content.
+ */
+#define OUTPUT_LOG_INTERVAL_NS 3600000000000ULL
 #endif /* DF_EBPF_CONFIG_H */

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"hash/fnv"
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -305,7 +306,7 @@ func (n *NodeInfo) generateControllerInfo() {
 	if err == nil {
 		localAZs := make([]string, 0, len(localConns))
 		for _, localConn := range localConns {
-			if Contains(localAZs, localConn.AZ) == false {
+			if slices.Contains(localAZs, localConn.AZ) == false {
 				localAZs = append(localAZs, localConn.AZ)
 			}
 		}
@@ -987,7 +988,7 @@ func (n *NodeInfo) generatePlatformData() {
 		if len(localAZs) == 0 {
 			n.updatePlatformData(allCompletePlatformDataExceptPod)
 		} else {
-			if Contains(localAZs, CONN_DEFAULT_AZ) {
+			if slices.Contains(localAZs, CONN_DEFAULT_AZ) {
 				regionToPlatformDataOnlyPod := n.metaData.GetPlatformDataOP().GetRegionToPlatformDataOnlyPod()
 				if regionPlatformData, ok := regionToPlatformDataOnlyPod[localRegion]; ok {
 					platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_2)

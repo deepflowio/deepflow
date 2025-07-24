@@ -36,9 +36,9 @@ type PodService struct {
 func NewPodService(cfg config.Config, q *queue.OverwriteQueue) *PodService {
 	mng := &PodService{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedFields)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
 		cfg,
-		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE,
+		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, // PodServiceID 在 ingester 中并未被使用，必须指定 instance_type 为 PodService
 	}
 	mng.SetSubscriberSelf(mng)
 	return mng
@@ -57,7 +57,7 @@ func (p *PodService) OnResourceBatchAdded(md *message.Metadata, msg interface{})
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(item.ID),
+			eventapi.TagPodServiceID(item.ID), // TODO 此字段在 ingester 中并未被使用，待删除
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagL3DeviceType(p.deviceType),
 			eventapi.TagL3DeviceID(item.ID),
@@ -77,7 +77,9 @@ func (p *PodService) OnResourceBatchAdded(md *message.Metadata, msg interface{})
 }
 
 func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.PodServiceFieldsUpdate)
+	updateMsg := msg.(*message.PodServiceUpdate)
+	dbItem := updateMsg.GetNewMySQLItem().(*metadbmodel.PodService)
+	fields := updateMsg.GetFields().(*message.PodServiceFieldsUpdate)
 	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
 		return
 	}
@@ -92,13 +94,15 @@ func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		diff := CompareConfig(old, new, int(c.cfg.ConfigDiffContext))
 
 		opts = []eventapi.TagFieldOption{
-			eventapi.TagPodServiceID(fields.GetID()),
+			eventapi.TagPodServiceID(dbItem.ID), // TODO 此字段在 ingester 中并未被使用，待删除
+			eventapi.TagL3DeviceType(c.deviceType),
+			eventapi.TagL3DeviceID(dbItem.ID),
 			eventapi.TagAttributes(
 				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
 				[]string{new, diff}),
 		}
 	}
-	c.createAndEnqueue(md, fields.GetLcuuid(), eventType, opts...)
+	c.createInstanceAndEnqueue(md, dbItem.Lcuuid, eventType, dbItem.Name, c.deviceType, dbItem.ID, opts...)
 }
 
 func (p *PodService) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {

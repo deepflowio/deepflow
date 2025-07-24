@@ -921,6 +921,16 @@ async fn handler(
     }
 }
 
+fn parse_profile_time_to_seconds(t: &str) -> u32 {
+    let value = t.trim().parse::<u64>().unwrap_or_default();
+    match t.len() {
+        0..=10 => value as u32,                // s
+        11..=13 => (value / 1_000) as u32,     // ms
+        14..=16 => (value / 1_000_000) as u32, // us
+        _ => (value / 1_000_000_000) as u32,   // ns
+    }
+}
+
 fn parse_profile_query(query: &str, profile: &mut metric::Profile) {
     let query_hash: HashMap<String, String> = query
         .split('&')
@@ -942,20 +952,10 @@ fn parse_profile_query(query: &str, profile: &mut metric::Profile) {
         profile.sample_rate = sample_rate.parse::<u32>().unwrap_or_default();
     };
     if let Some(from) = query_hash.get("from") {
-        let from = from.parse::<u64>().unwrap_or_default();
-        if from > u32::MAX as u64 {
-            profile.from = (from / 1_000_000_000) as u32;
-        } else {
-            profile.from = from as u32;
-        }
+        profile.from = parse_profile_time_to_seconds(from);
     };
     if let Some(until) = query_hash.get("until") {
-        let until = until.parse::<u64>().unwrap_or_default();
-        if until > u32::MAX as u64 {
-            profile.until = (until / 1_000_000_000) as u32;
-        } else {
-            profile.until = until as u32;
-        }
+        profile.until = parse_profile_time_to_seconds(until);
     };
     if let Some(spy_name) = query_hash.get("spyName") {
         profile.spy_name = spy_name.to_string();

@@ -404,11 +404,11 @@ impl SofaRpcLog {
                 payload = &payload[RESP_HDR_LEN..];
                 info.resp_code = hdr.resp_code;
                 info.resp_len = hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
-                if info.resp_code == 8 {
-                    info.status = L7ResponseStatus::ClientError;
-                } else if info.resp_code != 0 {
-                    info.status = L7ResponseStatus::ServerError;
-                }
+                info.status = match info.resp_code {
+                    0 => L7ResponseStatus::Ok,
+                    8 => L7ResponseStatus::ClientError,
+                    _ => L7ResponseStatus::ServerError,
+                };
                 LogMessageType::Response
             }
             _ => return Err(Error::L7ProtocolUnknown),
@@ -665,7 +665,10 @@ mod test {
             l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
         },
         flow_generator::{
-            protocol_logs::rpc::sofa_rpc::{CMD_CODE_REQ, CMD_CODE_RESP, PROTO_BOLT_V1},
+            protocol_logs::{
+                rpc::sofa_rpc::{CMD_CODE_REQ, CMD_CODE_RESP, PROTO_BOLT_V1},
+                L7ResponseStatus,
+            },
             LogMessageType, L7_RRT_CACHE_CAPACITY,
         },
         utils::test::Capture,
@@ -769,6 +772,7 @@ mod test {
             assert_eq!(k.req_id, 2);
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.resp_code, 0);
+            assert_eq!(k.status, L7ResponseStatus::Ok);
             assert_eq!(k.resp_len, 210);
             assert_eq!(k.captured_response_byte, resp_payload.len() as u32);
         } else {
@@ -859,6 +863,7 @@ mod test {
             assert_eq!(k.req_id, 2);
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.resp_code, 0);
+            assert_eq!(k.status, L7ResponseStatus::Ok);
             assert_eq!(k.resp_len, 210);
             assert_eq!(k.captured_response_byte, resp_payload.len() as u32);
         } else {
