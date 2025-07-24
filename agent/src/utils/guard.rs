@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-use std::io::Read;
-use std::path::Path;
 #[cfg(target_os = "linux")]
 use std::time::Instant;
 use std::{
     fs::{self, File},
+    io::Read,
+    path::Path,
     string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
@@ -33,6 +33,7 @@ use chrono::prelude::*;
 use libc::malloc_trim;
 use log::{debug, error, info, warn};
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
+use time::{format_description, OffsetDateTime};
 
 use super::process::{
     get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss, get_thread_num,
@@ -133,11 +134,71 @@ impl SystemLoadGuard {
     }
 }
 
+pub struct Feed {
+    timestamp: RwLock<SystemTime>,
+    line: RwLock<String>,
+}
+
+impl Default for Feed {
+    fn default() -> Self {
+        Self {
+            timestamp: RwLock::new(SystemTime::now()),
+            line: RwLock::new(String::new()),
+        }
+    }
+}
+
+impl std::fmt::Display for Feed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let datetime: OffsetDateTime = (*self.timestamp.read().unwrap()).into();
+        let format =
+            format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap();
+
+        write!(
+            f,
+            "{}: {}",
+            datetime.format(&format).unwrap(),
+            self.line.read().unwrap()
+        )
+    }
+}
+
+impl Feed {
+    const TIMEOUT: Duration = Duration::from_secs(60);
+
+    fn add(&self, line: String) {
+        *self.line.write().unwrap() = line;
+        *self.timestamp.write().unwrap() = SystemTime::now();
+    }
+
+    fn timeout(&self, t: Duration) -> (bool, Duration) {
+        if self.line.read().unwrap().is_empty() {
+            return (false, Duration::ZERO);
+        }
+
+        let now = SystemTime::now();
+        let timestamp = *self.timestamp.read().unwrap();
+        let Ok(interval) = now.duration_since(timestamp) else {
+            error!("Clock may have gone backwards, restart agent ...");
+            crate::utils::notify_exit(-1);
+            return (false, Duration::ZERO);
+        };
+
+        if interval >= t {
+            (true, interval)
+        } else {
+            (false, Duration::ZERO)
+        }
+    }
+}
+
 pub struct Guard {
     config: EnvironmentAccess,
     log_dir: String,
     thread: Mutex<Option<JoinHandle<()>>>,
+    thread_watchdog: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
+    running_watchdog: Arc<AtomicBool>,
     exception_handler: ExceptionHandler,
     cgroup_mount_path: String,
     is_cgroup_v2: bool,
@@ -164,7 +225,9 @@ impl Guard {
             config,
             log_dir,
             thread: Mutex::new(None),
+            thread_watchdog: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
+            running_watchdog: Arc::new(AtomicBool::new(false)),
             exception_handler,
             cgroup_mount_path,
             is_cgroup_v2,
@@ -271,6 +334,35 @@ impl Guard {
         (cpu_limit / 10) as f32 > cpu_usage // The cpu_usage is in percentage, and the unit of cpu_limit is milli-cores. Divide cpu_limit by 10 to align the units
     }
 
+    pub fn start_watchdog(&self, feed: Arc<Feed>) {
+        let config = self.config.clone();
+        let running = self.running_watchdog.clone();
+        let thread = thread::Builder::new()
+            .name("watchdog".to_owned())
+            .spawn(move || {
+                loop {
+                    if !running.swap(true, Relaxed) {
+                        break;
+                    }
+                    let guard_interval = config.load().guard_interval.as_secs();
+                    let (timeout, interval) = feed.timeout(Duration::from_secs(guard_interval << 1));
+                    if timeout {
+                        error!("The guard thread (circuit breakers) feeds the watchdog thread every {} seconds. Unfortunately, it has now been discovered that the feed has not been updated for over {} seconds. The location of the last feed is: {}, restart deepflow-agent ...", guard_interval, interval.as_secs(), feed);
+                        crate::utils::notify_exit(-1);
+                        break;
+                    }
+
+                    sleep(Duration::from_secs(1));
+                }
+                info!("guard watchdog exited");
+            })
+            .unwrap();
+
+        self.thread_watchdog.lock().unwrap().replace(thread);
+        info!("guard watchdog started");
+    }
+
+
     pub fn start(&self) {
         {
             let (started, _) = &*self.running;
@@ -300,21 +392,32 @@ impl Guard {
         let cgroups_disabled = self.cgroups_disabled;
         #[cfg(target_os = "linux")]
         let mut last_page_reclaim = Instant::now();
+        let feed = Arc::new(Feed::default());
+
+        self.running_watchdog.store(true, Relaxed);
+        self.start_watchdog(feed.clone());
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
             #[cfg(target_os = "linux")]
             let mut last_over_max_sockets_limit = None;
+            let feed = feed.clone();
+
+            feed.add("feed init ...".to_string());
+
             loop {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
                 let cpu_limit = config.max_millicpus;
                 let mut system_guard = system.lock().unwrap();
+                feed.add("system_guard.refresh_process_specifics".to_string());
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
                     warn!("refresh process with cpu failed");
                 }
                 drop(system_guard);
+                feed.add("system_load.check".to_string());
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
+                feed.add("get_file_and_size_sum".to_string());
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
                         let log_file_size = config.log_file_size; // Log file size limit (unit: M)
@@ -327,6 +430,7 @@ impl Guard {
                         if file_sizes_sum > (log_file_size as u64) << 20 {
                             error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
                                file_sizes_sum, (log_file_size << 20));
+                            feed.add("Self::release_log_files".to_string());
                             Self::release_log_files(file_and_size_sum, log_file_size as u64);
                             exception_handler.set(Exception::LogFileExceeded);
                         } else {
@@ -341,12 +445,14 @@ impl Guard {
                 if !in_container && config.tap_mode != TapMode::Analyzer {
                     if cgroups_available && !cgroups_disabled {
                         if check_cgroup_result {
+                            feed.add("Self::check_cgroups".to_string());
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
                                 warn!("check cgroups failed, limit cpu or memory without cgroups");
                             }
                         }
                         if !check_cgroup_result {
+                            feed.add(format!("Self::check_cpu {}", line!()));
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
                                     error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -361,6 +467,7 @@ impl Guard {
                             }
                         }
                     } else {
+                        feed.add(format!("Self::check_cpu {}", line!()));
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -378,6 +485,7 @@ impl Guard {
 
                 #[cfg(all(target_os = "linux", target_env = "gnu"))]
                 if !memory_trim_disabled {
+                    feed.add("malloc_trim".to_string());
                     unsafe { let _ = malloc_trim(0); }
                 }
 
@@ -395,6 +503,7 @@ impl Guard {
                 if tap_mode != TapMode::Analyzer {
                     let memory_limit = config.max_memory;
                     if memory_limit != 0 {
+                        feed.add("get_memory_rss".to_string());
                         match get_memory_rss() {
                             Ok(memory_usage) => {
                                 if memory_usage >= memory_limit {
@@ -421,6 +530,7 @@ impl Guard {
                     }
                 }
 
+                feed.add("get_current_sys_free_memory_percentage".to_string());
                 let sys_free_memory_limit = config.sys_free_memory_limit;
                 let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
                 debug!(
@@ -446,6 +556,7 @@ impl Guard {
                     }
                 }
 
+                feed.add("get_thread_num".to_string());
                 match get_thread_num() {
                     Ok(thread_num) => {
                         let thread_limit = config.thread_threshold;
@@ -502,11 +613,13 @@ impl Guard {
                     }
                 }
 
+                feed.add("running.lock".to_string());
                 let (running, timer) = &*running;
                 let mut running = running.lock().unwrap();
                 if !*running {
                     break;
                 }
+                feed.add("timer.wait_timeout".to_string());
                 running = timer.wait_timeout(running, config.guard_interval).unwrap().0;
                 if !*running {
                     break;
@@ -531,6 +644,12 @@ impl Guard {
         timer.notify_one();
 
         if let Some(thread) = self.thread.lock().unwrap().take() {
+            let _ = thread.join();
+        }
+
+        self.running_watchdog.store(false, Relaxed);
+
+        if let Some(thread) = self.thread_watchdog.lock().unwrap().take() {
             let _ = thread.join();
         }
     }
