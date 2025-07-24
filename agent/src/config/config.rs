@@ -571,26 +571,32 @@ pub struct Proc {
     #[serde(with = "humantime_serde")]
     pub min_lifetime: Duration,
     pub tag_extraction: TagExtraction,
+    #[serde(deserialize_with = "deser_to_sorted_strings")]
+    pub process_blacklist: Vec<String>,
     pub process_matcher: Vec<ProcessMatcher>,
     pub symbol_table: SymbolTable,
 }
 
 impl Default for Proc {
     fn default() -> Self {
-        Self {
+        let mut p = Self {
             enabled: true,
             proc_dir_path: "/proc".to_string(),
             socket_info_sync_interval: Duration::from_secs(0),
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
+            process_blacklist: vec![
+                "sleep".to_owned(),
+                "sh".to_owned(),
+                "bash".to_owned(),
+                "pause".to_owned(),
+                "runc".to_owned(),
+                "grep".to_owned(),
+                "awk".to_owned(),
+                "sed".to_owned(),
+                "curl".to_owned(),
+            ],
             process_matcher: vec![
-                ProcessMatcher {
-                    match_regex: Regex::new(r"^(sleep|sh|bash|pause|runc)$").unwrap(),
-                    only_in_container: false,
-                    ignore: true,
-                    enabled_features: vec!["proc.gprocess_info".to_string()],
-                    ..Default::default()
-                },
                 ProcessMatcher {
                     match_regex: Regex::new(r"\bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)").unwrap(),
                     only_in_container: false,
@@ -629,7 +635,10 @@ impl Default for Proc {
                 },
             ],
             symbol_table: SymbolTable::default(),
-        }
+        };
+        p.process_blacklist.sort_unstable();
+        p.process_blacklist.dedup();
+        p
     }
 }
 
@@ -3905,6 +3914,16 @@ where
         humantime::parse_duration(v)
             .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(v), &"a duration"))
     }
+}
+
+fn deser_to_sorted_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut v = Vec::<String>::deserialize(deserializer)?;
+    v.sort_unstable();
+    v.dedup();
+    Ok(v)
 }
 
 #[cfg(test)]
