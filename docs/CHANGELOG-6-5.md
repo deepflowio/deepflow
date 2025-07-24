@@ -104,3 +104,7 @@
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
+
+
+#### Refactoring
+* refactor: optimize l7 perf cache [#10175](https://github.com/deepflowio/deepflow/pull/10175) by [yuanchaoa](https://github.com/yuanchaoa)
