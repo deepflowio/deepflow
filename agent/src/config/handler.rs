@@ -3653,6 +3653,15 @@ impl ConfigHandler {
             process_matcher_update = true;
             restart_agent = !first_run;
         }
+        if proc.process_blacklist != new_proc.process_blacklist {
+            info!(
+                "Update inputs.proc.process_blacklist from {:?} to {:?}.",
+                proc.process_blacklist, new_proc.process_blacklist
+            );
+            proc.process_blacklist = new_proc.process_blacklist.clone();
+            process_matcher_update = true;
+            restart_agent = !first_run;
+        }
         if proc.process_matcher != new_proc.process_matcher {
             info!(
                 "Update inputs.proc.process_matcher from {:?} to {:?}.",
@@ -3704,6 +3713,7 @@ impl ConfigHandler {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             if let Some(c) = components.as_ref() {
                 c.process_listener.on_config_change(
+                    &new_config.user_config.inputs.proc.process_blacklist,
                     &new_config.user_config.inputs.proc.process_matcher,
                     new_config.user_config.inputs.proc.proc_dir_path.clone(),
                     new_config
