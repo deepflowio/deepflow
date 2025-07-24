@@ -43,7 +43,7 @@ use crate::{
     utils::bytes,
 };
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct MongoDBInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
@@ -83,6 +83,31 @@ pub struct MongoDBInfo {
     is_on_blacklist: bool,
     #[serde(skip)]
     reply_false: bool,
+}
+
+impl Default for MongoDBInfo {
+    fn default() -> Self {
+        Self {
+            msg_type: LogMessageType::Request,
+            is_tls: false,
+            req_len: 0,
+            resp_len: 0,
+            request_id: 0,
+            response_id: 0,
+            op_code: 0,
+            op_code_name: String::new(),
+            request: String::new(),
+            response: String::new(),
+            response_code: 0,
+            exception: String::new(),
+            status: L7ResponseStatus::Ok,
+            captured_request_byte: 0,
+            captured_response_byte: 0,
+            rrt: 0,
+            is_on_blacklist: false,
+            reply_false: false,
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for MongoDBInfo {
