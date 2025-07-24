@@ -1282,6 +1282,21 @@ inputs:
       #     deepflow-agent 执行 `script_command` 脚本命令的用户名。
       # upgrade_from: static_config.os-app-tag-exec-user
       exec_username: deepflow
+    # type: string
+    # name:
+    #   en: Process Blacklist
+    #   ch: 进程黑名单
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The list of processe names ignored by process matcher.
+    #   ch: |-
+    #     进程匹配器忽略的进程列表。
+    process_blacklist: [sleep, sh, bash, pause, runc, grep, awk, sed, curl]
     # type: dict
     # name:
     #   en: Process Matcher
@@ -1587,10 +1602,6 @@ inputs:
     # ---
     # enabled_features: []
     process_matcher:
-      - match_regex: ^(sleep|sh|bash|pause|runc)$
-        only_in_container: false
-        ignore: true
-        enabled_features: [proc.gprocess_info]
       - match_regex: \bjava( +\S+)* +-jar +(\S*/)*([^ /]+\.jar)
         match_type: cmdline_with_args
         only_in_container: false

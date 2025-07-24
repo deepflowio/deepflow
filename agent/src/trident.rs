@@ -2296,6 +2296,7 @@ impl AgentComponents {
         let queue_debugger = debugger.clone_queue();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let process_listener = Arc::new(ProcessListener::new(
+            &candidate_config.user_config.inputs.proc.process_blacklist,
             &candidate_config.user_config.inputs.proc.process_matcher,
             candidate_config
                 .user_config
