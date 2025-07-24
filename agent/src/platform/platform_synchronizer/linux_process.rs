@@ -317,6 +317,16 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
     };
 
     for mut process_data in process_datas {
+        // check pid exist and start time correct
+        match Process::new(process_data.pid as i32)
+            .and_then(|p| p.stat())
+            .and_then(|stat| stat.starttime())
+            .map(|dt| dt.timestamp())
+        {
+            Ok(ts) if ts as u64 == process_data.start_time.as_secs() => (),
+            _ => continue,
+        }
+
         let Ok(up_sec) = process_data.up_sec(now_sec) else {
             continue;
         };
