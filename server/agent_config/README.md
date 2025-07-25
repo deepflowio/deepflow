@@ -6236,6 +6236,7 @@ The detail config for Vector Component, all availble config keys could be found 
 Here's an example for how to capture kubernetes logs、host metrics in virtual machine and kubelet metrics in kubernetes. It'll send to DeepFlow-Agent as output.
 
 scrape host metrics:
+`K8S_NODE_NAME_FOR_DEEPFLOW` only required in k8s container environment
 ```yaml
 sources:
   host_metrics:
@@ -6308,7 +6309,7 @@ sources:
   kubelet_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+    - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
     auth:
       strategy: bearer
       token: SECRET[kube_token.token]

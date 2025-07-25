@@ -20,7 +20,7 @@ sources:
   kubelet_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+    - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
     auth:
       strategy: bearer
       token: SECRET[kube_token.token]
