@@ -20,12 +20,11 @@ use std::{
     path::Path,
     string::String,
     sync::{
-        atomic::{AtomicBool, Ordering::Relaxed},
-        Arc, Condvar, Mutex, RwLock,
+        atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
+        Arc, Condvar, Mutex,
     },
     thread::{self, sleep, JoinHandle},
-    time::SystemTime,
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use arc_swap::access::Access;
@@ -34,6 +33,8 @@ use chrono::prelude::*;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 use libc::malloc_trim;
 use log::{debug, error, info, warn};
+use num_enum::TryFromPrimitive;
+use strum_macros::Display;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use time::{format_description, OffsetDateTime};
 
@@ -135,55 +136,99 @@ impl SystemLoadGuard {
 }
 
 pub struct Feed {
-    timestamp: RwLock<SystemTime>,
-    line: RwLock<String>,
+    timestamp_and_title: AtomicU64,
 }
 
 impl Default for Feed {
     fn default() -> Self {
         Self {
-            timestamp: RwLock::new(SystemTime::now()),
-            line: RwLock::new(String::new()),
+            timestamp_and_title: AtomicU64::new(0),
         }
     }
 }
 
 impl std::fmt::Display for Feed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let datetime: OffsetDateTime = (*self.timestamp.read().unwrap()).into();
+        let datetime =
+            OffsetDateTime::from_unix_timestamp(self.timestamp().as_secs() as i64).unwrap();
         let format =
             format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap();
 
-        write!(
-            f,
-            "{}: {}",
-            datetime.format(&format).unwrap(),
-            self.line.read().unwrap()
-        )
+        write!(f, "{}: {}", datetime.format(&format).unwrap(), self.title(),)
     }
 }
 
-impl Feed {
-    const TIMEOUT: Duration = Duration::from_secs(60);
+#[derive(Display, TryFromPrimitive)]
+#[repr(u32)]
+enum FeedTitle {
+    #[strum(serialize = "feed init ...")]
+    Init,
+    #[strum(serialize = "system_guard.refresh_process_specifics")]
+    SystemGuard,
+    #[strum(serialize = "system_load.check")]
+    SystemLoad,
+    #[strum(serialize = "get_file_and_size_sum")]
+    FileSize,
+    #[strum(serialize = "Self::release_log_files")]
+    ReleaseLog,
+    #[strum(serialize = "Self::check_cgroups")]
+    CheckCgroups,
+    #[strum(serialize = "Self::check_cpu1")]
+    CheckCpu1,
+    #[strum(serialize = "Self::check_cpu2")]
+    CheckCpu2,
+    #[strum(serialize = "malloc_trim")]
+    MallocTrim,
+    #[strum(serialize = "get_memory_rss")]
+    GetMemory,
+    #[strum(serialize = "get_current_sys_free_memory_percentage")]
+    SysFree,
+    #[strum(serialize = "get_thread_num")]
+    ThreadNum,
+    #[strum(serialize = "running.lock")]
+    RunningLock,
+    #[strum(serialize = "timer.wait_timeout")]
+    WaitTimeout,
+}
 
-    fn add(&self, line: String) {
-        *self.line.write().unwrap() = line;
-        *self.timestamp.write().unwrap() = SystemTime::now();
+impl Feed {
+    fn timestamp(&self) -> Duration {
+        let timestamp_and_title = self.timestamp_and_title.load(Relaxed);
+
+        Duration::from_secs(timestamp_and_title & 0xffffffff)
+    }
+
+    fn title(&self) -> String {
+        let timestamp_and_title = self.timestamp_and_title.load(Relaxed);
+        let title = timestamp_and_title >> 32;
+
+        FeedTitle::try_from(title as u32).unwrap().to_string()
+    }
+
+    fn add(&self, title: FeedTitle) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let timestamp_and_title = (timestamp & 0xffffffff) | ((title as u32 as u64) << 32);
+
+        self.timestamp_and_title.store(timestamp_and_title, Relaxed);
     }
 
     fn timeout(&self, t: Duration) -> (bool, Duration) {
-        if self.line.read().unwrap().is_empty() {
+        if self.timestamp() == Duration::ZERO {
             return (false, Duration::ZERO);
         }
 
-        let now = SystemTime::now();
-        let timestamp = *self.timestamp.read().unwrap();
-        let Ok(interval) = now.duration_since(timestamp) else {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let last = self.timestamp();
+        if now < last {
             error!("Clock may have gone backwards, restart agent ...");
             crate::utils::notify_exit(-1);
             return (false, Duration::ZERO);
-        };
+        }
 
+        let interval = now - last;
         if interval >= t {
             (true, interval)
         } else {
@@ -334,6 +379,7 @@ impl Guard {
         (cpu_limit * 100) as f32 > cpu_usage
     }
 
+    // CAUTION: keep this thread small and simple, DO NOT use any lock!
     pub fn start_watchdog(&self, feed: Arc<Feed>) {
         let config = self.config.clone();
         let running = self.running_watchdog.clone();
@@ -398,21 +444,21 @@ impl Guard {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
             let feed = feed.clone();
 
-            feed.add("feed init ...".to_string());
+            feed.add(FeedTitle::Init);
 
             loop {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
                 let cpu_limit = config.max_cpus;
                 let mut system_guard = system.lock().unwrap();
-                feed.add("system_guard.refresh_process_specifics".to_string());
+                feed.add(FeedTitle::SystemGuard);
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
                     warn!("refresh process with cpu failed");
                 }
                 drop(system_guard);
-                feed.add("system_load.check".to_string());
+                feed.add(FeedTitle::SystemLoad);
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
-                feed.add("get_file_and_size_sum".to_string());
+                feed.add(FeedTitle::FileSize);
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
                         let log_file_size = config.log_file_size; // Log file size limit (unit: M)
@@ -425,7 +471,7 @@ impl Guard {
                         if file_sizes_sum > (log_file_size as u64) << 20 {
                             error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
                                file_sizes_sum, (log_file_size << 20));
-                            feed.add("Self::release_log_files".to_string());
+                            feed.add(FeedTitle::ReleaseLog);
                             Self::release_log_files(file_and_size_sum, log_file_size as u64);
                             exception_handler.set(Exception::LogFileExceeded);
                         } else {
@@ -440,14 +486,14 @@ impl Guard {
                 if !in_container && config.tap_mode != TapMode::Analyzer {
                     if cgroups_available && !cgroups_disabled {
                         if check_cgroup_result {
-                            feed.add("Self::check_cgroups".to_string());
+                            feed.add(FeedTitle::CheckCgroups);
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
                                 warn!("check cgroups failed, limit cpu or memory without cgroups");
                             }
                         }
                         if !check_cgroup_result {
-                            feed.add(format!("Self::check_cpu {}", line!()));
+                            feed.add(FeedTitle::CheckCpu1);
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
                                     error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -462,7 +508,7 @@ impl Guard {
                             }
                         }
                     } else {
-                        feed.add(format!("Self::check_cpu {}", line!()));
+                        feed.add(FeedTitle::CheckCpu2);
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -480,7 +526,7 @@ impl Guard {
 
                 #[cfg(all(target_os = "linux", target_env = "gnu"))]
                 if !memory_trim_disabled {
-                    feed.add("malloc_trim".to_string());
+                    feed.add(FeedTitle::MallocTrim);
                     unsafe { let _ = malloc_trim(0); }
                 }
 
@@ -492,7 +538,7 @@ impl Guard {
                 if tap_mode != TapMode::Analyzer {
                     let memory_limit = config.max_memory;
                     if memory_limit != 0 {
-                        feed.add("get_memory_rss".to_string());
+                        feed.add(FeedTitle::GetMemory);
                         match get_memory_rss() {
                             Ok(memory_usage) => {
                                 if memory_usage >= memory_limit {
@@ -519,7 +565,7 @@ impl Guard {
                     }
                 }
 
-                feed.add("get_current_sys_free_memory_percentage".to_string());
+                feed.add(FeedTitle::SysFree);
                 let sys_free_memory_limit = config.sys_free_memory_limit;
                 let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
                 debug!(
@@ -545,7 +591,7 @@ impl Guard {
                     }
                 }
 
-                feed.add("get_thread_num".to_string());
+                feed.add(FeedTitle::ThreadNum);
                 match get_thread_num() {
                     Ok(thread_num) => {
                         let thread_limit = config.thread_threshold;
@@ -569,13 +615,13 @@ impl Guard {
                     }
                 }
 
-                feed.add("running.lock".to_string());
+                feed.add(FeedTitle::RunningLock);
                 let (running, timer) = &*running;
                 let mut running = running.lock().unwrap();
                 if !*running {
                     break;
                 }
-                feed.add("timer.wait_timeout".to_string());
+                feed.add(FeedTitle::WaitTimeout);
                 running = timer.wait_timeout(running, config.guard_interval).unwrap().0;
                 if !*running {
                     break;
