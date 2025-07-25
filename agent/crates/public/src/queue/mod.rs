@@ -16,9 +16,11 @@
 
 mod debug;
 mod overwrite_queue;
+mod mpmc_queue;
 
 pub use debug::{bounded_with_debug, DebugSender, MultiDebugSender};
 pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
+pub use mpmc_queue::{bounded as bounded_mpmc, Receiver as MpmcReceiver, Sender as MpmcSender, StatsHandle as MpmcStatsHandle};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
