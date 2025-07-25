@@ -1,11 +1,20 @@
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use tokio::runtime::Runtime;
+use tokio::sync::broadcast::Sender;
+
+use public::utils::net::IpMacPair;
 
 pub struct VectorComponent {}
 
 impl VectorComponent {
-    pub fn new(_: bool, _: serde_yaml::Value, _: Arc<Runtime>) -> Self {
+    pub fn new(
+        _: bool,
+        _: serde_yaml::Value,
+        _: Arc<Runtime>,
+        _: String,
+        _: Arc<Sender<IpMacPair>>,
+    ) -> Self {
         Self {}
     }
 
