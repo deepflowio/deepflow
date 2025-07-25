@@ -392,8 +392,8 @@ impl Session {
     ) -> Result<Vec<u8>> {
         let s = self
             .grpc_plugin(agent::PluginRequest {
-                ctrl_ip: Some(agent_id.ip.to_string()),
-                ctrl_mac: Some(agent_id.mac.to_string()),
+                ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
+                ctrl_mac: Some(agent_id.ipmac.mac.to_string()),
                 plugin_type: Some(plugin_type as i32),
                 plugin_name: Some(name.into()),
                 team_id: Some(agent_id.team_id.clone()),

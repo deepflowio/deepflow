@@ -83,7 +83,7 @@ use public::{
     proto::agent::{
         self as pb, AgentIdentifier, AgentType, DynamicConfig, Exception, PacketCaptureType,
     },
-    utils::net::{is_unicast_link_local, MacAddr},
+    utils::net::{is_unicast_link_local, IpMacPair, MacAddr},
 };
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
@@ -601,7 +601,7 @@ pub struct Synchronizer {
     ntp_diff: Arc<AtomicI64>,
     agent_mode: RunningMode,
     standalone_runtime_config: Option<PathBuf>,
-    agent_id_tx: Arc<broadcast::Sender<AgentId>>,
+    ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
 }
 
 impl Synchronizer {
@@ -623,7 +623,7 @@ impl Synchronizer {
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
-        agent_id_tx: Arc<broadcast::Sender<AgentId>>,
+        ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
         ntp_diff: Arc<AtomicI64>,
     ) -> Synchronizer {
         Synchronizer {
@@ -658,7 +658,7 @@ impl Synchronizer {
             ntp_diff,
             agent_mode,
             standalone_runtime_config,
-            agent_id_tx,
+            ipmac_tx,
         }
     }
 
@@ -732,8 +732,8 @@ impl Synchronizer {
             current_k8s_image: static_config.current_k8s_image.clone(),
             exception: Some(exception_handler.take()),
             process_name: Some(static_config.version_info.name.to_owned()),
-            ctrl_mac: Some(agent_id.mac.to_string()),
-            ctrl_ip: Some(agent_id.ip.to_string()),
+            ctrl_mac: Some(agent_id.ipmac.mac.to_string()),
+            ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
             team_id: Some(agent_id.team_id.clone()),
             host: Some(status.hostname.clone()),
             host_ips: {
@@ -1242,7 +1242,7 @@ impl Synchronizer {
                 ntp_msg.ts_xmit = rand::thread_rng().next_u64();
                 let send_time = SystemTime::now();
 
-                let ctrl_ip = agent_id.read().ip.to_string();
+                let ctrl_ip = agent_id.read().ipmac.ip.to_string();
                 let response = session
                     .grpc_ntp_with_statsd(pb::NtpRequest {
                         ctrl_ip: Some(ctrl_ip),
@@ -1338,8 +1338,8 @@ impl Synchronizer {
         };
         let response = session
             .grpc_upgrade_with_statsd(pb::UpgradeRequest {
-                ctrl_ip: Some(agent_id.ip.to_string()),
-                ctrl_mac: Some(agent_id.mac.to_string()),
+                ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
+                ctrl_mac: Some(agent_id.ipmac.mac.to_string()),
                 team_id: Some(agent_id.team_id.clone()),
             })
             .await;
@@ -1422,8 +1422,8 @@ impl Synchronizer {
 
         let response = session
             .grpc_upgrade_with_statsd(pb::UpgradeRequest {
-                ctrl_ip: Some(agent_id.ip.to_string()),
-                ctrl_mac: Some(agent_id.mac.to_string()),
+                ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
+                ctrl_mac: Some(agent_id.ipmac.mac.to_string()),
                 team_id: Some(agent_id.team_id.clone()),
             })
             .await;
@@ -1753,16 +1753,16 @@ impl Synchronizer {
         }));
     }
 
-    async fn watch_agent_id(
-        mut agent_id_rx: broadcast::Receiver<AgentId>,
+    async fn watch_ipmac_pair(
+        mut ipmac_rx: broadcast::Receiver<IpMacPair>,
         agent_id: Arc<RwLock<AgentId>>,
         status: Arc<RwLock<Status>>,
     ) {
-        while let Ok(new_agent_id) = agent_id_rx.recv().await {
+        while let Ok(new_ipmac) = ipmac_rx.recv().await {
             {
                 let mut old_id = agent_id.write();
-                old_id.ip = new_agent_id.ip;
-                old_id.mac = new_agent_id.mac;
+                old_id.ipmac.ip = new_ipmac.ip;
+                old_id.ipmac.mac = new_ipmac.mac;
             }
             {
                 let mut sg = status.write();
@@ -1778,9 +1778,9 @@ impl Synchronizer {
         }
         let agent_id = self.agent_id.clone();
         let status = self.status.clone();
-        let agent_id_rx = self.agent_id_tx.subscribe();
+        let ipmac_rx = self.ipmac_tx.subscribe();
         self.runtime.spawn(async move {
-            Self::watch_agent_id(agent_id_rx, agent_id, status).await;
+            Self::watch_ipmac_pair(ipmac_rx, agent_id, status).await;
         });
         match self.agent_mode {
             RunningMode::Managed => {
