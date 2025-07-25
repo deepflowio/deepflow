@@ -6060,6 +6060,7 @@ Vector 组件的具体配置，所有可用配置可在此链接中查找：[vec
 以下提供一份抓取 kubernetes 日志、宿主机指标及 kubernetes kubelet 指标的示例，并将这些数据发送到 DeepFlow-Agent。
 
 抓取主机指标
+`K8S_NODE_NAME_FOR_DEEPFLOW` 变量仅容器环境必须，非容器环境可以去掉
 ```yaml
 sources:
   host_metrics:
@@ -6132,7 +6133,7 @@ sources:
   kubelet_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+    - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
     auth:
       strategy: bearer
       token: SECRET[kube_token.token]
