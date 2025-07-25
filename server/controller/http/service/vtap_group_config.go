@@ -19,6 +19,7 @@ package service
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -77,7 +78,7 @@ func ConvertStrToIntListWithIgnore(convertStr string, ignoreFields []int) ([]int
 		if err != nil {
 			return []int{}, err
 		}
-		if common.Contains[int](ignoreFields, target) {
+		if slices.Contains(ignoreFields, target) {
 			continue
 		}
 		result = append(result, target)
@@ -108,7 +109,7 @@ func copyStruct(from, to interface{}, ignoreName []string) {
 	toElem := toValue.Elem()
 	for i := 0; i < toElem.NumField(); i++ {
 		toField := toElem.Type().Field(i)
-		if common.Contains(ignoreName, toField.Name) {
+		if slices.Contains(ignoreName, toField.Name) {
 			// set value to avoid return nil
 			if toField.Type.Kind() == reflect.Slice {
 				sliceType := reflect.SliceOf(toField.Type.Elem())
@@ -639,7 +640,7 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 	typeOfRealConfiguration := reflect.ValueOf(realConfiguration).Elem()
 	for i := 0; i < tv.NumField(); i++ {
 		field := tt.Field(i)
-		if common.Contains(ignoreName, field.Name) == true {
+		if slices.Contains(ignoreName, field.Name) == true {
 			typeOfRealConfiguration.Field(i).Set(tv.Field(i))
 		}
 		value := tv.Field(i)

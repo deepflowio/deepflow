@@ -108,7 +108,7 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 	db.Find(&regions)
 	db.Find(&azs)
 	db.Find(&azControllerconns)
-	db.Find(&vtaps)
+	db.Select("controller_ip", "cur_controller_ip").Find(&vtaps)
 
 	lcuuidToRegion := make(map[string]*metadbmodel.Region)
 	for i, region := range regions {

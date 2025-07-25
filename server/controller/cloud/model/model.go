@@ -363,25 +363,10 @@ type PodService struct {
 }
 
 func (p PodService) ToLoggable() interface{} {
-	return PodService{
-		Lcuuid:             p.Lcuuid,
-		Name:               p.Name,
-		MetadataHash:       p.MetadataHash,
-		SpecHash:           p.SpecHash,
-		Label:              p.Label,
-		Annotation:         p.Annotation,
-		Type:               p.Type,
-		Selector:           p.Selector,
-		ExternalIP:         p.ExternalIP,
-		ServiceClusterIP:   p.ServiceClusterIP,
-		PodIngressLcuuid:   p.PodIngressLcuuid,
-		PodNamespaceLcuuid: p.PodNamespaceLcuuid,
-		PodClusterLcuuid:   p.PodClusterLcuuid,
-		VPCLcuuid:          p.VPCLcuuid,
-		AZLcuuid:           p.AZLcuuid,
-		RegionLcuuid:       p.RegionLcuuid,
-		SubDomainLcuuid:    p.SubDomainLcuuid,
-	}
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodServicePort struct {
@@ -413,20 +398,10 @@ type PodGroup struct {
 }
 
 func (p PodGroup) ToLoggable() interface{} {
-	return PodGroup{
-		Lcuuid:             p.Lcuuid,
-		Name:               p.Name,
-		MetadataHash:       p.MetadataHash,
-		SpecHash:           p.SpecHash,
-		Label:              p.Label,
-		Type:               p.Type,
-		PodNum:             p.PodNum,
-		PodNamespaceLcuuid: p.PodNamespaceLcuuid,
-		PodClusterLcuuid:   p.PodClusterLcuuid,
-		AZLcuuid:           p.AZLcuuid,
-		RegionLcuuid:       p.RegionLcuuid,
-		SubDomainLcuuid:    p.SubDomainLcuuid,
-	}
+	copied := p
+	copied.Metadata = "**HIDDEN**"
+	copied.Spec = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupPort struct {
@@ -517,18 +492,9 @@ type ConfigMap struct {
 }
 
 func (c ConfigMap) ToLoggable() interface{} {
-	return ConfigMap{
-		Lcuuid:             c.Lcuuid,
-		Name:               c.Name,
-		DataHash:           c.DataHash,
-		PodNamespaceLcuuid: c.PodNamespaceLcuuid,
-		PodClusterLcuuid:   c.PodClusterLcuuid,
-		VPCLcuuid:          c.VPCLcuuid,
-		AZLcuuid:           c.AZLcuuid,
-		RegionLcuuid:       c.RegionLcuuid,
-		SubDomainLcuuid:    c.SubDomainLcuuid,
-		CreatedAt:          c.CreatedAt,
-	}
+	copied := c
+	copied.Data = "**HIDDEN**"
+	return copied
 }
 
 type PodGroupConfigMapConnection struct {

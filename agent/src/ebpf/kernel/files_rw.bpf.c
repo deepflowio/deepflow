@@ -19,6 +19,9 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+// Default value set when file read/write latency timestamp rollback occurs.
+#define TIME_ROLLBACK_DEFAULT_LATENCY_NS 50000
+ 
 static __inline bool is_regular_file(int fd,
 				     struct member_fields_offset *off_ptr)
 {
@@ -33,10 +36,11 @@ static __inline bool is_regular_file(int fd,
 }
 
 static __inline void set_file_metric_data(struct __io_event_buffer *buffer,
+					  struct __socket_data *v,
 					  int fd,
 					  struct member_fields_offset *off_ptr)
 {
-#define MAX_DIRECTORY_DEPTH 20
+#define MAX_DIRECTORY_DEPTH 19
 
 	struct member_fields_offset *offset = off_ptr;
 	if (offset == NULL) {
@@ -48,9 +52,39 @@ static __inline void set_file_metric_data(struct __io_event_buffer *buffer,
 	if (file == NULL)
 		return;
 
+	/*
+	 * Get the underlying device number of the superblock, which indicates
+	 * the device where the file system is mounted, and use it in user space
+	 * to determine the mount point of the file.
+	 *
+	 * struct file {
+	 *    ...
+	 *    struct inode *f_inode;
+	 * };
+	 * struct inode {
+	 *    ...
+	 *    struct super_block *i_sb;
+	 * };
+	 * struct super_block {
+	 *    ...
+	 *    kern_dev_t s_dev;
+	 * };
+	 */
+	void *f_inode = NULL, *i_sb = NULL;
+	bpf_probe_read_kernel(&f_inode, sizeof(f_inode),
+			      file + offset->struct_file_f_inode_offset);
+	if (!f_inode)
+		return;
+
+	bpf_probe_read_kernel(&i_sb, sizeof(i_sb),
+			      f_inode + offset->struct_inode_i_sb_offset);
+	if (!i_sb)
+		return;
+
+	bpf_probe_read_kernel(&v->s_dev, sizeof(v->s_dev),
+			      i_sb + offset->struct_super_block_s_dev_offset);
 	bpf_probe_read_kernel(&buffer->offset, sizeof(buffer->offset),
 			      file + offset->struct_file_f_pos_offset);
-
 	void *dentry = NULL, *parent;
 	bpf_probe_read_kernel(&dentry, sizeof(dentry),
 			      file + offset->struct_file_dentry_offset);
@@ -85,7 +119,7 @@ static __inline int trace_io_event_common(void *ctx,
 					  enum traffic_direction direction,
 					  __u64 pid_tgid)
 {
-	__u64 latency = 0;
+	__u64 latency = 0, curr_ts;
 	__u64 trace_id = 0;
 	__u32 k0 = 0;
 	__u32 tgid = pid_tgid >> 32;
@@ -120,7 +154,19 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
-	latency = bpf_ktime_get_ns() - data_args->enter_ts;
+	curr_ts = bpf_ktime_get_ns();
+	latency = curr_ts - data_args->enter_ts;
+
+	/*
+	 * When using `bpf_ktime_get_ns()` to calculate latency, set `latency`
+	 * to TIME_ROLLBACK_DEFAULT_LATENCY_NS (50 microseconds) if a time rollback
+	 * (non-monotonic behavior) is detected. This is commonly observed on
+	 * CentOS with the 3.10 kernel.
+	 */
+	if (unlikely(curr_ts < data_args->enter_ts)) {
+		latency = TIME_ROLLBACK_DEFAULT_LATENCY_NS;
+	}
+
 	if (latency < tracer_ctx->io_event_minimal_duration) {
 		return -1;
 	}
@@ -133,7 +179,6 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-	set_file_metric_data(buffer, data_args->fd, offset);
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
@@ -149,15 +194,14 @@ static __inline int trace_io_event_common(void *ctx,
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
+	set_file_metric_data(buffer, v, data_args->fd, offset);
+	v->fd = data_args->fd;
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
 	v->coroutine_id = trace_key.goid;
 	v->timestamp = data_args->enter_ts;
-
 	v->syscall_len = sizeof(*buffer);
-
 	v->source = DATA_SOURCE_IO_EVENT;
-
 	v->thread_trace_id = trace_id;
 	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));

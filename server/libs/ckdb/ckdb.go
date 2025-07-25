@@ -294,6 +294,30 @@ func (t DiskType) String() string {
 	return "Unknown"
 }
 
+type AggrType uint8
+
+const (
+	AggrNone AggrType = iota
+	AggrSum
+	AggrAvg
+	AggrLast
+	AggrLastAndSum
+	AggrLastAndSumProfileValue
+)
+
+var aggrTypeString = []string{
+	AggrNone:                   "",
+	AggrSum:                    "sum",
+	AggrAvg:                    "avg",
+	AggrLast:                   "last",
+	AggrLastAndSum:             "last and sum",
+	AggrLastAndSumProfileValue: "last and sum profile value",
+}
+
+func (t AggrType) String() string {
+	return aggrTypeString[t]
+}
+
 const (
 	DF_STORAGE_POLICY     = "df_storage"
 	DF_CLUSTER            = "df_cluster"
@@ -309,8 +333,11 @@ type Column struct {
 	TypeArgs string
 	Codec    CodecType // 压缩算法
 	Index    IndexType // 二级索引
-	GroupBy  bool      // 在AggregatingMergeTree表中用于group by的字段
 	Comment  string    // 列注释
+
+	GroupBy            bool // 在AggregatingMergeTree表中用于group by的字段
+	IgnoredInAggrTable bool // Whether to store in AggregatingMergeTree table
+	Aggr               AggrType
 }
 
 func (c *Column) MakeModifyTimeZoneSQL(database, table, timeZone string) string {
@@ -323,6 +350,26 @@ func (c *Column) MakeModifyTimeZoneSQL(database, table, timeZone string) string 
 
 func (c *Column) SetGroupBy() *Column {
 	c.GroupBy = true
+	return c
+}
+
+func (c *Column) SetIgnoredInAggrTable() *Column {
+	c.IgnoredInAggrTable = true
+	return c
+}
+
+func (c *Column) SetAggr(a AggrType) *Column {
+	c.Aggr = a
+	return c
+}
+
+func (c *Column) SetAggrLast() *Column {
+	c.Aggr = AggrLast
+	return c
+}
+
+func (c *Column) SetAggrLastAndSumProfileValue() *Column {
+	c.Aggr = AggrLastAndSumProfileValue
 	return c
 }
 
@@ -364,7 +411,7 @@ func NewColumn(name string, t ColumnType) *Column {
 		codec = CodecGorilla
 		index = IndexMinmax
 	}
-	return &Column{name, t, "", codec, index, false, ""}
+	return &Column{name, t, "", codec, index, "", false, false, AggrNone}
 }
 
 func NewColumnWithGroupBy(name string, t ColumnType) *Column {

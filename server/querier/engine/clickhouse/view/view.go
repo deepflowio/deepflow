@@ -209,10 +209,6 @@ func (v *View) trans() {
 				} else {
 					metricTag.Value = node.Value
 				}
-				// remove auto ip tag
-				if strings.HasPrefix(node.Value, "auto_instance_ip") || strings.HasPrefix(node.Value, "auto_service_ip") {
-					metricTag.NoReturn = true
-				}
 				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
 				tagsAliasInner = append(tagsAliasInner, metricTag.Value)
 			} else if node.Flag == NODE_FLAG_METRICS_INNER {
@@ -249,6 +245,10 @@ func (v *View) trans() {
 		group := node.(*Group)
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
+			// remove auto ip group
+			if strings.HasPrefix(group.Value, "auto_instance_ip") || strings.HasPrefix(group.Value, "auto_service_ip") {
+				continue
+			}
 			// 外层group
 			metricGroup := &Group{}
 			if group.Alias != "" {
@@ -285,14 +285,10 @@ func (v *View) trans() {
 	if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		// 计算层不拆层
 		// 里层tag+外层metric
-		// remove auto ip tag
 		newTagsInner := []Node{}
 		for _, tagInner := range tagsLevelInner {
-			node, ok := tagInner.(*Tag)
+			_, ok := tagInner.(*Tag)
 			if ok {
-				if strings.HasPrefix(node.Value, "auto_instance_ip") || strings.HasPrefix(node.Value, "auto_service_ip") {
-					node.NoReturn = true
-				}
 				newTagsInner = append(newTagsInner, tagInner)
 			}
 		}

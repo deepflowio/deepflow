@@ -61,7 +61,10 @@ struct __socket_data {
 	__u32 extra_data_count;
 
 	/* 追踪信息 */
-	__u32 tcp_seq;
+	union {
+		__u32 tcp_seq;
+		__u32 s_dev; // Device number of the superblock, which indicates the device where the file system is mounted.
+	};
 	__u64 thread_trace_id;
 
 	/* 追踪数据信息 */
@@ -71,7 +74,10 @@ struct __socket_data {
 	__u8 is_tls:1;
 
 	__u64 syscall_len;	// 本次系统调用读、写数据的总长度
-	__u64 data_seq;		// cap_data在Socket中的相对顺序号
+	union {
+		__u64 data_seq;		// cap_data在Socket中的相对顺序号
+		__u32 fd;
+	};
 	__u16 data_type;	// HTTP, DNS, MySQL
 	__u16 data_len;		// 数据长度
 	__u8 socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
@@ -346,6 +352,8 @@ struct member_fields_offset {
 	__u32 struct_files_private_data_offset;	// offsetof(struct file, private_data)
 	__u32 struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
 	__u32 struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
+	__u32 struct_inode_i_sb_offset;		// offsetof(struct inode, i_sb)
+	__u32 struct_super_block_s_dev_offset;	// offsetof(struct super_block, s_dev)
 	__u32 struct_file_dentry_offset;	// offsetof(struct file, f_path) + offsetof(struct path, dentry)
 	__u32 struct_dentry_name_offset;	// offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
 	__u32 struct_sock_family_offset;	// offsetof(struct sock_common, skc_family)

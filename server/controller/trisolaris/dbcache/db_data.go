@@ -363,7 +363,9 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	vInterfaces, err := dbmgr.DBMgr[models.VInterface](db).Gets()
+	vInterfaces, err := dbmgr.DBMgr[models.VInterface](db).GetFields([]string{
+		"id", "devicetype", "deviceid", "iftype", "mac", "vmac", "subnetid", "name", "region", "lcuuid", "domain", "sub_domain",
+	})
 	if err == nil {
 		d.vInterfaces = vInterfaces
 	} else {

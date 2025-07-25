@@ -338,7 +338,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	podGroupType := uint8(0)
 	if event.IfNeedTagged {
 		s.Tagged = 1
-		resourceInfo := d.platformData.QueryResourceInfo(s.OrgId, event.InstanceType, event.InstanceID)
+		resourceInfo := d.platformData.QueryResourceInfo(s.OrgId, event.InstanceType, event.InstanceID, event.PodID)
 		if resourceInfo != nil {
 			s.RegionID = uint16(resourceInfo.RegionID)
 			s.AZID = uint16(resourceInfo.AZID)

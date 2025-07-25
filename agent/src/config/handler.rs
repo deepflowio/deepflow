@@ -51,7 +51,7 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        RequestLogTunning, SessionTimeout, TagFilterOperator, UserConfig,
+        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -60,7 +60,7 @@ use crate::rpc::Session;
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
-        l7_protocol_log::L7ProtocolBitmap, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
+        l7_protocol_log::L7ProtocolBitmap, Timestamp, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
     },
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
@@ -92,6 +92,17 @@ use public::bitmap::Bitmap;
 use public::l7_protocol::L7Protocol;
 use public::proto::agent::{self, AgentType, PacketCaptureType};
 use public::utils::net::MacAddr;
+
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        use public::{
+            enums::FieldType,
+            l7_protocol::L7ProtocolEnum,
+        };
+        use super::config::ExtraCustomFieldPolicyMap;
+        use enterprise_utils::l7::plugin::custom_field_policy::ExtraCustomProtocolConfig;
+    }
+}
 
 const MB: u64 = 1048576;
 
@@ -1021,6 +1032,8 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
     pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
     pub mysql_decompress_payload: bool,
+    #[cfg(feature = "enterprise")]
+    pub custom_protocol_config: ExtraCustomProtocolConfig,
 }
 
 impl Default for LogParserConfig {
@@ -1041,6 +1054,8 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_response_suffixes: vec![],
             unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
             mysql_decompress_payload: true,
+            #[cfg(feature = "enterprise")]
+            custom_protocol_config: ExtraCustomProtocolConfig::default(),
         }
     }
 }
@@ -1087,6 +1102,16 @@ impl fmt::Debug for LogParserConfig {
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .finish()
+    }
+}
+
+impl LogParserConfig {
+    pub fn get_l7_timeout(&self, l7_protocol: L7Protocol) -> Timestamp {
+        match self.l7_log_session_aggr_timeout.get(&l7_protocol) {
+            Some(timeout) => *timeout,
+            None => Timeouts::l7_default_timeout(l7_protocol),
+        }
+        .into()
     }
 }
 
@@ -1437,6 +1462,9 @@ pub struct L7LogDynamicConfig {
     pub extra_log_fields: ExtraLogFields,
 
     pub grpc_streaming_data_enabled: bool,
+
+    #[cfg(feature = "enterprise")]
+    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1467,12 +1495,18 @@ impl fmt::Debug for L7LogDynamicConfig {
 
 impl PartialEq for L7LogDynamicConfig {
     fn eq(&self, other: &Self) -> bool {
-        self.proxy_client == other.proxy_client
+        #[allow(unused_mut)]
+        let mut eq = self.proxy_client == other.proxy_client
             && self.x_request_id == other.x_request_id
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
             && self.extra_log_fields == other.extra_log_fields
-            && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled
+            && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled;
+        #[cfg(feature = "enterprise")]
+        {
+            eq &= self.extra_field_policies == other.extra_field_policies;
+        }
+        eq
     }
 }
 
@@ -1486,6 +1520,10 @@ impl L7LogDynamicConfig {
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
         grpc_streaming_data_enabled: bool,
+        #[cfg(feature = "enterprise")] extra_field_policies: HashMap<
+            L7ProtocolEnum,
+            ExtraCustomFieldPolicyMap,
+        >,
     ) -> Self {
         let mut expected_headers_set = get_expected_headers();
         let mut dup_checker = HashSet::new();
@@ -1529,7 +1567,36 @@ impl L7LogDynamicConfig {
         extra_log_fields.deduplicate();
 
         for f in extra_log_fields.http2.iter() {
+            dup_checker.insert(f.field_name.to_owned());
             expected_headers_set.insert(f.field_name.as_bytes().to_vec());
+        }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(policy_map) =
+            extra_field_policies.get(&L7ProtocolEnum::L7Protocol(L7Protocol::Http2))
+        {
+            for f in &policy_map.policies {
+                if let Some(req_headers) = f.from_req_key.get(&FieldType::Header) {
+                    for req_field in req_headers.values().flatten() {
+                        if dup_checker.contains(&req_field.field_match_keyword) {
+                            continue;
+                        }
+                        dup_checker.insert(req_field.field_match_keyword.to_owned());
+                        expected_headers_set
+                            .insert(req_field.field_match_keyword.as_bytes().to_vec());
+                    }
+                }
+                if let Some(resp_headers) = f.from_resp_key.get(&FieldType::Header) {
+                    for resp_field in resp_headers.values().flatten() {
+                        if dup_checker.contains(&resp_field.field_match_keyword) {
+                            continue;
+                        }
+                        dup_checker.insert(resp_field.field_match_keyword.to_owned());
+                        expected_headers_set
+                            .insert(resp_field.field_match_keyword.as_bytes().to_vec());
+                    }
+                }
+            }
         }
 
         Self {
@@ -1542,6 +1609,8 @@ impl L7LogDynamicConfig {
             expected_headers_set: Arc::new(expected_headers_set),
             extra_log_fields,
             grpc_streaming_data_enabled,
+            #[cfg(feature = "enterprise")]
+            extra_field_policies,
         }
     }
 
@@ -1939,15 +2008,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             flow: (&conf).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l7_throttle,
-                l7_log_session_aggr_max_timeout: conf
-                    .processors
-                    .request_log
-                    .timeouts
-                    .session_aggregate
-                    .iter()
-                    .map(|app| app.timeout)
-                    .max()
-                    .unwrap_or(Duration::ZERO),
+                l7_log_session_aggr_max_timeout: conf.processors.request_log.timeouts.max(),
                 l7_log_session_aggr_timeout: conf
                     .processors
                     .request_log
@@ -2018,6 +2079,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .protocol_special_config
                         .grpc
                         .streaming_data_enabled,
+                    #[cfg(feature = "enterprise")]
+                    conf.get_extra_field_policies(),
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
@@ -2082,6 +2145,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .decompress_payload,
+                #[cfg(feature = "enterprise")]
+                custom_protocol_config: conf.get_custom_protocol_config(),
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -3665,6 +3730,15 @@ impl ConfigHandler {
             process_matcher_update = true;
             restart_agent = !first_run;
         }
+        if proc.process_blacklist != new_proc.process_blacklist {
+            info!(
+                "Update inputs.proc.process_blacklist from {:?} to {:?}.",
+                proc.process_blacklist, new_proc.process_blacklist
+            );
+            proc.process_blacklist = new_proc.process_blacklist.clone();
+            process_matcher_update = true;
+            restart_agent = !first_run;
+        }
         if proc.process_matcher != new_proc.process_matcher {
             info!(
                 "Update inputs.proc.process_matcher from {:?} to {:?}.",
@@ -3716,6 +3790,7 @@ impl ConfigHandler {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             if let Some(c) = components.as_ref() {
                 c.process_listener.on_config_change(
+                    &new_config.user_config.inputs.proc.process_blacklist,
                     &new_config.user_config.inputs.proc.process_matcher,
                     new_config.user_config.inputs.proc.proc_dir_path.clone(),
                     new_config
@@ -4902,6 +4977,13 @@ impl ConfigHandler {
             app.protocol_special_config = new_app.protocol_special_config;
             restart_agent = !first_run;
         }
+        if app.custom_protocols != new_app.custom_protocols {
+            info!(
+                "Update processors.request_log.application_protocol_inference.custom_protocols from {:?} to {:?}.",
+                app.custom_protocols, new_app.custom_protocols
+            );
+            app.custom_protocols = new_app.custom_protocols.clone();
+        }
         let filters = &mut request_log.filters;
         let new_filters = &mut new_request_log.filters;
         if filters.port_number_prefilters != new_filters.port_number_prefilters {
@@ -4998,6 +5080,14 @@ impl ConfigHandler {
                 tag_extraction.tracing_tag, new_tag_extraction.tracing_tag
             );
             tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
+        }
+        if tag_extraction.custom_field_policies != new_tag_extraction.custom_field_policies {
+            info!(
+                "Update processors.request_log.tag_extraction.custom_field_policies from {:?} to {:?}.",
+                tag_extraction.custom_field_policies, new_tag_extraction.custom_field_policies
+            );
+            tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
+            restart_agent = !first_run;
         }
 
         let tunning = &mut request_log.tunning;

@@ -35,7 +35,6 @@ use public::pwd::PasswordInfo;
 use ring::digest;
 use serde::Deserialize;
 
-use super::linux_socket::get_proc_netns;
 use super::proc_scan_hook::proc_scan_hook;
 
 use crate::config::handler::OsProcScanConfig;
@@ -144,6 +143,17 @@ pub fn calc_process_datas_sha1(data: &Vec<ProcessData>) -> [u8; SHA1_DIGEST_LEN]
     let mut ret = [0u8; SHA1_DIGEST_LEN];
     ret.copy_from_slice(h.finish().as_ref().as_bytes());
     ret
+}
+
+fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
+    // works with linux 3.0+ kernel only
+    // refer to this [commit](https://github.com/torvalds/linux/commit/6b4e306aa3dc94a0545eb9279475b1ab6209a31f)
+    // use 0 as default ns for old kernel
+    proc.namespaces()
+        .map_or(Ok(0), |m| match m.get(&std::ffi::OsString::from("net")) {
+            Some(netns) => Ok(netns.identifier),
+            _ => Ok(0),
+        })
 }
 
 impl TryFrom<&Process> for ProcessData {
@@ -307,6 +317,16 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
     };
 
     for mut process_data in process_datas {
+        // check pid exist and start time correct
+        match Process::new(process_data.pid as i32)
+            .and_then(|p| p.stat())
+            .and_then(|stat| stat.starttime())
+            .map(|dt| dt.timestamp())
+        {
+            Ok(ts) if ts as u64 == process_data.start_time.as_secs() => (),
+            _ => continue,
+        }
+
         let Ok(up_sec) = process_data.up_sec(now_sec) else {
             continue;
         };

@@ -1804,6 +1804,41 @@ inputs:
 
 deepflow-agent 执行 `script_command` 脚本命令的用户名。
 
+### 进程黑名单 {#inputs.proc.process_blacklist}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.proc.process_blacklist`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    process_blacklist:
+    - sleep
+    - sh
+    - bash
+    - pause
+    - runc
+    - grep
+    - awk
+    - sed
+    - curl
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+进程匹配器忽略的进程列表。
+
 ### 进程匹配器 {#inputs.proc.process_matcher}
 
 **标签**:
@@ -1821,11 +1856,6 @@ Upgrade from old version: `static_config.os-proc-regex`
 inputs:
   proc:
     process_matcher:
-    - enabled_features:
-      - proc.gprocess_info
-      ignore: true
-      match_regex: ^(sleep|sh|bash|pause|runc)$
-      only_in_container: false
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
@@ -2959,7 +2989,7 @@ inputs:
 
 #### DPDK {#inputs.cbpf.special_network.dpdk}
 
-##### source {#inputs.cbpf.special_network.dpdk.source}
+##### 数据源 {#inputs.cbpf.special_network.dpdk.source}
 
 **标签**:
 
@@ -2995,7 +3025,7 @@ inputs:
 
 目前支持两种采集 DPDK 流量的方式，包括：
 - pdump: 详情见 [https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html](https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html)
-- eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量
+- eBPF: 使用 eBPF Uprobe 的方式获取 DPDK 流量，同时需要配置 `inputs.ebpf.socket.uprobe.dpdk`
 
 ##### 乱序重排缓存时间窗口大小 {#inputs.cbpf.special_network.dpdk.reorder_cache_window_size}
 
@@ -3719,7 +3749,7 @@ inputs:
 
 设置 DPDK 应用的命令名称, eBPF 会自动寻找并进行追踪采集数据包
 
-配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`
+配置样例: 如果命令行是 `/usr/bin/mydpdk`, 可以配置成 `command: mydpdk`, 并设置 `inputs.cbpf.special_network.dpdk.source = eBPF`
 
 在 DPDK 作为 vhost-user 后端的场景中，虚拟机与 DPDK 应用之间通过 virtqueue（vring）进行数据交换。
 eBPF 可以在无需修改 DPDK 或虚拟机的前提下，自动 hook 到 vring 接口，实现对传输数据包的捕获和分析，
@@ -4230,6 +4260,12 @@ inputs:
 - 禁用：不采集任何文件 IO 事件。
 - 调用生命周期：仅采集调用生命周期内的文件 IO 事件。
 - 全部：采集所有的文件 IO 事件。
+
+说明：
+- 为了获取文件的完整路径，需要结合进程的挂载信息进行路径拼接。然而，一些进程在完成任务后会迅速退出，
+  此时我们处理其产生的文件读写数据时，可能已无法从 /proc/[pid]/mountinfo 中获取挂载信息，导致路径不
+  完整（缺少挂载点）。我们对于 50ms 以下生存期的进程，文件路径会缺少挂载点信息。对于长期运行的进程，
+  则不存在该问题。
 
 ##### 最小耗时 {#inputs.ebpf.file.io_event.minimal_duration}
 
@@ -6055,307 +6091,303 @@ Vector 组件的具体配置，所有可用配置可在此链接中查找：[vec
 
 抓取主机指标
 ```yaml
-config:
-  sources:
-    host_metrics:
-      type: host_metrics
-      scrape_interval_secs: 10
-      namespace: node
-  transforms:
-    host_metrics_relabel:
-      type: remap
-      inputs:
-      - host_metrics
-      source: |
-        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
-        .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
-        metrics_map = {
-          "boot_time": "boot_time_seconds",
-          "memory_active_bytes": "memory_Active_bytes",
-          "memory_available_bytes": "memory_MemAvailable_bytes",
-          "memory_buffers_bytes": "memory_Buffers_bytes",
-          "memory_cached_bytes": "memory_Cached_bytes",
-          "memory_free_bytes": "memory_MemFree_bytes",
-          "memory_swap_free_bytes": "memory_SwapFree_bytes",
-          "memory_swap_total_bytes": "memory_SwapTotal_bytes",
-          "memory_swap_used_bytes": "memory_SwapCached_bytes",
-          "memory_total_bytes": "memory_MemTotal_bytes",
-          "network_transmit_packets_drop_total": "network_transmit_drop_total",
-          "uptime": "uname_info",
-          "filesystem_total_bytes": "filesystem_size_bytes",
-        }
-        metric_name = get!(value: metrics_map, path: [.name])
-        if !is_null(metric_name) {
-          .name = metric_name
-        }
-        if .tags.collector == "filesystem" {
-          .tags.fstype = .tags.filesystem
-          del(.tags.filesystem)
-        }
-  sinks:
-    prometheus_remote_write:
-      type: prometheus_remote_write
-      inputs:
-      - host_metrics_relabel
-      endpoint: http://127.0.0.1:38086/api/v1/prometheus
-      healthcheck:
-        enabled: false
+sources:
+  host_metrics:
+    type: host_metrics
+    scrape_interval_secs: 10
+    namespace: node
+transforms:
+  host_metrics_relabel:
+    type: remap
+    inputs:
+    - host_metrics
+    source: |
+      .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+      .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+      metrics_map = {
+        "boot_time": "boot_time_seconds",
+        "memory_active_bytes": "memory_Active_bytes",
+        "memory_available_bytes": "memory_MemAvailable_bytes",
+        "memory_buffers_bytes": "memory_Buffers_bytes",
+        "memory_cached_bytes": "memory_Cached_bytes",
+        "memory_free_bytes": "memory_MemFree_bytes",
+        "memory_swap_free_bytes": "memory_SwapFree_bytes",
+        "memory_swap_total_bytes": "memory_SwapTotal_bytes",
+        "memory_swap_used_bytes": "memory_SwapCached_bytes",
+        "memory_total_bytes": "memory_MemTotal_bytes",
+        "network_transmit_packets_drop_total": "network_transmit_drop_total",
+        "uptime": "uname_info",
+        "filesystem_total_bytes": "filesystem_size_bytes",
+      }
+      metric_name = get!(value: metrics_map, path: [.name])
+      if !is_null(metric_name) {
+        .name = metric_name
+      }
+      if .tags.collector == "filesystem" {
+        .tags.fstype = .tags.filesystem
+        del(.tags.filesystem)
+      }
+sinks:
+  prometheus_remote_write:
+    type: prometheus_remote_write
+    inputs:
+    - host_metrics_relabel
+    endpoint: http://127.0.0.1:38086/api/v1/prometheus
+    healthcheck:
+      enabled: false
 
 ```
 
 抓取 kubernetes 指标
 ```yaml
-config:
-  secret:
-    kube_token:
-      type: directory
-      path: /var/run/secrets/kubernetes.io/serviceaccount
-  sources:
-    cadvisor_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
-      auth:
-        strategy: bearer
-        token: SECRET[kube_token.token]
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-      tls:
-        verify_certificate: false
-    kubelet_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
-      auth:
-        strategy: bearer
-        token: SECRET[kube_token.token]
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-      tls:
-        verify_certificate: false
-    kube_state_metrics:
-      type: prometheus_scrape
-      endpoints:
-      - http://opensource-kube-state-metrics:8080/metrics
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 10
-      honor_labels: true
-      instance_tag: instance
-      endpoint_tag: metrics_endpoint
-  transforms:
-    cadvisor_relabel_filter:
-      type: filter
-      inputs:
-      - cadvisor_metrics
-      condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
-    kubelet_relabel_filter:
-      type: filter
-      inputs:
-      - kubelet_metrics
-      condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
-    kube_state_relabel_filter:
-      type: filter
-      inputs:
-      - kube_state_metrics
-      condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
-    common_relabel_config:
-      type: remap
-      inputs:
-      - cadvisor_relabel_filter
-      - kubelet_relabel_filter
-      - kube_state_relabel_filter
-      source: |-
-        if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
-        .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
-        }
-  sinks:
-    prometheus_remote_write:
-      type: prometheus_remote_write
-      inputs:
-      - common_relabel_config
-      endpoint: http://127.0.0.1:38086/api/v1/prometheus
-      healthcheck:
-        enabled: false
+secret:
+  kube_token:
+    type: directory
+    path: /var/run/secrets/kubernetes.io/serviceaccount
+sources:
+  cadvisor_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - https://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics/cadvisor
+    auth:
+      strategy: bearer
+      token: SECRET[kube_token.token]
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+    tls:
+      verify_certificate: false
+  kubelet_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://${K8S_NODE_IP_FOR_DEEPFLOW}:10250/metrics
+    auth:
+      strategy: bearer
+      token: SECRET[kube_token.token]
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+    tls:
+      verify_certificate: false
+  kube_state_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://opensource-kube-state-metrics:8080/metrics
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 10
+    honor_labels: true
+    instance_tag: instance
+    endpoint_tag: metrics_endpoint
+transforms:
+  cadvisor_relabel_filter:
+    type: filter
+    inputs:
+    - cadvisor_metrics
+    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+  kubelet_relabel_filter:
+    type: filter
+    inputs:
+    - kubelet_metrics
+    condition: "match(string!(.name), r'kubelet_cgroup_(manager_duration_seconds_bucket|manager_duration_seconds_count)|kubelet_node_(config_error|node_name)|kubelet_pleg_relist_(duration_seconds_bucket|duration_seconds_count|interval_seconds_bucket)|kubelet_pod_(start_duration_seconds_count|worker_duration_seconds_bucket|worker_duration_seconds_count)|kubelet_running_(container_count|containers|pod_count|pods)|kubelet_runtime_(operations_duration_seconds_bucket|perations_errors_total|operations_total)|kubelet_volume_stats_(available_bytes|capacity_bytes|inodes|inodes_used)|process_(cpu_seconds_total|resident_memory_bytes)|rest_client_(request_duration_seconds_bucket|requests_total)|storage_operation_(duration_seconds_bucket|duration_seconds_count|errors_total)|up|volume_manager_total_volumes')"
+  kube_state_relabel_filter:
+    type: filter
+    inputs:
+    - kube_state_metrics
+    condition: "!match(string!(.name), r'kube_endpoint_address_not_ready|kube_endpoint_address_available')"
+  common_relabel_config:
+    type: remap
+    inputs:
+    - cadvisor_relabel_filter
+    - kubelet_relabel_filter
+    - kube_state_relabel_filter
+    source: |-
+      if !is_null(.tags) && is_string(.tags.metrics_endpoint) {
+      .tags.metrics_path = parse_regex!(.tags.metrics_endpoint, r'https?:\/\/[^\/]+(?<path>\/.*)$').path
+      }
+sinks:
+  prometheus_remote_write:
+    type: prometheus_remote_write
+    inputs:
+    - common_relabel_config
+    endpoint: http://127.0.0.1:38086/api/v1/prometheus
+    healthcheck:
+      enabled: false
 
 ```
 
 抓取 kubernetes 日志(以采集 DeepFlow Pod 日志为例，若需要采集其他 Pod 日志可修改 `extra_label_selector` 并加上具体条件)
 ```yaml
-config:
-  data_dir: /vector-log-checkpoint
-  sources:
-    kubernetes_logs:
-      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-      type: kubernetes_logs
-      namespace_annotation_fields:
-        namespace_labels: ""
-      node_annotation_fields:
-        node_labels: ""
-      pod_annotation_fields:
-        pod_annotations: ""
-        pod_labels: ""
-      extra_label_selector: "app=deepflow,component!=front-end"
-    kubernetes_logs_frontend:
-      self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
-      type: kubernetes_logs
-      namespace_annotation_fields:
-        namespace_labels: ""
-      node_annotation_fields:
-        node_labels: ""
-      pod_annotation_fields:
-        pod_annotations: ""
-        pod_labels: ""
-      extra_label_selector: "app=deepflow,component=front-end"
-  transforms:
-    multiline_kubernetes_logs:
-      type: reduce
-      inputs:
-        - kubernetes_logs
-      group_by:
-        - file
-        - stream
-      merge_strategies:
-        message: concat_newline
-      starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
-      expire_after_ms: 2000
-      flush_period_ms: 500
-    flush_kubernetes_logs:
-     type: remap
-     inputs:
-       - multiline_kubernetes_logs
-     source: |-
-         .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
-    remap_kubernetes_logs:
-      type: remap
-      inputs:
-      - flush_kubernetes_logs
-      - kubernetes_logs_frontend
-      source: |-
-          if is_string(.message) && is_json(string!(.message)) {
-              tags = parse_json(.message) ?? {}
-              ._df_log_type = tags._df_log_type
-              .org_id = to_int(tags.org_id) ?? 0
-              .user_id = to_int(tags.user_id) ?? 0
-              .message = tags.message || tags.msg
-              del(tags._df_log_type)
-              del(tags.org_id)
-              del(tags.user_id)
-              del(tags.message)
-              del(tags.msg)
-              .json = tags
-          }
-          if !exists(.level) {
-             if exists(.json) {
-                .level = to_string!(.json.level)
-                del(.json.level)
-             } else {
-               level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
-               if !exists(level_tags.level) {
-                  level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
-               }
-               if exists(level_tags.level) {
-                  level_tags.level = upcase(string!(level_tags.level))
-                  if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
-                      level_tags.level = "INFO"
-                  }
-                  if level_tags.level == "WARNING" {
-                      level_tags.level = "WARN"
-                  }
-                  if level_tags.level == "DEBU" {
-                      level_tags.level = "DEBUG"
-                  }
-                  if level_tags.level == "ERRO" {
-                      level_tags.level = "ERROR"
-                  }
-                  if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
-                      level_tags.level = "FATAL"
-                  }
-                  .level = level_tags.level
-               }
+data_dir: /vector-log-checkpoint
+sources:
+  kubernetes_logs:
+    self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+    type: kubernetes_logs
+    namespace_annotation_fields:
+      namespace_labels: ""
+    node_annotation_fields:
+      node_labels: ""
+    pod_annotation_fields:
+      pod_annotations: ""
+      pod_labels: ""
+    extra_label_selector: "app=deepflow,component!=front-end"
+  kubernetes_logs_frontend:
+    self_node_name: ${K8S_NODE_NAME_FOR_DEEPFLOW}
+    type: kubernetes_logs
+    namespace_annotation_fields:
+      namespace_labels: ""
+    node_annotation_fields:
+      node_labels: ""
+    pod_annotation_fields:
+      pod_annotations: ""
+      pod_labels: ""
+    extra_label_selector: "app=deepflow,component=front-end"
+transforms:
+  multiline_kubernetes_logs:
+    type: reduce
+    inputs:
+      - kubernetes_logs
+    group_by:
+      - file
+      - stream
+    merge_strategies:
+      message: concat_newline
+    starts_when: match(string!(.message), r'^(.+=|\[|\[?\u001B\[[0-9;]*m|\[mysql\]\s|\{\".+\"|(::ffff:)?([0-9]{1,3}.){3}[0-9]{1,3}[\s\-]+(\[)?)?\d{4}[-\/\.]?\d{2}[-\/\.]?\d{2}[T\s]?\d{2}:\d{2}:\d{2}')
+    expire_after_ms: 2000
+    flush_period_ms: 500
+  flush_kubernetes_logs:
+   type: remap
+   inputs:
+     - multiline_kubernetes_logs
+   source: |-
+       .message = replace(string!(.message), r'\u001B\[([0-9]{1,3}(;[0-9]{1,3})*)?m', "")
+  remap_kubernetes_logs:
+    type: remap
+    inputs:
+    - flush_kubernetes_logs
+    - kubernetes_logs_frontend
+    source: |-
+        if is_string(.message) && is_json(string!(.message)) {
+            tags = parse_json(.message) ?? {}
+            ._df_log_type = tags._df_log_type
+            .org_id = to_int(tags.org_id) ?? 0
+            .user_id = to_int(tags.user_id) ?? 0
+            .message = tags.message || tags.msg
+            del(tags._df_log_type)
+            del(tags.org_id)
+            del(tags.user_id)
+            del(tags.message)
+            del(tags.msg)
+            .json = tags
+        }
+        if !exists(.level) {
+           if exists(.json) {
+              .level = to_string!(.json.level)
+              del(.json.level)
+           } else {
+             level_tags = parse_regex(.message, r'[\[\\<](?<level>(?i)INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\]\\>]') ?? {}
+             if !exists(level_tags.level) {
+                level_tags = parse_regex(.message, r'[\s](?<level>INFOR?(MATION)?|WARN(ING)?|DEBUG?|ERROR?|TRACE|FATAL|CRIT(ICAL)?)[\s]') ?? {}
              }
-          }
-          if !exists(._df_log_type) {
-              ._df_log_type = "system"
-          }
-          if !exists(.app_service) {
-              .app_service = .kubernetes.container_name
-          }
-  sinks:
-    http:
-      type: http
-      inputs: [remap_kubernetes_logs]
-      uri: http://127.0.0.1:38086/api/v1/log
-      encoding:
-        codec: json
+             if exists(level_tags.level) {
+                level_tags.level = upcase(string!(level_tags.level))
+                if level_tags.level == "INFORMATION" || level_tags.level == "INFOMATION" {
+                    level_tags.level = "INFO"
+                }
+                if level_tags.level == "WARNING" {
+                    level_tags.level = "WARN"
+                }
+                if level_tags.level == "DEBU" {
+                    level_tags.level = "DEBUG"
+                }
+                if level_tags.level == "ERRO" {
+                    level_tags.level = "ERROR"
+                }
+                if level_tags.level == "CRIT" || level_tags.level == "CRITICAL" {
+                    level_tags.level = "FATAL"
+                }
+                .level = level_tags.level
+             }
+           }
+        }
+        if !exists(._df_log_type) {
+            ._df_log_type = "system"
+        }
+        if !exists(.app_service) {
+            .app_service = .kubernetes.container_name
+        }
+sinks:
+  http:
+    type: http
+    inputs: [remap_kubernetes_logs]
+    uri: http://127.0.0.1:38086/api/v1/log
+    encoding:
+      codec: json
 
 ```
 
 使用 http_client 或者 socket 拨测一个远端服务
 ```yaml
-config:
-  sources:
-    http_client_dial:
-      type: http_client
-      endpoint: http://$HOST:$PORT
-      method: GET
-      scrape_interval_secs: 10
-      scrape_timeout_secs: 5
-    internal_metrics:
-      type: internal_metrics
-      scrape_interval_secs: 10
-      namespace: ${K8S_NAMESPACE_FOR_DEEPFLOW}
-    socket_dial_input:
-      type: demo_logs
-      interval: 10
-      format: shuffle
-      lines: [""]
-  transforms:
-    internal_metrics_relabel:
-      type: remap
-      inputs:
-      - internal_metrics
-      source: |-
-        .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
-    internal_metrics_dispatch:
-      type: route
-      inputs:
-      - internal_metrics_relabel
-      route:
-        http_client_dial_metrics: '.tags.component_id == "http_client_dial"'
-        socket_dial_metrics: '.tags.component_id == "socket_dial"'
-    http_client_dial_metrics:
-      type: filter
-      inputs:
-      - internal_metrics_dispatch.http_client_dial_metrics
-      condition: "match(string!(.name),r'http_client_.*')"
-    socket_dial_metrics:
-      type: filter
-      inputs:
-      - internal_metrics_dispatch.socket_dial_metrics
-      condition: "match(string!(.name),r'buffer.*')"
-  sinks:
-    socket_dial:
-      type: socket
-      inputs:
-      - socket_dial_input
-      address: $HOST:$PORT
-      mode: tcp
-      encoding:
-        codec: raw_message
-    prometheus_remote_write:
-      type: prometheus_remote_write
-      inputs:
-      - http_client_dial_metrics
-      - socket_dial_metrics
-      endpoint: http://127.0.0.1:38086/api/v1/prometheus
-      healthcheck:
-        enabled: false
+sources:
+  http_client_dial:
+    type: http_client
+    endpoint: http://$HOST:$PORT
+    method: GET
+    scrape_interval_secs: 10
+    scrape_timeout_secs: 5
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 10
+    namespace: ${K8S_NAMESPACE_FOR_DEEPFLOW}
+  socket_dial_input:
+    type: demo_logs
+    interval: 10
+    format: shuffle
+    lines: [""]
+transforms:
+  internal_metrics_relabel:
+    type: remap
+    inputs:
+    - internal_metrics
+    source: |-
+      .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
+  internal_metrics_dispatch:
+    type: route
+    inputs:
+    - internal_metrics_relabel
+    route:
+      http_client_dial_metrics: '.tags.component_id == "http_client_dial"'
+      socket_dial_metrics: '.tags.component_id == "socket_dial"'
+  http_client_dial_metrics:
+    type: filter
+    inputs:
+    - internal_metrics_dispatch.http_client_dial_metrics
+    condition: "match(string!(.name),r'http_client_.*')"
+  socket_dial_metrics:
+    type: filter
+    inputs:
+    - internal_metrics_dispatch.socket_dial_metrics
+    condition: "match(string!(.name),r'buffer.*')"
+sinks:
+  socket_dial:
+    type: socket
+    inputs:
+    - socket_dial_input
+    address: $HOST:$PORT
+    mode: tcp
+    encoding:
+      codec: raw_message
+  prometheus_remote_write:
+    type: prometheus_remote_write
+    inputs:
+    - http_client_dial_metrics
+    - socket_dial_metrics
+    endpoint: http://127.0.0.1:38086/api/v1/prometheus
+    healthcheck:
+      enabled: false
 
 ```
 
@@ -7060,6 +7092,51 @@ processors:
 
 开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
 
+#### 自定义协议解析 {#processors.request_log.application_protocol_inference.custom_protocols}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.custom_protocols`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      custom_protocols: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义协议解析配置，支持通过简单的规则识别用户自定义的 L7 协议。
+示例：
+```yaml
+- protorol_name: "your_protocol_name" # 协议名称，对应 l7_flow_log.l7_protocol_str，注意：必须存在一个 `processors.request_log.tag_extraction.custom_field_policies` 配置，否则无法上报识别结果
+  pre_filter:
+    port_list: 1-65535 # 预过滤端口，可以提高解析性能
+  request_characters:  # 多个特征之间是 OR 的关系
+    - character: # 多个 match_keyword 之间是 AND 的关系
+      - match_keyword: abc  # 特征字符串
+        match_type: "string" # 取值："string", "hex"
+        match_ignore_case: false # 匹配特征字符串是否忽略大小写，当 match_type == string 时生效，默认值: false
+        match_from_begining: false # 是否需要从 Payload 头部开始匹配
+  response_characters:
+    - character:
+      - match_keyword: 0123af
+        match_type: "hex"
+        match_from_begining: false
+```
+
 ### 过滤器 {#processors.request_log.filters}
 
 #### 端口号预过滤器 {#processors.request_log.filters.port_number_prefilters}
@@ -7440,7 +7517,7 @@ Upgrade from old version: `static_config.rrt-tcp-timeout`
 processors:
   request_log:
     timeouts:
-      tcp_request_timeout: 1800s
+      tcp_request_timeout: 300s
 ```
 
 **模式**:
@@ -7452,7 +7529,8 @@ processors:
 **详细描述**:
 
 deepflow-agent 采集 TCP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 3600s。
+该参数值，该次调用将被识别为超时。该参数需大于配置 `processors.request_log.timeouts.session_aggregate`
+中 TCP 类型的超时时间（例如 HTTP2 默认值 120s），并小于 3600s。
 
 #### UDP 调用超时时间 {#processors.request_log.timeouts.udp_request_timeout}
 
@@ -7482,8 +7560,8 @@ processors:
 
 **详细描述**:
 
-deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过
-该参数值，该次调用将被识别为超时。该参数需大于会话合并的 SLOT_TIME （10s），并小于 300s。
+deepflow-agent 采集 UDP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过该参数值，该次调用将被识别为超时。
+该参数需大于配置 `processors.request_log.timeouts.session_aggregate` 中 UDP 类型的超时时间（例如 DNS 默认值 15s），并小于 300s。
 
 #### 会话合并窗口时长 {#processors.request_log.timeouts.session_aggregate_window_duration}
 
@@ -7610,7 +7688,8 @@ processors:
 
 **详细描述**:
 
-设置应用的超时时间。
+设置应用的超时时间。TCP 类型的应用协议超时时间需要小于 `processors.request_log.timeouts.tcp_request_timeout`，
+UDP 类型的应用协议超时时间需要小于 `processors.request_log.timeouts.udp_request_timeout`。
 
 ### 标签提取 {#processors.request_log.tag_extraction}
 
@@ -8004,6 +8083,67 @@ processors:
 **详细描述**:
 
 字段名
+
+#### 自定义字段提取策略 {#processors.request_log.tag_extraction.custom_field_policies}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.custom_field_policies`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      custom_field_policies: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+自定义字段提取策略，用于通过简单的规则提取 L7 协议中可能存在的自定义字段
+示例：
+```yaml
+- policy_name: "my_policy" # 策略名称
+  protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
+  custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
+  port_list: 1-65535
+  fields:
+  - field_name: "my_field" # 配置的字段
+    field_match_type: "string" # 可选值："string"
+    field_match_ignore_case: "false" # 当匹配 field 时是否忽略大小写，默认值：false
+    field_match_keyword: "abc" # 可以填写额外的字符以提升匹配准确率，例如 `"\"abc\": \""`
+
+    subfield_match_keyword: "y" # 有些情况下，我们需要提取一个子字段，例如 HTTP 的 Cookie 字段中，我们仅仅只需要提取其中的一部分，例如，我们要从 `abc: x=1,y=2,z=3` 的 Value（`x=1,y=2,z=3`）中提取 y 对应的值
+    separator_between_subfield_kv_pair: "," # 用于分割 key-value 键值对的分隔符，默认值：空
+    separator_between_subfield_key_and_value: "=" # 用于分割 key 和 value 的分隔符，默认值：空
+
+    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value，默认值为 `header_field`，含义见下方说明
+    traffic_direction: request # 可以限定仅在请求（或仅在响应）中搜索，默认值为 both，可选值：request/response/both
+    check_value_charset: false # 可用于检查提取结果是否合法
+    value_primary_charset: ["digits", "alphabets", "chinese"] # 提取结果校验字符集，可选值：digits/alphabets/chinese
+    value_special_charset: ".-_" # 提取结果校验字符集，额外校验这些特殊字符
+    attribute_name: "xyz" # 此时该字段将会出现在调用日志的 attribute.xyz 中，默认值为空，为空时该字段不会加入到 attribute 内
+    rewrite_native_tag: version # rewrite 可以填写以下几种字段之一，用于覆写对应字段的值：version/request_type/request_domain/request_resource/request_id/endpoint/response_code/response_exception/response_result/trace_id/span_id/x_request_id/http_proxy_client
+    rewrite_response_status: # rewrite response_status 字段，当 response_code 在 success_values 数组中时，会将 response_status 设置为 success，否则设置为 server_error
+      success_values: []
+    metric_name: "xyz" # 此时该字段将会出现在调用日志的 metrics.xyz 中，默认值为空
+```
+注意，其中 field_type 的不同值会影响到该字段的提取方式，具体如下：
+- `http_url_field`：从 HTTP URL 末尾的参数中提取字段，URL 末尾形如：`?key=value&key2=value2`
+- `header_field`：从 HTTP/Dubbo/SofaRPC/...等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`
+- `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
+- `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
+- `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
