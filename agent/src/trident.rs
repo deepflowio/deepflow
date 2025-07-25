@@ -130,7 +130,7 @@ use public::{
     packet::MiniPacket,
     proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender, MultiDebugSender},
-    utils::net::{get_route_src_ip, Link, MacAddr},
+    utils::net::{get_route_src_ip, IpMacPair, Link, MacAddr},
     LeakyBucket,
 };
 #[cfg(target_os = "linux")]
@@ -336,8 +336,7 @@ CompileTime: {}",
 
 #[derive(Clone, Debug)]
 pub struct AgentId {
-    pub ip: IpAddr,
-    pub mac: MacAddr,
+    pub ipmac: IpMacPair,
     pub team_id: String,
     pub group_id: String,
 }
@@ -345,8 +344,7 @@ pub struct AgentId {
 impl Default for AgentId {
     fn default() -> Self {
         Self {
-            ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            mac: Default::default(),
+            ipmac: IpMacPair::default(),
             team_id: Default::default(),
             group_id: Default::default(),
         }
@@ -355,7 +353,7 @@ impl Default for AgentId {
 
 impl fmt::Display for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.ip, self.mac)?;
+        write!(f, "{}/{}", self.ipmac.ip, self.ipmac.mac)?;
         if !self.team_id.is_empty() {
             write!(f, "/team={}", self.team_id)?;
         }
@@ -369,8 +367,8 @@ impl fmt::Display for AgentId {
 impl From<&AgentId> for agent::AgentId {
     fn from(id: &AgentId) -> Self {
         Self {
-            ip: Some(id.ip.to_string()),
-            mac: Some(id.mac.to_string()),
+            ip: Some(id.ipmac.ip.to_string()),
+            mac: Some(id.ipmac.mac.to_string()),
             team_id: Some(id.team_id.clone()),
             group_id: Some(id.group_id.clone()),
         }
@@ -646,8 +644,7 @@ impl Trident {
         #[cfg(target_os = "linux")]
         let agent_id = if sidecar_mode {
             AgentId {
-                ip: ctrl_ip.clone(),
-                mac: ctrl_mac,
+                ipmac: IpMacPair::from((ctrl_ip.clone(), ctrl_mac)),
                 team_id: config_handler.static_config.team_id.clone(),
                 group_id: config_handler.static_config.vtap_group_id_request.clone(),
             }
@@ -665,16 +662,14 @@ impl Trident {
                 return Err(anyhow!("reset netns error: {}", e));
             };
             AgentId {
-                ip,
-                mac,
+                ipmac: IpMacPair::from((ip, mac)),
                 team_id: config_handler.static_config.team_id.clone(),
                 group_id: config_handler.static_config.vtap_group_id_request.clone(),
             }
         };
         #[cfg(any(target_os = "windows", target_os = "android"))]
         let agent_id = AgentId {
-            ip: ctrl_ip.clone(),
-            mac: ctrl_mac,
+            ipmac: IpMacPair::from((ctrl_ip.clone(), ctrl_mac)),
             team_id: config_handler.static_config.team_id.clone(),
             group_id: config_handler.static_config.vtap_group_id_request.clone(),
         };
@@ -722,8 +717,8 @@ impl Trident {
             k8s_opaque_id = Config::get_k8s_ca_md5();
         }
 
-        let (agent_id_tx, _) = broadcast::channel::<AgentId>(1);
-        let agent_id_tx = Arc::new(agent_id_tx);
+        let (ipmac_tx, _) = broadcast::channel::<IpMacPair>(1);
+        let ipmac_tx = Arc::new(ipmac_tx);
 
         let synchronizer = Arc::new(Synchronizer::new(
             runtime.clone(),
@@ -741,7 +736,7 @@ impl Trident {
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
-            agent_id_tx.clone(),
+            ipmac_tx.clone(),
             ntp_diff,
         ));
         stats_collector.register_countable(
@@ -771,7 +766,7 @@ impl Trident {
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
             sidecar_mode,
-            agent_id_tx,
+            ipmac_tx.clone(),
         );
         domain_name_listener.start();
 
@@ -1064,6 +1059,7 @@ impl Trident {
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
                         sender_leaky_bucket.clone(),
+                        ipmac_tx.clone(),
                     )?;
 
                     comp.start();
@@ -1468,7 +1464,7 @@ pub struct DomainNameListener {
 
     thread_handler: Option<JoinHandle<()>>,
     stopped: Arc<AtomicBool>,
-    agent_id_tx: Arc<broadcast::Sender<AgentId>>,
+    ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
 }
 
 impl DomainNameListener {
@@ -1480,7 +1476,7 @@ impl DomainNameListener {
         domain_names: Vec<String>,
         ips: Vec<String>,
         sidecar_mode: bool,
-        agent_id_tx: Arc<broadcast::Sender<AgentId>>,
+        ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
     ) -> DomainNameListener {
         Self {
             stats_collector,
@@ -1490,7 +1486,7 @@ impl DomainNameListener {
             sidecar_mode,
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
-            agent_id_tx,
+            ipmac_tx,
         }
     }
 
@@ -1520,7 +1516,7 @@ impl DomainNameListener {
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
-        let agent_id_tx = self.agent_id_tx.clone();
+        let ipmac_tx = self.ipmac_tx.clone();
         let session = self.session.clone();
 
         #[cfg(target_os = "linux")]
@@ -1570,8 +1566,8 @@ impl DomainNameListener {
                                 ctrl_ip
                             );
                             #[cfg(target_os = "linux")]
-                            let agent_id = if sidecar_mode {
-                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, ..Default::default() }
+                            let ipmac = if sidecar_mode {
+                                IpMacPair::from((ctrl_ip.clone(), ctrl_mac))
                             } else {
                                 // use host ip/mac as agent id if not in sidecar mode
                                 if let Err(e) = netns::NsFile::Root.open_and_setns() {
@@ -1593,13 +1589,13 @@ impl DomainNameListener {
                                     crate::utils::clean_and_exit(1);
                                     continue;
                                 }
-                                AgentId { ip, mac, ..Default::default() }
+                                IpMacPair::from((ip, mac))
                             };
                             #[cfg(any(target_os = "windows", target_os = "android"))]
-                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac, ..Default::default() };
+                            let ipmac = IpMacPair::from((ctrl_ip.clone(), ctrl_mac));
 
                             session.reset_server_ip(ips.clone());
-                            let _ = agent_id_tx.send(agent_id);
+                            let _ = ipmac_tx.send(ipmac);
                         }
                     }
                 })
@@ -2086,6 +2082,7 @@ impl AgentComponents {
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
         sender_leaky_bucket: Arc<LeakyBucket>,
+        ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -3121,6 +3118,8 @@ impl AgentComponents {
             user_config.inputs.vector.enabled,
             user_config.inputs.vector.config.clone(),
             runtime.clone(),
+            synchronizer.agent_id.read().clone().ipmac.ip.to_string(),
+            ipmac_tx,
         );
 
         Ok(AgentComponents {
@@ -3392,6 +3391,7 @@ impl Components {
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
         sender_leaky_bucket: Arc<LeakyBucket>,
+        ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
         if crate::utils::environment::running_in_only_watch_k8s_mode() {
@@ -3417,6 +3417,7 @@ impl Components {
             agent_mode,
             runtime,
             sender_leaky_bucket,
+            ipmac_tx,
         )?;
         return Ok(Components::Agent(components));
     }
