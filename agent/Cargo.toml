@@ -107,6 +107,8 @@ tunnel = { path = "plugins/tunnel" }
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 zstd = "0.13.2"
+strum_macros = "0.27.2"
+strum = "0.27.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 cgroups-rs = "0.2.9"
