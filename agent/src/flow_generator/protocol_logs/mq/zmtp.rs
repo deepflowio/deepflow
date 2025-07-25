@@ -98,7 +98,7 @@ impl FrameType {
     }
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ZmtpInfo {
     msg_type: LogMessageType,
     req_msg_size: Option<u64>,
@@ -128,6 +128,34 @@ pub struct ZmtpInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+}
+
+impl Default for ZmtpInfo {
+    fn default() -> Self {
+        Self {
+            msg_type: Default::default(),
+            req_msg_size: None,
+            res_msg_size: None,
+            is_tls: false,
+            rtt: 0,
+            status: L7ResponseStatus::Ok,
+            err_msg: None,
+            subscription: None,
+            major_version: None,
+            minor_version: None,
+            more_frames: None,
+            socket_type: None,
+            frame_type: Default::default(),
+            mechanism: None,
+            command_name: None,
+            payload: Vec::new(),
+            captured_request_byte: 0,
+            captured_response_byte: 0,
+            attributes: Vec::new(),
+            l7_protocol_str: None,
+            is_on_blacklist: false,
+        }
+    }
 }
 
 impl ZmtpInfo {

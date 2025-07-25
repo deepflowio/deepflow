@@ -30,7 +30,7 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use nix::sys::utsname::uname;
 use procfs::process::all_processes_with_root;
 
@@ -269,8 +269,14 @@ struct ProcessNode {
     callback: Option<ProcessListenerCallback>,
 }
 
+#[derive(Default)]
+struct Features {
+    blacklist: Vec<String>,
+    features: HashMap<String, ProcessNode>,
+}
+
 pub struct ProcessListener {
-    features: Arc<RwLock<HashMap<String, ProcessNode>>>,
+    features: Arc<RwLock<Features>>,
     running: Arc<AtomicBool>,
     proc_root: Arc<RwLock<String>>,
     user: Arc<RwLock<String>>,
@@ -283,13 +289,14 @@ impl ProcessListener {
     const INTERVAL: usize = 10;
 
     pub fn new(
+        process_blacklist: &Vec<String>,
         process_matcher: &Vec<ProcessMatcher>,
         proc_root: String,
         user: String,
         command: Vec<String>,
     ) -> Self {
         let listener = Self {
-            features: Arc::new(RwLock::new(HashMap::new())),
+            features: Default::default(),
             running: Arc::new(AtomicBool::new(false)),
             thread_handle: Mutex::new(None),
             proc_root: Arc::new(RwLock::new(proc_root)),
@@ -297,26 +304,27 @@ impl ProcessListener {
             command: Arc::new(RwLock::new(command)),
         };
 
-        listener.set(process_matcher);
+        listener.set(process_blacklist, process_matcher);
 
         listener
     }
 
     pub fn on_config_change(
         &self,
+        process_blacklist: &Vec<String>,
         process_matcher: &Vec<ProcessMatcher>,
         proc_root: String,
         user: String,
         command: Vec<String>,
     ) {
-        self.set(process_matcher);
+        self.set(process_blacklist, process_matcher);
 
         *self.proc_root.write().unwrap() = proc_root;
         *self.user.write().unwrap() = user;
         *self.command.write().unwrap() = command;
     }
 
-    pub fn set(&self, process_matcher: &Vec<ProcessMatcher>) {
+    pub fn set(&self, process_blacklist: &Vec<String>, process_matcher: &Vec<ProcessMatcher>) {
         let mut features: HashMap<String, ProcessNode> = HashMap::new();
 
         for matcher in process_matcher.iter() {
@@ -337,18 +345,21 @@ impl ProcessListener {
             }
         }
 
-        *self.features.write().unwrap() = features;
+        *self.features.write().unwrap() = Features {
+            blacklist: process_blacklist.clone(),
+            features,
+        };
     }
 
     pub fn register(&self, feature: &str, callback: ProcessListenerCallback) {
         info!("Process listener register feature {}", feature);
         let mut features = self.features.write().unwrap();
-        if let Some(node) = features.get_mut(&feature.to_string()) {
+        if let Some(node) = features.features.get_mut(&feature.to_string()) {
             node.pids = vec![];
             node.process_datas = vec![];
             node.callback = Some(callback);
         } else {
-            let _ = features.insert(
+            let _ = features.features.insert(
                 feature.to_string(),
                 ProcessNode {
                     process_matcher: vec![],
@@ -371,10 +382,11 @@ impl ProcessListener {
     fn process(
         process_data_cache: &mut HashMap<i32, ProcessData>,
         proc_root: &str,
-        features: &mut HashMap<String, ProcessNode>,
+        features: &mut Features,
         user: &str,
         command: &[String],
     ) {
+        let (blacklist, features) = (&mut features.blacklist, &mut features.features);
         if features.is_empty() {
             return;
         }
@@ -403,6 +415,21 @@ impl ProcessListener {
                     continue;
                 }
             };
+            match process.status().map(|s| s.name) {
+                // not found
+                Ok(name) if blacklist.binary_search(&name).is_err() => (),
+                Ok(name) => {
+                    trace!(
+                        "process {name} (pid#{}) ignored because it is in blacklist",
+                        process.pid
+                    );
+                    continue;
+                }
+                Err(e) => {
+                    debug!("get process status failed: {}", e);
+                    continue;
+                }
+            }
             alive_pids.insert(process.pid);
             if let Some(old_data) = process_data_cache.get(&process.pid) {
                 if let Some(start_time) = process.stat().ok().and_then(|stat| stat.starttime().ok())

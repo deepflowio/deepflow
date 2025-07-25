@@ -1804,6 +1804,41 @@ inputs:
 
 deepflow-agent 执行 `script_command` 脚本命令的用户名。
 
+### 进程黑名单 {#inputs.proc.process_blacklist}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.proc.process_blacklist`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    process_blacklist:
+    - sleep
+    - sh
+    - bash
+    - pause
+    - runc
+    - grep
+    - awk
+    - sed
+    - curl
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+进程匹配器忽略的进程列表。
+
 ### 进程匹配器 {#inputs.proc.process_matcher}
 
 **标签**:
@@ -1821,11 +1856,6 @@ Upgrade from old version: `static_config.os-proc-regex`
 inputs:
   proc:
     process_matcher:
-    - enabled_features:
-      - proc.gprocess_info
-      ignore: true
-      match_regex: ^(sleep|sh|bash|pause|runc)$
-      only_in_container: false
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
@@ -4230,6 +4260,12 @@ inputs:
 - 禁用：不采集任何文件 IO 事件。
 - 调用生命周期：仅采集调用生命周期内的文件 IO 事件。
 - 全部：采集所有的文件 IO 事件。
+
+说明：
+- 为了获取文件的完整路径，需要结合进程的挂载信息进行路径拼接。然而，一些进程在完成任务后会迅速退出，
+  此时我们处理其产生的文件读写数据时，可能已无法从 /proc/[pid]/mountinfo 中获取挂载信息，导致路径不
+  完整（缺少挂载点）。我们对于 50ms 以下生存期的进程，文件路径会缺少挂载点信息。对于长期运行的进程，
+  则不存在该问题。
 
 ##### 最小耗时 {#inputs.ebpf.file.io_event.minimal_duration}
 
