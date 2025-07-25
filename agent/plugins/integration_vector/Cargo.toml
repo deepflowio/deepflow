@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 serde_yaml = "0.9"
 tokio = { version = "1.20.1", features = ["full"] }
+public = { path = "../../crates/public"}

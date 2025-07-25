@@ -665,7 +665,7 @@ impl ApiWatcher {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 agent_id: Some(config_guard.agent_id as u32),
-                source_ip: Some(id.ip.to_string()),
+                source_ip: Some(id.ipmac.ip.to_string()),
                 team_id: Some(id.team_id.clone()),
                 error_msg: Some(
                     err_msgs
@@ -798,7 +798,7 @@ impl ApiWatcher {
                             cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                             version: Some(context.version.load(Ordering::SeqCst)),
                             agent_id: Some(config_guard.agent_id as u32),
-                            source_ip: Some(id.ip.to_string()),
+                            source_ip: Some(id.ipmac.ip.to_string()),
                             team_id: Some(id.team_id.clone()),
                             error_msg: Some(e.to_string()),
                             entries: vec![],
