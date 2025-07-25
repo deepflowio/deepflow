@@ -17,7 +17,7 @@
 use std::{
     array::TryFromSliceError,
     fmt,
-    net::{IpAddr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
@@ -335,6 +335,34 @@ pub fn is_link_local_multicast(ip: &IpAddr) -> bool {
             ip_octets[0] == 224 && ip_octets[1] == 0 && ip_octets[2] == 0
         }
         IpAddr::V6(addr) => addr.segments()[0] & 0xff0f == 0xff02,
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IpMacPair {
+    pub ip: IpAddr,
+    pub mac: MacAddr,
+}
+
+impl From<(IpAddr, MacAddr)> for IpMacPair {
+    fn from((ip, mac): (IpAddr, MacAddr)) -> Self {
+        Self { ip, mac }
+    }
+}
+
+impl Default for IpMacPair {
+    fn default() -> Self {
+        Self {
+            ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            mac: Default::default(),
+        }
+    }
+}
+
+impl fmt::Display for IpMacPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.ip, self.mac)?;
+        Ok(())
     }
 }
 

@@ -213,7 +213,11 @@ impl SocketSynchronizer {
 
             let (ctrl_ip, ctrl_mac, team_id) = {
                 let id = agent_id.read();
-                (id.ip.to_string(), id.mac.to_string(), id.team_id.clone())
+                (
+                    id.ipmac.ip.to_string(),
+                    id.ipmac.mac.to_string(),
+                    id.team_id.clone(),
+                )
             };
             let mut policy_getter = policy_getter.lock().unwrap();
             let pids = get_socket_pids();
