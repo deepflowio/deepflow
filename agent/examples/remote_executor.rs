@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{net::Ipv4Addr, sync::Arc};
+use std::sync::Arc;
 
 use parking_lot::RwLock;
 use tokio::runtime::Builder;
@@ -25,6 +25,7 @@ use deepflow_agent::{
     trident::AgentId,
     utils::stats,
 };
+use public::utils::net::IpMacPair;
 
 fn main() {
     flexi_logger::Logger::try_with_env()
@@ -53,8 +54,7 @@ fn main() {
     );
 
     let agent_id = Arc::new(RwLock::new(AgentId {
-        ip: Ipv4Addr::UNSPECIFIED.into(),
-        mac: Default::default(),
+        ipmac: IpMacPair::default(),
         team_id: "example-team".to_owned(),
         group_id: "example-group".to_owned(),
     }));
