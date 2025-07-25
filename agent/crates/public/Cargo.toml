@@ -28,6 +28,7 @@ serde_yaml = "0.8"
 socket2 = "0.4"
 thiserror = "1.0"
 tonic.workspace = true
+crossbeam-channel = "0.5"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 k8s-openapi.workspace = true
