@@ -59,14 +59,25 @@ func (t *Tencent) getNetworks(region string) ([]model.Network, []model.Subnet, [
 		t.azLcuuidMap[azLcuuid] = 0
 
 		cidr4 := nData.Get("CidrBlock").MustString()
+		if cidr4 != "" {
+			subnets = append(subnets, model.Subnet{
+				Lcuuid:        common.GetUUIDByOrgID(t.orgID, networkLcuuid+cidr4),
+				Name:          networkName + "_v4",
+				CIDR:          cidr4,
+				NetworkLcuuid: networkLcuuid,
+				VPCLcuuid:     vpcLcuuid,
+			})
+		}
 		cidr6 := nData.Get("Ipv6CidrBlock").MustString()
-		subnets = append(subnets, model.Subnet{
-			Lcuuid:        common.GetUUIDByOrgID(t.orgID, networkLcuuid),
-			Name:          networkName,
-			CIDR:          cidr4 + cidr6,
-			NetworkLcuuid: networkLcuuid,
-			VPCLcuuid:     vpcLcuuid,
-		})
+		if cidr6 != "" {
+			subnets = append(subnets, model.Subnet{
+				Lcuuid:        common.GetUUIDByOrgID(t.orgID, networkLcuuid+cidr6),
+				Name:          networkName + "_v6",
+				CIDR:          cidr6,
+				NetworkLcuuid: networkLcuuid,
+				VPCLcuuid:     vpcLcuuid,
+			})
+		}
 
 		routeTableID := nData.Get("RouteTableId").MustString()
 		if routeTableID != "" {
