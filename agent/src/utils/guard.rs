@@ -24,8 +24,8 @@ use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
         Arc, Condvar, Mutex,
-    }
-    thread::{self, JoinHandle},
+    },
+    thread::{self, sleep, JoinHandle},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -398,8 +398,8 @@ impl Guard {
                     let (timeout, interval) = feed.timeout(Duration::from_secs(guard_interval << 1));
                     if timeout {
                         error!("The guard thread (circuit breakers) feeds the watchdog thread every {} seconds. Unfortunately, it has now been discovered that the feed has not been updated for over {} seconds. The location of the last feed is: {}, restart deepflow-agent ...", guard_interval, interval.as_secs(), feed);
-                        crate::utils::notify_exit(-1);
-                        break;
+                        sleep(Duration::from_secs(1));
+                        std::process::exit(-1);
                     }
 
                     sleep(Duration::from_secs(1));
@@ -411,7 +411,6 @@ impl Guard {
         self.thread_watchdog.lock().unwrap().replace(thread);
         info!("guard watchdog started");
     }
-
 
     pub fn start(&self) {
         {
@@ -466,7 +465,6 @@ impl Guard {
                 }
                 drop(system_guard);
                 feed.add(FeedTitle::SystemLoad);
-                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 feed.add(FeedTitle::FileSize);
                 match get_file_and_size_sum(&log_dir) {
