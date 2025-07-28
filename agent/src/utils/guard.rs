@@ -394,6 +394,7 @@ impl Guard {
                     let (timeout, interval) = feed.timeout(Duration::from_secs(guard_interval << 1));
                     if timeout {
                         error!("The guard thread (circuit breakers) feeds the watchdog thread every {} seconds. Unfortunately, it has now been discovered that the feed has not been updated for over {} seconds. The location of the last feed is: {}, restart deepflow-agent ...", guard_interval, interval.as_secs(), feed);
+                        sleep(Duration::from_secs(1));
                         std::process::exit(-1);
                     }
 
