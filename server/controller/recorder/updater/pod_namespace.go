@@ -95,13 +95,13 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		cloudTags = cloudItem.CloudTags
 	}
 	dbItem := &mysqlmodel.PodNamespace{
-		Name:         cloudItem.Name,
-		PodClusterID: podClusterID,
-		SubDomain:    cloudItem.SubDomainLcuuid,
-		Domain:       n.metadata.Domain.Lcuuid,
-		Region:       cloudItem.RegionLcuuid,
-		AZ:           cloudItem.AZLcuuid,
-		CloudTags:    cloudTags,
+		Name:             cloudItem.Name,
+		PodClusterID:     podClusterID,
+		SubDomain:        cloudItem.SubDomainLcuuid,
+		Domain:           n.metadata.Domain.Lcuuid,
+		Region:           cloudItem.RegionLcuuid,
+		AZ:               cloudItem.AZLcuuid,
+		LearnedCloudTags: cloudTags,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -118,14 +118,14 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 	// 	mapInfo["az"] = cloudItem.AZLcuuid
 	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	// }
-	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
+	if cloudcommon.DiffMap(diffBase.LearnedCloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
 		if cloudItem.CloudTags != nil {
 			updateTags = cloudItem.CloudTags
 		}
 		tagsJson, _ := json.Marshal(updateTags)
-		mapInfo["cloud_tags"] = tagsJson
-		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
+		mapInfo["learned_cloud_tags"] = tagsJson
+		structInfo.LearnedCloudTags.Set(diffBase.LearnedCloudTags, cloudItem.CloudTags)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
