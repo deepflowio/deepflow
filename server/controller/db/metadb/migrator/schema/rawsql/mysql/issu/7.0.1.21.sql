@@ -39,35 +39,54 @@ CREATE TABLE IF NOT EXISTS ch_tag_last_updated_at (
     updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb DEFAULT CHARSET=utf8;
 
-INSERT INTO ch_tag_last_updated_at (table_name) VALUES
-('ch_device'),
-('ch_az'),
-('ch_chost'),
-('ch_l3_epc'),
-('ch_subnet'),
-('ch_pod_cluster'),
-('ch_pod_ns'),
-('ch_pod_node'),
-('ch_pod_ingress'),
-('ch_pod_service'),
-('ch_pod_group'),
-('ch_pod'),
-('ch_gprocess'),
-('ch_chost_cloud_tag'),
-('ch_chost_cloud_tags'),
-('ch_pod_ns_cloud_tag'),
-('ch_pod_ns_cloud_tags'),
-('ch_pod_service_k8s_label'),
-('ch_pod_service_k8s_labels'),
-('ch_pod_service_k8s_annotation'),
-('ch_pod_service_k8s_annotations'),
-('ch_pod_k8s_env'),
-('ch_pod_k8s_envs'),
-('ch_pod_k8s_label'),
-('ch_pod_k8s_labels'),
-('ch_pod_k8s_annotation'),
-('ch_pod_k8s_annotations'),
-('ch_os_app_tag'),
-('ch_os_app_tags');
+DROP PROCEDURE IF EXISTS InsertTagLastUpdatedAtIfNotExists;
+
+CREATE PROCEDURE InsertTagLastUpdatedAtIfNotExists(
+    IN tableName VARCHAR(64)
+)
+BEGIN
+    DECLARE record_count INT;
+
+    SELECT COUNT(*)
+    INTO record_count
+    FROM ch_tag_last_updated_at
+    WHERE table_name = tableName;
+
+    IF record_count = 0 THEN
+        INSERT INTO ch_tag_last_updated_at (table_name) VALUES (tableName);
+    END IF;
+END;
+
+CALL InsertTagLastUpdatedAtIfNotExists('ch_device');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_az');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_chost');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_l3_epc');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_subnet');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_cluster');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_ns');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_node');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_ingress');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_service');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_group');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_gprocess');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_chost_cloud_tag');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_chost_cloud_tags');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_ns_cloud_tag');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_ns_cloud_tags');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_service_k8s_label');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_service_k8s_labels');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_service_k8s_annotation');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_service_k8s_annotations');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_env');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_envs');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_label');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_labels');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_annotation');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_pod_k8s_annotations');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_os_app_tag');
+CALL InsertTagLastUpdatedAtIfNotExists('ch_os_app_tags');
+
+DROP PROCEDURE InsertTagLastUpdatedAtIfNotExists;
 
 UPDATE db_version SET version='7.0.1.21';

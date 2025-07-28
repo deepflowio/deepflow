@@ -204,22 +204,23 @@ type HostUpdate struct {
 
 type VMFieldsUpdate struct {
 	Key
-	Name          fieldDetail[string]
-	IP            fieldDetail[string]
-	Label         fieldDetail[string]
-	State         fieldDetail[int]
-	HType         fieldDetail[int]
-	LaunchServer  fieldDetail[string]
-	CloudTags     fieldDetail[map[string]string]
-	HostID        fieldDetail[int]
-	UID           fieldDetail[string]
-	Hostname      fieldDetail[string]
-	VPCID         fieldDetail[int]
-	VPCLcuuid     fieldDetail[string]
-	AZLcuuid      fieldDetail[string]
-	RegionLcuuid  fieldDetail[string]
-	NetworkID     fieldDetail[int]
-	NetworkLcuuid fieldDetail[string]
+	Name             fieldDetail[string]
+	IP               fieldDetail[string]
+	Label            fieldDetail[string]
+	State            fieldDetail[int]
+	HType            fieldDetail[int]
+	LaunchServer     fieldDetail[string]
+	LearnedCloudTags fieldDetail[map[string]string]
+	CustomCloudTags  fieldDetail[map[string]string]
+	HostID           fieldDetail[int]
+	UID              fieldDetail[string]
+	Hostname         fieldDetail[string]
+	VPCID            fieldDetail[int]
+	VPCLcuuid        fieldDetail[string]
+	AZLcuuid         fieldDetail[string]
+	RegionLcuuid     fieldDetail[string]
+	NetworkID        fieldDetail[int]
+	NetworkLcuuid    fieldDetail[string]
 }
 
 type VMUpdate struct {
@@ -564,11 +565,12 @@ type PodClusterUpdate struct {
 
 type PodNamespaceFieldsUpdate struct {
 	Key
-	CloudTags    fieldDetail[map[string]string]
-	AZLcuuid     fieldDetail[string]
-	RegionLcuuid fieldDetail[string]
-	Name         fieldDetail[string]
-	PodClusterID fieldDetail[int]
+	LearnedCloudTags fieldDetail[map[string]string]
+	CustomCloudTags  fieldDetail[map[string]string]
+	AZLcuuid         fieldDetail[string]
+	RegionLcuuid     fieldDetail[string]
+	Name             fieldDetail[string]
+	PodClusterID     fieldDetail[int]
 }
 type PodNamespaceUpdate struct {
 	Fields[PodNamespaceFieldsUpdate]

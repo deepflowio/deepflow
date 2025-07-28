@@ -412,7 +412,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) subdomain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			podNS.CloudTags, err = convertTagsToMap(cloudTag.Tags)
+			podNS.LearnedCloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -435,7 +435,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			chost.CloudTags, err = convertTagsToMap(cloudTag.Tags)
+			chost.LearnedCloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -453,7 +453,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource, orgDB *metadb.D
 					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			podNS.CloudTags, err = convertTagsToMap(cloudTag.Tags)
+			podNS.LearnedCloudTags, err = convertTagsToMap(cloudTag.Tags)
 			if err != nil {
 				return nil, err
 			}
@@ -738,13 +738,13 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 			if cloudMD.CHostCloudTags == nil {
 				cloudMD.CHostCloudTags = make(cloudmodel.UUIDToCloudTags)
 			}
-			cloudMD.CHostCloudTags[chost.Lcuuid] = chost.CloudTags
+			cloudMD.CHostCloudTags[chost.Lcuuid] = chost.LearnedCloudTags
 		}
 		for _, podNamespace := range toolDS.cloudTagPodNamespaces {
 			if cloudMD.PodNamespaceCloudTags == nil {
 				cloudMD.PodNamespaceCloudTags = make(cloudmodel.UUIDToCloudTags)
 			}
-			cloudMD.PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
+			cloudMD.PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.LearnedCloudTags
 		}
 		for _, podNamespace := range toolDS.subdomainPodNamespaces {
 			if cloudMD.SubDomainResources == nil {
@@ -755,7 +755,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 					PodNamespaceCloudTags: make(cloudmodel.UUIDToCloudTags),
 				}
 			}
-			cloudMD.SubDomainResources[podNamespace.SubDomain].PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
+			cloudMD.SubDomainResources[podNamespace.SubDomain].PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.LearnedCloudTags
 		}
 
 		for _, lb := range toolDS.additionalLBs {
