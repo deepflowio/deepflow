@@ -63,8 +63,8 @@ func NewChChostCloudTags() *ChChostCloudTags {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.CloudTags.IsDifferent() {
-		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
+	if fieldsUpdate.LearnedCloudTags.IsDifferent() {
+		bytes, err := json.Marshal(fieldsUpdate.LearnedCloudTags.GetNew())
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			return
@@ -89,10 +89,10 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKey, targets []mysqlmodel.ChChostCloudTags) {
-	if len(source.CloudTags) == 0 {
+	if len(source.LearnedCloudTags) == 0 {
 		return
 	}
-	bytes, err := json.Marshal(source.CloudTags)
+	bytes, err := json.Marshal(source.LearnedCloudTags)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 		return

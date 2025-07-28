@@ -31,19 +31,19 @@ func (b *DataSet) AddVM(dbItem *mysqlmodel.VM, seq int, toolDataSet *tool.DataSe
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
-		Name:          dbItem.Name,
-		Label:         dbItem.Label,
-		IP:            dbItem.IP,
-		Hostname:      dbItem.Hostname,
-		VPCLcuuid:     vpcLcuuid,
-		State:         dbItem.State,
-		HType:         dbItem.HType,
-		LaunchServer:  dbItem.LaunchServer,
-		HostID:        dbItem.HostID,
-		RegionLcuuid:  dbItem.Region,
-		AZLcuuid:      dbItem.AZ,
-		CloudTags:     dbItem.CloudTags,
-		NetworkLcuuid: networkLcuuid,
+		Name:             dbItem.Name,
+		Label:            dbItem.Label,
+		IP:               dbItem.IP,
+		Hostname:         dbItem.Hostname,
+		VPCLcuuid:        vpcLcuuid,
+		State:            dbItem.State,
+		HType:            dbItem.HType,
+		LaunchServer:     dbItem.LaunchServer,
+		HostID:           dbItem.HostID,
+		RegionLcuuid:     dbItem.Region,
+		AZLcuuid:         dbItem.AZ,
+		LearnedCloudTags: dbItem.LearnedCloudTags,
+		NetworkLcuuid:    networkLcuuid,
 	}
 	b.VMs[dbItem.Lcuuid] = newItem
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
@@ -56,19 +56,19 @@ func (b *DataSet) DeleteVM(lcuuid string) {
 
 type VM struct {
 	DiffBase
-	Name          string            `json:"name"`
-	Label         string            `json:"label"`
-	IP            string            `json:"ip"`
-	Hostname      string            `json:"hostname"`
-	State         int               `json:"state"`
-	HType         int               `json:"htype"`
-	LaunchServer  string            `json:"launch_server"`
-	HostID        int               `json:"host_id"`
-	VPCLcuuid     string            `json:"vpc_lcuuid"`
-	RegionLcuuid  string            `json:"region_lcuuid"`
-	AZLcuuid      string            `json:"az_lcuuid"`
-	CloudTags     map[string]string `json:"cloud_tags"`
-	NetworkLcuuid string            `json:"network_lcuuid"`
+	Name             string            `json:"name"`
+	Label            string            `json:"label"`
+	IP               string            `json:"ip"`
+	Hostname         string            `json:"hostname"`
+	State            int               `json:"state"`
+	HType            int               `json:"htype"`
+	LaunchServer     string            `json:"launch_server"`
+	HostID           int               `json:"host_id"`
+	VPCLcuuid        string            `json:"vpc_lcuuid"`
+	RegionLcuuid     string            `json:"region_lcuuid"`
+	AZLcuuid         string            `json:"az_lcuuid"`
+	LearnedCloudTags map[string]string `json:"learned_cloud_tags"`
+	NetworkLcuuid    string            `json:"network_lcuuid"`
 }
 
 func (v *VM) Update(cloudItem *cloudmodel.VM, toolDataSet *tool.DataSet) {
@@ -82,7 +82,7 @@ func (v *VM) Update(cloudItem *cloudmodel.VM, toolDataSet *tool.DataSet) {
 	v.VPCLcuuid = cloudItem.VPCLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.AZLcuuid = cloudItem.AZLcuuid
-	v.CloudTags = cloudItem.CloudTags
+	v.LearnedCloudTags = cloudItem.CloudTags
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	if cloudItem.LaunchServer != "" {
 		hostID, exists := toolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
