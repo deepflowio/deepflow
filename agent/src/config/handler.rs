@@ -40,9 +40,9 @@ use nix::{
     sched::{sched_setaffinity, CpuSet},
     unistd::Pid,
 };
-use sysinfo::SystemExt;
+use sysinfo::{System, SystemExt};
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use sysinfo::{CpuRefreshKind, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, RefreshKind};
 use tokio::runtime::Runtime;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2265,6 +2265,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 proxy_controller_port: conf.global.communication.proxy_controller_port,
             },
         };
+        let mut config = config;
+        config.auto_tune();
         Ok(config)
     }
 }
@@ -5506,6 +5508,45 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
+    }
+
+    pub fn auto_tune(&mut self) {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_cpu();
+        sys.refresh_memory();
+        let cpus = sys.cpus().len().max(1);
+        let mem_gb = (sys.total_memory() / (1024 * 1024 * 1024)).max(1);
+
+        if self.user_config.outputs.flow_log.tunning.sender_threads == 0 {
+            self.user_config.outputs.flow_log.tunning.sender_threads =
+                (cpus / 2).max(1);
+        }
+        if self.user_config.outputs.flow_metrics.tunning.sender_threads == 0 {
+            self.user_config.outputs.flow_metrics.tunning.sender_threads =
+                (cpus / 4).max(1);
+        }
+
+        let queue_base = 65536 * mem_gb as usize;
+        if self
+            .user_config
+            .processors
+            .flow_log
+            .tunning
+            .flow_generator_queue_size
+            == 0
+        {
+            self.user_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_generator_queue_size = queue_base;
+        }
+        if self.user_config.outputs.flow_log.tunning.collector_queue_size == 0 {
+            self.user_config.outputs.flow_log.tunning.collector_queue_size = queue_base;
+        }
+        if self.user_config.outputs.flow_metrics.tunning.sender_queue_size == 0 {
+            self.user_config.outputs.flow_metrics.tunning.sender_queue_size = queue_base;
+        }
     }
 }
 
