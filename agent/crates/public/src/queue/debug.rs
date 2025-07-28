@@ -17,8 +17,8 @@
 use std::{
     fmt::Debug,
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, AtomicUsize,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
     },
 };
 
