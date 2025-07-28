@@ -720,9 +720,11 @@ impl<T: Sendable> UniformSender<T> {
             ) {
                 Ok(_) => {
                     // guaranteed to be sent every 10 seconds
-                    if start_cached.elapsed() >= Duration::from_secs(10) {
+                    if start_cached.elapsed() >= Duration::from_secs(1000) {
                         start_cached = Instant::now();
                         self.cached = false;
+                        self.exception_handler.set(Exception::AnalyzerSocketError);
+                        info!("set analyzer socket error");
                     }
                     for send_item in batch.drain(..) {
                         if !self.running.load(Ordering::Relaxed) {
