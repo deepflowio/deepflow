@@ -986,6 +986,8 @@ dependencies = [
  "signal-hook",
  "socket2 0.4.9",
  "special_recv_engine",
+ "strum",
+ "strum_macros",
  "sysinfo",
  "tempfile",
  "thiserror",
@@ -3743,7 +3745,7 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.29",
+ "syn 2.0.32",
 ]
 
 [[package]]
