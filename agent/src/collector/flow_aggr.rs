@@ -43,7 +43,7 @@ use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use public::{
     buffer::BatchedBox,
     chrono_map::ChronoMap,
-    queue::{MultiDebugSender, Error, Receiver},
+    queue::{Error, MultiDebugSender, Receiver},
 };
 
 const TIMESTAMP_SLOT_COUNT: usize = SECONDS_IN_MINUTE as usize;
