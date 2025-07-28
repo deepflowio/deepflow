@@ -64,9 +64,9 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChChostCloudTag, 0)
 
-	if fieldsUpdate.CloudTags.IsDifferent() {
-		new := fieldsUpdate.CloudTags.GetNew()
-		old := fieldsUpdate.CloudTags.GetOld()
+	if fieldsUpdate.LearnedCloudTags.IsDifferent() {
+		new := fieldsUpdate.LearnedCloudTags.GetNew()
+		old := fieldsUpdate.LearnedCloudTags.GetOld()
 		for k, v := range new {
 			oldV, ok := old[k]
 			targetKey := NewIDKeyKey(sourceID, k)
@@ -116,7 +116,7 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKeyKey, targets []metadbmodel.ChChostCloudTag) {
-	for k, v := range source.CloudTags {
+	for k, v := range source.LearnedCloudTags {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, metadbmodel.ChChostCloudTag{
 			ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
