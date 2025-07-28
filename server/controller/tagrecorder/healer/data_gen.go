@@ -370,14 +370,14 @@ func idToUpdatedAt(resourceType, checkField string, data interface{}) map[int]ti
 	switch resourceType {
 	case common.RESOURCE_TYPE_VM_EN:
 		for _, item := range data.([]*metadbModel.VM) {
-			if len(item.CloudTags) == 0 {
+			if len(item.LearnedCloudTags) == 0 {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
 	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
 		for _, item := range data.([]*metadbModel.PodNamespace) {
-			if len(item.CloudTags) == 0 {
+			if len(item.LearnedCloudTags) == 0 {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()

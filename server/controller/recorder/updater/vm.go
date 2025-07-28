@@ -111,21 +111,21 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 		}
 	}
 	dbItem := &metadbmodel.VM{
-		Name:         cloudItem.Name,
-		Label:        cloudItem.Label,
-		IP:           cloudItem.IP,
-		Hostname:     cloudItem.Hostname,
-		UID:          cloudItem.Label,
-		State:        cloudItem.State,
-		HType:        cloudItem.HType,
-		LaunchServer: cloudItem.LaunchServer,
-		HostID:       hostID,
-		Domain:       m.metadata.Domain.Lcuuid,
-		Region:       cloudItem.RegionLcuuid,
-		AZ:           cloudItem.AZLcuuid,
-		VPCID:        vpcID,
-		CloudTags:    cloudTags,
-		NetworkID:    networkID,
+		Name:             cloudItem.Name,
+		Label:            cloudItem.Label,
+		IP:               cloudItem.IP,
+		Hostname:         cloudItem.Hostname,
+		UID:              cloudItem.Label,
+		State:            cloudItem.State,
+		HType:            cloudItem.HType,
+		LaunchServer:     cloudItem.LaunchServer,
+		HostID:           hostID,
+		Domain:           m.metadata.Domain.Lcuuid,
+		Region:           cloudItem.RegionLcuuid,
+		AZ:               cloudItem.AZLcuuid,
+		VPCID:            vpcID,
+		LearnedCloudTags: cloudTags,
+		NetworkID:        networkID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {
@@ -199,14 +199,14 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		mapInfo["az"] = cloudItem.AZLcuuid
 		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
-	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
+	if cloudcommon.DiffMap(diffBase.LearnedCloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
 		if cloudItem.CloudTags != nil {
 			updateTags = cloudItem.CloudTags
 		}
 		tagsJson, _ := json.Marshal(updateTags)
-		mapInfo["cloud_tags"] = tagsJson
-		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
+		mapInfo["learned_cloud_tags"] = tagsJson
+		structInfo.LearnedCloudTags.Set(diffBase.LearnedCloudTags, cloudItem.CloudTags)
 	}
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
 		networkID := 0
