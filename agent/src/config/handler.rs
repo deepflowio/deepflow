@@ -5527,6 +5527,11 @@ impl ModuleConfig {
         }
 
         let queue_base = 65536 * mem_gb as usize;
+        const MAX_QUEUE: usize = 64_000_000;
+        const FLOW_MIN: usize = 65_536;
+        const AGG_MIN: usize = 65_535;
+        const QUAD_MIN: usize = 262_144;
+
         if self
             .user_config
             .processors
@@ -5539,13 +5544,43 @@ impl ModuleConfig {
                 .processors
                 .flow_log
                 .tunning
-                .flow_generator_queue_size = queue_base;
+                .flow_generator_queue_size = queue_base.clamp(FLOW_MIN, MAX_QUEUE);
+        }
+        if self
+            .user_config
+            .processors
+            .flow_log
+            .tunning
+            .flow_aggregator_queue_size
+            == 0
+        {
+            self.user_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size = queue_base.clamp(AGG_MIN, MAX_QUEUE);
+        }
+        if self
+            .user_config
+            .processors
+            .flow_log
+            .tunning
+            .quadruple_generator_queue_size
+            == 0
+        {
+            self.user_config
+                .processors
+                .flow_log
+                .tunning
+                .quadruple_generator_queue_size = queue_base.clamp(QUAD_MIN, MAX_QUEUE);
         }
         if self.user_config.outputs.flow_log.tunning.collector_queue_size == 0 {
-            self.user_config.outputs.flow_log.tunning.collector_queue_size = queue_base;
+            self.user_config.outputs.flow_log.tunning.collector_queue_size =
+                queue_base.clamp(FLOW_MIN, MAX_QUEUE);
         }
         if self.user_config.outputs.flow_metrics.tunning.sender_queue_size == 0 {
-            self.user_config.outputs.flow_metrics.tunning.sender_queue_size = queue_base;
+            self.user_config.outputs.flow_metrics.tunning.sender_queue_size =
+                queue_base.clamp(FLOW_MIN, MAX_QUEUE);
         }
     }
 }

@@ -34,6 +34,7 @@ use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,
 };
+use serde_yaml::Value as YamlValue;
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
@@ -855,6 +856,7 @@ pub struct CbpfTunning {
     pub dispatcher_queue_enabled: bool,
     pub max_capture_packet_size: u32,
     pub raw_packet_buffer_block_size: usize,
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub raw_packet_queue_size: usize,
     pub max_capture_pps: u64,
 }
@@ -1129,6 +1131,7 @@ pub struct EbpfProfile {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfTunning {
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub collector_queue_size: usize,
     pub userspace_worker_threads: i32,
     pub perf_pages_count: u32,
@@ -1496,10 +1499,43 @@ where
     ));
 }
 
+fn parse_usize_or_auto<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let val = YamlValue::deserialize(deserializer)?;
+    match val {
+        YamlValue::Number(n) => n
+            .as_u64()
+            .map(|v| v as usize)
+            .ok_or_else(|| de::Error::invalid_value(Unexpected::Other("number"), &"unsigned integer or 'auto'")),
+        YamlValue::String(s) => {
+            if s.eq_ignore_ascii_case("auto") {
+                Ok(0)
+            } else {
+                s.parse::<usize>().map_err(|_| {
+                    de::Error::invalid_value(Unexpected::Str(&s), &"unsigned integer or 'auto'")
+                })
+            }
+        }
+        other => Err(de::Error::invalid_type(
+            match other {
+                YamlValue::Null => Unexpected::Unit,
+                YamlValue::Bool(b) => Unexpected::Bool(b),
+                YamlValue::Sequence(_) => Unexpected::Seq,
+                YamlValue::Mapping(_) => Unexpected::Map,
+                _ => Unexpected::Other("value"),
+            },
+            &"unsigned integer or 'auto'",
+        )),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TcpHeader {
     pub block_size: usize,
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub sender_queue_size: usize,
     #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub header_fields_flag: u8,
@@ -1518,6 +1554,7 @@ impl Default for TcpHeader {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PcapStream {
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub receiver_queue_size: usize,
     pub buffer_size_per_flow: u32,
     pub total_buffer_size: u64,
@@ -1539,6 +1576,7 @@ impl Default for PcapStream {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Toa {
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub sender_queue_size: usize,
     pub cache_size: usize,
 }
@@ -2302,8 +2340,11 @@ pub struct ProcessorsFlowLogTunning {
     pub concurrent_flow_limit: u32,
     pub memory_pool_size: usize,
     pub max_batched_buffer_size: usize,
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub flow_aggregator_queue_size: usize,
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub flow_generator_queue_size: usize,
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub quadruple_generator_queue_size: usize,
 }
 
@@ -2853,6 +2894,7 @@ impl Default for Throttles {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct OutputsFlowLogTunning {
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub collector_queue_size: usize,
     pub sender_threads: usize,
 }
@@ -2902,6 +2944,7 @@ impl Default for FlowMetricsFilters {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct FlowMetricsTunning {
+    #[serde(deserialize_with = "parse_usize_or_auto")]
     pub sender_queue_size: usize,
     pub sender_threads: usize,
 }
