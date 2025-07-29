@@ -624,7 +624,7 @@ fn get_container_id(proc: &Process) -> Option<String> {
         } else {
             for c in i.controllers {
                 match c.as_str() {
-                    "pids" | "cpuset" | "devices" | "memory" | "cpu" => {
+                    "pids" | "cpuset" | "devices" | "memory" | "cpu" | "" => {
                         path = i.pathname;
                         break 'l;
                     }
