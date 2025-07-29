@@ -97,6 +97,6 @@ func getModels() []interface{} {
 	}
 }
 
-func clearDBData[MT constraint.MySQLModel](db *gorm.DB) {
+func clearDBData[MT constraint.MetadbModel](db *gorm.DB) {
 	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(new(MT))
 }

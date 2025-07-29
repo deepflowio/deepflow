@@ -54,7 +54,7 @@ func (c *ConfigMap) OnResourceBatchAdded(md *message.Metadata, msg interface{}) 
 				[]string{item.Name}),
 		}
 
-		c.enqueueIfInsertIntoMySQLFailed(
+		c.enqueueIfInsertIntoMetadbFailed(
 			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
 		)
 	}
@@ -65,7 +65,7 @@ func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	if !fields.Data.IsDifferent() {
 		return
 	}
-	item := msg.(*message.ConfigMapUpdate).GetNewMySQLItem().(*metadbModel.ConfigMap)
+	item := msg.(*message.ConfigMapUpdate).GetNewMetadbItem().(*metadbModel.ConfigMap)
 
 	diff := CompareConfig(fields.Data.GetOld(), fields.Data.GetNew(), int(c.cfg.ConfigDiffContext))
 
@@ -79,7 +79,7 @@ func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 			[]string{item.Name, item.Data, diff}),
 	}
 
-	c.enqueueIfInsertIntoMySQLFailed(
+	c.enqueueIfInsertIntoMetadbFailed(
 		md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP, opts...,
 	)
 }
@@ -95,7 +95,7 @@ func (c *ConfigMap) OnResourceBatchDeleted(md *message.Metadata, msg interface{}
 				[]string{eventapi.AttributeNameConfigName},
 				[]string{item.Name}),
 		}
-		c.enqueueIfInsertIntoMySQLFailed(
+		c.enqueueIfInsertIntoMetadbFailed(
 			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
 		)
 	}

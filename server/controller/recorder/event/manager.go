@@ -96,7 +96,7 @@ func (e *ManagerComponent) enqueue(md *message.Metadata, resourceLcuuid string, 
 	}
 }
 
-func (e *ManagerComponent) enqueueInstanceIfInsertIntoMySQLFailed(
+func (e *ManagerComponent) enqueueInstanceIfInsertIntoMetadbFailed(
 	md *message.Metadata,
 	resourceLcuuid, domainLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
 ) {
@@ -106,7 +106,7 @@ func (e *ManagerComponent) enqueueInstanceIfInsertIntoMySQLFailed(
 		eventapi.TagInstanceID(uint32(instanceID)),
 		eventapi.TagInstanceName(instanceName))
 
-	e.enqueueIfInsertIntoMySQLFailed(md, resourceLcuuid, domainLcuuid, eventType, options...)
+	e.enqueueIfInsertIntoMetadbFailed(md, resourceLcuuid, domainLcuuid, eventType, options...)
 }
 
 // Due to the fixed sequence of resource learning, some data required by resource change events can only be obtained after the completion of subsequent resource learning.
@@ -115,12 +115,12 @@ func (e *ManagerComponent) enqueueInstanceIfInsertIntoMySQLFailed(
 // - PodNode's/POD's create event, PodNode's/POD's add-ip event, fill in the L3Device information and HostID as required
 // - POD's recreate event, requires real-time IPs information
 // - ConfigMap's create event, ConfigMap's update event, ConfigMap's delete event, requires real-time PodGroup-ConfigMap connection information
-// If the event is not stored in MySQL, it will be directly enqueued.
-func (e *ManagerComponent) enqueueIfInsertIntoMySQLFailed(
+// If the event is not stored in Metadb, it will be directly enqueued.
+func (e *ManagerComponent) enqueueIfInsertIntoMetadbFailed(
 	md *message.Metadata,
 	resourceLcuuid, domainLcuuid, eventType string, options ...eventapi.TagFieldOption,
 ) {
-	// use struct to create ResourceEvent instance if it will be stored in MySQL
+	// use struct to create ResourceEvent instance if it will be stored in Metadb
 	event := &eventapi.ResourceEvent{}
 	e.fillEvent(md, event, eventType, options...)
 	content, err := json.Marshal(event)

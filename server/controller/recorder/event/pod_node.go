@@ -74,7 +74,7 @@ func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 				opts...,
 			)
 		} else {
-			p.enqueueInstanceIfInsertIntoMySQLFailed(
+			p.enqueueInstanceIfInsertIntoMetadbFailed(
 				md,
 				item.Lcuuid,
 				domainLcuuid,

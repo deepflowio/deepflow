@@ -85,12 +85,12 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	isMasterController := IsMasterController(cfg)
 	if isMasterController {
-		router.SetInitStageForHealthChecker(router.StageMySQLMigration)
-		migrateMySQL(cfg)
+		router.SetInitStageForHealthChecker(router.StageMetadbMigration)
+		migrateMetadb(cfg)
 	}
 
-	router.SetInitStageForHealthChecker("MySQL init")
-	// 初始化MySQL
+	router.SetInitStageForHealthChecker("Metadb init")
+	// 初始化 Metadb
 	if err := metadb.GetDBs().Init(cfg.MetadbCfg); err != nil {
 		log.Errorf("init metadb failed: %s", err.Error())
 		time.Sleep(time.Second)

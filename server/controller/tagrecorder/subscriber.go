@@ -36,7 +36,7 @@ import (
 
 const hookerDeletePage = 0
 
-type deletePageHooker[MT constraint.MySQLModel, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
+type deletePageHooker[MT constraint.MetadbModel, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
 	beforeDeletePage([]*MT, MDPT) []*MT
 }
 
@@ -178,7 +178,7 @@ type SubscriberDataGenerator[
 	MUT msgconstraint.FieldsUpdate,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MySQLModel,
+	MT constraint.MetadbModel,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] interface {
@@ -194,7 +194,7 @@ type SubscriberComponent[
 	MUT msgconstraint.FieldsUpdate,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MySQLModel,
+	MT constraint.MetadbModel,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] struct {
@@ -215,7 +215,7 @@ func newSubscriberComponent[
 	MUT msgconstraint.FieldsUpdate,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MySQLModel,
+	MT constraint.MetadbModel,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ](
@@ -268,7 +268,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
-	dbItems := m.GetMySQLItems().([]*MT)
+	dbItems := m.GetMetadbItems().([]*MT)
 	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
@@ -314,7 +314,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updat
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	m := msg.(MDPT)
-	items := m.GetMySQLItems().([]*MT)
+	items := m.GetMetadbItems().([]*MT)
 	newItems := items
 	if hasHooker, ok := s.hookers[hookerDeletePage]; ok {
 		if hooker, ok := hasHooker.(deletePageHooker[MT, MDT, MDPT]); ok {

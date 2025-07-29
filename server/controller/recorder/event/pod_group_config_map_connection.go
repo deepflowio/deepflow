@@ -53,7 +53,7 @@ func (p *PodGroupConfigMapConnection) OnResourceBatchAdded(md *message.Metadata,
 				[]string{configMapName}),
 		}
 
-		p.enqueueIfInsertIntoMySQLFailed(
+		p.enqueueIfInsertIntoMetadbFailed(
 			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP, opts...,
 		)
 	}
@@ -73,7 +73,7 @@ func (p *PodGroupConfigMapConnection) OnResourceBatchDeleted(md *message.Metadat
 				[]string{configMapName}),
 		}
 
-		p.enqueueIfInsertIntoMySQLFailed(
+		p.enqueueIfInsertIntoMetadbFailed(
 			md, item.Lcuuid, item.Domain, eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP, opts...,
 		)
 	}
