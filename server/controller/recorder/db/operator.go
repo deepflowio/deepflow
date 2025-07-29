@@ -29,7 +29,7 @@ import (
 
 var log = logger.MustGetLogger("recorder.db")
 
-type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interface {
+type Operator[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] interface {
 	// 批量插入数据
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
@@ -40,7 +40,7 @@ type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interf
 	GetSoftDelete() bool
 }
 
-type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] struct {
+type OperatorBase[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] struct {
 	metadata *rcommon.Metadata
 
 	resourceTypeName        string
@@ -52,7 +52,7 @@ type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] st
 	toLoggable bool
 }
 
-func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
+func newOperatorBase[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
 	return OperatorBase[MPT, MT]{
 		resourceTypeName: resourceTypeName,
 		softDelete:       softDelete,

@@ -84,7 +84,7 @@ func (v *VM) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMsg := msg.(*message.VMUpdate)
-	dbItemNew := updateMsg.GetNewMySQLItem().(*metadbmodel.VM)
+	dbItemNew := updateMsg.GetNewMetadbItem().(*metadbmodel.VM)
 	updatedFields := updateMsg.GetFields().(*message.VMFieldsUpdate)
 	id := updatedFields.GetID()
 

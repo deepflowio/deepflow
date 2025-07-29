@@ -23,8 +23,8 @@ import (
 type AddPtr[T Add] interface {
 	*T
 
-	SetMySQLItems(interface{})
-	GetMySQLItems() interface{} // return []*constraint.MySQLModel
+	SetMetadbItems(interface{})
+	GetMetadbItems() interface{} // return []*constraint.MetadbModel
 	SetAddition(interface{})
 	GetAddition() interface{} // return *message.Addition
 }
@@ -51,8 +51,8 @@ type UpdatePtr[T Update] interface {
 	GetDiffBase() interface{} // return *constraint.DiffBase
 	SetCloudItem(interface{})
 	GetCloudItem() interface{} // return *constraint.CloudModel
-	SetNewMySQLItem(interface{})
-	GetNewMySQLItem() interface{} // return *constraint.MySQLModel
+	SetNewMetadbItem(interface{})
+	GetNewMetadbItem() interface{} // return *constraint.MetadbModel
 }
 
 // Update是所有资源更新消息的泛型约束
@@ -98,8 +98,8 @@ type DeletePtr[T Delete] interface {
 
 	SetLcuuids([]string)
 	GetLcuuids() []string
-	SetMySQLItems(interface{})
-	GetMySQLItems() interface{} // return []*constraint.MySQLModel
+	SetMetadbItems(interface{})
+	GetMetadbItems() interface{} // return []*constraint.MetadbModel
 	SetAddition(interface{})
 	GetAddition() interface{} // return *constraint.Addition
 }

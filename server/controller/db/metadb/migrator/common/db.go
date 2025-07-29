@@ -65,7 +65,7 @@ func GetSessionWithoutName(cfg config.Config) (*gorm.DB, error) {
 }
 
 func GetSessionWithName(cfg config.Config) (*gorm.DB, error) {
-	// set multiStatements=true in dsn only when migrating MySQL
+	// set multiStatements=true in dsn only when migrating Metadb
 	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
 	if err != nil {
 		return nil, err

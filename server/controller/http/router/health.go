@@ -32,7 +32,7 @@ var log = logger.MustGetLogger("router")
 const (
 	OK = "ok"
 
-	StageMySQLMigration = "MySQL migration"
+	StageMetadbMigration = "Metadb migration"
 )
 
 var curStage string
@@ -52,8 +52,8 @@ func (s *Health) RegisterTo(e *gin.Engine) {
 			curStageCost := time.Since(curStageStartedAt)
 			msg := fmt.Sprintf("server is in stage: %s now, time cost: %v", curStage, curStageCost)
 			log.Errorf(msg)
-			if curStage == StageMySQLMigration && curStageCost > 30*time.Second {
-				log.Warningf("MySQL migration is taking too long, please add initialDelaySeconds of server to wait for migration to complete")
+			if curStage == StageMetadbMigration && curStageCost > 30*time.Second {
+				log.Warningf("Metadb migration is taking too long, please add initialDelaySeconds of server to wait for migration to complete")
 			}
 			response.JSON(
 				c,

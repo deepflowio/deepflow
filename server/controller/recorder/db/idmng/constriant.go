@@ -20,8 +20,8 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// 资源的MySQL orm对象
-type MySQLModel interface {
+// 资源的 Metadb orm对象
+type MetadbModel interface {
 	metadbmodel.Region | metadbmodel.AZ | metadbmodel.SubDomain | metadbmodel.Host | metadbmodel.VM |
 		metadbmodel.VPC | metadbmodel.Network | metadbmodel.VRouter |
 		metadbmodel.DHCPPort |
