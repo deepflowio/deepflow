@@ -78,7 +78,7 @@ func (p *PodService) OnResourceBatchAdded(md *message.Metadata, msg interface{})
 
 func (c *PodService) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMsg := msg.(*message.PodServiceUpdate)
-	dbItem := updateMsg.GetNewMySQLItem().(*metadbmodel.PodService)
+	dbItem := updateMsg.GetNewMetadbItem().(*metadbmodel.PodService)
 	fields := updateMsg.GetFields().(*message.PodServiceFieldsUpdate)
 	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
 		return

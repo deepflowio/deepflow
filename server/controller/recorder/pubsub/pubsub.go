@@ -84,11 +84,11 @@ func (p *AnyChangePubSubComponent) PublishChange(md *message.Metadata) {
 const (
 	TopicPlatformResourceChanged     = iota // subscribe to this topic to get notification of resource changed
 	TopicResourceBatchAddedMessage          // subscribe to this topic to get message add model data of resource batch added
-	TopicResourceBatchAddedMySQL            // subscribe to this topic to get MySQL model data of resource batch added
+	TopicResourceBatchAddedMetadb           // subscribe to this topic to get Metadb model data of resource batch added
 	TopicResourceUpdatedFields              // subscribe to this topic to get message update model data of resource updated
 	TopicResourceUpdatedMessage             // subscribe to this topic to get message update model data of resource updated
 	TopicResourceBatchDeletedLcuuid         // subscribe to this topic to get lcuuids of resource batch deleted
-	TopicResourceBatchDeletedMySQL          // subscribe to this topic to get MySQL model data of resource batch deleted
+	TopicResourceBatchDeletedMetadb         // subscribe to this topic to get Metadb model data of resource batch deleted
 	TopicResourceBatchDeletedMessage        // subscribe to this topic to get message delete model data of resource batch deleted
 )
 
@@ -132,9 +132,9 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 	// TODO better log
 	log.Debugf("publish add %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
-		if topic == TopicResourceBatchAddedMySQL {
+		if topic == TopicResourceBatchAddedMetadb {
 			for _, sub := range subs {
-				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
+				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMetadbItems())
 			}
 		}
 		if topic == TopicResourceBatchAddedMessage {
@@ -169,9 +169,9 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids())
 			}
 		}
-		if topic == TopicResourceBatchDeletedMySQL {
+		if topic == TopicResourceBatchDeletedMetadb {
 			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMetadbItems())
 			}
 		}
 		if topic == TopicResourceBatchDeletedMessage {

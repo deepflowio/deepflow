@@ -95,7 +95,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 				opts...,
 			)
 		} else {
-			p.enqueueInstanceIfInsertIntoMySQLFailed(
+			p.enqueueInstanceIfInsertIntoMetadbFailed(
 				md,
 				item.Lcuuid,
 				domainLcuuid,
@@ -111,7 +111,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMsg := msg.(*message.PodUpdate)
-	dbItemNew := updateMsg.GetNewMySQLItem().(*metadbmodel.Pod)
+	dbItemNew := updateMsg.GetNewMetadbItem().(*metadbmodel.Pod)
 	updatedFields := updateMsg.GetFields().(*message.PodFieldsUpdate)
 
 	var eType string
@@ -147,7 +147,7 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		opts = append(opts, eventapi.TagIP(ips[0]))
 	}
 
-	p.enqueueInstanceIfInsertIntoMySQLFailed(
+	p.enqueueInstanceIfInsertIntoMetadbFailed(
 		md,
 		updatedFields.GetLcuuid(),
 		dbItemNew.Domain,

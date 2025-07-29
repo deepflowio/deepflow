@@ -379,7 +379,7 @@ func (i *IPTool) getDeviceNameFromAllByID(md *message.Metadata, deviceType, devi
 	return ""
 }
 
-func findFromAllByID[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, id int) *MT {
+func findFromAllByID[MT constraint.MetadbSoftDeleteModel](db *metadb.DB, id int) *MT {
 	var item *MT
 	res := db.Unscoped().Where("id = ?", id).Find(&item)
 	if res.Error != nil {
