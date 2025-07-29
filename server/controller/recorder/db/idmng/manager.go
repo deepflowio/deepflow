@@ -129,12 +129,12 @@ type IDPoolUpdater interface {
 	recycle(ids []int)
 }
 
-type idGetter[MT MySQLModel] interface {
+type idGetter[MT MetadbModel] interface {
 	getRealID(*MT) int
 }
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
-type IDPool[MT MySQLModel] struct {
+type IDPool[MT MetadbModel] struct {
 	mutex    sync.RWMutex
 	keyField string
 	AscIDAllocator
@@ -142,7 +142,7 @@ type IDPool[MT MySQLModel] struct {
 	idGetter idGetter[MT]
 }
 
-func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
+func newIDPool[MT MetadbModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
 	p := &IDPool[MT]{
 		keyField:       "id",
 		AscIDAllocator: NewAscIDAllocator(org, resourceType, minID, max),

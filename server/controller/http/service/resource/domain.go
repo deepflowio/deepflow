@@ -1048,7 +1048,7 @@ func DeleteSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func forceDelete[MT constraint.MySQLSoftDeleteModel](db *metadb.DB, query interface{}, args ...interface{}) { // TODO common func
+func forceDelete[MT constraint.MetadbSoftDeleteModel](db *metadb.DB, query interface{}, args ...interface{}) { // TODO common func
 	err := db.Unscoped().Where(query, args...).Delete(new(MT)).Error
 	if err != nil {
 		log.Errorf("metadb delete resource: %v %v failed: %s", query, args, err, db.LogPrefixORGID)

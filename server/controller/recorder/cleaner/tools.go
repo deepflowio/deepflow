@@ -39,7 +39,7 @@ func WhereFindPtr[T any](db *metadb.DB, query interface{}, args ...interface{}) 
 	return result, err
 }
 
-func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, items []*MT) string {
+func formatLogDeleteABecauseBHasGone[MT constraint.MetadbModel](a, b string, items []*MT) string {
 	var str string
 	for _, item := range items {
 		str += fmt.Sprintf("%+v ", item)
@@ -47,7 +47,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func getIDs[MT constraint.MySQLModel](db *metadb.DB, domainLcuuid string) (ids []int) {
+func getIDs[MT constraint.MetadbModel](db *metadb.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
@@ -56,7 +56,7 @@ func getIDs[MT constraint.MySQLModel](db *metadb.DB, domainLcuuid string) (ids [
 	return
 }
 
-func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](
+func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MetadbSoftDeleteModel](
 	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
@@ -85,7 +85,7 @@ func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConst
 	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
 }
 
-func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
+func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MetadbSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
 	msgMetadataToDBItems := make(map[*message.Metadata][]*MT)
 	for _, item := range dbItems {
 		var msgMetadata *message.Metadata
@@ -107,7 +107,7 @@ func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Del
 	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) { // TODO use pubsub
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
 			msgData := MDPT(new(MDT))
-			msgData.SetMySQLItems(dbItems)
+			msgData.SetMetadbItems(dbItems)
 			if resourceType == ctrlCommon.RESOURCE_TYPE_PROCESS_EN {
 				msgData.SetAddition(getProcessMessageDeleteAddition(db, dbItems, resourceType, toolData)) // TODO optimize
 				log.Infof("process delete addition: %s", msgData.GetAddition(), db.LogPrefixORGID)

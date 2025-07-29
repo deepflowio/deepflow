@@ -52,7 +52,7 @@ type StatsdBuilder interface {
 	BuildStatsd(statsd.Statsd) ResourceUpdater
 }
 
-type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
+type DataGenerator[CT constraint.CloudModel, MT constraint.MetadbModel, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
 	// 根据 cloud 数据获取对应的 diff base 数据
 	getDiffBaseByCloudItem(*CT) (BT, bool)
 	// 生成插入 DB 所需的数据
@@ -66,19 +66,19 @@ const (
 	hookerAfterDBDeletePage
 )
 
-type addPageHooker[MT constraint.MySQLModel, MAAT message.AddAddition] interface {
+type addPageHooker[MT constraint.MetadbModel, MAAT message.AddAddition] interface {
 	beforeAddPage([]*MT) ([]*MT, *MAAT, bool)
 }
 
-type deletePageHooker[MT constraint.MySQLModel, MDAT message.DeleteAddition] interface {
+type deletePageHooker[MT constraint.MetadbModel, MDAT message.DeleteAddition] interface {
 	afterDeletePage([]*MT) (*MDAT, bool)
 }
 
 type UpdaterBase[
 	CT constraint.CloudModel,
 	BT constraint.DiffBase,
-	MPT constraint.MySQLModelPtr[MT],
-	MT constraint.MySQLModel,
+	MPT constraint.MetadbModelPtr[MT],
+	MT constraint.MetadbModel,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MAAT message.AddAddition,
@@ -119,8 +119,8 @@ type UpdaterBase[
 func newUpdaterBase[
 	CT constraint.CloudModel,
 	BT constraint.DiffBase,
-	MPT constraint.MySQLModelPtr[MT],
-	MT constraint.MySQLModel,
+	MPT constraint.MetadbModelPtr[MT],
+	MT constraint.MetadbModel,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MAAT message.AddAddition,
@@ -262,7 +262,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		u.notifyOnAdded(dbItems)
 
 		msgData := MAPT(new(MAT))
-		msgData.SetMySQLItems(dbItems)
+		msgData.SetMetadbItems(dbItems)
 		msgData.SetAddition(addition)
 		u.pubsub.PublishBatchAdded(u.msgMetadata, msgData)
 		u.Changed = true
@@ -279,7 +279,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		msgData.SetFields(structInfo)
 		msgData.SetDiffBase(diffBase)
 		msgData.SetCloudItem(cloudItem)
-		msgData.SetNewMySQLItem(dbItem)
+		msgData.SetNewMetadbItem(dbItem)
 		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
 		u.Changed = true
 	}
@@ -316,7 +316,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		}
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
-		msgData.SetMySQLItems(dbItems)
+		msgData.SetMetadbItems(dbItems)
 		msgData.SetAddition(addition)
 		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData)
 		u.Changed = true

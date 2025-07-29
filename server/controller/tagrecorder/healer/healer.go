@@ -248,7 +248,7 @@ type Healer interface {
 }
 
 func newHealer[
-	MT constraint.MySQLModel,
+	MT constraint.MetadbModel,
 	CT tagrecorder.SubscriberMetaDBChModel,
 	MAPT msgConstraint.AddPtr[MAT],
 	MAT msgConstraint.Add,
@@ -262,7 +262,7 @@ func newHealer[
 }
 
 type healerComponent[
-	MT constraint.MySQLModel,
+	MT constraint.MetadbModel,
 	CT tagrecorder.SubscriberMetaDBChModel,
 	MAPT msgConstraint.AddPtr[MAT],
 	MAT msgConstraint.Add,
@@ -338,7 +338,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	}
 
 	msgData := MAPT(new(MAT))
-	msgData.SetMySQLItems(dbItems)
+	msgData.SetMetadbItems(dbItems)
 	targetSubscriber.OnResourceBatchAdded(h.msgMetadata, msgData)
 	return nil
 }

@@ -63,7 +63,7 @@ func IsMasterController(cfg *config.ControllerConfig) bool {
 }
 
 // migrate db by master region master controller
-func migrateMySQL(cfg *config.ControllerConfig) {
+func migrateMetadb(cfg *config.ControllerConfig) {
 	err := migrator.Migrate(cfg.MetadbCfg)
 	if err != nil {
 		log.Errorf("migrate metadb failed: %s", err.Error())
@@ -121,7 +121,7 @@ func checkAndStartMasterFunctions(
 
 				sCtx, sCancel = context.WithCancel(ctx)
 
-				migrateMySQL(cfg)
+				migrateMetadb(cfg)
 
 				// 启动资源ID管理器
 				err := recorderResource.IDManagers.Start(sCtx)

@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
-type MySQLModelPtr[T MySQLModel] interface {
+type MetadbModelPtr[T MetadbModel] interface {
 	*T
 
 	GetLcuuid() string
@@ -36,8 +36,8 @@ type MySQLModelPtr[T MySQLModel] interface {
 	GetUpdatedAt() time.Time
 }
 
-// 资源的MySQL orm对象
-type MySQLModel interface {
+// 资源的 Metadb orm对象
+type MetadbModel interface {
 	metadbmodel.Region | metadbmodel.AZ | metadbmodel.SubDomain | metadbmodel.Host | metadbmodel.VM |
 		metadbmodel.VPC | metadbmodel.Network | metadbmodel.Subnet | metadbmodel.VRouter | metadbmodel.RoutingTable |
 		metadbmodel.DHCPPort | metadbmodel.VInterface | metadbmodel.WANIP | metadbmodel.LANIP | metadbmodel.FloatingIP |
@@ -85,8 +85,8 @@ type DiffBase interface {
 	GetLcuuid() string
 }
 
-// 软删除资源的MySQL orm对象
-type MySQLSoftDeleteModel interface {
+// 软删除资源的 Metadb orm对象
+type MetadbSoftDeleteModel interface {
 	metadbmodel.Region | metadbmodel.AZ | metadbmodel.Host | metadbmodel.VM | metadbmodel.VPC | metadbmodel.Network |
 		metadbmodel.VRouter | metadbmodel.DHCPPort | metadbmodel.NATGateway |
 		metadbmodel.LB | metadbmodel.LBListener | metadbmodel.CEN | metadbmodel.PeerConnection | metadbmodel.RDSInstance |

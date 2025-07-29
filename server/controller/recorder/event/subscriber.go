@@ -144,8 +144,8 @@ func newCUDSubscriberComponent(
 	}
 	s.subTopics = append(
 		s.subTopics,
-		pubsub.TopicResourceBatchAddedMySQL,
-		pubsub.TopicResourceBatchDeletedMySQL,
+		pubsub.TopicResourceBatchAddedMetadb,
+		pubsub.TopicResourceBatchDeletedMetadb,
 	)
 	return s
 }

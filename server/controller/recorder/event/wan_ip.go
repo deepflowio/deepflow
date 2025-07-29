@@ -108,7 +108,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueInstanceIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMetadbFailed(
 						md,
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
@@ -130,7 +130,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
-					i.enqueueInstanceIfInsertIntoMySQLFailed(
+					i.enqueueInstanceIfInsertIntoMetadbFailed(
 						md,
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
