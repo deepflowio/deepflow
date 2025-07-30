@@ -109,30 +109,14 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 				filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
 			}
 			return
-		} else if strings.HasPrefix(resourceNoID, "k8s.label.") {
-			podIDSuffix := "pod_id" + suffix
-			serviceIDSuffix := "service_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.label.")
-			filter = fmt.Sprintf("((toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s')) OR (toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoID, "k8s.annotation.") {
-			podIDSuffix := "pod_id" + suffix
-			serviceIDSuffix := "service_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.annotation.")
-			filter = fmt.Sprintf("((toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoID, "k8s.env.") {
-			podIDSuffix := "pod_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoID, "k8s.env.")
-			filter = fmt.Sprintf("toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')", podIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoID, "cloud.tag.") {
-			deviceIDSuffix := "l3_device_id" + suffix
-			deviceTypeSuffix := "l3_device_type" + suffix
-			podNSIDSuffix := "pod_ns_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoID, "cloud.tag.")
-			filter = fmt.Sprintf("((toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND %s=1) OR (toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))", deviceIDSuffix, tagNoPreffix, deviceTypeSuffix, podNSIDSuffix, tagNoPreffix)
-		} else if strings.HasPrefix(resourceNoID, "os.app.") {
-			processIDSuffix := "gprocess_id" + suffix
-			tagNoPreffix := strings.TrimPrefix(resourceNoID, "os.app.")
-			filter = fmt.Sprintf("toUInt64(%s) GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
+		} else if nameNoPreffix, _, transKey := common.TransMapItem(resource, table); transKey != "" {
+			// map item tag
+			tagItem, _ := tag.GetTag(transKey, db, table, "default")
+			if strings.HasPrefix(resource, "os.app.") || strings.HasPrefix(resource, "k8s.env.") {
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, "!=", "''")
+			} else {
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, "!=", "''")
+			}
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoID]; ok {
 			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
 		} else if common.IsValueInSliceString(resourceNoID, tag.TAG_RESOURCE_TYPE_DEFAULT) ||
@@ -180,38 +164,60 @@ type WhereTag struct {
 
 // k8s.label, k8s.annotation, cloud.tag
 func TransLabelFilter(translator, regexpTranslator, key, op, value string) (filter string) {
-	switch strings.ToLower(op) {
-	case "match":
-		filter = fmt.Sprintf(regexpTranslator, op, value, key, op, value, key)
-	case "not match":
-		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key, "match", value, key) + ")"
-	case "not ilike":
-		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key, "ilike", value, key) + ")"
-	case "not in":
-		filter = "not(" + fmt.Sprintf(translator, "in", value, key, "in", value, key) + ")"
-	case "!=":
-		filter = "not(" + fmt.Sprintf(translator, "=", value, key, "=", value, key) + ")"
-	default:
-		filter = fmt.Sprintf(translator, op, value, key, op, value, key)
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	positiveOperator, positiveOK := chCommon.PositiveOperatorMap[opLower]
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		if value == "''" {
+			// trans to exist
+			filter = fmt.Sprintf(trans, op, value, key, op, value, key)
+		} else {
+			filter = "not(" + fmt.Sprintf(trans, inverseOperator, value, key, inverseOperator, value, key) + ")"
+		}
+	} else if positiveOK {
+		if value == "''" {
+			// trans to not exist
+			filter = "not(" + fmt.Sprintf(trans, positiveOperator, value, key, positiveOperator, value, key) + ")"
+		} else {
+			filter = fmt.Sprintf(trans, op, value, key, op, value, key)
+		}
+	} else {
+		filter = fmt.Sprintf(trans, op, value, key, op, value, key)
 	}
 	return
 }
 
 // k8s.env, os.app
 func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter string) {
-	switch strings.ToLower(op) {
-	case "match":
-		filter = fmt.Sprintf(regexpTranslator, op, value, key)
-	case "not match":
-		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key) + ")"
-	case "not ilike":
-		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key) + ")"
-	case "not in":
-		filter = "not(" + fmt.Sprintf(translator, "in", value, key) + ")"
-	case "!=":
-		filter = "not(" + fmt.Sprintf(translator, "=", value, key) + ")"
-	default:
-		filter = fmt.Sprintf(translator, op, value, key)
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	positiveOperator, positiveOK := chCommon.PositiveOperatorMap[opLower]
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		if value == "''" {
+			// trans to exist
+			filter = fmt.Sprintf(trans, op, value, key)
+		} else {
+			filter = "not(" + fmt.Sprintf(trans, inverseOperator, value, key) + ")"
+		}
+	} else if positiveOK {
+		if value == "''" {
+			// trans to not exist
+			filter = "not(" + fmt.Sprintf(trans, positiveOperator, value, key) + ")"
+		} else {
+			filter = fmt.Sprintf(trans, op, value, key)
+		}
+	} else {
+		filter = fmt.Sprintf(trans, op, value, key)
 	}
 	return
 }
@@ -220,37 +226,33 @@ func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter
 // natgw, lb, host, host_hostname, host_ip, pod_node, pod_node_hostname, pod_node_ip,
 // pod_group_type
 func TransChostFilter(translator, regexpTranslator, op, value string) (filter string) {
-	switch strings.ToLower(op) {
-	case "match":
-		filter = fmt.Sprintf(regexpTranslator, op, value)
-	case "not match":
-		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value) + ")"
-	case "not ilike":
-		filter = "not(" + fmt.Sprintf(translator, "ilike", value) + ")"
-	case "not in":
-		filter = "not(" + fmt.Sprintf(translator, "in", value) + ")"
-	case "!=":
-		filter = "not(" + fmt.Sprintf(translator, "=", value) + ")"
-	default:
-		filter = fmt.Sprintf(translator, op, value)
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		filter = "not(" + fmt.Sprintf(trans, inverseOperator, value) + ")"
+	} else {
+		filter = fmt.Sprintf(trans, op, value)
 	}
 	return
 }
 
 func TransAlertEventNoSuffixFilter(translator, regexpTranslator, op, value string) (filter string) {
-	switch strings.ToLower(op) {
-	case "match":
-		filter = fmt.Sprintf(regexpTranslator, op, value, op, value, op, value)
-	case "not match":
-		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, "match", value, "match", value) + ")"
-	case "not ilike":
-		filter = "not(" + fmt.Sprintf(translator, "ilike", value, "ilike", value, "ilike", value) + ")"
-	case "not in":
-		filter = "not(" + fmt.Sprintf(translator, "in", value, "in", value, "in", value) + ")"
-	case "!=":
-		filter = "not(" + fmt.Sprintf(translator, "=", value, "=", value, "=", value) + ")"
-	default:
-		filter = fmt.Sprintf(translator, op, value, op, value, op, value)
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		filter = "not(" + fmt.Sprintf(trans, inverseOperator, value, inverseOperator, value, inverseOperator, value) + ")"
+	} else {
+		filter = fmt.Sprintf(trans, op, value, op, value, op, value)
 	}
 	return
 }
@@ -258,19 +260,17 @@ func TransAlertEventNoSuffixFilter(translator, regexpTranslator, op, value strin
 // pod_ingress, pod_service, ip
 // x_request_id, syscall_thread, syscall_coroutine, syscall_cap_seq, syscall_trace_id, tcp_seq
 func TransIngressFilter(translator, regexpTranslator, op, value string) (filter string) {
-	switch strings.ToLower(op) {
-	case "match":
-		filter = fmt.Sprintf(regexpTranslator, op, value, op, value)
-	case "not match":
-		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, "match", value) + ")"
-	case "not ilike":
-		filter = "not(" + fmt.Sprintf(translator, "ilike", value, "ilike", value) + ")"
-	case "not in":
-		filter = "not(" + fmt.Sprintf(translator, "in", value, "in", value) + ")"
-	case "!=":
-		filter = "not(" + fmt.Sprintf(translator, "=", value, "=", value) + ")"
-	default:
-		filter = fmt.Sprintf(translator, op, value, op, value)
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		filter = "not(" + fmt.Sprintf(trans, inverseOperator, value, inverseOperator, value) + ")"
+	} else {
+		filter = fmt.Sprintf(trans, op, value, op, value)
 	}
 	return
 }
