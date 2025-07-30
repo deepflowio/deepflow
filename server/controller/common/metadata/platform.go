@@ -145,24 +145,35 @@ type SubDomainInfo struct {
 	metadbmodel.SubDomain
 }
 
-type DomainNameLogPrefix struct {
-	Name string
+func NewDomainPrefix(name string) logger.Prefix {
+	if name == "" {
+		return &DomainIDPrefix{0}
+	}
+	return &DomainNameLogPrefix{name}
 }
 
-func NewDomainPrefix(name string) logger.Prefix {
-	return &DomainNameLogPrefix{name}
+type DomainIDPrefix struct {
+	ID int
+}
+
+func (p *DomainIDPrefix) Prefix() string {
+	return fmt.Sprintf("[DomainID-%d]", p.ID)
+}
+
+type DomainNameLogPrefix struct {
+	Name string
 }
 
 func (p *DomainNameLogPrefix) Prefix() string {
 	return fmt.Sprintf("[DomainName-%s]", p.Name)
 }
 
-type SubDomainNameLogPrefix struct {
-	Name string
-}
-
 func NewSubDomainPrefix(name string) logger.Prefix {
 	return &SubDomainNameLogPrefix{name}
+}
+
+type SubDomainNameLogPrefix struct {
+	Name string
 }
 
 func (p *SubDomainNameLogPrefix) Prefix() string {
