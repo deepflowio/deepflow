@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	tagrecorderHealer "github.com/deepflowio/deepflow/server/controller/tagrecorder/healer"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -176,6 +177,7 @@ func (c *Cleaners) timedCleanDirtyData(sContext context.Context) {
 func (c *Cleaners) cleanDirtyData() {
 	for _, cl := range c.orgIDToCleaner {
 		cl.cleanDirtyData()
+		cl.tagrecorderHealer.Run()
 	}
 }
 
@@ -226,6 +228,8 @@ type Cleaner struct {
 
 	statsdLock           sync.Mutex
 	domainLcuuidToStatsd map[string]*domainStatsd
+
+	tagrecorderHealer *tagrecorderHealer.Healers
 }
 
 func newCleaner(cfg config.RecorderConfig, orgID int) (*Cleaner, error) {
@@ -234,11 +238,14 @@ func newCleaner(cfg config.RecorderConfig, orgID int) (*Cleaner, error) {
 		log.Errorf("failed to create org object: %s", err.Error())
 		return nil, err
 	}
+
 	c := &Cleaner{
 		org:                  org,
 		cfg:                  cfg,
 		toolData:             newToolData(),
 		domainLcuuidToStatsd: make(map[string]*domainStatsd),
+
+		tagrecorderHealer: tagrecorderHealer.NewDefaultDomainHealers(org.DB),
 	}
 	c.refreshStatsd()
 	return c, nil

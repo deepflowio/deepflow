@@ -125,6 +125,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 		AZ:               cloudItem.AZLcuuid,
 		VPCID:            vpcID,
 		LearnedCloudTags: cloudTags,
+		CustomCloudTags:  make(map[string]string),
 		NetworkID:        networkID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
