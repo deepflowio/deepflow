@@ -62,3 +62,17 @@ var SHOW_TAG_VALUE_MAP = map[string][]string{
 	"pod_node_map":    []string{"pod_cluster", "pod_node"},
 	"subnet_map":      []string{"l3_epc", "subnet"},
 }
+
+var InverseOperatorMap = map[string]string{
+	"not match": "match",
+	"not ilike": "ilike",
+	"not in":    "in",
+	"!=":        "=",
+}
+
+var PositiveOperatorMap = map[string]string{
+	"match": "not match",
+	"ilike": "not ilike",
+	"in":    "not in",
+	"=":     "!=",
+}
