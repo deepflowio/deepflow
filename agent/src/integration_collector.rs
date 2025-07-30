@@ -914,10 +914,13 @@ async fn handler(
             Ok(Response::builder().body(Body::empty()).unwrap())
         }
         // Return the 404 Not Found for other routes.
-        _ => Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(NOT_FOUND.into())
-            .unwrap()),
+        _ => {
+            info!("{:?}", req.uri().path());
+            Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(NOT_FOUND.into())
+                .unwrap())
+        }
     }
 }
 
