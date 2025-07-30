@@ -356,7 +356,7 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 
 func (d *Decoder) decompressData(data []byte, compressFlag uint8) []byte {
 	// zstdCompress comes from agent-sender
-	if compressFlag&_ZSTD_COMPRESS_FLAG == _ZSTD_COMPRESS_FLAG {
+	if compressFlag&compressFlag == _ZSTD_COMPRESS_FLAG {
 		var err error
 		data, err = profile_common.ZstdDecompress(d.decompressBuffer[:0], data)
 		if err != nil {
@@ -365,7 +365,7 @@ func (d *Decoder) decompressData(data []byte, compressFlag uint8) []byte {
 		}
 	}
 	// gzipCompress comes from application-profiler
-	if compressFlag&_GZIP_COMPRESS_FLAG == _GZIP_COMPRESS_FLAG {
+	if compressFlag&compressFlag == _GZIP_COMPRESS_FLAG {
 		var err error
 		data, err = profile_common.GzipDecompress(data)
 		if err != nil {
