@@ -17,6 +17,8 @@
 package dbwriter
 
 import (
+	"net"
+
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
@@ -67,6 +69,12 @@ func (t *SpanWithTraceID) Encode() {
 		encoder.WriteU32(t.IP40)
 		encoder.WriteU32(t.IP41)
 	} else {
+		if len(t.IP60) == 0 {
+			t.IP60 = net.IPv6zero
+		}
+		if len(t.IP61) == 0 {
+			t.IP61 = net.IPv6zero
+		}
 		encoder.WriteIPv6(t.IP60)
 		encoder.WriteIPv6(t.IP61)
 	}

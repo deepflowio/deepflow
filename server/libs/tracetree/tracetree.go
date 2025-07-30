@@ -150,6 +150,12 @@ func (t *TraceTree) Encode() {
 				encoder.WriteU32(s.IP40)
 				encoder.WriteU32(s.IP41)
 			} else {
+				if len(s.IP60) == 0 {
+					s.IP60 = net.IPv6zero
+				}
+				if len(s.IP61) == 0 {
+					s.IP61 = net.IPv6zero
+				}
 				encoder.WriteIPv6(s.IP60)
 				encoder.WriteIPv6(s.IP61)
 			}
@@ -165,6 +171,9 @@ func (t *TraceTree) Encode() {
 		if nodeInfo.IsIPv4 {
 			encoder.WriteU32(nodeInfo.IP4)
 		} else {
+			if len(nodeInfo.IP6) == 0 {
+				nodeInfo.IP6 = net.IPv6zero
+			}
 			encoder.WriteIPv6(nodeInfo.IP6)
 		}
 
