@@ -102,6 +102,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		Region:           cloudItem.RegionLcuuid,
 		AZ:               cloudItem.AZLcuuid,
 		LearnedCloudTags: cloudTags,
+		CustomCloudTags:  make(map[string]string),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
