@@ -42,7 +42,7 @@ type dataGenerator interface {
 	setGroupSortOrder(order string) dataGenerator
 	setInSubDomain(bool) dataGenerator
 	setChDeviceTypes(...int) dataGenerator
-	setAdditionalSelectField(string) dataGenerator
+	setAdditionalSelectField(...string) dataGenerator
 	setUnscoped(bool) dataGenerator
 }
 
@@ -238,9 +238,9 @@ type dataGeneratorComponent[GT dataGeneratorModel] struct {
 	groupSortOrder string // "ASC" or "DESC", default is "ASC"
 
 	// TODO refactor
-	chDeviceTypes         []int  // additional query conditions, only used for ch_device query
-	additionalSelectField string // additional fields to select, used for label, env... query
-	unscoped              bool   // whether to use Unscoped() in the query, default is true
+	chDeviceTypes          []int    // additional query conditions, only used for ch_device query
+	additionalSelectFields []string // additional fields to select, used for label, env... query
+	unscoped               bool     // whether to use Unscoped() in the query, default is true
 }
 
 func (s *dataGeneratorComponent[GT]) getResourceType() string {
@@ -289,8 +289,8 @@ func (s *dataGeneratorComponent[GT]) setChDeviceTypes(deviceTypes ...int) dataGe
 	return s
 }
 
-func (s *dataGeneratorComponent[GT]) setAdditionalSelectField(fields string) dataGenerator {
-	s.additionalSelectField = fields
+func (s *dataGeneratorComponent[GT]) setAdditionalSelectField(fields ...string) dataGenerator {
+	s.additionalSelectFields = append(s.additionalSelectFields, fields...)
 	return s
 }
 
@@ -309,8 +309,8 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 	query := s.md.DB.Model(&item)
 
 	selectFieldsStr := s.realIDField + ", updated_at"
-	if len(s.additionalSelectField) > 0 {
-		selectFieldsStr += ", " + s.additionalSelectField
+	if len(s.additionalSelectFields) > 0 {
+		selectFieldsStr += ", " + strings.Join(s.additionalSelectFields, ", ")
 	}
 	query = query.Select(selectFieldsStr)
 
@@ -354,53 +354,55 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		return err
 	}
 
-	if s.additionalSelectField == "" {
+	if len(s.additionalSelectFields) == 0 {
 		for _, item := range data {
 			s.idToUpdatedAt[(*item).GetID()] = (*item).GetUpdatedAt()
 		}
 	} else {
-		s.idToUpdatedAt = idToUpdatedAt(s.resourceType, s.additionalSelectField, data)
+		s.idToUpdatedAt = idToUpdatedAt(s.resourceType, s.additionalSelectFields, data)
 	}
 	log.Infof("gen %s data finished, count: %d", s.resourceType, len(s.idToUpdatedAt), s.md.LogPrefixes)
 	return nil
 }
 
-func idToUpdatedAt(resourceType, checkField string, data interface{}) map[int]time.Time {
+func idToUpdatedAt(resourceType string, checkFields []string, data interface{}) map[int]time.Time {
 	idToUpdatedAt := make(map[int]time.Time)
 	switch resourceType {
 	case common.RESOURCE_TYPE_VM_EN:
 		for _, item := range data.([]*mysqlmodel.VM) {
-			if len(item.LearnedCloudTags) == 0 {
+			if len(item.LearnedCloudTags) == 0 && len(item.CustomCloudTags) == 0 {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
 	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
 		for _, item := range data.([]*mysqlmodel.PodNamespace) {
-			if len(item.LearnedCloudTags) == 0 {
+			if len(item.LearnedCloudTags) == 0 && len(item.CustomCloudTags) == 0 {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
+
+	// 仅有 cloud.tag 需要支持多个字段检查，其他情况只会赋值一个字段，使用 checkFields[0] 即可
 	case common.RESOURCE_TYPE_POD_SERVICE_EN:
 		for _, item := range data.([]*mysqlmodel.PodService) {
-			if checkField == "label" && item.Label == "" {
+			if checkFields[0] == "label" && item.Label == "" {
 				continue
 			}
-			if checkField == "annotation" && item.Annotation == "" {
+			if checkFields[0] == "annotation" && item.Annotation == "" {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
 	case common.RESOURCE_TYPE_POD_EN:
 		for _, item := range data.([]*mysqlmodel.Pod) {
-			if checkField == "env" && item.ENV == "" {
+			if checkFields[0] == "env" && item.ENV == "" {
 				continue
 			}
-			if checkField == "label" && item.Label == "" {
+			if checkFields[0] == "label" && item.Label == "" {
 				continue
 			}
-			if checkField == "annotation" && item.Annotation == "" {
+			if checkFields[0] == "annotation" && item.Annotation == "" {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()

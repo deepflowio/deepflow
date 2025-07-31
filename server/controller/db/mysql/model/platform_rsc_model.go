@@ -229,7 +229,6 @@ type VM struct {
 	SoftDeleteBase   `gorm:"embedded" mapstructure:",squash"`
 	State            int               `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE" mapstructure:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
 	Name             string            `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Alias            string            `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Label            string            `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
 	IP               string            `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
 	Hostname         string            `gorm:"column:hostname;type:char(64);default:''" json:"HOSTNAME" mapstructure:"HOSTNAME"`
@@ -757,7 +756,6 @@ type PodNamespace struct {
 	Base             `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase   `gorm:"embedded" mapstructure:",squash"`
 	Name             string            `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Alias            string            `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	PodClusterID     int               `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
 	AZ               string            `gorm:"column:az;type:char(64);default:''" json:"AZ" mapstructure:"AZ"`
 	Region           string            `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
