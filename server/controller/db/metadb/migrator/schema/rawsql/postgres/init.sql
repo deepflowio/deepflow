@@ -274,7 +274,6 @@ CREATE TABLE IF NOT EXISTS vm (
     id                  SERIAL PRIMARY KEY,
     state               INTEGER NOT NULL,
     name                VARCHAR(256) DEFAULT '',
-    alias               VARCHAR(64) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
     ip                  VARCHAR(64) DEFAULT '',
     vl2id               INTEGER DEFAULT 0,
@@ -283,7 +282,8 @@ CREATE TABLE IF NOT EXISTS vm (
     htype               INTEGER DEFAULT 1,
     launch_server       VARCHAR(64) DEFAULT '',
     host_id             INTEGER DEFAULT 0,
-    cloud_tags          TEXT,
+    learned_cloud_tags  TEXT,
+    custom_cloud_tags   TEXT,
     epc_id              INTEGER DEFAULT 0,
     domain              VARCHAR(64) DEFAULT '',
     az                  VARCHAR(64) DEFAULT '',
@@ -670,8 +670,8 @@ TRUNCATE TABLE vm_pod_node_connection;
 CREATE TABLE IF NOT EXISTS pod_namespace (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
-    alias               VARCHAR(64) DEFAULT '',
-    cloud_tags          TEXT,
+    learned_cloud_tags  TEXT,
+    custom_cloud_tags   TEXT,
     pod_cluster_id      INTEGER DEFAULT NULL,
     az                  VARCHAR(64) DEFAULT '',
     region              VARCHAR(64) DEFAULT '',
@@ -683,7 +683,6 @@ CREATE TABLE IF NOT EXISTS pod_namespace (
     deleted_at          TIMESTAMP DEFAULT NULL
 );
 TRUNCATE TABLE pod_namespace;
-COMMENT ON COLUMN pod_namespace.cloud_tags IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS pod_ingress (
     id                  SERIAL PRIMARY KEY,
