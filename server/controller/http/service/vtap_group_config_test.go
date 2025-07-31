@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/deepflowio/deepflow/server/agent_config"
-	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 func Test_copyStruct(t *testing.T) {
@@ -35,16 +34,16 @@ func Test_copyStruct(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		assertFunc func(t *testing.T, data *model.AgentGroupConfigResponse)
+		assertFunc func(t *testing.T, data *agent_config.AgentGroupConfigResponse)
 	}{
 		{
 			name: "ignore name test",
 			args: args{
 				ignoreName: ignoreName,
 				from:       &agent_config.AgentGroupConfigModel{},
-				to:         &model.AgentGroupConfigResponse{},
+				to:         &agent_config.AgentGroupConfigResponse{},
 			},
-			assertFunc: func(t *testing.T, data *model.AgentGroupConfigResponse) {
+			assertFunc: func(t *testing.T, data *agent_config.AgentGroupConfigResponse) {
 				if data.WasmPlugins == nil {
 					t.Errorf("WasmPlugins is nil, wanted: []string")
 				}
@@ -63,7 +62,7 @@ func Test_copyStruct(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			copyStruct(tt.args.from, tt.args.to, tt.args.ignoreName)
-			tt.assertFunc(t, tt.args.to.(*model.AgentGroupConfigResponse))
+			tt.assertFunc(t, tt.args.to.(*agent_config.AgentGroupConfigResponse))
 		})
 	}
 }
