@@ -15,12 +15,20 @@
  */
 
 mod debug;
-mod overwrite_queue;
+mod dynamic_queue;
 mod mpmc_queue;
+mod overwrite_queue;
 
 pub use debug::{bounded_with_debug, DebugSender, MultiDebugSender};
+pub use dynamic_queue::{
+    bounded as bounded_dynamic, Receiver as DynamicReceiver, Sender as DynamicSender,
+    StatsHandle as DynamicStatsHandle,
+};
+pub use mpmc_queue::{
+    bounded as bounded_mpmc, Receiver as MpmcReceiver, Sender as MpmcSender,
+    StatsHandle as MpmcStatsHandle,
+};
 pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
-pub use mpmc_queue::{bounded as bounded_mpmc, Receiver as MpmcReceiver, Sender as MpmcSender, StatsHandle as MpmcStatsHandle};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
