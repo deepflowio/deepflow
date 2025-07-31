@@ -168,19 +168,19 @@ func NewHealers(md metadata.Platform) *Healers {
 
 		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTag, *message.VMAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
+			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
 		newHealer[mysqlmodel.VM, mysqlmodel.ChChostCloudTags, *message.VMAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
+			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),
 		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTag, *message.PodNamespaceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG)),
 		newHealer[mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTags, *message.PodNamespaceAdd](
 			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("cloud_tags").setUnscoped(false),
+			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS)),
 		newHealer[mysqlmodel.PodService, mysqlmodel.ChPodServiceK8sLabel, *message.PodServiceAdd](
 			msgMetadata,
