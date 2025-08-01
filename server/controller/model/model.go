@@ -655,14 +655,14 @@ func (GenesisVM) TableName() string {
 	return "genesis_vm"
 }
 
-type GenesisVpc struct {
+type GenesisVPC struct {
 	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name   string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	NodeIP string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
-func (GenesisVpc) TableName() string {
+func (GenesisVPC) TableName() string {
 	return "genesis_vpc"
 }
 
