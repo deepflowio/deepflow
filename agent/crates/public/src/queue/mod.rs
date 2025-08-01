@@ -28,8 +28,6 @@ pub use mpmc_queue::{
     bounded as bounded_mpmc, Receiver as MpmcReceiver, Sender as MpmcSender,
     StatsHandle as MpmcStatsHandle,
 };
-pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
-use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum Error<T> {

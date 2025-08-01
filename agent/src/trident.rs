@@ -2372,6 +2372,7 @@ impl AgentComponents {
         let mut l4_flow_aggr_senders = Vec::new();
         for i in 0..user_config.outputs.flow_log.tunning.sender_threads {
             let name: &'static str = Box::leak(format!("3-flowlog-to-collector-sender-{}", i).into_boxed_str());
+
             let (s, r, counter) = queue::bounded_with_debug(
                 user_config
                     .processors

@@ -9,7 +9,7 @@ name: verify agent
 jobs:
   verify_agent:
     name: verify agent
-    runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
+    runs-on: "ubuntu-latest"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -49,7 +49,7 @@ jobs:
 
   verify_agent_arm64:
     name: verify agent arm64
-    runs-on: "cirun-aws-arm64-32c--${{ github.run_id }}"
+    runs-on: "ubuntu-22.04-arm"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
