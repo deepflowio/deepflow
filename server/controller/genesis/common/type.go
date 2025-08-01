@@ -26,14 +26,14 @@ import (
 )
 
 type GenesisSyncType interface {
-	model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisVIP | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess
+	model.GenesisVinterface | model.GenesisVPC | model.GenesisHost | model.GenesisVM | model.GenesisVIP | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess
 }
 
 type GenesisSyncData struct {
 	IPLastSeens map[int][]model.GenesisIP
 	VIPs        map[int][]model.GenesisVIP
 	VMs         map[int][]model.GenesisVM
-	VPCs        map[int][]model.GenesisVpc
+	VPCs        map[int][]model.GenesisVPC
 	Hosts       map[int][]model.GenesisHost
 	Lldps       map[int][]model.GenesisLldp
 	Ports       map[int][]model.GenesisPort
@@ -46,7 +46,7 @@ type GenesisSyncDataResponse struct {
 	IPLastSeens []model.GenesisIP
 	VIPs        []model.GenesisVIP
 	VMs         []model.GenesisVM
-	VPCs        []model.GenesisVpc
+	VPCs        []model.GenesisVPC
 	Hosts       []model.GenesisHost
 	Lldps       []model.GenesisLldp
 	Ports       []model.GenesisPort
@@ -80,6 +80,7 @@ type VIFRPCMessage struct {
 	VtapID                  uint32
 	Peer                    string
 	K8SClusterID            string
+	Key                     string
 	StorageRefresh          bool
 	WorkloadResourceEnabled bool
 	Message                 *trident.GenesisSyncRequest

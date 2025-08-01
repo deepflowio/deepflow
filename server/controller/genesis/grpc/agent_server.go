@@ -174,7 +174,9 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 		}
 	}
 
-	groupShortLcuuid := request.GetAgentInfo().GetGroupId()
+	vtapInfo := request.GetAgentInfo()
+	groupShortLcuuid := vtapInfo.GetGroupId()
+	vtapKey := fmt.Sprintf("%s-%s", vtapInfo.GetIp(), vtapInfo.GetMac())
 	_, enabled := g.workloadResouceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
@@ -182,6 +184,7 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
 			common.VIFRPCMessage{
+				Key:                     vtapKey,
 				Peer:                    remote,
 				VtapID:                  vtapID,
 				ORGID:                   orgID,
@@ -198,6 +201,7 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
 	g.genesisSyncQueue.Put(
 		common.VIFRPCMessage{
+			Key:                     vtapKey,
 			Peer:                    remote,
 			VtapID:                  vtapID,
 			ORGID:                   orgID,
