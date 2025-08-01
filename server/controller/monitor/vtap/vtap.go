@@ -58,11 +58,13 @@ func (v *VTapCheck) Start() {
 		}
 	}()
 
-	go func() {
-		for range time.Tick(time.Second * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
-			v.deleteLostVTap()
-		}
-	}()
+	if v.cfg.VTapAutoDeleteEnabled {
+		go func() {
+			for range time.Tick(time.Second * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
+				v.deleteLostVTap()
+			}
+		}()
+	}
 }
 
 func (v *VTapCheck) Stop() {
