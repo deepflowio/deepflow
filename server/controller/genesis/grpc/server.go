@@ -75,34 +75,36 @@ type TridentStats struct {
 }
 
 type SynchronizerServer struct {
-	cfg                         config.GenesisConfig
-	k8sQueue                    queue.QueueWriter
-	genesisSyncQueue            queue.QueueWriter
-	teamShortLcuuidToInfo       sync.Map
-	clusterIDToVersion          sync.Map
-	vtapToVersion               sync.Map
-	vtapToLastSeen              sync.Map
-	clusterIDToLastSeen         sync.Map
-	tridentStatsMap             sync.Map
-	workloadResouceEnabledCache *cache.Cache
-	gsync                       *sstore.GenesisSync
-	gkubernetes                 *kstore.GenesisKubernetes
+	cfg                               config.GenesisConfig
+	k8sQueue                          queue.QueueWriter
+	genesisSyncQueue                  queue.QueueWriter
+	teamShortLcuuidToInfo             sync.Map
+	clusterIDToVersion                sync.Map
+	vtapToVersion                     sync.Map
+	vtapToLastSeen                    sync.Map
+	clusterIDToLastSeen               sync.Map
+	tridentStatsMap                   sync.Map
+	workloadResouceEnabledCache       *cache.Cache
+	workloadResouceChangeEnabledCache *cache.Cache
+	gsync                             *sstore.GenesisSync
+	gkubernetes                       *kstore.GenesisKubernetes
 }
 
 func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter,
 	gsync *sstore.GenesisSync, gkubernetes *kstore.GenesisKubernetes) *SynchronizerServer {
 	return &SynchronizerServer{
-		cfg:                         cfg,
-		k8sQueue:                    k8sQueue,
-		genesisSyncQueue:            genesisSyncQueue,
-		gsync:                       gsync,
-		gkubernetes:                 gkubernetes,
-		vtapToVersion:               sync.Map{},
-		vtapToLastSeen:              sync.Map{},
-		clusterIDToVersion:          sync.Map{},
-		clusterIDToLastSeen:         sync.Map{},
-		tridentStatsMap:             sync.Map{},
-		workloadResouceEnabledCache: cache.New(5*time.Minute, 30*time.Minute),
+		cfg:                               cfg,
+		k8sQueue:                          k8sQueue,
+		genesisSyncQueue:                  genesisSyncQueue,
+		gsync:                             gsync,
+		gkubernetes:                       gkubernetes,
+		vtapToVersion:                     sync.Map{},
+		vtapToLastSeen:                    sync.Map{},
+		clusterIDToVersion:                sync.Map{},
+		clusterIDToLastSeen:               sync.Map{},
+		tridentStatsMap:                   sync.Map{},
+		workloadResouceEnabledCache:       cache.New(5*time.Minute, 30*time.Minute),
+		workloadResouceChangeEnabledCache: cache.New(5*time.Minute, 30*time.Minute),
 	}
 }
 

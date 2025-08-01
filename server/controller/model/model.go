@@ -542,6 +542,14 @@ func (GenesisHost) TableName() string {
 	return "genesis_host"
 }
 
+func (g GenesisHost) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisHost) GetVtapID() uint32 {
+	return g.VtapID
+}
+
 type GenesisIP struct {
 	Masklen          uint32    `gorm:"column:masklen;type:int;default:null;default:0" json:"MASKLEN"`
 	VtapID           uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
@@ -556,6 +564,14 @@ func (GenesisIP) TableName() string {
 	return "genesis_ip"
 }
 
+func (g GenesisIP) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisIP) GetVtapID() uint32 {
+	return g.VtapID
+}
+
 type GenesisVIP struct {
 	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	IP     string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
@@ -565,6 +581,14 @@ type GenesisVIP struct {
 
 func (GenesisVIP) TableName() string {
 	return "genesis_vip"
+}
+
+func (g GenesisVIP) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisVIP) GetVtapID() uint32 {
+	return g.VtapID
 }
 
 type GenesisLldp struct {
@@ -584,6 +608,14 @@ func (GenesisLldp) TableName() string {
 	return "genesis_lldp"
 }
 
+func (g GenesisLldp) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisLldp) GetVtapID() uint32 {
+	return g.VtapID
+}
+
 type GenesisNetwork struct {
 	SegmentationID uint32 `gorm:"column:segmentation_id;type:int;default:null" json:"SEGMENTATION_ID"`
 	NetType        uint32 `gorm:"column:net_type;type:int;default:null" json:"NET_TYPE"`
@@ -597,6 +629,14 @@ type GenesisNetwork struct {
 
 func (GenesisNetwork) TableName() string {
 	return "genesis_network"
+}
+
+func (g GenesisNetwork) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisNetwork) GetVtapID() uint32 {
+	return g.VtapID
 }
 
 type GenesisPort struct {
@@ -613,6 +653,14 @@ type GenesisPort struct {
 
 func (GenesisPort) TableName() string {
 	return "genesis_port"
+}
+
+func (g GenesisPort) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisPort) GetVtapID() uint32 {
+	return g.VtapID
 }
 
 type GenesisVinterface struct {
@@ -639,6 +687,14 @@ func (GenesisVinterface) TableName() string {
 	return "genesis_vinterface"
 }
 
+func (g GenesisVinterface) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisVinterface) GetVtapID() uint32 {
+	return g.VtapID
+}
+
 type GenesisVM struct {
 	State        uint32    `gorm:"column:state;type:int;default:null" json:"STATE"`
 	VtapID       uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
@@ -655,15 +711,31 @@ func (GenesisVM) TableName() string {
 	return "genesis_vm"
 }
 
-type GenesisVpc struct {
+func (g GenesisVM) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisVM) GetVtapID() uint32 {
+	return g.VtapID
+}
+
+type GenesisVPC struct {
 	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name   string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	NodeIP string `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 }
 
-func (GenesisVpc) TableName() string {
+func (GenesisVPC) TableName() string {
 	return "genesis_vpc"
+}
+
+func (g GenesisVPC) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisVPC) GetVtapID() uint32 {
+	return g.VtapID
 }
 
 type GenesisProcess struct {
@@ -683,6 +755,14 @@ type GenesisProcess struct {
 
 func (GenesisProcess) TableName() string {
 	return "genesis_process"
+}
+
+func (g GenesisProcess) GetLcuuid() string {
+	return g.Lcuuid
+}
+
+func (g GenesisProcess) GetVtapID() uint32 {
+	return g.VtapID
 }
 
 type GenesisStorage struct {
