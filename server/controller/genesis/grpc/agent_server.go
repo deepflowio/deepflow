@@ -86,10 +86,18 @@ func (g *SynchronizerServer) GenerateCache() {
 				log.Debugf("agent group configuration (ID:%d) workload resource sync disabled", config.ID, logger.NewORGPrefix(orgID))
 				continue
 			}
+			key := fmt.Sprintf("%d-%s", orgID, group.ShortUUID)
+			if _, ok := g.workloadResouceEnabledCache.Get(key); !ok {
+				var vtaps []model.VTap
+				db.Select("id").Where("vtap_group_lcuuid = ?", config.AgentGroupLcuuid).Find(&vtaps)
+				for _, vtap := range vtaps {
+					g.workloadResouceChangeEnabledCache.SetDefault(fmt.Sprintf("%d-%d", orgID, vtap.ID), nil)
+				}
+			}
 			if group.ID == 1 && group.Name == "default" {
 				g.workloadResouceEnabledCache.SetDefault(fmt.Sprintf("%d-", orgID), true)
 			}
-			g.workloadResouceEnabledCache.SetDefault(fmt.Sprintf("%d-%s", orgID, group.ShortUUID), true)
+			g.workloadResouceEnabledCache.SetDefault(key, true)
 		}
 	}
 }
@@ -174,14 +182,26 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 		}
 	}
 
-	groupShortLcuuid := request.GetAgentInfo().GetGroupId()
+	vtapInfo := request.GetAgentInfo()
+	groupShortLcuuid := vtapInfo.GetGroupId()
+	vtapKey := fmt.Sprintf("%s-%s", vtapInfo.GetIp(), vtapInfo.GetMac())
 	_, enabled := g.workloadResouceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
 	if version == localVersion || platformData == nil {
+		// If the worload-v is modified to be enabled during the period of continuous heartbeat,
+		// it will trigger the re-reporting of the full data.
+		if _, ok := g.workloadResouceChangeEnabledCache.Get(vtap); ok {
+			g.vtapToVersion.Store(vtap, uint64(0))
+			g.workloadResouceChangeEnabledCache.Delete(vtap)
+			log.Debugf("genesis sync re-reporting from ip %s vtap_id %v", remote, vtapID, logger.NewORGPrefix(orgID))
+			return &agent.GenesisSyncResponse{}, nil
+		}
+
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
 			common.VIFRPCMessage{
+				Key:                     vtapKey,
 				Peer:                    remote,
 				VtapID:                  vtapID,
 				ORGID:                   orgID,
@@ -198,6 +218,7 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
 	g.genesisSyncQueue.Put(
 		common.VIFRPCMessage{
+			Key:                     vtapKey,
 			Peer:                    remote,
 			VtapID:                  vtapID,
 			ORGID:                   orgID,

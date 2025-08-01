@@ -364,7 +364,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(orgID int, vtapID uint
 		log.Error(err.Error(), logger.NewORGPrefix(orgID))
 		return common.GenesisSyncDataResponse{}
 	}
-	vpc := model.GenesisVpc{
+	vpc := model.GenesisVPC{
 		Name:   v.defaultVPCName,
 		Lcuuid: ccommon.GetUUIDByOrgID(orgID, v.defaultVPCName),
 		VtapID: vtapID,
@@ -375,14 +375,14 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(orgID int, vtapID uint
 	behindNat := peer != natIP
 	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode, logger.NewORGPrefix(orgID))
 	if behindNat && !v.singleVPCMode {
-		vpc = model.GenesisVpc{
+		vpc = model.GenesisVPC{
 			Name:   "VPC-" + peer,
 			Lcuuid: ccommon.GetUUIDByOrgID(orgID, "VPC-"+peer),
 			VtapID: vtapID,
 			NodeIP: v.nodeIP,
 		}
 	}
-	vpcs := []model.GenesisVpc{vpc}
+	vpcs := []model.GenesisVPC{vpc}
 
 	vm := model.GenesisVM{
 		Name:         hostName,
@@ -572,7 +572,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(orgID int, vtapID uint32, p
 	macToPort := map[string]map[string]string{}
 	portToBridge := map[string]bridge{}
 	vms := []model.GenesisVM{}
-	vpcs := []model.GenesisVpc{}
+	vpcs := []model.GenesisVPC{}
 	ports := []model.GenesisPort{}
 	networks := []model.GenesisNetwork{}
 
@@ -786,7 +786,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(orgID int, vtapID uint32, p
 		networks = append(networks, n)
 	}
 	for id, name := range vpcIDToName {
-		vpc := model.GenesisVpc{}
+		vpc := model.GenesisVPC{}
 		vpc.VtapID = vtapID
 		vpc.NodeIP = v.nodeIP
 		vpc.Lcuuid = id
