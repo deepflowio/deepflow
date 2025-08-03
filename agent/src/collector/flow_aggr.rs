@@ -43,7 +43,7 @@ use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use public::{
     buffer::BatchedBox,
     chrono_map::ChronoMap,
-    queue::{DebugSender, Error, Receiver},
+    queue::{DebugSender, MultiDebugSender, Error, Receiver},
 };
 
 const TIMESTAMP_SLOT_COUNT: usize = SECONDS_IN_MINUTE as usize;
@@ -65,7 +65,7 @@ pub struct FlowAggrCounter {
 pub struct FlowAggrThread {
     id: usize,
     input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
-    output: DebugSender<BoxedTaggedFlow>,
+    output: MultiDebugSender<BoxedTaggedFlow>,
     config: CollectorAccess,
     delay: Duration,
 
@@ -81,7 +81,7 @@ impl FlowAggrThread {
     pub fn new(
         id: usize,
         input: Receiver<Arc<BatchedBox<TaggedFlow>>>,
-        output: DebugSender<BoxedTaggedFlow>,
+        output: MultiDebugSender<BoxedTaggedFlow>,
         config: CollectorAccess,
         delay: Duration,
         ntp_diff: Arc<AtomicI64>,
@@ -180,7 +180,7 @@ impl FlowAggr {
 
     pub fn new(
         input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
-        output: DebugSender<BoxedTaggedFlow>,
+        output: MultiDebugSender<BoxedTaggedFlow>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
         delay: Duration,
@@ -435,7 +435,7 @@ struct Sender {
 
 impl Sender {
     pub fn new(
-        output: DebugSender<BoxedTaggedFlow>,
+        output: MultiDebugSender<BoxedTaggedFlow>,
         ntp_diff: Arc<AtomicI64>,
         config: CollectorAccess,
         metrics: Arc<FlowAggrCounter>,
@@ -506,7 +506,7 @@ struct ThrottlingQueue {
     last_flush_cache_with_throttling_time: Duration,
     last_flush_cache_without_throttling_time: Duration,
     period_count: usize,
-    output: DebugSender<BoxedTaggedFlow>,
+    output: MultiDebugSender<BoxedTaggedFlow>,
 
     cache_with_throttling: Vec<BoxedTaggedFlow>,
     cache_without_throttling: Vec<BoxedTaggedFlow>,
@@ -519,7 +519,7 @@ impl ThrottlingQueue {
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
     const CACHE_WITHOUT_THROTTLING_SIZE: usize = 1024;
 
-    pub fn new(output: DebugSender<BoxedTaggedFlow>, config: CollectorAccess) -> Self {
+    pub fn new(output: MultiDebugSender<BoxedTaggedFlow>, config: CollectorAccess) -> Self {
         let t: u64 = config.load().l4_log_collect_nps_threshold * Self::THROTTLE_BUCKET;
         Self {
             config,
