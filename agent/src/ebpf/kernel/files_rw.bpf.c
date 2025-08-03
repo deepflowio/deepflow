@@ -70,19 +70,21 @@ static __inline void set_file_metric_data(struct __io_event_buffer *buffer,
 	 *    kern_dev_t s_dev;
 	 * };
 	 */
-	void *f_inode = NULL, *i_sb = NULL;
-	bpf_probe_read_kernel(&f_inode, sizeof(f_inode),
+	void *ptr = NULL;
+	// Fetch struct inode *f_inode
+	bpf_probe_read_kernel(&ptr, sizeof(ptr),
 			      file + offset->struct_file_f_inode_offset);
-	if (!f_inode)
+	if (!ptr)
 		return;
 
-	bpf_probe_read_kernel(&i_sb, sizeof(i_sb),
-			      f_inode + offset->struct_inode_i_sb_offset);
-	if (!i_sb)
+	// Fetch struct super_block *i_sb;
+	bpf_probe_read_kernel(&ptr, sizeof(ptr),
+			      ptr + offset->struct_inode_i_sb_offset);
+	if (!ptr)
 		return;
 
 	bpf_probe_read_kernel(&v->s_dev, sizeof(v->s_dev),
-			      i_sb + offset->struct_super_block_s_dev_offset);
+			      ptr + offset->struct_super_block_s_dev_offset);
 	bpf_probe_read_kernel(&buffer->offset, sizeof(buffer->offset),
 			      file + offset->struct_file_f_pos_offset);
 	void *dentry = NULL, *parent;
