@@ -372,10 +372,10 @@ static __inline int iovecs_copy(struct __socket_data *v,
 				size_t real_len, __u32 send_len)
 {
 /*
- * The number of loops in eBPF is limited; tests have shown that the
- * Linux 4.14 kernel supports a maximum of 27 iterations.
+ * When `LOOP_LIMIT` is set too high, the 'fentry/fexit' bytecode fails
+ * to load. Testing shows that the appropriate maximum value is 22.
  */
-#define LOOP_LIMIT 27
+#define LOOP_LIMIT 22
 
 	struct copy_data_s {
 		char data[sizeof(v->data)];
@@ -2273,7 +2273,6 @@ KPROG(sys_recvfrom) (struct pt_regs *ctx) {
 	return do_sys_enter_recvfrom(sockfd, buf, src_addr);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                struct sockaddr *src_addr, socklen_t *addrlen);
 TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
@@ -2287,19 +2286,6 @@ TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	struct sockaddr *u_addr = NULL;
 	struct syscall_sendto_enter_ctx *sendto_ctx = (struct syscall_sendto_enter_ctx *)ctx;
 	u_addr = sendto_ctx->addr;
-#else
-//int __sys_recvfrom(int fd, void __user *ubuf, size_t size, unsigned int flags,
-//                   struct sockaddr __user *addr, int __user *addr_len)
-KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
-	   unsigned int flags, struct sockaddr __user * addr,
-	   int __user * addr_len)
-{
-	if (flags & MSG_PEEK)
-		return 0;
-	int sockfd = fd;
-	char *buf = (char *)ubuf;
-	struct sockaddr *u_addr = addr;
-#endif /* LINUX_VER_KFUNC */
 	return do_sys_enter_recvfrom(sockfd, buf, u_addr);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
@@ -2334,17 +2320,9 @@ KRETPROG(sys_recvfrom) (struct pt_regs *ctx) {
 	return do_sys_exit_recvfrom((void *)ctx, bytes_count);
 }
 #else
-#ifndef LINUX_VER_KFUNC
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvfrom/format
 TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx *ctx) {
 	ssize_t bytes_count = ctx->ret;
-#else
-KRETFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
-	      unsigned int flags, struct sockaddr __user * addr,
-	      int __user * addr_len, int ret)
-{
-	ssize_t bytes_count = ret;
-#endif /* LINUX_VER_KFUNC */
 	return do_sys_exit_recvfrom((void *)ctx, bytes_count);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */

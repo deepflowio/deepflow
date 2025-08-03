@@ -266,7 +266,6 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
 	kfunc_set_sym_for_entry_and_exit(tps, "ksys_read");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendto");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvfrom");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmsg");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmmsg");
 	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmsg");
@@ -285,9 +284,11 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 
 	/*
 	 * On certain kernels, such as 5.15.0-127-generic and 5.10.134-18.al8.x86_64,
-	 * `recvmmsg()` probes of type `kprobe`/`kfunc` may not work properly. To address
+	 * `recvmmsg()/recvfrom()` probes of type `kprobe`/`kfunc` may not work properly. To address
 	 * this, we use the more stable `tracepoint`-based probe instead.
 	 */
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvfrom");	
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
 
