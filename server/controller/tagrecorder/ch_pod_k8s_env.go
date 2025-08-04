@@ -27,8 +27,8 @@ type ChPodK8sEnv struct {
 	SubscriberComponent[
 		*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		metadbmodel.Pod,
@@ -42,8 +42,8 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 		newSubscriberComponent[
 			*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			metadbmodel.Pod,
@@ -58,7 +58,11 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *metadb.DB) {
+func (c *ChPodK8sEnv) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
+	sourceID := newSource.ID
 	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChPodK8sEnv, 0)
 	keysToDelete := make([]IDKeyKey, 0)
@@ -74,9 +78,12 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sEnv{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-					Key:      k,
-					Value:    v,
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+					Key:         k,
+					Value:       v,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				})
 				continue
 			}
@@ -87,9 +94,12 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
 					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sEnv{
-						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-						Key:      k,
-						Value:    v,
+						ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+						Key:         k,
+						Value:       v,
+						TeamID:      md.GetTeamID(),
+						DomainID:    md.GetDomainID(),
+						SubDomainID: md.GetSubDomainID(),
 					})
 					continue
 				}

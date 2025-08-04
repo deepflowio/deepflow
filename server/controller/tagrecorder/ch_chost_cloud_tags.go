@@ -30,8 +30,8 @@ type ChChostCloudTags struct {
 	SubscriberComponent[
 		*message.VMAdd,
 		message.VMAdd,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
+		*message.VMUpdate,
+		message.VMUpdate,
 		*message.VMDelete,
 		message.VMDelete,
 		metadbmodel.VM,
@@ -45,8 +45,8 @@ func NewChChostCloudTags() *ChChostCloudTags {
 		newSubscriberComponent[
 			*message.VMAdd,
 			message.VMAdd,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
+			*message.VMUpdate,
+			message.VMUpdate,
 			*message.VMDelete,
 			message.VMDelete,
 			metadbmodel.VM,
@@ -61,38 +61,63 @@ func NewChChostCloudTags() *ChChostCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *metadb.DB) {
+func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
+	sourceID := newSource.ID
+	cloudTagMap := map[string]string{}
 	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.LearnedCloudTags.IsDifferent() {
-		bytes, err := json.Marshal(fieldsUpdate.LearnedCloudTags.GetNew())
-		if err != nil {
-			log.Error(err, db.LogPrefixORGID)
-			return
-		}
-		updateInfo["cloud_tags"] = string(bytes)
+
+	if !fieldsUpdate.LearnedCloudTags.IsDifferent() && !fieldsUpdate.CustomCloudTags.IsDifferent() {
+		return
 	}
+
+	for k, v := range newSource.LearnedCloudTags {
+		cloudTagMap[k] = v
+	}
+	for k, v := range newSource.CustomCloudTags {
+		cloudTagMap[k] = v
+	}
+
+	bytes, err := json.Marshal(cloudTagMap)
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
+	updateInfo["cloud_tags"] = string(bytes)
 	targetKey := IDKey{ID: sourceID}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChChostCloudTags
-		db.Where("id = ?", sourceID).Find(&chItem)
-		if chItem.ID == 0 {
-			c.SubscriberComponent.dbOperator.add(
-				[]IDKey{targetKey},
-				[]metadbmodel.ChChostCloudTags{{ChIDBase: metadbmodel.ChIDBase{ID: sourceID}, CloudTags: updateInfo["cloud_tags"].(string)}},
-				db,
-			)
-			return
-		}
+	var chItem metadbmodel.ChChostCloudTags
+	db.Where("id = ?", sourceID).Find(&chItem)
+	if chItem.ID == 0 {
+		c.SubscriberComponent.dbOperator.add(
+			[]IDKey{targetKey},
+			[]metadbmodel.ChChostCloudTags{{
+				ChIDBase:  metadbmodel.ChIDBase{ID: sourceID},
+				CloudTags: updateInfo["cloud_tags"].(string),
+				TeamID:    md.GetTeamID(),
+				DomainID:  md.GetDomainID(),
+			}},
+			db,
+		)
+		return
 	}
 	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKey, targets []metadbmodel.ChChostCloudTags) {
-	if len(source.LearnedCloudTags) == 0 {
+	cloudTagMap := map[string]string{}
+	for k, v := range source.LearnedCloudTags {
+		cloudTagMap[k] = v
+	}
+	for k, v := range source.CustomCloudTags {
+		cloudTagMap[k] = v
+	}
+	if len(cloudTagMap) == 0 {
 		return
 	}
-	bytes, err := json.Marshal(source.LearnedCloudTags)
+	bytes, err := json.Marshal(cloudTagMap)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 		return

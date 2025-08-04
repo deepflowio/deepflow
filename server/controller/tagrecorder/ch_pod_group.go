@@ -29,8 +29,8 @@ type ChPodGroup struct {
 	SubscriberComponent[
 		*message.PodGroupAdd,
 		message.PodGroupAdd,
-		*message.PodGroupFieldsUpdate,
-		message.PodGroupFieldsUpdate,
+		*message.PodGroupUpdate,
+		message.PodGroupUpdate,
 		*message.PodGroupDelete,
 		message.PodGroupDelete,
 		metadbmodel.PodGroup,
@@ -45,8 +45,8 @@ func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 		newSubscriberComponent[
 			*message.PodGroupAdd,
 			message.PodGroupAdd,
-			*message.PodGroupFieldsUpdate,
-			message.PodGroupFieldsUpdate,
+			*message.PodGroupUpdate,
+			message.PodGroupUpdate,
 			*message.PodGroupDelete,
 			message.PodGroupDelete,
 			metadbmodel.PodGroup,
@@ -88,7 +88,11 @@ func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *metadbmodel.Po
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodGroup) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate, db *metadb.DB) {
+func (c *ChPodGroup) onResourceUpdated(md *message.Metadata, updateMessage *message.PodGroupUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodGroupFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodGroup)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

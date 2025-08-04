@@ -30,8 +30,8 @@ type ChPodNSCloudTags struct {
 	SubscriberComponent[
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
-		*message.PodNamespaceFieldsUpdate,
-		message.PodNamespaceFieldsUpdate,
+		*message.PodNamespaceUpdate,
+		message.PodNamespaceUpdate,
 		*message.PodNamespaceDelete,
 		message.PodNamespaceDelete,
 		metadbmodel.PodNamespace,
@@ -45,8 +45,8 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 		newSubscriberComponent[
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
-			*message.PodNamespaceFieldsUpdate,
-			message.PodNamespaceFieldsUpdate,
+			*message.PodNamespaceUpdate,
+			message.PodNamespaceUpdate,
 			*message.PodNamespaceDelete,
 			message.PodNamespaceDelete,
 			metadbmodel.PodNamespace,
@@ -61,17 +61,32 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *metadb.DB) {
+func (c *ChPodNSCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNamespaceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodNamespaceFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNamespace)
+	sourceID := newSource.ID
+	cloudTagMap := map[string]string{}
 	updateInfo := make(map[string]interface{})
 
-	if fieldsUpdate.LearnedCloudTags.IsDifferent() {
-		bytes, err := json.Marshal(fieldsUpdate.LearnedCloudTags.GetNew())
-		if err != nil {
-			log.Error(err, db.LogPrefixORGID)
-			return
-		}
-		updateInfo["cloud_tags"] = string(bytes)
+	if !fieldsUpdate.LearnedCloudTags.IsDifferent() && !fieldsUpdate.CustomCloudTags.IsDifferent() {
+		return
 	}
+
+	for k, v := range newSource.LearnedCloudTags {
+		cloudTagMap[k] = v
+	}
+	for k, v := range newSource.CustomCloudTags {
+		cloudTagMap[k] = v
+	}
+
+	bytes, err := json.Marshal(cloudTagMap)
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
+	updateInfo["cloud_tags"] = string(bytes)
+
 	targetKey := IDKey{ID: sourceID}
 	if len(updateInfo) > 0 {
 		var chItem metadbmodel.ChPodNSCloudTags
@@ -80,7 +95,12 @@ func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 			c.SubscriberComponent.dbOperator.add(
 				[]IDKey{targetKey},
 				[]metadbmodel.ChPodNSCloudTags{{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID}, CloudTags: updateInfo["cloud_tags"].(string)}},
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+					CloudTags:   updateInfo["cloud_tags"].(string),
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
+				}},
 				db,
 			)
 		} else {

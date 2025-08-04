@@ -49,8 +49,8 @@ type UpdatePtr[T Update] interface {
 	GetFields() interface{} // return *FieldsUpdate
 	SetDiffBase(interface{})
 	GetDiffBase() interface{} // return *constraint.DiffBase
-	SetCloudItem(interface{})
-	GetCloudItem() interface{} // return *constraint.CloudModel
+	// SetCloudItem(interface{})
+	// GetCloudItem() interface{} // return *constraint.CloudModel
 	SetNewMetadbItem(interface{})
 	GetNewMetadbItem() interface{} // return *constraint.MetadbModel
 }

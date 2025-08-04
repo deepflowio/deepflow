@@ -27,8 +27,8 @@ type ChPodK8sAnnotations struct {
 	SubscriberComponent[
 		*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		metadbmodel.Pod,
@@ -42,8 +42,8 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 		newSubscriberComponent[
 			*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			metadbmodel.Pod,
@@ -58,7 +58,11 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *metadb.DB) {
+func (c *ChPodK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
@@ -73,7 +77,12 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *mess
 			c.SubscriberComponent.dbOperator.add(
 				[]IDKey{targetKey},
 				[]metadbmodel.ChPodK8sAnnotations{{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID}, Annotations: updateInfo["annotations"].(string)}},
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+					Annotations: updateInfo["annotations"].(string),
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
+				}},
 				db,
 			)
 		}

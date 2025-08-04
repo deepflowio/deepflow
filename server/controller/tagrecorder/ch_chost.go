@@ -29,8 +29,8 @@ type ChChost struct {
 	SubscriberComponent[
 		*message.VMAdd,
 		message.VMAdd,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
+		*message.VMUpdate,
+		message.VMUpdate,
 		*message.VMDelete,
 		message.VMDelete,
 		metadbmodel.VM,
@@ -44,8 +44,8 @@ func NewChChost() *ChChost {
 		newSubscriberComponent[
 			*message.VMAdd,
 			message.VMAdd,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
+			*message.VMUpdate,
+			message.VMUpdate,
 			*message.VMDelete,
 			message.VMDelete,
 			metadbmodel.VM,
@@ -83,7 +83,11 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *metadb.DB) {
+func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

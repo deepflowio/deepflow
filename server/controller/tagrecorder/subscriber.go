@@ -20,13 +20,11 @@ import (
 	"fmt"
 	"slices"
 	"sync"
-	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -174,8 +172,8 @@ type Subscriber interface {
 type SubscriberDataGenerator[
 	MAPT msgconstraint.AddPtr[MAT],
 	MAT msgconstraint.Add,
-	MUPT msgconstraint.FieldsUpdatePtr[MUT],
-	MUT msgconstraint.FieldsUpdate,
+	MUPT msgconstraint.UpdatePtr[MUT],
+	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MetadbModel,
@@ -183,15 +181,15 @@ type SubscriberDataGenerator[
 	KT SubscriberChModelKey,
 ] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
-	onResourceUpdated(int, MUPT, *metadb.DB)
+	onResourceUpdated(*message.Metadata, MUPT)
 	softDeletedTargetsUpdated([]CT, *metadb.DB)
 }
 
 type SubscriberComponent[
 	MAPT msgconstraint.AddPtr[MAT],
 	MAT msgconstraint.Add,
-	MUPT msgconstraint.FieldsUpdatePtr[MUT],
-	MUT msgconstraint.FieldsUpdate,
+	MUPT msgconstraint.UpdatePtr[MUT],
+	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MetadbModel,
@@ -211,8 +209,8 @@ type SubscriberComponent[
 func newSubscriberComponent[
 	MAPT msgconstraint.AddPtr[MAT],
 	MAT msgconstraint.Add,
-	MUPT msgconstraint.FieldsUpdatePtr[MUT],
-	MUT msgconstraint.FieldsUpdate,
+	MUPT msgconstraint.UpdatePtr[MUT],
+	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
 	MT constraint.MetadbModel,
@@ -261,7 +259,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMessage, s)
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
+	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedMessage, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMessage, s)
 }
 
@@ -275,18 +273,12 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	}
 	keys, chItems := s.generateKeyTargets(md, dbItems)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
-	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	updateFields := msg.(MUPT)
-	db, err := metadb.GetDB(md.GetORGID())
-	if err != nil {
-		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
-	}
-	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
-	s.updateChTagLastUpdatedAt(md, db)
+	updateMessage := msg.(MUPT)
+	s.subscriberDG.onResourceUpdated(md, updateMessage)
 }
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateOrSync(db *metadb.DB, key KT, updateInfo map[string]interface{}) {
@@ -338,7 +330,6 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
 	}
-	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Delete resource by domain
@@ -351,7 +342,6 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 	if err := db.Where("domain_id = ?", md.GetDomainID()).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 	}
-	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Delete resource by sub domain
@@ -364,7 +354,6 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	if err := db.Where("sub_domain_id = ?", md.GetSubDomainID()).Delete(&chModel).Error; err != nil {
 		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 	}
-	s.updateChTagLastUpdatedAt(md, db)
 }
 
 // Update team_id of resource by sub domain
@@ -376,15 +365,5 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 	}
 	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.GetSubDomainID()).Update("team_id", md.GetTeamID()).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
-	}
-	s.updateChTagLastUpdatedAt(md, db)
-}
-
-// updateChTagLastUpdatedAt updates the updated_at field of self resource type to trigger clickhouse synchronization
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateChTagLastUpdatedAt(md *message.Metadata, db *metadb.DB) {
-	err := db.Model(&metadbModel.ChTagLastUpdatedAt{}).Where("table_name = ?", s.resourceTypeName).
-		Updates(map[string]interface{}{"updated_at": time.Now()}).Error
-	if err != nil {
-		log.Errorf("update %s updated_at error: %v", s.resourceTypeName, err, db.LogPrefixORGID)
 	}
 }
