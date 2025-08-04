@@ -29,8 +29,8 @@ type ChChost struct {
 	SubscriberComponent[
 		*message.VMAdd,
 		message.VMAdd,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
+		*message.VMUpdate,
+		message.VMUpdate,
 		*message.VMDelete,
 		message.VMDelete,
 		mysqlmodel.VM,
@@ -44,8 +44,8 @@ func NewChChost() *ChChost {
 		newSubscriberComponent[
 			*message.VMAdd,
 			message.VMAdd,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
+			*message.VMUpdate,
+			message.VMUpdate,
 			*message.VMDelete,
 			message.VMDelete,
 			mysqlmodel.VM,
@@ -83,7 +83,11 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
+func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

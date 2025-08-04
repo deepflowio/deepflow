@@ -31,8 +31,8 @@ type ChGProcess struct {
 	SubscriberComponent[
 		*message.ProcessAdd,
 		message.ProcessAdd,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
+		*message.ProcessUpdate,
+		message.ProcessUpdate,
 		*message.ProcessDelete,
 		message.ProcessDelete,
 		mysqlmodel.Process,
@@ -47,8 +47,8 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 		newSubscriberComponent[
 			*message.ProcessAdd,
 			message.ProcessAdd,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
+			*message.ProcessUpdate,
+			message.ProcessUpdate,
 			*message.ProcessDelete,
 			message.ProcessDelete,
 			mysqlmodel.Process,
@@ -90,7 +90,9 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.ProcessUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.ProcessFieldsUpdate)
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

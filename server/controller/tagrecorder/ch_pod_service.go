@@ -29,8 +29,8 @@ type ChPodService struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
@@ -44,8 +44,8 @@ func NewChPodService() *ChPodService {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
@@ -81,7 +81,11 @@ func (c *ChPodService) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodService) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

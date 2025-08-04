@@ -29,8 +29,8 @@ type ChPodCluster struct {
 	SubscriberComponent[
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
-		*message.PodClusterFieldsUpdate,
-		message.PodClusterFieldsUpdate,
+		*message.PodClusterUpdate,
+		message.PodClusterUpdate,
 		*message.PodClusterDelete,
 		message.PodClusterDelete,
 		mysqlmodel.PodCluster,
@@ -45,8 +45,8 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 		newSubscriberComponent[
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
-			*message.PodClusterFieldsUpdate,
-			message.PodClusterFieldsUpdate,
+			*message.PodClusterUpdate,
+			message.PodClusterUpdate,
 			*message.PodClusterDelete,
 			message.PodClusterDelete,
 			mysqlmodel.PodCluster,
@@ -85,7 +85,11 @@ func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodCluster) onResourceUpdated(sourceID int, fieldsUpdate *message.PodClusterFieldsUpdate, db *mysql.DB) {
+func (c *ChPodCluster) onResourceUpdated(md *message.Metadata, updateMessage *message.PodClusterUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodClusterFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodCluster)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

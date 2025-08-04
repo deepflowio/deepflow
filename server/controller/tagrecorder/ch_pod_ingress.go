@@ -29,8 +29,8 @@ type ChPodIngress struct {
 	SubscriberComponent[
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
-		*message.PodIngressFieldsUpdate,
-		message.PodIngressFieldsUpdate,
+		*message.PodIngressUpdate,
+		message.PodIngressUpdate,
 		*message.PodIngressDelete,
 		message.PodIngressDelete,
 		mysqlmodel.PodIngress,
@@ -44,8 +44,8 @@ func NewChPodIngress() *ChPodIngress {
 		newSubscriberComponent[
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
-			*message.PodIngressFieldsUpdate,
-			message.PodIngressFieldsUpdate,
+			*message.PodIngressUpdate,
+			message.PodIngressUpdate,
 			*message.PodIngressDelete,
 			message.PodIngressDelete,
 			mysqlmodel.PodIngress,
@@ -81,7 +81,11 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodIngress) onResourceUpdated(sourceID int, fieldsUpdate *message.PodIngressFieldsUpdate, db *mysql.DB) {
+func (c *ChPodIngress) onResourceUpdated(md *message.Metadata, updateMessage *message.PodIngressUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodIngressFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodIngress)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

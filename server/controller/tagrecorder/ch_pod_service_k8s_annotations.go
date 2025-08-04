@@ -27,8 +27,8 @@ type ChPodServiceK8sAnnotations struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
@@ -42,8 +42,8 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
@@ -58,7 +58,11 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	var chItem mysqlmodel.ChPodServiceK8sAnnotations
 
@@ -77,6 +81,11 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 				[]mysqlmodel.ChPodServiceK8sAnnotations{{
 					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
 					Annotations: updateInfo["annotations"].(string),
+					L3EPCID:     newSource.VPCID,
+					PodNsID:     newSource.PodNamespaceID,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				}},
 				db,
 			)
@@ -94,6 +103,8 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source
 	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodServiceK8sAnnotations{{
 		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
+		L3EPCID:     source.VPCID,
+		PodNsID:     source.PodNamespaceID,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
 		SubDomainID: md.GetSubDomainID(),

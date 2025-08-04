@@ -27,8 +27,8 @@ type ChPodServiceK8sAnnotation struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
@@ -42,8 +42,8 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
@@ -58,7 +58,13 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
+	sourceID := newSource.ID
+	vpcID := newSource.VPCID
+	podNsID := newSource.PodNamespaceID
 	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]mysqlmodel.ChPodServiceK8sAnnotation, 0)
 	keysToDelete := make([]IDKeyKey, 0)
@@ -74,11 +80,14 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodServiceK8sAnnotation{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
-					Key:      k,
-					Value:    v,
-					L3EPCID:  fieldsUpdate.VPCID.GetNew(),
-					PodNsID:  fieldsUpdate.PodNamespaceID.GetNew(),
+					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+					Key:         k,
+					Value:       v,
+					L3EPCID:     vpcID,
+					PodNsID:     podNsID,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				})
 				continue
 			}
@@ -89,9 +98,14 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate
 				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
 					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodServiceK8sAnnotation{
-						ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
-						Key:      k,
-						Value:    v,
+						ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+						Key:         k,
+						Value:       v,
+						L3EPCID:     vpcID,
+						PodNsID:     podNsID,
+						TeamID:      md.GetTeamID(),
+						DomainID:    md.GetDomainID(),
+						SubDomainID: md.GetSubDomainID(),
 					})
 					continue
 				}
@@ -126,6 +140,8 @@ func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source 
 			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
+			L3EPCID:     source.VPCID,
+			PodNsID:     source.PodNamespaceID,
 			TeamID:      md.GetTeamID(),
 			DomainID:    md.GetDomainID(),
 			SubDomainID: md.GetSubDomainID(),
