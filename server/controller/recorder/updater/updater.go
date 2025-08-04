@@ -277,8 +277,8 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		structInfo.SetLcuuid(diffBase.GetLcuuid())
 		msgData := MUPT(new(MUT))
 		msgData.SetFields(structInfo)
-		msgData.SetDiffBase(diffBase)
-		msgData.SetCloudItem(cloudItem)
+		// msgData.SetDiffBase(diffBase)
+		// msgData.SetCloudItem(cloudItem)
 		msgData.SetNewMetadbItem(dbItem)
 		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
 		u.Changed = true
