@@ -27,8 +27,8 @@ type ChPodServiceK8sLabels struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		metadbmodel.PodService,
@@ -42,8 +42,8 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			metadbmodel.PodService,
@@ -58,7 +58,11 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
+func (c *ChPodServiceK8sLabels) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Label.IsDifferent() {
 		labels, _ := StrToJsonAndMap(fieldsUpdate.Label.GetNew())
@@ -74,8 +78,13 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 			c.SubscriberComponent.dbOperator.add(
 				[]IDKey{targetKey},
 				[]metadbmodel.ChPodServiceK8sLabels{{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-					Labels:   updateInfo["labels"].(string),
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+					Labels:      updateInfo["labels"].(string),
+					L3EPCID:     newSource.VPCID,
+					PodNsID:     newSource.PodNamespaceID,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				}},
 				db,
 			)
@@ -93,6 +102,8 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, source *met
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sLabels{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
+		L3EPCID:     source.VPCID,
+		PodNsID:     source.PodNamespaceID,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
 		SubDomainID: md.GetSubDomainID(),

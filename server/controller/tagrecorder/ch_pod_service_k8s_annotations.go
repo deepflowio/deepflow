@@ -27,8 +27,8 @@ type ChPodServiceK8sAnnotations struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		metadbmodel.PodService,
@@ -42,8 +42,8 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			metadbmodel.PodService,
@@ -58,7 +58,11 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
+func (c *ChPodServiceK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	var chItem metadbmodel.ChPodServiceK8sAnnotations
 
@@ -77,6 +81,11 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 				[]metadbmodel.ChPodServiceK8sAnnotations{{
 					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
 					Annotations: updateInfo["annotations"].(string),
+					L3EPCID:     newSource.VPCID,
+					PodNsID:     newSource.PodNamespaceID,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				}},
 				db,
 			)
@@ -94,6 +103,8 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source
 	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sAnnotations{{
 		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
+		L3EPCID:     source.VPCID,
+		PodNsID:     source.PodNamespaceID,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
 		SubDomainID: md.GetSubDomainID(),

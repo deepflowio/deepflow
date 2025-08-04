@@ -29,8 +29,8 @@ type ChNetwork struct {
 	SubscriberComponent[
 		*message.NetworkAdd,
 		message.NetworkAdd,
-		*message.NetworkFieldsUpdate,
-		message.NetworkFieldsUpdate,
+		*message.NetworkUpdate,
+		message.NetworkUpdate,
 		*message.NetworkDelete,
 		message.NetworkDelete,
 		metadbmodel.Network,
@@ -45,8 +45,8 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 		newSubscriberComponent[
 			*message.NetworkAdd,
 			message.NetworkAdd,
-			*message.NetworkFieldsUpdate,
-			message.NetworkFieldsUpdate,
+			*message.NetworkUpdate,
+			message.NetworkUpdate,
 			*message.NetworkDelete,
 			message.NetworkDelete,
 			metadbmodel.Network,
@@ -85,7 +85,11 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNetwork) onResourceUpdated(sourceID int, fieldsUpdate *message.NetworkFieldsUpdate, db *metadb.DB) {
+func (c *ChNetwork) onResourceUpdated(md *message.Metadata, updateMessage *message.NetworkUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.NetworkFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Network)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

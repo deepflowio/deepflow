@@ -27,8 +27,8 @@ type ChChostCloudTag struct {
 	SubscriberComponent[
 		*message.VMAdd,
 		message.VMAdd,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
+		*message.VMUpdate,
+		message.VMUpdate,
 		*message.VMDelete,
 		message.VMDelete,
 		metadbmodel.VM,
@@ -42,8 +42,8 @@ func NewChChostCloudTag() *ChChostCloudTag {
 		newSubscriberComponent[
 			*message.VMAdd,
 			message.VMAdd,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
+			*message.VMUpdate,
+			message.VMUpdate,
 			*message.VMDelete,
 			message.VMDelete,
 			metadbmodel.VM,
@@ -58,54 +58,95 @@ func NewChChostCloudTag() *ChChostCloudTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *metadb.DB) {
+func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
+	sourceID := newSource.ID
+	new := map[string]string{}
+	old := map[string]string{}
+	updateInfo := make(map[string]interface{})
 	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChChostCloudTag, 0)
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChChostCloudTag, 0)
 
+	if !fieldsUpdate.LearnedCloudTags.IsDifferent() && !fieldsUpdate.CustomCloudTags.IsDifferent() {
+		return
+	}
+
 	if fieldsUpdate.LearnedCloudTags.IsDifferent() {
-		new := fieldsUpdate.LearnedCloudTags.GetNew()
-		old := fieldsUpdate.LearnedCloudTags.GetOld()
-		for k, v := range new {
-			oldV, ok := old[k]
-			targetKey := NewIDKeyKey(sourceID, k)
-			if !ok {
+		for k, v := range fieldsUpdate.LearnedCloudTags.GetNew() {
+			new[k] = v
+		}
+		for k, v := range fieldsUpdate.LearnedCloudTags.GetOld() {
+			old[k] = v
+		}
+	} else {
+		for k, v := range newSource.LearnedCloudTags {
+			new[k] = v
+			old[k] = v
+		}
+	}
+
+	// custom cloud tag has a higher priority
+	if fieldsUpdate.CustomCloudTags.IsDifferent() {
+		for k, v := range fieldsUpdate.CustomCloudTags.GetNew() {
+			new[k] = v
+		}
+		for k, v := range fieldsUpdate.CustomCloudTags.GetOld() {
+			old[k] = v
+		}
+	} else {
+		for k, v := range newSource.CustomCloudTags {
+			new[k] = v
+			old[k] = v
+		}
+	}
+
+	for k, v := range new {
+		oldV, ok := old[k]
+		targetKey := NewIDKeyKey(sourceID, k)
+		if !ok {
+			keysToAdd = append(keysToAdd, targetKey)
+			targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
+				ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+				Key:      k,
+				Value:    v,
+				TeamID:   md.GetTeamID(),
+				DomainID: md.GetDomainID(),
+			})
+			continue
+		}
+
+		if oldV != v {
+			var chItem metadbmodel.ChChostCloudTag
+			db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+			if chItem.ID == 0 {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
 					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 					Key:      k,
 					Value:    v,
+					TeamID:   md.GetTeamID(),
+					DomainID: md.GetDomainID(),
 				})
 				continue
 			}
-			updateInfo := make(map[string]interface{})
-			if oldV != v {
-				var chItem metadbmodel.ChChostCloudTag
-				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
-				if chItem.ID == 0 {
-					keysToAdd = append(keysToAdd, targetKey)
-					targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
-						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-						Key:      k,
-						Value:    v,
-					})
-					continue
-				}
-				updateInfo["value"] = v
-			}
-			c.updateOrSync(db, targetKey, updateInfo)
+			updateInfo["value"] = v
 		}
-		for k := range old {
-			if _, ok := new[k]; !ok {
-				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
-				targetsToDelete = append(targetsToDelete, metadbmodel.ChChostCloudTag{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-					Key:      k,
-				})
-			}
+		c.updateOrSync(db, targetKey, updateInfo)
+	}
+	for k := range old {
+		if _, ok := new[k]; !ok {
+			keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
+			targetsToDelete = append(targetsToDelete, metadbmodel.ChChostCloudTag{
+				ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
+				Key:      k,
+			})
 		}
 	}
+
 	if len(keysToAdd) > 0 {
 		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
@@ -116,7 +157,8 @@ func (c *ChChostCloudTag) onResourceUpdated(sourceID int, fieldsUpdate *message.
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKeyKey, targets []metadbmodel.ChChostCloudTag) {
-	for k, v := range source.LearnedCloudTags {
+	cloudTagMap := MergeCloudTags(source.LearnedCloudTags, source.CustomCloudTags)
+	for k, v := range cloudTagMap {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
 		targets = append(targets, metadbmodel.ChChostCloudTag{
 			ChIDBase: metadbmodel.ChIDBase{ID: source.ID},

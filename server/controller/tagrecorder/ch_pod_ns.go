@@ -29,8 +29,8 @@ type ChPodNamespace struct {
 	SubscriberComponent[
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
-		*message.PodNamespaceFieldsUpdate,
-		message.PodNamespaceFieldsUpdate,
+		*message.PodNamespaceUpdate,
+		message.PodNamespaceUpdate,
 		*message.PodNamespaceDelete,
 		message.PodNamespaceDelete,
 		metadbmodel.PodNamespace,
@@ -45,8 +45,8 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 		newSubscriberComponent[
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
-			*message.PodNamespaceFieldsUpdate,
-			message.PodNamespaceFieldsUpdate,
+			*message.PodNamespaceUpdate,
+			message.PodNamespaceUpdate,
 			*message.PodNamespaceDelete,
 			message.PodNamespaceDelete,
 			metadbmodel.PodNamespace,
@@ -86,7 +86,11 @@ func (c *ChPodNamespace) sourceToTarget(md *message.Metadata, source *metadbmode
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *metadb.DB) {
+func (c *ChPodNamespace) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNamespaceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodNamespaceFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNamespace)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
