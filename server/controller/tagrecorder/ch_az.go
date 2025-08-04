@@ -29,8 +29,8 @@ type ChAZ struct {
 	SubscriberComponent[
 		*message.AZAdd,
 		message.AZAdd,
-		*message.AZFieldsUpdate,
-		message.AZFieldsUpdate,
+		*message.AZUpdate,
+		message.AZUpdate,
 		*message.AZDelete,
 		message.AZDelete,
 		mysqlmodel.AZ,
@@ -46,8 +46,8 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 		newSubscriberComponent[
 			*message.AZAdd,
 			message.AZAdd,
-			*message.AZFieldsUpdate,
-			message.AZFieldsUpdate,
+			*message.AZUpdate,
+			message.AZUpdate,
 			*message.AZDelete,
 			message.AZDelete,
 			mysqlmodel.AZ,
@@ -65,7 +65,11 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *mysql.DB) {
+func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.AZUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.AZFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.AZ)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

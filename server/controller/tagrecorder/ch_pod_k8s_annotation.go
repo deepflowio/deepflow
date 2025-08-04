@@ -27,8 +27,8 @@ type ChPodK8sAnnotation struct {
 	SubscriberComponent[
 		*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		mysqlmodel.Pod,
@@ -42,8 +42,8 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 		newSubscriberComponent[
 			*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			mysqlmodel.Pod,
@@ -58,7 +58,11 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+func (c *ChPodK8sAnnotation) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
+	sourceID := newSource.ID
 	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]mysqlmodel.ChPodK8sAnnotation, 0)
 	keysToDelete := make([]IDKeyKey, 0)
@@ -74,9 +78,12 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sAnnotation{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
-					Key:      k,
-					Value:    v,
+					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+					Key:         k,
+					Value:       v,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				})
 				continue
 			}
@@ -87,9 +94,12 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
 					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sAnnotation{
-						ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
-						Key:      k,
-						Value:    v,
+						ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+						Key:         k,
+						Value:       v,
+						TeamID:      md.GetTeamID(),
+						DomainID:    md.GetDomainID(),
+						SubDomainID: md.GetSubDomainID(),
 					})
 					continue
 				}

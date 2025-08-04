@@ -27,8 +27,8 @@ type ChPodK8sLabels struct {
 	SubscriberComponent[
 		*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		mysqlmodel.Pod,
@@ -42,8 +42,8 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 		newSubscriberComponent[
 			*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			mysqlmodel.Pod,
@@ -58,7 +58,11 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+func (c *ChPodK8sLabels) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Label.IsDifferent() {
@@ -73,7 +77,12 @@ func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.P
 			c.SubscriberComponent.dbOperator.add(
 				[]IDKey{targetKey},
 				[]mysqlmodel.ChPodK8sLabels{{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, Labels: updateInfo["labels"].(string)}},
+					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+					Labels:      updateInfo["labels"].(string),
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
+				}},
 				db,
 			)
 		}

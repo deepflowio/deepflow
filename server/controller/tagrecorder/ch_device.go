@@ -32,8 +32,8 @@ type ChVMDevice struct {
 	SubscriberComponent[
 		*message.VMAdd,
 		message.VMAdd,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
+		*message.VMUpdate,
+		message.VMUpdate,
 		*message.VMDelete,
 		message.VMDelete,
 		mysqlmodel.VM,
@@ -48,8 +48,8 @@ func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 		newSubscriberComponent[
 			*message.VMAdd,
 			message.VMAdd,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
+			*message.VMUpdate,
+			message.VMUpdate,
 			*message.VMDelete,
 			message.VMDelete,
 			mysqlmodel.VM,
@@ -93,7 +93,11 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVMDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
+func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -133,8 +137,8 @@ type ChHostDevice struct {
 	SubscriberComponent[
 		*message.HostAdd,
 		message.HostAdd,
-		*message.HostFieldsUpdate,
-		message.HostFieldsUpdate,
+		*message.HostUpdate,
+		message.HostUpdate,
 		*message.HostDelete,
 		message.HostDelete,
 		mysqlmodel.Host,
@@ -149,8 +153,8 @@ func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 		newSubscriberComponent[
 			*message.HostAdd,
 			message.HostAdd,
-			*message.HostFieldsUpdate,
-			message.HostFieldsUpdate,
+			*message.HostUpdate,
+			message.HostUpdate,
 			*message.HostDelete,
 			message.HostDelete,
 			mysqlmodel.Host,
@@ -193,7 +197,11 @@ func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.H
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChHostDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.HostFieldsUpdate, db *mysql.DB) {
+func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.HostUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.HostFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Host)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -235,8 +243,8 @@ type ChVRouterDevice struct {
 	SubscriberComponent[
 		*message.VRouterAdd,
 		message.VRouterAdd,
-		*message.VRouterFieldsUpdate,
-		message.VRouterFieldsUpdate,
+		*message.VRouterUpdate,
+		message.VRouterUpdate,
 		*message.VRouterDelete,
 		message.VRouterDelete,
 		mysqlmodel.VRouter,
@@ -251,8 +259,8 @@ func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 		newSubscriberComponent[
 			*message.VRouterAdd,
 			message.VRouterAdd,
-			*message.VRouterFieldsUpdate,
-			message.VRouterFieldsUpdate,
+			*message.VRouterUpdate,
+			message.VRouterUpdate,
 			*message.VRouterDelete,
 			message.VRouterDelete,
 			mysqlmodel.VRouter,
@@ -292,7 +300,11 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVRouterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.VRouterFieldsUpdate, db *mysql.DB) {
+func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.VRouterUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VRouterFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VRouter)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -318,8 +330,8 @@ type ChDHCPPortDevice struct {
 	SubscriberComponent[
 		*message.DHCPPortAdd,
 		message.DHCPPortAdd,
-		*message.DHCPPortFieldsUpdate,
-		message.DHCPPortFieldsUpdate,
+		*message.DHCPPortUpdate,
+		message.DHCPPortUpdate,
 		*message.DHCPPortDelete,
 		message.DHCPPortDelete,
 		mysqlmodel.DHCPPort,
@@ -334,8 +346,8 @@ func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice
 		newSubscriberComponent[
 			*message.DHCPPortAdd,
 			message.DHCPPortAdd,
-			*message.DHCPPortFieldsUpdate,
-			message.DHCPPortFieldsUpdate,
+			*message.DHCPPortUpdate,
+			message.DHCPPortUpdate,
 			*message.DHCPPortDelete,
 			message.DHCPPortDelete,
 			mysqlmodel.DHCPPort,
@@ -375,7 +387,11 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *mysqlmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.DHCPPortFieldsUpdate, db *mysql.DB) {
+func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.DHCPPortUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.DHCPPortFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.DHCPPort)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -401,8 +417,8 @@ type ChNATGatewayDevice struct {
 	SubscriberComponent[
 		*message.NATGatewayAdd,
 		message.NATGatewayAdd,
-		*message.NATGatewayFieldsUpdate,
-		message.NATGatewayFieldsUpdate,
+		*message.NATGatewayUpdate,
+		message.NATGatewayUpdate,
 		*message.NATGatewayDelete,
 		message.NATGatewayDelete,
 		mysqlmodel.NATGateway,
@@ -417,8 +433,8 @@ func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDe
 		newSubscriberComponent[
 			*message.NATGatewayAdd,
 			message.NATGatewayAdd,
-			*message.NATGatewayFieldsUpdate,
-			message.NATGatewayFieldsUpdate,
+			*message.NATGatewayUpdate,
+			message.NATGatewayUpdate,
 			*message.NATGatewayDelete,
 			message.NATGatewayDelete,
 			mysqlmodel.NATGateway,
@@ -459,7 +475,11 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.NATGatewayFieldsUpdate, db *mysql.DB) {
+func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.NATGatewayUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.NATGatewayFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.NATGateway)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -488,8 +508,8 @@ type ChLBDevice struct {
 	SubscriberComponent[
 		*message.LBAdd,
 		message.LBAdd,
-		*message.LBFieldsUpdate,
-		message.LBFieldsUpdate,
+		*message.LBUpdate,
+		message.LBUpdate,
 		*message.LBDelete,
 		message.LBDelete,
 		mysqlmodel.LB,
@@ -504,8 +524,8 @@ func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 		newSubscriberComponent[
 			*message.LBAdd,
 			message.LBAdd,
-			*message.LBFieldsUpdate,
-			message.LBFieldsUpdate,
+			*message.LBUpdate,
+			message.LBUpdate,
 			*message.LBDelete,
 			message.LBDelete,
 			mysqlmodel.LB,
@@ -546,7 +566,11 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.LB)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChLBDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.LBFieldsUpdate, db *mysql.DB) {
+func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.LBUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.LBFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.LB)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -574,8 +598,8 @@ func (c *ChLBDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, db
 type ChRDSInstanceDevice struct {
 	SubscriberComponent[*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
-		*message.RDSInstanceFieldsUpdate,
-		message.RDSInstanceFieldsUpdate,
+		*message.RDSInstanceUpdate,
+		message.RDSInstanceUpdate,
 		*message.RDSInstanceDelete,
 		message.RDSInstanceDelete,
 		mysqlmodel.RDSInstance,
@@ -589,8 +613,8 @@ func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstance
 	mng := &ChRDSInstanceDevice{
 		newSubscriberComponent[*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
-			*message.RDSInstanceFieldsUpdate,
-			message.RDSInstanceFieldsUpdate,
+			*message.RDSInstanceUpdate,
+			message.RDSInstanceUpdate,
 			*message.RDSInstanceDelete,
 			message.RDSInstanceDelete,
 			mysqlmodel.RDSInstance,
@@ -631,7 +655,11 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *mysql
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RDSInstanceFieldsUpdate, db *mysql.DB) {
+func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.RDSInstanceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.RDSInstanceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.RDSInstance)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -659,8 +687,8 @@ func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChD
 type ChRedisInstanceDevice struct {
 	SubscriberComponent[*message.RedisInstanceAdd,
 		message.RedisInstanceAdd,
-		*message.RedisInstanceFieldsUpdate,
-		message.RedisInstanceFieldsUpdate,
+		*message.RedisInstanceUpdate,
+		message.RedisInstanceUpdate,
 		*message.RedisInstanceDelete,
 		message.RedisInstanceDelete,
 		mysqlmodel.RedisInstance,
@@ -674,8 +702,8 @@ func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInst
 	mng := &ChRedisInstanceDevice{
 		newSubscriberComponent[*message.RedisInstanceAdd,
 			message.RedisInstanceAdd,
-			*message.RedisInstanceFieldsUpdate,
-			message.RedisInstanceFieldsUpdate,
+			*message.RedisInstanceUpdate,
+			message.RedisInstanceUpdate,
 			*message.RedisInstanceDelete,
 			message.RedisInstanceDelete,
 			mysqlmodel.RedisInstance,
@@ -716,7 +744,11 @@ func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *mys
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRedisInstanceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.RedisInstanceFieldsUpdate, db *mysql.DB) {
+func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.RedisInstanceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.RedisInstanceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.RedisInstance)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -744,8 +776,8 @@ func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.C
 type ChPodServiceDevice struct {
 	SubscriberComponent[*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		mysqlmodel.PodService,
@@ -759,8 +791,8 @@ func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDe
 	mng := &ChPodServiceDevice{
 		newSubscriberComponent[*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			mysqlmodel.PodService,
@@ -814,7 +846,11 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -839,8 +875,8 @@ func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDe
 type ChPodDevice struct {
 	SubscriberComponent[*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		mysqlmodel.Pod,
@@ -854,8 +890,8 @@ func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 	mng := &ChPodDevice{
 		newSubscriberComponent[*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			mysqlmodel.Pod,
@@ -896,7 +932,11 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *mysqlmodel.Po
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -921,8 +961,8 @@ func (c *ChPodDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevice, d
 type ChPodGroupDevice struct {
 	SubscriberComponent[*message.PodGroupAdd,
 		message.PodGroupAdd,
-		*message.PodGroupFieldsUpdate,
-		message.PodGroupFieldsUpdate,
+		*message.PodGroupUpdate,
+		message.PodGroupUpdate,
 		*message.PodGroupDelete,
 		message.PodGroupDelete,
 		mysqlmodel.PodGroup,
@@ -936,8 +976,8 @@ func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice
 	mng := &ChPodGroupDevice{
 		newSubscriberComponent[*message.PodGroupAdd,
 			message.PodGroupAdd,
-			*message.PodGroupFieldsUpdate,
-			message.PodGroupFieldsUpdate,
+			*message.PodGroupUpdate,
+			message.PodGroupUpdate,
 			*message.PodGroupDelete,
 			message.PodGroupDelete,
 			mysqlmodel.PodGroup,
@@ -978,7 +1018,11 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *mysqlmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodGroupDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodGroupFieldsUpdate, db *mysql.DB) {
+func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodGroupUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodGroupFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodGroup)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -1004,8 +1048,8 @@ func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []mysqlmodel.ChDevi
 type ChPodNodeDevice struct {
 	SubscriberComponent[*message.PodNodeAdd,
 		message.PodNodeAdd,
-		*message.PodNodeFieldsUpdate,
-		message.PodNodeFieldsUpdate,
+		*message.PodNodeUpdate,
+		message.PodNodeUpdate,
 		*message.PodNodeDelete,
 		message.PodNodeDelete,
 		mysqlmodel.PodNode,
@@ -1019,8 +1063,8 @@ func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 	mng := &ChPodNodeDevice{
 		newSubscriberComponent[*message.PodNodeAdd,
 			message.PodNodeAdd,
-			*message.PodNodeFieldsUpdate,
-			message.PodNodeFieldsUpdate,
+			*message.PodNodeUpdate,
+			message.PodNodeUpdate,
 			*message.PodNodeDelete,
 			message.PodNodeDelete,
 			mysqlmodel.PodNode,
@@ -1063,7 +1107,11 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNodeDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNodeFieldsUpdate, db *mysql.DB) {
+func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNodeUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodNodeFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodNode)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -1094,8 +1142,8 @@ type ChPodClusterDevice struct {
 	SubscriberComponent[
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
-		*message.PodClusterFieldsUpdate,
-		message.PodClusterFieldsUpdate,
+		*message.PodClusterUpdate,
+		message.PodClusterUpdate,
 		*message.PodClusterDelete,
 		message.PodClusterDelete,
 		mysqlmodel.PodCluster,
@@ -1110,8 +1158,8 @@ func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDe
 		newSubscriberComponent[
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
-			*message.PodClusterFieldsUpdate,
-			message.PodClusterFieldsUpdate,
+			*message.PodClusterUpdate,
+			message.PodClusterUpdate,
 			*message.PodClusterDelete,
 			message.PodClusterDelete,
 			mysqlmodel.PodCluster,
@@ -1152,7 +1200,11 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *mysqlm
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodClusterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodClusterFieldsUpdate, db *mysql.DB) {
+func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodClusterUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodClusterFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodCluster)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -1177,8 +1229,8 @@ type ChProcessDevice struct {
 	SubscriberComponent[
 		*message.ProcessAdd,
 		message.ProcessAdd,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
+		*message.ProcessUpdate,
+		message.ProcessUpdate,
 		*message.ProcessDelete,
 		message.ProcessDelete,
 		mysqlmodel.Process,
@@ -1193,8 +1245,8 @@ func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 		newSubscriberComponent[
 			*message.ProcessAdd,
 			message.ProcessAdd,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
+			*message.ProcessUpdate,
+			message.ProcessUpdate,
 			*message.ProcessDelete,
 			message.ProcessDelete,
 			mysqlmodel.Process,
@@ -1236,7 +1288,9 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *mysqlmode
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChProcessDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
+func (c *ChProcessDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.ProcessUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.ProcessFieldsUpdate)
 	updateInfo := make(map[string]interface{})
 	gid := int(fieldsUpdate.GID.GetNew())
 	if fieldsUpdate.Name.IsDifferent() {
@@ -1273,8 +1327,8 @@ type ChCustomServiceDevice struct {
 	SubscriberComponent[
 		*message.CustomServiceAdd,
 		message.CustomServiceAdd,
-		*message.CustomServiceFieldsUpdate,
-		message.CustomServiceFieldsUpdate,
+		*message.CustomServiceUpdate,
+		message.CustomServiceUpdate,
 		*message.CustomServiceDelete,
 		message.CustomServiceDelete,
 		mysqlmodel.CustomService,
@@ -1289,8 +1343,8 @@ func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomSer
 		newSubscriberComponent[
 			*message.CustomServiceAdd,
 			message.CustomServiceAdd,
-			*message.CustomServiceFieldsUpdate,
-			message.CustomServiceFieldsUpdate,
+			*message.CustomServiceUpdate,
+			message.CustomServiceUpdate,
 			*message.CustomServiceDelete,
 			message.CustomServiceDelete,
 			mysqlmodel.CustomService,
@@ -1325,7 +1379,11 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *mys
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChCustomServiceDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.CustomServiceFieldsUpdate, db *mysql.DB) {
+func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.CustomServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.CustomServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.CustomService)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

@@ -29,8 +29,8 @@ type ChVPC struct {
 	SubscriberComponent[
 		*message.VPCAdd,
 		message.VPCAdd,
-		*message.VPCFieldsUpdate,
-		message.VPCFieldsUpdate,
+		*message.VPCUpdate,
+		message.VPCUpdate,
 		*message.VPCDelete,
 		message.VPCDelete,
 		mysqlmodel.VPC,
@@ -45,8 +45,8 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 		newSubscriberComponent[
 			*message.VPCAdd,
 			message.VPCAdd,
-			*message.VPCFieldsUpdate,
-			message.VPCFieldsUpdate,
+			*message.VPCUpdate,
+			message.VPCUpdate,
 			*message.VPCDelete,
 			message.VPCDelete,
 			mysqlmodel.VPC,
@@ -85,7 +85,11 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *mysqlmodel.VPC) (ke
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVPC) onResourceUpdated(sourceID int, fieldsUpdate *message.VPCFieldsUpdate, db *mysql.DB) {
+func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.VPCUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.VPCFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VPC)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {

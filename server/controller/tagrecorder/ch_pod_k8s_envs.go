@@ -27,8 +27,8 @@ type ChPodK8sEnvs struct {
 	SubscriberComponent[
 		*message.PodAdd,
 		message.PodAdd,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
+		*message.PodUpdate,
+		message.PodUpdate,
 		*message.PodDelete,
 		message.PodDelete,
 		mysqlmodel.Pod,
@@ -42,8 +42,8 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 		newSubscriberComponent[
 			*message.PodAdd,
 			message.PodAdd,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
+			*message.PodUpdate,
+			message.PodUpdate,
 			*message.PodDelete,
 			message.PodDelete,
 			mysqlmodel.Pod,
@@ -58,7 +58,11 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
+func (c *ChPodK8sEnvs) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
@@ -73,7 +77,12 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 			c.SubscriberComponent.dbOperator.add(
 				[]IDKey{targetKey},
 				[]mysqlmodel.ChPodK8sEnvs{{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID}, Envs: updateInfo["envs"].(string)}},
+					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+					Envs:        updateInfo["envs"].(string),
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
+				}},
 				db,
 			)
 		}
