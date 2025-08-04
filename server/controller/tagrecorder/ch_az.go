@@ -29,8 +29,8 @@ type ChAZ struct {
 	SubscriberComponent[
 		*message.AZAdd,
 		message.AZAdd,
-		*message.AZFieldsUpdate,
-		message.AZFieldsUpdate,
+		*message.AZUpdate,
+		message.AZUpdate,
 		*message.AZDelete,
 		message.AZDelete,
 		metadbmodel.AZ,
@@ -46,8 +46,8 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 		newSubscriberComponent[
 			*message.AZAdd,
 			message.AZAdd,
-			*message.AZFieldsUpdate,
-			message.AZFieldsUpdate,
+			*message.AZUpdate,
+			message.AZUpdate,
 			*message.AZDelete,
 			message.AZDelete,
 			metadbmodel.AZ,
@@ -65,7 +65,11 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *metadb.DB) {
+func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.AZUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.AZFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.AZ)
+	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()

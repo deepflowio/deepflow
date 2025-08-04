@@ -27,8 +27,8 @@ type ChPodServiceK8sLabel struct {
 	SubscriberComponent[
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
+		*message.PodServiceUpdate,
+		message.PodServiceUpdate,
 		*message.PodServiceDelete,
 		message.PodServiceDelete,
 		metadbmodel.PodService,
@@ -42,8 +42,8 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 		newSubscriberComponent[
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
+			*message.PodServiceUpdate,
+			message.PodServiceUpdate,
 			*message.PodServiceDelete,
 			message.PodServiceDelete,
 			metadbmodel.PodService,
@@ -58,7 +58,13 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *metadb.DB) {
+func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+	db := md.GetDB()
+	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
+	sourceID := newSource.ID
+	vpcID := newSource.VPCID
+	podNsID := newSource.PodNamespaceID
 	keysToAdd := make([]IDKeyKey, 0)
 	targetsToAdd := make([]metadbmodel.ChPodServiceK8sLabel, 0)
 	keysToDelete := make([]IDKeyKey, 0)
@@ -74,11 +80,14 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
 				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sLabel{
-					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-					Key:      k,
-					Value:    v,
-					L3EPCID:  fieldsUpdate.VPCID.GetNew(),
-					PodNsID:  fieldsUpdate.PodNamespaceID.GetNew(),
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+					Key:         k,
+					Value:       v,
+					L3EPCID:     vpcID,
+					PodNsID:     podNsID,
+					TeamID:      md.GetTeamID(),
+					DomainID:    md.GetDomainID(),
+					SubDomainID: md.GetSubDomainID(),
 				})
 				continue
 			}
@@ -89,9 +98,14 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *mes
 				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
 					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sLabel{
-						ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
-						Key:      k,
-						Value:    v,
+						ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
+						Key:         k,
+						Value:       v,
+						L3EPCID:     vpcID,
+						PodNsID:     podNsID,
+						TeamID:      md.GetTeamID(),
+						DomainID:    md.GetDomainID(),
+						SubDomainID: md.GetSubDomainID(),
 					})
 					continue
 				}
@@ -128,6 +142,8 @@ func (c *ChPodServiceK8sLabel) sourceToTarget(md *message.Metadata, source *meta
 			ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
+			L3EPCID:     source.VPCID,
+			PodNsID:     source.PodNamespaceID,
 			TeamID:      md.GetTeamID(),
 			DomainID:    md.GetDomainID(),
 			SubDomainID: md.GetSubDomainID(),

@@ -29,3 +29,15 @@ func StrToJsonAndMap(str string) (resJson string, resMap map[string]string) {
 	resJson = string(jsonStr)
 	return
 }
+
+func MergeCloudTags(learnedCloudTags, customCloudTags map[string]string) map[string]string {
+	res := map[string]string{}
+	for k, v := range learnedCloudTags {
+		res[k] = v
+	}
+	// custom cloud tag has a higher priority
+	for k, v := range customCloudTags {
+		res[k] = v
+	}
+	return res
+}
