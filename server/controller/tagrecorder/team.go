@@ -43,7 +43,7 @@ func GetTeamInfo(db *mysql.DB) {
 		log.Error(err, db.LogPrefixORGID)
 		return
 	}
-	err = db.Unscoped().Find(&vTaps).Error
+	err = db.Unscoped().Select("id", "team_id").Find(&vTaps).Error
 	if err != nil {
 		log.Error(err, db.LogPrefixORGID)
 		return

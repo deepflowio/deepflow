@@ -485,7 +485,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		podIDToPodNodeID:      make(map[int]int),
 	}
 	var vtaps []*mysqlmodel.VTap
-	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
+	if err = db.Unscoped().Select("id", "type", "name", "launch_server", "launch_server_id").Find(&vtaps).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vtap", err), db.LogPrefixORGID)
 		return
 	}
