@@ -448,7 +448,9 @@ impl AppMeter {
     }
 
     pub fn is_empty(&self) -> bool {
-        *self == Self::default()
+        self.traffic.is_empty()
+            && self.latency == AppLatency::default()
+            && self.anomaly == AppAnomaly::default()
     }
 }
 
@@ -478,6 +480,10 @@ impl AppTraffic {
     pub fn reverse(&mut self) {
         swap(&mut self.request, &mut self.response);
         self.direction_score = 0;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.request == 0 && self.response == 0
     }
 }
 
