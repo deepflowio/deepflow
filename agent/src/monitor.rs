@@ -25,6 +25,8 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
+#[cfg(target_os = "linux")]
+use procfs::{diskstats, DiskStat};
 #[cfg(target_os = "windows")]
 use sysinfo::NetworkExt;
 use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
@@ -415,6 +417,133 @@ impl RefCountable for FreeDiskUsage {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn disk_stat_from_name(name: &str) -> Option<DiskStat> {
+    let Ok(disks) = diskstats() else {
+        return None;
+    };
+
+    for d in disks {
+        if d.name.as_str() == name {
+            return Some(d);
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "linux")]
+struct DiskMonitor {
+    name: String,
+    stat: Arc<Mutex<DiskStat>>,
+}
+
+#[cfg(target_os = "linux")]
+impl DiskMonitor {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            stat: Arc::new(Mutex::new(DiskStat {
+                major: 0,
+                minor: 0,
+                name: String::new(),
+                reads: 0,
+                merged: 0,
+                sectors_read: 0,
+                time_reading: 0,
+                writes: 0,
+                writes_merged: 0,
+                sectors_written: 0,
+                time_writing: 0,
+                in_progress: 0,
+                time_in_progress: 0,
+                weighted_time_in_progress: 0,
+                discards: None,
+                discards_merged: None,
+                sectors_discarded: None,
+                time_discarding: None,
+                flushes: None,
+                time_flushing: None,
+            })),
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl RefCountable for DiskMonitor {
+    fn get_counters(&self) -> Vec<Counter> {
+        let mut metrics = vec![];
+        let mut last = self.stat.lock().unwrap();
+        match disk_stat_from_name(self.name.as_str()) {
+            Some(now) if last.sectors_read > 0 => {
+                // KB
+                metrics.push((
+                    "read",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(if now.sectors_read <= last.sectors_read {
+                        0
+                    } else {
+                        (now.sectors_read - last.sectors_read) * 512 / 1024
+                    }),
+                ));
+                metrics.push((
+                    "write",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(if now.sectors_written <= last.sectors_written {
+                        0
+                    } else {
+                        (now.sectors_written - last.sectors_written) * 512 / 1024
+                    }),
+                ));
+                // ns
+                metrics.push((
+                    "read_latency",
+                    CounterType::Gauged,
+                    CounterValue::Float(if now.time_reading <= last.time_reading {
+                        0.0
+                    } else {
+                        ((now.time_reading - last.time_reading) * 1000000) as f64
+                            / (now.reads - last.reads) as f64
+                    }),
+                ));
+                metrics.push((
+                    "write_latency",
+                    CounterType::Gauged,
+                    CounterValue::Float(if now.time_writing <= last.time_writing {
+                        0.0
+                    } else {
+                        ((now.time_writing - last.time_writing) * 1000000) as f64
+                            / (now.writes - last.writes) as f64
+                    }),
+                ));
+                *last = now;
+            }
+            Some(now) => {
+                *last = now;
+            }
+            None => {
+                warn!("get disk {} io failed.", self.name);
+            }
+        }
+        metrics
+    }
+}
+
+#[cfg(target_os = "linux")]
+struct DiskModule {
+    name: String,
+}
+
+#[cfg(target_os = "linux")]
+impl stats::Module for DiskModule {
+    fn name(&self) -> &'static str {
+        "disk_io"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![StatsOption::Tag("name", self.name.clone())]
+    }
+}
 pub struct Monitor {
     stats: Arc<Collector>,
     running: AtomicBool,
@@ -425,6 +554,8 @@ pub struct Monitor {
     config: EnvironmentAccess,
     free_disks_config: Arc<Mutex<Vec<String>>>,
     free_disk_counters: Arc<Mutex<Vec<Arc<FreeDiskUsage>>>>,
+    #[cfg(target_os = "linux")]
+    disks_io: Vec<Arc<DiskMonitor>>,
 }
 
 impl Monitor {
@@ -432,6 +563,18 @@ impl Monitor {
         let mut system = System::new();
         system.refresh_cpu();
         let system = Arc::new(Mutex::new(system));
+        #[cfg(target_os = "linux")]
+        let mut disks_io = vec![];
+        #[cfg(target_os = "linux")]
+        if let Ok(disks) = diskstats() {
+            for d in disks {
+                // /dev/mem, /dev/null & /dev/pts & /dev/loopx & cdrom
+                if d.major == 1 || d.major == 2 || d.major == 7 || d.major == 11 {
+                    continue;
+                }
+                disks_io.push(Arc::new(DiskMonitor::new(d.name)));
+            }
+        };
 
         Ok(Self {
             stats,
@@ -447,6 +590,8 @@ impl Monitor {
             config: config.clone(),
             free_disks_config: Arc::new(Mutex::new(vec![])),
             free_disk_counters: Arc::new(Mutex::new(vec![])),
+            #[cfg(target_os = "linux")]
+            disks_io,
         })
     }
 
@@ -566,6 +711,16 @@ impl Monitor {
             &stats::NoTagModule("system"),
             Countable::Ref(Arc::downgrade(&self.sys_load) as Weak<dyn RefCountable>),
         );
+
+        #[cfg(target_os = "linux")]
+        for disk in &self.disks_io {
+            self.stats.register_countable(
+                &DiskModule {
+                    name: disk.name.clone(),
+                },
+                Countable::Ref(Arc::downgrade(disk) as Weak<dyn RefCountable>),
+            );
+        }
 
         let config = self.config.clone();
         let stats_collector = self.stats.clone();
