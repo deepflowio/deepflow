@@ -3414,7 +3414,6 @@ impl UserConfig {
         self.global.communication.proxy_controller_ip = "127.0.0.1".to_string();
         self.global.communication.proxy_controller_port = 30035;
         self.global.ntp.enabled = false;
-        self.inputs.cbpf.af_packet.interface_regex = "".to_string();
         self.outputs.flow_metrics.filters.apm_metrics = true;
         self.outputs.flow_metrics.filters.npm_metrics = true;
         self.outputs.flow_metrics.filters.npm_metrics_concurrent = true;
