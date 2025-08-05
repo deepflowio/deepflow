@@ -35,8 +35,8 @@ const (
 	ORG_ID_INVALID                  = "ORG_ID_INVALID"
 	CHECK_SCOPE_TEAMS_FAIL          = "CHECK_SCOPE_TEAMS_FAIL"
 	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND" // TODO map to http.StatusNotFound ?
-	// K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
-	// SET_RESOUORCE_FAIL              = "SET_RESOUORCE_FAIL"
+	WINDOWS_AGENT_UNSUPPORTED       = "WINDOWS_AGENT_UNSUPPORTED"
+	AGENT_UNSUPPORTED               = "AGENT_UNSUPPORTED"
 
 	// map to http.StatusInternalServerError
 	FAIL              = "FAIL"
@@ -68,6 +68,8 @@ var (
 		ORG_ID_INVALID:                  http.StatusBadRequest,
 		CHECK_SCOPE_TEAMS_FAIL:          http.StatusBadRequest,
 		RESOURCE_NOT_FOUND:              http.StatusBadRequest,
+		WINDOWS_AGENT_UNSUPPORTED:       http.StatusBadRequest,
+		AGENT_UNSUPPORTED:               http.StatusBadRequest,
 
 		FAIL:              http.StatusInternalServerError,
 		SERVER_ERROR:      http.StatusInternalServerError,

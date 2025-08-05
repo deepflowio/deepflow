@@ -56,18 +56,18 @@ var (
 	}
 
 	profileCommandMap = map[string]struct{}{
-		"ps":              struct{}{},
-		"java-dump-stack": struct{}{},
-		"java-dump-gc":    struct{}{},
-		"java-dump-heap":  struct{}{},
-		"ebpf-dump-stack": struct{}{},
+		"ps":              {},
+		"java-dump-stack": {},
+		"java-dump-gc":    {},
+		"java-dump-heap":  {},
+		"ebpf-dump-stack": {},
 	}
 	probeCommandMap = map[string]struct{}{
-		"ping":       struct{}{},
-		"tcping":     struct{}{},
-		"curl":       struct{}{},
-		"dig":        struct{}{},
-		"traceroute": struct{}{},
+		"ping":       {},
+		"tcping":     {},
+		"curl":       {},
+		"dig":        {},
+		"traceroute": {},
 	}
 )
 
@@ -132,7 +132,11 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err, db.LogPrefixORGID)
-			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
+			if common.GetOsType(agent.Os) == common.OS_WINDOWS {
+				response.JSON(c, response.SetOptStatus(httpcommon.WINDOWS_AGENT_UNSUPPORTED), response.SetError(err))
+			} else {
+				response.JSON(c, response.SetOptStatus(httpcommon.AGENT_UNSUPPORTED), response.SetError(err))
+			}
 			c.Abort()
 			return
 		}
