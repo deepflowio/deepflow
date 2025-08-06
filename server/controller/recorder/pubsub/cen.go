@@ -23,30 +23,30 @@ import (
 
 type CEN struct {
 	ResourcePubSubComponent[
-		*message.CENAdd,
-		message.CENAdd,
+		*message.AddedCENs,
+		message.AddedCENs,
 		message.AddNoneAddition,
-		*message.CENUpdate,
-		message.CENUpdate,
-		*message.CENFieldsUpdate,
-		message.CENFieldsUpdate,
-		*message.CENDelete,
-		message.CENDelete,
+		*message.UpdatedCEN,
+		message.UpdatedCEN,
+		*message.UpdatedCENFields,
+		message.UpdatedCENFields,
+		*message.DeletedCENs,
+		message.DeletedCENs,
 		message.DeleteNoneAddition]
 }
 
 func NewCEN() *CEN {
 	return &CEN{
 		ResourcePubSubComponent[
-			*message.CENAdd,
-			message.CENAdd,
+			*message.AddedCENs,
+			message.AddedCENs,
 			message.AddNoneAddition,
-			*message.CENUpdate,
-			message.CENUpdate,
-			*message.CENFieldsUpdate,
-			message.CENFieldsUpdate,
-			*message.CENDelete,
-			message.CENDelete,
+			*message.UpdatedCEN,
+			message.UpdatedCEN,
+			*message.UpdatedCENFields,
+			message.UpdatedCENFields,
+			*message.DeletedCENs,
+			message.DeletedCENs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeCEN),

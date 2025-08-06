@@ -23,30 +23,30 @@ import (
 
 type ConfigMap struct {
 	ResourcePubSubComponent[
-		*message.ConfigMapAdd,
-		message.ConfigMapAdd,
+		*message.AddedConfigMaps,
+		message.AddedConfigMaps,
 		message.AddNoneAddition,
-		*message.ConfigMapUpdate,
-		message.ConfigMapUpdate,
-		*message.ConfigMapFieldsUpdate,
-		message.ConfigMapFieldsUpdate,
-		*message.ConfigMapDelete,
-		message.ConfigMapDelete,
+		*message.UpdatedConfigMap,
+		message.UpdatedConfigMap,
+		*message.UpdatedConfigMapFields,
+		message.UpdatedConfigMapFields,
+		*message.DeletedConfigMaps,
+		message.DeletedConfigMaps,
 		message.DeleteNoneAddition]
 }
 
 func NewConfigMap() *ConfigMap {
 	return &ConfigMap{
 		ResourcePubSubComponent[
-			*message.ConfigMapAdd,
-			message.ConfigMapAdd,
+			*message.AddedConfigMaps,
+			message.AddedConfigMaps,
 			message.AddNoneAddition,
-			*message.ConfigMapUpdate,
-			message.ConfigMapUpdate,
-			*message.ConfigMapFieldsUpdate,
-			message.ConfigMapFieldsUpdate,
-			*message.ConfigMapDelete,
-			message.ConfigMapDelete,
+			*message.UpdatedConfigMap,
+			message.UpdatedConfigMap,
+			*message.UpdatedConfigMapFields,
+			message.UpdatedConfigMapFields,
+			*message.DeletedConfigMaps,
+			message.DeletedConfigMaps,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeConfigMap),

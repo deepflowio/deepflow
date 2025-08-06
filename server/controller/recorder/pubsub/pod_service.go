@@ -23,30 +23,30 @@ import (
 
 type PodService struct {
 	ResourcePubSubComponent[
-		*message.PodServiceAdd,
-		message.PodServiceAdd,
+		*message.AddedPodServices,
+		message.AddedPodServices,
 		message.AddNoneAddition,
-		*message.PodServiceUpdate,
-		message.PodServiceUpdate,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
-		*message.PodServiceDelete,
-		message.PodServiceDelete,
+		*message.UpdatedPodService,
+		message.UpdatedPodService,
+		*message.UpdatedPodServiceFields,
+		message.UpdatedPodServiceFields,
+		*message.DeletedPodServices,
+		message.DeletedPodServices,
 		message.DeleteNoneAddition]
 }
 
 func NewPodService() *PodService {
 	return &PodService{
 		ResourcePubSubComponent[
-			*message.PodServiceAdd,
-			message.PodServiceAdd,
+			*message.AddedPodServices,
+			message.AddedPodServices,
 			message.AddNoneAddition,
-			*message.PodServiceUpdate,
-			message.PodServiceUpdate,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
-			*message.PodServiceDelete,
-			message.PodServiceDelete,
+			*message.UpdatedPodService,
+			message.UpdatedPodService,
+			*message.UpdatedPodServiceFields,
+			message.UpdatedPodServiceFields,
+			*message.DeletedPodServices,
+			message.DeletedPodServices,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodService),

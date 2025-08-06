@@ -32,15 +32,15 @@ type DHCPPort struct {
 		*diffbase.DHCPPort,
 		*metadbmodel.DHCPPort,
 		metadbmodel.DHCPPort,
-		*message.DHCPPortAdd,
-		message.DHCPPortAdd,
+		*message.AddedDHCPPorts,
+		message.AddedDHCPPorts,
 		message.AddNoneAddition,
-		*message.DHCPPortUpdate,
-		message.DHCPPortUpdate,
-		*message.DHCPPortFieldsUpdate,
-		message.DHCPPortFieldsUpdate,
-		*message.DHCPPortDelete,
-		message.DHCPPortDelete,
+		*message.UpdatedDHCPPort,
+		message.UpdatedDHCPPort,
+		*message.UpdatedDHCPPortFields,
+		message.UpdatedDHCPPortFields,
+		*message.DeletedDHCPPorts,
+		message.DeletedDHCPPorts,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 			*diffbase.DHCPPort,
 			*metadbmodel.DHCPPort,
 			metadbmodel.DHCPPort,
-			*message.DHCPPortAdd,
-			message.DHCPPortAdd,
+			*message.AddedDHCPPorts,
+			message.AddedDHCPPorts,
 			message.AddNoneAddition,
-			*message.DHCPPortUpdate,
-			message.DHCPPortUpdate,
-			*message.DHCPPortFieldsUpdate,
-			message.DHCPPortFieldsUpdate,
-			*message.DHCPPortDelete,
-			message.DHCPPortDelete,
+			*message.UpdatedDHCPPort,
+			message.UpdatedDHCPPort,
+			*message.UpdatedDHCPPortFields,
+			message.UpdatedDHCPPortFields,
+			*message.DeletedDHCPPorts,
+			message.DeletedDHCPPorts,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
@@ -98,8 +98,8 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 	return dbItem, true
 }
 
-func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (*message.DHCPPortFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.DHCPPortFieldsUpdate)
+func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (*message.UpdatedDHCPPortFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedDHCPPortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

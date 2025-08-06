@@ -23,30 +23,30 @@ import (
 
 type RoutingTable struct {
 	ResourcePubSubComponent[
-		*message.RoutingTableAdd,
-		message.RoutingTableAdd,
+		*message.AddedRoutingTables,
+		message.AddedRoutingTables,
 		message.AddNoneAddition,
-		*message.RoutingTableUpdate,
-		message.RoutingTableUpdate,
-		*message.RoutingTableFieldsUpdate,
-		message.RoutingTableFieldsUpdate,
-		*message.RoutingTableDelete,
-		message.RoutingTableDelete,
+		*message.UpdatedRoutingTable,
+		message.UpdatedRoutingTable,
+		*message.UpdatedRoutingTableFields,
+		message.UpdatedRoutingTableFields,
+		*message.DeletedRoutingTables,
+		message.DeletedRoutingTables,
 		message.DeleteNoneAddition]
 }
 
 func NewRoutingTable() *RoutingTable {
 	return &RoutingTable{
 		ResourcePubSubComponent[
-			*message.RoutingTableAdd,
-			message.RoutingTableAdd,
+			*message.AddedRoutingTables,
+			message.AddedRoutingTables,
 			message.AddNoneAddition,
-			*message.RoutingTableUpdate,
-			message.RoutingTableUpdate,
-			*message.RoutingTableFieldsUpdate,
-			message.RoutingTableFieldsUpdate,
-			*message.RoutingTableDelete,
-			message.RoutingTableDelete,
+			*message.UpdatedRoutingTable,
+			message.UpdatedRoutingTable,
+			*message.UpdatedRoutingTableFields,
+			message.UpdatedRoutingTableFields,
+			*message.DeletedRoutingTables,
+			message.DeletedRoutingTables,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRoutingTable),

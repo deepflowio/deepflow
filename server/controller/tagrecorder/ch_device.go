@@ -30,12 +30,12 @@ import (
 
 type ChVMDevice struct {
 	SubscriberComponent[
-		*message.VMAdd,
-		message.VMAdd,
-		*message.VMUpdate,
-		message.VMUpdate,
-		*message.VMDelete,
-		message.VMDelete,
+		*message.AddedVMs,
+		message.AddedVMs,
+		*message.UpdatedVM,
+		message.UpdatedVM,
+		*message.DeletedVMs,
+		message.DeletedVMs,
 		metadbmodel.VM,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -46,12 +46,12 @@ type ChVMDevice struct {
 func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 	mng := &ChVMDevice{
 		newSubscriberComponent[
-			*message.VMAdd,
-			message.VMAdd,
-			*message.VMUpdate,
-			message.VMUpdate,
-			*message.VMDelete,
-			message.VMDelete,
+			*message.AddedVMs,
+			message.AddedVMs,
+			*message.UpdatedVM,
+			message.UpdatedVM,
+			*message.DeletedVMs,
+			message.DeletedVMs,
 			metadbmodel.VM,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -93,9 +93,9 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.VM
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -135,12 +135,12 @@ func (c *ChVMDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, d
 
 type ChHostDevice struct {
 	SubscriberComponent[
-		*message.HostAdd,
-		message.HostAdd,
-		*message.HostUpdate,
-		message.HostUpdate,
-		*message.HostDelete,
-		message.HostDelete,
+		*message.AddedHosts,
+		message.AddedHosts,
+		*message.UpdatedHost,
+		message.UpdatedHost,
+		*message.DeletedHosts,
+		message.DeletedHosts,
 		metadbmodel.Host,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -151,12 +151,12 @@ type ChHostDevice struct {
 func NewChHostDevice(resourceTypeToIconID map[IconKey]int) *ChHostDevice {
 	mng := &ChHostDevice{
 		newSubscriberComponent[
-			*message.HostAdd,
-			message.HostAdd,
-			*message.HostUpdate,
-			message.HostUpdate,
-			*message.HostDelete,
-			message.HostDelete,
+			*message.AddedHosts,
+			message.AddedHosts,
+			*message.UpdatedHost,
+			message.UpdatedHost,
+			*message.DeletedHosts,
+			message.DeletedHosts,
 			metadbmodel.Host,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -197,9 +197,9 @@ func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.HostUpdate) {
+func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedHost) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.HostFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedHostFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Host)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -241,12 +241,12 @@ func (c *ChHostDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice,
 
 type ChVRouterDevice struct {
 	SubscriberComponent[
-		*message.VRouterAdd,
-		message.VRouterAdd,
-		*message.VRouterUpdate,
-		message.VRouterUpdate,
-		*message.VRouterDelete,
-		message.VRouterDelete,
+		*message.AddedVRouters,
+		message.AddedVRouters,
+		*message.UpdatedVRouter,
+		message.UpdatedVRouter,
+		*message.DeletedVRouters,
+		message.DeletedVRouters,
 		metadbmodel.VRouter,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -257,12 +257,12 @@ type ChVRouterDevice struct {
 func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 	mng := &ChVRouterDevice{
 		newSubscriberComponent[
-			*message.VRouterAdd,
-			message.VRouterAdd,
-			*message.VRouterUpdate,
-			message.VRouterUpdate,
-			*message.VRouterDelete,
-			message.VRouterDelete,
+			*message.AddedVRouters,
+			message.AddedVRouters,
+			*message.UpdatedVRouter,
+			message.UpdatedVRouter,
+			*message.DeletedVRouters,
+			message.DeletedVRouters,
 			metadbmodel.VRouter,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -300,9 +300,9 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.VRouterUpdate) {
+func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVRouter) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.VRouterFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVRouterFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VRouter)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -328,12 +328,12 @@ func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 
 type ChDHCPPortDevice struct {
 	SubscriberComponent[
-		*message.DHCPPortAdd,
-		message.DHCPPortAdd,
-		*message.DHCPPortUpdate,
-		message.DHCPPortUpdate,
-		*message.DHCPPortDelete,
-		message.DHCPPortDelete,
+		*message.AddedDHCPPorts,
+		message.AddedDHCPPorts,
+		*message.UpdatedDHCPPort,
+		message.UpdatedDHCPPort,
+		*message.DeletedDHCPPorts,
+		message.DeletedDHCPPorts,
 		metadbmodel.DHCPPort,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -344,12 +344,12 @@ type ChDHCPPortDevice struct {
 func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice {
 	mng := &ChDHCPPortDevice{
 		newSubscriberComponent[
-			*message.DHCPPortAdd,
-			message.DHCPPortAdd,
-			*message.DHCPPortUpdate,
-			message.DHCPPortUpdate,
-			*message.DHCPPortDelete,
-			message.DHCPPortDelete,
+			*message.AddedDHCPPorts,
+			message.AddedDHCPPorts,
+			*message.UpdatedDHCPPort,
+			message.UpdatedDHCPPort,
+			*message.DeletedDHCPPorts,
+			message.DeletedDHCPPorts,
 			metadbmodel.DHCPPort,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -387,9 +387,9 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.DHCPPortUpdate) {
+func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedDHCPPort) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.DHCPPortFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedDHCPPortFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.DHCPPort)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -415,12 +415,12 @@ func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDev
 
 type ChNATGatewayDevice struct {
 	SubscriberComponent[
-		*message.NATGatewayAdd,
-		message.NATGatewayAdd,
-		*message.NATGatewayUpdate,
-		message.NATGatewayUpdate,
-		*message.NATGatewayDelete,
-		message.NATGatewayDelete,
+		*message.AddedNATGateways,
+		message.AddedNATGateways,
+		*message.UpdatedNATGateway,
+		message.UpdatedNATGateway,
+		*message.DeletedNATGateways,
+		message.DeletedNATGateways,
 		metadbmodel.NATGateway,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -431,12 +431,12 @@ type ChNATGatewayDevice struct {
 func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDevice {
 	mng := &ChNATGatewayDevice{
 		newSubscriberComponent[
-			*message.NATGatewayAdd,
-			message.NATGatewayAdd,
-			*message.NATGatewayUpdate,
-			message.NATGatewayUpdate,
-			*message.NATGatewayDelete,
-			message.NATGatewayDelete,
+			*message.AddedNATGateways,
+			message.AddedNATGateways,
+			*message.UpdatedNATGateway,
+			message.UpdatedNATGateway,
+			*message.DeletedNATGateways,
+			message.DeletedNATGateways,
 			metadbmodel.NATGateway,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -475,9 +475,9 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *metadb
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.NATGatewayUpdate) {
+func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNATGateway) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.NATGatewayFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedNATGatewayFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.NATGateway)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -506,12 +506,12 @@ func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 
 type ChLBDevice struct {
 	SubscriberComponent[
-		*message.LBAdd,
-		message.LBAdd,
-		*message.LBUpdate,
-		message.LBUpdate,
-		*message.LBDelete,
-		message.LBDelete,
+		*message.AddedLBs,
+		message.AddedLBs,
+		*message.UpdatedLB,
+		message.UpdatedLB,
+		*message.DeletedLBs,
+		message.DeletedLBs,
 		metadbmodel.LB,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -522,12 +522,12 @@ type ChLBDevice struct {
 func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 	mng := &ChLBDevice{
 		newSubscriberComponent[
-			*message.LBAdd,
-			message.LBAdd,
-			*message.LBUpdate,
-			message.LBUpdate,
-			*message.LBDelete,
-			message.LBDelete,
+			*message.AddedLBs,
+			message.AddedLBs,
+			*message.UpdatedLB,
+			message.UpdatedLB,
+			*message.DeletedLBs,
+			message.DeletedLBs,
 			metadbmodel.LB,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -566,9 +566,9 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.LB
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.LBUpdate) {
+func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedLB) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.LBFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedLBFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.LB)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -596,12 +596,12 @@ func (c *ChLBDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, d
 }
 
 type ChRDSInstanceDevice struct {
-	SubscriberComponent[*message.RDSInstanceAdd,
-		message.RDSInstanceAdd,
-		*message.RDSInstanceUpdate,
-		message.RDSInstanceUpdate,
-		*message.RDSInstanceDelete,
-		message.RDSInstanceDelete,
+	SubscriberComponent[*message.AddedRDSInstances,
+		message.AddedRDSInstances,
+		*message.UpdatedRDSInstance,
+		message.UpdatedRDSInstance,
+		*message.DeletedRDSInstances,
+		message.DeletedRDSInstances,
 		metadbmodel.RDSInstance,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -611,12 +611,12 @@ type ChRDSInstanceDevice struct {
 
 func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstanceDevice {
 	mng := &ChRDSInstanceDevice{
-		newSubscriberComponent[*message.RDSInstanceAdd,
-			message.RDSInstanceAdd,
-			*message.RDSInstanceUpdate,
-			message.RDSInstanceUpdate,
-			*message.RDSInstanceDelete,
-			message.RDSInstanceDelete,
+		newSubscriberComponent[*message.AddedRDSInstances,
+			message.AddedRDSInstances,
+			*message.UpdatedRDSInstance,
+			message.UpdatedRDSInstance,
+			*message.DeletedRDSInstances,
+			message.DeletedRDSInstances,
 			metadbmodel.RDSInstance,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -655,9 +655,9 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *metad
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.RDSInstanceUpdate) {
+func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRDSInstance) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.RDSInstanceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedRDSInstanceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.RDSInstance)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -685,12 +685,12 @@ func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.Ch
 }
 
 type ChRedisInstanceDevice struct {
-	SubscriberComponent[*message.RedisInstanceAdd,
-		message.RedisInstanceAdd,
-		*message.RedisInstanceUpdate,
-		message.RedisInstanceUpdate,
-		*message.RedisInstanceDelete,
-		message.RedisInstanceDelete,
+	SubscriberComponent[*message.AddedRedisInstances,
+		message.AddedRedisInstances,
+		*message.UpdatedRedisInstance,
+		message.UpdatedRedisInstance,
+		*message.DeletedRedisInstances,
+		message.DeletedRedisInstances,
 		metadbmodel.RedisInstance,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -700,12 +700,12 @@ type ChRedisInstanceDevice struct {
 
 func NewChRedisInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRedisInstanceDevice {
 	mng := &ChRedisInstanceDevice{
-		newSubscriberComponent[*message.RedisInstanceAdd,
-			message.RedisInstanceAdd,
-			*message.RedisInstanceUpdate,
-			message.RedisInstanceUpdate,
-			*message.RedisInstanceDelete,
-			message.RedisInstanceDelete,
+		newSubscriberComponent[*message.AddedRedisInstances,
+			message.AddedRedisInstances,
+			*message.UpdatedRedisInstance,
+			message.UpdatedRedisInstance,
+			*message.DeletedRedisInstances,
+			message.DeletedRedisInstances,
 			metadbmodel.RedisInstance,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -744,9 +744,9 @@ func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *met
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.RedisInstanceUpdate) {
+func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRedisInstance) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.RedisInstanceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedRedisInstanceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.RedisInstance)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -774,12 +774,12 @@ func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.
 }
 
 type ChPodServiceDevice struct {
-	SubscriberComponent[*message.PodServiceAdd,
-		message.PodServiceAdd,
-		*message.PodServiceUpdate,
-		message.PodServiceUpdate,
-		*message.PodServiceDelete,
-		message.PodServiceDelete,
+	SubscriberComponent[*message.AddedPodServices,
+		message.AddedPodServices,
+		*message.UpdatedPodService,
+		message.UpdatedPodService,
+		*message.DeletedPodServices,
+		message.DeletedPodServices,
 		metadbmodel.PodService,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -789,12 +789,12 @@ type ChPodServiceDevice struct {
 
 func NewChPodServiceDevice(resourceTypeToIconID map[IconKey]int) *ChPodServiceDevice {
 	mng := &ChPodServiceDevice{
-		newSubscriberComponent[*message.PodServiceAdd,
-			message.PodServiceAdd,
-			*message.PodServiceUpdate,
-			message.PodServiceUpdate,
-			*message.PodServiceDelete,
-			message.PodServiceDelete,
+		newSubscriberComponent[*message.AddedPodServices,
+			message.AddedPodServices,
+			*message.UpdatedPodService,
+			message.UpdatedPodService,
+			*message.DeletedPodServices,
+			message.DeletedPodServices,
 			metadbmodel.PodService,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -846,9 +846,9 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *metadb
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -873,12 +873,12 @@ func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 }
 
 type ChPodDevice struct {
-	SubscriberComponent[*message.PodAdd,
-		message.PodAdd,
-		*message.PodUpdate,
-		message.PodUpdate,
-		*message.PodDelete,
-		message.PodDelete,
+	SubscriberComponent[*message.AddedPods,
+		message.AddedPods,
+		*message.UpdatedPod,
+		message.UpdatedPod,
+		*message.DeletedPods,
+		message.DeletedPods,
 		metadbmodel.Pod,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -888,12 +888,12 @@ type ChPodDevice struct {
 
 func NewChPodDevice(resourceTypeToIconID map[IconKey]int) *ChPodDevice {
 	mng := &ChPodDevice{
-		newSubscriberComponent[*message.PodAdd,
-			message.PodAdd,
-			*message.PodUpdate,
-			message.PodUpdate,
-			*message.PodDelete,
-			message.PodDelete,
+		newSubscriberComponent[*message.AddedPods,
+			message.AddedPods,
+			*message.UpdatedPod,
+			message.UpdatedPod,
+			*message.DeletedPods,
+			message.DeletedPods,
 			metadbmodel.Pod,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -932,9 +932,9 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -959,12 +959,12 @@ func (c *ChPodDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, 
 }
 
 type ChPodGroupDevice struct {
-	SubscriberComponent[*message.PodGroupAdd,
-		message.PodGroupAdd,
-		*message.PodGroupUpdate,
-		message.PodGroupUpdate,
-		*message.PodGroupDelete,
-		message.PodGroupDelete,
+	SubscriberComponent[*message.AddedPodGroups,
+		message.AddedPodGroups,
+		*message.UpdatedPodGroup,
+		message.UpdatedPodGroup,
+		*message.DeletedPodGroups,
+		message.DeletedPodGroups,
 		metadbmodel.PodGroup,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -974,12 +974,12 @@ type ChPodGroupDevice struct {
 
 func NewChPodGroupDevice(resourceTypeToIconID map[IconKey]int) *ChPodGroupDevice {
 	mng := &ChPodGroupDevice{
-		newSubscriberComponent[*message.PodGroupAdd,
-			message.PodGroupAdd,
-			*message.PodGroupUpdate,
-			message.PodGroupUpdate,
-			*message.PodGroupDelete,
-			message.PodGroupDelete,
+		newSubscriberComponent[*message.AddedPodGroups,
+			message.AddedPodGroups,
+			*message.UpdatedPodGroup,
+			message.UpdatedPodGroup,
+			*message.DeletedPodGroups,
+			message.DeletedPodGroups,
 			metadbmodel.PodGroup,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -1018,9 +1018,9 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodGroupUpdate) {
+func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodGroup) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodGroupFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodGroupFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodGroup)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -1046,12 +1046,12 @@ func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDev
 }
 
 type ChPodNodeDevice struct {
-	SubscriberComponent[*message.PodNodeAdd,
-		message.PodNodeAdd,
-		*message.PodNodeUpdate,
-		message.PodNodeUpdate,
-		*message.PodNodeDelete,
-		message.PodNodeDelete,
+	SubscriberComponent[*message.AddedPodNodes,
+		message.AddedPodNodes,
+		*message.UpdatedPodNode,
+		message.UpdatedPodNode,
+		*message.DeletedPodNodes,
+		message.DeletedPodNodes,
 		metadbmodel.PodNode,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -1061,12 +1061,12 @@ type ChPodNodeDevice struct {
 
 func NewChPodNodeDevice(resourceTypeToIconID map[IconKey]int) *ChPodNodeDevice {
 	mng := &ChPodNodeDevice{
-		newSubscriberComponent[*message.PodNodeAdd,
-			message.PodNodeAdd,
-			*message.PodNodeUpdate,
-			message.PodNodeUpdate,
-			*message.PodNodeDelete,
-			message.PodNodeDelete,
+		newSubscriberComponent[*message.AddedPodNodes,
+			message.AddedPodNodes,
+			*message.UpdatedPodNode,
+			message.UpdatedPodNode,
+			*message.DeletedPodNodes,
+			message.DeletedPodNodes,
 			metadbmodel.PodNode,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -1107,9 +1107,9 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNodeUpdate) {
+func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNode) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodNodeFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNodeFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNode)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -1140,12 +1140,12 @@ func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 
 type ChPodClusterDevice struct {
 	SubscriberComponent[
-		*message.PodClusterAdd,
-		message.PodClusterAdd,
-		*message.PodClusterUpdate,
-		message.PodClusterUpdate,
-		*message.PodClusterDelete,
-		message.PodClusterDelete,
+		*message.AddedPodClusters,
+		message.AddedPodClusters,
+		*message.UpdatedPodCluster,
+		message.UpdatedPodCluster,
+		*message.DeletedPodClusters,
+		message.DeletedPodClusters,
 		metadbmodel.PodCluster,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -1156,12 +1156,12 @@ type ChPodClusterDevice struct {
 func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDevice {
 	mng := &ChPodClusterDevice{
 		newSubscriberComponent[
-			*message.PodClusterAdd,
-			message.PodClusterAdd,
-			*message.PodClusterUpdate,
-			message.PodClusterUpdate,
-			*message.PodClusterDelete,
-			message.PodClusterDelete,
+			*message.AddedPodClusters,
+			message.AddedPodClusters,
+			*message.UpdatedPodCluster,
+			message.UpdatedPodCluster,
+			*message.DeletedPodClusters,
+			message.DeletedPodClusters,
 			metadbmodel.PodCluster,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -1200,9 +1200,9 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *metadb
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.PodClusterUpdate) {
+func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodCluster) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodClusterFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodClusterFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodCluster)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
@@ -1227,12 +1227,12 @@ func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 
 type ChProcessDevice struct {
 	SubscriberComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
+		*message.AddedProcesses,
+		message.AddedProcesses,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
 		metadbmodel.Process,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -1243,12 +1243,12 @@ type ChProcessDevice struct {
 func NewChProcessDevice(resourceTypeToIconID map[IconKey]int) *ChProcessDevice {
 	mng := &ChProcessDevice{
 		newSubscriberComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
+			*message.AddedProcesses,
+			message.AddedProcesses,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
 			metadbmodel.Process,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -1288,9 +1288,9 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChProcessDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.ProcessUpdate) {
+func (c *ChProcessDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedProcess) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.ProcessFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedProcessFields)
 	updateInfo := make(map[string]interface{})
 	gid := int(fieldsUpdate.GID.GetNew())
 	if fieldsUpdate.Name.IsDifferent() {
@@ -1312,7 +1312,7 @@ func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 	}).Create(&targets)
 }
 
-func (c *ChProcessDevice) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.ProcessDelete) []*metadbmodel.Process {
+func (c *ChProcessDevice) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.DeletedProcesses) []*metadbmodel.Process {
 	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
 	newDatas := []*metadbmodel.Process{}
 	for _, item := range dbData {
@@ -1325,12 +1325,12 @@ func (c *ChProcessDevice) beforeDeletePage(dbData []*metadbmodel.Process, msg *m
 
 type ChCustomServiceDevice struct {
 	SubscriberComponent[
-		*message.CustomServiceAdd,
-		message.CustomServiceAdd,
-		*message.CustomServiceUpdate,
-		message.CustomServiceUpdate,
-		*message.CustomServiceDelete,
-		message.CustomServiceDelete,
+		*message.AddedCustomServices,
+		message.AddedCustomServices,
+		*message.UpdatedCustomService,
+		message.UpdatedCustomService,
+		*message.DeletedCustomServices,
+		message.DeletedCustomServices,
 		metadbmodel.CustomService,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -1341,12 +1341,12 @@ type ChCustomServiceDevice struct {
 func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomServiceDevice {
 	mng := &ChCustomServiceDevice{
 		newSubscriberComponent[
-			*message.CustomServiceAdd,
-			message.CustomServiceAdd,
-			*message.CustomServiceUpdate,
-			message.CustomServiceUpdate,
-			*message.CustomServiceDelete,
-			message.CustomServiceDelete,
+			*message.AddedCustomServices,
+			message.AddedCustomServices,
+			*message.UpdatedCustomService,
+			message.UpdatedCustomService,
+			*message.DeletedCustomServices,
+			message.DeletedCustomServices,
 			metadbmodel.CustomService,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -1379,9 +1379,9 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *met
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.CustomServiceUpdate) {
+func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedCustomService) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.CustomServiceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedCustomServiceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.CustomService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

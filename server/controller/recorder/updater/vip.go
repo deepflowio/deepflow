@@ -32,15 +32,15 @@ type VIP struct {
 		*diffbase.VIP,
 		*metadbmodel.VIP,
 		metadbmodel.VIP,
-		*message.VIPAdd,
-		message.VIPAdd,
+		*message.AddedVIPs,
+		message.AddedVIPs,
 		message.AddNoneAddition,
-		*message.VIPUpdate,
-		message.VIPUpdate,
-		*message.VIPFieldsUpdate,
-		message.VIPFieldsUpdate,
-		*message.VIPDelete,
-		message.VIPDelete,
+		*message.UpdatedVIP,
+		message.UpdatedVIP,
+		*message.UpdatedVIPFields,
+		message.UpdatedVIPFields,
+		*message.DeletedVIPs,
+		message.DeletedVIPs,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 			*diffbase.VIP,
 			*metadbmodel.VIP,
 			metadbmodel.VIP,
-			*message.VIPAdd,
-			message.VIPAdd,
+			*message.AddedVIPs,
+			message.AddedVIPs,
 			message.AddNoneAddition,
-			*message.VIPUpdate,
-			message.VIPUpdate,
-			*message.VIPFieldsUpdate,
-			message.VIPFieldsUpdate,
-			*message.VIPDelete,
-			message.VIPDelete,
+			*message.UpdatedVIP,
+			message.UpdatedVIP,
+			*message.UpdatedVIPFields,
+			message.UpdatedVIPFields,
+			*message.DeletedVIPs,
+			message.DeletedVIPs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
@@ -89,8 +89,8 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*metadbmodel.VIP, 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (*message.VIPFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.VIPFieldsUpdate)
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (*message.UpdatedVIPFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVIPFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP

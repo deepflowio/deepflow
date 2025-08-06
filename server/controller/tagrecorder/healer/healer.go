@@ -44,55 +44,55 @@ func NewHealers(md metadata.Platform) *Healers {
 		message.MetadataSoftDelete(false), // no soft delete in healer
 	)
 	h.healers = []Healer{
-		newHealer[metadbModel.Host, metadbModel.ChDevice, *message.HostAdd](
+		newHealer[metadbModel.Host, metadbModel.ChDevice, *message.AddedHosts](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_HOST_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_HOST)),
-		newHealer[metadbModel.VM, metadbModel.ChDevice, *message.VMAdd](
+		newHealer[metadbModel.VM, metadbModel.ChDevice, *message.AddedVMs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VM)),
-		newHealer[metadbModel.VRouter, metadbModel.ChDevice, *message.VRouterAdd](
+		newHealer[metadbModel.VRouter, metadbModel.ChDevice, *message.AddedVRouters](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VROUTER_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VROUTER)),
-		newHealer[metadbModel.DHCPPort, metadbModel.ChDevice, *message.DHCPPortAdd](
+		newHealer[metadbModel.DHCPPort, metadbModel.ChDevice, *message.AddedDHCPPorts](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_DHCP_PORT_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_DHCP_PORT)),
-		newHealer[metadbModel.NATGateway, metadbModel.ChDevice, *message.NATGatewayAdd](
+		newHealer[metadbModel.NATGateway, metadbModel.ChDevice, *message.AddedNATGateways](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_NAT_GATEWAY_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_NAT_GATEWAY)),
-		newHealer[metadbModel.LB, metadbModel.ChDevice, *message.LBAdd](
+		newHealer[metadbModel.LB, metadbModel.ChDevice, *message.AddedLBs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_LB_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_LB)),
-		newHealer[metadbModel.RDSInstance, metadbModel.ChDevice, *message.RDSInstanceAdd](
+		newHealer[metadbModel.RDSInstance, metadbModel.ChDevice, *message.AddedRDSInstances](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_RDS_INSTANCE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_RDS_INSTANCE)),
-		newHealer[metadbModel.RedisInstance, metadbModel.ChDevice, *message.RedisInstanceAdd](
+		newHealer[metadbModel.RedisInstance, metadbModel.ChDevice, *message.AddedRedisInstances](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_REDIS_INSTANCE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_REDIS_INSTANCE)),
-		newHealer[metadbModel.PodNode, metadbModel.ChDevice, *message.PodNodeAdd](
+		newHealer[metadbModel.PodNode, metadbModel.ChDevice, *message.AddedPodNodes](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_NODE)),
-		newHealer[metadbModel.PodService, metadbModel.ChDevice, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChDevice, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_SERVICE)),
-		newHealer[metadbModel.Pod, metadbModel.ChDevice, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChDevice, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD)),
-		newHealer[metadbModel.PodCluster, metadbModel.ChDevice, *message.PodClusterAdd](
+		newHealer[metadbModel.PodCluster, metadbModel.ChDevice, *message.AddedPodClusters](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_CLUSTER)),
-		newHealer[metadbModel.PodGroup, metadbModel.ChDevice, *message.PodGroupAdd](
+		newHealer[metadbModel.PodGroup, metadbModel.ChDevice, *message.AddedPodGroups](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(
@@ -104,121 +104,121 @@ func NewHealers(md metadata.Platform) *Healers {
 				common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
 			),
 		),
-		newHealer[metadbModel.Process, metadbModel.ChDevice, *message.ProcessAdd](
+		newHealer[metadbModel.Process, metadbModel.ChDevice, *message.AddedProcesses](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_GPROCESS)),
-		newHealer[metadbModel.CustomService, metadbModel.ChDevice, *message.CustomServiceAdd](
+		newHealer[metadbModel.CustomService, metadbModel.ChDevice, *message.AddedCustomServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_CUSTOM_SERVICE)),
 
-		newHealer[metadbModel.AZ, metadbModel.ChAZ, *message.AZAdd](
+		newHealer[metadbModel.AZ, metadbModel.ChAZ, *message.AddedAZs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
 
-		newHealer[metadbModel.VM, metadbModel.ChChost, *message.VMAdd](
+		newHealer[metadbModel.VM, metadbModel.ChChost, *message.AddedVMs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
 
-		newHealer[metadbModel.VPC, metadbModel.ChVPC, *message.VPCAdd](
+		newHealer[metadbModel.VPC, metadbModel.ChVPC, *message.AddedVPCs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
-		newHealer[metadbModel.Network, metadbModel.ChNetwork, *message.NetworkAdd](
+		newHealer[metadbModel.Network, metadbModel.ChNetwork, *message.AddedNetworks](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_NETWORK_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_NETWORK)),
 
-		newHealer[metadbModel.PodCluster, metadbModel.ChPodCluster, *message.PodClusterAdd](
+		newHealer[metadbModel.PodCluster, metadbModel.ChPodCluster, *message.AddedPodClusters](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_CLUSTER)),
-		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNamespace, *message.PodNamespaceAdd](
+		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNamespace, *message.AddedPodNamespaces](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NAMESPACE)),
-		newHealer[metadbModel.PodNode, metadbModel.ChPodNode, *message.PodNodeAdd](
+		newHealer[metadbModel.PodNode, metadbModel.ChPodNode, *message.AddedPodNodes](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NODE)),
-		newHealer[metadbModel.PodIngress, metadbModel.ChPodIngress, *message.PodIngressAdd](
+		newHealer[metadbModel.PodIngress, metadbModel.ChPodIngress, *message.AddedPodIngresses](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_INGRESS_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_INGRESS)),
-		newHealer[metadbModel.PodService, metadbModel.ChPodService, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChPodService, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE)),
-		newHealer[metadbModel.PodGroup, metadbModel.ChPodGroup, *message.PodGroupAdd](
+		newHealer[metadbModel.PodGroup, metadbModel.ChPodGroup, *message.AddedPodGroups](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_GROUP)),
-		newHealer[metadbModel.Pod, metadbModel.ChPod, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPod, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD)),
 
-		newHealer[metadbModel.Process, metadbModel.ChGProcess, *message.ProcessAdd](
+		newHealer[metadbModel.Process, metadbModel.ChGProcess, *message.AddedProcesses](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_GPROCESS)),
 
-		newHealer[metadbModel.VM, metadbModel.ChChostCloudTag, *message.VMAdd](
+		newHealer[metadbModel.VM, metadbModel.ChChostCloudTag, *message.AddedVMs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
-		newHealer[metadbModel.VM, metadbModel.ChChostCloudTags, *message.VMAdd](
+		newHealer[metadbModel.VM, metadbModel.ChChostCloudTags, *message.AddedVMs](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),
-		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNSCloudTag, *message.PodNamespaceAdd](
+		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNSCloudTag, *message.AddedPodNamespaces](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG)),
-		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNSCloudTags, *message.PodNamespaceAdd](
+		newHealer[metadbModel.PodNamespace, metadbModel.ChPodNSCloudTags, *message.AddedPodNamespaces](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS)),
-		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sLabel, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sLabel, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL)),
-		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sLabels, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sLabels, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS)),
-		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sAnnotation, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sAnnotation, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATION)),
-		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sAnnotations, *message.PodServiceAdd](
+		newHealer[metadbModel.PodService, metadbModel.ChPodServiceK8sAnnotations, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sEnv, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sEnv, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENV)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sEnvs, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sEnvs, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("env").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENVS)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sLabel, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sLabel, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABEL)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sLabels, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sLabels, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("label").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABELS)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sAnnotation, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sAnnotation, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATION)),
-		newHealer[metadbModel.Pod, metadbModel.ChPodK8sAnnotations, *message.PodAdd](
+		newHealer[metadbModel.Pod, metadbModel.ChPodK8sAnnotations, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS)),

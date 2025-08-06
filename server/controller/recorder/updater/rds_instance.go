@@ -32,15 +32,15 @@ type RDSInstance struct {
 		*diffbase.RDSInstance,
 		*metadbmodel.RDSInstance,
 		metadbmodel.RDSInstance,
-		*message.RDSInstanceAdd,
-		message.RDSInstanceAdd,
+		*message.AddedRDSInstances,
+		message.AddedRDSInstances,
 		message.AddNoneAddition,
-		*message.RDSInstanceUpdate,
-		message.RDSInstanceUpdate,
-		*message.RDSInstanceFieldsUpdate,
-		message.RDSInstanceFieldsUpdate,
-		*message.RDSInstanceDelete,
-		message.RDSInstanceDelete,
+		*message.UpdatedRDSInstance,
+		message.UpdatedRDSInstance,
+		*message.UpdatedRDSInstanceFields,
+		message.UpdatedRDSInstanceFields,
+		*message.DeletedRDSInstances,
+		message.DeletedRDSInstances,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 			*diffbase.RDSInstance,
 			*metadbmodel.RDSInstance,
 			metadbmodel.RDSInstance,
-			*message.RDSInstanceAdd,
-			message.RDSInstanceAdd,
+			*message.AddedRDSInstances,
+			message.AddedRDSInstances,
 			message.AddNoneAddition,
-			*message.RDSInstanceUpdate,
-			message.RDSInstanceUpdate,
-			*message.RDSInstanceFieldsUpdate,
-			message.RDSInstanceFieldsUpdate,
-			*message.RDSInstanceDelete,
-			message.RDSInstanceDelete,
+			*message.UpdatedRDSInstance,
+			message.UpdatedRDSInstance,
+			*message.UpdatedRDSInstanceFields,
+			message.UpdatedRDSInstanceFields,
+			*message.DeletedRDSInstances,
+			message.DeletedRDSInstances,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
@@ -105,8 +105,8 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.RDSInstanceFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.RDSInstanceFieldsUpdate)
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.UpdatedRDSInstanceFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedRDSInstanceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

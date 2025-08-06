@@ -32,15 +32,15 @@ type PodIngress struct {
 		*diffbase.PodIngress,
 		*metadbmodel.PodIngress,
 		metadbmodel.PodIngress,
-		*message.PodIngressAdd,
-		message.PodIngressAdd,
+		*message.AddedPodIngresses,
+		message.AddedPodIngresses,
 		message.AddNoneAddition,
-		*message.PodIngressUpdate,
-		message.PodIngressUpdate,
-		*message.PodIngressFieldsUpdate,
-		message.PodIngressFieldsUpdate,
-		*message.PodIngressDelete,
-		message.PodIngressDelete,
+		*message.UpdatedPodIngress,
+		message.UpdatedPodIngress,
+		*message.UpdatedPodIngressFields,
+		message.UpdatedPodIngressFields,
+		*message.DeletedPodIngresses,
+		message.DeletedPodIngresses,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 			*diffbase.PodIngress,
 			*metadbmodel.PodIngress,
 			metadbmodel.PodIngress,
-			*message.PodIngressAdd,
-			message.PodIngressAdd,
+			*message.AddedPodIngresses,
+			message.AddedPodIngresses,
 			message.AddNoneAddition,
-			*message.PodIngressUpdate,
-			message.PodIngressUpdate,
-			*message.PodIngressFieldsUpdate,
-			message.PodIngressFieldsUpdate,
-			*message.PodIngressDelete,
-			message.PodIngressDelete,
+			*message.UpdatedPodIngress,
+			message.UpdatedPodIngress,
+			*message.UpdatedPodIngressFields,
+			message.UpdatedPodIngressFields,
+			*message.DeletedPodIngresses,
+			message.DeletedPodIngresses,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
@@ -108,8 +108,8 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*met
 	return dbItem, true
 }
 
-func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (*message.PodIngressFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodIngressFieldsUpdate)
+func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (*message.UpdatedPodIngressFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodIngressFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

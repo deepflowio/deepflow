@@ -23,30 +23,30 @@ import (
 
 type PodServicePort struct {
 	ResourcePubSubComponent[
-		*message.PodServicePortAdd,
-		message.PodServicePortAdd,
+		*message.AddedPodServicePorts,
+		message.AddedPodServicePorts,
 		message.AddNoneAddition,
-		*message.PodServicePortUpdate,
-		message.PodServicePortUpdate,
-		*message.PodServicePortFieldsUpdate,
-		message.PodServicePortFieldsUpdate,
-		*message.PodServicePortDelete,
-		message.PodServicePortDelete,
+		*message.UpdatedPodServicePort,
+		message.UpdatedPodServicePort,
+		*message.UpdatedPodServicePortFields,
+		message.UpdatedPodServicePortFields,
+		*message.DeletedPodServicePorts,
+		message.DeletedPodServicePorts,
 		message.DeleteNoneAddition]
 }
 
 func NewPodServicePort() *PodServicePort {
 	return &PodServicePort{
 		ResourcePubSubComponent[
-			*message.PodServicePortAdd,
-			message.PodServicePortAdd,
+			*message.AddedPodServicePorts,
+			message.AddedPodServicePorts,
 			message.AddNoneAddition,
-			*message.PodServicePortUpdate,
-			message.PodServicePortUpdate,
-			*message.PodServicePortFieldsUpdate,
-			message.PodServicePortFieldsUpdate,
-			*message.PodServicePortDelete,
-			message.PodServicePortDelete,
+			*message.UpdatedPodServicePort,
+			message.UpdatedPodServicePort,
+			*message.UpdatedPodServicePortFields,
+			message.UpdatedPodServicePortFields,
+			*message.DeletedPodServicePorts,
+			message.DeletedPodServicePorts,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodServicePort),

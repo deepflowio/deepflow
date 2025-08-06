@@ -23,30 +23,30 @@ import (
 
 type Host struct {
 	ResourcePubSubComponent[
-		*message.HostAdd,
-		message.HostAdd,
+		*message.AddedHosts,
+		message.AddedHosts,
 		message.AddNoneAddition,
-		*message.HostUpdate,
-		message.HostUpdate,
-		*message.HostFieldsUpdate,
-		message.HostFieldsUpdate,
-		*message.HostDelete,
-		message.HostDelete,
+		*message.UpdatedHost,
+		message.UpdatedHost,
+		*message.UpdatedHostFields,
+		message.UpdatedHostFields,
+		*message.DeletedHosts,
+		message.DeletedHosts,
 		message.DeleteNoneAddition]
 }
 
 func NewHost() *Host {
 	return &Host{
 		ResourcePubSubComponent[
-			*message.HostAdd,
-			message.HostAdd,
+			*message.AddedHosts,
+			message.AddedHosts,
 			message.AddNoneAddition,
-			*message.HostUpdate,
-			message.HostUpdate,
-			*message.HostFieldsUpdate,
-			message.HostFieldsUpdate,
-			*message.HostDelete,
-			message.HostDelete,
+			*message.UpdatedHost,
+			message.UpdatedHost,
+			*message.UpdatedHostFields,
+			message.UpdatedHostFields,
+			*message.DeletedHosts,
+			message.DeletedHosts,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeHost),
