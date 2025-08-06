@@ -37,15 +37,15 @@ type Process struct {
 		*diffbase.Process,
 		*metadbmodel.Process,
 		metadbmodel.Process,
-		*message.ProcessAdd,
-		message.ProcessAdd,
+		*message.AddedProcesses,
+		message.AddedProcesses,
 		message.ProcessAddAddition,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.UpdatedProcessFields,
+		message.UpdatedProcessFields,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
 		message.ProcessDeleteAddition]
 }
 
@@ -56,15 +56,15 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 			*diffbase.Process,
 			*metadbmodel.Process,
 			metadbmodel.Process,
-			*message.ProcessAdd,
-			message.ProcessAdd,
+			*message.AddedProcesses,
+			message.AddedProcesses,
 			message.ProcessAddAddition,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.UpdatedProcessFields,
+			message.UpdatedProcessFields,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
 			message.ProcessDeleteAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
@@ -155,8 +155,8 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 	return dbItem, true
 }
 
-func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.ProcessFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.ProcessFieldsUpdate)
+func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.UpdatedProcessFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedProcessFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

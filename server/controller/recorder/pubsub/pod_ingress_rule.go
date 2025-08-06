@@ -23,30 +23,30 @@ import (
 
 type PodIngressRule struct {
 	ResourcePubSubComponent[
-		*message.PodIngressRuleAdd,
-		message.PodIngressRuleAdd,
+		*message.AddedPodIngressRules,
+		message.AddedPodIngressRules,
 		message.AddNoneAddition,
-		*message.PodIngressRuleUpdate,
-		message.PodIngressRuleUpdate,
-		*message.PodIngressRuleFieldsUpdate,
-		message.PodIngressRuleFieldsUpdate,
-		*message.PodIngressRuleDelete,
-		message.PodIngressRuleDelete,
+		*message.UpdatedPodIngressRule,
+		message.UpdatedPodIngressRule,
+		*message.UpdatedPodIngressRuleFields,
+		message.UpdatedPodIngressRuleFields,
+		*message.DeletedPodIngressRules,
+		message.DeletedPodIngressRules,
 		message.DeleteNoneAddition]
 }
 
 func NewPodIngressRule() *PodIngressRule {
 	return &PodIngressRule{
 		ResourcePubSubComponent[
-			*message.PodIngressRuleAdd,
-			message.PodIngressRuleAdd,
+			*message.AddedPodIngressRules,
+			message.AddedPodIngressRules,
 			message.AddNoneAddition,
-			*message.PodIngressRuleUpdate,
-			message.PodIngressRuleUpdate,
-			*message.PodIngressRuleFieldsUpdate,
-			message.PodIngressRuleFieldsUpdate,
-			*message.PodIngressRuleDelete,
-			message.PodIngressRuleDelete,
+			*message.UpdatedPodIngressRule,
+			message.UpdatedPodIngressRule,
+			*message.UpdatedPodIngressRuleFields,
+			message.UpdatedPodIngressRuleFields,
+			*message.DeletedPodIngressRules,
+			message.DeletedPodIngressRules,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodIngressRule),

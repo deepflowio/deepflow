@@ -32,15 +32,15 @@ type PodCluster struct {
 		*diffbase.PodCluster,
 		*metadbmodel.PodCluster,
 		metadbmodel.PodCluster,
-		*message.PodClusterAdd,
-		message.PodClusterAdd,
+		*message.AddedPodClusters,
+		message.AddedPodClusters,
 		message.AddNoneAddition,
-		*message.PodClusterUpdate,
-		message.PodClusterUpdate,
-		*message.PodClusterFieldsUpdate,
-		message.PodClusterFieldsUpdate,
-		*message.PodClusterDelete,
-		message.PodClusterDelete,
+		*message.UpdatedPodCluster,
+		message.UpdatedPodCluster,
+		*message.UpdatedPodClusterFields,
+		message.UpdatedPodClusterFields,
+		*message.DeletedPodClusters,
+		message.DeletedPodClusters,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 			*diffbase.PodCluster,
 			*metadbmodel.PodCluster,
 			metadbmodel.PodCluster,
-			*message.PodClusterAdd,
-			message.PodClusterAdd,
+			*message.AddedPodClusters,
+			message.AddedPodClusters,
 			message.AddNoneAddition,
-			*message.PodClusterUpdate,
-			message.PodClusterUpdate,
-			*message.PodClusterFieldsUpdate,
-			message.PodClusterFieldsUpdate,
-			*message.PodClusterDelete,
-			message.PodClusterDelete,
+			*message.UpdatedPodCluster,
+			message.UpdatedPodCluster,
+			*message.UpdatedPodClusterFields,
+			message.UpdatedPodClusterFields,
+			*message.DeletedPodClusters,
+			message.DeletedPodClusters,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
@@ -101,8 +101,8 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*met
 	return dbItem, true
 }
 
-func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem *cloudmodel.PodCluster) (*message.PodClusterFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodClusterFieldsUpdate)
+func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem *cloudmodel.PodCluster) (*message.UpdatedPodClusterFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodClusterFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

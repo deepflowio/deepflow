@@ -37,15 +37,15 @@ type VM struct {
 		*diffbase.VM,
 		*metadbmodel.VM,
 		metadbmodel.VM,
-		*message.VMAdd,
-		message.VMAdd,
+		*message.AddedVMs,
+		message.AddedVMs,
 		message.AddNoneAddition,
-		*message.VMUpdate,
-		message.VMUpdate,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
-		*message.VMDelete,
-		message.VMDelete,
+		*message.UpdatedVM,
+		message.UpdatedVM,
+		*message.UpdatedVMFields,
+		message.UpdatedVMFields,
+		*message.DeletedVMs,
+		message.DeletedVMs,
 		message.DeleteNoneAddition]
 }
 
@@ -56,15 +56,15 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 			*diffbase.VM,
 			*metadbmodel.VM,
 			metadbmodel.VM,
-			*message.VMAdd,
-			message.VMAdd,
+			*message.AddedVMs,
+			message.AddedVMs,
 			message.AddNoneAddition,
-			*message.VMUpdate,
-			message.VMUpdate,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
-			*message.VMDelete,
-			message.VMDelete,
+			*message.UpdatedVM,
+			message.UpdatedVM,
+			*message.UpdatedVMFields,
+			message.UpdatedVMFields,
+			*message.DeletedVMs,
+			message.DeletedVMs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
@@ -141,8 +141,8 @@ func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
 	m.statsd.GetMonitor(statsd.TagTypeVMSyncDelay).Fill(int(syncDelay))
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.VMFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.VMFieldsUpdate)
+func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.UpdatedVMFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVMFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

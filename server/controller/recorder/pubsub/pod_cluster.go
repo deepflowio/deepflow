@@ -23,30 +23,30 @@ import (
 
 type PodCluster struct {
 	ResourcePubSubComponent[
-		*message.PodClusterAdd,
-		message.PodClusterAdd,
+		*message.AddedPodClusters,
+		message.AddedPodClusters,
 		message.AddNoneAddition,
-		*message.PodClusterUpdate,
-		message.PodClusterUpdate,
-		*message.PodClusterFieldsUpdate,
-		message.PodClusterFieldsUpdate,
-		*message.PodClusterDelete,
-		message.PodClusterDelete,
+		*message.UpdatedPodCluster,
+		message.UpdatedPodCluster,
+		*message.UpdatedPodClusterFields,
+		message.UpdatedPodClusterFields,
+		*message.DeletedPodClusters,
+		message.DeletedPodClusters,
 		message.DeleteNoneAddition]
 }
 
 func NewPodCluster() *PodCluster {
 	return &PodCluster{
 		ResourcePubSubComponent[
-			*message.PodClusterAdd,
-			message.PodClusterAdd,
+			*message.AddedPodClusters,
+			message.AddedPodClusters,
 			message.AddNoneAddition,
-			*message.PodClusterUpdate,
-			message.PodClusterUpdate,
-			*message.PodClusterFieldsUpdate,
-			message.PodClusterFieldsUpdate,
-			*message.PodClusterDelete,
-			message.PodClusterDelete,
+			*message.UpdatedPodCluster,
+			message.UpdatedPodCluster,
+			*message.UpdatedPodClusterFields,
+			message.UpdatedPodClusterFields,
+			*message.DeletedPodClusters,
+			message.DeletedPodClusters,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodCluster),

@@ -27,12 +27,12 @@ import (
 
 type ChNetwork struct {
 	SubscriberComponent[
-		*message.NetworkAdd,
-		message.NetworkAdd,
-		*message.NetworkUpdate,
-		message.NetworkUpdate,
-		*message.NetworkDelete,
-		message.NetworkDelete,
+		*message.AddedNetworks,
+		message.AddedNetworks,
+		*message.UpdatedNetwork,
+		message.UpdatedNetwork,
+		*message.DeletedNetworks,
+		message.DeletedNetworks,
 		metadbmodel.Network,
 		metadbmodel.ChNetwork,
 		IDKey,
@@ -43,12 +43,12 @@ type ChNetwork struct {
 func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	mng := &ChNetwork{
 		newSubscriberComponent[
-			*message.NetworkAdd,
-			message.NetworkAdd,
-			*message.NetworkUpdate,
-			message.NetworkUpdate,
-			*message.NetworkDelete,
-			message.NetworkDelete,
+			*message.AddedNetworks,
+			message.AddedNetworks,
+			*message.UpdatedNetwork,
+			message.UpdatedNetwork,
+			*message.DeletedNetworks,
+			message.DeletedNetworks,
 			metadbmodel.Network,
 			metadbmodel.ChNetwork,
 			IDKey,
@@ -85,9 +85,9 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNetwork) onResourceUpdated(md *message.Metadata, updateMessage *message.NetworkUpdate) {
+func (c *ChNetwork) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNetwork) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.NetworkFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedNetworkFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Network)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

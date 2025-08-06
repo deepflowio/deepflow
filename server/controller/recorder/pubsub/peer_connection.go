@@ -23,30 +23,30 @@ import (
 
 type PeerConnection struct {
 	ResourcePubSubComponent[
-		*message.PeerConnectionAdd,
-		message.PeerConnectionAdd,
+		*message.AddedPeerConnections,
+		message.AddedPeerConnections,
 		message.AddNoneAddition,
-		*message.PeerConnectionUpdate,
-		message.PeerConnectionUpdate,
-		*message.PeerConnectionFieldsUpdate,
-		message.PeerConnectionFieldsUpdate,
-		*message.PeerConnectionDelete,
-		message.PeerConnectionDelete,
+		*message.UpdatedPeerConnection,
+		message.UpdatedPeerConnection,
+		*message.UpdatedPeerConnectionFields,
+		message.UpdatedPeerConnectionFields,
+		*message.DeletedPeerConnections,
+		message.DeletedPeerConnections,
 		message.DeleteNoneAddition]
 }
 
 func NewPeerConnection() *PeerConnection {
 	return &PeerConnection{
 		ResourcePubSubComponent[
-			*message.PeerConnectionAdd,
-			message.PeerConnectionAdd,
+			*message.AddedPeerConnections,
+			message.AddedPeerConnections,
 			message.AddNoneAddition,
-			*message.PeerConnectionUpdate,
-			message.PeerConnectionUpdate,
-			*message.PeerConnectionFieldsUpdate,
-			message.PeerConnectionFieldsUpdate,
-			*message.PeerConnectionDelete,
-			message.PeerConnectionDelete,
+			*message.UpdatedPeerConnection,
+			message.UpdatedPeerConnection,
+			*message.UpdatedPeerConnectionFields,
+			message.UpdatedPeerConnectionFields,
+			*message.DeletedPeerConnections,
+			message.DeletedPeerConnections,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePeerConnection),

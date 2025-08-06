@@ -23,30 +23,30 @@ import (
 
 type FloatingIP struct {
 	ResourcePubSubComponent[
-		*message.FloatingIPAdd,
-		message.FloatingIPAdd,
+		*message.AddedFloatingIPs,
+		message.AddedFloatingIPs,
 		message.AddNoneAddition,
-		*message.FloatingIPUpdate,
-		message.FloatingIPUpdate,
-		*message.FloatingIPFieldsUpdate,
-		message.FloatingIPFieldsUpdate,
-		*message.FloatingIPDelete,
-		message.FloatingIPDelete,
+		*message.UpdatedFloatingIP,
+		message.UpdatedFloatingIP,
+		*message.UpdatedFloatingIPFields,
+		message.UpdatedFloatingIPFields,
+		*message.DeletedFloatingIPs,
+		message.DeletedFloatingIPs,
 		message.DeleteNoneAddition]
 }
 
 func NewFloatingIP() *FloatingIP {
 	return &FloatingIP{
 		ResourcePubSubComponent[
-			*message.FloatingIPAdd,
-			message.FloatingIPAdd,
+			*message.AddedFloatingIPs,
+			message.AddedFloatingIPs,
 			message.AddNoneAddition,
-			*message.FloatingIPUpdate,
-			message.FloatingIPUpdate,
-			*message.FloatingIPFieldsUpdate,
-			message.FloatingIPFieldsUpdate,
-			*message.FloatingIPDelete,
-			message.FloatingIPDelete,
+			*message.UpdatedFloatingIP,
+			message.UpdatedFloatingIP,
+			*message.UpdatedFloatingIPFields,
+			message.UpdatedFloatingIPFields,
+			*message.DeletedFloatingIPs,
+			message.DeletedFloatingIPs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeFloatingIP),

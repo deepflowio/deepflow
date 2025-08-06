@@ -23,30 +23,30 @@ import (
 
 type VIP struct {
 	ResourcePubSubComponent[
-		*message.VIPAdd,
-		message.VIPAdd,
+		*message.AddedVIPs,
+		message.AddedVIPs,
 		message.AddNoneAddition,
-		*message.VIPUpdate,
-		message.VIPUpdate,
-		*message.VIPFieldsUpdate,
-		message.VIPFieldsUpdate,
-		*message.VIPDelete,
-		message.VIPDelete,
+		*message.UpdatedVIP,
+		message.UpdatedVIP,
+		*message.UpdatedVIPFields,
+		message.UpdatedVIPFields,
+		*message.DeletedVIPs,
+		message.DeletedVIPs,
 		message.DeleteNoneAddition]
 }
 
 func NewVIP() *VIP {
 	return &VIP{
 		ResourcePubSubComponent[
-			*message.VIPAdd,
-			message.VIPAdd,
+			*message.AddedVIPs,
+			message.AddedVIPs,
 			message.AddNoneAddition,
-			*message.VIPUpdate,
-			message.VIPUpdate,
-			*message.VIPFieldsUpdate,
-			message.VIPFieldsUpdate,
-			*message.VIPDelete,
-			message.VIPDelete,
+			*message.UpdatedVIP,
+			message.UpdatedVIP,
+			*message.UpdatedVIPFields,
+			message.UpdatedVIPFields,
+			*message.DeletedVIPs,
+			message.DeletedVIPs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVIP),

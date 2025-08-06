@@ -23,30 +23,30 @@ import (
 
 type LB struct {
 	ResourcePubSubComponent[
-		*message.LBAdd,
-		message.LBAdd,
+		*message.AddedLBs,
+		message.AddedLBs,
 		message.AddNoneAddition,
-		*message.LBUpdate,
-		message.LBUpdate,
-		*message.LBFieldsUpdate,
-		message.LBFieldsUpdate,
-		*message.LBDelete,
-		message.LBDelete,
+		*message.UpdatedLB,
+		message.UpdatedLB,
+		*message.UpdatedLBFields,
+		message.UpdatedLBFields,
+		*message.DeletedLBs,
+		message.DeletedLBs,
 		message.DeleteNoneAddition]
 }
 
 func NewLB() *LB {
 	return &LB{
 		ResourcePubSubComponent[
-			*message.LBAdd,
-			message.LBAdd,
+			*message.AddedLBs,
+			message.AddedLBs,
 			message.AddNoneAddition,
-			*message.LBUpdate,
-			message.LBUpdate,
-			*message.LBFieldsUpdate,
-			message.LBFieldsUpdate,
-			*message.LBDelete,
-			message.LBDelete,
+			*message.UpdatedLB,
+			message.UpdatedLB,
+			*message.UpdatedLBFields,
+			message.UpdatedLBFields,
+			*message.DeletedLBs,
+			message.DeletedLBs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLB),

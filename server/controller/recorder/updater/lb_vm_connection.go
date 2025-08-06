@@ -32,15 +32,15 @@ type LBVMConnection struct {
 		*diffbase.LBVMConnection,
 		*metadbmodel.LBVMConnection,
 		metadbmodel.LBVMConnection,
-		*message.LBVMConnectionAdd,
-		message.LBVMConnectionAdd,
+		*message.AddedLBVMConnections,
+		message.AddedLBVMConnections,
 		message.AddNoneAddition,
-		*message.LBVMConnectionUpdate,
-		message.LBVMConnectionUpdate,
-		*message.LBVMConnectionFieldsUpdate,
-		message.LBVMConnectionFieldsUpdate,
-		*message.LBVMConnectionDelete,
-		message.LBVMConnectionDelete,
+		*message.UpdatedLBVMConnection,
+		message.UpdatedLBVMConnection,
+		*message.UpdatedLBVMConnectionFields,
+		message.UpdatedLBVMConnectionFields,
+		*message.DeletedLBVMConnections,
+		message.DeletedLBVMConnections,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 			*diffbase.LBVMConnection,
 			*metadbmodel.LBVMConnection,
 			metadbmodel.LBVMConnection,
-			*message.LBVMConnectionAdd,
-			message.LBVMConnectionAdd,
+			*message.AddedLBVMConnections,
+			message.AddedLBVMConnections,
 			message.AddNoneAddition,
-			*message.LBVMConnectionUpdate,
-			message.LBVMConnectionUpdate,
-			*message.LBVMConnectionFieldsUpdate,
-			message.LBVMConnectionFieldsUpdate,
-			*message.LBVMConnectionDelete,
-			message.LBVMConnectionDelete,
+			*message.UpdatedLBVMConnection,
+			message.UpdatedLBVMConnection,
+			*message.UpdatedLBVMConnectionFields,
+			message.UpdatedLBVMConnectionFields,
+			*message.DeletedLBVMConnections,
+			message.DeletedLBVMConnections,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
@@ -106,6 +106,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (*message.LBVMConnectionFieldsUpdate, map[string]interface{}, bool) {
+func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (*message.UpdatedLBVMConnectionFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

@@ -32,15 +32,15 @@ type NATRule struct {
 		*diffbase.NATRule,
 		*metadbmodel.NATRule,
 		metadbmodel.NATRule,
-		*message.NATRuleAdd,
-		message.NATRuleAdd,
+		*message.AddedNATRules,
+		message.AddedNATRules,
 		message.AddNoneAddition,
-		*message.NATRuleUpdate,
-		message.NATRuleUpdate,
-		*message.NATRuleFieldsUpdate,
-		message.NATRuleFieldsUpdate,
-		*message.NATRuleDelete,
-		message.NATRuleDelete,
+		*message.UpdatedNATRule,
+		message.UpdatedNATRule,
+		*message.UpdatedNATRuleFields,
+		message.UpdatedNATRuleFields,
+		*message.DeletedNATRules,
+		message.DeletedNATRules,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 			*diffbase.NATRule,
 			*metadbmodel.NATRule,
 			metadbmodel.NATRule,
-			*message.NATRuleAdd,
-			message.NATRuleAdd,
+			*message.AddedNATRules,
+			message.AddedNATRules,
 			message.AddNoneAddition,
-			*message.NATRuleUpdate,
-			message.NATRuleUpdate,
-			*message.NATRuleFieldsUpdate,
-			message.NATRuleFieldsUpdate,
-			*message.NATRuleDelete,
-			message.NATRuleDelete,
+			*message.UpdatedNATRule,
+			message.UpdatedNATRule,
+			*message.UpdatedNATRuleFields,
+			message.UpdatedNATRuleFields,
+			*message.DeletedNATRules,
+			message.DeletedNATRules,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
@@ -119,6 +119,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (*message.NATRuleFieldsUpdate, map[string]interface{}, bool) {
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (*message.UpdatedNATRuleFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

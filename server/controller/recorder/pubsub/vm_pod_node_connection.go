@@ -23,30 +23,30 @@ import (
 
 type VMPodNodeConnection struct {
 	ResourcePubSubComponent[
-		*message.VMPodNodeConnectionAdd,
-		message.VMPodNodeConnectionAdd,
+		*message.AddedVMPodNodeConnections,
+		message.AddedVMPodNodeConnections,
 		message.AddNoneAddition,
-		*message.VMPodNodeConnectionUpdate,
-		message.VMPodNodeConnectionUpdate,
-		*message.VMPodNodeConnectionFieldsUpdate,
-		message.VMPodNodeConnectionFieldsUpdate,
-		*message.VMPodNodeConnectionDelete,
-		message.VMPodNodeConnectionDelete,
+		*message.UpdatedVMPodNodeConnection,
+		message.UpdatedVMPodNodeConnection,
+		*message.UpdatedVMPodNodeConnectionFields,
+		message.UpdatedVMPodNodeConnectionFields,
+		*message.DeletedVMPodNodeConnections,
+		message.DeletedVMPodNodeConnections,
 		message.DeleteNoneAddition]
 }
 
 func NewVMPodNodeConnection() *VMPodNodeConnection {
 	return &VMPodNodeConnection{
 		ResourcePubSubComponent[
-			*message.VMPodNodeConnectionAdd,
-			message.VMPodNodeConnectionAdd,
+			*message.AddedVMPodNodeConnections,
+			message.AddedVMPodNodeConnections,
 			message.AddNoneAddition,
-			*message.VMPodNodeConnectionUpdate,
-			message.VMPodNodeConnectionUpdate,
-			*message.VMPodNodeConnectionFieldsUpdate,
-			message.VMPodNodeConnectionFieldsUpdate,
-			*message.VMPodNodeConnectionDelete,
-			message.VMPodNodeConnectionDelete,
+			*message.UpdatedVMPodNodeConnection,
+			message.UpdatedVMPodNodeConnection,
+			*message.UpdatedVMPodNodeConnectionFields,
+			message.UpdatedVMPodNodeConnectionFields,
+			*message.DeletedVMPodNodeConnections,
+			message.DeletedVMPodNodeConnections,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVMPodNodeConnection),

@@ -23,30 +23,30 @@ import (
 
 type VRouter struct {
 	ResourcePubSubComponent[
-		*message.VRouterAdd,
-		message.VRouterAdd,
+		*message.AddedVRouters,
+		message.AddedVRouters,
 		message.AddNoneAddition,
-		*message.VRouterUpdate,
-		message.VRouterUpdate,
-		*message.VRouterFieldsUpdate,
-		message.VRouterFieldsUpdate,
-		*message.VRouterDelete,
-		message.VRouterDelete,
+		*message.UpdatedVRouter,
+		message.UpdatedVRouter,
+		*message.UpdatedVRouterFields,
+		message.UpdatedVRouterFields,
+		*message.DeletedVRouters,
+		message.DeletedVRouters,
 		message.DeleteNoneAddition]
 }
 
 func NewVRouter() *VRouter {
 	return &VRouter{
 		ResourcePubSubComponent[
-			*message.VRouterAdd,
-			message.VRouterAdd,
+			*message.AddedVRouters,
+			message.AddedVRouters,
 			message.AddNoneAddition,
-			*message.VRouterUpdate,
-			message.VRouterUpdate,
-			*message.VRouterFieldsUpdate,
-			message.VRouterFieldsUpdate,
-			*message.VRouterDelete,
-			message.VRouterDelete,
+			*message.UpdatedVRouter,
+			message.UpdatedVRouter,
+			*message.UpdatedVRouterFields,
+			message.UpdatedVRouterFields,
+			*message.DeletedVRouters,
+			message.DeletedVRouters,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVRouter),
