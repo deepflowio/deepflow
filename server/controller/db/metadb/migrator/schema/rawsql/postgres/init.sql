@@ -965,6 +965,7 @@ CREATE TABLE IF NOT EXISTS process (
 TRUNCATE TABLE process;
 COMMENT ON COLUMN process.os_app_tags IS 'separated by ,';
 CREATE INDEX process_gid_update_index ON process (domain, sub_domain, gid, updated_at);
+CREATE INDEX process_deleted_at_index ON process (deleted_at);
 
 CREATE TABLE IF NOT EXISTS genesis_vpc (
     lcuuid          VARCHAR(64),
