@@ -42,7 +42,7 @@ func (o *ChOSAppTag) generateNewData(db *mysql.DB) (map[IDKeyKey]mysqlmodel.ChOS
 	keyToItem := make(map[IDKeyKey]mysqlmodel.ChOSAppTag)
 	gidToOsAppTagMap := make(map[int]map[string]string)
 
-	err := db.Find(&processes).Error
+	err := db.Select("gid", "os_app_tags").Find(&processes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
