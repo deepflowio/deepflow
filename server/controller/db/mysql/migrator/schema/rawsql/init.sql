@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS process (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL,
-    INDEX domain_sub_domain_gid_updated_at_index(domain, sub_domain, gid, updated_at DESC)
+    INDEX domain_sub_domain_gid_updated_at_index(domain, sub_domain, gid, updated_at DESC),
+    INDEX deleted_at_index(deleted_at)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
 
