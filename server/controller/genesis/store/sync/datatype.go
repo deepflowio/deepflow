@@ -18,7 +18,6 @@ package sync
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -78,18 +77,9 @@ func (g *GenesisSyncTypeOperation[T]) Renew(orgID int, key string, timestamp tim
 
 	if key == "" {
 		for _, item := range items {
-			tData := reflect.ValueOf(&item).Elem()
-			itemLcuuid := tData.FieldByName("Lcuuid").String()
+			itemLcuuid := item.GetLcuuid()
 			if oLastSeen, ok := g.lastSeen[orgID]; ok {
 				oLastSeen[itemLcuuid] = timestamp
-			}
-
-			dataLastTime := tData.FieldByName("LastSeen")
-			if dataLastTime.IsValid() && dataLastTime.CanSet() {
-				dataLastTime.Set(reflect.ValueOf(timestamp))
-				if odataStore, ok := g.dataStore[orgID]; ok {
-					odataStore[itemLcuuid] = item
-				}
 			}
 		}
 	} else {
@@ -104,8 +94,7 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 
 	if key == "" {
 		for _, item := range items {
-			tData := reflect.ValueOf(&item).Elem()
-			itemLcuuid := tData.FieldByName("Lcuuid").String()
+			itemLcuuid := item.GetLcuuid()
 			if oLastSeen, ok := g.lastSeen[orgID]; ok {
 				oLastSeen[itemLcuuid] = timestamp
 			} else {
@@ -243,9 +232,7 @@ func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
 		}
 
 		for _, data := range g.dataStore[db.ORGID] {
-			tData := reflect.ValueOf(&data).Elem()
-			vtapID := tData.FieldByName("VtapID").Uint()
-			if _, ok := vtapIDMap[uint32(vtapID)]; !ok {
+			if _, ok := vtapIDMap[data.GetVtapID()]; !ok {
 				continue
 			}
 			items = append(items, data)
