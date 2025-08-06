@@ -23,30 +23,30 @@ import (
 
 type DHCPPort struct {
 	ResourcePubSubComponent[
-		*message.DHCPPortAdd,
-		message.DHCPPortAdd,
+		*message.AddedDHCPPorts,
+		message.AddedDHCPPorts,
 		message.AddNoneAddition,
-		*message.DHCPPortUpdate,
-		message.DHCPPortUpdate,
-		*message.DHCPPortFieldsUpdate,
-		message.DHCPPortFieldsUpdate,
-		*message.DHCPPortDelete,
-		message.DHCPPortDelete,
+		*message.UpdatedDHCPPort,
+		message.UpdatedDHCPPort,
+		*message.UpdatedDHCPPortFields,
+		message.UpdatedDHCPPortFields,
+		*message.DeletedDHCPPorts,
+		message.DeletedDHCPPorts,
 		message.DeleteNoneAddition]
 }
 
 func NewDHCPPort() *DHCPPort {
 	return &DHCPPort{
 		ResourcePubSubComponent[
-			*message.DHCPPortAdd,
-			message.DHCPPortAdd,
+			*message.AddedDHCPPorts,
+			message.AddedDHCPPorts,
 			message.AddNoneAddition,
-			*message.DHCPPortUpdate,
-			message.DHCPPortUpdate,
-			*message.DHCPPortFieldsUpdate,
-			message.DHCPPortFieldsUpdate,
-			*message.DHCPPortDelete,
-			message.DHCPPortDelete,
+			*message.UpdatedDHCPPort,
+			message.UpdatedDHCPPort,
+			*message.UpdatedDHCPPortFields,
+			message.UpdatedDHCPPortFields,
+			*message.DeletedDHCPPorts,
+			message.DeletedDHCPPorts,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeDHCPPort),

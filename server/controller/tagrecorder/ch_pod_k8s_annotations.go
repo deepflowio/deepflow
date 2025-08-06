@@ -25,12 +25,12 @@ import (
 
 type ChPodK8sAnnotations struct {
 	SubscriberComponent[
-		*message.PodAdd,
-		message.PodAdd,
-		*message.PodUpdate,
-		message.PodUpdate,
-		*message.PodDelete,
-		message.PodDelete,
+		*message.AddedPods,
+		message.AddedPods,
+		*message.UpdatedPod,
+		message.UpdatedPod,
+		*message.DeletedPods,
+		message.DeletedPods,
 		metadbmodel.Pod,
 		metadbmodel.ChPodK8sAnnotations,
 		IDKey,
@@ -40,12 +40,12 @@ type ChPodK8sAnnotations struct {
 func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 	mng := &ChPodK8sAnnotations{
 		newSubscriberComponent[
-			*message.PodAdd,
-			message.PodAdd,
-			*message.PodUpdate,
-			message.PodUpdate,
-			*message.PodDelete,
-			message.PodDelete,
+			*message.AddedPods,
+			message.AddedPods,
+			*message.UpdatedPod,
+			message.UpdatedPod,
+			*message.DeletedPods,
+			message.DeletedPods,
 			metadbmodel.Pod,
 			metadbmodel.ChPodK8sAnnotations,
 			IDKey,
@@ -58,9 +58,9 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+func (c *ChPodK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

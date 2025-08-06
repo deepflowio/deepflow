@@ -23,30 +23,30 @@ import (
 
 type PodNamespace struct {
 	ResourcePubSubComponent[
-		*message.PodNamespaceAdd,
-		message.PodNamespaceAdd,
+		*message.AddedPodNamespaces,
+		message.AddedPodNamespaces,
 		message.AddNoneAddition,
-		*message.PodNamespaceUpdate,
-		message.PodNamespaceUpdate,
-		*message.PodNamespaceFieldsUpdate,
-		message.PodNamespaceFieldsUpdate,
-		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete,
+		*message.UpdatedPodNamespace,
+		message.UpdatedPodNamespace,
+		*message.UpdatedPodNamespaceFields,
+		message.UpdatedPodNamespaceFields,
+		*message.DeletedPodNamespaces,
+		message.DeletedPodNamespaces,
 		message.DeleteNoneAddition]
 }
 
 func NewPodNamespace() *PodNamespace {
 	return &PodNamespace{
 		ResourcePubSubComponent[
-			*message.PodNamespaceAdd,
-			message.PodNamespaceAdd,
+			*message.AddedPodNamespaces,
+			message.AddedPodNamespaces,
 			message.AddNoneAddition,
-			*message.PodNamespaceUpdate,
-			message.PodNamespaceUpdate,
-			*message.PodNamespaceFieldsUpdate,
-			message.PodNamespaceFieldsUpdate,
-			*message.PodNamespaceDelete,
-			message.PodNamespaceDelete,
+			*message.UpdatedPodNamespace,
+			message.UpdatedPodNamespace,
+			*message.UpdatedPodNamespaceFields,
+			message.UpdatedPodNamespaceFields,
+			*message.DeletedPodNamespaces,
+			message.DeletedPodNamespaces,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodNamespace),

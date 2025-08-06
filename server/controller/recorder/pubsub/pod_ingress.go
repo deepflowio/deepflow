@@ -23,30 +23,30 @@ import (
 
 type PodIngress struct {
 	ResourcePubSubComponent[
-		*message.PodIngressAdd,
-		message.PodIngressAdd,
+		*message.AddedPodIngresses,
+		message.AddedPodIngresses,
 		message.AddNoneAddition,
-		*message.PodIngressUpdate,
-		message.PodIngressUpdate,
-		*message.PodIngressFieldsUpdate,
-		message.PodIngressFieldsUpdate,
-		*message.PodIngressDelete,
-		message.PodIngressDelete,
+		*message.UpdatedPodIngress,
+		message.UpdatedPodIngress,
+		*message.UpdatedPodIngressFields,
+		message.UpdatedPodIngressFields,
+		*message.DeletedPodIngresses,
+		message.DeletedPodIngresses,
 		message.DeleteNoneAddition]
 }
 
 func NewPodIngress() *PodIngress {
 	return &PodIngress{
 		ResourcePubSubComponent[
-			*message.PodIngressAdd,
-			message.PodIngressAdd,
+			*message.AddedPodIngresses,
+			message.AddedPodIngresses,
 			message.AddNoneAddition,
-			*message.PodIngressUpdate,
-			message.PodIngressUpdate,
-			*message.PodIngressFieldsUpdate,
-			message.PodIngressFieldsUpdate,
-			*message.PodIngressDelete,
-			message.PodIngressDelete,
+			*message.UpdatedPodIngress,
+			message.UpdatedPodIngress,
+			*message.UpdatedPodIngressFields,
+			message.UpdatedPodIngressFields,
+			*message.DeletedPodIngresses,
+			message.DeletedPodIngresses,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodIngress),

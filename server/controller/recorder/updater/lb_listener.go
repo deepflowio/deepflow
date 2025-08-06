@@ -32,15 +32,15 @@ type LBListener struct {
 		*diffbase.LBListener,
 		*metadbmodel.LBListener,
 		metadbmodel.LBListener,
-		*message.LBListenerAdd,
-		message.LBListenerAdd,
+		*message.AddedLBListeners,
+		message.AddedLBListeners,
 		message.AddNoneAddition,
-		*message.LBListenerUpdate,
-		message.LBListenerUpdate,
-		*message.LBListenerFieldsUpdate,
-		message.LBListenerFieldsUpdate,
-		*message.LBListenerDelete,
-		message.LBListenerDelete,
+		*message.UpdatedLBListener,
+		message.UpdatedLBListener,
+		*message.UpdatedLBListenerFields,
+		message.UpdatedLBListenerFields,
+		*message.DeletedLBListeners,
+		message.DeletedLBListeners,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 			*diffbase.LBListener,
 			*metadbmodel.LBListener,
 			metadbmodel.LBListener,
-			*message.LBListenerAdd,
-			message.LBListenerAdd,
+			*message.AddedLBListeners,
+			message.AddedLBListeners,
 			message.AddNoneAddition,
-			*message.LBListenerUpdate,
-			message.LBListenerUpdate,
-			*message.LBListenerFieldsUpdate,
-			message.LBListenerFieldsUpdate,
-			*message.LBListenerDelete,
-			message.LBListenerDelete,
+			*message.UpdatedLBListener,
+			message.UpdatedLBListener,
+			*message.UpdatedLBListenerFields,
+			message.UpdatedLBListenerFields,
+			*message.DeletedLBListeners,
+			message.DeletedLBListeners,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
@@ -102,8 +102,8 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*met
 	return dbItem, true
 }
 
-func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (*message.LBListenerFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.LBListenerFieldsUpdate)
+func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (*message.UpdatedLBListenerFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedLBListenerFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

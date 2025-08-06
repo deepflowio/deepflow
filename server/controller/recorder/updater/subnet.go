@@ -33,15 +33,15 @@ type Subnet struct {
 		*diffbase.Subnet,
 		*metadbmodel.Subnet,
 		metadbmodel.Subnet,
-		*message.SubnetAdd,
-		message.SubnetAdd,
+		*message.AddedSubnets,
+		message.AddedSubnets,
 		message.AddNoneAddition,
-		*message.SubnetUpdate,
-		message.SubnetUpdate,
-		*message.SubnetFieldsUpdate,
-		message.SubnetFieldsUpdate,
-		*message.SubnetDelete,
-		message.SubnetDelete,
+		*message.UpdatedSubnet,
+		message.UpdatedSubnet,
+		*message.UpdatedSubnetFields,
+		message.UpdatedSubnetFields,
+		*message.DeletedSubnets,
+		message.DeletedSubnets,
 		message.DeleteNoneAddition]
 }
 
@@ -52,15 +52,15 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 			*diffbase.Subnet,
 			*metadbmodel.Subnet,
 			metadbmodel.Subnet,
-			*message.SubnetAdd,
-			message.SubnetAdd,
+			*message.AddedSubnets,
+			message.AddedSubnets,
 			message.AddNoneAddition,
-			*message.SubnetUpdate,
-			message.SubnetUpdate,
-			*message.SubnetFieldsUpdate,
-			message.SubnetFieldsUpdate,
-			*message.SubnetDelete,
-			message.SubnetDelete,
+			*message.UpdatedSubnet,
+			message.UpdatedSubnet,
+			*message.UpdatedSubnetFields,
+			message.UpdatedSubnetFields,
+			*message.DeletedSubnets,
+			message.DeletedSubnets,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
@@ -107,8 +107,8 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*metadbmodel
 	return dbItem, true
 }
 
-func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (*message.SubnetFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.SubnetFieldsUpdate)
+func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (*message.UpdatedSubnetFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedSubnetFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

@@ -29,12 +29,12 @@ import (
 
 type ChGProcess struct {
 	SubscriberComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
+		*message.AddedProcesses,
+		message.AddedProcesses,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
 		metadbmodel.Process,
 		metadbmodel.ChGProcess,
 		IDKey,
@@ -45,12 +45,12 @@ type ChGProcess struct {
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	mng := &ChGProcess{
 		newSubscriberComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
+			*message.AddedProcesses,
+			message.AddedProcesses,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
 			metadbmodel.Process,
 			metadbmodel.ChGProcess,
 			IDKey,
@@ -90,9 +90,9 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.ProcessUpdate) {
+func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedProcess) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.ProcessFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedProcessFields)
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -115,7 +115,7 @@ func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess,
 	}).Create(&targets)
 }
 
-func (c *ChGProcess) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.ProcessDelete) []*metadbmodel.Process {
+func (c *ChGProcess) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.DeletedProcesses) []*metadbmodel.Process {
 	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
 	newDatas := []*metadbmodel.Process{}
 	for _, item := range dbData {

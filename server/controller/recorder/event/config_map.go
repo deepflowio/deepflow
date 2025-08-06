@@ -61,11 +61,11 @@ func (c *ConfigMap) OnResourceBatchAdded(md *message.Metadata, msg interface{}) 
 }
 
 func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.ConfigMapUpdate).GetFields().(*message.ConfigMapFieldsUpdate)
+	fields := msg.(*message.UpdatedConfigMap).GetFields().(*message.UpdatedConfigMapFields)
 	if !fields.Data.IsDifferent() {
 		return
 	}
-	item := msg.(*message.ConfigMapUpdate).GetNewMetadbItem().(*metadbModel.ConfigMap)
+	item := msg.(*message.UpdatedConfigMap).GetNewMetadbItem().(*metadbModel.ConfigMap)
 
 	diff := CompareConfig(fields.Data.GetOld(), fields.Data.GetNew(), int(c.cfg.ConfigDiffContext))
 

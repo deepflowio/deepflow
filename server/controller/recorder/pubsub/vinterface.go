@@ -23,30 +23,30 @@ import (
 
 type VInterface struct {
 	ResourcePubSubComponent[
-		*message.VInterfaceAdd,
-		message.VInterfaceAdd,
+		*message.AddedVInterfaces,
+		message.AddedVInterfaces,
 		message.AddNoneAddition,
-		*message.VInterfaceUpdate,
-		message.VInterfaceUpdate,
-		*message.VInterfaceFieldsUpdate,
-		message.VInterfaceFieldsUpdate,
-		*message.VInterfaceDelete,
-		message.VInterfaceDelete,
+		*message.UpdatedVInterface,
+		message.UpdatedVInterface,
+		*message.UpdatedVInterfaceFields,
+		message.UpdatedVInterfaceFields,
+		*message.DeletedVInterfaces,
+		message.DeletedVInterfaces,
 		message.DeleteNoneAddition]
 }
 
 func NewVInterface() *VInterface {
 	return &VInterface{
 		ResourcePubSubComponent[
-			*message.VInterfaceAdd,
-			message.VInterfaceAdd,
+			*message.AddedVInterfaces,
+			message.AddedVInterfaces,
 			message.AddNoneAddition,
-			*message.VInterfaceUpdate,
-			message.VInterfaceUpdate,
-			*message.VInterfaceFieldsUpdate,
-			message.VInterfaceFieldsUpdate,
-			*message.VInterfaceDelete,
-			message.VInterfaceDelete,
+			*message.UpdatedVInterface,
+			message.UpdatedVInterface,
+			*message.UpdatedVInterfaceFields,
+			message.UpdatedVInterfaceFields,
+			*message.DeletedVInterfaces,
+			message.DeletedVInterfaces,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVInterface),

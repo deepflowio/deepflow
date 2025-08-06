@@ -46,7 +46,7 @@ func (p *PodGroup) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 }
 
 func (c *PodGroup) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	fields := msg.(*message.PodGroupFieldsUpdate)
+	fields := msg.(*message.UpdatedPodGroupFields)
 	if !fields.Metadata.IsDifferent() && !fields.Spec.IsDifferent() {
 		return
 	}

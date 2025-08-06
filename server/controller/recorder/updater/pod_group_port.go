@@ -32,15 +32,15 @@ type PodGroupPort struct {
 		*diffbase.PodGroupPort,
 		*metadbmodel.PodGroupPort,
 		metadbmodel.PodGroupPort,
-		*message.PodGroupPortAdd,
-		message.PodGroupPortAdd,
+		*message.AddedPodGroupPorts,
+		message.AddedPodGroupPorts,
 		message.AddNoneAddition,
-		*message.PodGroupPortUpdate,
-		message.PodGroupPortUpdate,
-		*message.PodGroupPortFieldsUpdate,
-		message.PodGroupPortFieldsUpdate,
-		*message.PodGroupPortDelete,
-		message.PodGroupPortDelete,
+		*message.UpdatedPodGroupPort,
+		message.UpdatedPodGroupPort,
+		*message.UpdatedPodGroupPortFields,
+		message.UpdatedPodGroupPortFields,
+		*message.DeletedPodGroupPorts,
+		message.DeletedPodGroupPorts,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 			*diffbase.PodGroupPort,
 			*metadbmodel.PodGroupPort,
 			metadbmodel.PodGroupPort,
-			*message.PodGroupPortAdd,
-			message.PodGroupPortAdd,
+			*message.AddedPodGroupPorts,
+			message.AddedPodGroupPorts,
 			message.AddNoneAddition,
-			*message.PodGroupPortUpdate,
-			message.PodGroupPortUpdate,
-			*message.PodGroupPortFieldsUpdate,
-			message.PodGroupPortFieldsUpdate,
-			*message.PodGroupPortDelete,
-			message.PodGroupPortDelete,
+			*message.UpdatedPodGroupPort,
+			message.UpdatedPodGroupPort,
+			*message.UpdatedPodGroupPortFields,
+			message.UpdatedPodGroupPortFields,
+			*message.DeletedPodGroupPorts,
+			message.DeletedPodGroupPorts,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
@@ -109,8 +109,8 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 	return dbItem, true
 }
 
-func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (*message.PodGroupPortFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodGroupPortFieldsUpdate)
+func (p *PodGroupPort) generateUpdateInfo(diffBase *diffbase.PodGroupPort, cloudItem *cloudmodel.PodGroupPort) (*message.UpdatedPodGroupPortFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodGroupPortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

@@ -35,15 +35,15 @@ type Pod struct {
 		*diffbase.Pod,
 		*metadbmodel.Pod,
 		metadbmodel.Pod,
-		*message.PodAdd,
-		message.PodAdd,
+		*message.AddedPods,
+		message.AddedPods,
 		message.AddNoneAddition,
-		*message.PodUpdate,
-		message.PodUpdate,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
-		*message.PodDelete,
-		message.PodDelete,
+		*message.UpdatedPod,
+		message.UpdatedPod,
+		*message.UpdatedPodFields,
+		message.UpdatedPodFields,
+		*message.DeletedPods,
+		message.DeletedPods,
 		message.DeleteNoneAddition]
 }
 
@@ -54,15 +54,15 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 			*diffbase.Pod,
 			*metadbmodel.Pod,
 			metadbmodel.Pod,
-			*message.PodAdd,
-			message.PodAdd,
+			*message.AddedPods,
+			message.AddedPods,
 			message.AddNoneAddition,
-			*message.PodUpdate,
-			message.PodUpdate,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
-			*message.PodDelete,
-			message.PodDelete,
+			*message.UpdatedPod,
+			message.UpdatedPod,
+			*message.UpdatedPodFields,
+			message.UpdatedPodFields,
+			*message.DeletedPods,
+			message.DeletedPods,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
@@ -168,8 +168,8 @@ func (m *Pod) recordStatsd(cloudItem *cloudmodel.Pod) {
 	m.statsd.GetMonitor(statsd.TagTypePodSyncDelay).Fill(int(syncDelay))
 }
 
-func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.PodFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodFieldsUpdate)
+func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.UpdatedPodFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

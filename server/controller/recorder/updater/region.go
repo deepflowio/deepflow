@@ -32,15 +32,15 @@ type Region struct {
 		*diffbase.Region,
 		*metadbmodel.Region,
 		metadbmodel.Region,
-		*message.RegionAdd,
-		message.RegionAdd,
+		*message.AddedRegions,
+		message.AddedRegions,
 		message.AddNoneAddition,
-		*message.RegionUpdate,
-		message.RegionUpdate,
-		*message.RegionFieldsUpdate,
-		message.RegionFieldsUpdate,
-		*message.RegionDelete,
-		message.RegionDelete,
+		*message.UpdatedRegion,
+		message.UpdatedRegion,
+		*message.UpdatedRegionFields,
+		message.UpdatedRegionFields,
+		*message.DeletedRegions,
+		message.DeletedRegions,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 			*diffbase.Region,
 			*metadbmodel.Region,
 			metadbmodel.Region,
-			*message.RegionAdd,
-			message.RegionAdd,
+			*message.AddedRegions,
+			message.AddedRegions,
 			message.AddNoneAddition,
-			*message.RegionUpdate,
-			message.RegionUpdate,
-			*message.RegionFieldsUpdate,
-			message.RegionFieldsUpdate,
-			*message.RegionDelete,
-			message.RegionDelete,
+			*message.UpdatedRegion,
+			message.UpdatedRegion,
+			*message.UpdatedRegionFields,
+			message.UpdatedRegionFields,
+			*message.DeletedRegions,
+			message.DeletedRegions,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
@@ -87,8 +87,8 @@ func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*metadbmodel
 	return dbItem, true
 }
 
-func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (*message.RegionFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.RegionFieldsUpdate)
+func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (*message.UpdatedRegionFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedRegionFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

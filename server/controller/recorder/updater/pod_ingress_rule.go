@@ -32,15 +32,15 @@ type PodIngressRule struct {
 		*diffbase.PodIngressRule,
 		*metadbmodel.PodIngressRule,
 		metadbmodel.PodIngressRule,
-		*message.PodIngressRuleAdd,
-		message.PodIngressRuleAdd,
+		*message.AddedPodIngressRules,
+		message.AddedPodIngressRules,
 		message.AddNoneAddition,
-		*message.PodIngressRuleUpdate,
-		message.PodIngressRuleUpdate,
-		*message.PodIngressRuleFieldsUpdate,
-		message.PodIngressRuleFieldsUpdate,
-		*message.PodIngressRuleDelete,
-		message.PodIngressRuleDelete,
+		*message.UpdatedPodIngressRule,
+		message.UpdatedPodIngressRule,
+		*message.UpdatedPodIngressRuleFields,
+		message.UpdatedPodIngressRuleFields,
+		*message.DeletedPodIngressRules,
+		message.DeletedPodIngressRules,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 			*diffbase.PodIngressRule,
 			*metadbmodel.PodIngressRule,
 			metadbmodel.PodIngressRule,
-			*message.PodIngressRuleAdd,
-			message.PodIngressRuleAdd,
+			*message.AddedPodIngressRules,
+			message.AddedPodIngressRules,
 			message.AddNoneAddition,
-			*message.PodIngressRuleUpdate,
-			message.PodIngressRuleUpdate,
-			*message.PodIngressRuleFieldsUpdate,
-			message.PodIngressRuleFieldsUpdate,
-			*message.PodIngressRuleDelete,
-			message.PodIngressRuleDelete,
+			*message.UpdatedPodIngressRule,
+			message.UpdatedPodIngressRule,
+			*message.UpdatedPodIngressRuleFields,
+			message.UpdatedPodIngressRuleFields,
+			*message.DeletedPodIngressRules,
+			message.DeletedPodIngressRules,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
@@ -101,6 +101,6 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 }
 
 // 保留接口
-func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (*message.PodIngressRuleFieldsUpdate, map[string]interface{}, bool) {
+func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (*message.UpdatedPodIngressRuleFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

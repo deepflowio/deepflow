@@ -23,30 +23,30 @@ import (
 
 type NATRule struct {
 	ResourcePubSubComponent[
-		*message.NATRuleAdd,
-		message.NATRuleAdd,
+		*message.AddedNATRules,
+		message.AddedNATRules,
 		message.AddNoneAddition,
-		*message.NATRuleUpdate,
-		message.NATRuleUpdate,
-		*message.NATRuleFieldsUpdate,
-		message.NATRuleFieldsUpdate,
-		*message.NATRuleDelete,
-		message.NATRuleDelete,
+		*message.UpdatedNATRule,
+		message.UpdatedNATRule,
+		*message.UpdatedNATRuleFields,
+		message.UpdatedNATRuleFields,
+		*message.DeletedNATRules,
+		message.DeletedNATRules,
 		message.DeleteNoneAddition]
 }
 
 func NewNATRule() *NATRule {
 	return &NATRule{
 		ResourcePubSubComponent[
-			*message.NATRuleAdd,
-			message.NATRuleAdd,
+			*message.AddedNATRules,
+			message.AddedNATRules,
 			message.AddNoneAddition,
-			*message.NATRuleUpdate,
-			message.NATRuleUpdate,
-			*message.NATRuleFieldsUpdate,
-			message.NATRuleFieldsUpdate,
-			*message.NATRuleDelete,
-			message.NATRuleDelete,
+			*message.UpdatedNATRule,
+			message.UpdatedNATRule,
+			*message.UpdatedNATRuleFields,
+			message.UpdatedNATRuleFields,
+			*message.DeletedNATRules,
+			message.DeletedNATRules,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATRule),

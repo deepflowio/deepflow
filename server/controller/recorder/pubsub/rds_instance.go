@@ -23,30 +23,30 @@ import (
 
 type RDSInstance struct {
 	ResourcePubSubComponent[
-		*message.RDSInstanceAdd,
-		message.RDSInstanceAdd,
+		*message.AddedRDSInstances,
+		message.AddedRDSInstances,
 		message.AddNoneAddition,
-		*message.RDSInstanceUpdate,
-		message.RDSInstanceUpdate,
-		*message.RDSInstanceFieldsUpdate,
-		message.RDSInstanceFieldsUpdate,
-		*message.RDSInstanceDelete,
-		message.RDSInstanceDelete,
+		*message.UpdatedRDSInstance,
+		message.UpdatedRDSInstance,
+		*message.UpdatedRDSInstanceFields,
+		message.UpdatedRDSInstanceFields,
+		*message.DeletedRDSInstances,
+		message.DeletedRDSInstances,
 		message.DeleteNoneAddition]
 }
 
 func NewRDSInstance() *RDSInstance {
 	return &RDSInstance{
 		ResourcePubSubComponent[
-			*message.RDSInstanceAdd,
-			message.RDSInstanceAdd,
+			*message.AddedRDSInstances,
+			message.AddedRDSInstances,
 			message.AddNoneAddition,
-			*message.RDSInstanceUpdate,
-			message.RDSInstanceUpdate,
-			*message.RDSInstanceFieldsUpdate,
-			message.RDSInstanceFieldsUpdate,
-			*message.RDSInstanceDelete,
-			message.RDSInstanceDelete,
+			*message.UpdatedRDSInstance,
+			message.UpdatedRDSInstance,
+			*message.UpdatedRDSInstanceFields,
+			message.UpdatedRDSInstanceFields,
+			*message.DeletedRDSInstances,
+			message.DeletedRDSInstances,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRDSInstance),

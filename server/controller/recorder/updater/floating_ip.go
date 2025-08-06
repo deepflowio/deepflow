@@ -33,15 +33,15 @@ type FloatingIP struct {
 		*diffbase.FloatingIP,
 		*metadbmodel.FloatingIP,
 		metadbmodel.FloatingIP,
-		*message.FloatingIPAdd,
-		message.FloatingIPAdd,
+		*message.AddedFloatingIPs,
+		message.AddedFloatingIPs,
 		message.AddNoneAddition,
-		*message.FloatingIPUpdate,
-		message.FloatingIPUpdate,
-		*message.FloatingIPFieldsUpdate,
-		message.FloatingIPFieldsUpdate,
-		*message.FloatingIPDelete,
-		message.FloatingIPDelete,
+		*message.UpdatedFloatingIP,
+		message.UpdatedFloatingIP,
+		*message.UpdatedFloatingIPFields,
+		message.UpdatedFloatingIPFields,
+		*message.DeletedFloatingIPs,
+		message.DeletedFloatingIPs,
 		message.DeleteNoneAddition]
 }
 
@@ -52,15 +52,15 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 			*diffbase.FloatingIP,
 			*metadbmodel.FloatingIP,
 			metadbmodel.FloatingIP,
-			*message.FloatingIPAdd,
-			message.FloatingIPAdd,
+			*message.AddedFloatingIPs,
+			message.AddedFloatingIPs,
 			message.AddNoneAddition,
-			*message.FloatingIPUpdate,
-			message.FloatingIPUpdate,
-			*message.FloatingIPFieldsUpdate,
-			message.FloatingIPFieldsUpdate,
-			*message.FloatingIPDelete,
-			message.FloatingIPDelete,
+			*message.UpdatedFloatingIP,
+			message.UpdatedFloatingIP,
+			*message.UpdatedFloatingIPFields,
+			message.UpdatedFloatingIPFields,
+			*message.DeletedFloatingIPs,
+			message.DeletedFloatingIPs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
@@ -123,8 +123,8 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*met
 	return dbItem, true
 }
 
-func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (*message.FloatingIPFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.FloatingIPFieldsUpdate)
+func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (*message.UpdatedFloatingIPFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedFloatingIPFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

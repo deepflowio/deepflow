@@ -23,30 +23,30 @@ import (
 
 type PodGroupPort struct {
 	ResourcePubSubComponent[
-		*message.PodGroupPortAdd,
-		message.PodGroupPortAdd,
+		*message.AddedPodGroupPorts,
+		message.AddedPodGroupPorts,
 		message.AddNoneAddition,
-		*message.PodGroupPortUpdate,
-		message.PodGroupPortUpdate,
-		*message.PodGroupPortFieldsUpdate,
-		message.PodGroupPortFieldsUpdate,
-		*message.PodGroupPortDelete,
-		message.PodGroupPortDelete,
+		*message.UpdatedPodGroupPort,
+		message.UpdatedPodGroupPort,
+		*message.UpdatedPodGroupPortFields,
+		message.UpdatedPodGroupPortFields,
+		*message.DeletedPodGroupPorts,
+		message.DeletedPodGroupPorts,
 		message.DeleteNoneAddition]
 }
 
 func NewPodGroupPort() *PodGroupPort {
 	return &PodGroupPort{
 		ResourcePubSubComponent[
-			*message.PodGroupPortAdd,
-			message.PodGroupPortAdd,
+			*message.AddedPodGroupPorts,
+			message.AddedPodGroupPorts,
 			message.AddNoneAddition,
-			*message.PodGroupPortUpdate,
-			message.PodGroupPortUpdate,
-			*message.PodGroupPortFieldsUpdate,
-			message.PodGroupPortFieldsUpdate,
-			*message.PodGroupPortDelete,
-			message.PodGroupPortDelete,
+			*message.UpdatedPodGroupPort,
+			message.UpdatedPodGroupPort,
+			*message.UpdatedPodGroupPortFields,
+			message.UpdatedPodGroupPortFields,
+			*message.DeletedPodGroupPorts,
+			message.DeletedPodGroupPorts,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodGroupPort),

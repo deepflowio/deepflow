@@ -33,15 +33,15 @@ type VRouter struct {
 		*diffbase.VRouter,
 		*metadbmodel.VRouter,
 		metadbmodel.VRouter,
-		*message.VRouterAdd,
-		message.VRouterAdd,
+		*message.AddedVRouters,
+		message.AddedVRouters,
 		message.AddNoneAddition,
-		*message.VRouterUpdate,
-		message.VRouterUpdate,
-		*message.VRouterFieldsUpdate,
-		message.VRouterFieldsUpdate,
-		*message.VRouterDelete,
-		message.VRouterDelete,
+		*message.UpdatedVRouter,
+		message.UpdatedVRouter,
+		*message.UpdatedVRouterFields,
+		message.UpdatedVRouterFields,
+		*message.DeletedVRouters,
+		message.DeletedVRouters,
 		message.DeleteNoneAddition]
 }
 
@@ -52,15 +52,15 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 			*diffbase.VRouter,
 			*metadbmodel.VRouter,
 			metadbmodel.VRouter,
-			*message.VRouterAdd,
-			message.VRouterAdd,
+			*message.AddedVRouters,
+			message.AddedVRouters,
 			message.AddNoneAddition,
-			*message.VRouterUpdate,
-			message.VRouterUpdate,
-			*message.VRouterFieldsUpdate,
-			message.VRouterFieldsUpdate,
-			*message.VRouterDelete,
-			message.VRouterDelete,
+			*message.UpdatedVRouter,
+			message.UpdatedVRouter,
+			*message.UpdatedVRouterFields,
+			message.UpdatedVRouterFields,
+			*message.DeletedVRouters,
+			message.DeletedVRouters,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
@@ -101,8 +101,8 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmod
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (*message.VRouterFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.VRouterFieldsUpdate)
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (*message.UpdatedVRouterFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVRouterFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

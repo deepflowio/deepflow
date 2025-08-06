@@ -32,15 +32,15 @@ type PodGroupConfigMapConnection struct {
 		*diffbase.PodGroupConfigMapConnection,
 		*metadbmodel.PodGroupConfigMapConnection,
 		metadbmodel.PodGroupConfigMapConnection,
-		*message.PodGroupConfigMapConnectionAdd,
-		message.PodGroupConfigMapConnectionAdd,
+		*message.AddedPodGroupConfigMapConnections,
+		message.AddedPodGroupConfigMapConnections,
 		message.AddNoneAddition,
-		*message.PodGroupConfigMapConnectionUpdate,
-		message.PodGroupConfigMapConnectionUpdate,
-		*message.PodGroupConfigMapConnectionFieldsUpdate,
-		message.PodGroupConfigMapConnectionFieldsUpdate,
-		*message.PodGroupConfigMapConnectionDelete,
-		message.PodGroupConfigMapConnectionDelete,
+		*message.UpdatedPodGroupConfigMapConnection,
+		message.UpdatedPodGroupConfigMapConnection,
+		*message.UpdatedPodGroupConfigMapConnectionFields,
+		message.UpdatedPodGroupConfigMapConnectionFields,
+		*message.DeletedPodGroupConfigMapConnections,
+		message.DeletedPodGroupConfigMapConnections,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 			*diffbase.PodGroupConfigMapConnection,
 			*metadbmodel.PodGroupConfigMapConnection,
 			metadbmodel.PodGroupConfigMapConnection,
-			*message.PodGroupConfigMapConnectionAdd,
-			message.PodGroupConfigMapConnectionAdd,
+			*message.AddedPodGroupConfigMapConnections,
+			message.AddedPodGroupConfigMapConnections,
 			message.AddNoneAddition,
-			*message.PodGroupConfigMapConnectionUpdate,
-			message.PodGroupConfigMapConnectionUpdate,
-			*message.PodGroupConfigMapConnectionFieldsUpdate,
-			message.PodGroupConfigMapConnectionFieldsUpdate,
-			*message.PodGroupConfigMapConnectionDelete,
-			message.PodGroupConfigMapConnectionDelete,
+			*message.UpdatedPodGroupConfigMapConnection,
+			message.UpdatedPodGroupConfigMapConnection,
+			*message.UpdatedPodGroupConfigMapConnectionFields,
+			message.UpdatedPodGroupConfigMapConnectionFields,
+			*message.DeletedPodGroupConfigMapConnections,
+			message.DeletedPodGroupConfigMapConnections,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
@@ -105,6 +105,6 @@ func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.
 	return dbItem, true
 }
 
-func (h *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (*message.PodGroupConfigMapConnectionFieldsUpdate, map[string]interface{}, bool) {
+func (h *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (*message.UpdatedPodGroupConfigMapConnectionFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

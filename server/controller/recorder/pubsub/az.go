@@ -23,30 +23,30 @@ import (
 
 type AZ struct {
 	ResourcePubSubComponent[
-		*message.AZAdd,
-		message.AZAdd,
+		*message.AddedAZs,
+		message.AddedAZs,
 		message.AddNoneAddition,
-		*message.AZUpdate,
-		message.AZUpdate,
-		*message.AZFieldsUpdate,
-		message.AZFieldsUpdate,
-		*message.AZDelete,
-		message.AZDelete,
+		*message.UpdatedAZ,
+		message.UpdatedAZ,
+		*message.UpdatedAZFields,
+		message.UpdatedAZFields,
+		*message.DeletedAZs,
+		message.DeletedAZs,
 		message.DeleteNoneAddition]
 }
 
 func NewAZ() *AZ {
 	return &AZ{
 		ResourcePubSubComponent[
-			*message.AZAdd,
-			message.AZAdd,
+			*message.AddedAZs,
+			message.AddedAZs,
 			message.AddNoneAddition,
-			*message.AZUpdate,
-			message.AZUpdate,
-			*message.AZFieldsUpdate,
-			message.AZFieldsUpdate,
-			*message.AZDelete,
-			message.AZDelete,
+			*message.UpdatedAZ,
+			message.UpdatedAZ,
+			*message.UpdatedAZFields,
+			message.UpdatedAZFields,
+			*message.DeletedAZs,
+			message.DeletedAZs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeAZ),
