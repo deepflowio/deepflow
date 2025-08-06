@@ -27,12 +27,12 @@ import (
 
 type ChAZ struct {
 	SubscriberComponent[
-		*message.AZAdd,
-		message.AZAdd,
-		*message.AZUpdate,
-		message.AZUpdate,
-		*message.AZDelete,
-		message.AZDelete,
+		*message.AddedAZs,
+		message.AddedAZs,
+		*message.UpdatedAZ,
+		message.UpdatedAZ,
+		*message.DeletedAZs,
+		message.DeletedAZs,
 		metadbmodel.AZ,
 		metadbmodel.ChAZ,
 		IDKey,
@@ -44,12 +44,12 @@ type ChAZ struct {
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	mng := &ChAZ{
 		newSubscriberComponent[
-			*message.AZAdd,
-			message.AZAdd,
-			*message.AZUpdate,
-			message.AZUpdate,
-			*message.AZDelete,
-			message.AZDelete,
+			*message.AddedAZs,
+			message.AddedAZs,
+			*message.UpdatedAZ,
+			message.UpdatedAZ,
+			*message.DeletedAZs,
+			message.DeletedAZs,
 			metadbmodel.AZ,
 			metadbmodel.ChAZ,
 			IDKey,
@@ -65,9 +65,9 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.AZUpdate) {
+func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedAZ) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.AZFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedAZFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.AZ)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

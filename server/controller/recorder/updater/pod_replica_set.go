@@ -32,15 +32,15 @@ type PodReplicaSet struct {
 		*diffbase.PodReplicaSet,
 		*metadbmodel.PodReplicaSet,
 		metadbmodel.PodReplicaSet,
-		*message.PodReplicaSetAdd,
-		message.PodReplicaSetAdd,
+		*message.AddedPodReplicaSets,
+		message.AddedPodReplicaSets,
 		message.AddNoneAddition,
-		*message.PodReplicaSetUpdate,
-		message.PodReplicaSetUpdate,
-		*message.PodReplicaSetFieldsUpdate,
-		message.PodReplicaSetFieldsUpdate,
-		*message.PodReplicaSetDelete,
-		message.PodReplicaSetDelete,
+		*message.UpdatedPodReplicaSet,
+		message.UpdatedPodReplicaSet,
+		*message.UpdatedPodReplicaSetFields,
+		message.UpdatedPodReplicaSetFields,
+		*message.DeletedPodReplicaSets,
+		message.DeletedPodReplicaSets,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 			*diffbase.PodReplicaSet,
 			*metadbmodel.PodReplicaSet,
 			metadbmodel.PodReplicaSet,
-			*message.PodReplicaSetAdd,
-			message.PodReplicaSetAdd,
+			*message.AddedPodReplicaSets,
+			message.AddedPodReplicaSets,
 			message.AddNoneAddition,
-			*message.PodReplicaSetUpdate,
-			message.PodReplicaSetUpdate,
-			*message.PodReplicaSetFieldsUpdate,
-			message.PodReplicaSetFieldsUpdate,
-			*message.PodReplicaSetDelete,
-			message.PodReplicaSetDelete,
+			*message.UpdatedPodReplicaSet,
+			message.UpdatedPodReplicaSet,
+			*message.UpdatedPodReplicaSetFields,
+			message.UpdatedPodReplicaSetFields,
+			*message.DeletedPodReplicaSets,
+			message.DeletedPodReplicaSets,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
@@ -119,8 +119,8 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 	return dbItem, true
 }
 
-func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (*message.PodReplicaSetFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodReplicaSetFieldsUpdate)
+func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (*message.UpdatedPodReplicaSetFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodReplicaSetFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

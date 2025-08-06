@@ -1,7 +1,11 @@
 /**
  * Copyright (c) 2024 Yunshan Networks
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ 		message.ProcessUpdate,
+		*message.ProcessFieldsUpdate,
+		message.ProcessFieldsUpdate,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
+		message.ProcessDeleteAddition,icensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -12,7 +16,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+*/
 
 package pubsub
 
@@ -23,30 +27,30 @@ import (
 
 type Process struct {
 	ResourcePubSubComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
+		*message.AddedProcesses,
+		message.AddedProcesses,
 		message.ProcessAddAddition,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.UpdatedProcessFields,
+		message.UpdatedProcessFields,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
 		message.ProcessDeleteAddition]
 }
 
 func NewProcess() *Process {
 	return &Process{
 		ResourcePubSubComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
+			*message.AddedProcesses,
+			message.AddedProcesses,
 			message.ProcessAddAddition,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.UpdatedProcessFields,
+			message.UpdatedProcessFields,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
 			message.ProcessDeleteAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeProcess),

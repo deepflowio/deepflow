@@ -33,15 +33,15 @@ type CEN struct {
 		*diffbase.CEN,
 		*metadbmodel.CEN,
 		metadbmodel.CEN,
-		*message.CENAdd,
-		message.CENAdd,
+		*message.AddedCENs,
+		message.AddedCENs,
 		message.AddNoneAddition,
-		*message.CENUpdate,
-		message.CENUpdate,
-		*message.CENFieldsUpdate,
-		message.CENFieldsUpdate,
-		*message.CENDelete,
-		message.CENDelete,
+		*message.UpdatedCEN,
+		message.UpdatedCEN,
+		*message.UpdatedCENFields,
+		message.UpdatedCENFields,
+		*message.DeletedCENs,
+		message.DeletedCENs,
 		message.DeleteNoneAddition]
 }
 
@@ -52,15 +52,15 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 			*diffbase.CEN,
 			*metadbmodel.CEN,
 			metadbmodel.CEN,
-			*message.CENAdd,
-			message.CENAdd,
+			*message.AddedCENs,
+			message.AddedCENs,
 			message.AddNoneAddition,
-			*message.CENUpdate,
-			message.CENUpdate,
-			*message.CENFieldsUpdate,
-			message.CENFieldsUpdate,
-			*message.CENDelete,
-			message.CENDelete,
+			*message.UpdatedCEN,
+			message.UpdatedCEN,
+			*message.UpdatedCENFields,
+			message.UpdatedCENFields,
+			*message.DeletedCENs,
+			message.DeletedCENs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
@@ -102,8 +102,8 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.CENFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.CENFieldsUpdate)
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.UpdatedCENFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedCENFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

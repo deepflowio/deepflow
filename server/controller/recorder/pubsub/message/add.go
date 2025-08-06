@@ -20,217 +20,217 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-type RegionAdd struct {
+type AddedRegions struct {
 	MetadbItems[metadbmodel.Region]
 	addition[AddNoneAddition]
 }
 
-type AZAdd struct {
+type AddedAZs struct {
 	MetadbItems[metadbmodel.AZ]
 	addition[AddNoneAddition]
 }
 
-type SubDomainAdd struct {
+type AddedSubDomains struct {
 	MetadbItems[metadbmodel.SubDomain]
 	addition[AddNoneAddition]
 }
 
-type HostAdd struct {
+type AddedHosts struct {
 	MetadbItems[metadbmodel.Host]
 	addition[AddNoneAddition]
 }
 
-type VMAdd struct {
+type AddedVMs struct {
 	MetadbItems[metadbmodel.VM]
 	addition[AddNoneAddition]
 }
 
-type VMPodNodeConnectionAdd struct {
+type AddedVMPodNodeConnections struct {
 	MetadbItems[metadbmodel.VMPodNodeConnection]
 	addition[AddNoneAddition]
 }
 
-type VPCAdd struct {
+type AddedVPCs struct {
 	MetadbItems[metadbmodel.VPC]
 	addition[AddNoneAddition]
 }
 
-type NetworkAdd struct {
+type AddedNetworks struct {
 	MetadbItems[metadbmodel.Network]
 	addition[AddNoneAddition]
 }
 
-type SubnetAdd struct {
+type AddedSubnets struct {
 	MetadbItems[metadbmodel.Subnet]
 	addition[AddNoneAddition]
 }
 
-type VRouterAdd struct {
+type AddedVRouters struct {
 	MetadbItems[metadbmodel.VRouter]
 	addition[AddNoneAddition]
 }
 
-type RoutingTableAdd struct {
+type AddedRoutingTables struct {
 	MetadbItems[metadbmodel.RoutingTable]
 	addition[AddNoneAddition]
 }
 
-type DHCPPortAdd struct {
+type AddedDHCPPorts struct {
 	MetadbItems[metadbmodel.DHCPPort]
 	addition[AddNoneAddition]
 }
 
-type VInterfaceAdd struct {
+type AddedVInterfaces struct {
 	MetadbItems[metadbmodel.VInterface]
 	addition[AddNoneAddition]
 }
 
-type FloatingIPAdd struct {
+type AddedFloatingIPs struct {
 	MetadbItems[metadbmodel.FloatingIP]
 	addition[AddNoneAddition]
 }
 
-type LANIPAdd struct {
+type AddedLANIPs struct {
 	MetadbItems[metadbmodel.LANIP]
 	addition[AddNoneAddition]
 }
 
-type WANIPAdd struct {
+type AddedWANIPs struct {
 	MetadbItems[metadbmodel.WANIP]
 	addition[AddNoneAddition]
 }
 
-type VIPAdd struct {
+type AddedVIPs struct {
 	MetadbItems[metadbmodel.VIP]
 	addition[AddNoneAddition]
 }
 
-type NATGatewayAdd struct {
+type AddedNATGateways struct {
 	MetadbItems[metadbmodel.NATGateway]
 	addition[AddNoneAddition]
 }
 
-type NATRuleAdd struct {
+type AddedNATRules struct {
 	MetadbItems[metadbmodel.NATRule]
 	addition[AddNoneAddition]
 }
 
-type NATVMConnectionAdd struct {
+type AddedNATVMConnections struct {
 	MetadbItems[metadbmodel.NATVMConnection]
 	addition[AddNoneAddition]
 }
 
-type LBAdd struct {
+type AddedLBs struct {
 	MetadbItems[metadbmodel.LB]
 	addition[AddNoneAddition]
 }
 
-type LBListenerAdd struct {
+type AddedLBListeners struct {
 	MetadbItems[metadbmodel.LBListener]
 	addition[AddNoneAddition]
 }
 
-type LBTargetServerAdd struct {
+type AddedLBTargetServers struct {
 	MetadbItems[metadbmodel.LBTargetServer]
 	addition[AddNoneAddition]
 }
 
-type LBVMConnectionAdd struct {
+type AddedLBVMConnections struct {
 	MetadbItems[metadbmodel.LBVMConnection]
 	addition[AddNoneAddition]
 }
 
-type PeerConnectionAdd struct {
+type AddedPeerConnections struct {
 	MetadbItems[metadbmodel.PeerConnection]
 	addition[AddNoneAddition]
 }
 
-type CENAdd struct {
+type AddedCENs struct {
 	MetadbItems[metadbmodel.CEN]
 	addition[AddNoneAddition]
 }
 
-type RDSInstanceAdd struct {
+type AddedRDSInstances struct {
 	MetadbItems[metadbmodel.RDSInstance]
 	addition[AddNoneAddition]
 }
 
-type RedisInstanceAdd struct {
+type AddedRedisInstances struct {
 	MetadbItems[metadbmodel.RedisInstance]
 	addition[AddNoneAddition]
 }
 
-type PodClusterAdd struct {
+type AddedPodClusters struct {
 	MetadbItems[metadbmodel.PodCluster]
 	addition[AddNoneAddition]
 }
 
-type PodNamespaceAdd struct {
+type AddedPodNamespaces struct {
 	MetadbItems[metadbmodel.PodNamespace]
 	addition[AddNoneAddition]
 }
 
-type PodNodeAdd struct {
+type AddedPodNodes struct {
 	MetadbItems[metadbmodel.PodNode]
 	addition[AddNoneAddition]
 }
 
-type PodIngressAdd struct {
+type AddedPodIngresses struct {
 	MetadbItems[metadbmodel.PodIngress]
 	addition[AddNoneAddition]
 }
 
-type PodIngressRuleAdd struct {
+type AddedPodIngressRules struct {
 	MetadbItems[metadbmodel.PodIngressRule]
 	addition[AddNoneAddition]
 }
 
-type PodIngressRuleBackendAdd struct {
+type AddedPodIngressRuleBackends struct {
 	MetadbItems[metadbmodel.PodIngressRuleBackend]
 	addition[AddNoneAddition]
 }
 
-type PodServiceAdd struct {
+type AddedPodServices struct {
 	MetadbItems[metadbmodel.PodService]
 	addition[AddNoneAddition]
 }
 
-type PodServicePortAdd struct {
+type AddedPodServicePorts struct {
 	MetadbItems[metadbmodel.PodServicePort]
 	addition[AddNoneAddition]
 }
 
-type PodGroupAdd struct {
+type AddedPodGroups struct {
 	MetadbItems[metadbmodel.PodGroup]
 	addition[AddNoneAddition]
 }
 
-type ConfigMapAdd struct {
+type AddedConfigMaps struct {
 	MetadbItems[metadbmodel.ConfigMap]
 	addition[AddNoneAddition]
 }
 
-type PodGroupConfigMapConnectionAdd struct {
+type AddedPodGroupConfigMapConnections struct {
 	MetadbItems[metadbmodel.PodGroupConfigMapConnection]
 	addition[AddNoneAddition]
 }
 
-type PodGroupPortAdd struct {
+type AddedPodGroupPorts struct {
 	MetadbItems[metadbmodel.PodGroupPort]
 	addition[AddNoneAddition]
 }
 
-type PodReplicaSetAdd struct {
+type AddedPodReplicaSets struct {
 	MetadbItems[metadbmodel.PodReplicaSet]
 	addition[AddNoneAddition]
 }
 
-type PodAdd struct {
+type AddedPods struct {
 	MetadbItems[metadbmodel.Pod]
 	addition[AddNoneAddition]
 }
 
-type ProcessAdd struct {
+type AddedProcesses struct {
 	MetadbItems[metadbmodel.Process]
 	addition[ProcessAddAddition]
 }
@@ -239,7 +239,7 @@ type ProcessAddAddition struct {
 	// CreatedGIDs []uint32 // reserved for tagrecorder use
 }
 
-type CustomServiceAdd struct {
+type AddedCustomServices struct {
 	MetadbItems[metadbmodel.CustomService]
 	addition[AddNoneAddition]
 }

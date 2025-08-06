@@ -32,15 +32,15 @@ type VMPodNodeConnection struct {
 		*diffbase.VMPodNodeConnection,
 		*metadbmodel.VMPodNodeConnection,
 		metadbmodel.VMPodNodeConnection,
-		*message.VMPodNodeConnectionAdd,
-		message.VMPodNodeConnectionAdd,
+		*message.AddedVMPodNodeConnections,
+		message.AddedVMPodNodeConnections,
 		message.AddNoneAddition,
-		*message.VMPodNodeConnectionUpdate,
-		message.VMPodNodeConnectionUpdate,
-		*message.VMPodNodeConnectionFieldsUpdate,
-		message.VMPodNodeConnectionFieldsUpdate,
-		*message.VMPodNodeConnectionDelete,
-		message.VMPodNodeConnectionDelete,
+		*message.UpdatedVMPodNodeConnection,
+		message.UpdatedVMPodNodeConnection,
+		*message.UpdatedVMPodNodeConnectionFields,
+		message.UpdatedVMPodNodeConnectionFields,
+		*message.DeletedVMPodNodeConnections,
+		message.DeletedVMPodNodeConnections,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 			*diffbase.VMPodNodeConnection,
 			*metadbmodel.VMPodNodeConnection,
 			metadbmodel.VMPodNodeConnection,
-			*message.VMPodNodeConnectionAdd,
-			message.VMPodNodeConnectionAdd,
+			*message.AddedVMPodNodeConnections,
+			message.AddedVMPodNodeConnections,
 			message.AddNoneAddition,
-			*message.VMPodNodeConnectionUpdate,
-			message.VMPodNodeConnectionUpdate,
-			*message.VMPodNodeConnectionFieldsUpdate,
-			message.VMPodNodeConnectionFieldsUpdate,
-			*message.VMPodNodeConnectionDelete,
-			message.VMPodNodeConnectionDelete,
+			*message.UpdatedVMPodNodeConnection,
+			message.UpdatedVMPodNodeConnection,
+			*message.UpdatedVMPodNodeConnectionFields,
+			message.UpdatedVMPodNodeConnectionFields,
+			*message.DeletedVMPodNodeConnections,
+			message.DeletedVMPodNodeConnections,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
@@ -99,6 +99,6 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 }
 
 // 保留接口
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (*message.VMPodNodeConnectionFieldsUpdate, map[string]interface{}, bool) {
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (*message.UpdatedVMPodNodeConnectionFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

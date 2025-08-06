@@ -32,15 +32,15 @@ type NATVMConnection struct {
 		*diffbase.NATVMConnection,
 		*metadbmodel.NATVMConnection,
 		metadbmodel.NATVMConnection,
-		*message.NATVMConnectionAdd,
-		message.NATVMConnectionAdd,
+		*message.AddedNATVMConnections,
+		message.AddedNATVMConnections,
 		message.AddNoneAddition,
-		*message.NATVMConnectionUpdate,
-		message.NATVMConnectionUpdate,
-		*message.NATVMConnectionFieldsUpdate,
-		message.NATVMConnectionFieldsUpdate,
-		*message.NATVMConnectionDelete,
-		message.NATVMConnectionDelete,
+		*message.UpdatedNATVMConnection,
+		message.UpdatedNATVMConnection,
+		*message.UpdatedNATVMConnectionFields,
+		message.UpdatedNATVMConnectionFields,
+		*message.DeletedNATVMConnections,
+		message.DeletedNATVMConnections,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 			*diffbase.NATVMConnection,
 			*metadbmodel.NATVMConnection,
 			metadbmodel.NATVMConnection,
-			*message.NATVMConnectionAdd,
-			message.NATVMConnectionAdd,
+			*message.AddedNATVMConnections,
+			message.AddedNATVMConnections,
 			message.AddNoneAddition,
-			*message.NATVMConnectionUpdate,
-			message.NATVMConnectionUpdate,
-			*message.NATVMConnectionFieldsUpdate,
-			message.NATVMConnectionFieldsUpdate,
-			*message.NATVMConnectionDelete,
-			message.NATVMConnectionDelete,
+			*message.UpdatedNATVMConnection,
+			message.UpdatedNATVMConnection,
+			*message.UpdatedNATVMConnectionFields,
+			message.UpdatedNATVMConnectionFields,
+			*message.DeletedNATVMConnections,
+			message.DeletedNATVMConnections,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
@@ -106,6 +106,6 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
-func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (*message.NATVMConnectionFieldsUpdate, map[string]interface{}, bool) {
+func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (*message.UpdatedNATVMConnectionFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

@@ -23,30 +23,30 @@ import (
 
 type PodGroup struct {
 	ResourcePubSubComponent[
-		*message.PodGroupAdd,
-		message.PodGroupAdd,
+		*message.AddedPodGroups,
+		message.AddedPodGroups,
 		message.AddNoneAddition,
-		*message.PodGroupUpdate,
-		message.PodGroupUpdate,
-		*message.PodGroupFieldsUpdate,
-		message.PodGroupFieldsUpdate,
-		*message.PodGroupDelete,
-		message.PodGroupDelete,
+		*message.UpdatedPodGroup,
+		message.UpdatedPodGroup,
+		*message.UpdatedPodGroupFields,
+		message.UpdatedPodGroupFields,
+		*message.DeletedPodGroups,
+		message.DeletedPodGroups,
 		message.DeleteNoneAddition]
 }
 
 func NewPodGroup() *PodGroup {
 	return &PodGroup{
 		ResourcePubSubComponent[
-			*message.PodGroupAdd,
-			message.PodGroupAdd,
+			*message.AddedPodGroups,
+			message.AddedPodGroups,
 			message.AddNoneAddition,
-			*message.PodGroupUpdate,
-			message.PodGroupUpdate,
-			*message.PodGroupFieldsUpdate,
-			message.PodGroupFieldsUpdate,
-			*message.PodGroupDelete,
-			message.PodGroupDelete,
+			*message.UpdatedPodGroup,
+			message.UpdatedPodGroup,
+			*message.UpdatedPodGroupFields,
+			message.UpdatedPodGroupFields,
+			*message.DeletedPodGroups,
+			message.DeletedPodGroups,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodGroup),

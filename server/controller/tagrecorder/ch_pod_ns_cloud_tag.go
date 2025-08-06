@@ -25,12 +25,12 @@ import (
 
 type ChPodNSCloudTag struct {
 	SubscriberComponent[
-		*message.PodNamespaceAdd,
-		message.PodNamespaceAdd,
-		*message.PodNamespaceUpdate,
-		message.PodNamespaceUpdate,
-		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete,
+		*message.AddedPodNamespaces,
+		message.AddedPodNamespaces,
+		*message.UpdatedPodNamespace,
+		message.UpdatedPodNamespace,
+		*message.DeletedPodNamespaces,
+		message.DeletedPodNamespaces,
 		metadbmodel.PodNamespace,
 		metadbmodel.ChPodNSCloudTag,
 		IDKeyKey,
@@ -40,12 +40,12 @@ type ChPodNSCloudTag struct {
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	mng := &ChPodNSCloudTag{
 		newSubscriberComponent[
-			*message.PodNamespaceAdd,
-			message.PodNamespaceAdd,
-			*message.PodNamespaceUpdate,
-			message.PodNamespaceUpdate,
-			*message.PodNamespaceDelete,
-			message.PodNamespaceDelete,
+			*message.AddedPodNamespaces,
+			message.AddedPodNamespaces,
+			*message.UpdatedPodNamespace,
+			message.UpdatedPodNamespace,
+			*message.DeletedPodNamespaces,
+			message.DeletedPodNamespaces,
 			metadbmodel.PodNamespace,
 			metadbmodel.ChPodNSCloudTag,
 			IDKeyKey,
@@ -58,9 +58,9 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNamespaceUpdate) {
+func (c *ChPodNSCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNamespace) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodNamespaceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNamespaceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNamespace)
 	sourceID := newSource.ID
 	new := map[string]string{}

@@ -23,30 +23,30 @@ import (
 
 type LBListener struct {
 	ResourcePubSubComponent[
-		*message.LBListenerAdd,
-		message.LBListenerAdd,
+		*message.AddedLBListeners,
+		message.AddedLBListeners,
 		message.AddNoneAddition,
-		*message.LBListenerUpdate,
-		message.LBListenerUpdate,
-		*message.LBListenerFieldsUpdate,
-		message.LBListenerFieldsUpdate,
-		*message.LBListenerDelete,
-		message.LBListenerDelete,
+		*message.UpdatedLBListener,
+		message.UpdatedLBListener,
+		*message.UpdatedLBListenerFields,
+		message.UpdatedLBListenerFields,
+		*message.DeletedLBListeners,
+		message.DeletedLBListeners,
 		message.DeleteNoneAddition]
 }
 
 func NewLBListener() *LBListener {
 	return &LBListener{
 		ResourcePubSubComponent[
-			*message.LBListenerAdd,
-			message.LBListenerAdd,
+			*message.AddedLBListeners,
+			message.AddedLBListeners,
 			message.AddNoneAddition,
-			*message.LBListenerUpdate,
-			message.LBListenerUpdate,
-			*message.LBListenerFieldsUpdate,
-			message.LBListenerFieldsUpdate,
-			*message.LBListenerDelete,
-			message.LBListenerDelete,
+			*message.UpdatedLBListener,
+			message.UpdatedLBListener,
+			*message.UpdatedLBListenerFields,
+			message.UpdatedLBListenerFields,
+			*message.DeletedLBListeners,
+			message.DeletedLBListeners,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBListener),

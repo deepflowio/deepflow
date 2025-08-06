@@ -27,12 +27,12 @@ import (
 
 type ChPodGroup struct {
 	SubscriberComponent[
-		*message.PodGroupAdd,
-		message.PodGroupAdd,
-		*message.PodGroupUpdate,
-		message.PodGroupUpdate,
-		*message.PodGroupDelete,
-		message.PodGroupDelete,
+		*message.AddedPodGroups,
+		message.AddedPodGroups,
+		*message.UpdatedPodGroup,
+		message.UpdatedPodGroup,
+		*message.DeletedPodGroups,
+		message.DeletedPodGroups,
 		metadbmodel.PodGroup,
 		metadbmodel.ChPodGroup,
 		IDKey,
@@ -43,12 +43,12 @@ type ChPodGroup struct {
 func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 	mng := &ChPodGroup{
 		newSubscriberComponent[
-			*message.PodGroupAdd,
-			message.PodGroupAdd,
-			*message.PodGroupUpdate,
-			message.PodGroupUpdate,
-			*message.PodGroupDelete,
-			message.PodGroupDelete,
+			*message.AddedPodGroups,
+			message.AddedPodGroups,
+			*message.UpdatedPodGroup,
+			message.UpdatedPodGroup,
+			*message.DeletedPodGroups,
+			message.DeletedPodGroups,
 			metadbmodel.PodGroup,
 			metadbmodel.ChPodGroup,
 			IDKey,
@@ -88,9 +88,9 @@ func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *metadbmodel.Po
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodGroup) onResourceUpdated(md *message.Metadata, updateMessage *message.PodGroupUpdate) {
+func (c *ChPodGroup) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodGroup) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodGroupFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodGroupFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodGroup)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

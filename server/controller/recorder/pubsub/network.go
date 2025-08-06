@@ -23,30 +23,30 @@ import (
 
 type Network struct {
 	ResourcePubSubComponent[
-		*message.NetworkAdd,
-		message.NetworkAdd,
+		*message.AddedNetworks,
+		message.AddedNetworks,
 		message.AddNoneAddition,
-		*message.NetworkUpdate,
-		message.NetworkUpdate,
-		*message.NetworkFieldsUpdate,
-		message.NetworkFieldsUpdate,
-		*message.NetworkDelete,
-		message.NetworkDelete,
+		*message.UpdatedNetwork,
+		message.UpdatedNetwork,
+		*message.UpdatedNetworkFields,
+		message.UpdatedNetworkFields,
+		*message.DeletedNetworks,
+		message.DeletedNetworks,
 		message.DeleteNoneAddition]
 }
 
 func NewNetwork() *Network {
 	return &Network{
 		ResourcePubSubComponent[
-			*message.NetworkAdd,
-			message.NetworkAdd,
+			*message.AddedNetworks,
+			message.AddedNetworks,
 			message.AddNoneAddition,
-			*message.NetworkUpdate,
-			message.NetworkUpdate,
-			*message.NetworkFieldsUpdate,
-			message.NetworkFieldsUpdate,
-			*message.NetworkDelete,
-			message.NetworkDelete,
+			*message.UpdatedNetwork,
+			message.UpdatedNetwork,
+			*message.UpdatedNetworkFields,
+			message.UpdatedNetworkFields,
+			*message.DeletedNetworks,
+			message.DeletedNetworks,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNetwork),

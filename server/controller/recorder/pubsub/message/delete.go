@@ -46,259 +46,259 @@ func (m *MetadbItems[T]) SetMetadbItems(items interface{}) {
 	m.data = items.([]*T)
 }
 
-type RegionDelete struct {
+type DeletedRegions struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Region]
 	addition[DeleteNoneAddition]
 }
 
-type AZDelete struct {
+type DeletedAZs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.AZ]
 	addition[DeleteNoneAddition]
 }
 
-type SubDomainDelete struct {
+type DeletedSubDomains struct {
 	Lcuuids
 	MetadbItems[metadbmodel.SubDomain]
 	addition[DeleteNoneAddition]
 }
 
-type HostDelete struct {
+type DeletedHosts struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Host]
 	addition[DeleteNoneAddition]
 }
 
-type VMDelete struct {
+type DeletedVMs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VM]
 	addition[DeleteNoneAddition]
 }
 
-type VMPodNodeConnectionDelete struct {
+type DeletedVMPodNodeConnections struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VMPodNodeConnection]
 	addition[DeleteNoneAddition]
 }
 
-type VPCDelete struct {
+type DeletedVPCs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VPC]
 	addition[DeleteNoneAddition]
 }
 
-type NetworkDelete struct {
+type DeletedNetworks struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Network]
 	addition[DeleteNoneAddition]
 }
 
-type SubnetDelete struct {
+type DeletedSubnets struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Subnet]
 	addition[DeleteNoneAddition]
 }
 
-type VRouterDelete struct {
+type DeletedVRouters struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VRouter]
 	addition[DeleteNoneAddition]
 }
 
-type RoutingTableDelete struct {
+type DeletedRoutingTables struct {
 	Lcuuids
 	MetadbItems[metadbmodel.RoutingTable]
 	addition[DeleteNoneAddition]
 }
 
-type DHCPPortDelete struct {
+type DeletedDHCPPorts struct {
 	Lcuuids
 	MetadbItems[metadbmodel.DHCPPort]
 	addition[DeleteNoneAddition]
 }
 
-type VInterfaceDelete struct {
+type DeletedVInterfaces struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VInterface]
 	addition[DeleteNoneAddition]
 }
 
-type FloatingIPDelete struct {
+type DeletedFloatingIPs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.FloatingIP]
 	addition[DeleteNoneAddition]
 }
 
-type LANIPDelete struct {
+type DeletedLANIPs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.LANIP]
 	addition[DeleteNoneAddition]
 }
 
-type WANIPDelete struct {
+type DeletedWANIPs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.WANIP]
 	addition[DeleteNoneAddition]
 }
 
-type VIPDelete struct {
+type DeletedVIPs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.VIP]
 	addition[DeleteNoneAddition]
 }
 
-type NATGatewayDelete struct {
+type DeletedNATGateways struct {
 	Lcuuids
 	MetadbItems[metadbmodel.NATGateway]
 	addition[DeleteNoneAddition]
 }
 
-type NATRuleDelete struct {
+type DeletedNATRules struct {
 	Lcuuids
 	MetadbItems[metadbmodel.NATRule]
 	addition[DeleteNoneAddition]
 }
 
-type NATVMConnectionDelete struct {
+type DeletedNATVMConnections struct {
 	Lcuuids
 	MetadbItems[metadbmodel.NATVMConnection]
 	addition[DeleteNoneAddition]
 }
 
-type LBDelete struct {
+type DeletedLBs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.LB]
 	addition[DeleteNoneAddition]
 }
 
-type LBListenerDelete struct {
+type DeletedLBListeners struct {
 	Lcuuids
 	MetadbItems[metadbmodel.LBListener]
 	addition[DeleteNoneAddition]
 }
 
-type LBTargetServerDelete struct {
+type DeletedLBTargetServers struct {
 	Lcuuids
 	MetadbItems[metadbmodel.LBTargetServer]
 	addition[DeleteNoneAddition]
 }
 
-type LBVMConnectionDelete struct {
+type DeletedLBVMConnections struct {
 	Lcuuids
 	MetadbItems[metadbmodel.LBVMConnection]
 	addition[DeleteNoneAddition]
 }
 
-type PeerConnectionDelete struct {
+type DeletedPeerConnections struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PeerConnection]
 	addition[DeleteNoneAddition]
 }
 
-type CENDelete struct {
+type DeletedCENs struct {
 	Lcuuids
 	MetadbItems[metadbmodel.CEN]
 	addition[DeleteNoneAddition]
 }
 
-type RDSInstanceDelete struct {
+type DeletedRDSInstances struct {
 	Lcuuids
 	MetadbItems[metadbmodel.RDSInstance]
 	addition[DeleteNoneAddition]
 }
 
-type RedisInstanceDelete struct {
+type DeletedRedisInstances struct {
 	Lcuuids
 	MetadbItems[metadbmodel.RedisInstance]
 	addition[DeleteNoneAddition]
 }
 
-type PodClusterDelete struct {
+type DeletedPodClusters struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodCluster]
 	addition[DeleteNoneAddition]
 }
 
-type PodNamespaceDelete struct {
+type DeletedPodNamespaces struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodNamespace]
 	addition[DeleteNoneAddition]
 }
 
-type PodNodeDelete struct {
+type DeletedPodNodes struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodNode]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressDelete struct {
+type DeletedPodIngresses struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodIngress]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressRuleDelete struct {
+type DeletedPodIngressRules struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodIngressRule]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressRuleBackendDelete struct {
+type DeletedPodIngressRuleBackends struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodIngressRuleBackend]
 	addition[DeleteNoneAddition]
 }
 
-type PodServiceDelete struct {
+type DeletedPodServices struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodService]
 	addition[DeleteNoneAddition]
 }
 
-type PodServicePortDelete struct {
+type DeletedPodServicePorts struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodServicePort]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupDelete struct {
+type DeletedPodGroups struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodGroup]
 	addition[DeleteNoneAddition]
 }
 
-type ConfigMapDelete struct {
+type DeletedConfigMaps struct {
 	Lcuuids
 	MetadbItems[metadbmodel.ConfigMap]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupConfigMapConnectionDelete struct {
+type DeletedPodGroupConfigMapConnections struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodGroupConfigMapConnection]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupPortDelete struct {
+type DeletedPodGroupPorts struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodGroupPort]
 	addition[DeleteNoneAddition]
 }
 
-type PodReplicaSetDelete struct {
+type DeletedPodReplicaSets struct {
 	Lcuuids
 	MetadbItems[metadbmodel.PodReplicaSet]
 	addition[DeleteNoneAddition]
 }
 
-type PodDelete struct {
+type DeletedPods struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Pod]
 	addition[DeleteNoneAddition]
 }
 
-type ProcessDelete struct {
+type DeletedProcesses struct {
 	Lcuuids
 	MetadbItems[metadbmodel.Process]
 	addition[ProcessDeleteAddition]
@@ -308,7 +308,7 @@ type ProcessDeleteAddition struct {
 	DeletedGIDs []uint32
 }
 
-type CustomServiceDelete struct {
+type DeletedCustomServices struct {
 	Lcuuids
 	MetadbItems[metadbmodel.CustomService]
 	addition[DeleteNoneAddition]

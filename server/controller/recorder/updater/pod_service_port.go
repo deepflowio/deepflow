@@ -32,15 +32,15 @@ type PodServicePort struct {
 		*diffbase.PodServicePort,
 		*metadbmodel.PodServicePort,
 		metadbmodel.PodServicePort,
-		*message.PodServicePortAdd,
-		message.PodServicePortAdd,
+		*message.AddedPodServicePorts,
+		message.AddedPodServicePorts,
 		message.AddNoneAddition,
-		*message.PodServicePortUpdate,
-		message.PodServicePortUpdate,
-		*message.PodServicePortFieldsUpdate,
-		message.PodServicePortFieldsUpdate,
-		*message.PodServicePortDelete,
-		message.PodServicePortDelete,
+		*message.UpdatedPodServicePort,
+		message.UpdatedPodServicePort,
+		*message.UpdatedPodServicePortFields,
+		message.UpdatedPodServicePortFields,
+		*message.DeletedPodServicePorts,
+		message.DeletedPodServicePorts,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 			*diffbase.PodServicePort,
 			*metadbmodel.PodServicePort,
 			metadbmodel.PodServicePort,
-			*message.PodServicePortAdd,
-			message.PodServicePortAdd,
+			*message.AddedPodServicePorts,
+			message.AddedPodServicePorts,
 			message.AddNoneAddition,
-			*message.PodServicePortUpdate,
-			message.PodServicePortUpdate,
-			*message.PodServicePortFieldsUpdate,
-			message.PodServicePortFieldsUpdate,
-			*message.PodServicePortDelete,
-			message.PodServicePortDelete,
+			*message.UpdatedPodServicePort,
+			message.UpdatedPodServicePort,
+			*message.UpdatedPodServicePortFields,
+			message.UpdatedPodServicePortFields,
+			*message.DeletedPodServicePorts,
+			message.DeletedPodServicePorts,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
@@ -102,8 +102,8 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	return dbItem, true
 }
 
-func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (*message.PodServicePortFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodServicePortFieldsUpdate)
+func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (*message.UpdatedPodServicePortFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodServicePortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

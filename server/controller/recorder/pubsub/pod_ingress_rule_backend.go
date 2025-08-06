@@ -23,30 +23,30 @@ import (
 
 type PodIngressRuleBackend struct {
 	ResourcePubSubComponent[
-		*message.PodIngressRuleBackendAdd,
-		message.PodIngressRuleBackendAdd,
+		*message.AddedPodIngressRuleBackends,
+		message.AddedPodIngressRuleBackends,
 		message.AddNoneAddition,
-		*message.PodIngressRuleBackendUpdate,
-		message.PodIngressRuleBackendUpdate,
-		*message.PodIngressRuleBackendFieldsUpdate,
-		message.PodIngressRuleBackendFieldsUpdate,
-		*message.PodIngressRuleBackendDelete,
-		message.PodIngressRuleBackendDelete,
+		*message.UpdatedPodIngressRuleBackend,
+		message.UpdatedPodIngressRuleBackend,
+		*message.UpdatedPodIngressRuleBackendFields,
+		message.UpdatedPodIngressRuleBackendFields,
+		*message.DeletedPodIngressRuleBackends,
+		message.DeletedPodIngressRuleBackends,
 		message.DeleteNoneAddition]
 }
 
 func NewPodIngressRuleBackend() *PodIngressRuleBackend {
 	return &PodIngressRuleBackend{
 		ResourcePubSubComponent[
-			*message.PodIngressRuleBackendAdd,
-			message.PodIngressRuleBackendAdd,
+			*message.AddedPodIngressRuleBackends,
+			message.AddedPodIngressRuleBackends,
 			message.AddNoneAddition,
-			*message.PodIngressRuleBackendUpdate,
-			message.PodIngressRuleBackendUpdate,
-			*message.PodIngressRuleBackendFieldsUpdate,
-			message.PodIngressRuleBackendFieldsUpdate,
-			*message.PodIngressRuleBackendDelete,
-			message.PodIngressRuleBackendDelete,
+			*message.UpdatedPodIngressRuleBackend,
+			message.UpdatedPodIngressRuleBackend,
+			*message.UpdatedPodIngressRuleBackendFields,
+			message.UpdatedPodIngressRuleBackendFields,
+			*message.DeletedPodIngressRuleBackends,
+			message.DeletedPodIngressRuleBackends,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodIngressRuleBackend),

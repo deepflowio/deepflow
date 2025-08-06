@@ -32,15 +32,15 @@ type PodIngressRuleBackend struct {
 		*diffbase.PodIngressRuleBackend,
 		*metadbmodel.PodIngressRuleBackend,
 		metadbmodel.PodIngressRuleBackend,
-		*message.PodIngressRuleBackendAdd,
-		message.PodIngressRuleBackendAdd,
+		*message.AddedPodIngressRuleBackends,
+		message.AddedPodIngressRuleBackends,
 		message.AddNoneAddition,
-		*message.PodIngressRuleBackendUpdate,
-		message.PodIngressRuleBackendUpdate,
-		*message.PodIngressRuleBackendFieldsUpdate,
-		message.PodIngressRuleBackendFieldsUpdate,
-		*message.PodIngressRuleBackendDelete,
-		message.PodIngressRuleBackendDelete,
+		*message.UpdatedPodIngressRuleBackend,
+		message.UpdatedPodIngressRuleBackend,
+		*message.UpdatedPodIngressRuleBackendFields,
+		message.UpdatedPodIngressRuleBackendFields,
+		*message.DeletedPodIngressRuleBackends,
+		message.DeletedPodIngressRuleBackends,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 			*diffbase.PodIngressRuleBackend,
 			*metadbmodel.PodIngressRuleBackend,
 			metadbmodel.PodIngressRuleBackend,
-			*message.PodIngressRuleBackendAdd,
-			message.PodIngressRuleBackendAdd,
+			*message.AddedPodIngressRuleBackends,
+			message.AddedPodIngressRuleBackends,
 			message.AddNoneAddition,
-			*message.PodIngressRuleBackendUpdate,
-			message.PodIngressRuleBackendUpdate,
-			*message.PodIngressRuleBackendFieldsUpdate,
-			message.PodIngressRuleBackendFieldsUpdate,
-			*message.PodIngressRuleBackendDelete,
-			message.PodIngressRuleBackendDelete,
+			*message.UpdatedPodIngressRuleBackend,
+			message.UpdatedPodIngressRuleBackend,
+			*message.UpdatedPodIngressRuleBackendFields,
+			message.UpdatedPodIngressRuleBackendFields,
+			*message.DeletedPodIngressRuleBackends,
+			message.DeletedPodIngressRuleBackends,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
@@ -118,6 +118,6 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 }
 
 // 保留接口
-func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (*message.PodIngressRuleBackendFieldsUpdate, map[string]interface{}, bool) {
+func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (*message.UpdatedPodIngressRuleBackendFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

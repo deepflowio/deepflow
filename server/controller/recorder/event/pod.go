@@ -110,9 +110,9 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 }
 
 func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	updateMsg := msg.(*message.PodUpdate)
+	updateMsg := msg.(*message.UpdatedPod)
 	dbItemNew := updateMsg.GetNewMetadbItem().(*metadbmodel.Pod)
-	updatedFields := updateMsg.GetFields().(*message.PodFieldsUpdate)
+	updatedFields := updateMsg.GetFields().(*message.UpdatedPodFields)
 
 	var eType string
 	var description string

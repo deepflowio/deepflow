@@ -23,30 +23,30 @@ import (
 
 type NATGateway struct {
 	ResourcePubSubComponent[
-		*message.NATGatewayAdd,
-		message.NATGatewayAdd,
+		*message.AddedNATGateways,
+		message.AddedNATGateways,
 		message.AddNoneAddition,
-		*message.NATGatewayUpdate,
-		message.NATGatewayUpdate,
-		*message.NATGatewayFieldsUpdate,
-		message.NATGatewayFieldsUpdate,
-		*message.NATGatewayDelete,
-		message.NATGatewayDelete,
+		*message.UpdatedNATGateway,
+		message.UpdatedNATGateway,
+		*message.UpdatedNATGatewayFields,
+		message.UpdatedNATGatewayFields,
+		*message.DeletedNATGateways,
+		message.DeletedNATGateways,
 		message.DeleteNoneAddition]
 }
 
 func NewNATGateway() *NATGateway {
 	return &NATGateway{
 		ResourcePubSubComponent[
-			*message.NATGatewayAdd,
-			message.NATGatewayAdd,
+			*message.AddedNATGateways,
+			message.AddedNATGateways,
 			message.AddNoneAddition,
-			*message.NATGatewayUpdate,
-			message.NATGatewayUpdate,
-			*message.NATGatewayFieldsUpdate,
-			message.NATGatewayFieldsUpdate,
-			*message.NATGatewayDelete,
-			message.NATGatewayDelete,
+			*message.UpdatedNATGateway,
+			message.UpdatedNATGateway,
+			*message.UpdatedNATGatewayFields,
+			message.UpdatedNATGatewayFields,
+			*message.DeletedNATGateways,
+			message.DeletedNATGateways,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATGateway),
