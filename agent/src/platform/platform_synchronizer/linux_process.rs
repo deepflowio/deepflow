@@ -303,6 +303,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
             .as_secs(),
     );
     let process_datas = get_proc_scan_process_datas();
+    info!("get process datas {:?}", process_datas);
     let mut tags_map = match get_os_app_tag_by_exec(user, cmd) {
         Ok(tags) => tags,
         Err(err) => {
@@ -324,15 +325,20 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
             .map(|dt| dt.timestamp())
         {
             Ok(ts) if ts as u64 == process_data.start_time.as_secs() => (),
-            _ => continue,
+            _ => {
+                info!("lizf pid not exist, {:?}", process_data);
+                continue;
+            }
         }
 
         let Ok(up_sec) = process_data.up_sec(now_sec) else {
+            info!("lizf ret continue1 {:?}", process_data);
             continue;
         };
 
         // filter the short live proc
         if up_sec < u64::from(conf.os_proc_socket_min_lifetime) {
+            info!("lizf ret continue2 {} {:?}", up_sec, process_data);
             continue;
         }
 
@@ -365,6 +371,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
     }
     fill_child_proc_tag_by_parent(ret.as_mut());
     proc_scan_hook(ret);
+    info!("lizf get process datas ret {:?}", ret);
 }
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
