@@ -55,17 +55,19 @@ func NewSyncStorage(ctx context.Context, cfg config.GenesisConfig, sChan chan co
 	}
 }
 
-func (s *SyncStorage) Renew(orgID int, vtapID uint32, vtapKey string, refresh bool, items common.GenesisSyncDataResponse) {
+func (s *SyncStorage) Renew(orgID int, vtapID uint32, vtapKey string, refresh, wrEnabled bool, items common.GenesisSyncDataResponse) {
 	s.data.VIPs.Renew(orgID, vtapID, vtapKey, items.VIPs)
-	s.data.VMs.Renew(orgID, vtapID, vtapKey, items.VMs)
-	s.data.VPCs.Renew(orgID, vtapID, vtapKey, items.VPCs)
-	s.data.Hosts.Renew(orgID, vtapID, vtapKey, items.Hosts)
-	s.data.Lldps.Renew(orgID, vtapID, vtapKey, items.Lldps)
-	s.data.Ports.Renew(orgID, vtapID, vtapKey, items.Ports)
-	s.data.Networks.Renew(orgID, vtapID, vtapKey, items.Networks)
-	s.data.IPlastseens.Renew(orgID, vtapID, vtapKey, items.IPLastSeens)
-	s.data.Vinterfaces.Renew(orgID, vtapID, vtapKey, items.Vinterfaces)
 	s.data.Processes.Renew(orgID, vtapID, vtapKey, items.Processes)
+	s.data.Vinterfaces.Renew(orgID, vtapID, vtapKey, items.Vinterfaces)
+	if wrEnabled {
+		s.data.VMs.Renew(orgID, vtapID, vtapKey, items.VMs)
+		s.data.VPCs.Renew(orgID, vtapID, vtapKey, items.VPCs)
+		s.data.Hosts.Renew(orgID, vtapID, vtapKey, items.Hosts)
+		s.data.Lldps.Renew(orgID, vtapID, vtapKey, items.Lldps)
+		s.data.Ports.Renew(orgID, vtapID, vtapKey, items.Ports)
+		s.data.Networks.Renew(orgID, vtapID, vtapKey, items.Networks)
+		s.data.IPlastseens.Renew(orgID, vtapID, vtapKey, items.IPLastSeens)
+	}
 
 	if !refresh {
 		return
@@ -104,13 +106,12 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items com
 		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return
 	}
-	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "vtap_id"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
+		DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": s.nodeIP}),
 	}).Create(&model.GenesisStorage{
 		VtapID: vtapID,
-		NodeIP: nodeIP,
+		NodeIP: s.nodeIP,
 	})
 }
 
@@ -176,7 +177,6 @@ func (s *SyncStorage) refreshDatabase() {
 			log.Error("get org ids failed")
 			return
 		}
-		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 		for _, orgID := range orgIDs {
 			db, err := metadb.GetDB(orgID)
 			if err != nil {
@@ -188,7 +188,7 @@ func (s *SyncStorage) refreshDatabase() {
 			storages := []model.GenesisStorage{}
 			invalidStorages := []model.GenesisStorage{}
 			db.Select("id").Find(&vTaps)
-			db.Where("node_ip = ?", nodeIP).Find(&storages)
+			db.Where("node_ip = ?", s.nodeIP).Find(&storages)
 			for _, v := range vTaps {
 				vTapIDs[v.ID] = false
 			}
@@ -200,9 +200,9 @@ func (s *SyncStorage) refreshDatabase() {
 			if len(invalidStorages) > 0 {
 				err := db.Delete(&invalidStorages).Error
 				if err != nil {
-					log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err, logger.NewORGPrefix(orgID))
+					log.Errorf("node (%s) clean genesis storage invalid data failed: %s", s.nodeIP, err, logger.NewORGPrefix(orgID))
 				} else {
-					log.Infof("node (%s) clean genesis storage invalid data success", nodeIP, logger.NewORGPrefix(orgID))
+					log.Infof("node (%s) clean genesis storage invalid data success", s.nodeIP, logger.NewORGPrefix(orgID))
 				}
 			}
 		}
