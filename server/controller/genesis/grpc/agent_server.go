@@ -182,9 +182,14 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 		}
 	}
 
+	var vtapKey string
 	vtapInfo := request.GetAgentInfo()
 	groupShortLcuuid := vtapInfo.GetGroupId()
-	vtapKey := fmt.Sprintf("%s-%s", vtapInfo.GetIp(), vtapInfo.GetMac())
+	vtapIP := vtapInfo.GetIp()
+	vtapMac := vtapInfo.GetMac()
+	if vtapIP != "" && vtapMac != "" {
+		vtapKey = fmt.Sprintf("%s-%s", vtapIP, vtapMac)
+	}
 	_, enabled := g.workloadResouceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
