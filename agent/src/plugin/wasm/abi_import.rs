@@ -30,7 +30,7 @@ use super::{
 use log::{error, info, warn};
 use public::bytes::read_u16_be;
 use wasmtime::{AsContext, AsContextMut, Caller, Engine, Linker, Store};
-use wasmtime_wasi::snapshots::preview_1::add_wasi_snapshot_preview1_to_linker;
+use wasmtime_wasi::preview1::add_to_linker_sync;
 
 /*
     import function, correspond to go func signature:
@@ -528,6 +528,6 @@ fn link_wasi(
 
 fn get_wasi_linker(engine: Engine) -> Linker<StoreDataType> {
     let mut wasi_linker = Linker::<StoreDataType>::new(&engine);
-    add_wasi_snapshot_preview1_to_linker(&mut wasi_linker, |b| &mut b.wasi_ctx).unwrap();
+    add_to_linker_sync(&mut wasi_linker, |b| &mut b.wasi_ctx).unwrap();
     wasi_linker
 }

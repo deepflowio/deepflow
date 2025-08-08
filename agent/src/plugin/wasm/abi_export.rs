@@ -262,7 +262,7 @@ impl VmParser for InstanceWrap {
     }
 
     fn get_custom_message_hook(&self, store: &mut Store<StoreDataType>) -> Result<Option<u64>> {
-        let Some(func) = self.vm_func_get_custom_message_hook else {
+        let Some(ref func) = self.vm_func_get_custom_message_hook else {
             return Ok(None);
         };
         let ptr = func.call(&mut *store, ()).map_err(|e| {
