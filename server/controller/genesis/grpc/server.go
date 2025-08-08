@@ -40,7 +40,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
-	sstore "github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -76,14 +75,14 @@ type SynchronizerServer struct {
 	vtapToLastSeen                     sync.Map
 	clusterIDToLastSeen                sync.Map
 	agentStatsMap                      sync.Map
+	gsync                              common.GenesisSync
 	workloadResourceEnabledCache       *cache.Cache
 	workloadResourceChangeEnabledCache *cache.Cache
-	gsync                              *sstore.GenesisSync
 	gkubernetes                        *kstore.GenesisKubernetes
 }
 
 func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter,
-	gsync *sstore.GenesisSync, gkubernetes *kstore.GenesisKubernetes) *SynchronizerServer {
+	gsync common.GenesisSync, gkubernetes *kstore.GenesisKubernetes) *SynchronizerServer {
 	return &SynchronizerServer{
 		cfg:                                cfg,
 		k8sQueue:                           k8sQueue,

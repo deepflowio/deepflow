@@ -27,6 +27,7 @@ type GenesisConfig struct {
 	DataPersistenceInterval int      `default:"60" yaml:"data_persistence_interval"`
 	MultiNSMode             bool     `default:"false" yaml:"multi_ns_mode"`
 	SingleVPCMode           bool     `default:"false" yaml:"single_vpc_mode"`
+	Database                string   `default:"mysql" yaml:"database"`
 	DefaultVPCName          string   `default:"default-public-vpc" yaml:"default_vpc_name"`
 	IgnoreNICRegex          string   `default:"^(kube-ipvs)" yaml:"ignore_nic_regex"`
 	VMNameField             string   `default:"metadata" yaml:"vm_name_field"`

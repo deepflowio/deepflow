@@ -24,6 +24,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
+type GenesisSync interface {
+	Start()
+	GetGenesisSyncData(orgID int) GenesisSyncDataResponse
+	GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, error)
+}
+
 type GenesisSyncType interface {
 	model.GenesisVinterface | model.GenesisVPC | model.GenesisHost | model.GenesisVM | model.GenesisVIP | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess
 }
