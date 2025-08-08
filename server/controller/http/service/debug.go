@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/bytedance/sonic"
@@ -28,7 +27,6 @@ import (
 
 	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -163,25 +161,28 @@ func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (grpc.AgentStats, e
 	return genesis.GenesisService.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
-func GetGenesisAgentStorage(vtapIDString string, orgDB *metadb.DB) (model.GenesisStorage, error) {
+func GetGenesisAgentStorage(redisStoreEnabled bool, vtapIDString string, orgDB *metadb.DB) (model.GenesisStorage, error) {
 	var gStorage model.GenesisStorage
 	vtapID, err := strconv.Atoi(vtapIDString)
 	if err != nil {
-		return gStorage, errors.New(fmt.Sprintf("invalid vtap id (%s)", vtapIDString))
+		return gStorage, fmt.Errorf("invalid vtap id (%s)", vtapIDString)
 	}
 
-	redisCli := dbredis.GetClient()
-	if redisCli != nil {
-		var azControllerConn metadbmodel.AZControllerConnection
-		err = orgDB.Where("controller_ip = ?", os.Getenv(ccommon.NODE_IP_KEY)).First(&azControllerConn).Error
-		if err != nil {
-			return gStorage, err
+	if redisStoreEnabled {
+		redisCli := dbredis.GetClient()
+		if redisCli == nil {
+			return gStorage, errors.New("get redis client failed")
 		}
-		key := fmt.Sprintf(gcommon.SYNC_TYPE_FORMAT, azControllerConn.Region, orgDB.ORGID, "vinterface", vtapID)
+		var vtap metadbmodel.VTap
+		err = orgDB.Select("ctrl_ip", "ctrl_mac").Where("id = ?", vtapID).First(&vtap).Error
+		if err != nil {
+			return gStorage, fmt.Errorf("get vtap id (%d) failed:%s", vtapID, err.Error())
+		}
+		key := fmt.Sprintf(gcommon.SYNC_TYPE_FORMAT, orgDB.ORGID, "vinterface", vtap.CtrlIP+"-"+vtap.CtrlMac)
 		val, err := redisCli.GenesisSync.Get(context.Background(), key).Result()
 		if err != nil {
 			if err == redis.Nil {
-				return gStorage, fmt.Errorf("not found vtap id (%d) info", vtapID)
+				return gStorage, fmt.Errorf("not found resource of vtap id (%d)", vtapID)
 			}
 			return gStorage, err
 		}

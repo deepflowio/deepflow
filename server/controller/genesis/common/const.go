@@ -17,7 +17,12 @@
 package common
 
 const (
-	SYNC_TYPE_FORMAT = "%v-%v-%v-%v" // region-orgID-type-vtapID
+	SYNC_TYPE_FORMAT = "%d-%s-%s" // orgID-type-vtapKey
+)
+
+const (
+	CONFIG_DB_MYSQL = "mysql"
+	CONFIG_DB_REDIS = "redis"
 )
 
 const (
