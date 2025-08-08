@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis/grpc"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
 	sstore "github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
+	sstore2 "github.com/deepflowio/deepflow/server/controller/genesis/store2/sync"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -37,18 +38,24 @@ var log = logger.MustGetLogger("genesis")
 var GenesisService *Genesis
 
 type Genesis struct {
-	ctx          context.Context
-	config       *config.ControllerConfig
-	sync         *sstore.GenesisSync
-	kubernetes   *kstore.GenesisKubernetes
-	Synchronizer *grpc.SynchronizerServer
+	performanceStore bool
+	ctx              context.Context
+	config           *config.ControllerConfig
+	sync             *sstore.GenesisSync
+	kubernetes       *kstore.GenesisKubernetes
+	Synchronizer     *grpc.SynchronizerServer
 }
 
-func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
+func NewGenesis(ctx context.Context, isMaster bool, config *config.ControllerConfig) *Genesis {
 	syncQueue := queue.NewOverwriteQueue("genesis-sync-data", config.GenesisCfg.QueueLengths)
 	kubernetesQueue := queue.NewOverwriteQueue("genesis-k8s-data", config.GenesisCfg.QueueLengths)
 
-	genesisSync := sstore.NewGenesisSync(ctx, syncQueue, config)
+	var enabled bool = true
+	genesisSync := sstore2.NewGenesisSync(ctx, isMaster, syncQueue, config)
+	if genesisSync == nil || !config.GenesisCfg.PerformanceStore {
+		enabled = false
+		genesisSync = sstore.NewGenesisSync(ctx, isMaster, syncQueue, config)
+	}
 	genesisSync.Start()
 
 	genesisK8S := kstore.NewGenesisKubernetes(ctx, kubernetesQueue, config)
@@ -66,11 +73,12 @@ func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
 	}()
 
 	GenesisService = &Genesis{
-		ctx:          ctx,
-		config:       config,
-		sync:         genesisSync,
-		kubernetes:   genesisK8S,
-		Synchronizer: synchronizer,
+		ctx:              ctx,
+		config:           config,
+		sync:             genesisSync,
+		kubernetes:       genesisK8S,
+		Synchronizer:     synchronizer,
+		performanceStore: enabled,
 	}
 	return GenesisService
 }
@@ -121,6 +129,10 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 		serverIPs = append(serverIPs, serverIP)
 	}
 	return serverIPs, nil
+}
+
+func (g *Genesis) GetPerformanceStoreEnabled() bool {
+	return g.performanceStore
 }
 
 func (g *Genesis) GetGenesisSyncData(orgID int) common.GenesisSyncDataResponse {

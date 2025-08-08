@@ -14,27 +14,16 @@
  * limitations under the License.
  */
 
-package common
+package sync
 
-const (
-	SYNC_TYPE_FORMAT = "%d-%s-%s" // orgID-type-vtapKey
+import (
+	"context"
+
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-const (
-	TYPE_UPDATE = 1
-	TYPE_RENEW  = 2
-	TYPE_EXIT   = 3
-)
-
-const (
-	DEVICE_TYPE_KVM_HOST         = "kvm-host"
-	DEVICE_TYPE_KVM_VM           = "kvm-vm"
-	DEVICE_TYPE_DOCKER_HOST      = "docker-host"
-	DEVICE_TYPE_DOCKER_CONTAINER = "docker-container"
-	DEVICE_TYPE_PUBLIC_CLOUD     = "public-cloud"
-	DEVICE_TYPE_PHYSICAL_MACHINE = "physical-machine"
-)
-
-const (
-	CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED = "inputs.resources.workload_resource_sync_enabled"
-)
+func NewGenesisSync(ctx context.Context, isMaster bool, queue queue.QueueReader, config *config.ControllerConfig) *sync.GenesisSync {
+	return nil
+}
