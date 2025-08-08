@@ -246,9 +246,16 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 		}
 	}
 
+	var vtapKey string
 	vtapInfo := request.GetAgentInfo()
 	groupShortLcuuid := vtapInfo.GetGroupId()
-	vtapKey := fmt.Sprintf("%s-%s", vtapInfo.GetIp(), vtapInfo.GetMac())
+	vtapIP := vtapInfo.GetIp()
+	vtapMac := vtapInfo.GetMac()
+	if vtapIP == "" || vtapMac == "" {
+		log.Errorf("info (%#v) not found vtap ip or mac from ip %s vtap_id %v, please upgrade vtap", vtapInfo, remote, vtapID, logger.NewORGPrefix(orgID))
+		return &agent.GenesisSyncResponse{Version: &localVersion}, nil
+	}
+	vtapKey = fmt.Sprintf("%s-%s", vtapIP, vtapMac)
 	_, enabled := g.workloadResourceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
