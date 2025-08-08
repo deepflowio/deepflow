@@ -372,6 +372,8 @@ controller:
     # - x.x.x.x/x
     # - x.x.x.x-x.x.x.x
 
+    # 高性能存储模式开关，默认false
+    performance_store:
     # 多namespace模式开关，默认false
     multi_ns_mode:
     # 单独vpc模式开关，默认false
