@@ -23,7 +23,8 @@ use anyhow::Result;
 use log::error;
 use prost::Message as ProstMessage;
 use wasmtime::{Engine, Linker, Store, StoreLimits, StoreLimitsBuilder};
-use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
+use wasmtime_wasi::preview1::WasiP1Ctx;
+use wasmtime_wasi::p2::WasiCtxBuilder;
 
 use crate::{
     common::l7_protocol_log::ParseParam,
@@ -73,7 +74,7 @@ pub const WASM_EXPORT_FUNC_NAME: [&'static str; 5] = [
 pub(super) struct StoreDataType {
     pub(super) parse_ctx: Option<VmParseCtx>,
     pub(super) limiter: StoreLimits,
-    pub(super) wasi_ctx: WasiCtx,
+    pub(super) wasi_ctx: WasiP1Ctx,
 }
 
 pub struct WasmVm {
@@ -126,7 +127,7 @@ impl WasmVm {
             StoreDataType {
                 parse_ctx: None,
                 limiter,
-                wasi_ctx: WasiCtxBuilder::new().build(),
+                wasi_ctx: WasiCtxBuilder::new().build_p1(),
             },
         );
         store.limiter(|s| &mut s.limiter);
