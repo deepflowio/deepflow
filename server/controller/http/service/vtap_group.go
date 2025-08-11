@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -256,177 +257,280 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 	return nil
 }
 
-func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
-	userInfo := a.resourceAccess.UserInfo
-	dbInfo, err := metadb.GetDB(userInfo.ORGID)
+func (a *AgentGroup) Update(lcuuid string, body map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
+	// 1. Prepare and validate data (outside transaction)
+	toolData, err := a.prepareUpdateData(lcuuid, body, cfg)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
 
-	db := dbInfo.DB
-	err = db.Transaction(func(tx *gorm.DB) error {
-		var vtapGroup metadbmodel.VTapGroup
-		var vtapGroupTeamID int
-		if ret := tx.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
-			return fmt.Errorf("vtap_group (%s) not found", lcuuid)
-		}
-		vtapGroupTeamID = vtapGroup.TeamID
-		resourceUpdate := map[string]interface{}{
-			"team_id":       vtapGroupUpdate["TEAM_ID"],
-			"owner_user_id": vtapGroupUpdate["USER_ID"],
-		}
-		if _, ok := vtapGroupUpdate["USER_ID"]; !ok {
-			resourceUpdate = nil
-		}
-		if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID,
-			common.SET_RESOURCE_TYPE_AGENT_GROUP, vtapGroup.Lcuuid, resourceUpdate); err != nil {
-			return err
-		}
-		var vtapGroupConfigs []agentconf.AgentGroupConfigModel
-		db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&vtapGroupConfigs)
-		// transfer agent group config
-		_, ok1 := vtapGroupUpdate["TEAM_ID"]
-		_, ok2 := vtapGroupUpdate["USER_ID"]
-		if ok1 && ok2 {
-			for _, vtapGroupConfig := range vtapGroupConfigs {
-				if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID,
-					common.SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG, *vtapGroupConfig.Lcuuid, resourceUpdate); err != nil {
-					return err
-				}
-			}
-		}
+	// 2. Perform permission checks (outside transaction)
+	if err := a.validateUpdatePermissions(toolData); err != nil {
+		return model.VtapGroup{}, err
+	}
 
-		log.Infof("update vtap_group (%s) config %v", vtapGroup.Name, vtapGroupUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
+	log.Infof("update vtap_group (%s) config %v", toolData.agentGroup.Name, toolData.requestBody, toolData.db.LogPrefixORGID, toolData.db.LogPrefixName)
 
-		var dbUpdateMap = make(map[string]interface{})
-		// 修改名称
-		if _, ok := vtapGroupUpdate["NAME"]; ok {
-			dbUpdateMap["name"] = vtapGroupUpdate["NAME"]
-		}
-
-		// 修改状态
-		if _, ok := vtapGroupUpdate["STATE"]; ok {
-			tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("state", vtapGroupUpdate["STATE"])
-		}
-
-		// 注册采集器
-		if _, ok := vtapGroupUpdate["ENABLE"]; ok {
-			tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("enable", vtapGroupUpdate["ENABLE"])
-		}
-
-		if _, ok := vtapGroupUpdate["TEAM_ID"]; ok {
-			dbUpdateMap["team_id"] = vtapGroupUpdate["TEAM_ID"]
-			vtapGroupTeamIDFloat, ok := vtapGroupUpdate["TEAM_ID"].(float64)
-			if !ok {
-				return fmt.Errorf("get team id(type=%s) error", reflect.TypeOf(vtapGroupUpdate["TEAM_ID"]).String())
-			}
-			vtapGroupTeamID = int(vtapGroupTeamIDFloat)
-		}
-		if _, ok := vtapGroupUpdate["USER_ID"]; ok {
-			dbUpdateMap["user_id"] = vtapGroupUpdate["USER_ID"]
-		}
-
-		var allOldVtaps []metadbmodel.VTap
-		tx.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
-		oldVtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
-		if err != nil {
-			return err
-		}
-
-		if _, ok := vtapGroupUpdate["ENABLE"]; ok {
-			for _, vtap := range allOldVtaps {
-				if err := a.resourceAccess.CanUpdateResource(vtap.TeamID,
-					common.SET_RESOURCE_TYPE_AGENT, vtap.Lcuuid, nil); err != nil {
-					return fmt.Errorf("%w no permission to update agent(%s)", err, vtap.Name)
-				}
-			}
-		}
-
-		// update agents in agent group
-		if _, ok := vtapGroupUpdate["VTAP_LCUUIDS"]; ok {
-			if len(vtapGroupUpdate["VTAP_LCUUIDS"].([]interface{})) > cfg.Spec.VTapMaxPerGroup {
-				return response.ServiceError(
-					httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
-					fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
-				)
-			}
-
-			var allNewVtaps []metadbmodel.VTap
-			tx.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&allNewVtaps)
-			newVtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allNewVtaps)
-			if err != nil {
-				return err
-			}
-
-			lcuuidToOldVtap := make(map[string]*metadbmodel.VTap)
-			lcuuidToNewVtap := make(map[string]*metadbmodel.VTap)
-			var oldVtapLcuuids = mapset.NewSet()
-			var newVtapLcuuids = mapset.NewSet()
-			var delVtapLcuuids = mapset.NewSet()
-			var addVtapLcuuids = mapset.NewSet()
-			for i, vtap := range oldVtaps {
-				lcuuidToOldVtap[vtap.Lcuuid] = &oldVtaps[i]
-				oldVtapLcuuids.Add(vtap.Lcuuid)
-			}
-			for i, vtap := range newVtaps {
-				lcuuidToNewVtap[vtap.Lcuuid] = &newVtaps[i]
-				newVtapLcuuids.Add(vtap.Lcuuid)
-			}
-
-			delVtapLcuuids = oldVtapLcuuids.Difference(newVtapLcuuids)
-			addVtapLcuuids = newVtapLcuuids.Difference(oldVtapLcuuids)
-
-			var defaultVtapGroup metadbmodel.VTapGroup
-			if ret := tx.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
-				return response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
-			}
-
-			var agents []metadbmodel.VTap
-			for _, lcuuid := range delVtapLcuuids.ToSlice() {
-				vtap := lcuuidToOldVtap[lcuuid.(string)]
-				log.Infof("update vtap group lcuuid(%s -> %s)",
-					vtap.VtapGroupLcuuid, defaultVtapGroup.Lcuuid, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
-				if err = tx.Model(&metadbmodel.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid}).Error; err != nil {
-					return err
-				}
-				agents = append(agents, *vtap)
-			}
-			if len(agents) > 0 {
-				if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &defaultVtapGroup, agents); err != nil {
-					return err
-				}
-			}
-
-			agents = []metadbmodel.VTap{}
-			for _, lcuuid := range addVtapLcuuids.ToSlice() {
-				vtap := lcuuidToNewVtap[lcuuid.(string)]
-				if vtap.TeamID != vtapGroupTeamID {
-					return fmt.Errorf(
-						"agent(%s) team(%d) must equal to agent group team(%d)", vtap.Name, vtap.TeamID, vtapGroupTeamID)
-				}
-				log.Infof("update vtap group lcuuid(%s - > %s)",
-					vtap.VtapGroupLcuuid, vtapGroup.Lcuuid, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
-				if err = tx.Model(&metadbmodel.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": vtapGroup.Lcuuid}).Error; err != nil {
-					return err
-				}
-				agents = append(agents, *vtap)
-			}
-			if len(agents) > 0 {
-				return agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &vtapGroup, agents)
-			}
-			return nil
-		}
-
-		// 更新vtap_group DB
-		return tx.Model(&vtapGroup).Updates(dbUpdateMap).Error
+	// 3. Execute database operations within a transaction
+	err = toolData.db.DB.Transaction(func(tx *gorm.DB) error {
+		return a.executeUpdateInTransaction(tx, toolData)
 	})
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache(userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(a.resourceAccess.UserInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
+}
+
+// updateRelatedData encapsulates all data required for the update operation
+type updateRelatedData struct {
+	requestBody map[string]interface{}
+	db          *mysql.DB
+
+	agentGroup               *mysqlmodel.VTapGroup
+	agentGroupValuesToUpdate map[string]interface{} // values to update in agent group table
+	oldAgentGroupTeamID      int
+	newAgentGroupTeamID      int
+	agentListChanged         bool
+
+	agentGroupConfigs     []agentconf.AgentGroupConfigModel
+	userAccessedOldAgents []mysqlmodel.VTap
+	userAccessedNewAgents []mysqlmodel.VTap
+
+	agentsToRemove    []mysqlmodel.VTap
+	agentsToAdd       []mysqlmodel.VTap
+	defaultAgentGroup *mysqlmodel.VTapGroup
+}
+
+// prepareUpdateData prepares all data required for the update
+func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]interface{}, cfg *config.ControllerConfig) (*updateRelatedData, error) {
+	db, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &updateRelatedData{
+		db:                       db,
+		requestBody:              requestBody,
+		agentGroupValuesToUpdate: make(map[string]interface{}),
+	}
+
+	if err := db.Where("lcuuid = ?", lcuuid).First(&data.agentGroup); err.Error != nil {
+		return nil, fmt.Errorf("failed to get vtap_group: %s", err.Error.Error())
+	}
+	data.oldAgentGroupTeamID = data.agentGroup.TeamID
+	data.newAgentGroupTeamID = data.oldAgentGroupTeamID
+
+	if err := db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&data.agentGroupConfigs).Error; err != nil {
+		return nil, fmt.Errorf("failed to get vtap_group configs: %s", err.Error())
+	}
+
+	if teamIDValue, ok := requestBody["TEAM_ID"]; ok {
+		vtapGroupTeamIDFloat, ok := teamIDValue.(float64)
+		if !ok {
+			return nil, fmt.Errorf("get team id(type=%s) error", reflect.TypeOf(teamIDValue).String())
+		}
+		data.newAgentGroupTeamID = int(vtapGroupTeamIDFloat)
+		data.agentGroupValuesToUpdate["team_id"] = teamIDValue
+	}
+
+	if nameValue, ok := requestBody["NAME"]; ok {
+		data.agentGroupValuesToUpdate["name"] = nameValue
+	}
+	if userIDValue, ok := requestBody["USER_ID"]; ok {
+		data.agentGroupValuesToUpdate["user_id"] = userIDValue
+	}
+
+	var allOldAgents []mysqlmodel.VTap
+	if err := db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&allOldAgents).Error; err != nil {
+		return nil, fmt.Errorf("failed to get vtap_group agents: %s", err.Error())
+	}
+	userAccessedOldAgents, err := GetAgentByUser(a.resourceAccess.UserInfo, &a.cfg.FPermit, allOldAgents)
+	if err != nil {
+		return nil, err
+	}
+	data.userAccessedOldAgents = userAccessedOldAgents
+
+	// Handle agent list update
+	if value, ok := requestBody["VTAP_LCUUIDS"]; ok {
+		data.agentListChanged = true
+		agentLcuuids, ok := value.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("get vtap_lcuuids(type=%s) error", reflect.TypeOf(value).String())
+		}
+
+		if len(agentLcuuids) > cfg.Spec.VTapMaxPerGroup {
+			return nil, response.ServiceError(
+				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
+				fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
+			)
+		}
+
+		var allNewAgents []mysqlmodel.VTap
+		if err := db.Where("lcuuid IN (?)", agentLcuuids).Find(&allNewAgents).Error; err != nil {
+			return nil, fmt.Errorf("failed to get new vtap_group agents: %s", err.Error())
+		}
+		userAccessedNewAgents, err := GetAgentByUser(a.resourceAccess.UserInfo, &a.cfg.FPermit, allNewAgents)
+		if err != nil {
+			return nil, err
+		}
+		for _, agent := range userAccessedNewAgents {
+			if agent.TeamID != data.newAgentGroupTeamID {
+				return nil, fmt.Errorf("agent name(%s) team(%d) must equal to agent group team(%d)", agent.Name, agent.TeamID, data.newAgentGroupTeamID)
+			}
+		}
+		data.userAccessedNewAgents = userAccessedNewAgents
+
+		a.calculateAgentDifferences(data)
+
+		// Agents removed from the current agent group need to be migrated to the default agent group;
+		// if necessary, obtain the default agent group information
+		if len(data.agentsToRemove) > 0 {
+			if err := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&data.defaultAgentGroup); err.Error != nil {
+				return nil, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, "failed to get default vtap_group")
+			}
+		}
+	}
+
+	return data, nil
+}
+
+// calculateAgentDifferences calculates the difference between the agents to be added and removed
+func (a *AgentGroup) calculateAgentDifferences(data *updateRelatedData) {
+	oldAgentLcuuids := mapset.NewSet[string]()
+	newAgentLcuuids := mapset.NewSet[string]()
+	for _, agent := range data.userAccessedOldAgents {
+		oldAgentLcuuids.Add(agent.Lcuuid)
+	}
+	for _, agent := range data.userAccessedNewAgents {
+		newAgentLcuuids.Add(agent.Lcuuid)
+	}
+	agentLcuuidsToRemove := oldAgentLcuuids.Difference(newAgentLcuuids).ToSlice()
+	agentLcuuidsToAdd := newAgentLcuuids.Difference(oldAgentLcuuids).ToSlice()
+
+	for _, agent := range data.userAccessedOldAgents {
+		if slices.Contains(agentLcuuidsToRemove, agent.Lcuuid) {
+			data.agentsToRemove = append(data.agentsToRemove, agent)
+		}
+	}
+	for _, agent := range data.userAccessedNewAgents {
+		if slices.Contains(agentLcuuidsToAdd, agent.Lcuuid) {
+			data.agentsToAdd = append(data.agentsToAdd, agent)
+		}
+	}
+}
+
+// validateUpdatePermissions validates the permission for the update operation
+func (a *AgentGroup) validateUpdatePermissions(data *updateRelatedData) error {
+	changeUserValues := make(map[string]interface{})
+	teamIDValue, changeTeam := data.requestBody["TEAM_ID"]
+	userIDValue, changeUser := data.requestBody["USER_ID"]
+
+	// Following the logic before refactoring, only assign this value when the user ID changes
+	if changeUser {
+		changeUserValues["owner_user_id"] = userIDValue
+		changeUserValues["team_id"] = teamIDValue
+	}
+
+	// Validate permission for current agent group
+	if err := a.resourceAccess.CanUpdateResource(data.oldAgentGroupTeamID,
+		common.SET_RESOURCE_TYPE_AGENT_GROUP, data.agentGroup.Lcuuid, changeUserValues); err != nil {
+		return err
+	}
+
+	// Validate permission for agent group config
+	if changeTeam && changeUser {
+		for _, config := range data.agentGroupConfigs {
+			if err := a.resourceAccess.CanUpdateResource(data.oldAgentGroupTeamID,
+				common.SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG, *config.Lcuuid, changeUserValues); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Validate permission for agents in agent group
+	if _, ok := data.requestBody["ENABLE"]; ok {
+		for _, agent := range data.userAccessedOldAgents {
+			if err := a.resourceAccess.CanUpdateResource(agent.TeamID,
+				common.SET_RESOURCE_TYPE_AGENT, agent.Lcuuid, nil); err != nil {
+				return fmt.Errorf("%w no permission to update agent(%s)", err, agent.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeUpdateInTransaction performs the database operations within a transaction
+func (a *AgentGroup) executeUpdateInTransaction(tx *gorm.DB, data *updateRelatedData) error {
+	// Handle state update
+	if stateValue, ok := data.requestBody["STATE"]; ok {
+		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("state", stateValue).Error; err != nil {
+			return err
+		}
+	}
+
+	// Handle enable state update
+	if enableValue, ok := data.requestBody["ENABLE"]; ok {
+		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("enable", enableValue).Error; err != nil {
+			return err
+		}
+	}
+
+	// Handle agent list update
+	if data.agentListChanged {
+		if err := a.updateAgentAssignments(tx, data); err != nil {
+			return err
+		}
+	}
+
+	// Handle agent group self update
+	if len(data.agentGroupValuesToUpdate) > 0 {
+		if err := tx.Model(data.agentGroup).Updates(data.agentGroupValuesToUpdate).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// updateAgentAssignments handle the agent list update
+func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData) error {
+	// Handle agents removed from the current agent group
+	if len(data.agentsToRemove) > 0 {
+		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.defaultAgentGroup.Lcuuid}
+		for _, agent := range data.agentsToRemove {
+			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
+				agent.Name, agent.VtapGroupLcuuid, data.defaultAgentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
+
+			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
+				return err
+			}
+		}
+		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.defaultAgentGroup, data.agentsToRemove); err != nil {
+			return err
+		}
+	}
+
+	// Handle agents added to the current agent group
+	if len(data.agentsToAdd) > 0 {
+		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.agentGroup.Lcuuid}
+		for _, agent := range data.agentsToAdd {
+			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
+				agent.Name, agent.VtapGroupLcuuid, data.agentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
+
+			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
+				return err
+			}
+		}
+		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.agentGroup, data.agentsToAdd); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
@@ -465,14 +569,14 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 			"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID}).Error; err != nil {
 			return err
 		}
-		if err = db.Delete(&vtapGroup).Error; err != nil {
+		if err = tx.Delete(&vtapGroup).Error; err != nil {
 			return err
 		}
 		// TODO remove after vtap_group_config is deprecated
-		if err = db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agentconf.AgentGroupConfigModel{}).Error; err != nil {
+		if err = tx.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agentconf.AgentGroupConfigModel{}).Error; err != nil {
 			return err
 		}
-		return db.Where("agent_group_lcuuid = ?", lcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error
+		return tx.Where("agent_group_lcuuid = ?", lcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error
 	})
 	if err != nil {
 		return nil, err
