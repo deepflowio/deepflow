@@ -103,8 +103,8 @@ func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.D
 		DiffBaseDataSet:  diffbase.NewDataSet(md), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
 		ToolDataSet:      tool.NewDataSet(md),     // 各类资源的映射关系，用于按需进行数据转换
 	}
-	c.StartSelfHealing()
 	c.tagrecorderHealers = tagrecorderHealer.NewHealers(md.Platform)
+	c.StartSelfHealing()
 	return c
 }
 
