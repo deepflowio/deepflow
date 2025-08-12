@@ -258,9 +258,12 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 }
 
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMessage, s)
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedMessage, s)
-	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMessage, s)
+	pubsub.Subscribe(
+		s,
+		pubsub.NewSubscriptionSpec(s.subResourceTypeName, pubsub.TopicResourceBatchAddedFull),
+		pubsub.NewSubscriptionSpec(s.subResourceTypeName, pubsub.TopicResourceUpdatedFull),
+		pubsub.NewSubscriptionSpec(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedFull),
+	)
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
