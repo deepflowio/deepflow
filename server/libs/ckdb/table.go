@@ -381,12 +381,24 @@ func (t *Table) IsAggrTableWrong(createTableSQL string) bool {
 	return len(orderKeys) != t.OrderKeysCount()
 }
 
+func (t *Table) IsLocalTableWrong(createTableSql string) bool {
+	return strings.Contains(createTableSql, "mem-inuse")
+}
+
 func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
 	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
 }
 
 func (t *Table) AggrTable1S(orgID uint16) string {
 	return t.AggrTable(orgID, AggregationSecond)
+}
+
+func (t *Table) LocalTable1S(orgID uint16) string {
+	return fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tablePrefix(), AggregationSecond.String())
+}
+
+func (t *Table) MakeLocalTableDropSQL1S(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.LocalTable1S(orgID))
 }
 
 func (t *Table) MakeAggrTableDropSQL1S(orgID uint16) string {
@@ -601,7 +613,9 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 				columns = append(columns, fmt.Sprintf("%s_last", c.Name))
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s_sum", c.Name, c.Name))
 			case AggrLastAndSumProfileValue:
-				columns = append(columns, fmt.Sprintf("if(profile_event_type = 'mem-inuse', %s_last, finalizeAggregation(%s_sum__agg)) as %s", c.Name, c.Name, c.Name))
+				// The profile 'mem-inuse' data is collected every 10 seconds. If you want to aggregate it by 1 second,
+				// you need to use the sum aggregation instead of the last aggregation.
+				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s", c.Name, c.Name))
 			default:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 			}
