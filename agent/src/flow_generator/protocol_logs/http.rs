@@ -1314,6 +1314,24 @@ impl HttpLog {
         Ok(n)
     }
 
+    // Note: Windows is compiled using Rust 1.75.0 and does not support the APIs added in the higher
+    // version of Rust.
+    #[cfg(target_os = "windows")]
+    #[cfg(feature = "enterprise")]
+    pub const fn trim_ascii_start(bytes: &[u8]) -> &[u8] {
+        let mut bytes = bytes;
+        // Note: A pattern matching based approach (instead of indexing) allows
+        // making the function const.
+        while let [first, rest @ ..] = bytes {
+            if first.is_ascii_whitespace() {
+                bytes = rest;
+            } else {
+                break;
+            }
+        }
+        bytes
+    }
+
     pub fn parse_http_v1(
         &mut self,
         payload: &[u8],
@@ -1424,7 +1442,10 @@ impl HttpLog {
             tags,
             policy,
             policy_indices,
+            #[cfg(target_os = "linux")]
             headers.remaining_buf().trim_ascii_start(),
+            #[cfg(target_os = "windows")]
+            Self::trim_ascii_start(headers.remaining_buf()),
         );
 
         Ok(())
