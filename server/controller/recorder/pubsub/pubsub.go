@@ -25,60 +25,51 @@ import (
 var log = logger.MustGetLogger("recorder.pubsub")
 
 type PubSub interface {
-	Subscribe(topic int, subscriber interface{})
-	Unsubscribe(topic int, subscriber interface{})
+	Subscribe(subscriber interface{}, spec *SubscriptionSpec)
 }
 
 type PubSubComponent struct {
-	pubSubType  string
-	subscribers map[int][]interface{} // key: topic, value: subscribers
+	pubSubType            string
+	topicToSubscriberInfo map[int][]*SubscriberInfo
 }
 
 func newPubSubComponent(pubsubType string) PubSubComponent {
 	return PubSubComponent{
-		pubSubType:  pubsubType,
-		subscribers: make(map[int][]interface{}),
+		pubSubType:            pubsubType,
+		topicToSubscriberInfo: make(map[int][]*SubscriberInfo),
 	}
 }
 
-func (p *PubSubComponent) Subscribe(topic int, subscriber interface{}) {
-	// log.Infof("subscribe topic: %d to pubsub: %s from subscriber: %#v", topic, p.pubSubType, subscriber)
-	if _, exists := p.subscribers[topic]; !exists {
-		p.subscribers[topic] = []interface{}{}
+func (p *PubSubComponent) Subscribe(subscriber interface{}, spec *SubscriptionSpec) {
+	if _, exists := p.topicToSubscriberInfo[spec.Topic]; !exists {
+		p.topicToSubscriberInfo[spec.Topic] = []*SubscriberInfo{}
 	}
-	p.subscribers[topic] = append(p.subscribers[topic], subscriber)
-}
-
-func (p *PubSubComponent) Unsubscribe(topic int, subscriber interface{}) {
-	if _, exists := p.subscribers[topic]; !exists {
-		return
-	}
-	for i, sub := range p.subscribers[topic] {
-		if sub == subscriber {
-			p.subscribers[topic] = append(p.subscribers[topic][:i], p.subscribers[topic][i+1:]...)
-			return
-		}
-	}
+	p.topicToSubscriberInfo[spec.Topic] = append(p.topicToSubscriberInfo[spec.Topic], newSubscriberInfo(subscriber, spec))
 }
 
 // PubSub interface for the whole cloud platform
 type DomainPubSub interface {
 	PubSub
-	PublishChange(*message.Metadata) // publish any change of the cloud platform, only notify the fact that the cloud platform has been changed, without specific changed data.
 }
 
-const (
-	TopicResourceChanged             = iota // subscribe to this topic to get notification of resource changed
-	TopicResourceBatchAddedMessage          // subscribe to this topic to get message add model data of resource batch added
-	TopicResourceBatchAddedMySQL            // subscribe to this topic to get MySQL model data of resource batch added
-	TopicResourceUpdatedFields              // subscribe to this topic to get message update model data of resource updated
-	TopicResourceUpdatedMessage             // subscribe to this topic to get message update model data of resource updated
-	TopicResourceBatchDeletedLcuuid         // subscribe to this topic to get lcuuids of resource batch deleted
-	TopicResourceBatchDeletedMySQL          // subscribe to this topic to get MySQL model data of resource batch deleted
-	TopicResourceBatchDeletedMessage        // subscribe to this topic to get message delete model data of resource batch deleted
-)
+type AnyChangePubSubComponent struct {
+	PubSubComponent
+}
 
-// Pubsub interface for a specific resource
+func (p *AnyChangePubSubComponent) PublishChange(md *message.Metadata) {
+	for topic, infos := range p.topicToSubscriberInfo {
+		for _, info := range infos {
+			if !info.GetSubscriptionSpec().Matches(md.GetDomainLcuuid()) {
+				continue
+			}
+			if topic == TopicPlatformChanged {
+				info.GetSubscriber().(AnyChangedSubscriber).OnAnyChanged(md)
+			}
+		}
+	}
+}
+
+// ResourcePubSub interface for a specific resource
 type ResourcePubSub[
 	MAPT constraint.AddPtr[MAT],
 	MAT constraint.Add,
@@ -92,7 +83,6 @@ type ResourcePubSub[
 	MDAT message.DeleteAddition,
 ] interface {
 	PubSub
-	PublishChange(*message.Metadata)             // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
 	PublishBatchAdded(*message.Metadata, MAPT)   // publish resource batch added notification, including specific data
 	PublishUpdated(*message.Metadata, MUPT)      // publish resource updated notification, including specific data
 	PublishBatchDeleted(*message.Metadata, MDPT) // publish resource batch deleted notification, including specific data
@@ -114,28 +104,20 @@ type ResourcePubSubComponent[
 	PubSubComponent
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishChange(md *message.Metadata) {
-	for topic, subs := range p.subscribers {
-		if topic == TopicResourceChanged {
-			for _, sub := range subs {
-				sub.(ResourceChangedSubscriber).OnResourceChanged(md, nil)
-			}
-		}
-	}
-}
-
 func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
 	// TODO better log
 	log.Debugf("publish add %#v, %#v", md, msg)
-	for topic, subs := range p.subscribers {
-		if topic == TopicResourceBatchAddedMySQL {
-			for _, sub := range subs {
-				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
+	for topic, infos := range p.topicToSubscriberInfo {
+		for _, info := range infos {
+			if !info.GetSubscriptionSpec().Matches(md.GetDomainLcuuid()) {
+				continue
 			}
-		}
-		if topic == TopicResourceBatchAddedMessage {
-			for _, sub := range subs {
-				sub.(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg)
+
+			if topic == TopicResourceBatchAddedMetadbItems {
+				info.GetSubscriber().(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
+			}
+			if topic == TopicResourceBatchAddedFull {
+				info.GetSubscriber().(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg)
 			}
 		}
 	}
@@ -143,15 +125,17 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishUpdated(md *message.Metadata, msg MUPT) {
 	log.Debugf("publish update %#v, %#v", md, msg)
-	for topic, subs := range p.subscribers {
-		if topic == TopicResourceUpdatedFields {
-			for _, sub := range subs {
-				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg.GetFields().(MFUPT))
+	for topic, infos := range p.topicToSubscriberInfo {
+		for _, info := range infos {
+			if !info.GetSubscriptionSpec().Matches(md.GetDomainLcuuid()) {
+				continue
 			}
-		}
-		if topic == TopicResourceUpdatedMessage {
-			for _, sub := range subs {
-				sub.(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg)
+
+			if topic == TopicResourceUpdatedFields {
+				info.GetSubscriber().(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg.GetFields().(MFUPT))
+			}
+			if topic == TopicResourceUpdatedFull {
+				info.GetSubscriber().(ResourceUpdatedSubscriber).OnResourceUpdated(md, msg)
 			}
 		}
 	}
@@ -159,20 +143,20 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT, MDAT]) PublishBatchDeleted(md *message.Metadata, msg MDPT) {
 	log.Debugf("publish delete %#v, %#v", md, msg)
-	for topic, subs := range p.subscribers {
-		if topic == TopicResourceBatchDeletedLcuuid {
-			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids())
+	for topic, infos := range p.topicToSubscriberInfo {
+		for _, info := range infos {
+			if !info.GetSubscriptionSpec().Matches(md.GetDomainLcuuid()) {
+				continue
 			}
-		}
-		if topic == TopicResourceBatchDeletedMySQL {
-			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
+
+			if topic == TopicResourceBatchDeletedLcuuids {
+				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids())
 			}
-		}
-		if topic == TopicResourceBatchDeletedMessage {
-			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg)
+			if topic == TopicResourceBatchDeletedMetadbItems {
+				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
+			}
+			if topic == TopicResourceBatchDeletedFull {
+				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg)
 			}
 		}
 	}
