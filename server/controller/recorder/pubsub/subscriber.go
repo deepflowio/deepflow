@@ -18,6 +18,30 @@ package pubsub
 
 import "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 
+// newSubscriberInfo creates a new subscriber info
+func newSubscriberInfo(subscriber interface{}, spec *SubscriptionSpec) *SubscriberInfo {
+	return &SubscriberInfo{
+		subscriber: subscriber,
+		spec:       spec,
+	}
+}
+
+// SubscriberInfo encapsulates subscriber instance and its subscription specification
+type SubscriberInfo struct {
+	// subscriber is the subscriber instance
+	subscriber interface{}
+	// spec defines the subscription conditions and filtering rules
+	spec *SubscriptionSpec
+}
+
+func (si SubscriberInfo) GetSubscriber() interface{} {
+	return si.subscriber
+}
+
+func (si SubscriberInfo) GetSubscriptionSpec() *SubscriptionSpec {
+	return si.spec
+}
+
 type Subscriber interface {
 	Subscribe()
 }
