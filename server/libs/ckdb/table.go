@@ -382,6 +382,10 @@ func (t *Table) IsAggrTableWrong(createTableSQL string) bool {
 	return len(orderKeys) != t.OrderKeysCount()
 }
 
+func (t *Table) IsLocalTableWrong(createTableSql string) bool {
+	return strings.Contains(createTableSql, "mem-inuse")
+}
+
 func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
 	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
 }
@@ -393,6 +397,14 @@ func (t *Table) AggrTable1S(orgID uint16) string {
 func (t *Table) MakeAggrTableRenameSQL1S(orgID uint16) string {
 	table := t.AggrTable1S(orgID)
 	return fmt.Sprintf("RENAME TABLE %s to %s_%d`", table, table[:len(table)-1], time.Now().Unix())
+}
+
+func (t *Table) LocalTable1S(orgID uint16) string {
+	return fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tablePrefix(), AggregationSecond.String())
+}
+
+func (t *Table) MakeLocalTableDropSQL1S(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.LocalTable1S(orgID))
 }
 
 func (t *Table) MakeAggrTableCreateSQL1S(orgID uint16) string {
@@ -605,7 +617,7 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 				columns = append(columns, fmt.Sprintf("%s_last", c.Name))
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s_sum", c.Name, c.Name))
 			case AggrLastAndSumProfileValue:
-				columns = append(columns, fmt.Sprintf("if(profile_event_type = 'mem-inuse', %s_last, finalizeAggregation(%s_sum__agg)) as %s", c.Name, c.Name, c.Name))
+				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s", c.Name, c.Name))
 			default:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 			}
