@@ -111,7 +111,9 @@ func (s *SubscriberComponent) GetSubResourceType() string {
 func (s *SubscriberComponent) Subscribe() {
 	for _, topic := range s.subTopics {
 		log.Info("subscribe topic: ", topic, " from resource type: ", s.subResourceTypeName)
-		pubsub.Subscribe(s.subResourceTypeName, topic, s.subscriberSelf)
+		pubsub.Subscribe(
+			s.subscriberSelf,
+			pubsub.NewSubscriptionSpec(s.subResourceTypeName, topic))
 	}
 }
 
@@ -127,7 +129,7 @@ func newChangedSubscriberComponent(
 	}
 	s.subTopics = append(
 		s.subTopics,
-		pubsub.TopicPlatformResourceChanged,
+		pubsub.TopicPlatformChanged,
 	)
 	return s
 }
@@ -144,8 +146,8 @@ func newCUDSubscriberComponent(
 	}
 	s.subTopics = append(
 		s.subTopics,
-		pubsub.TopicResourceBatchAddedMetadb,
-		pubsub.TopicResourceBatchDeletedMetadb,
+		pubsub.TopicResourceBatchAddedMetadbItems,
+		pubsub.TopicResourceBatchDeletedMetadbItems,
 	)
 	return s
 }
