@@ -24,14 +24,14 @@ import (
 )
 
 type Metadata struct {
-	metadata.Platform  // Base metadata containing platform resource common fields
-	AdditionalMetadata // Additional metadata for specific message types
+	metadata.Platform // Base metadata containing platform resource common fields
+	Addition          // Additional metadata for specific message types
 }
 
 func NewMetadata(options ...func(*Metadata)) *Metadata {
 	md := &Metadata{
 		metadata.Platform{},
-		AdditionalMetadata{},
+		Addition{},
 	}
 	for _, option := range options {
 		option(md)
@@ -65,25 +65,25 @@ func MetadataSubDomain(subDomain metadbModel.SubDomain) func(*Metadata) {
 
 func MetadataSoftDelete(flag bool) func(*Metadata) {
 	return func(m *Metadata) {
-		m.AdditionalMetadata.SoftDelete = flag
+		m.Addition.SoftDelete = flag
 	}
 }
 
 func MetadataToolDataSet(ds *tool.DataSet) func(*Metadata) {
 	return func(m *Metadata) {
-		m.AdditionalMetadata.ToolDataSet = ds
+		m.Addition.ToolDataSet = ds
 	}
 }
 
-type AdditionalMetadata struct { // TODO better
+type Addition struct { // TODO better
 	SoftDelete  bool          // for message type of delete action
 	ToolDataSet *tool.DataSet // for message type of resource event
 }
 
-func (m AdditionalMetadata) GetSoftDelete() bool {
+func (m Addition) GetSoftDelete() bool {
 	return m.SoftDelete
 }
 
-func (m AdditionalMetadata) GetToolDataSet() *tool.DataSet {
+func (m Addition) GetToolDataSet() *tool.DataSet {
 	return m.ToolDataSet
 }

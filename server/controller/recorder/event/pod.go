@@ -45,7 +45,7 @@ type Pod struct {
 func NewPod(q *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_EN, SubTopic(pubsub.TopicResourceUpdatedFull)),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD,
 		newTool(),
 	}

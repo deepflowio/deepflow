@@ -35,7 +35,7 @@ type ConfigMap struct {
 func NewConfigMap(cfg config.Config, q *queue.OverwriteQueue) *ConfigMap {
 	mng := &ConfigMap{
 		newManagerComponent(ctrlCommon.RESOURCE_TYPE_CONFIG_MAP_EN, q),
-		newCUDSubscriberComponent(ctrlCommon.RESOURCE_TYPE_CONFIG_MAP_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
+		newCUDSubscriberComponent(ctrlCommon.RESOURCE_TYPE_CONFIG_MAP_EN, SubTopic(pubsub.TopicResourceUpdatedFull)),
 		cfg,
 	}
 	mng.SetSubscriberSelf(mng)
