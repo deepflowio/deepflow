@@ -7,9 +7,9 @@ use brpc_policy::RpcMeta;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{L7PerfStats, L7Protocol, PacketDirection},
+        flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::LogParserConfig,
@@ -213,6 +213,18 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&BrpcInfo> for LogCache {
+    fn from(info: &BrpcInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.resp_status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 impl L7ProtocolInfoInterface for BrpcInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
@@ -292,39 +304,17 @@ impl L7ProtocolParserInterface for BrpcLog {
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                    match param.direction {
-                        PacketDirection::ClientToServer => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        PacketDirection::ServerToClient => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if info.msg_type == LogMessageType::Response {
+                        if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                            info.endpoint = Some(endpoint.to_string());
                         }
                     }
-                    match info.resp_status {
-                        L7ResponseStatus::ClientError => {
-                            self.perf_stats
-                                .as_mut()
-                                .map(|p: &mut L7PerfStats| p.inc_req_err());
-                        }
-                        L7ResponseStatus::ServerError => {
-                            self.perf_stats
-                                .as_mut()
-                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                        }
-                        _ => {}
-                    }
-                    if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
-                            info.rtt = rtt;
-                            if info.msg_type == LogMessageType::Response {
-                                info.endpoint = endpoint;
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                        });
+                    if let Some(stats) = info.perf_stats(param) {
+                        info.rtt = stats.rrt_sum;
+                        perf_stats.sequential_merge(&stats);
                     }
                 }
-                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
 
