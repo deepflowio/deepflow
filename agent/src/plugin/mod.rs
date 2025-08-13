@@ -25,8 +25,11 @@ use public::{bytes::read_u32_be, counter::Countable, l7_protocol::L7Protocol};
 use serde::Serialize;
 
 use crate::{
-    common::flow::PacketDirection,
-    common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+    common::{
+        flow::PacketDirection,
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::LogCache,
+    },
     config::handler::LogParserConfig,
     flow_generator::{
         protocol_logs::{
@@ -646,6 +649,18 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 x_request_id_1: w.trace.x_request_id_1,
                 ..Default::default()
             }),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&CustomInfo> for LogCache {
+    fn from(info: &CustomInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.resp.status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
             ..Default::default()
         }
     }
