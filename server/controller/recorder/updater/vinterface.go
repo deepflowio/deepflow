@@ -36,15 +36,15 @@ type VInterface struct {
 		*diffbase.VInterface,
 		*mysqlmodel.VInterface,
 		mysqlmodel.VInterface,
-		*message.VInterfaceAdd,
-		message.VInterfaceAdd,
+		*message.AddedVInterfaces,
+		message.AddedVInterfaces,
 		message.AddNoneAddition,
-		*message.VInterfaceUpdate,
-		message.VInterfaceUpdate,
-		*message.VInterfaceFieldsUpdate,
-		message.VInterfaceFieldsUpdate,
-		*message.VInterfaceDelete,
-		message.VInterfaceDelete,
+		*message.UpdatedVInterface,
+		message.UpdatedVInterface,
+		*message.UpdatedVInterfaceFields,
+		message.UpdatedVInterfaceFields,
+		*message.DeletedVInterfaces,
+		message.DeletedVInterfaces,
 		message.DeleteNoneAddition]
 }
 
@@ -55,15 +55,15 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 			*diffbase.VInterface,
 			*mysqlmodel.VInterface,
 			mysqlmodel.VInterface,
-			*message.VInterfaceAdd,
-			message.VInterfaceAdd,
+			*message.AddedVInterfaces,
+			message.AddedVInterfaces,
 			message.AddNoneAddition,
-			*message.VInterfaceUpdate,
-			message.VInterfaceUpdate,
-			*message.VInterfaceFieldsUpdate,
-			message.VInterfaceFieldsUpdate,
-			*message.VInterfaceDelete,
-			message.VInterfaceDelete,
+			*message.UpdatedVInterface,
+			message.UpdatedVInterface,
+			*message.UpdatedVInterfaceFields,
+			message.UpdatedVInterfaceFields,
+			*message.DeletedVInterfaces,
+			message.DeletedVInterfaces,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
@@ -153,8 +153,8 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.VInterfaceFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.VInterfaceFieldsUpdate)
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.UpdatedVInterfaceFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVInterfaceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
 		if cloudItem.NetworkLcuuid == "" {

@@ -35,15 +35,15 @@ type PodNamespace struct {
 		*diffbase.PodNamespace,
 		*mysqlmodel.PodNamespace,
 		mysqlmodel.PodNamespace,
-		*message.PodNamespaceAdd,
-		message.PodNamespaceAdd,
+		*message.AddedPodNamespaces,
+		message.AddedPodNamespaces,
 		message.AddNoneAddition,
-		*message.PodNamespaceUpdate,
-		message.PodNamespaceUpdate,
-		*message.PodNamespaceFieldsUpdate,
-		message.PodNamespaceFieldsUpdate,
-		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete,
+		*message.UpdatedPodNamespace,
+		message.UpdatedPodNamespace,
+		*message.UpdatedPodNamespaceFields,
+		message.UpdatedPodNamespaceFields,
+		*message.DeletedPodNamespaces,
+		message.DeletedPodNamespaces,
 		message.DeleteNoneAddition]
 }
 
@@ -54,15 +54,15 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 			*diffbase.PodNamespace,
 			*mysqlmodel.PodNamespace,
 			mysqlmodel.PodNamespace,
-			*message.PodNamespaceAdd,
-			message.PodNamespaceAdd,
+			*message.AddedPodNamespaces,
+			message.AddedPodNamespaces,
 			message.AddNoneAddition,
-			*message.PodNamespaceUpdate,
-			message.PodNamespaceUpdate,
-			*message.PodNamespaceFieldsUpdate,
-			message.PodNamespaceFieldsUpdate,
-			*message.PodNamespaceDelete,
-			message.PodNamespaceDelete,
+			*message.UpdatedPodNamespace,
+			message.UpdatedPodNamespace,
+			*message.UpdatedPodNamespaceFields,
+			message.UpdatedPodNamespaceFields,
+			*message.DeletedPodNamespaces,
+			message.DeletedPodNamespaces,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
@@ -108,8 +108,8 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	return dbItem, true
 }
 
-func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (*message.PodNamespaceFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodNamespaceFieldsUpdate)
+func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (*message.UpdatedPodNamespaceFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodNamespaceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

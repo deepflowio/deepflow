@@ -25,12 +25,12 @@ import (
 
 type ChPodServiceK8sLabel struct {
 	SubscriberComponent[
-		*message.PodServiceAdd,
-		message.PodServiceAdd,
-		*message.PodServiceUpdate,
-		message.PodServiceUpdate,
-		*message.PodServiceDelete,
-		message.PodServiceDelete,
+		*message.AddedPodServices,
+		message.AddedPodServices,
+		*message.UpdatedPodService,
+		message.UpdatedPodService,
+		*message.DeletedPodServices,
+		message.DeletedPodServices,
 		mysqlmodel.PodService,
 		mysqlmodel.ChPodServiceK8sLabel,
 		IDKeyKey,
@@ -40,12 +40,12 @@ type ChPodServiceK8sLabel struct {
 func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 	mng := &ChPodServiceK8sLabel{
 		newSubscriberComponent[
-			*message.PodServiceAdd,
-			message.PodServiceAdd,
-			*message.PodServiceUpdate,
-			message.PodServiceUpdate,
-			*message.PodServiceDelete,
-			message.PodServiceDelete,
+			*message.AddedPodServices,
+			message.AddedPodServices,
+			*message.UpdatedPodService,
+			message.UpdatedPodService,
+			*message.DeletedPodServices,
+			message.DeletedPodServices,
 			mysqlmodel.PodService,
 			mysqlmodel.ChPodServiceK8sLabel,
 			IDKeyKey,
@@ -58,9 +58,9 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
 	sourceID := newSource.ID
 	vpcID := newSource.VPCID

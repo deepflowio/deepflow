@@ -23,30 +23,30 @@ import (
 
 type WANIP struct {
 	ResourcePubSubComponent[
-		*message.WANIPAdd,
-		message.WANIPAdd,
+		*message.AddedWANIPs,
+		message.AddedWANIPs,
 		message.AddNoneAddition,
-		*message.WANIPUpdate,
-		message.WANIPUpdate,
-		*message.WANIPFieldsUpdate,
-		message.WANIPFieldsUpdate,
-		*message.WANIPDelete,
-		message.WANIPDelete,
+		*message.UpdatedWANIP,
+		message.UpdatedWANIP,
+		*message.UpdatedWANIPFields,
+		message.UpdatedWANIPFields,
+		*message.DeletedWANIPs,
+		message.DeletedWANIPs,
 		message.DeleteNoneAddition]
 }
 
 func NewWANIP() *WANIP {
 	return &WANIP{
 		ResourcePubSubComponent[
-			*message.WANIPAdd,
-			message.WANIPAdd,
+			*message.AddedWANIPs,
+			message.AddedWANIPs,
 			message.AddNoneAddition,
-			*message.WANIPUpdate,
-			message.WANIPUpdate,
-			*message.WANIPFieldsUpdate,
-			message.WANIPFieldsUpdate,
-			*message.WANIPDelete,
-			message.WANIPDelete,
+			*message.UpdatedWANIP,
+			message.UpdatedWANIP,
+			*message.UpdatedWANIPFields,
+			message.UpdatedWANIPFields,
+			*message.DeletedWANIPs,
+			message.DeletedWANIPs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeWANIP),

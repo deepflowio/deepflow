@@ -17,11 +17,11 @@
 package message
 
 type AddAddition interface {
-	AddNoneAddition | ProcessAddAddition
+	AddNoneAddition | AddedProcessesAddition
 }
 
 type DeleteAddition interface {
-	DeleteNoneAddition | ProcessDeleteAddition
+	DeleteNoneAddition | DeletedProcessesAddition
 }
 
 type AddNoneAddition struct {

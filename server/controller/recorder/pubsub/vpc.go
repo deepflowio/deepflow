@@ -23,30 +23,30 @@ import (
 
 type VPC struct {
 	ResourcePubSubComponent[
-		*message.VPCAdd,
-		message.VPCAdd,
+		*message.AddedVPCs,
+		message.AddedVPCs,
 		message.AddNoneAddition,
-		*message.VPCUpdate,
-		message.VPCUpdate,
-		*message.VPCFieldsUpdate,
-		message.VPCFieldsUpdate,
-		*message.VPCDelete,
-		message.VPCDelete,
+		*message.UpdatedVPC,
+		message.UpdatedVPC,
+		*message.UpdatedVPCFields,
+		message.UpdatedVPCFields,
+		*message.DeletedVPCs,
+		message.DeletedVPCs,
 		message.DeleteNoneAddition]
 }
 
 func NewVPC() *VPC {
 	return &VPC{
 		ResourcePubSubComponent[
-			*message.VPCAdd,
-			message.VPCAdd,
+			*message.AddedVPCs,
+			message.AddedVPCs,
 			message.AddNoneAddition,
-			*message.VPCUpdate,
-			message.VPCUpdate,
-			*message.VPCFieldsUpdate,
-			message.VPCFieldsUpdate,
-			*message.VPCDelete,
-			message.VPCDelete,
+			*message.UpdatedVPC,
+			message.UpdatedVPC,
+			*message.UpdatedVPCFields,
+			message.UpdatedVPCFields,
+			*message.DeletedVPCs,
+			message.DeletedVPCs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVPC),

@@ -23,30 +23,30 @@ import (
 
 type RedisInstance struct {
 	ResourcePubSubComponent[
-		*message.RedisInstanceAdd,
-		message.RedisInstanceAdd,
+		*message.AddedRedisInstances,
+		message.AddedRedisInstances,
 		message.AddNoneAddition,
-		*message.RedisInstanceUpdate,
-		message.RedisInstanceUpdate,
-		*message.RedisInstanceFieldsUpdate,
-		message.RedisInstanceFieldsUpdate,
-		*message.RedisInstanceDelete,
-		message.RedisInstanceDelete,
+		*message.UpdatedRedisInstance,
+		message.UpdatedRedisInstance,
+		*message.UpdatedRedisInstanceFields,
+		message.UpdatedRedisInstanceFields,
+		*message.DeletedRedisInstances,
+		message.DeletedRedisInstances,
 		message.DeleteNoneAddition]
 }
 
 func NewRedisInstance() *RedisInstance {
 	return &RedisInstance{
 		ResourcePubSubComponent[
-			*message.RedisInstanceAdd,
-			message.RedisInstanceAdd,
+			*message.AddedRedisInstances,
+			message.AddedRedisInstances,
 			message.AddNoneAddition,
-			*message.RedisInstanceUpdate,
-			message.RedisInstanceUpdate,
-			*message.RedisInstanceFieldsUpdate,
-			message.RedisInstanceFieldsUpdate,
-			*message.RedisInstanceDelete,
-			message.RedisInstanceDelete,
+			*message.UpdatedRedisInstance,
+			message.UpdatedRedisInstance,
+			*message.UpdatedRedisInstanceFields,
+			message.UpdatedRedisInstanceFields,
+			*message.DeletedRedisInstances,
+			message.DeletedRedisInstances,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRedisInstance),

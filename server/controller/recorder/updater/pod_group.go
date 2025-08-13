@@ -34,15 +34,15 @@ type PodGroup struct {
 		*diffbase.PodGroup,
 		*mysqlmodel.PodGroup,
 		mysqlmodel.PodGroup,
-		*message.PodGroupAdd,
-		message.PodGroupAdd,
+		*message.AddedPodGroups,
+		message.AddedPodGroups,
 		message.AddNoneAddition,
-		*message.PodGroupUpdate,
-		message.PodGroupUpdate,
-		*message.PodGroupFieldsUpdate,
-		message.PodGroupFieldsUpdate,
-		*message.PodGroupDelete,
-		message.PodGroupDelete,
+		*message.UpdatedPodGroup,
+		message.UpdatedPodGroup,
+		*message.UpdatedPodGroupFields,
+		message.UpdatedPodGroupFields,
+		*message.DeletedPodGroups,
+		message.DeletedPodGroups,
 		message.DeleteNoneAddition]
 }
 
@@ -53,15 +53,15 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 			*diffbase.PodGroup,
 			*mysqlmodel.PodGroup,
 			mysqlmodel.PodGroup,
-			*message.PodGroupAdd,
-			message.PodGroupAdd,
+			*message.AddedPodGroups,
+			message.AddedPodGroups,
 			message.AddNoneAddition,
-			*message.PodGroupUpdate,
-			message.PodGroupUpdate,
-			*message.PodGroupFieldsUpdate,
-			message.PodGroupFieldsUpdate,
-			*message.PodGroupDelete,
-			message.PodGroupDelete,
+			*message.UpdatedPodGroup,
+			message.UpdatedPodGroup,
+			*message.UpdatedPodGroupFields,
+			message.UpdatedPodGroupFields,
+			*message.DeletedPodGroups,
+			message.DeletedPodGroups,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
@@ -128,8 +128,8 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 	return dbItem, true
 }
 
-func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cloudmodel.PodGroup) (*message.PodGroupFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodGroupFieldsUpdate)
+func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cloudmodel.PodGroup) (*message.UpdatedPodGroupFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodGroupFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

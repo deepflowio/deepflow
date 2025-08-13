@@ -27,12 +27,12 @@ import (
 
 type ChVPC struct {
 	SubscriberComponent[
-		*message.VPCAdd,
-		message.VPCAdd,
-		*message.VPCUpdate,
-		message.VPCUpdate,
-		*message.VPCDelete,
-		message.VPCDelete,
+		*message.AddedVPCs,
+		message.AddedVPCs,
+		*message.UpdatedVPC,
+		message.UpdatedVPC,
+		*message.DeletedVPCs,
+		message.DeletedVPCs,
 		mysqlmodel.VPC,
 		mysqlmodel.ChVPC,
 		IDKey,
@@ -43,12 +43,12 @@ type ChVPC struct {
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	mng := &ChVPC{
 		newSubscriberComponent[
-			*message.VPCAdd,
-			message.VPCAdd,
-			*message.VPCUpdate,
-			message.VPCUpdate,
-			*message.VPCDelete,
-			message.VPCDelete,
+			*message.AddedVPCs,
+			message.AddedVPCs,
+			*message.UpdatedVPC,
+			message.UpdatedVPC,
+			*message.DeletedVPCs,
+			message.DeletedVPCs,
 			mysqlmodel.VPC,
 			mysqlmodel.ChVPC,
 			IDKey,
@@ -85,9 +85,9 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *mysqlmodel.VPC) (ke
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.VPCUpdate) {
+func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVPC) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.VPCFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVPCFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VPC)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

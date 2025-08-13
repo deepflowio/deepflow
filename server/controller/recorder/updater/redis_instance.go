@@ -32,15 +32,15 @@ type RedisInstance struct {
 		*diffbase.RedisInstance,
 		*mysqlmodel.RedisInstance,
 		mysqlmodel.RedisInstance,
-		*message.RedisInstanceAdd,
-		message.RedisInstanceAdd,
+		*message.AddedRedisInstances,
+		message.AddedRedisInstances,
 		message.AddNoneAddition,
-		*message.RedisInstanceUpdate,
-		message.RedisInstanceUpdate,
-		*message.RedisInstanceFieldsUpdate,
-		message.RedisInstanceFieldsUpdate,
-		*message.RedisInstanceDelete,
-		message.RedisInstanceDelete,
+		*message.UpdatedRedisInstance,
+		message.UpdatedRedisInstance,
+		*message.UpdatedRedisInstanceFields,
+		message.UpdatedRedisInstanceFields,
+		*message.DeletedRedisInstances,
+		message.DeletedRedisInstances,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 			*diffbase.RedisInstance,
 			*mysqlmodel.RedisInstance,
 			mysqlmodel.RedisInstance,
-			*message.RedisInstanceAdd,
-			message.RedisInstanceAdd,
+			*message.AddedRedisInstances,
+			message.AddedRedisInstances,
 			message.AddNoneAddition,
-			*message.RedisInstanceUpdate,
-			message.RedisInstanceUpdate,
-			*message.RedisInstanceFieldsUpdate,
-			message.RedisInstanceFieldsUpdate,
-			*message.RedisInstanceDelete,
-			message.RedisInstanceDelete,
+			*message.UpdatedRedisInstance,
+			message.UpdatedRedisInstance,
+			*message.UpdatedRedisInstanceFields,
+			message.UpdatedRedisInstanceFields,
+			*message.DeletedRedisInstances,
+			message.DeletedRedisInstances,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
@@ -104,8 +104,8 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 	return dbItem, true
 }
 
-func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (*message.RedisInstanceFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.RedisInstanceFieldsUpdate)
+func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (*message.UpdatedRedisInstanceFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedRedisInstanceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

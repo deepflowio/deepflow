@@ -46,269 +46,269 @@ func (m *MySQLItems[T]) SetMySQLItems(items interface{}) {
 	m.data = items.([]*T)
 }
 
-type RegionDelete struct {
+type DeletedRegions struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Region]
 	addition[DeleteNoneAddition]
 }
 
-type AZDelete struct {
+type DeletedAZs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.AZ]
 	addition[DeleteNoneAddition]
 }
 
-type SubDomainDelete struct {
+type DeletedSubDomains struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.SubDomain]
 	addition[DeleteNoneAddition]
 }
 
-type HostDelete struct {
+type DeletedHosts struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Host]
 	addition[DeleteNoneAddition]
 }
 
-type VMDelete struct {
+type DeletedVMs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VM]
 	addition[DeleteNoneAddition]
 }
 
-type VMPodNodeConnectionDelete struct {
+type DeletedVMPodNodeConnections struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VMPodNodeConnection]
 	addition[DeleteNoneAddition]
 }
 
-type VPCDelete struct {
+type DeletedVPCs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VPC]
 	addition[DeleteNoneAddition]
 }
 
-type NetworkDelete struct {
+type DeletedNetworks struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Network]
 	addition[DeleteNoneAddition]
 }
 
-type SubnetDelete struct {
+type DeletedSubnets struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Subnet]
 	addition[DeleteNoneAddition]
 }
 
-type VRouterDelete struct {
+type DeletedVRouters struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VRouter]
 	addition[DeleteNoneAddition]
 }
 
-type RoutingTableDelete struct {
+type DeletedRoutingTables struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.RoutingTable]
 	addition[DeleteNoneAddition]
 }
 
-type DHCPPortDelete struct {
+type DeletedDHCPPorts struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.DHCPPort]
 	addition[DeleteNoneAddition]
 }
 
-type VInterfaceDelete struct {
+type DeletedVInterfaces struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VInterface]
 	addition[DeleteNoneAddition]
 }
 
-type FloatingIPDelete struct {
+type DeletedFloatingIPs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.FloatingIP]
 	addition[DeleteNoneAddition]
 }
 
-type LANIPDelete struct {
+type DeletedLANIPs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.LANIP]
 	addition[DeleteNoneAddition]
 }
 
-type WANIPDelete struct {
+type DeletedWANIPs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.WANIP]
 	addition[DeleteNoneAddition]
 }
 
-type VIPDelete struct {
+type DeletedVIPs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.VIP]
 	addition[DeleteNoneAddition]
 }
 
-type NATGatewayDelete struct {
+type DeletedNATGateways struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.NATGateway]
 	addition[DeleteNoneAddition]
 }
 
-type NATRuleDelete struct {
+type DeletedNATRules struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.NATRule]
 	addition[DeleteNoneAddition]
 }
 
-type NATVMConnectionDelete struct {
+type DeletedNATVMConnections struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.NATVMConnection]
 	addition[DeleteNoneAddition]
 }
 
-type LBDelete struct {
+type DeletedLBs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.LB]
 	addition[DeleteNoneAddition]
 }
 
-type LBListenerDelete struct {
+type DeletedLBListeners struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.LBListener]
 	addition[DeleteNoneAddition]
 }
 
-type LBTargetServerDelete struct {
+type DeletedLBTargetServers struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.LBTargetServer]
 	addition[DeleteNoneAddition]
 }
 
-type LBVMConnectionDelete struct {
+type DeletedLBVMConnections struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.LBVMConnection]
 	addition[DeleteNoneAddition]
 }
 
-type PeerConnectionDelete struct {
+type DeletedPeerConnections struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PeerConnection]
 	addition[DeleteNoneAddition]
 }
 
-type CENDelete struct {
+type DeletedCENs struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.CEN]
 	addition[DeleteNoneAddition]
 }
 
-type RDSInstanceDelete struct {
+type DeletedRDSInstances struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.RDSInstance]
 	addition[DeleteNoneAddition]
 }
 
-type RedisInstanceDelete struct {
+type DeletedRedisInstances struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.RedisInstance]
 	addition[DeleteNoneAddition]
 }
 
-type PodClusterDelete struct {
+type DeletedPodClusters struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodCluster]
 	addition[DeleteNoneAddition]
 }
 
-type PodNamespaceDelete struct {
+type DeletedPodNamespaces struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodNamespace]
 	addition[DeleteNoneAddition]
 }
 
-type PodNodeDelete struct {
+type DeletedPodNodes struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodNode]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressDelete struct {
+type DeletedPodIngresses struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodIngress]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressRuleDelete struct {
+type DeletedPodIngressRules struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodIngressRule]
 	addition[DeleteNoneAddition]
 }
 
-type PodIngressRuleBackendDelete struct {
+type DeletedPodIngressRuleBackends struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodIngressRuleBackend]
 	addition[DeleteNoneAddition]
 }
 
-type PodServiceDelete struct {
+type DeletedPodServices struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodService]
 	addition[DeleteNoneAddition]
 }
 
-type PodServicePortDelete struct {
+type DeletedPodServicePorts struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodServicePort]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupDelete struct {
+type DeletedPodGroups struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodGroup]
 	addition[DeleteNoneAddition]
 }
 
-type ConfigMapDelete struct {
+type DeletedConfigMaps struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.ConfigMap]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupConfigMapConnectionDelete struct {
+type DeletedPodGroupConfigMapConnections struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
 	addition[DeleteNoneAddition]
 }
 
-type PodGroupPortDelete struct {
+type DeletedPodGroupPorts struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodGroupPort]
 	addition[DeleteNoneAddition]
 }
 
-type PodReplicaSetDelete struct {
+type DeletedPodReplicaSets struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.PodReplicaSet]
 	addition[DeleteNoneAddition]
 }
 
-type PodDelete struct {
+type DeletedPods struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Pod]
 	addition[DeleteNoneAddition]
 }
 
-type ProcessDelete struct {
+type DeletedProcesses struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.Process]
-	addition[ProcessDeleteAddition]
+	addition[DeletedProcessesAddition]
 }
 
-type ProcessDeleteAddition struct {
+type DeletedProcessesAddition struct {
 	DeletedGIDs []uint32
 }
 
-type CustomServiceDelete struct {
+type DeletedCustomServices struct {
 	Lcuuids
 	MySQLItems[mysqlmodel.CustomService]
 	addition[DeleteNoneAddition]

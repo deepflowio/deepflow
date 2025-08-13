@@ -29,12 +29,12 @@ import (
 
 type ChGProcess struct {
 	SubscriberComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
+		*message.AddedProcesses,
+		message.AddedProcesses,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
 		mysqlmodel.Process,
 		mysqlmodel.ChGProcess,
 		IDKey,
@@ -45,12 +45,12 @@ type ChGProcess struct {
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	mng := &ChGProcess{
 		newSubscriberComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
+			*message.AddedProcesses,
+			message.AddedProcesses,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
 			mysqlmodel.Process,
 			mysqlmodel.ChGProcess,
 			IDKey,
@@ -90,9 +90,9 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.ProcessUpdate) {
+func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedProcess) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.ProcessFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedProcessFields)
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Name.IsDifferent() {
@@ -115,8 +115,8 @@ func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysqlmodel.ChGProcess, 
 	}).Create(&targets)
 }
 
-func (c *ChGProcess) beforeDeletePage(dbData []*mysqlmodel.Process, msg *message.ProcessDelete) []*mysqlmodel.Process {
-	gids := msg.GetAddition().(*message.ProcessDeleteAddition).DeletedGIDs
+func (c *ChGProcess) beforeDeletePage(dbData []*mysqlmodel.Process, msg *message.DeletedProcesses) []*mysqlmodel.Process {
+	gids := msg.GetAddition().(*message.DeletedProcessesAddition).DeletedGIDs
 	newDatas := []*mysqlmodel.Process{}
 	for _, item := range dbData {
 		if slices.Contains(gids, item.GID) {

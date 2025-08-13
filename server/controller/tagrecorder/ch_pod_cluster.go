@@ -27,12 +27,12 @@ import (
 
 type ChPodCluster struct {
 	SubscriberComponent[
-		*message.PodClusterAdd,
-		message.PodClusterAdd,
-		*message.PodClusterUpdate,
-		message.PodClusterUpdate,
-		*message.PodClusterDelete,
-		message.PodClusterDelete,
+		*message.AddedPodClusters,
+		message.AddedPodClusters,
+		*message.UpdatedPodCluster,
+		message.UpdatedPodCluster,
+		*message.DeletedPodClusters,
+		message.DeletedPodClusters,
 		mysqlmodel.PodCluster,
 		mysqlmodel.ChPodCluster,
 		IDKey,
@@ -43,12 +43,12 @@ type ChPodCluster struct {
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	mng := &ChPodCluster{
 		newSubscriberComponent[
-			*message.PodClusterAdd,
-			message.PodClusterAdd,
-			*message.PodClusterUpdate,
-			message.PodClusterUpdate,
-			*message.PodClusterDelete,
-			message.PodClusterDelete,
+			*message.AddedPodClusters,
+			message.AddedPodClusters,
+			*message.UpdatedPodCluster,
+			message.UpdatedPodCluster,
+			*message.DeletedPodClusters,
+			message.DeletedPodClusters,
 			mysqlmodel.PodCluster,
 			mysqlmodel.ChPodCluster,
 			IDKey,
@@ -85,9 +85,9 @@ func (c *ChPodCluster) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodCluster) onResourceUpdated(md *message.Metadata, updateMessage *message.PodClusterUpdate) {
+func (c *ChPodCluster) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodCluster) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodClusterFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodClusterFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodCluster)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

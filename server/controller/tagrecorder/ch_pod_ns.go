@@ -27,12 +27,12 @@ import (
 
 type ChPodNamespace struct {
 	SubscriberComponent[
-		*message.PodNamespaceAdd,
-		message.PodNamespaceAdd,
-		*message.PodNamespaceUpdate,
-		message.PodNamespaceUpdate,
-		*message.PodNamespaceDelete,
-		message.PodNamespaceDelete,
+		*message.AddedPodNamespaces,
+		message.AddedPodNamespaces,
+		*message.UpdatedPodNamespace,
+		message.UpdatedPodNamespace,
+		*message.DeletedPodNamespaces,
+		message.DeletedPodNamespaces,
 		mysqlmodel.PodNamespace,
 		mysqlmodel.ChPodNamespace,
 		IDKey,
@@ -43,12 +43,12 @@ type ChPodNamespace struct {
 func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 	mng := &ChPodNamespace{
 		newSubscriberComponent[
-			*message.PodNamespaceAdd,
-			message.PodNamespaceAdd,
-			*message.PodNamespaceUpdate,
-			message.PodNamespaceUpdate,
-			*message.PodNamespaceDelete,
-			message.PodNamespaceDelete,
+			*message.AddedPodNamespaces,
+			message.AddedPodNamespaces,
+			*message.UpdatedPodNamespace,
+			message.UpdatedPodNamespace,
+			*message.DeletedPodNamespaces,
+			message.DeletedPodNamespaces,
 			mysqlmodel.PodNamespace,
 			mysqlmodel.ChPodNamespace,
 			IDKey,
@@ -86,9 +86,9 @@ func (c *ChPodNamespace) sourceToTarget(md *message.Metadata, source *mysqlmodel
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) onResourceUpdated(md *message.Metadata, updateMessage *message.PodNamespaceUpdate) {
+func (c *ChPodNamespace) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNamespace) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodNamespaceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNamespaceFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodNamespace)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

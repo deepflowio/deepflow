@@ -36,15 +36,15 @@ type ConfigMap struct {
 		*diffbase.ConfigMap,
 		*mysqlmodel.ConfigMap,
 		mysqlmodel.ConfigMap,
-		*message.ConfigMapAdd,
-		message.ConfigMapAdd,
+		*message.AddedConfigMaps,
+		message.AddedConfigMaps,
 		message.AddNoneAddition,
-		*message.ConfigMapUpdate,
-		message.ConfigMapUpdate,
-		*message.ConfigMapFieldsUpdate,
-		message.ConfigMapFieldsUpdate,
-		*message.ConfigMapDelete,
-		message.ConfigMapDelete,
+		*message.UpdatedConfigMap,
+		message.UpdatedConfigMap,
+		*message.UpdatedConfigMapFields,
+		message.UpdatedConfigMapFields,
+		*message.DeletedConfigMaps,
+		message.DeletedConfigMaps,
 		message.DeleteNoneAddition]
 }
 
@@ -55,15 +55,15 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 			*diffbase.ConfigMap,
 			*mysqlmodel.ConfigMap,
 			mysqlmodel.ConfigMap,
-			*message.ConfigMapAdd,
-			message.ConfigMapAdd,
+			*message.AddedConfigMaps,
+			message.AddedConfigMaps,
 			message.AddNoneAddition,
-			*message.ConfigMapUpdate,
-			message.ConfigMapUpdate,
-			*message.ConfigMapFieldsUpdate,
-			message.ConfigMapFieldsUpdate,
-			*message.ConfigMapDelete,
-			message.ConfigMapDelete,
+			*message.UpdatedConfigMap,
+			message.UpdatedConfigMap,
+			*message.UpdatedConfigMapFields,
+			message.UpdatedConfigMapFields,
+			*message.DeletedConfigMaps,
+			message.DeletedConfigMaps,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
@@ -130,8 +130,8 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*mysql
 	return dbItem, true
 }
 
-func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *cloudmodel.ConfigMap) (*message.ConfigMapFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.ConfigMapFieldsUpdate)
+func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *cloudmodel.ConfigMap) (*message.UpdatedConfigMapFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedConfigMapFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

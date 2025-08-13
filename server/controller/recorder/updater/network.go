@@ -32,15 +32,15 @@ type Network struct {
 		*diffbase.Network,
 		*mysqlmodel.Network,
 		mysqlmodel.Network,
-		*message.NetworkAdd,
-		message.NetworkAdd,
+		*message.AddedNetworks,
+		message.AddedNetworks,
 		message.AddNoneAddition,
-		*message.NetworkUpdate,
-		message.NetworkUpdate,
-		*message.NetworkFieldsUpdate,
-		message.NetworkFieldsUpdate,
-		*message.NetworkDelete,
-		message.NetworkDelete,
+		*message.UpdatedNetwork,
+		message.UpdatedNetwork,
+		*message.UpdatedNetworkFields,
+		message.UpdatedNetworkFields,
+		*message.DeletedNetworks,
+		message.DeletedNetworks,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 			*diffbase.Network,
 			*mysqlmodel.Network,
 			mysqlmodel.Network,
-			*message.NetworkAdd,
-			message.NetworkAdd,
+			*message.AddedNetworks,
+			message.AddedNetworks,
 			message.AddNoneAddition,
-			*message.NetworkUpdate,
-			message.NetworkUpdate,
-			*message.NetworkFieldsUpdate,
-			message.NetworkFieldsUpdate,
-			*message.NetworkDelete,
-			message.NetworkDelete,
+			*message.UpdatedNetwork,
+			message.UpdatedNetwork,
+			*message.UpdatedNetworkFields,
+			message.UpdatedNetworkFields,
+			*message.DeletedNetworks,
+			message.DeletedNetworks,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
@@ -105,8 +105,8 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysqlmode
 	return dbItem, true
 }
 
-func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (*message.NetworkFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.NetworkFieldsUpdate)
+func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (*message.UpdatedNetworkFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedNetworkFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

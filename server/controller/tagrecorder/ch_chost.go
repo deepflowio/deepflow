@@ -27,12 +27,12 @@ import (
 
 type ChChost struct {
 	SubscriberComponent[
-		*message.VMAdd,
-		message.VMAdd,
-		*message.VMUpdate,
-		message.VMUpdate,
-		*message.VMDelete,
-		message.VMDelete,
+		*message.AddedVMs,
+		message.AddedVMs,
+		*message.UpdatedVM,
+		message.UpdatedVM,
+		*message.DeletedVMs,
+		message.DeletedVMs,
 		mysqlmodel.VM,
 		mysqlmodel.ChChost,
 		IDKey,
@@ -42,12 +42,12 @@ type ChChost struct {
 func NewChChost() *ChChost {
 	mng := &ChChost{
 		newSubscriberComponent[
-			*message.VMAdd,
-			message.VMAdd,
-			*message.VMUpdate,
-			message.VMUpdate,
-			*message.VMDelete,
-			message.VMDelete,
+			*message.AddedVMs,
+			message.AddedVMs,
+			*message.UpdatedVM,
+			message.UpdatedVM,
+			*message.DeletedVMs,
+			message.DeletedVMs,
 			mysqlmodel.VM,
 			mysqlmodel.ChChost,
 			IDKey,
@@ -83,9 +83,9 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (k
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

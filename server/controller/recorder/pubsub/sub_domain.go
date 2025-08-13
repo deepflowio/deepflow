@@ -23,30 +23,30 @@ import (
 
 type SubDomain struct {
 	ResourcePubSubComponent[
-		*message.SubDomainAdd,
-		message.SubDomainAdd,
+		*message.AddedSubDomains,
+		message.AddedSubDomains,
 		message.AddNoneAddition,
-		*message.SubDomainUpdate,
-		message.SubDomainUpdate,
-		*message.SubDomainFieldsUpdate,
-		message.SubDomainFieldsUpdate,
-		*message.SubDomainDelete,
-		message.SubDomainDelete,
+		*message.UpdatedSubDomain,
+		message.UpdatedSubDomain,
+		*message.UpdatedSubDomainFields,
+		message.UpdatedSubDomainFields,
+		*message.DeletedSubDomains,
+		message.DeletedSubDomains,
 		message.DeleteNoneAddition]
 }
 
 func NewSubDomain() *SubDomain {
 	return &SubDomain{
 		ResourcePubSubComponent[
-			*message.SubDomainAdd,
-			message.SubDomainAdd,
+			*message.AddedSubDomains,
+			message.AddedSubDomains,
 			message.AddNoneAddition,
-			*message.SubDomainUpdate,
-			message.SubDomainUpdate,
-			*message.SubDomainFieldsUpdate,
-			message.SubDomainFieldsUpdate,
-			*message.SubDomainDelete,
-			message.SubDomainDelete,
+			*message.UpdatedSubDomain,
+			message.UpdatedSubDomain,
+			*message.UpdatedSubDomainFields,
+			message.UpdatedSubDomainFields,
+			*message.DeletedSubDomains,
+			message.DeletedSubDomains,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeSubDomain),

@@ -27,12 +27,12 @@ import (
 
 type ChPodService struct {
 	SubscriberComponent[
-		*message.PodServiceAdd,
-		message.PodServiceAdd,
-		*message.PodServiceUpdate,
-		message.PodServiceUpdate,
-		*message.PodServiceDelete,
-		message.PodServiceDelete,
+		*message.AddedPodServices,
+		message.AddedPodServices,
+		*message.UpdatedPodService,
+		message.UpdatedPodService,
+		*message.DeletedPodServices,
+		message.DeletedPodServices,
 		mysqlmodel.PodService,
 		mysqlmodel.ChPodService,
 		IDKey,
@@ -42,12 +42,12 @@ type ChPodService struct {
 func NewChPodService() *ChPodService {
 	mng := &ChPodService{
 		newSubscriberComponent[
-			*message.PodServiceAdd,
-			message.PodServiceAdd,
-			*message.PodServiceUpdate,
-			message.PodServiceUpdate,
-			*message.PodServiceDelete,
-			message.PodServiceDelete,
+			*message.AddedPodServices,
+			message.AddedPodServices,
+			*message.UpdatedPodService,
+			message.UpdatedPodService,
+			*message.DeletedPodServices,
+			message.DeletedPodServices,
 			mysqlmodel.PodService,
 			mysqlmodel.ChPodService,
 			IDKey,
@@ -81,9 +81,9 @@ func (c *ChPodService) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodService) onResourceUpdated(md *message.Metadata, updateMessage *message.PodServiceUpdate) {
+func (c *ChPodService) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodServiceFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

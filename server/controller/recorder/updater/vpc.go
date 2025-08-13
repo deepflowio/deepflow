@@ -33,15 +33,15 @@ type VPC struct {
 		*diffbase.VPC,
 		*mysqlmodel.VPC,
 		mysqlmodel.VPC,
-		*message.VPCAdd,
-		message.VPCAdd,
+		*message.AddedVPCs,
+		message.AddedVPCs,
 		message.AddNoneAddition,
-		*message.VPCUpdate,
-		message.VPCUpdate,
-		*message.VPCFieldsUpdate,
-		message.VPCFieldsUpdate,
-		*message.VPCDelete,
-		message.VPCDelete,
+		*message.UpdatedVPC,
+		message.UpdatedVPC,
+		*message.UpdatedVPCFields,
+		message.UpdatedVPCFields,
+		*message.DeletedVPCs,
+		message.DeletedVPCs,
 		message.DeleteNoneAddition]
 }
 
@@ -52,15 +52,15 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			*diffbase.VPC,
 			*mysqlmodel.VPC,
 			mysqlmodel.VPC,
-			*message.VPCAdd,
-			message.VPCAdd,
+			*message.AddedVPCs,
+			message.AddedVPCs,
 			message.AddNoneAddition,
-			*message.VPCUpdate,
-			message.VPCUpdate,
-			*message.VPCFieldsUpdate,
-			message.VPCFieldsUpdate,
-			*message.VPCDelete,
-			message.VPCDelete,
+			*message.UpdatedVPC,
+			message.UpdatedVPC,
+			*message.UpdatedVPCFields,
+			message.UpdatedVPCFields,
+			*message.DeletedVPCs,
+			message.DeletedVPCs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
@@ -97,8 +97,8 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysqlmodel.VPC, b
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.VPCFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.VPCFieldsUpdate)
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.UpdatedVPCFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVPCFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

@@ -23,31 +23,31 @@ import (
 
 type Process struct {
 	ResourcePubSubComponent[
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		message.ProcessAddAddition,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
-		message.ProcessDeleteAddition]
+		*message.AddedProcesses,
+		message.AddedProcesses,
+		message.AddedProcessesAddition,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.UpdatedProcessFields,
+		message.UpdatedProcessFields,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
+		message.DeletedProcessesAddition]
 }
 
 func NewProcess() *Process {
 	return &Process{
 		ResourcePubSubComponent[
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			message.ProcessAddAddition,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
-			message.ProcessDeleteAddition,
+			*message.AddedProcesses,
+			message.AddedProcesses,
+			message.AddedProcessesAddition,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.UpdatedProcessFields,
+			message.UpdatedProcessFields,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
+			message.DeletedProcessesAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeProcess),
 			resourceType:    common.RESOURCE_TYPE_PROCESS_EN,

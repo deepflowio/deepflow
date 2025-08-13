@@ -34,15 +34,15 @@ type PodService struct {
 		*diffbase.PodService,
 		*mysqlmodel.PodService,
 		mysqlmodel.PodService,
-		*message.PodServiceAdd,
-		message.PodServiceAdd,
+		*message.AddedPodServices,
+		message.AddedPodServices,
 		message.AddNoneAddition,
-		*message.PodServiceUpdate,
-		message.PodServiceUpdate,
-		*message.PodServiceFieldsUpdate,
-		message.PodServiceFieldsUpdate,
-		*message.PodServiceDelete,
-		message.PodServiceDelete,
+		*message.UpdatedPodService,
+		message.UpdatedPodService,
+		*message.UpdatedPodServiceFields,
+		message.UpdatedPodServiceFields,
+		*message.DeletedPodServices,
+		message.DeletedPodServices,
 		message.DeleteNoneAddition]
 }
 
@@ -53,15 +53,15 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 			*diffbase.PodService,
 			*mysqlmodel.PodService,
 			mysqlmodel.PodService,
-			*message.PodServiceAdd,
-			message.PodServiceAdd,
+			*message.AddedPodServices,
+			message.AddedPodServices,
 			message.AddNoneAddition,
-			*message.PodServiceUpdate,
-			message.PodServiceUpdate,
-			*message.PodServiceFieldsUpdate,
-			message.PodServiceFieldsUpdate,
-			*message.PodServiceDelete,
-			message.PodServiceDelete,
+			*message.UpdatedPodService,
+			message.UpdatedPodService,
+			*message.UpdatedPodServiceFields,
+			message.UpdatedPodServiceFields,
+			*message.DeletedPodServices,
+			message.DeletedPodServices,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
@@ -151,8 +151,8 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	return dbItem, true
 }
 
-func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.PodServiceFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodServiceFieldsUpdate)
+func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.UpdatedPodServiceFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodServiceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {
 		var podIngressID int

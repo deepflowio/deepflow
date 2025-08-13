@@ -23,30 +23,30 @@ import (
 
 type PodReplicaSet struct {
 	ResourcePubSubComponent[
-		*message.PodReplicaSetAdd,
-		message.PodReplicaSetAdd,
+		*message.AddedPodReplicaSets,
+		message.AddedPodReplicaSets,
 		message.AddNoneAddition,
-		*message.PodReplicaSetUpdate,
-		message.PodReplicaSetUpdate,
-		*message.PodReplicaSetFieldsUpdate,
-		message.PodReplicaSetFieldsUpdate,
-		*message.PodReplicaSetDelete,
-		message.PodReplicaSetDelete,
+		*message.UpdatedPodReplicaSet,
+		message.UpdatedPodReplicaSet,
+		*message.UpdatedPodReplicaSetFields,
+		message.UpdatedPodReplicaSetFields,
+		*message.DeletedPodReplicaSets,
+		message.DeletedPodReplicaSets,
 		message.DeleteNoneAddition]
 }
 
 func NewPodReplicaSet() *PodReplicaSet {
 	return &PodReplicaSet{
 		ResourcePubSubComponent[
-			*message.PodReplicaSetAdd,
-			message.PodReplicaSetAdd,
+			*message.AddedPodReplicaSets,
+			message.AddedPodReplicaSets,
 			message.AddNoneAddition,
-			*message.PodReplicaSetUpdate,
-			message.PodReplicaSetUpdate,
-			*message.PodReplicaSetFieldsUpdate,
-			message.PodReplicaSetFieldsUpdate,
-			*message.PodReplicaSetDelete,
-			message.PodReplicaSetDelete,
+			*message.UpdatedPodReplicaSet,
+			message.UpdatedPodReplicaSet,
+			*message.UpdatedPodReplicaSetFields,
+			message.UpdatedPodReplicaSetFields,
+			*message.DeletedPodReplicaSets,
+			message.DeletedPodReplicaSets,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodReplicaSet),
