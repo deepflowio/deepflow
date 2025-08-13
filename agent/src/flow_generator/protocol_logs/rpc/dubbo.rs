@@ -21,7 +21,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
@@ -397,10 +397,21 @@ impl From<DubboInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&DubboInfo> for LogCache {
+    fn from(info: &DubboInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.resp_status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct DubboLog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
@@ -437,24 +448,17 @@ impl L7ProtocolParserInterface for DubboLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                    info.endpoint = Some(endpoint.to_string());
                 }
             }
-            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                info.rrt = rrt;
-                if info.msg_type == LogMessageType::Response {
-                    info.endpoint = endpoint;
-                }
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
+            }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
         } else {

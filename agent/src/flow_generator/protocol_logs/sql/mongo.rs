@@ -30,7 +30,7 @@ use crate::{
         flow::L7Protocol,
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -214,11 +214,21 @@ impl From<MongoDBInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&MongoDBInfo> for LogCache {
+    fn from(info: &MongoDBInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct MongoDBLog {
     info: MongoDBInfo,
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for MongoDBLog {
@@ -251,28 +261,15 @@ impl L7ProtocolParserInterface for MongoDBLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match info.msg_type {
-                LogMessageType::Request => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if let Some(mut stats) = info.perf_stats(param) {
+                if info.reply_false {
+                    stats.inc_resp_err();
                 }
-                LogMessageType::Response => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                    if info.response_code > 0 {
-                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                    }
-                }
-                _ => {}
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
             }
-            if info.reply_false {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-            }
-            info.cal_rrt(param, &None).map(|(rrt, _)| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
         } else {

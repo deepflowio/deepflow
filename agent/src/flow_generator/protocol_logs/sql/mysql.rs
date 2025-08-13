@@ -37,7 +37,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
@@ -409,6 +409,17 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&MysqlInfo> for LogCache {
+    fn from(info: &MysqlInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 thread_local! {
     static DECODE_BUFFER: Cell<Option<Vec<u8>>> = Cell::new(None);
 }
@@ -431,8 +442,6 @@ pub struct MysqlLog {
     pc: ParameterCounter,
     has_request: bool,
     has_login: bool,
-
-    last_is_on_blacklist: bool,
 
     // if compression is enabled, both requests and responses will have compression header
     has_compressed_header: Option<bool>,
@@ -529,37 +538,12 @@ impl L7ProtocolParserInterface for MysqlLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
-            }
-            match info.status {
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats
-                        .as_mut()
-                        .map(|p: &mut L7PerfStats| p.inc_req_err());
-                }
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats
-                        .as_mut()
-                        .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                }
-                _ => {}
-            }
-            if info.msg_type == LogMessageType::Request || info.msg_type == LogMessageType::Response
-            {
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
             }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {

@@ -8,7 +8,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
@@ -1827,6 +1827,18 @@ impl From<OpenWireInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&OpenWireInfo> for LogCache {
+    fn from(info: &OpenWireInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 const DEFAULT_TIGHT_ENCODING_ENABLED: bool = true;
 const DEFAULT_SIZE_PREFIX_DISABLED: bool = false;
 const DEFAULT_CACHE_ENABLED: bool = true;
@@ -1860,7 +1872,6 @@ pub struct OpenWireLog {
     client_next_skip_len: Option<usize>,
     server_next_skip_len: Option<usize>,
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl Default for OpenWireLog {
@@ -1877,7 +1888,6 @@ impl Default for OpenWireLog {
             client_next_skip_len: None,
             server_next_skip_len: None,
             perf_stats: None,
-            last_is_on_blacklist: false,
         }
     }
 }
@@ -1902,39 +1912,17 @@ impl L7ProtocolParserInterface for OpenWireLog {
             if let Some(config) = param.parse_config {
                 info.set_is_on_blacklist(config);
             }
-            if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
-                    }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+            if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if info.msg_type == LogMessageType::Response {
+                    if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                        info.topic = Some(endpoint.to_string());
                     }
                 }
-                match info.status {
-                    L7ResponseStatus::ClientError => {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_req_err());
-                    }
-                    L7ResponseStatus::ServerError => {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                    }
-                    _ => {}
-                }
-                if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param, &info.topic).map(|(rtt, endpoint)| {
-                        info.rtt = rtt;
-                        if info.msg_type == LogMessageType::Response {
-                            info.topic = endpoint;
-                        }
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                    });
+                if let Some(stats) = info.perf_stats(param) {
+                    info.rtt = stats.rrt_sum;
+                    perf_stats.sequential_merge(&stats);
                 }
             }
-            self.last_is_on_blacklist = info.is_on_blacklist;
         });
 
         if !param.parse_log {
