@@ -77,26 +77,31 @@ func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID 
 }
 
 func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUUID string, resourceUp map[string]interface{}) error {
-	if !ra.Fpermit.Enabled {
-		return nil
-	}
-	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessUpdate)
-	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
-		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
-		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
-	} else {
-		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+	// Check if the current user has permission to operate on the current resource. This check can be skipped for super admin accounts.
+	if ra.UserInfo.Type != common.USER_TYPE_SUPER_ADMIN {
+		if !ra.Fpermit.Enabled {
+			return nil
+		}
+		url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessUpdate)
+		if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+			resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
+			url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
+		} else {
+			url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+		}
+
+		if err := PermitVerify(url, ra.UserInfo, teamID); err != nil {
+			return err
+		}
 	}
 
-	if err := PermitVerify(url, ra.UserInfo, teamID); err != nil {
-		return err
-	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
 		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE ||
 		resourceUp == nil || len(resourceUp) == 0 {
 		return nil
 	}
 
+	// When updating the owner or team of the current resource, the following check cannot be skipped even for super admins.
 	if newOwnerID, ok := resourceUp["owner_user_id"]; ok {
 		body := map[string]interface{}{
 			"new_team_id":   teamID,
@@ -104,13 +109,13 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 			"resource_type": resourceType,
 			"resource_id":   resourceUUID,
 		}
-		url = fmt.Sprintf(urlUGCPermission, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
+		url := fmt.Sprintf(urlUGCPermission, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 		if err := ugcPermission(url, ra.UserInfo, body); err != nil {
 			return err
 		}
 	}
 
-	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
+	url := fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"resource_where": map[string]interface{}{
 			"resource_type": resourceType,
