@@ -63,7 +63,8 @@ use crate::{
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
-            L7PerfCache, L7ProtocolBitmap, L7ProtocolParser, L7ProtocolParserInterface,
+            L7PerfCache, L7PerfCacheCounter, L7ProtocolBitmap, L7ProtocolParser,
+            L7ProtocolParserInterface,
         },
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader, ProtocolData},
@@ -260,8 +261,9 @@ impl FlowMap {
         stats_collector: Arc<stats::Collector>,
         from_ebpf: bool,
     ) -> Self {
+        let perf_cache = L7PerfCache::new(config.capacity as usize);
         let flow_perf_counter = Arc::new(FlowPerfCounter::default());
-        let stats_counter = Arc::new(FlowMapCounter::default());
+        let stats_counter = Arc::new(FlowMapCounter::new(perf_cache.counters()));
         let packet_sequence_enabled = config.packet_sequence_flag > 0 && !from_ebpf;
         let time_window_size = {
             let max_timeout = config.flow_timeout.max;
@@ -340,7 +342,7 @@ impl FlowMap {
                 _ => None,
             },
             last_queue_flush: Duration::ZERO,
-            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(config.capacity as usize))),
+            perf_cache: Rc::new(RefCell::new(perf_cache)),
             flow_perf_counter,
             ntp_diff,
             stats_counter,
@@ -1669,7 +1671,8 @@ impl FlowMap {
         let l7_timeout_count = self
             .perf_cache
             .borrow_mut()
-            .pop_timeout_count(&flow_id, false);
+            .timeout_cache
+            .pop_timeout_count(flow_id, false);
         let (l7_perf_stats, l7_protocol) =
             meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
         let app_proto_head = l7_info.app_proto_head().unwrap();
@@ -2016,7 +2019,8 @@ impl FlowMap {
                 let l7_timeout_count = self
                     .perf_cache
                     .borrow_mut()
-                    .pop_timeout_count(&flow.flow_id, flow_end);
+                    .timeout_cache
+                    .pop_timeout_count(flow.flow_id, flow_end);
                 l7_stats.stats.err_timeout = l7_timeout_count as u32;
                 l7_stats.endpoint = None;
                 l7_stats.flow_id = flow.flow_id;
@@ -2110,7 +2114,7 @@ impl FlowMap {
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
-        self.perf_cache.borrow_mut().remove(&flow_id);
+        self.perf_cache.borrow_mut().remove_flow(flow_id);
 
         self.flow_node_pool.put(node);
     }
@@ -2497,7 +2501,6 @@ impl FlowMap {
 }
 
 #[rustfmt::skip]
-#[derive(Default)]
 pub struct FlowMapCounter {
     new: AtomicU64,                      // the number of created flow
     closed: AtomicU64,                   // the number of closed flow
@@ -2511,8 +2514,27 @@ pub struct FlowMapCounter {
     slot_max_depth: AtomicU64,           // the max length of Vec<FlowNode>
     total_scan: AtomicU64,               // the total number of iteration to scan over Vec<FlowNode>
     time_set_shrinks: AtomicU64,         // the total number of time_set HashSet shrinks
-    pub l7_perf_cache_len: AtomicU64,    // the number of struct L7PerfCache::rrt_cache length
-    pub l7_timeout_cache_len: AtomicU64, // the number of struct L7PerfCache::timeout_cache length
+    l7_perf_cache_counters: L7PerfCacheCounter,
+}
+
+impl FlowMapCounter {
+    fn new(l7_perf_cache_counters: L7PerfCacheCounter) -> Self {
+        Self {
+            new: AtomicU64::new(0),
+            closed: AtomicU64::new(0),
+            drop_by_window: AtomicU64::new(0),
+            drop_by_capacity: AtomicU64::new(0),
+            packet_delay: AtomicI64::new(0),
+            flush_delay: AtomicI64::new(0),
+            flow_delay: AtomicI64::new(0),
+            concurrent: AtomicU64::new(0),
+            slots: AtomicU64::new(0),
+            slot_max_depth: AtomicU64::new(0),
+            total_scan: AtomicU64::new(0),
+            time_set_shrinks: AtomicU64::new(0),
+            l7_perf_cache_counters,
+        }
+    }
 }
 
 impl RefCountable for FlowMapCounter {
@@ -2580,12 +2602,20 @@ impl RefCountable for FlowMapCounter {
             (
                 "l7_perf_cache_len",
                 CounterType::Gauged,
-                CounterValue::Unsigned(self.l7_perf_cache_len.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(
+                    self.l7_perf_cache_counters
+                        .rrt_cache_len
+                        .load(Ordering::Relaxed),
+                ),
             ),
             (
                 "l7_timeout_cache_len",
                 CounterType::Gauged,
-                CounterValue::Unsigned(self.l7_timeout_cache_len.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(
+                    self.l7_perf_cache_counters
+                        .timeout_cache_len
+                        .load(Ordering::Relaxed),
+                ),
             ),
         ]
     }

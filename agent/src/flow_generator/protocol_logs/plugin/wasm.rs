@@ -18,7 +18,7 @@ use public::l7_protocol::{CustomProtocol, L7Protocol};
 
 use crate::{
     common::{
-        flow::{L7PerfStats, PacketDirection},
+        flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
@@ -78,49 +78,16 @@ impl L7ProtocolParserInterface for WasmLog {
                     i.msg_type = param.direction.into();
                     set_captured_byte!(i, param);
 
-                    let endpoint = if i.req.endpoint.is_empty() {
-                        None
-                    } else {
-                        Some(i.req.endpoint.clone())
-                    };
-
-                    if i.need_merge() {
-                        i.cal_rrt_for_multi_merge_log(param, &endpoint)
-                            .map(|(rrt, endpoint)| {
-                                i.rrt = rrt;
-                                if i.msg_type == LogMessageType::Response {
-                                    i.req.endpoint = endpoint.unwrap_or_default();
-                                }
-                            });
-                        if i.is_req_end || i.is_resp_end {
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(i.rrt));
-
-                            match param.direction {
-                                PacketDirection::ClientToServer => {
-                                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                                }
-                                PacketDirection::ServerToClient => {
-                                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                                }
+                    if let Some(perf_stats) = self.perf_stats.as_mut() {
+                        if i.msg_type == LogMessageType::Response {
+                            if let Some(endpoint) = i.load_endpoint_from_cache(param) {
+                                i.req.endpoint = endpoint.to_string();
                             }
                         }
-                    } else {
-                        match param.direction {
-                            PacketDirection::ClientToServer => {
-                                self.perf_stats.as_mut().map(|p| p.inc_req());
-                            }
-                            PacketDirection::ServerToClient => {
-                                self.perf_stats.as_mut().map(|p| p.inc_resp());
-                            }
+                        if let Some(stats) = i.perf_stats(param) {
+                            i.rrt = stats.rrt_sum;
+                            perf_stats.sequential_merge(&stats);
                         }
-
-                        i.cal_rrt(param, &endpoint).map(|(rrt, endpoint)| {
-                            i.rrt = rrt;
-                            if i.msg_type == LogMessageType::Response {
-                                i.req.endpoint = endpoint.unwrap_or_default();
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                        });
                     }
 
                     L7ProtocolInfo::CustomInfo(i)

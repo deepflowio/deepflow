@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::sync::atomic::Ordering;
+use std::cell::RefMut;
 
 use super::flow::PacketDirection;
 use enum_dispatch::enum_dispatch;
@@ -22,7 +22,10 @@ use log::{debug, error, warn};
 use serde::Serialize;
 
 use crate::{
-    common::l7_protocol_log::{LogCache, LogCacheKey},
+    common::{
+        flow::L7PerfStats,
+        l7_protocol_log::{L7PerfCache, LogCache, LogCacheKey},
+    },
     flow_generator::{
         protocol_logs::{
             fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
@@ -49,11 +52,21 @@ macro_rules! all_protocol_info {
             )+
         }
 
-        impl From<L7ProtocolInfo> for L7ProtocolSendLog{
-            fn from(f:L7ProtocolInfo)->L7ProtocolSendLog{
-                match f{
+        impl From<L7ProtocolInfo> for L7ProtocolSendLog {
+            fn from(f: L7ProtocolInfo) -> Self {
+                match f {
                     $(
-                        L7ProtocolInfo::$name(info)=>info.into(),
+                        L7ProtocolInfo::$name(info) => info.into(),
+                    )+
+                }
+            }
+        }
+
+        impl From<&L7ProtocolInfo> for LogCache {
+            fn from(info: &L7ProtocolInfo) -> Self {
+                match info {
+                    $(
+                        L7ProtocolInfo::$name(info) => info.into(),
                     )+
                 }
             }
@@ -121,7 +134,10 @@ cfg_if::cfg_if! {
 }
 
 #[enum_dispatch(L7ProtocolInfo)]
-pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
+pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog>
+where
+    LogCache: for<'a> From<&'a Self>,
+{
     // 个别协议一个连接可能有子流，这里需要返回流标识，例如http2的stream id
     // ============================================================
     // Returns the stream ID, distinguishing substreams. such as http2 stream id, dns transaction id
@@ -164,6 +180,25 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         (false, false)
     }
 
+    // load endpoint from cache for *responses*
+    // call this before calling `perf_stats` because the latter may remove cached entry
+    fn load_endpoint_from_cache<'a>(&mut self, param: &'a ParseParam) -> Option<String> {
+        let key = LogCacheKey::new(param, self.session_id());
+        match param.l7_perf_cache.borrow_mut().rrt_cache.get(&key) {
+            Some(cached) if cached.endpoint.is_some() => {
+                let log = LogCache {
+                    time: param.time,
+                    ..LogCache::from(&*self)
+                };
+                if log.is_response_of(&cached) {
+                    return Some(cached.endpoint.as_ref().unwrap().clone());
+                }
+            }
+            _ => (),
+        }
+        None
+    }
+
     /*
         calculate rrt
         if have previous log cache:
@@ -176,250 +211,185 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(
-        &self,
-        param: &ParseParam,
-        endpoint: &Option<String>,
-    ) -> Option<(u64, Option<String>)> {
-        let mut perf_cache = param.l7_perf_cache.borrow_mut();
-        let cache_key = LogCacheKey::new(param, self.session_id());
-        let previous_log_info = perf_cache.pop(cache_key);
+    fn perf_stats(&self, param: &ParseParam) -> Option<L7PerfStats> {
+        if param.time == 0 {
+            error!("flow_id: {}, packet time 0", param.flow_id);
+            return None;
+        }
 
-        let time = param.time;
-        let msg_type: LogMessageType = param.direction.into();
-        let timeout = param.rrt_timeout as u64;
+        let cur_info = LogCache {
+            time: param.time,
+            ..LogCache::from(self)
+        };
+        assert!(
+            !self.need_merge()
+                || self.session_id().is_some() && cur_info.multi_merge_info.is_some()
+        );
 
-        if time != 0 {
-            let (in_cached_req, timeout_count) = perf_cache.get_or_insert_mut(param.flow_id);
-
-            let Some(mut previous_log_info) = previous_log_info else {
-                if msg_type == LogMessageType::Request {
-                    *in_cached_req += 1;
-                }
-                perf_cache.put(
-                    cache_key,
-                    LogCache {
-                        endpoint: endpoint.clone(),
-                        msg_type: param.direction.into(),
-                        time: param.time,
-                        multi_merge_info: None,
-                    },
-                );
-
-                param.stats_counter.as_ref().map(|f| {
-                    f.l7_perf_cache_len
-                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
-                    f.l7_timeout_cache_len
-                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
-                });
+        if cur_info.msg_type == LogMessageType::Session {
+            if cur_info.on_blacklist {
                 return None;
-            };
-
-            if previous_log_info.msg_type == LogMessageType::Request {
-                if *in_cached_req > 0 {
-                    *in_cached_req -= 1;
-                }
             }
-
-            // if previous is req and current is resp, calculate the round trip time.
-            if previous_log_info.msg_type == LogMessageType::Request
-                && msg_type == LogMessageType::Response
-                && time > previous_log_info.time
-            {
-                let rrt = time - previous_log_info.time;
-                // timeout, save the latest
-                if rrt > timeout {
-                    *timeout_count += 1;
-                    None
-                } else {
-                    Some((rrt, previous_log_info.endpoint.take()))
-                }
-            // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
-            // calculate the round trip time.
-            } else if previous_log_info.msg_type == LogMessageType::Response
-                && msg_type == LogMessageType::Request
-                && previous_log_info.time > time
-            {
-                let rrt = previous_log_info.time - time;
-                if rrt > timeout {
-                    // disorder info rrt unlikely have large rrt gt timeout
-                    warn!("l7 log info disorder with long time rrt {}", rrt);
-                    *timeout_count += 1;
-                    None
-                } else {
-                    Some((rrt, None))
-                }
-            } else {
-                debug!(
-                    "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
-                    param.flow_id, previous_log_info.msg_type, previous_log_info.time, msg_type, param.time,
-                );
-
-                // save the latest
-                if previous_log_info.time > time {
-                    if msg_type == LogMessageType::Request {
-                        *timeout_count += 1;
-                    }
-                    if previous_log_info.msg_type == LogMessageType::Request {
-                        *in_cached_req += 1;
-                    }
-                    perf_cache.put(cache_key, previous_log_info);
-                } else {
-                    if previous_log_info.msg_type == LogMessageType::Request {
-                        *timeout_count += 1;
-                    }
-                    if msg_type == LogMessageType::Request {
-                        *in_cached_req += 1;
-                    }
-                    perf_cache.put(
-                        cache_key,
-                        LogCache {
-                            endpoint: endpoint.clone(),
-                            msg_type: param.direction.into(),
-                            time: param.time,
-                            multi_merge_info: None,
-                        },
-                    );
-                }
-
-                param.stats_counter.as_ref().map(|f| {
-                    f.l7_perf_cache_len
-                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
-                    f.l7_timeout_cache_len
-                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed);
-                });
-                None
-            }
-        } else {
-            error!("flow_id: {}, packet time 0", param.flow_id);
-            None
-        }
-    }
-
-    // must have request id
-    // the main different with cal_rrt() is need to push back to lru when session not end
-    fn cal_rrt_for_multi_merge_log(
-        &self,
-        param: &ParseParam,
-        endpoint: &Option<String>,
-    ) -> Option<(u64, Option<String>)> {
-        assert!(self.session_id().is_some());
-
-        let mut perf_cache = param.l7_perf_cache.borrow_mut();
-        let cache_key = LogCacheKey::new(param, self.session_id());
-        let previous_log_info = perf_cache.pop(cache_key);
-
-        let time = param.time;
-        let msg_type: LogMessageType = param.direction.into();
-        let timeout = param.rrt_timeout as u64;
-
-        if time == 0 {
-            error!("flow_id: {}, packet time 0", param.flow_id);
-            return None;
-        }
-
-        let (in_cached_req, timeout_count) = perf_cache.get_or_insert_mut(param.flow_id);
-
-        let (req_end, resp_end) = {
-            let (req_end, resp_end) = self.is_req_resp_end();
+            // req/resp not counted for session type
+            let mut stats = L7PerfStats::from(&cur_info);
             match param.direction {
-                PacketDirection::ClientToServer => (req_end, false),
-                PacketDirection::ServerToClient => (false, resp_end),
+                PacketDirection::ClientToServer => stats.inc_req(),
+                PacketDirection::ServerToClient => stats.inc_resp(),
             }
-        };
-
-        let Some(mut previous_log_info) = previous_log_info else {
-            if msg_type == LogMessageType::Request {
-                *in_cached_req += 1;
-            }
-            perf_cache.put(
-                cache_key,
-                LogCache {
-                    endpoint: endpoint.clone(),
-                    msg_type: param.direction.into(),
-                    time: param.time,
-                    multi_merge_info: Some((req_end, resp_end, false)),
-                },
-            );
-
-            param.stats_counter.as_ref().map(|f| {
-                f.l7_perf_cache_len
-                    .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
-                f.l7_timeout_cache_len
-                    .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
-            });
-            return None;
-        };
-
-        let Some((cache_req_end, cache_resp_end, merged)) =
-            previous_log_info.multi_merge_info.as_mut()
-        else {
-            error!(
-                "{:?}:{} -> {:?}:{} flow_id: {} ebpf_type: {:?} rrt cal fail, multi_merge_info is none",
-                param.ip_src,
-                param.port_src,
-                param.ip_dst,
-                param.port_dst,
-                param.flow_id,
-                param.ebpf_type
-            );
-            return None;
-        };
-
-        if req_end {
-            *cache_req_end = true;
-        }
-        if resp_end {
-            *cache_resp_end = true;
+            return Some(stats);
         }
 
-        let (put_back, merged) = (!(*cache_req_end && *cache_resp_end), *merged);
+        let (mut rtt_cache, mut timeout_cache) = RefMut::map_split(
+            param.l7_perf_cache.borrow_mut(),
+            |perf_cache: &mut L7PerfCache| {
+                (&mut perf_cache.rrt_cache, &mut perf_cache.timeout_cache)
+            },
+        );
+        let key = LogCacheKey::new(param, self.session_id());
+        let prev_info = rtt_cache.get_mut(&key);
+        let timeout_counter = timeout_cache.get_or_insert_mut(param.flow_id);
 
-        if previous_log_info.msg_type != msg_type && !merged {
-            previous_log_info.multi_merge_info.as_mut().unwrap().2 = true;
-            if *in_cached_req > 0 {
-                *in_cached_req -= 1;
-            }
-        }
-
-        // if previous is req and current is resp, calculate the round trip time.
-        if (previous_log_info.msg_type == LogMessageType::Request
-            && msg_type == LogMessageType::Response
-            && time > previous_log_info.time) ||
-        // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
-        // calculate the round trip time.
-            (previous_log_info.msg_type == LogMessageType::Response
-            && msg_type == LogMessageType::Request
-            && previous_log_info.time > time)
-        {
-            let rrt = time.abs_diff(previous_log_info.time);
-
-            // timeout
-            let r = if rrt > timeout {
-                if !merged {
-                    *timeout_count += 1;
-                }
-                None
+        let Some(prev_info) = prev_info else {
+            // If the first log is a request and on blacklist, we still need to put it in cache to handle the response,
+            // but it's stats will not be counted.
+            //
+            // If the first log is a response, it's perf stats will not be counted here.
+            // We need to know whether its corresponding request is on blacklist before accounting.
+            let ret = if cur_info.msg_type == LogMessageType::Request && !cur_info.on_blacklist {
+                timeout_counter.in_cache += 1;
+                Some(L7PerfStats::from(&cur_info))
             } else {
-                if msg_type == LogMessageType::Response {
-                    Some((rrt, previous_log_info.endpoint.clone()))
-                } else {
-                    Some((rrt, None))
+                None
+            };
+            rtt_cache.put(key, cur_info);
+            return ret;
+        };
+
+        let mut keep_prev = false;
+        if let Some(merge_info) = prev_info.multi_merge_info.as_mut() {
+            let cur_merge_info = cur_info.multi_merge_info.as_ref().unwrap();
+            merge_info.req_end |= cur_merge_info.req_end;
+            merge_info.resp_end |= cur_merge_info.resp_end;
+
+            if prev_info.msg_type != cur_info.msg_type && !merge_info.merged {
+                merge_info.merged = true;
+                if !(prev_info.on_blacklist || cur_info.on_blacklist) {
+                    timeout_counter.in_cache = timeout_counter.in_cache.saturating_sub(1);
                 }
+            }
+
+            // keep previous only when
+            // 1. multi merge
+            // 2. req_end && resp_end == false
+            keep_prev = !(merge_info.req_end && merge_info.resp_end);
+        } else {
+            if prev_info.msg_type == LogMessageType::Request && !prev_info.on_blacklist {
+                timeout_counter.in_cache = timeout_counter.in_cache.saturating_sub(1);
+            }
+        }
+
+        if prev_info.is_request_of(&cur_info) {
+            let on_blacklist = prev_info.on_blacklist || cur_info.on_blacklist;
+            let result = if !on_blacklist {
+                // request accounted before
+                let mut perf_stats = L7PerfStats::from(&cur_info);
+
+                let rrt = cur_info.time - prev_info.time;
+                if rrt > param.rrt_timeout as u64 {
+                    match prev_info.multi_merge_info.as_ref() {
+                        Some(info) if info.merged => (),
+                        _ => timeout_counter.timeout += 1,
+                    }
+                } else {
+                    perf_stats.update_rrt(rrt);
+                }
+
+                Some(perf_stats)
+            } else {
+                None
             };
 
-            if put_back {
-                perf_cache.put(cache_key, previous_log_info);
+            if !keep_prev {
+                rtt_cache.pop(&key);
             }
-            r
+
+            result
+        } else if prev_info.is_response_of(&cur_info) {
+            // cur_info is request, prev_info is response
+            // request not accounted before
+            let result = if !cur_info.on_blacklist {
+                let mut perf_stats = L7PerfStats::from(&cur_info);
+
+                if !prev_info.on_blacklist {
+                    let rrt = prev_info.time - cur_info.time;
+                    if rrt > param.rrt_timeout as u64 {
+                        warn!("l7 log info disorder with long time rrt {}", rrt);
+                        match prev_info.multi_merge_info.as_ref() {
+                            Some(info) if info.merged => (),
+                            _ => timeout_counter.timeout += 1,
+                        }
+                    }
+
+                    perf_stats.sequential_merge(&L7PerfStats::from(&*prev_info));
+                    perf_stats.update_rrt(rrt);
+                }
+
+                Some(perf_stats)
+            } else {
+                None
+            };
+
+            if !keep_prev {
+                rtt_cache.pop(&key);
+            }
+
+            result
+        } else if !self.need_merge() {
+            debug!(
+                "can not calculate rrt, flow_id: {}, previous log type: {:?}, previous time: {}, current log type: {:?}, current time: {}",
+                param.flow_id, prev_info.msg_type, prev_info.time, cur_info.msg_type, cur_info.time,
+            );
+
+            if prev_info.time > cur_info.time {
+                if cur_info.msg_type == LogMessageType::Request {
+                    timeout_counter.timeout += 1;
+                }
+                if prev_info.msg_type == LogMessageType::Request {
+                    timeout_counter.in_cache += 1;
+                }
+                if !cur_info.on_blacklist {
+                    Some(L7PerfStats::from(&cur_info))
+                } else {
+                    None
+                }
+            } else {
+                if prev_info.msg_type == LogMessageType::Request {
+                    timeout_counter.timeout += 1;
+                }
+                if cur_info.msg_type == LogMessageType::Request {
+                    timeout_counter.in_cache += 1;
+                }
+                let prev_info = rtt_cache.put(key, cur_info).unwrap();
+                if !prev_info.on_blacklist {
+                    Some(L7PerfStats::from(&prev_info))
+                } else {
+                    None
+                }
+            }
         } else {
-            if previous_log_info.msg_type != msg_type && !merged {
-                *timeout_count += 1;
+            if prev_info.msg_type != cur_info.msg_type
+                && !prev_info.multi_merge_info.as_ref().unwrap().merged
+            {
+                timeout_counter.timeout += 1;
             }
-            if put_back {
-                perf_cache.put(cache_key, previous_log_info);
+            if !keep_prev {
+                rtt_cache.pop(&key);
             }
-            None
+            if !cur_info.on_blacklist {
+                Some(L7PerfStats::from(&cur_info))
+            } else {
+                None
+            }
         }
     }
 

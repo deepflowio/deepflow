@@ -21,7 +21,9 @@ use serde::Serialize;
 
 use crate::common::flow::{L7PerfStats, PacketDirection};
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam};
+use crate::common::l7_protocol_log::{
+    L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam,
+};
 use crate::common::meta_packet::EbpfFlags;
 use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
 use crate::flow_generator::protocol_logs::{set_captured_byte, value_is_default};
@@ -341,6 +343,18 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&FastCGIInfo> for LogCache {
+    fn from(info: &FastCGIInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 // reference https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html#S3.3
 struct FastCGIRecord {
     version: u8,
@@ -372,7 +386,6 @@ impl FastCGIRecord {
 #[derive(Default)]
 pub struct FastCGILog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl FastCGILog {
@@ -551,29 +564,17 @@ impl L7ProtocolParserInterface for FastCGILog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                    if info.status == L7ResponseStatus::ClientError {
-                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                    } else if info.status == L7ResponseStatus::ServerError {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                    }
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                    info.endpoint = Some(endpoint.to_string());
                 }
             }
-            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                info.rrt = rrt;
-                if info.msg_type == LogMessageType::Response {
-                    info.endpoint = endpoint;
-                }
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
+            }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         Ok(L7ParseResult::Single(L7ProtocolInfo::FastCGIInfo(info)))
     }
 
