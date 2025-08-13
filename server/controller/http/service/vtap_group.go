@@ -501,13 +501,14 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 	// Handle agents removed from the current agent group
 	if len(data.agentsToRemove) > 0 {
 		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.defaultAgentGroup.Lcuuid}
-		for _, agent := range data.agentsToRemove {
+		ids := make([]int, len(data.agentsToRemove))
+		for i, agent := range data.agentsToRemove {
 			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
 				agent.Name, agent.VtapGroupLcuuid, data.defaultAgentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
-
-			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
-				return err
-			}
+			ids[i] = agent.ID
+		}
+		if err := tx.Model(&mysqlmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.defaultAgentGroup, data.agentsToRemove); err != nil {
 			return err
@@ -517,13 +518,14 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 	// Handle agents added to the current agent group
 	if len(data.agentsToAdd) > 0 {
 		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.agentGroup.Lcuuid}
-		for _, agent := range data.agentsToAdd {
+		ids := make([]int, len(data.agentsToAdd))
+		for i, agent := range data.agentsToAdd {
 			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
 				agent.Name, agent.VtapGroupLcuuid, data.agentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
-
-			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
-				return err
-			}
+			ids[i] = agent.ID
+		}
+		if err := tx.Model(&mysqlmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.agentGroup, data.agentsToAdd); err != nil {
 			return err
