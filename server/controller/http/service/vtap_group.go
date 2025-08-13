@@ -287,26 +287,26 @@ func (a *AgentGroup) Update(lcuuid string, body map[string]interface{}, cfg *con
 // updateRelatedData encapsulates all data required for the update operation
 type updateRelatedData struct {
 	requestBody map[string]interface{}
-	db          *mysql.DB
+	db          *metadb.DB
 
-	agentGroup               *mysqlmodel.VTapGroup
+	agentGroup               *metadbmodel.VTapGroup
 	agentGroupValuesToUpdate map[string]interface{} // values to update in agent group table
 	oldAgentGroupTeamID      int
 	newAgentGroupTeamID      int
 	agentListChanged         bool
 
 	agentGroupConfigs     []agentconf.AgentGroupConfigModel
-	userAccessedOldAgents []mysqlmodel.VTap
-	userAccessedNewAgents []mysqlmodel.VTap
+	userAccessedOldAgents []metadbmodel.VTap
+	userAccessedNewAgents []metadbmodel.VTap
 
-	agentsToRemove    []mysqlmodel.VTap
-	agentsToAdd       []mysqlmodel.VTap
-	defaultAgentGroup *mysqlmodel.VTapGroup
+	agentsToRemove    []metadbmodel.VTap
+	agentsToAdd       []metadbmodel.VTap
+	defaultAgentGroup *metadbmodel.VTapGroup
 }
 
 // prepareUpdateData prepares all data required for the update
 func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]interface{}, cfg *config.ControllerConfig) (*updateRelatedData, error) {
-	db, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	db, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]int
 		data.agentGroupValuesToUpdate["user_id"] = userIDValue
 	}
 
-	var allOldAgents []mysqlmodel.VTap
+	var allOldAgents []metadbmodel.VTap
 	if err := db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&allOldAgents).Error; err != nil {
 		return nil, fmt.Errorf("failed to get vtap_group agents: %s", err.Error())
 	}
@@ -368,7 +368,7 @@ func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]int
 			)
 		}
 
-		var allNewAgents []mysqlmodel.VTap
+		var allNewAgents []metadbmodel.VTap
 		if err := db.Where("lcuuid IN (?)", agentLcuuids).Find(&allNewAgents).Error; err != nil {
 			return nil, fmt.Errorf("failed to get new vtap_group agents: %s", err.Error())
 		}
@@ -467,14 +467,14 @@ func (a *AgentGroup) validateUpdatePermissions(data *updateRelatedData) error {
 func (a *AgentGroup) executeUpdateInTransaction(tx *gorm.DB, data *updateRelatedData) error {
 	// Handle state update
 	if stateValue, ok := data.requestBody["STATE"]; ok {
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("state", stateValue).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("state", stateValue).Error; err != nil {
 			return err
 		}
 	}
 
 	// Handle enable state update
 	if enableValue, ok := data.requestBody["ENABLE"]; ok {
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("enable", enableValue).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("enable", enableValue).Error; err != nil {
 			return err
 		}
 	}
@@ -501,13 +501,14 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 	// Handle agents removed from the current agent group
 	if len(data.agentsToRemove) > 0 {
 		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.defaultAgentGroup.Lcuuid}
-		for _, agent := range data.agentsToRemove {
+		ids := make([]int, len(data.agentsToRemove))
+		for i, agent := range data.agentsToRemove {
 			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
 				agent.Name, agent.VtapGroupLcuuid, data.defaultAgentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
-
-			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
-				return err
-			}
+			ids[i] = agent.ID
+		}
+		if err := tx.Model(&metadbmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.defaultAgentGroup, data.agentsToRemove); err != nil {
 			return err
@@ -517,13 +518,14 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 	// Handle agents added to the current agent group
 	if len(data.agentsToAdd) > 0 {
 		valuesToUpdate := map[string]interface{}{"vtap_group_lcuuid": data.agentGroup.Lcuuid}
-		for _, agent := range data.agentsToAdd {
+		ids := make([]int, len(data.agentsToAdd))
+		for i, agent := range data.agentsToAdd {
 			log.Infof("update agent name(%s), detail: vtap_group_lcuuid(%s -> %s)",
 				agent.Name, agent.VtapGroupLcuuid, data.agentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
-
-			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", agent.ID).Updates(valuesToUpdate).Error; err != nil {
-				return err
-			}
+			ids[i] = agent.ID
+		}
+		if err := tx.Model(&metadbmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.agentGroup, data.agentsToAdd); err != nil {
 			return err
