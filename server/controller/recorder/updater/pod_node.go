@@ -32,15 +32,15 @@ type PodNode struct {
 		*diffbase.PodNode,
 		*mysqlmodel.PodNode,
 		mysqlmodel.PodNode,
-		*message.PodNodeAdd,
-		message.PodNodeAdd,
+		*message.AddedPodNodes,
+		message.AddedPodNodes,
 		message.AddNoneAddition,
-		*message.PodNodeUpdate,
-		message.PodNodeUpdate,
-		*message.PodNodeFieldsUpdate,
-		message.PodNodeFieldsUpdate,
-		*message.PodNodeDelete,
-		message.PodNodeDelete,
+		*message.UpdatedPodNode,
+		message.UpdatedPodNode,
+		*message.UpdatedPodNodeFields,
+		message.UpdatedPodNodeFields,
+		*message.DeletedPodNodes,
+		message.DeletedPodNodes,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 			*diffbase.PodNode,
 			*mysqlmodel.PodNode,
 			mysqlmodel.PodNode,
-			*message.PodNodeAdd,
-			message.PodNodeAdd,
+			*message.AddedPodNodes,
+			message.AddedPodNodes,
 			message.AddNoneAddition,
-			*message.PodNodeUpdate,
-			message.PodNodeUpdate,
-			*message.PodNodeFieldsUpdate,
-			message.PodNodeFieldsUpdate,
-			*message.PodNodeDelete,
-			message.PodNodeDelete,
+			*message.UpdatedPodNode,
+			message.UpdatedPodNode,
+			*message.UpdatedPodNodeFields,
+			message.UpdatedPodNodeFields,
+			*message.DeletedPodNodes,
+			message.DeletedPodNodes,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
@@ -115,8 +115,8 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysqlmode
 	return dbItem, true
 }
 
-func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (*message.PodNodeFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.PodNodeFieldsUpdate)
+func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (*message.UpdatedPodNodeFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedPodNodeFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Type != cloudItem.Type {
 		mapInfo["type"] = cloudItem.Type

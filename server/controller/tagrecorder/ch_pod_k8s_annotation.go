@@ -25,12 +25,12 @@ import (
 
 type ChPodK8sAnnotation struct {
 	SubscriberComponent[
-		*message.PodAdd,
-		message.PodAdd,
-		*message.PodUpdate,
-		message.PodUpdate,
-		*message.PodDelete,
-		message.PodDelete,
+		*message.AddedPods,
+		message.AddedPods,
+		*message.UpdatedPod,
+		message.UpdatedPod,
+		*message.DeletedPods,
+		message.DeletedPods,
 		mysqlmodel.Pod,
 		mysqlmodel.ChPodK8sAnnotation,
 		IDKeyKey,
@@ -40,12 +40,12 @@ type ChPodK8sAnnotation struct {
 func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 	mng := &ChPodK8sAnnotation{
 		newSubscriberComponent[
-			*message.PodAdd,
-			message.PodAdd,
-			*message.PodUpdate,
-			message.PodUpdate,
-			*message.PodDelete,
-			message.PodDelete,
+			*message.AddedPods,
+			message.AddedPods,
+			*message.UpdatedPod,
+			message.UpdatedPod,
+			*message.DeletedPods,
+			message.DeletedPods,
 			mysqlmodel.Pod,
 			mysqlmodel.ChPodK8sAnnotation,
 			IDKeyKey,
@@ -58,9 +58,9 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotation) onResourceUpdated(md *message.Metadata, updateMessage *message.PodUpdate) {
+func (c *ChPodK8sAnnotation) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
 	sourceID := newSource.ID
 	keysToAdd := make([]IDKeyKey, 0)

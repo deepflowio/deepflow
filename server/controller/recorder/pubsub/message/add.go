@@ -20,226 +20,226 @@ import (
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-type RegionAdd struct {
+type AddedRegions struct {
 	MySQLItems[mysqlmodel.Region]
 	addition[AddNoneAddition]
 }
 
-type AZAdd struct {
+type AddedAZs struct {
 	MySQLItems[mysqlmodel.AZ]
 	addition[AddNoneAddition]
 }
 
-type SubDomainAdd struct {
+type AddedSubDomains struct {
 	MySQLItems[mysqlmodel.SubDomain]
 	addition[AddNoneAddition]
 }
 
-type HostAdd struct {
+type AddedHosts struct {
 	MySQLItems[mysqlmodel.Host]
 	addition[AddNoneAddition]
 }
 
-type VMAdd struct {
+type AddedVMs struct {
 	MySQLItems[mysqlmodel.VM]
 	addition[AddNoneAddition]
 }
 
-type VMPodNodeConnectionAdd struct {
+type AddedVMPodNodeConnections struct {
 	MySQLItems[mysqlmodel.VMPodNodeConnection]
 	addition[AddNoneAddition]
 }
 
-type VPCAdd struct {
+type AddedVPCs struct {
 	MySQLItems[mysqlmodel.VPC]
 	addition[AddNoneAddition]
 }
 
-type NetworkAdd struct {
+type AddedNetworks struct {
 	MySQLItems[mysqlmodel.Network]
 	addition[AddNoneAddition]
 }
 
-type SubnetAdd struct {
+type AddedSubnets struct {
 	MySQLItems[mysqlmodel.Subnet]
 	addition[AddNoneAddition]
 }
 
-type VRouterAdd struct {
+type AddedVRouters struct {
 	MySQLItems[mysqlmodel.VRouter]
 	addition[AddNoneAddition]
 }
 
-type RoutingTableAdd struct {
+type AddedRoutingTables struct {
 	MySQLItems[mysqlmodel.RoutingTable]
 	addition[AddNoneAddition]
 }
 
-type DHCPPortAdd struct {
+type AddedDHCPPorts struct {
 	MySQLItems[mysqlmodel.DHCPPort]
 	addition[AddNoneAddition]
 }
 
-type VInterfaceAdd struct {
+type AddedVInterfaces struct {
 	MySQLItems[mysqlmodel.VInterface]
 	addition[AddNoneAddition]
 }
 
-type FloatingIPAdd struct {
+type AddedFloatingIPs struct {
 	MySQLItems[mysqlmodel.FloatingIP]
 	addition[AddNoneAddition]
 }
 
-type LANIPAdd struct {
+type AddedLANIPs struct {
 	MySQLItems[mysqlmodel.LANIP]
 	addition[AddNoneAddition]
 }
 
-type WANIPAdd struct {
+type AddedWANIPs struct {
 	MySQLItems[mysqlmodel.WANIP]
 	addition[AddNoneAddition]
 }
 
-type VIPAdd struct {
+type AddedVIPs struct {
 	MySQLItems[mysqlmodel.VIP]
 	addition[AddNoneAddition]
 }
 
-type NATGatewayAdd struct {
+type AddedNATGateways struct {
 	MySQLItems[mysqlmodel.NATGateway]
 	addition[AddNoneAddition]
 }
 
-type NATRuleAdd struct {
+type AddedNATRules struct {
 	MySQLItems[mysqlmodel.NATRule]
 	addition[AddNoneAddition]
 }
 
-type NATVMConnectionAdd struct {
+type AddedNATVMConnections struct {
 	MySQLItems[mysqlmodel.NATVMConnection]
 	addition[AddNoneAddition]
 }
 
-type LBAdd struct {
+type AddedLBs struct {
 	MySQLItems[mysqlmodel.LB]
 	addition[AddNoneAddition]
 }
 
-type LBListenerAdd struct {
+type AddedLBListeners struct {
 	MySQLItems[mysqlmodel.LBListener]
 	addition[AddNoneAddition]
 }
 
-type LBTargetServerAdd struct {
+type AddedLBTargetServers struct {
 	MySQLItems[mysqlmodel.LBTargetServer]
 	addition[AddNoneAddition]
 }
 
-type LBVMConnectionAdd struct {
+type AddedLBVMConnections struct {
 	MySQLItems[mysqlmodel.LBVMConnection]
 	addition[AddNoneAddition]
 }
 
-type PeerConnectionAdd struct {
+type AddedPeerConnections struct {
 	MySQLItems[mysqlmodel.PeerConnection]
 	addition[AddNoneAddition]
 }
 
-type CENAdd struct {
+type AddedCENs struct {
 	MySQLItems[mysqlmodel.CEN]
 	addition[AddNoneAddition]
 }
 
-type RDSInstanceAdd struct {
+type AddedRDSInstances struct {
 	MySQLItems[mysqlmodel.RDSInstance]
 	addition[AddNoneAddition]
 }
 
-type RedisInstanceAdd struct {
+type AddedRedisInstances struct {
 	MySQLItems[mysqlmodel.RedisInstance]
 	addition[AddNoneAddition]
 }
 
-type PodClusterAdd struct {
+type AddedPodClusters struct {
 	MySQLItems[mysqlmodel.PodCluster]
 	addition[AddNoneAddition]
 }
 
-type PodNamespaceAdd struct {
+type AddedPodNamespaces struct {
 	MySQLItems[mysqlmodel.PodNamespace]
 	addition[AddNoneAddition]
 }
 
-type PodNodeAdd struct {
+type AddedPodNodes struct {
 	MySQLItems[mysqlmodel.PodNode]
 	addition[AddNoneAddition]
 }
 
-type PodIngressAdd struct {
+type AddedPodIngresses struct {
 	MySQLItems[mysqlmodel.PodIngress]
 	addition[AddNoneAddition]
 }
 
-type PodIngressRuleAdd struct {
+type AddedPodIngressRules struct {
 	MySQLItems[mysqlmodel.PodIngressRule]
 	addition[AddNoneAddition]
 }
 
-type PodIngressRuleBackendAdd struct {
+type AddedPodIngressRuleBackends struct {
 	MySQLItems[mysqlmodel.PodIngressRuleBackend]
 	addition[AddNoneAddition]
 }
 
-type PodServiceAdd struct {
+type AddedPodServices struct {
 	MySQLItems[mysqlmodel.PodService]
 	addition[AddNoneAddition]
 }
 
-type PodServicePortAdd struct {
+type AddedPodServicePorts struct {
 	MySQLItems[mysqlmodel.PodServicePort]
 	addition[AddNoneAddition]
 }
 
-type PodGroupAdd struct {
+type AddedPodGroups struct {
 	MySQLItems[mysqlmodel.PodGroup]
 	addition[AddNoneAddition]
 }
 
-type ConfigMapAdd struct {
+type AddedConfigMaps struct {
 	MySQLItems[mysqlmodel.ConfigMap]
 	addition[AddNoneAddition]
 }
 
-type PodGroupConfigMapConnectionAdd struct {
+type AddedPodGroupConfigMapConnections struct {
 	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
 	addition[AddNoneAddition]
 }
 
-type PodGroupPortAdd struct {
+type AddedPodGroupPorts struct {
 	MySQLItems[mysqlmodel.PodGroupPort]
 	addition[AddNoneAddition]
 }
 
-type PodReplicaSetAdd struct {
+type AddedPodReplicaSets struct {
 	MySQLItems[mysqlmodel.PodReplicaSet]
 	addition[AddNoneAddition]
 }
 
-type PodAdd struct {
+type AddedPods struct {
 	MySQLItems[mysqlmodel.Pod]
 	addition[AddNoneAddition]
 }
 
-type ProcessAdd struct {
+type AddedProcesses struct {
 	MySQLItems[mysqlmodel.Process]
-	addition[ProcessAddAddition]
+	addition[AddedProcessesAddition]
 }
 
-type ProcessAddAddition struct {
+type AddedProcessesAddition struct {
 	// CreatedGIDs []uint32 // reserved for tagrecorder use
 }
 
-type CustomServiceAdd struct {
+type AddedCustomServices struct {
 	MySQLItems[mysqlmodel.CustomService]
 	addition[AddNoneAddition]
 }

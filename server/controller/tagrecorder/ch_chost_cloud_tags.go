@@ -28,12 +28,12 @@ import (
 
 type ChChostCloudTags struct {
 	SubscriberComponent[
-		*message.VMAdd,
-		message.VMAdd,
-		*message.VMUpdate,
-		message.VMUpdate,
-		*message.VMDelete,
-		message.VMDelete,
+		*message.AddedVMs,
+		message.AddedVMs,
+		*message.UpdatedVM,
+		message.UpdatedVM,
+		*message.DeletedVMs,
+		message.DeletedVMs,
 		mysqlmodel.VM,
 		mysqlmodel.ChChostCloudTags,
 		IDKey,
@@ -43,12 +43,12 @@ type ChChostCloudTags struct {
 func NewChChostCloudTags() *ChChostCloudTags {
 	mng := &ChChostCloudTags{
 		newSubscriberComponent[
-			*message.VMAdd,
-			message.VMAdd,
-			*message.VMUpdate,
-			message.VMUpdate,
-			*message.VMDelete,
-			message.VMDelete,
+			*message.AddedVMs,
+			message.AddedVMs,
+			*message.UpdatedVM,
+			message.UpdatedVM,
+			*message.DeletedVMs,
+			message.DeletedVMs,
 			mysqlmodel.VM,
 			mysqlmodel.ChChostCloudTags,
 			IDKey,
@@ -61,9 +61,9 @@ func NewChChostCloudTags() *ChChostCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.VMUpdate) {
+func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.VMFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

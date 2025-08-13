@@ -32,15 +32,15 @@ type RoutingTable struct {
 		*diffbase.RoutingTable,
 		*mysqlmodel.RoutingTable,
 		mysqlmodel.RoutingTable,
-		*message.RoutingTableAdd,
-		message.RoutingTableAdd,
+		*message.AddedRoutingTables,
+		message.AddedRoutingTables,
 		message.AddNoneAddition,
-		*message.RoutingTableUpdate,
-		message.RoutingTableUpdate,
-		*message.RoutingTableFieldsUpdate,
-		message.RoutingTableFieldsUpdate,
-		*message.RoutingTableDelete,
-		message.RoutingTableDelete,
+		*message.UpdatedRoutingTable,
+		message.UpdatedRoutingTable,
+		*message.UpdatedRoutingTableFields,
+		message.UpdatedRoutingTableFields,
+		*message.DeletedRoutingTables,
+		message.DeletedRoutingTables,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 			*diffbase.RoutingTable,
 			*mysqlmodel.RoutingTable,
 			mysqlmodel.RoutingTable,
-			*message.RoutingTableAdd,
-			message.RoutingTableAdd,
+			*message.AddedRoutingTables,
+			message.AddedRoutingTables,
 			message.AddNoneAddition,
-			*message.RoutingTableUpdate,
-			message.RoutingTableUpdate,
-			*message.RoutingTableFieldsUpdate,
-			message.RoutingTableFieldsUpdate,
-			*message.RoutingTableDelete,
-			message.RoutingTableDelete,
+			*message.UpdatedRoutingTable,
+			message.UpdatedRoutingTable,
+			*message.UpdatedRoutingTableFields,
+			message.UpdatedRoutingTableFields,
+			*message.DeletedRoutingTables,
+			message.DeletedRoutingTables,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
@@ -98,8 +98,8 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
-func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (*message.RoutingTableFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.RoutingTableFieldsUpdate)
+func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (*message.UpdatedRoutingTableFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedRoutingTableFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Destination != cloudItem.Destination {
 		mapInfo["destination"] = cloudItem.Destination

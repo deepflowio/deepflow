@@ -27,12 +27,12 @@ import (
 
 type ChPodIngress struct {
 	SubscriberComponent[
-		*message.PodIngressAdd,
-		message.PodIngressAdd,
-		*message.PodIngressUpdate,
-		message.PodIngressUpdate,
-		*message.PodIngressDelete,
-		message.PodIngressDelete,
+		*message.AddedPodIngresses,
+		message.AddedPodIngresses,
+		*message.UpdatedPodIngress,
+		message.UpdatedPodIngress,
+		*message.DeletedPodIngresses,
+		message.DeletedPodIngresses,
 		mysqlmodel.PodIngress,
 		mysqlmodel.ChPodIngress,
 		IDKey,
@@ -42,12 +42,12 @@ type ChPodIngress struct {
 func NewChPodIngress() *ChPodIngress {
 	mng := &ChPodIngress{
 		newSubscriberComponent[
-			*message.PodIngressAdd,
-			message.PodIngressAdd,
-			*message.PodIngressUpdate,
-			message.PodIngressUpdate,
-			*message.PodIngressDelete,
-			message.PodIngressDelete,
+			*message.AddedPodIngresses,
+			message.AddedPodIngresses,
+			*message.UpdatedPodIngress,
+			message.UpdatedPodIngress,
+			*message.DeletedPodIngresses,
+			message.DeletedPodIngresses,
 			mysqlmodel.PodIngress,
 			mysqlmodel.ChPodIngress,
 			IDKey,
@@ -81,9 +81,9 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysqlmodel.P
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodIngress) onResourceUpdated(md *message.Metadata, updateMessage *message.PodIngressUpdate) {
+func (c *ChPodIngress) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodIngress) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.PodIngressFieldsUpdate)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodIngressFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodIngress)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})

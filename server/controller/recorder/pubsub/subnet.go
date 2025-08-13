@@ -23,30 +23,30 @@ import (
 
 type Subnet struct {
 	ResourcePubSubComponent[
-		*message.SubnetAdd,
-		message.SubnetAdd,
+		*message.AddedSubnets,
+		message.AddedSubnets,
 		message.AddNoneAddition,
-		*message.SubnetUpdate,
-		message.SubnetUpdate,
-		*message.SubnetFieldsUpdate,
-		message.SubnetFieldsUpdate,
-		*message.SubnetDelete,
-		message.SubnetDelete,
+		*message.UpdatedSubnet,
+		message.UpdatedSubnet,
+		*message.UpdatedSubnetFields,
+		message.UpdatedSubnetFields,
+		*message.DeletedSubnets,
+		message.DeletedSubnets,
 		message.DeleteNoneAddition]
 }
 
 func NewSubnet() *Subnet {
 	return &Subnet{
 		ResourcePubSubComponent[
-			*message.SubnetAdd,
-			message.SubnetAdd,
+			*message.AddedSubnets,
+			message.AddedSubnets,
 			message.AddNoneAddition,
-			*message.SubnetUpdate,
-			message.SubnetUpdate,
-			*message.SubnetFieldsUpdate,
-			message.SubnetFieldsUpdate,
-			*message.SubnetDelete,
-			message.SubnetDelete,
+			*message.UpdatedSubnet,
+			message.UpdatedSubnet,
+			*message.UpdatedSubnetFields,
+			message.UpdatedSubnetFields,
+			*message.DeletedSubnets,
+			message.DeletedSubnets,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeSubnet),

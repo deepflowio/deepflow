@@ -32,15 +32,15 @@ type Host struct {
 		*diffbase.Host,
 		*mysqlmodel.Host,
 		mysqlmodel.Host,
-		*message.HostAdd,
-		message.HostAdd,
+		*message.AddedHosts,
+		message.AddedHosts,
 		message.AddNoneAddition,
-		*message.HostUpdate,
-		message.HostUpdate,
-		*message.HostFieldsUpdate,
-		message.HostFieldsUpdate,
-		*message.HostDelete,
-		message.HostDelete,
+		*message.UpdatedHost,
+		message.UpdatedHost,
+		*message.UpdatedHostFields,
+		message.UpdatedHostFields,
+		*message.DeletedHosts,
+		message.DeletedHosts,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 			*diffbase.Host,
 			*mysqlmodel.Host,
 			mysqlmodel.Host,
-			*message.HostAdd,
-			message.HostAdd,
+			*message.AddedHosts,
+			message.AddedHosts,
 			message.AddNoneAddition,
-			*message.HostUpdate,
-			message.HostUpdate,
-			*message.HostFieldsUpdate,
-			message.HostFieldsUpdate,
-			*message.HostDelete,
-			message.HostDelete,
+			*message.UpdatedHost,
+			message.UpdatedHost,
+			*message.UpdatedHostFields,
+			message.UpdatedHostFields,
+			*message.DeletedHosts,
+			message.DeletedHosts,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
@@ -99,8 +99,8 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysqlmodel.Host
 	return dbItem, true
 }
 
-func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (*message.HostFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.HostFieldsUpdate)
+func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (*message.UpdatedHostFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedHostFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

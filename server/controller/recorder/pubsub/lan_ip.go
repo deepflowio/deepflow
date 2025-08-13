@@ -23,30 +23,30 @@ import (
 
 type LANIP struct {
 	ResourcePubSubComponent[
-		*message.LANIPAdd,
-		message.LANIPAdd,
+		*message.AddedLANIPs,
+		message.AddedLANIPs,
 		message.AddNoneAddition,
-		*message.LANIPUpdate,
-		message.LANIPUpdate,
-		*message.LANIPFieldsUpdate,
-		message.LANIPFieldsUpdate,
-		*message.LANIPDelete,
-		message.LANIPDelete,
+		*message.UpdatedLANIP,
+		message.UpdatedLANIP,
+		*message.UpdatedLANIPFields,
+		message.UpdatedLANIPFields,
+		*message.DeletedLANIPs,
+		message.DeletedLANIPs,
 		message.DeleteNoneAddition]
 }
 
 func NewLANIP() *LANIP {
 	return &LANIP{
 		ResourcePubSubComponent[
-			*message.LANIPAdd,
-			message.LANIPAdd,
+			*message.AddedLANIPs,
+			message.AddedLANIPs,
 			message.AddNoneAddition,
-			*message.LANIPUpdate,
-			message.LANIPUpdate,
-			*message.LANIPFieldsUpdate,
-			message.LANIPFieldsUpdate,
-			*message.LANIPDelete,
-			message.LANIPDelete,
+			*message.UpdatedLANIP,
+			message.UpdatedLANIP,
+			*message.UpdatedLANIPFields,
+			message.UpdatedLANIPFields,
+			*message.DeletedLANIPs,
+			message.DeletedLANIPs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLANIP),

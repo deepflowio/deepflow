@@ -117,8 +117,8 @@ func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Del
 	}
 }
 
-func getProcessMessageDeleteAddition(db *mysql.DB, dbItems interface{}, resourceType string, toolData *toolData) *message.ProcessDeleteAddition {
-	addition := &message.ProcessDeleteAddition{}
+func getProcessMessageDeleteAddition(db *mysql.DB, dbItems interface{}, resourceType string, toolData *toolData) *message.DeletedProcessesAddition {
+	addition := &message.DeletedProcessesAddition{}
 	var allProcesses []*mysqlmodel.Process
 	if err := db.Unscoped().Find(&allProcesses).Error; err != nil {
 		log.Errorf("failed to get all processes: %s", err.Error(), db.LogPrefixORGID)
@@ -134,7 +134,7 @@ func getProcessMessageDeleteAddition(db *mysql.DB, dbItems interface{}, resource
 			deletedGIDs.Add(item.GID)
 		}
 	}
-	return &message.ProcessDeleteAddition{DeletedGIDs: deletedGIDs.ToSlice()}
+	return &message.DeletedProcessesAddition{DeletedGIDs: deletedGIDs.ToSlice()}
 }
 
 type toolData struct {

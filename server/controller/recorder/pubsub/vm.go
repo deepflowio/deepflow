@@ -23,30 +23,30 @@ import (
 
 type VM struct {
 	ResourcePubSubComponent[
-		*message.VMAdd,
-		message.VMAdd,
+		*message.AddedVMs,
+		message.AddedVMs,
 		message.AddNoneAddition,
-		*message.VMUpdate,
-		message.VMUpdate,
-		*message.VMFieldsUpdate,
-		message.VMFieldsUpdate,
-		*message.VMDelete,
-		message.VMDelete,
+		*message.UpdatedVM,
+		message.UpdatedVM,
+		*message.UpdatedVMFields,
+		message.UpdatedVMFields,
+		*message.DeletedVMs,
+		message.DeletedVMs,
 		message.DeleteNoneAddition]
 }
 
 func NewVM() *VM {
 	return &VM{
 		ResourcePubSubComponent[
-			*message.VMAdd,
-			message.VMAdd,
+			*message.AddedVMs,
+			message.AddedVMs,
 			message.AddNoneAddition,
-			*message.VMUpdate,
-			message.VMUpdate,
-			*message.VMFieldsUpdate,
-			message.VMFieldsUpdate,
-			*message.VMDelete,
-			message.VMDelete,
+			*message.UpdatedVM,
+			message.UpdatedVM,
+			*message.UpdatedVMFields,
+			message.UpdatedVMFields,
+			*message.DeletedVMs,
+			message.DeletedVMs,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeVM),

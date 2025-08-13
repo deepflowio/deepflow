@@ -23,30 +23,30 @@ import (
 
 type PodNode struct {
 	ResourcePubSubComponent[
-		*message.PodNodeAdd,
-		message.PodNodeAdd,
+		*message.AddedPodNodes,
+		message.AddedPodNodes,
 		message.AddNoneAddition,
-		*message.PodNodeUpdate,
-		message.PodNodeUpdate,
-		*message.PodNodeFieldsUpdate,
-		message.PodNodeFieldsUpdate,
-		*message.PodNodeDelete,
-		message.PodNodeDelete,
+		*message.UpdatedPodNode,
+		message.UpdatedPodNode,
+		*message.UpdatedPodNodeFields,
+		message.UpdatedPodNodeFields,
+		*message.DeletedPodNodes,
+		message.DeletedPodNodes,
 		message.DeleteNoneAddition]
 }
 
 func NewPodNode() *PodNode {
 	return &PodNode{
 		ResourcePubSubComponent[
-			*message.PodNodeAdd,
-			message.PodNodeAdd,
+			*message.AddedPodNodes,
+			message.AddedPodNodes,
 			message.AddNoneAddition,
-			*message.PodNodeUpdate,
-			message.PodNodeUpdate,
-			*message.PodNodeFieldsUpdate,
-			message.PodNodeFieldsUpdate,
-			*message.PodNodeDelete,
-			message.PodNodeDelete,
+			*message.UpdatedPodNode,
+			message.UpdatedPodNode,
+			*message.UpdatedPodNodeFields,
+			message.UpdatedPodNodeFields,
+			*message.DeletedPodNodes,
+			message.DeletedPodNodes,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodNode),

@@ -23,30 +23,30 @@ import (
 
 type LBVMConnection struct {
 	ResourcePubSubComponent[
-		*message.LBVMConnectionAdd,
-		message.LBVMConnectionAdd,
+		*message.AddedLBVMConnections,
+		message.AddedLBVMConnections,
 		message.AddNoneAddition,
-		*message.LBVMConnectionUpdate,
-		message.LBVMConnectionUpdate,
-		*message.LBVMConnectionFieldsUpdate,
-		message.LBVMConnectionFieldsUpdate,
-		*message.LBVMConnectionDelete,
-		message.LBVMConnectionDelete,
+		*message.UpdatedLBVMConnection,
+		message.UpdatedLBVMConnection,
+		*message.UpdatedLBVMConnectionFields,
+		message.UpdatedLBVMConnectionFields,
+		*message.DeletedLBVMConnections,
+		message.DeletedLBVMConnections,
 		message.DeleteNoneAddition]
 }
 
 func NewLBVMConnection() *LBVMConnection {
 	return &LBVMConnection{
 		ResourcePubSubComponent[
-			*message.LBVMConnectionAdd,
-			message.LBVMConnectionAdd,
+			*message.AddedLBVMConnections,
+			message.AddedLBVMConnections,
 			message.AddNoneAddition,
-			*message.LBVMConnectionUpdate,
-			message.LBVMConnectionUpdate,
-			*message.LBVMConnectionFieldsUpdate,
-			message.LBVMConnectionFieldsUpdate,
-			*message.LBVMConnectionDelete,
-			message.LBVMConnectionDelete,
+			*message.UpdatedLBVMConnection,
+			message.UpdatedLBVMConnection,
+			*message.UpdatedLBVMConnectionFields,
+			message.UpdatedLBVMConnectionFields,
+			*message.DeletedLBVMConnections,
+			message.DeletedLBVMConnections,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBVMConnection),

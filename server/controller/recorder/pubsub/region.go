@@ -23,30 +23,30 @@ import (
 
 type Region struct {
 	ResourcePubSubComponent[
-		*message.RegionAdd,
-		message.RegionAdd,
+		*message.AddedRegions,
+		message.AddedRegions,
 		message.AddNoneAddition,
-		*message.RegionUpdate,
-		message.RegionUpdate,
-		*message.RegionFieldsUpdate,
-		message.RegionFieldsUpdate,
-		*message.RegionDelete,
-		message.RegionDelete,
+		*message.UpdatedRegion,
+		message.UpdatedRegion,
+		*message.UpdatedRegionFields,
+		message.UpdatedRegionFields,
+		*message.DeletedRegions,
+		message.DeletedRegions,
 		message.DeleteNoneAddition]
 }
 
 func NewRegion() *Region {
 	return &Region{
 		ResourcePubSubComponent[
-			*message.RegionAdd,
-			message.RegionAdd,
+			*message.AddedRegions,
+			message.AddedRegions,
 			message.AddNoneAddition,
-			*message.RegionUpdate,
-			message.RegionUpdate,
-			*message.RegionFieldsUpdate,
-			message.RegionFieldsUpdate,
-			*message.RegionDelete,
-			message.RegionDelete,
+			*message.UpdatedRegion,
+			message.UpdatedRegion,
+			*message.UpdatedRegionFields,
+			message.UpdatedRegionFields,
+			*message.DeletedRegions,
+			message.DeletedRegions,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeRegion),

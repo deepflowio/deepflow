@@ -30,16 +30,16 @@ type AddPtr[T Add] interface {
 }
 
 type Add interface {
-	message.RegionAdd | message.AZAdd | message.SubDomainAdd | message.HostAdd | message.VMAdd |
-		message.VPCAdd | message.NetworkAdd | message.SubnetAdd | message.VRouterAdd | message.RoutingTableAdd |
-		message.DHCPPortAdd | message.VInterfaceAdd | message.WANIPAdd | message.LANIPAdd | message.FloatingIPAdd |
-		message.NATGatewayAdd | message.NATRuleAdd | message.NATVMConnectionAdd | message.LBAdd |
-		message.LBListenerAdd | message.LBTargetServerAdd | message.LBVMConnectionAdd | message.CENAdd |
-		message.PeerConnectionAdd | message.RDSInstanceAdd | message.RedisInstanceAdd | message.PodClusterAdd |
-		message.PodNodeAdd | message.VMPodNodeConnectionAdd | message.PodNamespaceAdd | message.PodIngressAdd |
-		message.PodIngressRuleAdd | message.PodIngressRuleBackendAdd | message.PodServiceAdd |
-		message.PodServicePortAdd | message.PodGroupAdd | message.ConfigMapAdd | message.PodGroupConfigMapConnectionAdd |
-		message.PodGroupPortAdd | message.PodReplicaSetAdd | message.PodAdd | message.ProcessAdd | message.VIPAdd | message.CustomServiceAdd
+	message.AddedRegions | message.AddedAZs | message.AddedSubDomains | message.AddedHosts | message.AddedVMs |
+		message.AddedVPCs | message.AddedNetworks | message.AddedSubnets | message.AddedVRouters | message.AddedRoutingTables |
+		message.AddedDHCPPorts | message.AddedVInterfaces | message.AddedWANIPs | message.AddedLANIPs | message.AddedFloatingIPs |
+		message.AddedNATGateways | message.AddedNATRules | message.AddedNATVMConnections | message.AddedLBs |
+		message.AddedLBListeners | message.AddedLBTargetServers | message.AddedLBVMConnections | message.AddedCENs |
+		message.AddedPeerConnections | message.AddedRDSInstances | message.AddedRedisInstances | message.AddedPodClusters |
+		message.AddedPodNodes | message.AddedVMPodNodeConnections | message.AddedPodNamespaces | message.AddedPodIngresses |
+		message.AddedPodIngressRules | message.AddedPodIngressRuleBackends | message.AddedPodServices |
+		message.AddedPodServicePorts | message.AddedPodGroups | message.AddedConfigMaps | message.AddedPodGroupConfigMapConnections |
+		message.AddedPodGroupPorts | message.AddedPodReplicaSets | message.AddedPods | message.AddedProcesses | message.AddedVIPs | message.AddedCustomServices
 }
 
 type UpdatePtr[T Update] interface {
@@ -57,16 +57,16 @@ type UpdatePtr[T Update] interface {
 
 // Update是所有资源更新消息的泛型约束
 type Update interface {
-	message.RegionUpdate | message.AZUpdate | message.SubDomainUpdate | message.HostUpdate | message.VMUpdate |
-		message.VPCUpdate | message.NetworkUpdate | message.SubnetUpdate | message.VRouterUpdate | message.RoutingTableUpdate |
-		message.DHCPPortUpdate | message.VInterfaceUpdate | message.WANIPUpdate | message.LANIPUpdate | message.FloatingIPUpdate |
-		message.NATGatewayUpdate | message.NATRuleUpdate | message.NATVMConnectionUpdate | message.LBUpdate |
-		message.LBListenerUpdate | message.LBTargetServerUpdate | message.LBVMConnectionUpdate | message.CENUpdate |
-		message.PeerConnectionUpdate | message.RDSInstanceUpdate | message.RedisInstanceUpdate | message.PodClusterUpdate |
-		message.PodNodeUpdate | message.VMPodNodeConnectionUpdate | message.PodNamespaceUpdate | message.PodIngressUpdate |
-		message.PodIngressRuleUpdate | message.PodIngressRuleBackendUpdate | message.PodServiceUpdate |
-		message.PodServicePortUpdate | message.PodGroupUpdate | message.ConfigMapUpdate | message.PodGroupConfigMapConnectionUpdate |
-		message.PodGroupPortUpdate | message.PodReplicaSetUpdate | message.PodUpdate | message.ProcessUpdate | message.VIPUpdate | message.CustomServiceUpdate
+	message.UpdatedRegion | message.UpdatedAZ | message.UpdatedSubDomain | message.UpdatedHost | message.UpdatedVM |
+		message.UpdatedVPC | message.UpdatedNetwork | message.UpdatedSubnet | message.UpdatedVRouter | message.UpdatedRoutingTable |
+		message.UpdatedDHCPPort | message.UpdatedVInterface | message.UpdatedWANIP | message.UpdatedLANIP | message.UpdatedFloatingIP |
+		message.UpdatedNATGateway | message.UpdatedNATRule | message.UpdatedNATVMConnection | message.UpdatedLB |
+		message.UpdatedLBListener | message.UpdatedLBTargetServer | message.UpdatedLBVMConnection | message.UpdatedCEN |
+		message.UpdatedPeerConnection | message.UpdatedRDSInstance | message.UpdatedRedisInstance | message.UpdatedPodCluster |
+		message.UpdatedPodNode | message.UpdatedVMPodNodeConnection | message.UpdatedPodNamespace | message.UpdatedPodIngress |
+		message.UpdatedPodIngressRule | message.UpdatedPodIngressRuleBackend | message.UpdatedPodService |
+		message.UpdatedPodServicePort | message.UpdatedPodGroup | message.UpdatedConfigMap | message.UpdatedPodGroupConfigMapConnection |
+		message.UpdatedPodGroupPort | message.UpdatedPodReplicaSet | message.UpdatedPod | message.UpdatedProcess | message.UpdatedVIP | message.UpdatedCustomService
 }
 
 type FieldsUpdatePtr[T FieldsUpdate] interface {
@@ -79,18 +79,18 @@ type FieldsUpdatePtr[T FieldsUpdate] interface {
 }
 
 type FieldsUpdate interface {
-	message.RegionFieldsUpdate | message.AZFieldsUpdate | message.SubDomainFieldsUpdate | message.HostFieldsUpdate |
-		message.VMFieldsUpdate | message.VPCFieldsUpdate | message.NetworkFieldsUpdate | message.SubnetFieldsUpdate |
-		message.VRouterFieldsUpdate | message.RoutingTableFieldsUpdate | message.DHCPPortFieldsUpdate |
-		message.VInterfaceFieldsUpdate | message.WANIPFieldsUpdate | message.LANIPFieldsUpdate | message.FloatingIPFieldsUpdate |
-		message.NATGatewayFieldsUpdate | message.NATRuleFieldsUpdate | message.NATVMConnectionFieldsUpdate | message.LBFieldsUpdate |
-		message.LBListenerFieldsUpdate | message.LBTargetServerFieldsUpdate | message.LBVMConnectionFieldsUpdate | message.CENFieldsUpdate |
-		message.PeerConnectionFieldsUpdate | message.RDSInstanceFieldsUpdate | message.RedisInstanceFieldsUpdate | message.PodClusterFieldsUpdate |
-		message.PodNodeFieldsUpdate | message.VMPodNodeConnectionFieldsUpdate | message.PodNamespaceFieldsUpdate | message.PodIngressFieldsUpdate |
-		message.PodIngressRuleFieldsUpdate | message.PodIngressRuleBackendFieldsUpdate | message.PodServiceFieldsUpdate |
-		message.PodServicePortFieldsUpdate | message.PodGroupFieldsUpdate | message.ConfigMapFieldsUpdate |
-		message.PodGroupConfigMapConnectionFieldsUpdate | message.PodGroupPortFieldsUpdate | message.PodReplicaSetFieldsUpdate |
-		message.PodFieldsUpdate | message.ProcessFieldsUpdate | message.VIPFieldsUpdate | message.CustomServiceFieldsUpdate
+	message.UpdatedRegionFields | message.UpdatedAZFields | message.UpdatedSubDomainFields | message.UpdatedHostFields |
+		message.UpdatedVMFields | message.UpdatedVPCFields | message.UpdatedNetworkFields | message.UpdatedSubnetFields |
+		message.UpdatedVRouterFields | message.UpdatedRoutingTableFields | message.UpdatedDHCPPortFields |
+		message.UpdatedVInterfaceFields | message.UpdatedWANIPFields | message.UpdatedLANIPFields | message.UpdatedFloatingIPFields |
+		message.UpdatedNATGatewayFields | message.UpdatedNATRuleFields | message.UpdatedNATVMConnectionFields | message.UpdatedLBFields |
+		message.UpdatedLBListenerFields | message.UpdatedLBTargetServerFields | message.UpdatedLBVMConnectionFields | message.UpdatedCENFields |
+		message.UpdatedPeerConnectionFields | message.UpdatedRDSInstanceFields | message.UpdatedRedisInstanceFields | message.UpdatedPodClusterFields |
+		message.UpdatedPodNodeFields | message.UpdatedVMPodNodeConnectionFields | message.UpdatedPodNamespaceFields | message.UpdatedPodIngressFields |
+		message.UpdatedPodIngressRuleFields | message.UpdatedPodIngressRuleBackendFields | message.UpdatedPodServiceFields |
+		message.UpdatedPodServicePortFields | message.UpdatedPodGroupFields | message.UpdatedConfigMapFields |
+		message.UpdatedPodGroupConfigMapConnectionFields | message.UpdatedPodGroupPortFields | message.UpdatedPodReplicaSetFields |
+		message.UpdatedPodFields | message.UpdatedProcessFields | message.UpdatedVIPFields | message.UpdatedCustomServiceFields
 }
 
 type DeletePtr[T Delete] interface {
@@ -105,14 +105,14 @@ type DeletePtr[T Delete] interface {
 }
 
 type Delete interface {
-	message.RegionDelete | message.AZDelete | message.SubDomainDelete | message.HostDelete | message.VMDelete |
-		message.VPCDelete | message.NetworkDelete | message.SubnetDelete | message.VRouterDelete | message.RoutingTableDelete |
-		message.DHCPPortDelete | message.VInterfaceDelete | message.WANIPDelete | message.LANIPDelete | message.FloatingIPDelete |
-		message.NATGatewayDelete | message.NATRuleDelete | message.NATVMConnectionDelete | message.LBDelete |
-		message.LBListenerDelete | message.LBTargetServerDelete | message.LBVMConnectionDelete | message.CENDelete |
-		message.PeerConnectionDelete | message.RDSInstanceDelete | message.RedisInstanceDelete | message.PodClusterDelete |
-		message.PodNodeDelete | message.VMPodNodeConnectionDelete | message.PodNamespaceDelete | message.PodIngressDelete |
-		message.PodIngressRuleDelete | message.PodIngressRuleBackendDelete | message.PodServiceDelete |
-		message.PodServicePortDelete | message.PodGroupDelete | message.ConfigMapDelete | message.PodGroupConfigMapConnectionDelete |
-		message.PodGroupPortDelete | message.PodReplicaSetDelete | message.PodDelete | message.ProcessDelete | message.VIPDelete | message.CustomServiceDelete
+	message.DeletedRegions | message.DeletedAZs | message.DeletedSubDomains | message.DeletedHosts | message.DeletedVMs |
+		message.DeletedVPCs | message.DeletedNetworks | message.DeletedSubnets | message.DeletedVRouters | message.DeletedRoutingTables |
+		message.DeletedDHCPPorts | message.DeletedVInterfaces | message.DeletedWANIPs | message.DeletedLANIPs | message.DeletedFloatingIPs |
+		message.DeletedNATGateways | message.DeletedNATRules | message.DeletedNATVMConnections | message.DeletedLBs |
+		message.DeletedLBListeners | message.DeletedLBTargetServers | message.DeletedLBVMConnections | message.DeletedCENs |
+		message.DeletedPeerConnections | message.DeletedRDSInstances | message.DeletedRedisInstances | message.DeletedPodClusters |
+		message.DeletedPodNodes | message.DeletedVMPodNodeConnections | message.DeletedPodNamespaces | message.DeletedPodIngresses |
+		message.DeletedPodIngressRules | message.DeletedPodIngressRuleBackends | message.DeletedPodServices |
+		message.DeletedPodServicePorts | message.DeletedPodGroups | message.DeletedConfigMaps | message.DeletedPodGroupConfigMapConnections |
+		message.DeletedPodGroupPorts | message.DeletedPodReplicaSets | message.DeletedPods | message.DeletedProcesses | message.DeletedVIPs | message.DeletedCustomServices
 }

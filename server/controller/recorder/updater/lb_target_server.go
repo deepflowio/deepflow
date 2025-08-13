@@ -32,15 +32,15 @@ type LBTargetServer struct {
 		*diffbase.LBTargetServer,
 		*mysqlmodel.LBTargetServer,
 		mysqlmodel.LBTargetServer,
-		*message.LBTargetServerAdd,
-		message.LBTargetServerAdd,
+		*message.AddedLBTargetServers,
+		message.AddedLBTargetServers,
 		message.AddNoneAddition,
-		*message.LBTargetServerUpdate,
-		message.LBTargetServerUpdate,
-		*message.LBTargetServerFieldsUpdate,
-		message.LBTargetServerFieldsUpdate,
-		*message.LBTargetServerDelete,
-		message.LBTargetServerDelete,
+		*message.UpdatedLBTargetServer,
+		message.UpdatedLBTargetServer,
+		*message.UpdatedLBTargetServerFields,
+		message.UpdatedLBTargetServerFields,
+		*message.DeletedLBTargetServers,
+		message.DeletedLBTargetServers,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 			*diffbase.LBTargetServer,
 			*mysqlmodel.LBTargetServer,
 			mysqlmodel.LBTargetServer,
-			*message.LBTargetServerAdd,
-			message.LBTargetServerAdd,
+			*message.AddedLBTargetServers,
+			message.AddedLBTargetServers,
 			message.AddNoneAddition,
-			*message.LBTargetServerUpdate,
-			message.LBTargetServerUpdate,
-			*message.LBTargetServerFieldsUpdate,
-			message.LBTargetServerFieldsUpdate,
-			*message.LBTargetServerDelete,
-			message.LBTargetServerDelete,
+			*message.UpdatedLBTargetServer,
+			message.UpdatedLBTargetServer,
+			*message.UpdatedLBTargetServerFields,
+			message.UpdatedLBTargetServerFields,
+			*message.DeletedLBTargetServers,
+			message.DeletedLBTargetServers,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
@@ -129,8 +129,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
-func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (*message.LBTargetServerFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.LBTargetServerFieldsUpdate)
+func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (*message.UpdatedLBTargetServerFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedLBTargetServerFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP

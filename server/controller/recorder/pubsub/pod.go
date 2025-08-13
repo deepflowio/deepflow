@@ -23,30 +23,30 @@ import (
 
 type Pod struct {
 	ResourcePubSubComponent[
-		*message.PodAdd,
-		message.PodAdd,
+		*message.AddedPods,
+		message.AddedPods,
 		message.AddNoneAddition,
-		*message.PodUpdate,
-		message.PodUpdate,
-		*message.PodFieldsUpdate,
-		message.PodFieldsUpdate,
-		*message.PodDelete,
-		message.PodDelete,
+		*message.UpdatedPod,
+		message.UpdatedPod,
+		*message.UpdatedPodFields,
+		message.UpdatedPodFields,
+		*message.DeletedPods,
+		message.DeletedPods,
 		message.DeleteNoneAddition]
 }
 
 func NewPod() *Pod {
 	return &Pod{
 		ResourcePubSubComponent[
-			*message.PodAdd,
-			message.PodAdd,
+			*message.AddedPods,
+			message.AddedPods,
 			message.AddNoneAddition,
-			*message.PodUpdate,
-			message.PodUpdate,
-			*message.PodFieldsUpdate,
-			message.PodFieldsUpdate,
-			*message.PodDelete,
-			message.PodDelete,
+			*message.UpdatedPod,
+			message.UpdatedPod,
+			*message.UpdatedPodFields,
+			message.UpdatedPodFields,
+			*message.DeletedPods,
+			message.DeletedPods,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePod),

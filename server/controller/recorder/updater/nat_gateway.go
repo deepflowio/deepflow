@@ -32,15 +32,15 @@ type NATGateway struct {
 		*diffbase.NATGateway,
 		*mysqlmodel.NATGateway,
 		mysqlmodel.NATGateway,
-		*message.NATGatewayAdd,
-		message.NATGatewayAdd,
+		*message.AddedNATGateways,
+		message.AddedNATGateways,
 		message.AddNoneAddition,
-		*message.NATGatewayUpdate,
-		message.NATGatewayUpdate,
-		*message.NATGatewayFieldsUpdate,
-		message.NATGatewayFieldsUpdate,
-		*message.NATGatewayDelete,
-		message.NATGatewayDelete,
+		*message.UpdatedNATGateway,
+		message.UpdatedNATGateway,
+		*message.UpdatedNATGatewayFields,
+		message.UpdatedNATGatewayFields,
+		*message.DeletedNATGateways,
+		message.DeletedNATGateways,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 			*diffbase.NATGateway,
 			*mysqlmodel.NATGateway,
 			mysqlmodel.NATGateway,
-			*message.NATGatewayAdd,
-			message.NATGatewayAdd,
+			*message.AddedNATGateways,
+			message.AddedNATGateways,
 			message.AddNoneAddition,
-			*message.NATGatewayUpdate,
-			message.NATGatewayUpdate,
-			*message.NATGatewayFieldsUpdate,
-			message.NATGatewayFieldsUpdate,
-			*message.NATGatewayDelete,
-			message.NATGatewayDelete,
+			*message.UpdatedNATGateway,
+			message.UpdatedNATGateway,
+			*message.UpdatedNATGatewayFields,
+			message.UpdatedNATGatewayFields,
+			*message.DeletedNATGateways,
+			message.DeletedNATGateways,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
@@ -101,8 +101,8 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (*message.NATGatewayFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.NATGatewayFieldsUpdate)
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (*message.UpdatedNATGatewayFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedNATGatewayFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

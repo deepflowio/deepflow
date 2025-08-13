@@ -23,30 +23,30 @@ import (
 
 type NATVMConnection struct {
 	ResourcePubSubComponent[
-		*message.NATVMConnectionAdd,
-		message.NATVMConnectionAdd,
+		*message.AddedNATVMConnections,
+		message.AddedNATVMConnections,
 		message.AddNoneAddition,
-		*message.NATVMConnectionUpdate,
-		message.NATVMConnectionUpdate,
-		*message.NATVMConnectionFieldsUpdate,
-		message.NATVMConnectionFieldsUpdate,
-		*message.NATVMConnectionDelete,
-		message.NATVMConnectionDelete,
+		*message.UpdatedNATVMConnection,
+		message.UpdatedNATVMConnection,
+		*message.UpdatedNATVMConnectionFields,
+		message.UpdatedNATVMConnectionFields,
+		*message.DeletedNATVMConnections,
+		message.DeletedNATVMConnections,
 		message.DeleteNoneAddition]
 }
 
 func NewNATVMConnection() *NATVMConnection {
 	return &NATVMConnection{
 		ResourcePubSubComponent[
-			*message.NATVMConnectionAdd,
-			message.NATVMConnectionAdd,
+			*message.AddedNATVMConnections,
+			message.AddedNATVMConnections,
 			message.AddNoneAddition,
-			*message.NATVMConnectionUpdate,
-			message.NATVMConnectionUpdate,
-			*message.NATVMConnectionFieldsUpdate,
-			message.NATVMConnectionFieldsUpdate,
-			*message.NATVMConnectionDelete,
-			message.NATVMConnectionDelete,
+			*message.UpdatedNATVMConnection,
+			message.UpdatedNATVMConnection,
+			*message.UpdatedNATVMConnectionFields,
+			message.UpdatedNATVMConnectionFields,
+			*message.DeletedNATVMConnections,
+			message.DeletedNATVMConnections,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeNATVMConnection),

@@ -32,15 +32,15 @@ type SubDomain struct {
 		*diffbase.SubDomain,
 		*mysqlmodel.SubDomain,
 		mysqlmodel.SubDomain,
-		*message.SubDomainAdd,
-		message.SubDomainAdd,
+		*message.AddedSubDomains,
+		message.AddedSubDomains,
 		message.AddNoneAddition,
-		*message.SubDomainUpdate,
-		message.SubDomainUpdate,
-		*message.SubDomainFieldsUpdate,
-		message.SubDomainFieldsUpdate,
-		*message.SubDomainDelete,
-		message.SubDomainDelete,
+		*message.UpdatedSubDomain,
+		message.UpdatedSubDomain,
+		*message.UpdatedSubDomainFields,
+		message.UpdatedSubDomainFields,
+		*message.DeletedSubDomains,
+		message.DeletedSubDomains,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 			*diffbase.SubDomain,
 			*mysqlmodel.SubDomain,
 			mysqlmodel.SubDomain,
-			*message.SubDomainAdd,
-			message.SubDomainAdd,
+			*message.AddedSubDomains,
+			message.AddedSubDomains,
 			message.AddNoneAddition,
-			*message.SubDomainUpdate,
-			message.SubDomainUpdate,
-			*message.SubDomainFieldsUpdate,
-			message.SubDomainFieldsUpdate,
-			*message.SubDomainDelete,
-			message.SubDomainDelete,
+			*message.UpdatedSubDomain,
+			message.UpdatedSubDomain,
+			*message.UpdatedSubDomainFields,
+			message.UpdatedSubDomainFields,
+			*message.DeletedSubDomains,
+			message.DeletedSubDomains,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
@@ -91,8 +91,8 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 	return dbItem, true
 }
 
-func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (*message.SubDomainFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.SubDomainFieldsUpdate)
+func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (*message.UpdatedSubDomainFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedSubDomainFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

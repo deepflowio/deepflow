@@ -32,15 +32,15 @@ type LB struct {
 		*diffbase.LB,
 		*mysqlmodel.LB,
 		mysqlmodel.LB,
-		*message.LBAdd,
-		message.LBAdd,
+		*message.AddedLBs,
+		message.AddedLBs,
 		message.AddNoneAddition,
-		*message.LBUpdate,
-		message.LBUpdate,
-		*message.LBFieldsUpdate,
-		message.LBFieldsUpdate,
-		*message.LBDelete,
-		message.LBDelete,
+		*message.UpdatedLB,
+		message.UpdatedLB,
+		*message.UpdatedLBFields,
+		message.UpdatedLBFields,
+		*message.DeletedLBs,
+		message.DeletedLBs,
 		message.DeleteNoneAddition]
 }
 
@@ -51,15 +51,15 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 			*diffbase.LB,
 			*mysqlmodel.LB,
 			mysqlmodel.LB,
-			*message.LBAdd,
-			message.LBAdd,
+			*message.AddedLBs,
+			message.AddedLBs,
 			message.AddNoneAddition,
-			*message.LBUpdate,
-			message.LBUpdate,
-			*message.LBFieldsUpdate,
-			message.LBFieldsUpdate,
-			*message.LBDelete,
-			message.LBDelete,
+			*message.UpdatedLB,
+			message.UpdatedLB,
+			*message.UpdatedLBFields,
+			message.UpdatedLBFields,
+			*message.DeletedLBs,
+			message.DeletedLBs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
@@ -102,8 +102,8 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysqlmodel.LB, bool
 	return dbItem, true
 }
 
-func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (*message.LBFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.LBFieldsUpdate)
+func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (*message.UpdatedLBFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedLBFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

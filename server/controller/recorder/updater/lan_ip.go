@@ -34,15 +34,15 @@ type LANIP struct {
 		*diffbase.LANIP,
 		*mysqlmodel.LANIP,
 		mysqlmodel.LANIP,
-		*message.LANIPAdd,
-		message.LANIPAdd,
+		*message.AddedLANIPs,
+		message.AddedLANIPs,
 		message.AddNoneAddition,
-		*message.LANIPUpdate,
-		message.LANIPUpdate,
-		*message.LANIPFieldsUpdate,
-		message.LANIPFieldsUpdate,
-		*message.LANIPDelete,
-		message.LANIPDelete,
+		*message.UpdatedLANIP,
+		message.UpdatedLANIP,
+		*message.UpdatedLANIPFields,
+		message.UpdatedLANIPFields,
+		*message.DeletedLANIPs,
+		message.DeletedLANIPs,
 		message.DeleteNoneAddition]
 }
 
@@ -53,15 +53,15 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 			*diffbase.LANIP,
 			*mysqlmodel.LANIP,
 			mysqlmodel.LANIP,
-			*message.LANIPAdd,
-			message.LANIPAdd,
+			*message.AddedLANIPs,
+			message.AddedLANIPs,
 			message.AddNoneAddition,
-			*message.LANIPUpdate,
-			message.LANIPUpdate,
-			*message.LANIPFieldsUpdate,
-			message.LANIPFieldsUpdate,
-			*message.LANIPDelete,
-			message.LANIPDelete,
+			*message.UpdatedLANIP,
+			message.UpdatedLANIP,
+			*message.UpdatedLANIPFields,
+			message.UpdatedLANIPFields,
+			*message.DeletedLANIPs,
+			message.DeletedLANIPs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
@@ -146,8 +146,8 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.LANIP
 	return dbItem, true
 }
 
-func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.LANIPFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.LANIPFieldsUpdate)
+func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.UpdatedLANIPFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedLANIPFields)
 	mapInfo := make(map[string]interface{})
 
 	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,

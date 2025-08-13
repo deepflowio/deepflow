@@ -36,15 +36,15 @@ type WANIP struct {
 		*diffbase.WANIP,
 		*mysqlmodel.WANIP,
 		mysqlmodel.WANIP,
-		*message.WANIPAdd,
-		message.WANIPAdd,
+		*message.AddedWANIPs,
+		message.AddedWANIPs,
 		message.AddNoneAddition,
-		*message.WANIPUpdate,
-		message.WANIPUpdate,
-		*message.WANIPFieldsUpdate,
-		message.WANIPFieldsUpdate,
-		*message.WANIPDelete,
-		message.WANIPDelete,
+		*message.UpdatedWANIP,
+		message.UpdatedWANIP,
+		*message.UpdatedWANIPFields,
+		message.UpdatedWANIPFields,
+		*message.DeletedWANIPs,
+		message.DeletedWANIPs,
 		message.DeleteNoneAddition]
 }
 
@@ -55,15 +55,15 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 			*diffbase.WANIP,
 			*mysqlmodel.WANIP,
 			mysqlmodel.WANIP,
-			*message.WANIPAdd,
-			message.WANIPAdd,
+			*message.AddedWANIPs,
+			message.AddedWANIPs,
 			message.AddNoneAddition,
-			*message.WANIPUpdate,
-			message.WANIPUpdate,
-			*message.WANIPFieldsUpdate,
-			message.WANIPFieldsUpdate,
-			*message.WANIPDelete,
-			message.WANIPDelete,
+			*message.UpdatedWANIP,
+			message.UpdatedWANIP,
+			*message.UpdatedWANIPFields,
+			message.UpdatedWANIPFields,
+			*message.DeletedWANIPs,
+			message.DeletedWANIPs,
 			message.DeleteNoneAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
@@ -134,8 +134,8 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.WANIP
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.WANIPFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.WANIPFieldsUpdate)
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.UpdatedWANIPFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedWANIPFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

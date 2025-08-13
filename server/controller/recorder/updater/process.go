@@ -37,16 +37,16 @@ type Process struct {
 		*diffbase.Process,
 		*mysqlmodel.Process,
 		mysqlmodel.Process,
-		*message.ProcessAdd,
-		message.ProcessAdd,
-		message.ProcessAddAddition,
-		*message.ProcessUpdate,
-		message.ProcessUpdate,
-		*message.ProcessFieldsUpdate,
-		message.ProcessFieldsUpdate,
-		*message.ProcessDelete,
-		message.ProcessDelete,
-		message.ProcessDeleteAddition]
+		*message.AddedProcesses,
+		message.AddedProcesses,
+		message.AddedProcessesAddition,
+		*message.UpdatedProcess,
+		message.UpdatedProcess,
+		*message.UpdatedProcessFields,
+		message.UpdatedProcessFields,
+		*message.DeletedProcesses,
+		message.DeletedProcesses,
+		message.DeletedProcessesAddition]
 }
 
 func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Process {
@@ -56,16 +56,16 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 			*diffbase.Process,
 			*mysqlmodel.Process,
 			mysqlmodel.Process,
-			*message.ProcessAdd,
-			message.ProcessAdd,
-			message.ProcessAddAddition,
-			*message.ProcessUpdate,
-			message.ProcessUpdate,
-			*message.ProcessFieldsUpdate,
-			message.ProcessFieldsUpdate,
-			*message.ProcessDelete,
-			message.ProcessDelete,
-			message.ProcessDeleteAddition,
+			*message.AddedProcesses,
+			message.AddedProcesses,
+			message.AddedProcessesAddition,
+			*message.UpdatedProcess,
+			message.UpdatedProcess,
+			*message.UpdatedProcessFields,
+			message.UpdatedProcessFields,
+			*message.DeletedProcesses,
+			message.DeletedProcesses,
+			message.DeletedProcessesAddition,
 		](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
@@ -155,8 +155,8 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 	return dbItem, true
 }
 
-func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.ProcessFieldsUpdate, map[string]interface{}, bool) {
-	structInfo := new(message.ProcessFieldsUpdate)
+func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *cloudmodel.Process) (*message.UpdatedProcessFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedProcessFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -201,7 +201,7 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
 
-func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Process, *message.ProcessAddAddition, bool) {
+func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Process, *message.AddedProcessesAddition, bool) {
 	identifierToNewGID := make(map[tool.ProcessIdentifier]uint32)
 	for _, item := range dbData {
 		if item.GID != 0 {
@@ -242,10 +242,10 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)]
 		}
 	}
-	return dbData, &message.ProcessAddAddition{}, true
+	return dbData, &message.AddedProcessesAddition{}, true
 }
 
-func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.ProcessDeleteAddition, bool) {
+func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.DeletedProcessesAddition, bool) {
 	deletedGIDs := mapset.NewSet[uint32]()
 	for _, item := range dbData {
 		if gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); ok {
@@ -254,5 +254,5 @@ func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.Proces
 			}
 		}
 	}
-	return &message.ProcessDeleteAddition{DeletedGIDs: deletedGIDs.ToSlice()}, true
+	return &message.DeletedProcessesAddition{DeletedGIDs: deletedGIDs.ToSlice()}, true
 }

@@ -23,30 +23,30 @@ import (
 
 type LBTargetServer struct {
 	ResourcePubSubComponent[
-		*message.LBTargetServerAdd,
-		message.LBTargetServerAdd,
+		*message.AddedLBTargetServers,
+		message.AddedLBTargetServers,
 		message.AddNoneAddition,
-		*message.LBTargetServerUpdate,
-		message.LBTargetServerUpdate,
-		*message.LBTargetServerFieldsUpdate,
-		message.LBTargetServerFieldsUpdate,
-		*message.LBTargetServerDelete,
-		message.LBTargetServerDelete,
+		*message.UpdatedLBTargetServer,
+		message.UpdatedLBTargetServer,
+		*message.UpdatedLBTargetServerFields,
+		message.UpdatedLBTargetServerFields,
+		*message.DeletedLBTargetServers,
+		message.DeletedLBTargetServers,
 		message.DeleteNoneAddition]
 }
 
 func NewLBTargetServer() *LBTargetServer {
 	return &LBTargetServer{
 		ResourcePubSubComponent[
-			*message.LBTargetServerAdd,
-			message.LBTargetServerAdd,
+			*message.AddedLBTargetServers,
+			message.AddedLBTargetServers,
 			message.AddNoneAddition,
-			*message.LBTargetServerUpdate,
-			message.LBTargetServerUpdate,
-			*message.LBTargetServerFieldsUpdate,
-			message.LBTargetServerFieldsUpdate,
-			*message.LBTargetServerDelete,
-			message.LBTargetServerDelete,
+			*message.UpdatedLBTargetServer,
+			message.UpdatedLBTargetServer,
+			*message.UpdatedLBTargetServerFields,
+			message.UpdatedLBTargetServerFields,
+			*message.DeletedLBTargetServers,
+			message.DeletedLBTargetServers,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypeLBTargetServer),

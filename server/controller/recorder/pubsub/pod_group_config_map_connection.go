@@ -23,30 +23,30 @@ import (
 
 type PodGroupConfigMapConnection struct {
 	ResourcePubSubComponent[
-		*message.PodGroupConfigMapConnectionAdd,
-		message.PodGroupConfigMapConnectionAdd,
+		*message.AddedPodGroupConfigMapConnections,
+		message.AddedPodGroupConfigMapConnections,
 		message.AddNoneAddition,
-		*message.PodGroupConfigMapConnectionUpdate,
-		message.PodGroupConfigMapConnectionUpdate,
-		*message.PodGroupConfigMapConnectionFieldsUpdate,
-		message.PodGroupConfigMapConnectionFieldsUpdate,
-		*message.PodGroupConfigMapConnectionDelete,
-		message.PodGroupConfigMapConnectionDelete,
+		*message.UpdatedPodGroupConfigMapConnection,
+		message.UpdatedPodGroupConfigMapConnection,
+		*message.UpdatedPodGroupConfigMapConnectionFields,
+		message.UpdatedPodGroupConfigMapConnectionFields,
+		*message.DeletedPodGroupConfigMapConnections,
+		message.DeletedPodGroupConfigMapConnections,
 		message.DeleteNoneAddition]
 }
 
 func NewPodGroupConfigMapConnection() *PodGroupConfigMapConnection {
 	return &PodGroupConfigMapConnection{
 		ResourcePubSubComponent[
-			*message.PodGroupConfigMapConnectionAdd,
-			message.PodGroupConfigMapConnectionAdd,
+			*message.AddedPodGroupConfigMapConnections,
+			message.AddedPodGroupConfigMapConnections,
 			message.AddNoneAddition,
-			*message.PodGroupConfigMapConnectionUpdate,
-			message.PodGroupConfigMapConnectionUpdate,
-			*message.PodGroupConfigMapConnectionFieldsUpdate,
-			message.PodGroupConfigMapConnectionFieldsUpdate,
-			*message.PodGroupConfigMapConnectionDelete,
-			message.PodGroupConfigMapConnectionDelete,
+			*message.UpdatedPodGroupConfigMapConnection,
+			message.UpdatedPodGroupConfigMapConnection,
+			*message.UpdatedPodGroupConfigMapConnectionFields,
+			message.UpdatedPodGroupConfigMapConnectionFields,
+			*message.DeletedPodGroupConfigMapConnections,
+			message.DeletedPodGroupConfigMapConnections,
 			message.DeleteNoneAddition,
 		]{
 			PubSubComponent: newPubSubComponent(PubSubTypePodGroupConfigMapConnection),
