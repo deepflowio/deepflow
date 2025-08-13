@@ -20,7 +20,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -165,10 +165,19 @@ impl From<SomeIpInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&SomeIpInfo> for LogCache {
+    fn from(info: &SomeIpInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.resp_status,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SomeIpLog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for SomeIpLog {
@@ -279,7 +288,8 @@ mod tests {
     use std::rc::Rc;
     use std::{cell::RefCell, fs};
 
-    use super::SomeIpLog;
+    use super::*;
+
     use crate::{
         common::{
             flow::PacketDirection,
@@ -368,7 +378,7 @@ mod tests {
                     }
                 }
             } else {
-                output.push_str(&format!("{:?}\n", SomeIpLog::default()));
+                output.push_str(&serde_json::to_string(&SomeIpInfo::default()).unwrap());
             }
         }
         output

@@ -22,7 +22,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
     },
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{
@@ -125,6 +125,16 @@ impl From<PingInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&PingInfo> for LogCache {
+    fn from(info: &PingInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct PingLog {
     proto: L7Protocol,
@@ -165,12 +175,12 @@ impl L7ProtocolParserInterface for PingLog {
                     ..Default::default()
                 };
                 set_captured_byte!(info, param);
-                self.perf_stats.as_mut().map(|p| p.inc_req());
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
-
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if let Some(stats) = info.perf_stats(param) {
+                        info.rrt = stats.rrt_sum;
+                        perf_stats.sequential_merge(&stats);
+                    }
+                }
                 Ok(L7ParseResult::Single(L7ProtocolInfo::PingInfo(info)))
             }
             IcmpTypes::EchoReply => {
@@ -183,12 +193,12 @@ impl L7ProtocolParserInterface for PingLog {
                     ..Default::default()
                 };
                 set_captured_byte!(info, param);
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
-
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if let Some(stats) = info.perf_stats(param) {
+                        info.rrt = stats.rrt_sum;
+                        perf_stats.sequential_merge(&stats);
+                    }
+                }
                 Ok(L7ParseResult::Single(L7ProtocolInfo::PingInfo(info)))
             }
             _ => Err(Error::PingHeaderParseFailed),

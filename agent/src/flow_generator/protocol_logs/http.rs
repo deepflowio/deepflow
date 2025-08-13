@@ -37,7 +37,9 @@ use crate::{
         flow::PacketDirection,
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{
+            L7ParseResult, L7ProtocolParserInterface, LogCache, MultiMergeInfo, ParseParam,
+        },
         meta_packet::EbpfFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
@@ -537,23 +539,38 @@ impl HttpInfo {
         return Some(self.path[start + 1..end].to_string());
     }
 
-    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
-        if let Some(t) = config.l7_log_blacklist_trie.get(&self.proto) {
-            self.is_on_blacklist = if self.is_grpc() {
-                self.service_name
-                    .as_ref()
-                    .map(|p| t.request_resource.is_on_blacklist(p))
-                    .unwrap_or_default()
-            } else {
-                t.request_resource.is_on_blacklist(&self.path)
-            } || t.request_type.is_on_blacklist(self.method.as_str())
-                || t.request_domain.is_on_blacklist(&self.host)
-                || self
-                    .endpoint
-                    .as_ref()
-                    .map(|p| t.endpoint.is_on_blacklist(p))
-                    .unwrap_or_default();
+    fn check_on_blacklist(&self, config: &LogParserConfig) -> bool {
+        let Some(blacklist) = config.l7_log_blacklist_trie.get(&self.proto) else {
+            return false;
+        };
+
+        if self.is_grpc() {
+            if let Some(name) = self.service_name.as_ref() {
+                if blacklist.request_resource.is_on_blacklist(name) {
+                    return true;
+                }
+            }
+        } else {
+            if blacklist.request_resource.is_on_blacklist(&self.path) {
+                return true;
+            }
         }
+
+        if blacklist.request_type.is_on_blacklist(self.method.as_str()) {
+            return true;
+        }
+
+        if blacklist.request_domain.is_on_blacklist(&self.host) {
+            return true;
+        }
+
+        if let Some(endpoint) = self.endpoint.as_ref() {
+            if blacklist.endpoint.is_on_blacklist(endpoint) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -651,10 +668,30 @@ impl From<HttpInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&HttpInfo> for LogCache {
+    fn from(info: &HttpInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            multi_merge_info: if info.need_merge() {
+                Some(MultiMergeInfo {
+                    req_end: info.is_req_end,
+                    resp_end: info.is_resp_end,
+                    merged: false,
+                })
+            } else {
+                None
+            },
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct HttpLog {
     proto: L7Protocol,
-    last_is_on_blacklist: bool,
     perf_stats: Option<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
@@ -812,7 +849,6 @@ impl L7ProtocolParserInterface for HttpLog {
             },
             _ => unreachable!(),
         };
-        new_log.last_is_on_blacklist = self.last_is_on_blacklist;
         new_log.perf_stats = self.perf_stats.take();
         new_log.http2_req_decoder = self.http2_req_decoder.take();
         new_log.http2_resp_decoder = self.http2_resp_decoder.take();
@@ -878,95 +914,28 @@ impl HttpLog {
             };
             info.endpoint = Some(handle_endpoint(config, path));
         }
-        info.set_is_on_blacklist(config);
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match self.proto {
-                L7Protocol::Http1 => {
-                    match param.direction {
-                        PacketDirection::ClientToServer => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        PacketDirection::ServerToClient => {
-                            if let Some(code) = info.grpc_status_code {
-                                self.set_grpc_status(code, info);
-                            } else {
-                                self.set_status(info.status_code, info);
-                            }
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
-                    }
-                    if info.msg_type != LogMessageType::Session {
-                        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                            info.rrt = rrt;
-                            if info.msg_type == LogMessageType::Response {
-                                info.endpoint = endpoint;
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                        });
-                    }
-                }
-                L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
-                    EbpfType::GoHttp2Uprobe => {
-                        if info.is_req_end {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        if info.is_resp_end {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
 
-                        if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt_for_multi_merge_log(param, &info.endpoint).map(
-                                |(rrt, endpoint)| {
-                                    info.rrt = rrt;
-                                    if info.msg_type == LogMessageType::Response {
-                                        info.endpoint = endpoint;
-                                    }
-                                },
-                            );
-                        }
-
-                        if info.is_req_end || info.is_resp_end {
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
-                        }
-
-                        if param.direction == PacketDirection::ServerToClient {
-                            if let Some(code) = info.grpc_status_code {
-                                self.set_grpc_status(code, info);
-                            } else {
-                                self.set_status(info.status_code, info);
-                            }
-                        }
-                    }
-                    _ => {
-                        match param.direction {
-                            PacketDirection::ClientToServer => {
-                                self.perf_stats.as_mut().map(|p| p.inc_req());
-                            }
-                            PacketDirection::ServerToClient => {
-                                self.perf_stats.as_mut().map(|p| p.inc_resp());
-
-                                if let Some(code) = info.grpc_status_code {
-                                    self.set_grpc_status(code, info);
-                                } else {
-                                    self.set_status(info.status_code, info);
-                                }
-                            }
-                        }
-                        if info.msg_type != LogMessageType::Session {
-                            info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-                                info.rrt = rrt;
-                                if info.msg_type == LogMessageType::Response {
-                                    info.endpoint = endpoint;
-                                }
-                                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                            });
-                        }
-                    }
-                },
-                _ => unreachable!(),
+        if param.direction == PacketDirection::ServerToClient {
+            if let Some(code) = info.grpc_status_code {
+                self.set_grpc_status(code, info);
+            } else {
+                self.set_status(info.status_code, info);
             }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
+
+        info.is_on_blacklist = info.check_on_blacklist(config);
+
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                    info.endpoint = Some(endpoint.to_string());
+                }
+            }
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
+            }
+        }
     }
 
     fn set_header_decoder(&mut self, expected_headers_set: Arc<HashSet<Vec<u8>>>) {
@@ -995,11 +964,9 @@ impl HttpLog {
             | GRPC_STATUS_OUT_OF_RANGE
             | GRPC_STATUS_UNAUTHENTICATED
             | GRPC_STATUS_NOT_FOUND..=GRPC_STATUS_PERMISSION_DENIED => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
                 info.status = L7ResponseStatus::ClientError;
             }
             _ => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 info.status = L7ResponseStatus::ServerError;
             }
         }
@@ -1009,14 +976,10 @@ impl HttpLog {
         if status_code >= HTTP_STATUS_CLIENT_ERROR_MIN
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
-            // http客户端请求存在错误
-            self.perf_stats.as_mut().map(|p| p.inc_req_err());
             info.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
-            // http服务端响应存在错误
-            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             info.status = L7ResponseStatus::ServerError;
         } else {
             info.status = L7ResponseStatus::Ok;
@@ -1883,7 +1846,8 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 #[cfg(test)]
 mod tests {
     use crate::config::{
-        handler::{LogParserConfig, TraceType},
+        config::TagFilterOperator,
+        handler::{BlacklistTrie, LogParserConfig, TraceType},
         ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
@@ -2406,6 +2370,75 @@ mod tests {
             }
         }
         http.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn blacklist() {
+        fn execute_case(config: &LogParserConfig, packets: &[MetaPacket]) -> L7PerfStats {
+            let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+            let mut http = HttpLog::new_v1();
+            for packet in packets {
+                let Some(payload) = packet.get_l4_payload() else {
+                    continue;
+                };
+                let param = &mut ParseParam::new(
+                    &*packet,
+                    rrt_cache.clone(),
+                    Default::default(),
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    Default::default(),
+                    true,
+                    true,
+                );
+                param.set_log_parser_config(&config);
+                let _ = http.parse_payload(payload, param);
+            }
+            http.perf_stats.unwrap()
+        }
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join("httpv1.pcap"), None);
+        let mut packets = capture.as_meta_packets();
+        packets[0].lookup_key.direction = PacketDirection::ClientToServer;
+        packets[1].lookup_key.direction = PacketDirection::ServerToClient;
+
+        let config = LogParserConfig::default();
+        let blacklist_config = LogParserConfig {
+            l7_log_blacklist_trie: HashMap::from([(
+                L7Protocol::Http1,
+                BlacklistTrie::new(&vec![TagFilterOperator {
+                    field_name: "endpoint".to_string(),
+                    operator: "prefix".to_string(),
+                    value: "/query".to_string(),
+                }])
+                .unwrap(),
+            )]),
+            ..Default::default()
+        };
+        let expected = L7PerfStats {
+            request_count: 1,
+            response_count: 1,
+            rrt_count: 1,
+            rrt_sum: 84051,
+            rrt_max: 84051,
+            ..Default::default()
+        };
+
+        // normal order
+        let stats = execute_case(&config, &packets);
+        assert_eq!(stats, expected);
+
+        // normal with blacklist
+        let stats = execute_case(&blacklist_config, &packets);
+        assert_eq!(stats, Default::default());
+
+        // reversed
+        packets.reverse();
+        let stats = execute_case(&config, &packets);
+        assert_eq!(stats, expected);
+
+        // reversed with blacklist
+        let stats = execute_case(&blacklist_config, &packets);
+        assert_eq!(stats, Default::default());
     }
 
     #[test]

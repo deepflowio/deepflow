@@ -29,7 +29,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
         Timestamp,
     },
@@ -259,7 +259,7 @@ pub struct TlsInfo {
     msg_type: LogMessageType,
     rrt: u64,
     tls_rtt: u64,
-    session_id: Option<u32>,
+    cal_tls_rtt: bool,
 
     #[serde(skip)]
     is_on_blacklist: bool,
@@ -267,7 +267,13 @@ pub struct TlsInfo {
 
 impl L7ProtocolInfoInterface for TlsInfo {
     fn session_id(&self) -> Option<u32> {
-        self.session_id
+        // 0xff is a random non-zero value for tls rtt calculation
+        // Calling `info.perf_stats` with cal_tls_rtt `on` or `off` will generate two different results
+        if self.cal_tls_rtt {
+            Some(0xff)
+        } else {
+            None
+        }
     }
 
     fn merge_log(
@@ -459,12 +465,22 @@ impl From<TlsInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&TlsInfo> for LogCache {
+    fn from(info: &TlsInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct TlsLog {
     change_cipher_spec_count: u8,
     is_change_cipher_spec: bool,
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 //解析器接口实现
@@ -489,46 +505,29 @@ impl L7ProtocolParserInterface for TlsLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            // Triggered by Client Hello and the last Change cipher spec
+            if info.cal_tls_rtt {
+                if let Some(stats) = info.perf_stats(param) {
+                    info.tls_rtt = stats.rrt_sum;
+                    perf_stats.update_tls_rtt(stats.rrt_sum);
                 }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
+                info.cal_tls_rtt = false;
             }
-            match info.status {
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                _ => {}
+
+            // In some scenarios, the last Change cipher spec does not have a corresponding response,
+            // and this is directly set to be reported by session
+            if self.is_change_cipher_spec && info.msg_type == LogMessageType::Request {
+                info.status = L7ResponseStatus::Ok;
+                info.msg_type = LogMessageType::Session
             }
-            if info.session_id.is_some() {
-                // Triggered by Client Hello and the last Change cipher spec
-                info.cal_rrt(param, &None).map(|(rtt, _)| {
-                    info.tls_rtt = rtt;
-                    self.perf_stats.as_mut().map(|p| p.update_tls_rtt(rtt));
-                });
-                info.session_id = None;
-                // In some scenarios, the last Change cipher spec does not have a corresponding response,
-                // and this is directly set to be reported by session
-                if self.is_change_cipher_spec && info.msg_type == LogMessageType::Request {
-                    info.status = L7ResponseStatus::Ok;
-                    info.msg_type = LogMessageType::Session
-                }
-            }
-            if info.msg_type != LogMessageType::Session {
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
+
+            // This `perf_stats` is called with info.cal_tls_rtt == false
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
             }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::TlsInfo(info)))
         } else {
@@ -546,7 +545,7 @@ impl L7ProtocolParserInterface for TlsLog {
 }
 
 impl TlsLog {
-    const CHNAGE_CIPHER_SPEC_LIMIT: u8 = 2;
+    const CHANGE_CIPHER_SPEC_LIMIT: u8 = 2;
 
     fn parse(&mut self, payload: &[u8], info: &mut TlsInfo, param: &ParseParam) -> Result<()> {
         if self.perf_stats.is_none() && param.parse_perf {
@@ -589,7 +588,7 @@ impl TlsLog {
                 info.msg_type = LogMessageType::Request;
                 tls_headers.iter().for_each(|h| {
                     if h.is_client_hello() {
-                        info.session_id = Some(0xff);
+                        info.cal_tls_rtt = true;
                     }
                     if h.is_alert() {
                         info.status = L7ResponseStatus::ClientError;
@@ -598,9 +597,9 @@ impl TlsLog {
                     if h.is_change_cipher_spec() {
                         self.change_cipher_spec_count += 1;
                         self.is_change_cipher_spec = true;
-                        if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
+                        if self.change_cipher_spec_count >= Self::CHANGE_CIPHER_SPEC_LIMIT {
                             self.change_cipher_spec_count = 0;
-                            info.session_id = Some(0xff);
+                            info.cal_tls_rtt = true;
                         }
                     } else {
                         self.is_change_cipher_spec = false;
@@ -659,9 +658,9 @@ impl TlsLog {
                     if h.is_change_cipher_spec() {
                         self.change_cipher_spec_count += 1;
                         self.is_change_cipher_spec = true;
-                        if self.change_cipher_spec_count >= Self::CHNAGE_CIPHER_SPEC_LIMIT {
+                        if self.change_cipher_spec_count >= Self::CHANGE_CIPHER_SPEC_LIMIT {
                             self.change_cipher_spec_count = 0;
-                            info.session_id = Some(0xff);
+                            info.cal_tls_rtt = true;
                         }
                     } else {
                         self.is_change_cipher_spec = false;

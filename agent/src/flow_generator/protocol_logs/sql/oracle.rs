@@ -21,7 +21,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -206,11 +206,21 @@ impl From<OracleInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&OracleInfo> for LogCache {
+    fn from(info: &OracleInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct OracleLog {
     perf_stats: Option<L7PerfStats>,
     parser: OracleParser,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for OracleLog {
@@ -272,26 +282,12 @@ impl L7ProtocolParserInterface for OracleLog {
         if let Some(config) = param.parse_config {
             log_info.set_is_on_blacklist(config);
         }
-        if !log_info.is_on_blacklist && !self.last_is_on_blacklist {
-            match param.direction {
-                PacketDirection::ClientToServer => self.perf_stats.as_mut().map(|p| p.inc_req()),
-                PacketDirection::ServerToClient => self.perf_stats.as_mut().map(|p| p.inc_resp()),
-            };
-            match log_info.status {
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                _ => {}
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if let Some(stats) = log_info.perf_stats(param) {
+                log_info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
             }
-            log_info.cal_rrt(param, &None).map(|(rrt, _)| {
-                log_info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(log_info.rrt));
-            });
         }
-        self.last_is_on_blacklist = log_info.is_on_blacklist;
         Ok(L7ParseResult::Single(L7ProtocolInfo::OracleInfo(log_info)))
     }
 

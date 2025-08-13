@@ -2054,7 +2054,9 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             warn!("Unsupported l7_protocol: {:?}", k);
                             continue;
                         }
-                        BlacklistTrie::new(v).map(|x| blacklist_trie.insert(l7_protocol, x));
+                        if let Some(t) = BlacklistTrie::new(v) {
+                            blacklist_trie.insert(l7_protocol, t);
+                        }
                     }
                     blacklist_trie
                 },

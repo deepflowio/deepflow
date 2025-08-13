@@ -30,7 +30,7 @@ use crate::{
         enums::IpProtocol,
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::LogParserConfig,
@@ -367,10 +367,20 @@ impl From<DnsInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&DnsInfo> for LogCache {
+    fn from(info: &DnsInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status(),
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct DnsLog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 //解析器接口实现
@@ -401,23 +411,12 @@ impl L7ProtocolParserInterface for DnsLog {
             if let Some(config) = param.parse_config {
                 info.set_is_on_blacklist(config);
             }
-            if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                if info.msg_type == LogMessageType::Response {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                    if info.status() == L7ResponseStatus::ClientError {
-                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                    } else if info.status() == L7ResponseStatus::ServerError {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                    }
-                } else {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+            if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if let Some(stats) = info.perf_stats(param) {
+                    info.rrt = stats.rrt_sum;
+                    perf_stats.sequential_merge(&stats);
                 }
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
             }
-            self.last_is_on_blacklist = info.is_on_blacklist;
         }
 
         if param.parse_log {

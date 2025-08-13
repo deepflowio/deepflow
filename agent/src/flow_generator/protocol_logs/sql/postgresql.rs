@@ -25,7 +25,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::LogParserConfig,
@@ -193,11 +193,21 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&PostgreInfo> for LogCache {
+    fn from(info: &PostgreInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct PostgresqlLog {
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
@@ -230,36 +240,14 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if !info.is_on_blacklist
-            && !self.last_is_on_blacklist
-            && !info.ignore
-            && info.at_lease_one_block
-        {
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+        if !info.ignore && info.at_lease_one_block {
+            if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if let Some(stats) = info.perf_stats(param) {
+                    info.rrt = stats.rrt_sum;
+                    perf_stats.sequential_merge(&stats);
                 }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
-            }
-            match info.status {
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                _ => {}
-            }
-            if info.at_lease_one_block {
-                info.cal_rrt(param, &None).map(|(rrt, _)| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
             }
         }
-        self.last_is_on_blacklist = info.is_on_blacklist;
         Ok(if info.ignore || !param.parse_log {
             L7ParseResult::None
         } else {

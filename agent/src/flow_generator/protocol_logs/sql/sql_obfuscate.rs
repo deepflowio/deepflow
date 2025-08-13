@@ -823,13 +823,21 @@ mod tests {
                     "SELECT CustomerName, OrderDate, TotalAmount FROM (SELECT Customers.CustomerName, Orders.OrderDate, SUM(OrderDetails.Quantity * OrderDetails.UnitPrice) OVER (PARTITION BY Customers.CustomerID) AS TotalAmount, ROW_NUMBER() OVER (PARTITION BY Customers.CustomerID ORDER BY Orders.OrderDate DESC) AS RowNum FROM Customers INNER JOIN Orders ON Customers.CustomerID = Orders.CustomerID INNER JOIN OrderDetails ON Orders.OrderID = OrderDetails.OrderID) AS Subquery WHERE RowNum = 1;",
                     Some("SELECT CustomerName, OrderDate, TotalAmount FROM (SELECT Customers.CustomerName, Orders.OrderDate, SUM(OrderDetails.Quantity * ?) OVER (PARTITION BY Customers.CustomerID),ROW_NUMBER() OVER (PARTITION BY Customers.CustomerID ORDER BY Orders.OrderDate DESC) FROM Customers INNER JOIN Orders ON Customers.CustomerID = ? INNER JOIN OrderDetails ON Orders.OrderID = ?) WHERE RowNum = ?;"),
                 ),
+                // TODO: fix this test case
+                (
+                    "SELECT * FROM `process` WHERE `process`.`deleted_at` IS NULL",
+                    Some("SELECT * FROM `process` WHERE `process`.`deleted_at` IS ?"),
+                )
             ];
         for (ti, tt) in test_cases.iter().enumerate() {
+            let result = attempt_obfuscation(&obfuscate_cache, tt.0.as_bytes());
             assert_eq!(
-                attempt_obfuscation(&obfuscate_cache, tt.0.as_bytes()),
+                result,
                 tt.1.map(|o| o.as_bytes().to_vec()),
-                "{}",
-                format!("Test case {}", ti)
+                "Test case {ti}, result is {:?}",
+                result
+                    .as_ref()
+                    .map(|r| std::str::from_utf8(&r).unwrap().to_owned())
             );
         }
     }

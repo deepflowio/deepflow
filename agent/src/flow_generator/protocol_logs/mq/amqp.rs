@@ -25,7 +25,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::LogParserConfig,
@@ -34,7 +34,7 @@ use crate::{
         protocol_logs::{
             decode_base64_to_string,
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, AppProtoHead, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be, read_u64_be},
@@ -733,7 +733,6 @@ impl AmqpInfo {
 pub struct AmqpLog {
     perf_stats: Option<L7PerfStats>,
     vhost: Option<String>,
-    last_is_on_blacklist: bool,
 }
 
 impl From<AmqpInfo> for L7ProtocolSendLog {
@@ -768,6 +767,18 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             ..Default::default()
         };
         log
+    }
+}
+
+impl From<&AmqpInfo> for LogCache {
+    fn from(info: &AmqpInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: L7ResponseStatus::Ok,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
     }
 }
 
@@ -964,32 +975,21 @@ impl L7ProtocolParserInterface for AmqpLog {
             if let L7ProtocolInfo::AmqpInfo(info) = info {
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
+                info.endpoint = info.generate_endpoint();
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                    if info.msg_type == LogMessageType::Request {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
-                        info.endpoint = info.generate_endpoint();
-                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
-                            info.rtt = rtt;
-                            if info.msg_type == LogMessageType::Response {
-                                info.endpoint = endpoint;
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                        });
-                    } else if info.msg_type == LogMessageType::Response {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        info.cal_rrt(param, &info.endpoint).map(|(rtt, endpoint)| {
-                            info.rtt = rtt;
-                            if info.msg_type == LogMessageType::Response {
-                                info.endpoint = endpoint;
-                            }
-                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                        });
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if info.msg_type == LogMessageType::Response {
+                        if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                            info.endpoint = Some(endpoint.to_string());
+                        }
+                    }
+                    if let Some(stats) = info.perf_stats(param) {
+                        info.rtt = stats.rrt_sum;
+                        perf_stats.sequential_merge(&stats);
                     }
                 }
-                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
         if !param.parse_log {
@@ -1005,7 +1005,6 @@ impl L7ProtocolParserInterface for AmqpLog {
 
     fn reset(&mut self) {
         let mut s = Self::default();
-        s.last_is_on_blacklist = self.last_is_on_blacklist;
         s.vhost = self.vhost.take();
         s.perf_stats = self.perf_stats.take();
         *self = s;

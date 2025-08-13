@@ -18,7 +18,10 @@ use std::cell::RefCell;
 use std::fmt;
 use std::net::IpAddr;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
@@ -34,14 +37,13 @@ use crate::common::meta_packet::{IcmpData, ProtocolData};
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
-use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
-use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
-use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
-use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
-    AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MemcachedLog, MongoDBLog, MqttLog,
-    MysqlLog, NatsLog, OpenWireLog, OracleLog, PingLog, PostgresqlLog, PulsarLog, RedisLog,
-    SofaRpcLog, SomeIpLog, TarsLog, TlsLog, ZmtpLog,
+    fastcgi::FastCGILog,
+    plugin::{custom_wrap::CustomWrapLog, get_custom_log_parser},
+    sql::ObfuscateCache,
+    AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, L7ResponseStatus, MemcachedLog,
+    MongoDBLog, MqttLog, MysqlLog, NatsLog, OpenWireLog, OracleLog, PingLog, PostgresqlLog,
+    PulsarLog, RedisLog, SofaRpcLog, SomeIpLog, TarsLog, TlsLog, ZmtpLog,
 };
 
 use crate::flow_generator::{LogMessageType, Result};
@@ -291,13 +293,68 @@ pub struct EbpfParam<'a> {
     pub process_kname: &'a str,
 }
 
+#[derive(Default)]
+pub struct MultiMergeInfo {
+    pub req_end: bool,
+    pub resp_end: bool,
+    pub merged: bool,
+}
+
+#[derive(Default)]
 pub struct LogCache {
     pub msg_type: LogMessageType,
     pub time: u64,
-    pub endpoint: Option<String>,
-    // req_end, resp_end, merged
+    pub resp_status: L7ResponseStatus,
+
+    pub on_blacklist: bool,
+
     // set merged to true when req and resp merge once
-    pub multi_merge_info: Option<(bool, bool, bool)>,
+    pub multi_merge_info: Option<MultiMergeInfo>,
+    // used to update response endpoint from request
+    // leave it to None when not needed to reduce memory allocation (not calling `load_endpoint_from_cache`)
+    pub endpoint: Option<String>,
+}
+
+impl LogCache {
+    pub fn is_request_of(&self, other: &Self) -> bool {
+        self.msg_type == LogMessageType::Request
+            && other.msg_type == LogMessageType::Response
+            && self.time < other.time
+    }
+
+    pub fn is_response_of(&self, other: &Self) -> bool {
+        self.msg_type == LogMessageType::Response
+            && other.msg_type == LogMessageType::Request
+            && self.time > other.time
+    }
+}
+
+impl From<&LogCache> for L7PerfStats {
+    fn from(cache: &LogCache) -> Self {
+        let (request_count, response_count) = match cache.multi_merge_info.as_ref() {
+            Some(info) => (
+                if info.req_end { 1 } else { 0 },
+                if info.resp_end { 1 } else { 0 },
+            ),
+            None => match cache.msg_type {
+                LogMessageType::Request => (1, 0),
+                LogMessageType::Response => (0, 1),
+                _ => (0, 0),
+            },
+        };
+        let (err_client_count, err_server_count) = match cache.resp_status {
+            L7ResponseStatus::ClientError => (1, 0),
+            L7ResponseStatus::ServerError => (0, 1),
+            _ => (0, 0),
+        };
+        L7PerfStats {
+            request_count,
+            response_count,
+            err_client_count,
+            err_server_count,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -340,100 +397,171 @@ impl LogCacheKey {
     }
 }
 
-pub struct L7PerfCache {
-    // lru cache previous rrt
-    pub rrt_cache: LruCache<LogCacheKey, LogCache>,
-    // LruCache<flow_id, (in_cache_req, count)>
-    pub timeout_cache: LruCache<u64, (usize, usize)>,
-    // LruCache<flow_id, LruCache<LogCacheKey, bool>>
-    pub flow_id_map: LruCache<u64, LruCache<LogCacheKey, bool>>,
-    // time in microseconds
-    pub last_log_time: u64,
+#[derive(Clone)]
+pub struct L7PerfCacheCounter {
+    pub rrt_cache_len: Arc<AtomicU64>,
+    pub timeout_cache_len: Arc<AtomicU64>,
 }
 
-impl L7PerfCache {
+pub struct RrtCache {
+    // lru cache previous rrt
+    logs: LruCache<LogCacheKey, LogCache>,
+    // LruCache<flow_id, LruCache<LogCacheKey, bool>>
+    flows: LruCache<u64, LruCache<LogCacheKey, ()>>,
+
+    cache_len: Arc<AtomicU64>,
+
+    // time in microseconds
+    last_log_time: u64,
+}
+
+impl RrtCache {
     // 60 seconds
     const LOG_INTERVAL: u64 = 60_000_000;
+
     // When the number of concurrent transactions exceeds this value, the RRT calculation error will occur.
     const MAX_RRT_CACHE_PER_FLOW: usize = 128;
 
-    pub fn new(cap: usize) -> Self {
-        L7PerfCache {
-            rrt_cache: LruCache::new(cap.try_into().unwrap()),
-            timeout_cache: LruCache::new(cap.try_into().unwrap()),
-            flow_id_map: LruCache::new(cap.try_into().unwrap()),
-            last_log_time: 0,
-        }
+    pub fn get(&mut self, key: &LogCacheKey) -> Option<&LogCache> {
+        self.logs.get(key)
+    }
+
+    pub fn get_mut(&mut self, key: &LogCacheKey) -> Option<&mut LogCache> {
+        self.logs.get_mut(key)
     }
 
     pub fn put(&mut self, key: LogCacheKey, value: LogCache) -> Option<LogCache> {
         let now = value.time;
-        if self.rrt_cache.len() >= usize::from(self.rrt_cache.cap())
+        if self.logs.len() >= usize::from(self.logs.cap())
             && self.last_log_time + Self::LOG_INTERVAL < now
         {
             self.last_log_time = now;
-            debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+            debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.logs.cap());
         }
-        if let Some((old, _)) = self
-            .flow_id_map
-            .get_or_insert_mut(key.flow_id(), || {
-                let mut cache = LruCache::new(Self::MAX_RRT_CACHE_PER_FLOW.try_into().unwrap());
-                cache.put(key.clone(), true);
-                cache
-            })
-            .push(key.clone(), true)
-        {
+
+        let keys = self.flows.get_or_insert_mut(key.flow_id(), || {
+            LruCache::new(Self::MAX_RRT_CACHE_PER_FLOW.try_into().unwrap())
+        });
+        match keys.push(key, ()) {
             // Another cache entry is removed due to the lru's capacity.
-            if key != old {
-                self.rrt_cache.pop(&old);
+            Some((old, _)) if key != old => {
+                self.logs.pop(&old);
                 if self.last_log_time + Self::LOG_INTERVAL < now {
                     self.last_log_time = now;
                     debug!(
-                        "The capacity({}) of the flow id table will be exceeded, flow id: {}",
+                        "LogCache removed from flow id {} cache because capacity({}) exceeded",
+                        old.flow_id(),
                         Self::MAX_RRT_CACHE_PER_FLOW,
-                        old.flow_id()
                     );
                 }
             }
+            _ => (),
         }
-        self.rrt_cache.put(key, value)
+
+        let ret = self.logs.put(key, value);
+        self.cache_len
+            .store(self.logs.len() as u64, Ordering::Relaxed);
+        ret
     }
 
-    pub fn pop(&mut self, key: LogCacheKey) -> Option<LogCache> {
-        if let Some(cache) = self.flow_id_map.get_mut(&key.flow_id()) {
-            cache.pop(&key);
+    pub fn pop(&mut self, key: &LogCacheKey) -> Option<LogCache> {
+        if let Some(cache) = self.flows.get_mut(&key.flow_id()) {
+            cache.pop(key);
 
             if cache.is_empty() {
-                self.flow_id_map.pop(&key.flow_id());
+                self.flows.pop(&key.flow_id());
             }
         }
-        self.rrt_cache.pop(&key)
+        let ret = self.logs.pop(key);
+        self.cache_len
+            .store(self.logs.len() as u64, Ordering::Relaxed);
+        ret
     }
 
-    pub fn pop_timeout_count(&mut self, flow_id: &u64, flow_end: bool) -> usize {
-        let (in_cache, t) = self.timeout_cache.pop(flow_id).unwrap_or((0, 0));
+    pub fn remove_flow(&mut self, flow_id: u64) {
+        if let Some(keys) = self.flows.pop(&flow_id) {
+            for (key, _) in keys {
+                self.logs.pop(&key);
+            }
+        }
+        self.cache_len
+            .store(self.logs.len() as u64, Ordering::Relaxed);
+    }
+}
+
+#[derive(Default)]
+pub struct TimeoutCacheEntry {
+    pub in_cache: u64,
+    pub timeout: u64,
+}
+
+pub struct TimeoutCache {
+    flows: LruCache<u64, TimeoutCacheEntry>,
+    cache_len: Arc<AtomicU64>,
+}
+
+impl TimeoutCache {
+    pub fn pop_timeout_count(&mut self, flow_id: u64, flow_end: bool) -> u64 {
+        let entry = self.get_or_insert_mut(flow_id);
         if flow_end {
-            in_cache + t
+            let v = entry.in_cache + entry.timeout;
+            self.flows.pop(&flow_id);
+            self.cache_len
+                .store(self.flows.len() as u64, Ordering::Relaxed);
+            v
         } else {
-            self.timeout_cache.put(*flow_id, (in_cache, 0));
-            t
+            let v = entry.timeout;
+            entry.timeout = 0;
+            v
         }
     }
 
-    pub fn get_or_insert_mut(&mut self, flow_id: u64) -> &mut (usize, usize) {
-        self.timeout_cache.get_or_insert_mut(flow_id, || (0, 0))
+    pub fn get_or_insert_mut(&mut self, flow_id: u64) -> &mut TimeoutCacheEntry {
+        self.flows
+            .get_or_insert_mut(flow_id, || TimeoutCacheEntry::default());
+        self.cache_len
+            .store(self.flows.len() as u64, Ordering::Relaxed);
+        self.flows.get_mut(&flow_id).unwrap()
     }
 
-    pub fn remove(&mut self, flow_id: &u64) {
-        self.timeout_cache.pop(flow_id);
+    pub fn remove_flow(&mut self, flow_id: u64) {
+        self.flows.pop(&flow_id);
+        self.cache_len
+            .store(self.flows.len() as u64, Ordering::Relaxed);
+    }
+}
 
-        let Some(keys) = self.flow_id_map.pop(flow_id) else {
-            return;
-        };
+pub struct L7PerfCache {
+    pub rrt_cache: RrtCache,
+    pub timeout_cache: TimeoutCache,
+}
 
-        for (key, _) in keys {
-            self.rrt_cache.pop(&key);
+impl L7PerfCache {
+    pub fn new(cap: usize) -> Self {
+        L7PerfCache {
+            rrt_cache: RrtCache {
+                logs: LruCache::new(cap.try_into().unwrap()),
+                flows: LruCache::new(cap.try_into().unwrap()),
+                cache_len: Arc::new(AtomicU64::new(0)),
+                last_log_time: 0,
+            },
+            timeout_cache: TimeoutCache {
+                flows: LruCache::new(cap.try_into().unwrap()),
+                cache_len: Arc::new(AtomicU64::new(0)),
+            },
         }
+    }
+
+    pub fn counters(&self) -> L7PerfCacheCounter {
+        L7PerfCacheCounter {
+            rrt_cache_len: self.rrt_cache.cache_len.clone(),
+            timeout_cache_len: self.timeout_cache.cache_len.clone(),
+        }
+    }
+
+    pub fn remove_flow(&mut self, flow_id: u64) {
+        self.rrt_cache.remove_flow(flow_id);
+        self.timeout_cache.remove_flow(flow_id);
     }
 }
 

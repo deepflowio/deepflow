@@ -28,7 +28,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     config::handler::{LogParserConfig, TraceType},
@@ -311,10 +311,21 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&SofaRpcInfo> for LogCache {
+    fn from(info: &SofaRpcInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.status,
+            on_blacklist: info.is_on_blacklist,
+            endpoint: info.get_endpoint(),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SofaRpcLog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
@@ -338,10 +349,17 @@ impl L7ProtocolParserInterface for SofaRpcLog {
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                    self.cal_perf(param, &mut info);
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if info.msg_type == LogMessageType::Response {
+                        if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                            info.endpoint = Some(endpoint.to_string());
+                        }
+                    }
+                    if let Some(stats) = info.perf_stats(param) {
+                        info.rrt = stats.rrt_sum;
+                        perf_stats.sequential_merge(&stats);
+                    }
                 }
-                self.last_is_on_blacklist = info.is_on_blacklist;
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
                 } else {
@@ -494,36 +512,6 @@ impl SofaRpcLog {
         } else {
             Ok(true)
         }
-    }
-
-    fn cal_perf(&mut self, param: &ParseParam, info: &mut SofaRpcInfo) {
-        match info.msg_type {
-            LogMessageType::Request => {
-                self.perf_stats.as_mut().map(|p| p.inc_req());
-            }
-            LogMessageType::Response => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
-            }
-            _ => {}
-        }
-
-        match info.status {
-            L7ResponseStatus::ClientError => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-            }
-            L7ResponseStatus::ServerError => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-            }
-            _ => {}
-        }
-
-        info.cal_rrt(param, &info.endpoint).map(|(rrt, endpoint)| {
-            info.rrt = rrt;
-            if info.msg_type == LogMessageType::Response {
-                info.endpoint = endpoint;
-            }
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
     }
 }
 
