@@ -134,7 +134,7 @@ func (i *ChIPRelation) newToolDataSet(db *mysql.DB) (*toolDataSet, bool) {
 	}
 
 	var vifs []*mysqlmodel.VInterface
-	if err := db.Where(
+	if err := db.Select("id", "deviceid", "devicetype").Where(
 		"devicetype IN ?",
 		[]int{
 			common.VIF_DEVICE_TYPE_VM,
