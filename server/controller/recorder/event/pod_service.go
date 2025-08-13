@@ -36,7 +36,7 @@ type PodService struct {
 func NewPodService(cfg config.Config, q *queue.OverwriteQueue) *PodService {
 	mng := &PodService{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, SubTopic(pubsub.TopicResourceUpdatedFull)),
 		cfg,
 		ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, // PodServiceID 在 ingester 中并未被使用，必须指定 instance_type 为 PodService
 	}

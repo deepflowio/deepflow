@@ -45,7 +45,7 @@ type VM struct {
 func NewVM(q *queue.OverwriteQueue) *VM {
 	mng := &VM{
 		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, q),
-		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, SubTopic(pubsub.TopicResourceUpdatedMessage)),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_VM_EN, SubTopic(pubsub.TopicResourceUpdatedFull)),
 		ctrlrcommon.VIF_DEVICE_TYPE_VM,
 	}
 	mng.SetSubscriberSelf(mng)
