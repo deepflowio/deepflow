@@ -1092,12 +1092,10 @@ impl Synchronizer {
 
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
-                    session.set_request_failed(true);
                     Self::grpc_failed_log(&mut grpc_failed_count, format!("from trigger {:?}", m));
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
-                session.set_request_failed(false);
                 grpc_failed_count = 0;
 
                 let mut stream = response.unwrap().into_inner();
