@@ -53,7 +53,7 @@ const (
 	DefaultByconityService          = "deepflow-byconity-server"
 	DefaultCKDBServicePort          = 9000
 	DefaultListenPort               = 20033
-	DefaultGrpcBufferSize           = 41943040
+	DefaultGrpcBufferSize           = 104857600
 	DefaultServiceLabelerLruCap     = 1 << 22
 	DefaultCKDBEndpointTCPPortName  = "tcp-port"
 	DefaultStatsInterval            = 10      // s
