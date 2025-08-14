@@ -243,12 +243,10 @@ impl Interior {
             let (sender, receiver) = mpsc::channel(1);
             let responser = Responser::new(self.agent_id.clone(), receiver);
 
-            self.session.update_current_server().await;
             let session_version = self.session.get_version();
             let (channel, rx_size) = match self.session.get_client() {
                 Some(c) => c,
                 None => {
-                    self.session.set_request_failed(true);
                     tokio::time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
