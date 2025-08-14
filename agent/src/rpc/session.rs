@@ -93,11 +93,9 @@ macro_rules! sync_grpc_call {
         let prefix = std::concat!("grpc ", stringify!($func));
 
         log::trace!("{} prepare client", prefix);
-        $self.update_current_server().await;
         let (channel, rx_size) = match $self.get_client() {
             Some(c) => c,
             None => {
-                $self.set_request_failed(true);
                 return Err(tonic::Status::cancelled("grpc client not connected"));
             }
         };
@@ -203,10 +201,13 @@ impl Session {
             }
             Err(e) => {
                 self.exception_handler.set(Exception::ControllerSocketError);
-                self.set_request_failed(true);
                 error!("{}", e);
             }
         }
+    }
+
+    fn reset_client(&self) {
+        self.client.write().channel = None;
     }
 
     pub fn get_client(&self) -> Option<(Channel, usize)> {
@@ -229,9 +230,12 @@ impl Session {
         self.server_dispatcher.read().get_current_ip()
     }
 
+    // Note: This function can only be called by the grpc sync thread.
     pub async fn update_current_server(&self) -> bool {
         let changed = self.server_dispatcher.write().update_current_ip();
         if changed || self.get_client().is_none() {
+            self.reset_client();
+
             let (ip, port) = self.server_dispatcher.read().get_current_ip();
             self.dial(&ip, port, &self.controller_cert_file_prefix)
                 .await;
@@ -252,6 +256,7 @@ impl Session {
         self.server_dispatcher.read().get_request_failed()
     }
 
+    // Note: This function can only be called by the grpc sync thread.
     pub fn set_request_failed(&self, failed: bool) {
         self.server_dispatcher.write().set_request_failed(failed);
     }
@@ -572,7 +577,7 @@ impl ServerDispatcher {
             (true, true) => {
                 let new_ip = self.get_current_controller_ip();
                 info!(
-                    "rpc IP changed to controller {} from unavailable proxy {}",
+                    "grpc server changed to controller {} from unavailable proxy {}",
                     new_ip, self.current_ip
                 );
                 self.current_ip = new_ip;
@@ -586,7 +591,7 @@ impl ServerDispatcher {
                 let proxy_ip = self.get_proxy_ip().unwrap();
                 if proxy_port != self.current_port || self.current_ip != proxy_ip {
                     info!(
-                        "rpc Proxy changed to proxy {} {} from proxy {} {}",
+                        "grpc server changed to proxy {} {} from proxy {} {}",
                         proxy_ip, proxy_port, self.current_ip, self.current_port
                     );
                     // 配置变更需要更新
@@ -602,14 +607,20 @@ impl ServerDispatcher {
                 self.next_controller_ip();
                 let port = self.get_port(false);
                 let ip = self.get_current_controller_ip();
-                info!(
-                    "rpc IP changed to controller {} {} from unavailable controller {} {}",
-                    ip, port, self.current_ip, self.current_port
-                );
-                self.current_port = port;
-                self.current_ip = ip;
 
-                true
+                if self.current_port != port || self.current_ip != ip {
+                    info!(
+                        "grpc server changed to controller {} {} from unavailable controller {} {}",
+                        ip, port, self.current_ip, self.current_port
+                    );
+                    self.current_port = port;
+                    self.current_ip = ip;
+
+                    true
+                } else {
+                    info!("grpc server controller {} {} change is consistent before and after, not updated", ip, port);
+                    false
+                }
             }
             // 访问控制器成功，切换为代理控制器
             (false, false) => {
@@ -621,7 +632,7 @@ impl ServerDispatcher {
 
                 if self.current_port != proxy_port || self.current_ip != proxy_ip {
                     info!(
-                        "rpc IP changed to proxy {} {} from controller {} {}",
+                        "grpc server changed to proxy {} {} from controller {} {}",
                         proxy_ip, proxy_port, self.current_ip, self.current_port
                     );
                     self.current_port = proxy_port;
@@ -629,7 +640,7 @@ impl ServerDispatcher {
                     true
                 } else {
                     info!(
-                        "rpc proxy {} {} and controller {} {} are the same, not updated",
+                        "grpc server proxy {} {} and controller {} {} are the same, not updated",
                         proxy_ip, proxy_port, proxy_ip, proxy_port
                     );
                     false
