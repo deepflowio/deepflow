@@ -734,7 +734,7 @@ ingester:
   #tcp-reader-buffer: 1048576
 
   ## Rpc synchronization recv/send msg buffer(unit: Byte)
-  #grpc-buffer-size: 41943040
+  #grpc-buffer-size: 104857600
 
   ## query platformData service, port filter fastmap LRU capacity(unit: count)
   #service-labber-lru-cap: 4194304
