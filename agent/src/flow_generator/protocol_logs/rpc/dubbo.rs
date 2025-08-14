@@ -189,18 +189,20 @@ impl DubboInfo {
         if self.trace_id.prio <= BASE_FIELD_PRIORITY {
             return;
         }
-        trace_type
-            .decode_trace_id(&trace_id)
-            .map(|id| self.trace_id = PrioField::new(BASE_FIELD_PRIORITY, id.to_string()));
+        self.trace_id = match trace_type.decode_trace_id(&trace_id) {
+            Some(id) => PrioField::new(BASE_FIELD_PRIORITY, id.to_string()),
+            None => PrioField::new(BASE_FIELD_PRIORITY, trace_id),
+        }
     }
 
     fn set_span_id(&mut self, span_id: String, trace_type: &TraceType) {
         if self.span_id.prio <= BASE_FIELD_PRIORITY {
             return;
         }
-        trace_type
-            .decode_span_id(&span_id)
-            .map(|id| self.span_id = PrioField::new(BASE_FIELD_PRIORITY, id.to_string()));
+        self.span_id = match trace_type.decode_span_id(&span_id) {
+            Some(id) => PrioField::new(BASE_FIELD_PRIORITY, id.to_string()),
+            None => PrioField::new(BASE_FIELD_PRIORITY, span_id),
+        }
     }
 
     pub fn merge_custom_info(&mut self, custom: CustomInfo) {
