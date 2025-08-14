@@ -252,3 +252,108 @@ pub mod tkex {
         }
     }
 }
+
+pub mod legacy {
+    use super::*;
+
+    use k8s_openapi::api::networking::v1::IngressTLS;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    pub struct IngressBackend {
+        pub resource: Option<k8s_openapi::api::core::v1::TypedLocalObjectReference>,
+        pub service_name: Option<String>,
+        pub service_port: Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    pub struct IngressRule {
+        pub host: Option<String>,
+        pub http: Option<HTTPIngressRuleValue>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    pub struct HTTPIngressRuleValue {
+        pub paths: Option<Vec<HTTPIngressPath>>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    pub struct HTTPIngressPath {
+        pub backend: IngressBackend,
+        pub path: Option<String>,
+        pub path_type: Option<String>,
+    }
+
+    pub mod networking {
+        use super::*;
+
+        #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+        #[kube(
+            group = "networking.k8s.io",
+            version = "v1beta1",
+            kind = "Ingress",
+            namespaced
+        )]
+        #[serde(rename_all = "camelCase")]
+        pub struct IngressSpec {
+            pub backend: Option<IngressBackend>,
+            pub ingress_class_name: Option<String>,
+            pub rules: Option<Vec<IngressRule>>,
+            pub tls: Option<Vec<IngressTLS>>,
+        }
+
+        impl Trimmable for Ingress {
+            fn trim(mut self) -> Self {
+                let name = if let Some(name) = self.metadata.name.as_ref() {
+                    name
+                } else {
+                    ""
+                };
+                let mut resource = Self::new(name, self.spec);
+                resource.metadata = ObjectMeta {
+                    uid: self.metadata.uid.take(),
+                    name: self.metadata.name.take(),
+                    namespace: self.metadata.namespace.take(),
+                    ..Default::default()
+                };
+                resource
+            }
+        }
+    }
+
+    pub mod extensions {
+        use super::*;
+
+        #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+        #[kube(
+            group = "extensions",
+            version = "v1beta1",
+            kind = "Ingress",
+            namespaced
+        )]
+        #[serde(rename_all = "camelCase")]
+        pub struct IngressSpec {
+            pub backend: Option<IngressBackend>,
+            pub ingress_class_name: Option<String>,
+            pub rules: Option<Vec<IngressRule>>,
+            pub tls: Option<Vec<IngressTLS>>,
+        }
+
+        impl Trimmable for Ingress {
+            fn trim(mut self) -> Self {
+                let name = if let Some(name) = self.metadata.name.as_ref() {
+                    name
+                } else {
+                    ""
+                };
+                let mut resource = Self::new(name, self.spec);
+                resource.metadata = ObjectMeta {
+                    uid: self.metadata.uid.take(),
+                    name: self.metadata.name.take(),
+                    namespace: self.metadata.namespace.take(),
+                    ..Default::default()
+                };
+                resource
+            }
+        }
+    }
+}

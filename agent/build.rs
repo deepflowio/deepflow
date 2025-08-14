@@ -68,7 +68,7 @@ fn get_branch() -> Result<String> {
 struct EnvCommand(&'static str, Vec<&'static str>);
 
 fn set_build_info() -> Result<()> {
-    println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
+    println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ee");
     println!("cargo:rustc-env=BRANCH={}", get_branch()?);
     println!(
         "cargo:rustc-env=COMPILE_TIME={}",
