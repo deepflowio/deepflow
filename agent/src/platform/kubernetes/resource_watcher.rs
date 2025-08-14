@@ -60,6 +60,7 @@ use tokio::{
 use super::crd::{
     calico::IpPool,
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
+    legacy,
     opengauss::OpenGaussCluster,
     pingan_cloud::ServiceRule,
     tkex::StatefulSetPlus,
@@ -210,6 +211,8 @@ pub enum GenericResourceWatcher {
     ReplicationController(ResourceWatcher<ReplicationController>),
     ReplicaSet(ResourceWatcher<ReplicaSet>),
     V1Ingress(ResourceWatcher<networking::v1::Ingress>),
+    V1Beta1Ingress(ResourceWatcher<legacy::networking::Ingress>),
+    ExtV1Beta1Ingress(ResourceWatcher<legacy::extensions::Ingress>),
     Route(ResourceWatcher<Route>),
     ConfigMap(ResourceWatcher<ConfigMap>),
 
@@ -381,10 +384,20 @@ pub fn default_resources() -> Vec<Resource> {
         Resource {
             name: "ingresses",
             pb_name: "*v1.Ingress",
-            group_versions: vec![GroupVersion {
-                group: "networking.k8s.io",
-                version: "v1",
-            }],
+            group_versions: vec![
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1",
+                },
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                },
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                },
+            ],
             selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
@@ -506,10 +519,20 @@ pub fn supported_resources() -> Vec<Resource> {
         Resource {
             name: "ingresses",
             pb_name: "*v1.Ingress",
-            group_versions: vec![GroupVersion {
-                group: "networking.k8s.io",
-                version: "v1",
-            }],
+            group_versions: vec![
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1",
+                },
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                },
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                },
+            ],
             selected_gv: SelectedGv::None,
             field_selector: String::new(),
         },
@@ -1459,6 +1482,24 @@ impl ResourceWatcherFactory {
                     group: "networking.k8s.io",
                     version: "v1",
                 } => GenericResourceWatcher::V1Ingress(self.new_namespace_resource(
+                    resource,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                } => GenericResourceWatcher::V1Beta1Ingress(self.new_namespace_resource(
+                    resource,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                } => GenericResourceWatcher::ExtV1Beta1Ingress(self.new_namespace_resource(
                     resource,
                     stats_collector,
                     namespace,
