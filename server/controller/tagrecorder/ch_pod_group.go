@@ -77,7 +77,7 @@ func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod
 		ChIDBase:     mysqlmodel.ChIDBase{ID: source.ID},
 		Name:         sourceName,
 		IconID:       iconID,
-		PodGroupType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		PodGroupType: common.RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
 		TeamID:       md.GetTeamID(),
@@ -99,7 +99,7 @@ func (c *ChPodGroup) onResourceUpdated(md *message.Metadata, updateMessage *mess
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if fieldsUpdate.Type.IsDifferent() {
-		updateInfo["pod_group_type"] = RESOURCE_POD_GROUP_TYPE_MAP[fieldsUpdate.Type.GetNew()]
+		updateInfo["pod_group_type"] = common.RESOURCE_POD_GROUP_TYPE_MAP[fieldsUpdate.Type.GetNew()]
 	}
 	if fieldsUpdate.PodClusterID.IsDifferent() {
 		updateInfo["pod_cluster_id"] = fieldsUpdate.PodClusterID.GetNew()
