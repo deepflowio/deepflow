@@ -1003,10 +1003,10 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 		sourceName += " (deleted)"
 	}
 
-	keys = append(keys, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+	keys = append(keys, DeviceKey{DeviceType: common.RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		DeviceID: source.ID})
 	targets = append(targets, metadbmodel.ChDevice{
-		DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		DeviceType:  common.RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		DeviceID:    source.ID,
 		Name:        sourceName,
 		IconID:      iconID,
@@ -1031,8 +1031,8 @@ func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage
 	if len(updateInfo) > 0 {
 		podGroupType := fieldsUpdate.Type.GetNew()
 		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
 			DeviceID: sourceID}, db)
 	}
 }
