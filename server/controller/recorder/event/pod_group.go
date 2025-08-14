@@ -76,8 +76,13 @@ func (p *PodGroup) ProduceByUpdate(cloudItem *cloudmodel.PodGroup, diffBase *dif
 			log.Errorf("pod service id not found for lcuuid: %s", diffBase.Lcuuid, p.metadata.LogPrefixes)
 			return
 		}
+		podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(id)
+		if !ok {
+			log.Errorf("pod service type not found for id: %d", id, p.metadata.LogPrefixes)
+		}
 		opts = []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(id),
+			eventapi.TagPodGroupType(uint32(podGroupType)),
 			eventapi.TagAttributes(
 				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
 				[]string{new, diff}),
