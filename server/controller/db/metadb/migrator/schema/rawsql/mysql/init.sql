@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS plugin (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    type                INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
+    `type`              INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
     user_name           INTEGER NOT NULL DEFAULT 1 COMMENT '1: agent 2: server',
     image               LONGBLOB NOT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -76,8 +76,8 @@ TRUNCATE TABLE process;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    type                INTEGER COMMENT '1.Server 3.Gateway 4.DFI',
-    state               INTEGER COMMENT '0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception',
+    `type`              INTEGER COMMENT '1.Server 3.Gateway 4.DFI',
+    `state`             INTEGER COMMENT '0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception',
     name                VARCHAR(256) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
@@ -110,8 +110,8 @@ CREATE TABLE IF NOT EXISTS third_party_device (
     vm_id               INTEGER,
     curr_time           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sys_uptime          CHAR(32),
-    type                INTEGER COMMENT '1.VM 2.Gateway 3.Compute 4.Network 5.Storage 6.Security',
-    state               INTEGER COMMENT '0.Temp 1.run 2.stop 3.added to vdc 4.no add to vdc 5.to start 6.to stop',
+    `type`              INTEGER COMMENT '1.VM 2.Gateway 3.Compute 4.Network 5.Storage 6.Security',
+    `state`             INTEGER COMMENT '0.Temp 1.run 2.stop 3.added to vdc 4.no add to vdc 5.to start 6.to stop',
     errno               INTEGER DEFAULT 0 COMMENT '1.Operate, 2.Install, 3.Uninstall, 4.Status',
     name                varchar(256),
     label               CHAR(64),
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS third_party_device (
     lcuuid              CHAR(64),
     order_id            INTEGER,
     product_specification_lcuuid CHAR(64),
-    role                INTEGER DEFAULT 1 COMMENT '1. General Purpose, 2. Load Balancer, 3. Database, 4. Web Server, 5. APP Server, 6. Firewall, 7. Gateway, 8. VPN, 9. Storage, 10. WAF 13.DEEPFLOW_TOOL',
+    `role`              INTEGER DEFAULT 1 COMMENT '1. General Purpose, 2. Load Balancer, 3. Database, 4. Web Server, 5. APP Server, 6. Firewall, 7. Gateway, 8. VPN, 9. Storage, 10. WAF 13.DEEPFLOW_TOOL',
     create_time         DATETIME,
     gateway             CHAR(64) DEFAULT '' COMMENT 'gateway of the default route',
     raid_support        CHAR(64) DEFAULT '' COMMENT 'must be a subset of RAID 0, 1, 5, 6, 10, 50, 60',
@@ -159,7 +159,7 @@ TRUNCATE TABLE third_party_device;
 
 CREATE TABLE IF NOT EXISTS vnet (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    state               INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.To run 7.Running 8.To stop 9.Stopped',
+    `state`             INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.To run 7.Running 8.To stop 9.Stopped',
     name                varchar(256) DEFAULT '',
     label               CHAR(64) DEFAULT '',
     description         VARCHAR(256) DEFAULT '',
@@ -193,7 +193,7 @@ TRUNCATE TABLE routing_table;
 
 CREATE TABLE IF NOT EXISTS vl2 (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    state               INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.Destroyed',
+    `state`             INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.Destroyed',
     net_type            INTEGER DEFAULT 4 COMMENT '1.CTRL 2.SERVICE 3.WAN 4.LAN',
     name                VARCHAR(256) NOT NULL,
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
@@ -240,7 +240,7 @@ DELETE FROM vl2_net;
 
 CREATE TABLE IF NOT EXISTS vm (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    state               INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying',
+    `state`             INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying',
     name                VARCHAR(256) DEFAULT '',
     label               CHAR(64) DEFAULT '',
     ip                  CHAR(64) DEFAULT '',
@@ -266,7 +266,7 @@ CREATE TABLE IF NOT EXISTS vm (
     INDEX epc_id_index(epc_id),
     INDEX az_index(az),
     INDEX region_index(region),
-    INDEX id_index(`id`)
+    INDEX id_index(id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 DELETE FROM vm;
 
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                CHAR(64) DEFAULT '',
     ifindex             INTEGER NOT NULL,
-    state               INTEGER NOT NULL COMMENT '1. Attached 2.Detached 3.Exception',
+    `state`             INTEGER NOT NULL COMMENT '1. Attached 2.Detached 3.Exception',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     iftype              INTEGER DEFAULT 0 COMMENT '0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool',
     mac                 CHAR(32) DEFAULT '',
@@ -314,8 +314,8 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX ip_index(`ip`),
-    INDEX vifid_index(`vifid`)
+    INDEX ip_index(ip),
+    INDEX vifid_index(vifid)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vinterface_ip;
 
@@ -347,8 +347,8 @@ CREATE TABLE IF NOT EXISTS ip_resource (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX ip_index(`ip`),
-    INDEX vifid_index(`vifid`)
+    INDEX ip_index(ip),
+    INDEX vifid_index(vifid)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM ip_resource;
 
@@ -406,13 +406,13 @@ CREATE TABLE IF NOT EXISTS domain (
     display_name        VARCHAR(64) DEFAULT '',
     cluster_id          CHAR(64),
     ip                  VARCHAR(64),
-    role                INTEGER DEFAULT 0 COMMENT '1.BSS 2.OSS 3.OpenStack 4.VSphere',
-    type                INTEGER DEFAULT 0 COMMENT '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce',
+    `role`              INTEGER DEFAULT 0 COMMENT '1.BSS 2.OSS 3.OpenStack 4.VSphere',
+    `type`              INTEGER DEFAULT 0 COMMENT '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce',
     public_ip           VARCHAR(64) DEFAULT NULL,
     config              TEXT,
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT '1' COMMENT '0.false 1.true',
-    state               INTEGER NOT NULL DEFAULT '1' COMMENT '1.normal 2.deleting 3.exception 4.warning 5.no_license',
+    `state`             INTEGER NOT NULL DEFAULT '1' COMMENT '1.normal 2.deleting 3.exception 4.warning 5.no_license',
     exceptions          INTEGER UNSIGNED DEFAULT 0,
     controller_ip       CHAR(64),
     lcuuid              CHAR(64) DEFAULT '',
@@ -435,7 +435,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     config              TEXT,
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT '1' COMMENT '0.false 1.true',
-    state               INTEGER NOT NULL DEFAULT '1' COMMENT '1.normal 2.deleting 3.exception 4.warning 5.no_license',
+    `state`             INTEGER NOT NULL DEFAULT '1' COMMENT '1.normal 2.deleting 3.exception 4.warning 5.no_license',
     exceptions          INTEGER UNSIGNED DEFAULT 0,
     lcuuid              CHAR(64) DEFAULT '',
     synced_at           DATETIME DEFAULT NULL,
@@ -482,19 +482,19 @@ TRUNCATE TABLE az_controller_connection;
 CREATE TABLE IF NOT EXISTS sys_configuration (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     param_name          CHAR(64) NOT NULL,
-    value               VARCHAR(256),
+    `value`             VARCHAR(256),
     comments            TEXT,
     lcuuid              CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE sys_configuration;
 set @lcuuid = (select uuid());
-INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (1, 'cloud_sync_timer', '60', 'unit: s', @lcuuid);
+INSERT INTO sys_configuration (id,param_name, value, comments, lcuuid) VALUES (1, 'cloud_sync_timer', '60', 'unit: s', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (2, 'pcap_data_retention', '3', 'unit: day', @lcuuid);
+INSERT INTO sys_configuration (id,param_name, value, comments, lcuuid) VALUES (2, 'pcap_data_retention', '3', 'unit: day', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (3, 'system_data_retention', '7', 'unit: day', @lcuuid);
+INSERT INTO sys_configuration (id,param_name, value, comments, lcuuid) VALUES (3, 'system_data_retention', '7', 'unit: day', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (4, 'ntp_servers', '0.cn.pool.ntp.org', '', @lcuuid);
+INSERT INTO sys_configuration (id,param_name, value, comments, lcuuid) VALUES (4, 'ntp_servers', '0.cn.pool.ntp.org', '', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS epc (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -509,7 +509,7 @@ CREATE TABLE IF NOT EXISTS epc (
     order_id            INTEGER DEFAULT 0,
     tunnel_id           INTEGER DEFAULT 0,
     operationid         INTEGER DEFAULT 0,
-    mode                INTEGER DEFAULT 2 COMMENT " 1:route, 2:transparent",
+    `mode`              INTEGER DEFAULT 2 COMMENT " 1:route, 2:transparent",
     topped              INTEGER DEFAULT 0,
     cidr                CHAR(64) DEFAULT '',
     uid                 CHAR(64) DEFAULT '',
@@ -573,7 +573,7 @@ TRUNCATE TABLE nat_gateway;
 CREATE TABLE IF NOT EXISTS nat_rule (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     nat_id              INTEGER DEFAULT 0,
-    type                CHAR(16) DEFAULT '',
+    `type`              CHAR(16) DEFAULT '',
     protocol            CHAR(64) DEFAULT '',
     floating_ip         CHAR(64) DEFAULT '',
     floating_ip_port    INTEGER DEFAULT NULL,
@@ -603,7 +603,7 @@ CREATE TABLE IF NOT EXISTS redis_instance (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
     label               CHAR(64) DEFAULT '',
-    state               tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. Running 2. Recovering',
+    `state`             tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. Running 2. Recovering',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
     az                  CHAR(64) DEFAULT '',
@@ -623,12 +623,12 @@ CREATE TABLE IF NOT EXISTS rds_instance (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
     label               CHAR(64) DEFAULT '',
-    state               tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. Running 2. Recovering',
+    `state`             tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. Running 2. Recovering',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
     az                  CHAR(64) DEFAULT '',
     epc_id              INTEGER DEFAULT 0,
-    type                INTEGER DEFAULT 0 COMMENT '0. Unknown 1. MySQL 2. SqlServer 3. PPAS 4. PostgreSQL 5. MariaDB',
+    `type`              INTEGER DEFAULT 0 COMMENT '0. Unknown 1. MySQL 2. SqlServer 3. PPAS 4. PostgreSQL 5. MariaDB',
     version             CHAR(64) DEFAULT '',
     series              tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. basic 2. HA',
     model               tinyint(1) NOT NULL DEFAULT 0 COMMENT '0. Unknown 1. Primary 2. Readonly 3. Temporary 4. Disaster recovery 5. share',
@@ -681,7 +681,7 @@ CREATE TABLE IF NOT EXISTS lb_target_server (
     lb_id               INTEGER DEFAULT 0,
     lb_listener_id      INTEGER DEFAULT 0,
     epc_id              INTEGER DEFAULT 0,
-    type                INTEGER DEFAULT 0 COMMENT '1.VM 2.IP',
+    `type`              INTEGER DEFAULT 0 COMMENT '1.VM 2.IP',
     ip                  CHAR(64) DEFAULT '',
     vm_id               INTEGER DEFAULT 0,
     port                INTEGER DEFAULT NULL,
@@ -893,7 +893,7 @@ CREATE TABLE IF NOT EXISTS pod_service (
     INDEX pod_ingress_id_index(pod_ingress_id),
     INDEX pod_namespace_id_index(pod_namespace_id),
     INDEX pod_cluster_id_index(pod_cluster_id),
-    INDEX domain_index(`domain`)
+    INDEX domain_index(domain)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_service;
 
@@ -976,18 +976,18 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule_backend;
 
-CREATE TABLE IF NOT EXISTS `report` (
-  `id`                     INTEGER NOT NULL AUTO_INCREMENT,
-  `title`                  varchar(200) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '' COMMENT 'Title of the report',
-  `begin_at`               datetime DEFAULT NULL COMMENT 'Start time of the report',
-  `end_at`                 datetime DEFAULT NULL COMMENT 'End time of the report',
-  `policy_id`              int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'report_policy ID',
-  `content`                LONGTEXT,
-  `lcuuid`                 varchar(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
-  `created_at`             datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  INDEX lcuuid(`lcuuid`),
-  INDEX policy_id(`policy_id`)
+CREATE TABLE IF NOT EXISTS report (
+  id                     INTEGER NOT NULL AUTO_INCREMENT,
+  title                  varchar(200) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '' COMMENT 'Title of the report',
+  begin_at               datetime DEFAULT NULL COMMENT 'Start time of the report',
+  end_at                 datetime DEFAULT NULL COMMENT 'End time of the report',
+  policy_id              int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'report_policy ID',
+  content                LONGTEXT,
+  lcuuid                 varchar(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
+  created_at             datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX lcuuid(lcuuid),
+  INDEX policy_id(policy_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 COMMENT='report records';
 
 CREATE TABLE IF NOT EXISTS vtap (
@@ -1072,26 +1072,26 @@ CREATE TABLE IF NOT EXISTS acl (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
 TRUNCATE TABLE acl;
 
-CREATE TABLE IF NOT EXISTS `resource_group` (
-  `id`                      INT(11) NOT NULL AUTO_INCREMENT,
-  `team_id`                 INTEGER DEFAULT 1,
-  `business_id`             INTEGER NOT NULL,
-  `lcuuid`                  VARCHAR(64) NOT NULL,
-  `name`                    VARCHAR(200) NOT NULL DEFAULT '',
-  `type`                    INTEGER NOT NULL COMMENT '3: anonymous vm, 4: anonymous ip, 5: anonymous pod, 6: anonymous pod_group, 8: anonymous pod_service, 81: anonymous pod_service as pod_group, 14: anonymous vl2',
-  `ip_type`                 INTEGER COMMENT '1: single ip, 2: ip range, 3: cidr, 4.mix [1, 2, 3]',
-  `ips`                     TEXT COMMENT 'ips separated by ,',
-  `vm_ids`                  TEXT COMMENT 'vm ids separated by ,',
-  `vl2_ids`                 TEXT COMMENT 'vl2 ids separated by ,',
-  `epc_id`                  INTEGER,
-  `pod_cluster_id`          INTEGER,
-  `extra_info_ids`          TEXT COMMENT 'resource group extra info ids separated by ,',
-  `lb_id`                   INTEGER,
-  `lb_listener_id`          INTEGER,
-  `icon_id`                 INTEGER DEFAULT -2,
-  `created_at`              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS resource_group (
+  id                      INT(11) NOT NULL AUTO_INCREMENT,
+  team_id                 INTEGER DEFAULT 1,
+  business_id             INTEGER NOT NULL,
+  lcuuid                  VARCHAR(64) NOT NULL,
+  name                    VARCHAR(200) NOT NULL DEFAULT '',
+  type                    INTEGER NOT NULL COMMENT '3: anonymous vm, 4: anonymous ip, 5: anonymous pod, 6: anonymous pod_group, 8: anonymous pod_service, 81: anonymous pod_service as pod_group, 14: anonymous vl2',
+  ip_type                 INTEGER COMMENT '1: single ip, 2: ip range, 3: cidr, 4.mix [1, 2, 3]',
+  ips                     TEXT COMMENT 'ips separated by ,',
+  vm_ids                  TEXT COMMENT 'vm ids separated by ,',
+  vl2_ids                 TEXT COMMENT 'vl2 ids separated by ,',
+  epc_id                  INTEGER,
+  pod_cluster_id          INTEGER,
+  extra_info_ids          TEXT COMMENT 'resource group extra info ids separated by ,',
+  lb_id                   INTEGER,
+  lb_listener_id          INTEGER,
+  icon_id                 INTEGER DEFAULT -2,
+  created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
 CREATE TABLE IF NOT EXISTS resource_group_extra_info (
@@ -1635,7 +1635,7 @@ CREATE TABLE IF NOT EXISTS genesis_host (
     ip          CHAR(64),
     vtap_id     INTEGER,
     node_ip     CHAR(48),
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_host;
 
@@ -1649,7 +1649,7 @@ CREATE TABLE IF NOT EXISTS genesis_vm (
     state           INTEGER,
     vtap_id         INTEGER,
     created_at      DATETIME,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vm;
 
@@ -1658,7 +1658,7 @@ CREATE TABLE IF NOT EXISTS genesis_vip (
     ip          CHAR(64),
     vtap_id     INTEGER,
     node_ip     CHAR(48),
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vip;
 
@@ -1667,7 +1667,7 @@ CREATE TABLE IF NOT EXISTS genesis_vpc (
     node_ip         CHAR(48),
     vtap_id         INTEGER,
     name            VARCHAR(256),
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vpc;
 
@@ -1680,7 +1680,7 @@ CREATE TABLE IF NOT EXISTS genesis_network (
     vpc_lcuuid      CHAR(64),
     vtap_id         INTEGER,
     node_ip         CHAR(48),
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_network;
 
@@ -1694,7 +1694,7 @@ CREATE TABLE IF NOT EXISTS genesis_port (
     vpc_lcuuid      CHAR(64),
     vtap_id         INTEGER,
     node_ip         CHAR(48),
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_port;
 
@@ -1706,7 +1706,7 @@ CREATE TABLE IF NOT EXISTS genesis_ip (
     last_seen           DATETIME,
     vtap_id             INTEGER,
     masklen             INTEGER DEFAULT 0,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_ip;
 
@@ -1721,7 +1721,7 @@ CREATE TABLE IF NOT EXISTS genesis_lldp (
     vinterface_description  VARCHAR(512),
     vtap_id                 INTEGER,
     last_seen               DATETIME,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_lldp;
 
@@ -1743,7 +1743,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
     team_id               INTEGER DEFAULT 1,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;
 
@@ -1760,7 +1760,7 @@ CREATE TABLE IF NOT EXISTS genesis_process (
     os_app_tags         TEXT COMMENT 'separated by ,',
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (lcuuid,vtap_id, node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE genesis_process;
 
@@ -1942,7 +1942,7 @@ CREATE TABLE IF NOT EXISTS ch_device (
     sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (devicetype, deviceid),
-    INDEX updated_at_index(`updated_at`)
+    INDEX updated_at_index(updated_at)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_device;
 INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) values(63999, 63999, "Internet", -1, 0, 0, 0);
@@ -1992,29 +1992,29 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
 TRUNCATE TABLE ch_vtap;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_label;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `labels`           TEXT,
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    labels           TEXT,
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_labels;
 
@@ -2256,7 +2256,7 @@ CREATE TABLE IF NOT EXISTS ch_string_enum (
     description_zh          VARCHAR(256) ,
     description_en          VARCHAR(256) ,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY  (tag_name,value)
+    PRIMARY KEY  (tag_name,`value`)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_string_enum;
 
@@ -2268,7 +2268,7 @@ CREATE TABLE IF NOT EXISTS ch_int_enum (
     description_zh          VARCHAR(256) ,
     description_en          VARCHAR(256) ,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY  (tag_name,value)
+    PRIMARY KEY  (tag_name,`value`)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_int_enum;
 
@@ -2289,68 +2289,68 @@ CREATE TABLE IF NOT EXISTS dial_test_task (
 TRUNCATE TABLE dial_test_task;
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`         VARCHAR(256),
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id            INTEGER NOT NULL,
+    `key`         VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`       VARCHAR(256),
+    team_id       INTEGER,
+    domain_id     INTEGER,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost_cloud_tag;
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tag;
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `cloud_tags`    TEXT,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id            INTEGER NOT NULL PRIMARY KEY,
+    cloud_tags    TEXT,
+    team_id       INTEGER,
+    domain_id     INTEGER,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `cloud_tags`       TEXT,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    cloud_tags       TEXT,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`)
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tag;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `os_app_tags`      TEXT,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    os_app_tags      TEXT,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tags;
 
@@ -2368,289 +2368,289 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
 TRUNCATE TABLE ch_gprocess;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    key              VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    value            VARCHAR(256),
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_label;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `labels`           TEXT,
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    labels           TEXT,
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_labels;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `annotations`      TEXT,
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    annotations      TEXT,
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `annotations`      TEXT,
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    annotations      TEXT,
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_name (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL UNIQUE,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id            INT(10) NOT NULL PRIMARY KEY,
+    name          VARCHAR(256) NOT NULL UNIQUE,
+    synced_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_name (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL UNIQUE,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id            INT(10) NOT NULL PRIMARY KEY,
+    name          VARCHAR(256) NOT NULL UNIQUE,
+    synced_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_value (
-    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `value`         TEXT,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    value         TEXT,
+    synced_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_label (
-    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL,
-    `value`         TEXT,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name          VARCHAR(256) NOT NULL,
+    value         TEXT,
+    synced_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
-    `id`                        INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`               VARCHAR(256) NOT NULL,
-    `app_label_name`            VARCHAR(256) NOT NULL,
-    `app_label_column_index`    TINYINT(3) UNSIGNED NOT NULL,
-    `synced_at`                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                        INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    metric_name               VARCHAR(256) NOT NULL,
+    app_label_name            VARCHAR(256) NOT NULL,
+    app_label_column_index    TINYINT(3) UNSIGNED NOT NULL,
+    synced_at                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_label_index(metric_name, app_label_name)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_app_label_layout;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_label_name (
-    `id`                INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`       VARCHAR(256) NOT NULL,
-    `label_name_id`     INT NOT NULL,
-    `synced_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    metric_name       VARCHAR(256) NOT NULL,
+    label_name_id     INT NOT NULL,
+    synced_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_label_name_index(metric_name, label_name_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_target (
-    `id`            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `metric_name`   VARCHAR(256) NOT NULL,
-    `target_id`     INT(10) NOT NULL,
-    `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    metric_name   VARCHAR(256) NOT NULL,
+    target_id     INT(10) NOT NULL,
+    synced_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_target_index(metric_name, target_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_target;
 
-CREATE TABLE IF NOT EXISTS `resource_version` (
-    `id`            INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `name`          VARCHAR(255) NOT NULL UNIQUE,
-    `version`       INTEGER NOT NULL DEFAULT 0,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS resource_version (
+    id            INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL UNIQUE,
+    version       INTEGER NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE resource_version;
 SET @prometheus_version = UNIX_TIMESTAMP(NOW());
 INSERT INTO resource_version (name, version) VALUES ('prometheus', @prometheus_version);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
-    `id`               INTEGER NOT NULL,
-    `key`              VARCHAR(256) NOT NULL COLLATE utf8_bin,
-    `value`            VARCHAR(256),
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `key`),
+    id               INTEGER NOT NULL,
+    `key`            VARCHAR(256) NOT NULL COLLATE utf8_bin,
+    `value`          VARCHAR(256),
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, `key`),
     INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_env;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
-    `id`               INTEGER NOT NULL PRIMARY KEY,
-    `envs`             TEXT,
-    `l3_epc_id`        INTEGER,
-    `pod_ns_id`        INTEGER,
-    `team_id`          INTEGER,
-    `domain_id`        INTEGER,
-    `sub_domain_id`    INTEGER,
-    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id               INTEGER NOT NULL PRIMARY KEY,
+    envs             TEXT,
+    l3_epc_id        INTEGER,
+    pod_ns_id        INTEGER,
+    team_id          INTEGER,
+    domain_id        INTEGER,
+    sub_domain_id    INTEGER,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_envs;
 
 CREATE TABLE IF NOT EXISTS ch_app_label (
-    `label_name_id`      INT(10) NOT NULL,
-    `label_value_id`     INT(10) NOT NULL,
-    `label_value`        TEXT,
-    `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    label_name_id      INT(10) NOT NULL,
+    label_value_id     INT(10) NOT NULL,
+    label_value        TEXT,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (label_name_id, label_value_id)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_app_label;
 
 CREATE TABLE IF NOT EXISTS ch_target_label (
-    `metric_id`          INT(10) NOT NULL,
-    `label_name_id`      INT(10) NOT NULL,
-    `target_id`          INT(10) NOT NULL,
-    `label_value`        VARCHAR(256) NOT NULL,
-    `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    metric_id          INT(10) NOT NULL,
+    label_name_id      INT(10) NOT NULL,
+    target_id          INT(10) NOT NULL,
+    label_value        VARCHAR(256) NOT NULL,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (metric_id, label_name_id, target_id)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_target_label;
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_label_name (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id            INT(10) NOT NULL PRIMARY KEY,
+    name          VARCHAR(256) NOT NULL,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_label_name;
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_metric_name (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id            INT(10) NOT NULL PRIMARY KEY,
+    name          VARCHAR(256) NOT NULL,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_metric_name;
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
-    `id`                        INT(10) NOT NULL PRIMARY KEY,
-    `metric_name`               VARCHAR(256) NOT NULL,
-    `app_label_name`            VARCHAR(256) NOT NULL,
-    `app_label_column_index`    TINYINT(3) UNSIGNED NOT NULL,
-    `updated_at`                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id                        INT(10) NOT NULL PRIMARY KEY,
+    metric_name               VARCHAR(256) NOT NULL,
+    app_label_name            VARCHAR(256) NOT NULL,
+    app_label_column_index    TINYINT(3) UNSIGNED NOT NULL,
+    updated_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_metric_app_label_layout;
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
-    `target_id`           INT(10) NOT NULL PRIMARY KEY,
-    `target_label_names`  TEXT,
-    `target_label_values` TEXT,
-    `updated_at`          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    target_id           INT(10) NOT NULL PRIMARY KEY,
+    target_label_names  TEXT,
+    target_label_values TEXT,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_target_label_layout;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service (
-    `id`                 INTEGER NOT NULL PRIMARY KEY,
-    `name`               VARCHAR(256),
-    `pod_cluster_id`     INTEGER,
-    `pod_ns_id`          INTEGER,
-    `team_id`            INTEGER,
-    `domain_id`          INTEGER,
-    `sub_domain_id`      INTEGER,
-    `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id                 INTEGER NOT NULL PRIMARY KEY,
+    name               VARCHAR(256),
+    pod_cluster_id     INTEGER,
+    pod_ns_id          INTEGER,
+    team_id            INTEGER,
+    domain_id          INTEGER,
+    sub_domain_id      INTEGER,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service;
 
 CREATE TABLE IF NOT EXISTS ch_chost (
-    `id`              INTEGER NOT NULL PRIMARY KEY,
-    `name`            VARCHAR(256),
-    `host_id`         INTEGER,
-    `l3_epc_id`       INTEGER,
-    `ip`              CHAR(64),
-    `subnet_id`       INTEGER,
-    `hostname`        VARCHAR(256),
-    `team_id`         INTEGER,
-    `domain_id`       INTEGER,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id              INTEGER NOT NULL PRIMARY KEY,
+    name            VARCHAR(256),
+    host_id         INTEGER,
+    l3_epc_id       INTEGER,
+    ip              CHAR(64),
+    subnet_id       INTEGER,
+    hostname        VARCHAR(256),
+    team_id         INTEGER,
+    domain_id       INTEGER,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_chost;
 
 CREATE TABLE IF NOT EXISTS ch_policy (
-    `tunnel_type`     INTEGER NOT NULL,
-    `acl_gid`         INTEGER NOT NULL,
-    `id`              INTEGER,
-    `name`            VARCHAR(256),
-    `team_id`         INTEGER DEFAULT 1,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`tunnel_type`, `acl_gid`)
+    tunnel_type     INTEGER NOT NULL,
+    acl_gid         INTEGER NOT NULL,
+    id              INTEGER,
+    name            VARCHAR(256),
+    team_id         INTEGER DEFAULT 1,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (tunnel_type, acl_gid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_policy;
 
 CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
-    `id`              INTEGER NOT NULL PRIMARY KEY,
-    `name`            VARCHAR(256),
-    `team_id`         INTEGER DEFAULT 1,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id              INTEGER NOT NULL PRIMARY KEY,
+    name            VARCHAR(256),
+    team_id         INTEGER DEFAULT 1,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_npb_tunnel;
 
 CREATE TABLE IF NOT EXISTS ch_alarm_policy (
-    `id`              INTEGER NOT NULL PRIMARY KEY,
-    `name`            VARCHAR(256),
-    `user_id`         INTEGER,
-    `team_id`         INTEGER DEFAULT 1,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id              INTEGER NOT NULL PRIMARY KEY,
+    name            VARCHAR(256),
+    user_id         INTEGER,
+    team_id         INTEGER DEFAULT 1,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_alarm_policy;
 
