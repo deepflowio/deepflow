@@ -372,6 +372,8 @@ controller:
     # - x.x.x.x/x
     # - x.x.x.x-x.x.x.x
 
+    # 数据存储选择，默认 mysql，可选 redis
+    database: mysql
     # 多namespace模式开关，默认false
     multi_ns_mode:
     # 单独vpc模式开关，默认false

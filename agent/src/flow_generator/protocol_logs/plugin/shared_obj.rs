@@ -29,7 +29,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
-        protocol_logs::{set_captured_byte, L7ResponseStatus, LogMessageType},
+        protocol_logs::{set_captured_byte, LogMessageType},
         Error, Result,
     },
     plugin::{
@@ -172,38 +172,20 @@ impl L7ProtocolParserInterface for SoLog {
                                 info.proto_str = self.proto_str.clone();
                                 info.proto = self.proto_num.unwrap();
                                 set_captured_byte!(info, param);
-                                match info.msg_type {
-                                    LogMessageType::Request => {
-                                        self.perf_stats.as_mut().map(|p| p.inc_req());
-                                    }
-                                    LogMessageType::Response => {
-                                        self.perf_stats.as_mut().map(|p| p.inc_resp());
-                                    }
-                                    _ => unreachable!(),
-                                }
 
-                                match info.resp.status {
-                                    L7ResponseStatus::ClientError => {
-                                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                                    }
-                                    L7ResponseStatus::ServerError => {
-                                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                                    }
-                                    _ => {}
-                                }
-
-                                let endpoint = if info.req.endpoint.is_empty() {
-                                    None
-                                } else {
-                                    Some(info.req.endpoint.clone())
-                                };
-                                info.cal_rrt(param, &endpoint).map(|(rrt, endpoint)| {
-                                    info.rrt = rrt;
+                                if let Some(perf_stats) = self.perf_stats.as_mut() {
                                     if info.msg_type == LogMessageType::Response {
-                                        info.req.endpoint = endpoint.unwrap_or_default();
+                                        if let Some(endpoint) = info.load_endpoint_from_cache(param)
+                                        {
+                                            info.req.endpoint = endpoint.to_string();
+                                        }
                                     }
-                                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                                });
+                                    if let Some(stats) = info.perf_stats(param) {
+                                        info.rrt = stats.rrt_sum;
+                                        perf_stats.sequential_merge(&stats);
+                                    }
+                                }
+
                                 if res.len == 1 {
                                     return Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(
                                         info,

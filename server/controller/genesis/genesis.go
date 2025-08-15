@@ -28,27 +28,36 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/grpc"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
-	sstore "github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
+	sstorem "github.com/deepflowio/deepflow/server/controller/genesis/store/sync/mysql"
+	sstorer "github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logger.MustGetLogger("genesis")
+
 var GenesisService *Genesis
 
 type Genesis struct {
+	redisStore   bool
 	ctx          context.Context
+	sync         common.GenesisSync
 	config       *config.ControllerConfig
-	sync         *sstore.GenesisSync
 	kubernetes   *kstore.GenesisKubernetes
 	Synchronizer *grpc.SynchronizerServer
 }
 
-func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
+func NewGenesis(ctx context.Context, isMaster bool, config *config.ControllerConfig) *Genesis {
 	syncQueue := queue.NewOverwriteQueue("genesis-sync-data", config.GenesisCfg.QueueLengths)
 	kubernetesQueue := queue.NewOverwriteQueue("genesis-k8s-data", config.GenesisCfg.QueueLengths)
 
-	genesisSync := sstore.NewGenesisSync(ctx, syncQueue, config)
+	var enabled bool = true
+	var genesisSync common.GenesisSync
+	genesisSync = sstorer.NewGenesisSync(ctx, isMaster, syncQueue, config)
+	if genesisSync == nil || config.GenesisCfg.Database != common.CONFIG_DB_REDIS {
+		enabled = false
+		genesisSync = sstorem.NewGenesisSync(ctx, isMaster, syncQueue, config)
+	}
 	genesisSync.Start()
 
 	genesisK8S := kstore.NewGenesisKubernetes(ctx, kubernetesQueue, config)
@@ -71,6 +80,7 @@ func NewGenesis(ctx context.Context, config *config.ControllerConfig) *Genesis {
 		sync:         genesisSync,
 		kubernetes:   genesisK8S,
 		Synchronizer: synchronizer,
+		redisStore:   enabled,
 	}
 	return GenesisService
 }
@@ -121,6 +131,10 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 		serverIPs = append(serverIPs, serverIP)
 	}
 	return serverIPs, nil
+}
+
+func (g *Genesis) GetRedisStoreEnabled() bool {
+	return g.redisStore
 }
 
 func (g *Genesis) GetGenesisSyncData(orgID int) common.GenesisSyncDataResponse {

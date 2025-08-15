@@ -219,7 +219,7 @@ func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 			response.JSON(c, response.SetOptStatus(httpcommon.GET_ORG_DB_FAIL), response.SetError(err))
 			return
 		}
-		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
+		data, err := service.GetGenesisAgentStorage(g.GetRedisStoreEnabled(), c.Param("vtapID"), db)
 		if err != nil {
 			response.JSON(c, response.SetError(err))
 			return
