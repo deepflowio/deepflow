@@ -204,6 +204,8 @@ impl Config {
         };
 
         loop {
+            session.update_current_server().await;
+
             match session
                 .grpc_get_kubernetes_cluster_id_with_statsd(request.clone())
                 .await
@@ -215,6 +217,7 @@ impl Config {
                             "get_kubernetes_cluster_id grpc call from server error: {}",
                             cluster_id_response.error_msg()
                         );
+                        session.set_request_failed(true);
                         tokio::time::sleep(MINUTE).await;
                         continue;
                     }
@@ -224,6 +227,7 @@ impl Config {
                                 error!(
                                     "call get_kubernetes_cluster_id return cluster_id is empty string"
                                 );
+                                session.set_request_failed(true);
                                 tokio::time::sleep(MINUTE).await;
                                 continue;
                             }
@@ -235,11 +239,15 @@ impl Config {
                             return Some(id);
                         }
                         None => {
-                            error!("call get_kubernetes_cluster_id return response is none")
+                            error!("call get_kubernetes_cluster_id return response is none");
+                            session.set_request_failed(true);
                         }
                     }
                 }
-                Err(e) => error!("get_kubernetes_cluster_id grpc call error: {}", e),
+                Err(e) => {
+                    error!("get_kubernetes_cluster_id grpc call error: {}", e);
+                    session.set_request_failed(true);
+                }
             }
             tokio::time::sleep(MINUTE).await;
         }
