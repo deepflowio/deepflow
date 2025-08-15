@@ -230,8 +230,8 @@ impl Session {
         self.server_dispatcher.read().get_current_ip()
     }
 
-    // Note: This function can only be called by the grpc sync thread.
-    pub async fn update_current_server(&self) -> bool {
+    // Note: This function can only be called by the grpc sync thread and grpc k8s cluster id thread.
+    pub async fn update_current_server(&self) {
         let changed = self.server_dispatcher.write().update_current_ip();
         if changed || self.get_client().is_none() {
             self.reset_client();
@@ -241,7 +241,6 @@ impl Session {
                 .await;
             self.version.fetch_add(1, Ordering::SeqCst);
         }
-        changed
     }
 
     pub fn get_version(&self) -> u64 {
@@ -256,7 +255,7 @@ impl Session {
         self.server_dispatcher.read().get_request_failed()
     }
 
-    // Note: This function can only be called by the grpc sync thread.
+    // Note: This function can only be called by the grpc sync thread and grpc k8s cluster id thread.
     pub fn set_request_failed(&self, failed: bool) {
         self.server_dispatcher.write().set_request_failed(failed);
     }
