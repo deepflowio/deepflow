@@ -2862,12 +2862,14 @@ impl Default for Throttles {
 #[serde(default)]
 pub struct OutputsFlowLogTunning {
     pub collector_queue_size: usize,
+    pub sender_threads: usize,
 }
 
 impl Default for OutputsFlowLogTunning {
     fn default() -> Self {
         Self {
             collector_queue_size: 65536,
+            sender_threads: 1,
         }
     }
 }
@@ -2909,12 +2911,14 @@ impl Default for FlowMetricsFilters {
 #[serde(default)]
 pub struct FlowMetricsTunning {
     pub sender_queue_size: usize,
+    pub sender_threads: usize,
 }
 
 impl Default for FlowMetricsTunning {
     fn default() -> Self {
         Self {
             sender_queue_size: 65536,
+            sender_threads: 1,
         }
     }
 }
