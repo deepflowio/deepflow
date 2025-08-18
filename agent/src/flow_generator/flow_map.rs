@@ -58,8 +58,8 @@ use crate::{
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
         enums::{CaptureNetworkType, EthernetType, HeaderType, IpProtocol, TcpFlags},
         flow::{
-            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7Protocol,
-            L7Stats, PacketDirection, SignalSource, TunnelField,
+            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7PerfStats,
+            L7Protocol, L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
@@ -2015,19 +2015,29 @@ impl FlowMap {
         if collect_stats {
             let flow = &tagged_flow.flow;
             if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
-                let mut l7_stats = L7Stats::default();
-                let l7_timeout_count = self
-                    .perf_cache
-                    .borrow_mut()
-                    .timeout_cache
-                    .pop_timeout_count(flow.flow_id, flow_end);
-                l7_stats.stats.err_timeout = l7_timeout_count as u32;
-                l7_stats.endpoint = None;
-                l7_stats.flow_id = flow.flow_id;
-                l7_stats.signal_source = flow.signal_source;
-                l7_stats.time_in_second = flow.flow_stat_time.into();
-                l7_stats.l7_protocol = flow_perf.l7_protocol;
-                l7_stats.flow = Some(tagged_flow.clone());
+                let mut perf_cache = self.perf_cache.borrow_mut();
+                let l7_stats = L7Stats {
+                    stats: L7PerfStats {
+                        err_timeout: perf_cache
+                            .timeout_cache
+                            .pop_timeout_count(flow.flow_id, flow_end)
+                            as u32,
+                        ..if flow_end {
+                            perf_cache
+                                .rrt_cache
+                                .collect_flow_perf_stats(flow.flow_id)
+                                .unwrap_or_default()
+                        } else {
+                            Default::default()
+                        }
+                    },
+                    flow_id: flow.flow_id,
+                    signal_source: flow.signal_source,
+                    time_in_second: flow.flow_stat_time.into(),
+                    l7_protocol: flow_perf.l7_protocol,
+                    flow: Some(tagged_flow.clone()),
+                    ..Default::default()
+                };
                 self.l7_stats_output
                     .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
