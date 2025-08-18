@@ -17,8 +17,6 @@
 package db
 
 import (
-	"time"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -198,7 +196,6 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 					dupItemIDs = append(dupItemIDs, id)
 				}
 				MPT(item).SetID(id)
-				MPT(item).SetUpdatedAt(time.Now())
 			}
 			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %+v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0], o.metadata.LogPrefixes)
 			err = o.metadata.DB.Unscoped().Delete(&dupItems).Error
