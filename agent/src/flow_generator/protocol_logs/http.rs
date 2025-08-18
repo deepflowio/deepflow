@@ -312,6 +312,7 @@ impl HttpInfo {
     fn is_invalid(&self) -> bool {
         (self.msg_type == LogMessageType::Request && self.method.is_none())
             || (self.msg_type == LogMessageType::Response && self.is_invalid_status_code())
+            || self.msg_type == LogMessageType::Other
     }
 
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
@@ -797,8 +798,8 @@ impl L7ProtocolParserInterface for HttpLog {
                         )
                         .is_ok()
                     }
-                    _ => self
-                        .check_http_v2(
+                    _ => {
+                        self.check_http_v2(
                             payload,
                             param,
                             &mut info,
@@ -809,7 +810,9 @@ impl L7ProtocolParserInterface for HttpLog {
                             #[cfg(feature = "enterprise")]
                             None,
                         )
-                        .is_ok(),
+                        .is_ok()
+                            && info.msg_type != LogMessageType::Other
+                    }
                 }
             }
             _ => unreachable!(),
