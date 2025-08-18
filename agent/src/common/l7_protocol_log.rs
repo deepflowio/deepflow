@@ -478,6 +478,26 @@ impl RrtCache {
         ret
     }
 
+    pub fn collect_flow_perf_stats(&mut self, flow_id: u64) -> Option<L7PerfStats> {
+        let Some(keys) = self.flows.pop(&flow_id) else {
+            return None;
+        };
+        let value = keys.into_iter().map(|(key, _)| self.logs.pop(&key)).fold(
+            L7PerfStats::default(),
+            |mut stats: L7PerfStats, entry| {
+                if let Some(entry) = entry {
+                    stats.sequential_merge(&L7PerfStats::from(&entry));
+                }
+                stats
+            },
+        );
+        if value == L7PerfStats::default() {
+            None
+        } else {
+            Some(value)
+        }
+    }
+
     pub fn remove_flow(&mut self, flow_id: u64) {
         if let Some(keys) = self.flows.pop(&flow_id) {
             for (key, _) in keys {
