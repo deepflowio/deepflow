@@ -127,7 +127,7 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             if let Some(perf_stats) = self.perf_stats.as_mut() {
                 if info.msg_type == LogMessageType::Response {
                     if let Some(endpoint) = info.load_endpoint_from_cache(param) {
-                        info.endpoint = Some(endpoint.to_string());
+                        info.req.endpoint = endpoint.to_string();
                     }
                 }
                 if let Some(stats) = info.perf_stats(param) {
@@ -217,18 +217,6 @@ impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
                     val: v.clone(),
                 })
                 .collect(),
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&CustomInfo> for LogCache {
-    fn from(info: &CustomInfo) -> Self {
-        LogCache {
-            msg_type: info.msg_type,
-            resp_status: L7ResponseStatus::from(info.response_status.as_str()),
-            on_blacklist: info.is_on_blacklist,
-            endpoint: info.get_endpoint(),
             ..Default::default()
         }
     }
