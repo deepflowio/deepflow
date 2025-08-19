@@ -40,3 +40,12 @@ type IngesterApi struct {
 	NodePort int `default:"30106" yaml:"node-port"`
 	Timeout  int `default:"60" yaml:"timeout"`
 }
+
+type Pcap struct {
+	PageSize int     `default:"100000" yaml:"page_size"`
+	Querier  Querier `yaml:"querier"`
+}
+
+type Querier struct {
+	ListenPort int `default:"20416" yaml:"listen_port"`
+}

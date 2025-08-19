@@ -84,6 +84,7 @@ type ControllerConfig struct {
 
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`
+	Pcap         configs.Pcap   `yaml:"pcap"`
 
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
