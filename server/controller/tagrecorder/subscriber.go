@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
@@ -34,7 +34,7 @@ import (
 
 const hookerDeletePage = 0
 
-type deletePageHooker[MT constraint.MetadbModel, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
+type deletePageHooker[MT metadbmodel.AssetResourceConstraint, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
 	beforeDeletePage([]*MT, MDPT) []*MT
 }
 
@@ -176,7 +176,7 @@ type SubscriberDataGenerator[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MetadbModel,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] interface {
@@ -192,7 +192,7 @@ type SubscriberComponent[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MetadbModel,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] struct {
@@ -213,7 +213,7 @@ func newSubscriberComponent[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT constraint.MetadbModel,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ](

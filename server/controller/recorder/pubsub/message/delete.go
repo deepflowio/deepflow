@@ -18,7 +18,6 @@ package message
 
 import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 type Lcuuids struct {
@@ -34,7 +33,7 @@ func (d *Lcuuids) SetLcuuids(lcuuids []string) {
 }
 
 // TODO rename to metadb
-type MetadbItems[T constraint.MetadbModel] struct {
+type MetadbItems[T metadbmodel.AssetResourceConstraint] struct {
 	data []*T
 }
 

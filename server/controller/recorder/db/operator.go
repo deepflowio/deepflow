@@ -20,15 +20,15 @@ import (
 	"slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("recorder.db")
 
-type Operator[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] interface {
+type Operator[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint] interface {
 	// 批量插入数据
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
@@ -39,7 +39,7 @@ type Operator[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] inte
 	GetSoftDelete() bool
 }
 
-type OperatorBase[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] struct {
+type OperatorBase[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint] struct {
 	metadata *rcommon.Metadata
 
 	resourceTypeName        string
@@ -51,7 +51,7 @@ type OperatorBase[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel] 
 	toLoggable bool
 }
 
-func newOperatorBase[MPT constraint.MetadbModelPtr[MT], MT constraint.MetadbModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
+func newOperatorBase[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
 	return OperatorBase[MPT, MT]{
 		resourceTypeName: resourceTypeName,
 		softDelete:       softDelete,
