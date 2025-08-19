@@ -98,7 +98,7 @@ func (d *fieldDetail[T]) SetOld(old T) {
 }
 
 // TODO rename to metadb
-type MetadbData[MT constraint.MetadbModel] struct {
+type MetadbData[MT metadbmodel.AssetResourceConstraint] struct {
 	new *MT
 	old *MT
 }

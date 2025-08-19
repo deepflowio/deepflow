@@ -17,10 +17,11 @@
 package listener
 
 import (
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-type Listener[CT constraint.CloudModel, MT constraint.MetadbModel, BT constraint.DiffBase] interface {
+type Listener[CT constraint.CloudModel, MT metadbmodel.AssetResourceConstraint, BT constraint.DiffBase] interface {
 	OnUpdaterAdded(addedDBItems []*MT)
 	OnUpdaterUpdated(cloudItem *CT, diffBaseItem BT)
 	OnUpdaterDeleted(lcuuids []string, deletedDBItems []*MT)
