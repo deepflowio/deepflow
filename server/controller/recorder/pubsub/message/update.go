@@ -98,7 +98,7 @@ func (d *fieldDetail[T]) SetOld(old T) {
 }
 
 // TODO rename to mysql
-type MySQLData[MT constraint.MySQLModel] struct {
+type MySQLData[MT mysqlmodel.AssetResourceConstraint] struct {
 	new *MT
 	old *MT
 }

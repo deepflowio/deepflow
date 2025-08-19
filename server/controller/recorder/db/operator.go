@@ -17,17 +17,18 @@
 package db
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/common"
+	"slices"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("recorder.db")
 
-type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interface {
+type Operator[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint] interface {
 	// 批量插入数据
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
@@ -38,7 +39,7 @@ type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interf
 	GetSoftDelete() bool
 }
 
-type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] struct {
+type OperatorBase[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint] struct {
 	metadata *rcommon.Metadata
 
 	resourceTypeName        string
@@ -50,7 +51,7 @@ type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] st
 	toLoggable bool
 }
 
-func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
+func newOperatorBase[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
 	return OperatorBase[MPT, MT]{
 		resourceTypeName: resourceTypeName,
 		softDelete:       softDelete,
@@ -161,7 +162,7 @@ func (o OperatorBase[MPT, MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[st
 	lcuuidToItem := make(map[string]*MT)
 	for _, item := range items {
 		lcuuid := MPT(item).GetLcuuid()
-		if common.Contains(lcuuids, lcuuid) {
+		if slices.Contains(lcuuids, lcuuid) {
 			log.Infof("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid, o.metadata.LogPrefixes)
 		} else {
 			dedupItems = append(dedupItems, item)
@@ -191,7 +192,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 				if !exists {
 					continue
 				}
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
 					dupItemIDs = append(dupItemIDs, id)
 				}
@@ -207,7 +208,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 			dupLcuuids := []string{}
 			for _, dupItem := range dupItems {
 				lcuuid := MPT(dupItem).GetLcuuid()
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
 				}
 			}
@@ -217,7 +218,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 			dedupItems := make([]*MT, 0, count)
 			dedupLcuuids := make([]string, 0, count)
 			for lcuuid, dbItem := range lcuuidToItem {
-				if !common.Contains(dupLcuuids, lcuuid) {
+				if !slices.Contains(dupLcuuids, lcuuid) {
 					dedupItems = append(dedupItems, dbItem)
 					dedupLcuuids = append(dedupLcuuids, lcuuid)
 				}

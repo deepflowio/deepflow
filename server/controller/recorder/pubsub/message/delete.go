@@ -18,7 +18,6 @@ package message
 
 import (
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 type Lcuuids struct {
@@ -34,7 +33,7 @@ func (d *Lcuuids) SetLcuuids(lcuuids []string) {
 }
 
 // TODO rename to mysql
-type MySQLItems[T constraint.MySQLModel] struct {
+type MySQLItems[T mysqlmodel.AssetResourceConstraint] struct {
 	data []*T
 }
 
