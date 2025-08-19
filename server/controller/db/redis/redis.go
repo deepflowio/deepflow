@@ -36,7 +36,9 @@ var (
 type Config struct {
 	ResourceAPIDatabase       int      `default:"1" yaml:"resource_api_database"`
 	GenesisSyncDatabase       int      `default:"4" yaml:"genesis_sync_database"`
+	PcapDatabase              int      `default:"5" yaml:"pcap_database"`
 	ResourceAPIExpireInterval int      `default:"3600" yaml:"resource_api_expire_interval"`
+	PcapExpireInterval        int      `default:"1800" yaml:"pcap_expire_interval"`
 	Host                      []string `default:"" yaml:"host"` // TODO add default value
 	Port                      uint32   `default:"6379" yaml:"port"`
 	Password                  string   `default:"deepflow" yaml:"password"`
@@ -56,6 +58,7 @@ func GetConfig() *Config { // TODO use this function
 type Client struct {
 	ResourceAPI redis.UniversalClient
 	GenesisSync redis.UniversalClient
+	Pcap        redis.UniversalClient
 	Config      *Config
 }
 
@@ -109,6 +112,8 @@ func Init(ctx context.Context, cfg Config) (err error) {
 		client = &Client{
 			ResourceAPI: createUniversalClient(cfg, cfg.ResourceAPIDatabase),
 			GenesisSync: createUniversalClient(cfg, cfg.GenesisSyncDatabase),
+			Pcap:        createUniversalClient(cfg, cfg.PcapDatabase),
+			Config:      &cfg,
 		}
 		_, err = client.ResourceAPI.Ping(ctx).Result()
 		if err != nil {
