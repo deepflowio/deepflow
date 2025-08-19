@@ -216,10 +216,7 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 
 	if len(updateTSDB) > 0 {
 		mgr := dbmgr.DBMgr[models.Analyzer](n.db)
-		err := mgr.AnalyzerUpdateBulk(updateTSDB)
-		if err != nil {
-			log.Error(n.Log(err.Error()))
-		}
+		mgr.AnalyzerUpdateBulk(n.ORGID.GetORGID(), updateTSDB)
 	}
 }
 
