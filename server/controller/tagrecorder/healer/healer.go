@@ -23,7 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
@@ -248,7 +247,7 @@ type Healer interface {
 }
 
 func newHealer[
-	MT constraint.MySQLModel,
+	MT mysqlmodel.AssetResourceConstraint,
 	CT tagrecorder.SubscriberMetaDBChModel,
 	MAPT msgConstraint.AddPtr[MAT],
 	MAT msgConstraint.Add,
@@ -262,7 +261,7 @@ func newHealer[
 }
 
 type healerComponent[
-	MT constraint.MySQLModel,
+	MT mysqlmodel.AssetResourceConstraint,
 	CT tagrecorder.SubscriberMetaDBChModel,
 	MAPT msgConstraint.AddPtr[MAT],
 	MAT msgConstraint.Add,

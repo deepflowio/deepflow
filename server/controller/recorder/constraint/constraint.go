@@ -18,40 +18,10 @@
 package constraint
 
 import (
-	"time"
-
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
-
-type MySQLModelPtr[T MySQLModel] interface {
-	*T
-
-	GetLcuuid() string
-	GetID() int
-
-	SetID(int)
-	SetUpdatedAt(time.Time)
-	GetUpdatedAt() time.Time
-}
-
-// 资源的MySQL orm对象
-type MySQLModel interface {
-	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.SubDomain | mysqlmodel.Host | mysqlmodel.VM |
-		mysqlmodel.VPC | mysqlmodel.Network | mysqlmodel.Subnet | mysqlmodel.VRouter | mysqlmodel.RoutingTable |
-		mysqlmodel.DHCPPort | mysqlmodel.VInterface | mysqlmodel.WANIP | mysqlmodel.LANIP | mysqlmodel.FloatingIP |
-		mysqlmodel.NATGateway | mysqlmodel.NATRule | mysqlmodel.NATVMConnection | mysqlmodel.LB |
-		mysqlmodel.LBListener | mysqlmodel.LBTargetServer | mysqlmodel.LBVMConnection | mysqlmodel.CEN |
-		mysqlmodel.PeerConnection | mysqlmodel.RDSInstance | mysqlmodel.RedisInstance | mysqlmodel.PodCluster |
-		mysqlmodel.PodNode | mysqlmodel.VMPodNodeConnection | mysqlmodel.PodNamespace | mysqlmodel.PodIngress |
-		mysqlmodel.PodIngressRule | mysqlmodel.PodIngressRuleBackend | mysqlmodel.PodService |
-		mysqlmodel.PodServicePort | mysqlmodel.PodGroup | mysqlmodel.ConfigMap | mysqlmodel.PodGroupConfigMapConnection |
-		mysqlmodel.PodGroupPort | mysqlmodel.PodReplicaSet | mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VIP | mysqlmodel.CustomService
-
-	GetID() int
-	GetUpdatedAt() time.Time
-}
 
 // 资源的原始数据结构
 type CloudModel interface {

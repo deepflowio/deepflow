@@ -39,7 +39,7 @@ func WhereFindPtr[T any](db *mysql.DB, query interface{}, args ...interface{}) (
 	return result, err
 }
 
-func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, items []*MT) string {
+func formatLogDeleteABecauseBHasGone[MT mysqlmodel.AssetResourceConstraint](a, b string, items []*MT) string {
 	var str string
 	for _, item := range items {
 		str += fmt.Sprintf("%+v ", item)
@@ -47,7 +47,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func getIDs[MT constraint.MySQLModel](db *mysql.DB, domainLcuuid string) (ids []int) {
+func getIDs[MT mysqlmodel.AssetResourceConstraint](db *mysql.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
