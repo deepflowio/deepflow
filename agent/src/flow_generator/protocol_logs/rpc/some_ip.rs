@@ -20,7 +20,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::EbpfFlags,
     },
     flow_generator::{
@@ -165,10 +165,19 @@ impl From<SomeIpInfo> for L7ProtocolSendLog {
     }
 }
 
+impl From<&SomeIpInfo> for LogCache {
+    fn from(info: &SomeIpInfo) -> Self {
+        LogCache {
+            msg_type: info.msg_type,
+            resp_status: info.resp_status,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SomeIpLog {
     perf_stats: Option<L7PerfStats>,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for SomeIpLog {
@@ -192,6 +201,12 @@ impl L7ProtocolParserInterface for SomeIpLog {
         self.parse(payload, &mut info, param)?;
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
+            }
+        }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::SomeIpInfo(info)))
         } else {
