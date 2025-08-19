@@ -26,7 +26,6 @@ import (
 	"gorm.io/gorm/schema"
 
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 func GetDB(dbFile string) *gorm.DB {
@@ -62,6 +61,6 @@ func GetModels() []interface{} {
 	}
 }
 
-func ClearDBData[MT constraint.MetadbModel](db *gorm.DB) {
+func ClearDBData[MT metadbmodel.AssetResourceConstraint](db *gorm.DB) {
 	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(new(MT))
 }

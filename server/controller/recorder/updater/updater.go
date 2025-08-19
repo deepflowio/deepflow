@@ -17,6 +17,7 @@
 package updater
 
 import (
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -52,7 +53,7 @@ type StatsdBuilder interface {
 	BuildStatsd(statsd.Statsd) ResourceUpdater
 }
 
-type DataGenerator[CT constraint.CloudModel, MT constraint.MetadbModel, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
+type DataGenerator[CT constraint.CloudModel, MT metadbmodel.AssetResourceConstraint, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
 	// 根据 cloud 数据获取对应的 diff base 数据
 	getDiffBaseByCloudItem(*CT) (BT, bool)
 	// 生成插入 DB 所需的数据
@@ -66,19 +67,19 @@ const (
 	hookerAfterDBDeletePage
 )
 
-type addPageHooker[MT constraint.MetadbModel, MAAT message.AddAddition] interface {
+type addPageHooker[MT metadbmodel.AssetResourceConstraint, MAAT message.AddAddition] interface {
 	beforeAddPage([]*MT) ([]*MT, *MAAT, bool)
 }
 
-type deletePageHooker[MT constraint.MetadbModel, MDAT message.DeleteAddition] interface {
+type deletePageHooker[MT metadbmodel.AssetResourceConstraint, MDAT message.DeleteAddition] interface {
 	afterDeletePage([]*MT) (*MDAT, bool)
 }
 
 type UpdaterBase[
 	CT constraint.CloudModel,
 	BT constraint.DiffBase,
-	MPT constraint.MetadbModelPtr[MT],
-	MT constraint.MetadbModel,
+	MPT metadbmodel.AssetResourceConstraintPtr[MT],
+	MT metadbmodel.AssetResourceConstraint,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MAAT message.AddAddition,
@@ -119,8 +120,8 @@ type UpdaterBase[
 func newUpdaterBase[
 	CT constraint.CloudModel,
 	BT constraint.DiffBase,
-	MPT constraint.MetadbModelPtr[MT],
-	MT constraint.MetadbModel,
+	MPT metadbmodel.AssetResourceConstraintPtr[MT],
+	MT metadbmodel.AssetResourceConstraint,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MAAT message.AddAddition,
