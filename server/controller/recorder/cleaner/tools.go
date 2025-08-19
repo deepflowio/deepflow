@@ -39,7 +39,7 @@ func WhereFindPtr[T any](db *metadb.DB, query interface{}, args ...interface{}) 
 	return result, err
 }
 
-func formatLogDeleteABecauseBHasGone[MT constraint.MetadbModel](a, b string, items []*MT) string {
+func formatLogDeleteABecauseBHasGone[MT metadbmodel.AssetResourceConstraint](a, b string, items []*MT) string {
 	var str string
 	for _, item := range items {
 		str += fmt.Sprintf("%+v ", item)
@@ -47,7 +47,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MetadbModel](a, b string, ite
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func getIDs[MT constraint.MetadbModel](db *metadb.DB, domainLcuuid string) (ids []int) {
+func getIDs[MT metadbmodel.AssetResourceConstraint](db *metadb.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
 	for _, item := range dbItems {

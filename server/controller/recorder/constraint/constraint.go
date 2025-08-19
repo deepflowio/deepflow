@@ -18,40 +18,10 @@
 package constraint
 
 import (
-	"time"
-
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
-
-type MetadbModelPtr[T MetadbModel] interface {
-	*T
-
-	GetLcuuid() string
-	GetID() int
-
-	SetID(int)
-	SetUpdatedAt(time.Time)
-	GetUpdatedAt() time.Time
-}
-
-// 资源的 Metadb orm对象
-type MetadbModel interface {
-	metadbmodel.Region | metadbmodel.AZ | metadbmodel.SubDomain | metadbmodel.Host | metadbmodel.VM |
-		metadbmodel.VPC | metadbmodel.Network | metadbmodel.Subnet | metadbmodel.VRouter | metadbmodel.RoutingTable |
-		metadbmodel.DHCPPort | metadbmodel.VInterface | metadbmodel.WANIP | metadbmodel.LANIP | metadbmodel.FloatingIP |
-		metadbmodel.NATGateway | metadbmodel.NATRule | metadbmodel.NATVMConnection | metadbmodel.LB |
-		metadbmodel.LBListener | metadbmodel.LBTargetServer | metadbmodel.LBVMConnection | metadbmodel.CEN |
-		metadbmodel.PeerConnection | metadbmodel.RDSInstance | metadbmodel.RedisInstance | metadbmodel.PodCluster |
-		metadbmodel.PodNode | metadbmodel.VMPodNodeConnection | metadbmodel.PodNamespace | metadbmodel.PodIngress |
-		metadbmodel.PodIngressRule | metadbmodel.PodIngressRuleBackend | metadbmodel.PodService |
-		metadbmodel.PodServicePort | metadbmodel.PodGroup | metadbmodel.ConfigMap | metadbmodel.PodGroupConfigMapConnection |
-		metadbmodel.PodGroupPort | metadbmodel.PodReplicaSet | metadbmodel.Pod | metadbmodel.Process | metadbmodel.VIP | metadbmodel.CustomService
-
-	GetID() int
-	GetUpdatedAt() time.Time
-}
 
 // 资源的原始数据结构
 type CloudModel interface {
