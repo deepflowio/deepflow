@@ -636,7 +636,7 @@ func (v *VTapInfo) GetSelfUpdateUrl() string {
 	return v.config.SelfUpdateUrl
 }
 
-func (v *VTapInfo) GetTridentTypeForUnknowVTap() uint16 {
+func (v *VTapInfo) GetTridentTypeForUnknowVTap() int {
 	if v == nil {
 		return 0
 	}
