@@ -40,6 +40,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
+	tcommon "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -136,7 +137,7 @@ func (g *SynchronizerServer) GenerateCache() {
 				log.Errorf("parse agent config lcuuid (%s) yaml (%s) failed", config.Lcuuid, config.Yaml, logger.NewORGPrefix(orgID))
 				continue
 			}
-			if !k.Bool(common.CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED) {
+			if !k.Bool(tcommon.CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED) {
 				log.Debugf("agent group configuration (ID:%d) workload resource sync disabled", config.ID, logger.NewORGPrefix(orgID))
 				continue
 			}
