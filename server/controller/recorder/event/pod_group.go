@@ -82,7 +82,12 @@ func (p *PodGroup) ProduceByUpdate(cloudItem *cloudmodel.PodGroup, diffBase *dif
 		}
 		opts = []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(id),
+			// We need to provide pod group type information for ingester to recognize auto_service classification
 			eventapi.TagPodGroupType(uint32(podGroupType)),
+			// Provide instance type to fill in auto_instance information
+			// Pod group itself does not have an instance type, but its changes essentially affect pods,
+			// so the type is set to pod; since it affects many pods, the auto instance id remains 0
+			eventapi.TagInstanceType(uint32(ctrlrcommon.VIF_DEVICE_TYPE_POD)),
 			eventapi.TagAttributes(
 				[]string{eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
 				[]string{new, diff}),
