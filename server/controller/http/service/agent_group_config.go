@@ -124,13 +124,13 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 		return nil, err
 	}
 	var domains []model.Domain
-	if err := dbInfo.Select("id", "name").Find(&domains).Error; err != nil {
+	if err := dbInfo.Select("lcuuid", "name").Find(&domains).Error; err != nil {
 		return nil, err
 	}
 	domainInfos := make([]map[string]interface{}, len(domains))
 	for i, domain := range domains {
 		domainInfos[i] = map[string]interface{}{
-			strconv.Itoa(domain.ID): map[string]interface{}{
+			domain.Lcuuid: map[string]interface{}{
 				"ch": domain.Name,
 				"en": domain.Name,
 			},
