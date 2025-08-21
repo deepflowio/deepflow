@@ -206,42 +206,6 @@ func (m *Upgrader) fmtLowerVersionValue(longKey string, value interface{}) inter
 		default:
 			return []int{}
 		}
-	} else if longKey == "domains" {
-		switch value := value.(type) {
-		case []interface{}:
-			if len(value) == 0 {
-				return []int{}
-			}
-			switch item := value[0].(type) {
-			case string:
-				result := make([]int, 0)
-				if len(value) == 1 && item == "0" {
-					return []int{0}
-				}
-				for i := range value {
-					if id, ok := m.domainData.LcuuidToID[value[i].(string)]; ok {
-						result = append(result, id)
-					}
-				}
-				return result
-			default:
-				log.Warnf("failed to convert %s to list: %v", longKey, value)
-				return []int{}
-			}
-		case []string:
-			result := make([]int, 0)
-			if len(value) == 1 && value[0] == "0" {
-				return []int{0}
-			}
-			for i := range value {
-				if id, ok := m.domainData.LcuuidToID[value[i]]; ok {
-					result = append(result, id)
-				}
-			}
-			return result
-		default:
-		}
-		return []int{}
 	} else if slices.Contains(m.lowerVersionIntToBoolKeys, longKey) {
 		switch value := value.(type) {
 		case int:
