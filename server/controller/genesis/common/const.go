@@ -34,7 +34,3 @@ const (
 	DEVICE_TYPE_PUBLIC_CLOUD     = "public-cloud"
 	DEVICE_TYPE_PHYSICAL_MACHINE = "physical-machine"
 )
-
-const (
-	CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED = "inputs.resources.workload_resource_sync_enabled"
-)
