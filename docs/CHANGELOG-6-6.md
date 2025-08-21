@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* fix: fails to update lower version agent group config [#10333](https://github.com/deepflowio/deepflow/pull/10333) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: auto enable agent sync workload-v [#10332](https://github.com/deepflowio/deepflow/pull/10332) by [askyrie](https://github.com/askyrie)
+* fix: concurrent write vtap synced_controller_at [#10330](https://github.com/deepflowio/deepflow/pull/10330) by [askyrie](https://github.com/askyrie)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
