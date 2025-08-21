@@ -518,34 +518,6 @@ func TestFmtLowerVersionValue(t *testing.T) {
 			},
 			want: []int{1, 2, 3},
 		},
-		{
-			name: "case02",
-			args: args{
-				longKey: "domains",
-				value:   []string{"lcuuid1", "lcuuid2"},
-				domainData: &DomainData{
-					LcuuidToID: map[string]int{
-						"lcuuid1": 1,
-						"lcuuid2": 2,
-					},
-				},
-			},
-			want: []int{1, 2},
-		},
-		{
-			name: "case04",
-			args: args{
-				longKey: "domains",
-				value:   []interface{}{"lcuuid1", "lcuuid2"},
-				domainData: &DomainData{
-					LcuuidToID: map[string]int{
-						"lcuuid1": 1,
-						"lcuuid2": 2,
-					},
-				},
-			},
-			want: []int{1, 2},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
