@@ -32,6 +32,7 @@ import (
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
+	tcommon "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -82,7 +83,7 @@ func (g *SynchronizerServer) GenerateCache() {
 				log.Errorf("parse agent config lcuuid (%s) yaml (%s) failed", config.Lcuuid, config.Yaml, logger.NewORGPrefix(orgID))
 				continue
 			}
-			if !k.Bool(common.CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED) {
+			if !k.Bool(tcommon.CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED) {
 				log.Debugf("agent group configuration (ID:%d) workload resource sync disabled", config.ID, logger.NewORGPrefix(orgID))
 				continue
 			}

@@ -118,12 +118,18 @@ const (
 )
 
 const (
+	UNKNOW_VTAP_TYPE_KVM        = 1
+	UNKNOW_VTAP_TYPE_WORKLOAD_V = 3
+)
+
+const (
 	CONFIG_KEY_NTP_ENABLED                 = "global.ntp.enabled"
 	CONFIG_KEY_INGESTER_IP                 = "global.communication.ingester_ip"
 	CONFIG_KEY_INGESTER_PORT               = "global.communication.ingester_port"
 	CONFIG_KEY_PROXY_CONTROLLER_IP         = "global.communication.proxy_controller_ip"
 	CONFIG_KEY_PROXY_CONTROLLER_PORT       = "global.communication.proxy_controller_port"
 	CONFIG_KEY_DOMAIN_FILTER               = "inputs.resources.pull_resource_from_controller.domain_filter"
+	CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED   = "inputs.resources.workload_resource_sync_enabled"
 	CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED = "inputs.resources.private_cloud.hypervisor_resource_enabled"
 )
 
