@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewPodReplicaSet(c *cache.Cache) *PodReplicaSet {
 	return listener
 }
 
-func (prs *PodReplicaSet) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodReplicaSet) {
+func (prs *PodReplicaSet) OnUpdaterAdded(addedDBItems []*metadbmodel.PodReplicaSet) {
 	prs.cache.AddPodReplicaSets(addedDBItems)
 }
 
@@ -42,6 +42,6 @@ func (prs *PodReplicaSet) OnUpdaterUpdated(cloudItem *cloudmodel.PodReplicaSet, 
 	diffBase.Update(cloudItem)
 }
 
-func (prs *PodReplicaSet) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodReplicaSet) {
+func (prs *PodReplicaSet) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodReplicaSet) {
 	prs.cache.DeletePodReplicaSets(lcuuids)
 }

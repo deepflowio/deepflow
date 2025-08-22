@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPodNamespace() *mysqlmodel.PodNamespace {
-	return &mysqlmodel.PodNamespace{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Region: uuid.New().String()}
+func newDBPodNamespace() *metadbmodel.PodNamespace {
+	return &metadbmodel.PodNamespace{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Region: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodNamespaceBatchSuccess() {
 	operator := NewPodNamespace()
 	itemToAdd := newDBPodNamespace()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PodNamespace{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PodNamespace{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PodNamespace
+	var addedItem *metadbmodel.PodNamespace
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodNamespace{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodNamespace{})
 }
 
 func (t *SuiteTest) TestUpdatePodNamespaceSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodNamespaceSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.PodNamespace
+	var updatedItem *metadbmodel.PodNamespace
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Region, updateInfo["region"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodNamespace{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodNamespace{})
 }
 
 func (t *SuiteTest) TestDeletePodNamespaceBatchSuccess() {
@@ -66,27 +66,27 @@ func (t *SuiteTest) TestDeletePodNamespaceBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PodNamespace
+	var deletedItem *metadbmodel.PodNamespace
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestPodNamespaceCreateAndFind() {
 	lcuuid := uuid.New().String()
-	pn := &mysqlmodel.PodNamespace{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	pn := &metadbmodel.PodNamespace{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(pn)
-	var resultPodNamespace *mysqlmodel.PodNamespace
+	var resultPodNamespace *metadbmodel.PodNamespace
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and az='' and region='' and sub_domain=''", lcuuid).First(&resultPodNamespace).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), pn.Base.Lcuuid, resultPodNamespace.Base.Lcuuid)
 
-	resultPodNamespace = new(mysqlmodel.PodNamespace)
+	resultPodNamespace = new(metadbmodel.PodNamespace)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodNamespace)
 	assert.Equal(t.T(), pn.Base.Lcuuid, resultPodNamespace.Base.Lcuuid)
 
-	resultPodNamespace = new(mysqlmodel.PodNamespace)
+	resultPodNamespace = new(metadbmodel.PodNamespace)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPodNamespace)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

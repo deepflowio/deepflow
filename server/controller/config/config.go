@@ -27,7 +27,7 @@ import (
 	shared_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	http "github.com/deepflowio/deepflow/server/controller/http/config"
@@ -84,7 +84,7 @@ type ControllerConfig struct {
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`
 
-	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
+	MetadbCfg      metadb.Config
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 

@@ -28,9 +28,9 @@ import (
 
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/agent_config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	tcommon "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -47,15 +47,15 @@ func isAgentInterestedHost(aType agent.AgentType) bool {
 }
 
 func (g *SynchronizerServer) GenerateCache() {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Error("get org ids failed")
 		return
 	}
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org (%d) mysql session failed", orgID)
+			log.Errorf("get org (%d) metadb session failed", orgID)
 			continue
 		}
 		var agentGroups []model.VTapGroup

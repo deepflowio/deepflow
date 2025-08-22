@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBNATGateway() *mysqlmodel.NATGateway {
-	return &mysqlmodel.NATGateway{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBNATGateway() *metadbmodel.NATGateway {
+	return &metadbmodel.NATGateway{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddNATGatewayBatchSuccess() {
 	operator := NewNATGateway()
 	itemToAdd := newDBNATGateway()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.NATGateway{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.NATGateway{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.NATGateway
+	var addedItem *metadbmodel.NATGateway
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATGateway{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.NATGateway{})
 }
 
 func (t *SuiteTest) TestUpdateNATGatewaySuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateNATGatewaySuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.NATGateway
+	var updatedItem *metadbmodel.NATGateway
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATGateway{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.NATGateway{})
 }
 
 func (t *SuiteTest) TestDeleteNATGatewayBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeleteNATGatewayBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.NATGateway
+	var deletedItem *metadbmodel.NATGateway
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestNATGatewayCreateAndFind() {
 	lcuuid := uuid.New().String()
-	natGateway := &mysqlmodel.NATGateway{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	natGateway := &metadbmodel.NATGateway{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(natGateway)
-	var resultNATGateway *mysqlmodel.NATGateway
+	var resultNATGateway *metadbmodel.NATGateway
 	err := t.db.Where("lcuuid = ? and name='' and label='' and floating_ips='' "+
 		"and az='' and region='' and uid=''", lcuuid).First(&resultNATGateway).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
 
-	resultNATGateway = new(mysqlmodel.NATGateway)
+	resultNATGateway = new(metadbmodel.NATGateway)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultNATGateway)
 	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
 
-	resultNATGateway = new(mysqlmodel.NATGateway)
+	resultNATGateway = new(metadbmodel.NATGateway)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNATGateway)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

@@ -7,8 +7,8 @@ package mocks
 import (
 	reflect "reflect"
 
-	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -36,7 +36,7 @@ func (m *MockQuerier) EXPECT() *MockQuerierMockRecorder {
 }
 
 // GetAgentDispatcher mocks base method.
-func (m *MockQuerier) GetAgentDispatcher(db *mysql.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
+func (m *MockQuerier) GetAgentDispatcher(db *metadb.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAgentDispatcher", db, domainPrefix, dataDuration)
 	ret0, _ := ret[0].(map[string]int64)

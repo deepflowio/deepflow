@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChPodServiceK8sAnnotation struct {
 		message.UpdatedPodService,
 		*message.DeletedPodServices,
 		message.DeletedPodServices,
-		mysqlmodel.PodService,
-		mysqlmodel.ChPodServiceK8sAnnotation,
+		metadbmodel.PodService,
+		metadbmodel.ChPodServiceK8sAnnotation,
 		IDKeyKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 			message.UpdatedPodService,
 			*message.DeletedPodServices,
 			message.DeletedPodServices,
-			mysqlmodel.PodService,
-			mysqlmodel.ChPodServiceK8sAnnotation,
+			metadbmodel.PodService,
+			metadbmodel.ChPodServiceK8sAnnotation,
 			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATION,
@@ -61,10 +61,10 @@ func NewChPodServiceK8sAnnotation() *ChPodServiceK8sAnnotation {
 func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
+	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	keysToDelete := make([]IDKeyKey, 0)
-	targetsToDelete := make([]mysqlmodel.ChPodServiceK8sAnnotation, 0)
+	targetsToDelete := make([]metadbmodel.ChPodServiceK8sAnnotation, 0)
 
 	if fieldsUpdate.Annotation.IsDifferent() {
 		_, oldMap := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
@@ -73,8 +73,8 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, upda
 		for k := range oldMap {
 			if _, ok := newMap[k]; !ok {
 				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
-				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodServiceK8sAnnotation{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+				targetsToDelete = append(targetsToDelete, metadbmodel.ChPodServiceK8sAnnotation{
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 					Key:      k,
 				})
 			}
@@ -87,12 +87,12 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, upda
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodService) (keys []IDKeyKey, targets []mysqlmodel.ChPodServiceK8sAnnotation) {
+func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []IDKeyKey, targets []metadbmodel.ChPodServiceK8sAnnotation) {
 	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
 	for k, v := range annotationMap {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
-		targets = append(targets, mysqlmodel.ChPodServiceK8sAnnotation{
-			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+		targets = append(targets, metadbmodel.ChPodServiceK8sAnnotation{
+			ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			L3EPCID:     source.VPCID,
@@ -106,6 +106,6 @@ func (c *ChPodServiceK8sAnnotation) sourceToTarget(md *message.Metadata, source 
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotation) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodServiceK8sAnnotation, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotation) softDeletedTargetsUpdated(targets []metadbmodel.ChPodServiceK8sAnnotation, db *metadb.DB) {
 
 }

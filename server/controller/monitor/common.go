@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -63,8 +63,8 @@ func getIPMap(hostType string) (map[string]bool, error) {
 	var res map[string]bool
 	switch hostType {
 	case common.HOST_TYPE_CONTROLLER:
-		var controllers []mysqlmodel.Controller
-		if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+		var controllers []metadbmodel.Controller
+		if err := metadb.DefaultDB.Find(&controllers).Error; err != nil {
 			return nil, err
 		}
 		res = make(map[string]bool, len(controllers))
@@ -72,8 +72,8 @@ func getIPMap(hostType string) (map[string]bool, error) {
 			res[controller.IP] = true
 		}
 	case common.HOST_TYPE_ANALYZER:
-		var analyzers []mysqlmodel.Analyzer
-		if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
+		var analyzers []metadbmodel.Analyzer
+		if err := metadb.DefaultDB.Find(&analyzers).Error; err != nil {
 			return nil, err
 		}
 		res = make(map[string]bool, len(analyzers))

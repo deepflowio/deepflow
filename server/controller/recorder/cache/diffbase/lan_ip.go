@@ -19,11 +19,11 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLANIP(dbItem *mysqlmodel.LANIP, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddLANIP(dbItem *metadbmodel.LANIP, seq int, toolDataSet *tool.DataSet) {
 	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
 	// which may cause recorder performance issues.
 	// subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)

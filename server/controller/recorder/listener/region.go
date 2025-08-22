@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewRegion(c *cache.Cache) *Region {
 	return listener
 }
 
-func (r *Region) OnUpdaterAdded(addedDBItems []*mysqlmodel.Region) {
+func (r *Region) OnUpdaterAdded(addedDBItems []*metadbmodel.Region) {
 	r.cache.AddRegions(addedDBItems)
 }
 
@@ -42,6 +42,6 @@ func (r *Region) OnUpdaterUpdated(cloudItem *cloudmodel.Region, diffBase *diffba
 	diffBase.Update(cloudItem)
 }
 
-func (r *Region) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Region) {
+func (r *Region) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Region) {
 	r.cache.DeleteRegions(lcuuids)
 }

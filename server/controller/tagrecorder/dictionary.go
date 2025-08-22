@@ -36,8 +36,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -179,12 +179,12 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	// Update the dictionary at all data nodes in the region
 	var replicaSQL string
 	var mysqlPort uint32
-	if c.cfg.MySqlCfg.ProxyHost != "" {
-		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.ProxyHost)
-		mysqlPort = c.cfg.MySqlCfg.ProxyPort
+	if c.cfg.MetadbCfg.ProxyHost != "" {
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MetadbCfg.ProxyHost)
+		mysqlPort = c.cfg.MetadbCfg.ProxyPort
 	} else {
-		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.Host)
-		mysqlPort = c.cfg.MySqlCfg.Port
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MetadbCfg.Host)
+		mysqlPort = c.cfg.MetadbCfg.Port
 	}
 
 	ckDb, err := clickhouse.Connect(*clickHouseCfg)
@@ -257,16 +257,16 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		CH_DICTIONARY_ALARM_POLICY,
 	)
 	// 根据不同的组织进行更新
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)
 	}
 	for _, orgID := range orgIDs {
 		if orgID == mysqlCommon.DEFAULT_ORG_ID {
-			mysqlDatabaseName = c.cfg.MySqlCfg.Database
+			mysqlDatabaseName = c.cfg.MetadbCfg.Database
 			ckDatabaseName = c.cfg.ClickHouseCfg.Database
 		} else {
-			mysqlDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.MySqlCfg.Database + "`"
+			mysqlDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.MetadbCfg.Database + "`"
 			ckDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.ClickHouseCfg.Database + "`"
 		}
 		var databases []string
@@ -337,7 +337,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			dictName := dict.(string)
 			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MetadbCfg.UserName, c.cfg.MetadbCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 			log.Infof("create dictionary %s", dictName, logger.NewORGPrefix(orgID))
 			log.Info(createSQL, logger.NewORGPrefix(orgID))
 			_, err = ckDb.Exec(createSQL)
@@ -368,14 +368,14 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 				break
 			}
 			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MetadbCfg.UserName, c.cfg.MetadbCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 			// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
-			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MySqlCfg.UserPassword, 1)
+			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MetadbCfg.UserPassword, 1)
 			if createSQL == checkDictSQL {
 				continue
 			}
-			logCheckSQL := strings.Replace(checkDictSQL, c.cfg.MySqlCfg.UserPassword, "[HIDDEN]", 1)
-			logCreateSQL := strings.Replace(createSQL, c.cfg.MySqlCfg.UserPassword, "[HIDDEN]", 1)
+			logCheckSQL := strings.Replace(checkDictSQL, c.cfg.MetadbCfg.UserPassword, "[HIDDEN]", 1)
+			logCreateSQL := strings.Replace(createSQL, c.cfg.MetadbCfg.UserPassword, "[HIDDEN]", 1)
 			log.Infof("update dictionary %s", dictName, logger.NewORGPrefix(orgID))
 			log.Infof("exist dictionary %s", logCheckSQL, logger.NewORGPrefix(orgID))
 			log.Infof("wanted dictionary %s", logCreateSQL, logger.NewORGPrefix(orgID))

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type PodNamespace struct {
-	OperatorBase[*mysqlmodel.PodNamespace, mysqlmodel.PodNamespace]
+	OperatorBase[*metadbmodel.PodNamespace, metadbmodel.PodNamespace]
 }
 
 func NewPodNamespace() *PodNamespace {
 	operater := &PodNamespace{
-		newOperatorBase[*mysqlmodel.PodNamespace](
+		newOperatorBase[*metadbmodel.PodNamespace](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			true,
 			true,

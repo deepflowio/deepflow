@@ -21,11 +21,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBRegion() mysqlmodel.Region {
-	var region mysqlmodel.Region
+func newDBRegion() metadbmodel.Region {
+	var region metadbmodel.Region
 	region.Lcuuid = uuid.NewString()
 	region.Name = region.Lcuuid[:6]
 	return region
@@ -38,23 +38,23 @@ func (t *SuiteTest) TestRefreshChRegion() {
 	region := newDBRegion()
 	t.db.Create(&region)
 	updater.Refresh()
-	var addedItem mysqlmodel.ChRegion
+	var addedItem metadbmodel.ChRegion
 	t.db.Where("id = ?", region.ID).Unscoped().Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, region.Name)
 
 	region.Name = uuid.NewString()
 	t.db.Save(&region)
 	updater.Refresh()
-	var updatedItem mysqlmodel.ChRegion
+	var updatedItem metadbmodel.ChRegion
 	t.db.Where("id = ?", region.ID).Unscoped().Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, region.Name)
 
-	t.db.Where("id = ?", region.ID).Delete(&mysqlmodel.Region{})
+	t.db.Where("id = ?", region.ID).Delete(&metadbmodel.Region{})
 	updater.Refresh()
-	var deletedItem mysqlmodel.ChRegion
+	var deletedItem metadbmodel.ChRegion
 	result := t.db.Unscoped().Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Region{})
-	t.db.Delete(&mysqlmodel.ChRegion{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Region{})
+	t.db.Delete(&metadbmodel.ChRegion{})
 }

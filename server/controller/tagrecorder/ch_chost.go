@@ -20,8 +20,8 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -33,8 +33,8 @@ type ChChost struct {
 		message.UpdatedVM,
 		*message.DeletedVMs,
 		message.DeletedVMs,
-		mysqlmodel.VM,
-		mysqlmodel.ChChost,
+		metadbmodel.VM,
+		metadbmodel.ChChost,
 		IDKey,
 	]
 }
@@ -48,8 +48,8 @@ func NewChChost() *ChChost {
 			message.UpdatedVM,
 			*message.DeletedVMs,
 			message.DeletedVMs,
-			mysqlmodel.VM,
-			mysqlmodel.ChChost,
+			metadbmodel.VM,
+			metadbmodel.ChChost,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST,
@@ -61,15 +61,15 @@ func NewChChost() *ChChost {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKey, targets []mysqlmodel.ChChost) {
+func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKey, targets []metadbmodel.ChChost) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysqlmodel.ChChost{
-		ChIDBase: mysqlmodel.ChIDBase{ID: source.ID},
+	targets = append(targets, metadbmodel.ChChost{
+		ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
 		Name:     sourceName,
 		L3EPCID:  source.VPCID,
 		HostID:   source.HostID,
@@ -87,7 +87,7 @@ func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChost) softDeletedTargetsUpdated(targets []mysqlmodel.ChChost, db *mysql.DB) {
+func (c *ChChost) softDeletedTargetsUpdated(targets []metadbmodel.ChChost, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

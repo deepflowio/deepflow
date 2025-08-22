@@ -22,7 +22,7 @@ import (
 
 	"gorm.io/gorm"
 
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"

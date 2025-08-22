@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChUser struct {
-	UpdaterComponent[mysqlmodel.ChUser, IDKey]
+	UpdaterComponent[metadbmodel.ChUser, IDKey]
 }
 
 func NewChUser() *ChUser {
 	updater := &ChUser{
-		newUpdaterComponent[mysqlmodel.ChUser, IDKey](
+		newUpdaterComponent[metadbmodel.ChUser, IDKey](
 			RESOURCE_TYPE_CH_USER,
 		),
 	}
@@ -35,19 +35,19 @@ func NewChUser() *ChUser {
 	return updater
 }
 
-func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChUser, bool) {
+func (c *ChUser) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChUser, bool) {
 	log.Infof("generate data for %s", c.resourceTypeName, db.LogPrefixORGID)
-	var users []mysqlmodel.User
+	var users []metadbmodel.User
 
-	err := mysql.DefaultDB.Unscoped().Find(&users).Error
+	err := metadb.DefaultDB.Unscoped().Find(&users).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChUser)
+	keyToItem := make(map[IDKey]metadbmodel.ChUser)
 	for _, user := range users {
-		keyToItem[IDKey{ID: user.ID}] = mysqlmodel.ChUser{
+		keyToItem[IDKey{ID: user.ID}] = metadbmodel.ChUser{
 			ID:   user.ID,
 			Name: user.UserName,
 		}
@@ -56,11 +56,11 @@ func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChUser, boo
 	return keyToItem, true
 }
 
-func (c *ChUser) generateKey(dbItem mysqlmodel.ChUser) IDKey {
+func (c *ChUser) generateKey(dbItem metadbmodel.ChUser) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (c *ChUser) generateUpdateInfo(oldItem, newItem mysqlmodel.ChUser) (map[string]interface{}, bool) {
+func (c *ChUser) generateUpdateInfo(oldItem, newItem metadbmodel.ChUser) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

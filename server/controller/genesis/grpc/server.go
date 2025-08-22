@@ -31,7 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
 	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"

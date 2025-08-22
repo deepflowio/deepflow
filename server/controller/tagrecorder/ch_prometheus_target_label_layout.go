@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChPrometheusTargetLabelLayout struct {
-	UpdaterComponent[mysqlmodel.ChPrometheusTargetLabelLayout, IDKey]
+	UpdaterComponent[metadbmodel.ChPrometheusTargetLabelLayout, IDKey]
 }
 
 func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 	updater := &ChPrometheusTargetLabelLayout{
-		newUpdaterComponent[mysqlmodel.ChPrometheusTargetLabelLayout, IDKey](
+		newUpdaterComponent[metadbmodel.ChPrometheusTargetLabelLayout, IDKey](
 			RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
 		),
 	}
@@ -38,15 +38,15 @@ func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusTargetLabelLayout) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChPrometheusTargetLabelLayout, bool) {
-	var prometheusTargets []mysqlmodel.PrometheusTarget
+func (l *ChPrometheusTargetLabelLayout) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChPrometheusTargetLabelLayout, bool) {
+	var prometheusTargets []metadbmodel.PrometheusTarget
 	err := db.Unscoped().Find(&prometheusTargets).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysqlmodel.ChPrometheusTargetLabelLayout)
+	keyToItem := make(map[IDKey]metadbmodel.ChPrometheusTargetLabelLayout)
 	for _, prometheusTarget := range prometheusTargets {
 		targetLabelNames := "job, instance"
 		targetLabelValues := prometheusTarget.Job + ", " + prometheusTarget.Instance
@@ -60,7 +60,7 @@ func (l *ChPrometheusTargetLabelLayout) generateNewData(db *mysql.DB) (map[IDKey
 				}
 			}
 		}
-		keyToItem[IDKey{ID: prometheusTarget.ID}] = mysqlmodel.ChPrometheusTargetLabelLayout{
+		keyToItem[IDKey{ID: prometheusTarget.ID}] = metadbmodel.ChPrometheusTargetLabelLayout{
 			TargetID:          prometheusTarget.ID,
 			TargetLabelNames:  targetLabelNames,
 			TargetLabelValues: targetLabelValues,
@@ -69,11 +69,11 @@ func (l *ChPrometheusTargetLabelLayout) generateNewData(db *mysql.DB) (map[IDKey
 	return keyToItem, true
 }
 
-func (l *ChPrometheusTargetLabelLayout) generateKey(dbItem mysqlmodel.ChPrometheusTargetLabelLayout) IDKey {
+func (l *ChPrometheusTargetLabelLayout) generateKey(dbItem metadbmodel.ChPrometheusTargetLabelLayout) IDKey {
 	return IDKey{ID: dbItem.TargetID}
 }
 
-func (l *ChPrometheusTargetLabelLayout) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPrometheusTargetLabelLayout) (map[string]interface{}, bool) {
+func (l *ChPrometheusTargetLabelLayout) generateUpdateInfo(oldItem, newItem metadbmodel.ChPrometheusTargetLabelLayout) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 
 	if oldItem.TargetLabelNames != newItem.TargetLabelNames {

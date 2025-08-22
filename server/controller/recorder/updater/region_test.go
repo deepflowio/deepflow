@@ -42,7 +42,7 @@ func (t *SuiteTest) getRegionMock(mockDB bool) (*cache.Cache, cloudmodel.Region)
 	wholeCache := cache.NewCache(domainLcuuid)
 
 	if mockDB {
-		dbItem := new(mysqlmodel.Region)
+		dbItem := new(metadbmodel.Region)
 		dbItem.Lcuuid = cloudItem.Lcuuid
 		dbItem.Name = cloudItem.Name
 		t.db.Create(dbItem)
@@ -59,11 +59,11 @@ func (t *SuiteTest) TestHandleAddRegionSucess() {
 
 	updater := NewRegion(cache, []cloudmodel.Region{cloudItem})
 	updater.HandleAddAndUpdate()
-	var addedItem *mysqlmodel.Region
+	var addedItem *metadbmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleUpdateRegionSucess() {
@@ -72,7 +72,7 @@ func (t *SuiteTest) TestHandleUpdateRegionSucess() {
 
 	updater := NewRegion(cache, []cloudmodel.Region{cloudItem})
 	updater.HandleAddAndUpdate()
-	var updatedItem *mysqlmodel.Region
+	var updatedItem *metadbmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Label, cloudItem.Label)
@@ -81,7 +81,7 @@ func (t *SuiteTest) TestHandleUpdateRegionSucess() {
 	diffBase := cache.DiffBaseDataSet.Regions[cloudItem.Lcuuid]
 	assert.Equal(t.T(), diffBase.GetSequence(), cache.GetSequence())
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleDeleteRegionSuccess() {
@@ -90,9 +90,9 @@ func (t *SuiteTest) TestHandleDeleteRegionSuccess() {
 	updater := NewRegion(cache, []cloudmodel.Region{})
 	updater.HandleAddAndUpdate()
 	updater.HandleDelete()
-	var deletedItem *mysqlmodel.Region
+	var deletedItem *metadbmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }

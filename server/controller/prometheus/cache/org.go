@@ -26,7 +26,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
@@ -76,7 +76,7 @@ func (c *ORGCaches) Start(ctx context.Context, cfg *prometheuscfg.Config) error 
 	c.working = true
 	c.mux.Unlock()
 
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}
@@ -147,7 +147,7 @@ func (c *ORGCaches) refresh() error {
 }
 
 func (c *ORGCaches) checkORGs() error {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}

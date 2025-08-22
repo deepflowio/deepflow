@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChPodK8sAnnotations struct {
 		message.UpdatedPod,
 		*message.DeletedPods,
 		message.DeletedPods,
-		mysqlmodel.Pod,
-		mysqlmodel.ChPodK8sAnnotations,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sAnnotations,
 		IDKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 			message.UpdatedPod,
 			*message.DeletedPods,
 			message.DeletedPods,
-			mysqlmodel.Pod,
-			mysqlmodel.ChPodK8sAnnotations,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sAnnotations,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS,
@@ -62,13 +62,13 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMess
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKey, targets []mysqlmodel.ChPodK8sAnnotations) {
+func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKey, targets []metadbmodel.ChPodK8sAnnotations) {
 	if source.Annotation == "" {
 		return
 	}
 	annotations, _ := common.StrToJsonAndMap(source.Annotation)
-	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodK8sAnnotations{{
-		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sAnnotations{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
@@ -77,6 +77,6 @@ func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, source *mysql
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sAnnotations, db *mysql.DB) {
+func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []metadbmodel.ChPodK8sAnnotations, db *metadb.DB) {
 
 }

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewRoutingTable(c *cache.Cache) *RoutingTable {
 	return listener
 }
 
-func (rt *RoutingTable) OnUpdaterAdded(addedDBItems []*mysqlmodel.RoutingTable) {
+func (rt *RoutingTable) OnUpdaterAdded(addedDBItems []*metadbmodel.RoutingTable) {
 	rt.cache.AddRoutingTables(addedDBItems)
 }
 
@@ -42,6 +42,6 @@ func (rt *RoutingTable) OnUpdaterUpdated(cloudItem *cloudmodel.RoutingTable, dif
 	diffBase.Update(cloudItem)
 }
 
-func (rt *RoutingTable) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.RoutingTable) {
+func (rt *RoutingTable) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.RoutingTable) {
 	rt.cache.DeleteRoutingTables(lcuuids)
 }

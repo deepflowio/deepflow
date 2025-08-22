@@ -22,7 +22,7 @@ import (
 	"slices"
 	"time"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -134,7 +134,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 	if err != nil {
 		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), e.metadata.LogPrefixes)
 	} else {
-		dbItem := mysqlmodel.ResourceEvent{
+		dbItem := metadbmodel.ResourceEvent{
 			Domain:  domainLcuuid,
 			Content: string(content),
 		}

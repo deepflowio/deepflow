@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (b *DataSet) AddPodIngress(dbItem *mysqlmodel.PodIngress, seq int) {
+func (b *DataSet) AddPodIngress(dbItem *metadbmodel.PodIngress, seq int) {
 	b.PodIngresses[dbItem.Lcuuid] = &PodIngress{
 		DiffBase: DiffBase{
 			Sequence: seq,
