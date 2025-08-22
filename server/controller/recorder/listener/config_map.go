@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewConfigMap(c *cache.Cache, eq *queue.OverwriteQueue) *ConfigMap {
 	return listener
 }
 
-func (h *ConfigMap) OnUpdaterAdded(addedDBItems []*mysqlmodel.ConfigMap) {
+func (h *ConfigMap) OnUpdaterAdded(addedDBItems []*metadbmodel.ConfigMap) {
 	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddConfigMaps(addedDBItems)
 }
@@ -48,7 +48,7 @@ func (h *ConfigMap) OnUpdaterUpdated(cloudItem *cloudmodel.ConfigMap, diffBase *
 	diffBase.Update(cloudItem, h.cache.ToolDataSet)
 }
 
-func (h *ConfigMap) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.ConfigMap) {
+func (h *ConfigMap) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.ConfigMap) {
 	h.eventProducer.ProduceByDelete(deletedDBItems)
 	h.cache.DeleteConfigMaps(lcuuids)
 }

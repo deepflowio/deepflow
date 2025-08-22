@@ -32,8 +32,8 @@ import (
 	"github.com/bitly/go-simplejson"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -42,7 +42,7 @@ import (
 
 var log = logger.MustGetLogger("service.rebalance")
 
-func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool, dataDuration int) (*model.VTapRebalanceResult, error) {
+func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *metadb.DB, ifCheckout bool, dataDuration int) (*model.VTapRebalanceResult, error) {
 	if err := r.generateRebalanceData(db, dataDuration); err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 			continue
 		}
 		vtapNameToID := make(map[string]int, len(azVTaps))
-		vTapIDToVTap := make(map[int]*mysqlmodel.VTap, len(azVTaps))
+		vTapIDToVTap := make(map[int]*metadbmodel.VTap, len(azVTaps))
 		vTapIDToTraffic := make(map[int]int64)
 		for _, vtap := range azVTaps {
 			vtapNameToID[vtap.Name] = vtap.ID
@@ -124,7 +124,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 	}
 
 	allVTapNameToID := make(map[string]int, len(r.dbInfo.VTaps))
-	allVTapIDToVTap := make(map[int]*mysqlmodel.VTap, len(r.dbInfo.VTaps))
+	allVTapIDToVTap := make(map[int]*metadbmodel.VTap, len(r.dbInfo.VTaps))
 	for _, vtap := range r.dbInfo.VTaps {
 		allVTapNameToID[vtap.Name] = vtap.ID
 		allVTapIDToVTap[vtap.ID] = &vtap
@@ -153,7 +153,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 	return response, nil
 }
 
-func (r *AnalyzerInfo) RebalanceAnalyzerByTrafficDebug(db *mysql.DB, dataDuration int) (map[string]interface{}, error) {
+func (r *AnalyzerInfo) RebalanceAnalyzerByTrafficDebug(db *metadb.DB, dataDuration int) (map[string]interface{}, error) {
 	data := make(map[string]interface{})
 	if err := r.generateRebalanceData(db, dataDuration); err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (r *AnalyzerInfo) trafficAZDebug(data map[string]interface{}) map[string]in
 		if !ok {
 			continue
 		}
-		analyzerIPToVTaps := make(map[string][]mysqlmodel.VTap, len(azAnalyzers))
+		analyzerIPToVTaps := make(map[string][]metadbmodel.VTap, len(azAnalyzers))
 		for _, vtap := range azVTaps {
 			analyzerIPToVTaps[vtap.AnalyzerIP] = append(analyzerIPToVTaps[vtap.AnalyzerIP], *vtap)
 		}
@@ -220,18 +220,18 @@ func (r *AnalyzerInfo) trafficAnalyzerDebug(orgID int, data map[string]interface
 	for _, region := range r.dbInfo.Regions {
 		regionToName[region.Lcuuid] = region.Name
 	}
-	lcuuidToAz := make(map[string]*mysqlmodel.AZ)
+	lcuuidToAz := make(map[string]*metadbmodel.AZ)
 	for i, az := range r.dbInfo.AZs {
 		lcuuidToAz[az.Lcuuid] = &r.dbInfo.AZs[i]
 	}
-	ipToAzAnalyzerCon := make(map[string][]*mysqlmodel.AZAnalyzerConnection)
+	ipToAzAnalyzerCon := make(map[string][]*metadbmodel.AZAnalyzerConnection)
 	for i, conn := range r.dbInfo.AZAnalyzerConns {
 		ipToAzAnalyzerCon[conn.AnalyzerIP] = append(
 			ipToAzAnalyzerCon[conn.AnalyzerIP],
 			&r.dbInfo.AZAnalyzerConns[i],
 		)
 	}
-	analyzerIPToVTaps := make(map[string][]mysqlmodel.VTap, len(r.dbInfo.VTaps))
+	analyzerIPToVTaps := make(map[string][]metadbmodel.VTap, len(r.dbInfo.VTaps))
 	for _, vtap := range r.dbInfo.VTaps {
 		analyzerIPToVTaps[vtap.AnalyzerIP] = append(analyzerIPToVTaps[vtap.AnalyzerIP], vtap)
 	}
@@ -281,7 +281,7 @@ func (r *AnalyzerInfo) trafficAnalyzerDebug(orgID int, data map[string]interface
 	return data
 }
 
-func (r *AnalyzerInfo) generateRebalanceData(db *mysql.DB, dataDuration int) error {
+func (r *AnalyzerInfo) generateRebalanceData(db *metadb.DB, dataDuration int) error {
 	// In automatic balancing, data is not obtained when ifCheckout = false.
 	if len(r.dbInfo.Analyzers) == 0 {
 		err := r.dbInfo.Get(db)
@@ -300,11 +300,11 @@ func (r *AnalyzerInfo) generateRebalanceData(db *mysql.DB, dataDuration int) err
 		r.RegionToAZLcuuids[az.Region] = append(r.RegionToAZLcuuids[az.Region], az.Lcuuid)
 		r.AZToRegion[az.Lcuuid] = az.Region
 	}
-	r.AZToVTaps = make(map[string][]*mysqlmodel.VTap)
+	r.AZToVTaps = make(map[string][]*metadbmodel.VTap)
 	for i, vtap := range info.VTaps {
 		r.AZToVTaps[vtap.AZ] = append(r.AZToVTaps[vtap.AZ], &info.VTaps[i])
 	}
-	ipToAnalyzer := make(map[string]*mysqlmodel.Analyzer)
+	ipToAnalyzer := make(map[string]*metadbmodel.Analyzer)
 	for i, analyzer := range info.Analyzers {
 		ipToAnalyzer[analyzer.IP] = &info.Analyzers[i]
 	}
@@ -327,8 +327,8 @@ func (r *AnalyzerInfo) generateRebalanceData(db *mysql.DB, dataDuration int) err
 type AZInfo struct {
 	lcuuid          string
 	vTapIDToTraffic map[int]int64
-	vtapIDToVTap    map[int]*mysqlmodel.VTap
-	analyzers       []*mysqlmodel.Analyzer
+	vtapIDToVTap    map[int]*metadbmodel.VTap
+	analyzers       []*metadbmodel.Analyzer
 }
 
 type ChangeInfo struct {
@@ -389,7 +389,7 @@ type ChangeInfo struct {
 //   - 采集器权重 = 采集器发送流量 / 所有采集器发送的流量
 //   - 数据节点的平均权重 = 采集器权重之和 / 正常数据节点个数
 //   - 数据节点权重 = 数据节点上的采集器权重之和 / 数据节点的平均权重
-func (p *AZInfo) rebalanceAnalyzer(db *mysql.DB, ifCheckout bool) (map[int]*ChangeInfo, *model.AZVTapRebalanceResult) {
+func (p *AZInfo) rebalanceAnalyzer(db *metadb.DB, ifCheckout bool) (map[int]*ChangeInfo, *model.AZVTapRebalanceResult) {
 	var beforeTraffic, afterTraffic int64
 	for _, dataSize := range p.vTapIDToTraffic {
 		afterTraffic += dataSize
@@ -547,7 +547,7 @@ func (p *AZInfo) rebalanceAnalyzer(db *mysql.DB, ifCheckout bool) (map[int]*Chan
 			}
 		}
 		if !ifCheckout {
-			db.Model(mysqlmodel.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
+			db.Model(metadbmodel.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
 		}
 		if _, ok := analyzerIPToInfo[allocIP]; !ok {
 			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip(%s)", allocVTap.VtapID, allocIP, db.LogPrefixORGID, db.LogPrefixName)
@@ -602,8 +602,8 @@ func (p *AZInfo) rebalanceAnalyzer(db *mysql.DB, ifCheckout bool) (map[int]*Chan
 	return vTapIDToChangeInfo, azVTapRebalanceResult
 }
 
-func (r *AnalyzerInfo) getVTapTraffic(db *mysql.DB, dataDuration int, regionToAZLcuuids map[string][]string) (map[string]map[string]int64, error) {
-	ipToController := make(map[string]*mysqlmodel.Controller)
+func (r *AnalyzerInfo) getVTapTraffic(db *metadb.DB, dataDuration int, regionToAZLcuuids map[string][]string) (map[string]map[string]int64, error) {
+	ipToController := make(map[string]*metadbmodel.Controller)
 	for i, controller := range r.dbInfo.Controllers {
 		ipToController[controller.IP] = &r.dbInfo.Controllers[i]
 	}
@@ -637,7 +637,7 @@ type Query struct {
 	onlyWeight bool
 }
 
-func (q *Query) GetAgentDispatcher(orgDB *mysql.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
+func (q *Query) GetAgentDispatcher(orgDB *metadb.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
 	if domainPrefix == "master-" {
 		domainPrefix = ""
 	}
@@ -717,7 +717,7 @@ func parseBody(data []byte) (map[string]int64, error) {
 	return vtapNameToTraffic, nil
 }
 
-func (r *AnalyzerInfo) updateCounter(db *mysql.DB, vtapIDToVTap map[int]*mysqlmodel.VTap, vtapNameToID map[string]int, vtapIDToChangeInfo map[int]*ChangeInfo) {
+func (r *AnalyzerInfo) updateCounter(db *metadb.DB, vtapIDToVTap map[int]*metadbmodel.VTap, vtapNameToID map[string]int, vtapIDToChangeInfo map[int]*ChangeInfo) {
 	vtapCounter := statsd.GetVTapCounter()
 	for vtapID, changeInfo := range vtapIDToChangeInfo {
 		vtap, ok := vtapIDToVTap[vtapID]

@@ -19,7 +19,7 @@ package event
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -41,7 +41,7 @@ func NewPodGroupConfigMapConnection(toolDS *tool.DataSet, eq *queue.OverwriteQue
 	return mng
 }
 
-func (p *PodGroupConfigMapConnection) ProduceByAdd(items []*mysqlmodel.PodGroupConfigMapConnection) {
+func (p *PodGroupConfigMapConnection) ProduceByAdd(items []*metadbmodel.PodGroupConfigMapConnection) {
 	for _, item := range items {
 		configMapName, ok := p.ToolDataSet.GetNameByConfigMapID(item.ConfigMapID)
 		if !ok {
@@ -65,7 +65,7 @@ func (p *PodGroupConfigMapConnection) ProduceByAdd(items []*mysqlmodel.PodGroupC
 func (p *PodGroupConfigMapConnection) ProduceByUpdate(cloudItem *cloudmodel.PodGroupConfigMapConnection, diffBase *diffbase.PodGroupConfigMapConnection) {
 }
 
-func (p *PodGroupConfigMapConnection) ProduceByDelete(items []*mysqlmodel.PodGroupConfigMapConnection) {
+func (p *PodGroupConfigMapConnection) ProduceByDelete(items []*metadbmodel.PodGroupConfigMapConnection) {
 	for _, item := range items {
 		configMapName, ok := p.ToolDataSet.GetNameByConfigMapID(item.ConfigMapID)
 		if !ok {

@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -34,8 +34,8 @@ type ChChostCloudTags struct {
 		message.UpdatedVM,
 		*message.DeletedVMs,
 		message.DeletedVMs,
-		mysqlmodel.VM,
-		mysqlmodel.ChChostCloudTags,
+		metadbmodel.VM,
+		metadbmodel.ChChostCloudTags,
 		IDKey,
 	]
 }
@@ -49,8 +49,8 @@ func NewChChostCloudTags() *ChChostCloudTags {
 			message.UpdatedVM,
 			*message.DeletedVMs,
 			message.DeletedVMs,
-			mysqlmodel.VM,
-			mysqlmodel.ChChostCloudTags,
+			metadbmodel.VM,
+			metadbmodel.ChChostCloudTags,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS,
@@ -64,7 +64,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
+	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -80,13 +80,13 @@ func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage
 	}
 	updateInfo["cloud_tags"] = string(bytes)
 	targetKey := IDKey{ID: sourceID}
-	var chItem mysqlmodel.ChChostCloudTags
+	var chItem metadbmodel.ChChostCloudTags
 	db.Where("id = ?", sourceID).Find(&chItem)
 	if chItem.ID == 0 {
 		c.SubscriberComponent.dbOperator.add(
 			[]IDKey{targetKey},
-			[]mysqlmodel.ChChostCloudTags{{
-				ChIDBase:  mysqlmodel.ChIDBase{ID: sourceID},
+			[]metadbmodel.ChChostCloudTags{{
+				ChIDBase:  metadbmodel.ChIDBase{ID: sourceID},
 				CloudTags: updateInfo["cloud_tags"].(string),
 				TeamID:    md.GetTeamID(),
 				DomainID:  md.GetDomainID(),
@@ -99,7 +99,7 @@ func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKey, targets []mysqlmodel.ChChostCloudTags) {
+func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKey, targets []metadbmodel.ChChostCloudTags) {
 	cloudTagMap := MergeCloudTags(source.LearnedCloudTags, source.CustomCloudTags)
 	if len(cloudTagMap) == 0 {
 		return
@@ -109,8 +109,8 @@ func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmod
 		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 		return
 	}
-	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChChostCloudTags{{
-		ChIDBase:  mysqlmodel.ChIDBase{ID: source.ID},
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChChostCloudTags{{
+		ChIDBase:  metadbmodel.ChIDBase{ID: source.ID},
 		CloudTags: string(bytes),
 		TeamID:    md.GetTeamID(),
 		DomainID:  md.GetDomainID(),
@@ -118,6 +118,6 @@ func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmod
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []mysqlmodel.ChChostCloudTags, db *mysql.DB) {
+func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []metadbmodel.ChChostCloudTags, db *metadb.DB) {
 
 }

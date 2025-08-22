@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -43,7 +43,7 @@ func NewConfigMap(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *ConfigMap {
 	return mng
 }
 
-func (p *ConfigMap) ProduceByAdd(items []*mysqlmodel.ConfigMap) {
+func (p *ConfigMap) ProduceByAdd(items []*metadbmodel.ConfigMap) {
 	for _, item := range items {
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagConfigMapID(uint32(item.ID)),
@@ -93,7 +93,7 @@ func (p *ConfigMap) ProduceByUpdate(cloudItem *cloudmodel.ConfigMap, diffBase *d
 	)
 }
 
-func (p *ConfigMap) ProduceByDelete(dbItems []*mysqlmodel.ConfigMap) {
+func (p *ConfigMap) ProduceByDelete(dbItems []*metadbmodel.ConfigMap) {
 	for _, item := range dbItems {
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagConfigMapID(uint32(item.ID)),

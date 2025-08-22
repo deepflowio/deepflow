@@ -45,7 +45,7 @@ func (t *SuiteTest) getVRouterMock(mockDB bool) (*cache.Cache, cloudmodel.VRoute
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.VRouter{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.VRouter{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.VRouters[cloudItem.Lcuuid] = &diffbase.VRouter{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -66,12 +66,12 @@ func (t *SuiteTest) TestHandleAddVRouterSucess() {
 	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.VRouter
+	var addedItem *metadbmodel.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VRouters), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VRouter{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VRouter{})
 }
 
 func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
@@ -87,7 +87,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.VRouter
+	var addedItem *metadbmodel.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VRouters), 1)
@@ -95,7 +95,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), addedItem.VPCID, newVPCID)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VRouter{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VRouter{})
 }
 
 func (t *SuiteTest) TestHandleDeleteVRouterSucess() {
@@ -104,7 +104,7 @@ func (t *SuiteTest) TestHandleDeleteVRouterSucess() {
 	updater := NewVRouter(cache, []cloudmodel.VRouter{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.VRouter
+	var addedItem *metadbmodel.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VRouters), 0)

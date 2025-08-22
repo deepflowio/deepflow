@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPodGroup() *mysqlmodel.PodGroup {
-	return &mysqlmodel.PodGroup{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPodGroup() *metadbmodel.PodGroup {
+	return &metadbmodel.PodGroup{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodGroupBatchSuccess() {
 	operator := NewPodGroup()
 	itemToAdd := newDBPodGroup()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PodGroup{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PodGroup{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PodGroup
+	var addedItem *metadbmodel.PodGroup
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroup{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodGroup{})
 }
 
 func (t *SuiteTest) TestUpdatePodGroupSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodGroupSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.PodGroup
+	var updatedItem *metadbmodel.PodGroup
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroup{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodGroup{})
 }
 
 func (t *SuiteTest) TestDeletePodGroupBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeletePodGroupBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PodGroup
+	var deletedItem *metadbmodel.PodGroup
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestPodGroupCreateAndFind() {
 	lcuuid := uuid.New().String()
-	az := &mysqlmodel.PodGroup{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	az := &metadbmodel.PodGroup{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(az)
-	var resultPodGroup *mysqlmodel.PodGroup
+	var resultPodGroup *metadbmodel.PodGroup
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and label='' and az='' and "+
 		"region='' and sub_domain=''", lcuuid).First(&resultPodGroup).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), az.Base.Lcuuid, resultPodGroup.Base.Lcuuid)
 
-	resultPodGroup = new(mysqlmodel.PodGroup)
+	resultPodGroup = new(metadbmodel.PodGroup)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodGroup)
 	assert.Equal(t.T(), az.Base.Lcuuid, resultPodGroup.Base.Lcuuid)
 
-	resultPodGroup = new(mysqlmodel.PodGroup)
+	resultPodGroup = new(metadbmodel.PodGroup)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPodGroup)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

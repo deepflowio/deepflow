@@ -37,8 +37,8 @@ import (
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -521,17 +521,17 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 
 func GetTeamShortLcuuidToInfo() (map[string]TeamInfo, error) {
 	teamIDToOrgID := map[string]TeamInfo{}
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		return teamIDToOrgID, err
 	}
 	for _, orgID := range orgIDs {
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
 			log.Error(err.Error())
 			continue
 		}
-		var teams []mysqlmodel.Team
+		var teams []metadbmodel.Team
 		err = db.Find(&teams).Error
 		if err != nil {
 			log.Error(err.Error())

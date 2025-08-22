@@ -29,8 +29,8 @@ import (
 	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
@@ -163,7 +163,7 @@ func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (grpc.TridentStats,
 	return genesis.GenesisService.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
-func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.GenesisStorage, error) {
+func GetGenesisAgentStorage(vtapIDString string, orgDB *metadb.DB) (model.GenesisStorage, error) {
 	var gStorage model.GenesisStorage
 	vtapID, err := strconv.Atoi(vtapIDString)
 	if err != nil {
@@ -172,7 +172,7 @@ func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.Genesis
 
 	redisCli := dbredis.GetClient()
 	if redisCli != nil {
-		var azControllerConn mysqlmodel.AZControllerConnection
+		var azControllerConn metadbmodel.AZControllerConnection
 		err = orgDB.Where("controller_ip = ?", os.Getenv(ccommon.NODE_IP_KEY)).First(&azControllerConn).Error
 		if err != nil {
 			return gStorage, err

@@ -19,7 +19,7 @@ package constraint
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
@@ -57,12 +57,12 @@ type DiffBase interface {
 
 // 软删除资源的MySQL orm对象
 type MySQLSoftDeleteModel interface {
-	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.Host | mysqlmodel.VM | mysqlmodel.VPC | mysqlmodel.Network |
-		mysqlmodel.VRouter | mysqlmodel.DHCPPort | mysqlmodel.NATGateway |
-		mysqlmodel.LB | mysqlmodel.LBListener | mysqlmodel.CEN | mysqlmodel.PeerConnection | mysqlmodel.RDSInstance |
-		mysqlmodel.RedisInstance | mysqlmodel.PodCluster | mysqlmodel.PodNode | mysqlmodel.PodNamespace |
-		mysqlmodel.PodIngress | mysqlmodel.PodService | mysqlmodel.PodGroup | mysqlmodel.ConfigMap |
-		mysqlmodel.PodReplicaSet | mysqlmodel.Pod | mysqlmodel.Process
+	metadbmodel.Region | metadbmodel.AZ | metadbmodel.Host | metadbmodel.VM | metadbmodel.VPC | metadbmodel.Network |
+		metadbmodel.VRouter | metadbmodel.DHCPPort | metadbmodel.NATGateway |
+		metadbmodel.LB | metadbmodel.LBListener | metadbmodel.CEN | metadbmodel.PeerConnection | metadbmodel.RDSInstance |
+		metadbmodel.RedisInstance | metadbmodel.PodCluster | metadbmodel.PodNode | metadbmodel.PodNamespace |
+		metadbmodel.PodIngress | metadbmodel.PodService | metadbmodel.PodGroup | metadbmodel.ConfigMap |
+		metadbmodel.PodReplicaSet | metadbmodel.Pod | metadbmodel.Process
 
 	GetDomainLcuuid() string
 	GetSubDomainLcuuid() string

@@ -28,8 +28,8 @@ import (
 	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -178,7 +178,7 @@ var tapSideIDToName = map[int]string{
 var DeprecatedTapSideID = []int{48, 49, 50}
 
 func convertDBToJson(
-	orgDB *mysql.DB,
+	orgDB *metadb.DB,
 	sData *agent_config.AgentGroupConfigModel,
 	tData *agent_config.AgentGroupConfigResponse,
 	idToTapTypeName map[int]string,
@@ -306,7 +306,7 @@ func convertDBToJson(
 	}
 }
 
-func convertDBToYaml(orgDB *mysql.DB, sData *agent_config.AgentGroupConfigModel, tData *agent_config.AgentGroupConfig) {
+func convertDBToYaml(orgDB *metadb.DB, sData *agent_config.AgentGroupConfigModel, tData *agent_config.AgentGroupConfig) {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
@@ -415,7 +415,7 @@ func convertJsonToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.A
 	convertToDb(sData, tData)
 }
 
-func convertYamlToDb(orgDB *mysql.DB, sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
+func convertYamlToDb(orgDB *metadb.DB, sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
 	if sData.YamlConfig != nil {
 		b, err := yaml.Marshal(sData.YamlConfig)
 		if err == nil {
@@ -507,7 +507,7 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 }
 
 func (a *VtapGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +523,7 @@ func (a *VtapGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_con
 		return nil, fmt.Errorf("vtapgroup %s configuration already exist", vTapGroupLcuuid)
 	}
 
-	dbGroup := &mysqlmodel.VTapGroup{}
+	dbGroup := &metadbmodel.VTapGroup{}
 	ret = db.Where("lcuuid = ?", vTapGroupLcuuid).First(dbGroup)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
@@ -544,7 +544,7 @@ func (a *VtapGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_con
 }
 
 func (a *VtapGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +558,7 @@ func (a *VtapGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agen
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	var vtapGroup *mysqlmodel.VTapGroup
+	var vtapGroup *metadbmodel.VTapGroup
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
@@ -572,7 +572,7 @@ func (a *VtapGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agen
 }
 
 func (a *VtapGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +586,7 @@ func (a *VtapGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, update
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	var vtapGroup *mysqlmodel.VTapGroup
+	var vtapGroup *metadbmodel.VTapGroup
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
@@ -655,19 +655,19 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 }
 
 func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
-	dbInfo, err := mysql.GetDB(userInfo.ORGID)
+	dbInfo, err := metadb.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
 
 	var dbConfigs []*agent_config.AgentGroupConfigModel
-	var tapTypes []*mysqlmodel.TapType
-	var domains []*mysqlmodel.Domain
-	var allVTapGroups []*mysqlmodel.VTapGroup
+	var tapTypes []*metadbmodel.TapType
+	var domains []*metadbmodel.Domain
+	var allVTapGroups []*metadbmodel.VTapGroup
 	idToTapTypeName := make(map[int]string)
 	lcuuidToDomain := make(map[string]string)
-	lcuuidToVTapGroup := make(map[string]*mysqlmodel.VTapGroup)
+	lcuuidToVTapGroup := make(map[string]*metadbmodel.VTapGroup)
 
 	db.Find(&dbConfigs)
 	db.Find(&tapTypes)
@@ -714,7 +714,7 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 }
 
 func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -732,8 +732,8 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 			realConfig = &agent_config.AgentGroupConfigModel{}
 		}
 	}
-	var tapTypes []*mysqlmodel.TapType
-	var domains []*mysqlmodel.Domain
+	var tapTypes []*metadbmodel.TapType
+	var domains []*metadbmodel.Domain
 	idToTapTypeName := make(map[int]string)
 	lcuuidToDomain := make(map[string]string)
 	db.Find(&tapTypes)
@@ -751,7 +751,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 
 	realData.TeamID = common.DEFAULT_TEAM_ID
 	if realConfig.VTapGroupLcuuid != nil {
-		var vtapGroup mysqlmodel.VTapGroup
+		var vtapGroup metadbmodel.VTapGroup
 		if err := db.Where("lcuuid = ?", *realConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 			return nil, err
 		}
@@ -769,7 +769,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 var emptyData = []byte{123, 125, 10}
 
 func GetVTapGroupAdvancedConfig(orgID int, lcuuid string) (string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -796,14 +796,14 @@ func GetVTapGroupAdvancedConfig(orgID int, lcuuid string) (string, error) {
 }
 
 func GetVTapGroupAdvancedConfigs(orgID int) ([]string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
 
 	var dbConfigs []agent_config.AgentGroupConfigModel
-	var dbGroups []mysqlmodel.VTapGroup
+	var dbGroups []metadbmodel.VTapGroup
 	lcuuidToShortUUID := make(map[string]string)
 	db.Find(&dbGroups)
 	for _, dbGroup := range dbGroups {
@@ -830,7 +830,7 @@ func GetVTapGroupAdvancedConfigs(orgID int) ([]string, error) {
 }
 
 func UpdateVTapGroupAdvancedConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -860,7 +860,7 @@ func UpdateVTapGroupAdvancedConfig(orgID int, lcuuid string, updateData *agent_c
 }
 
 func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGroupConfig) (string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -870,7 +870,7 @@ func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGrou
 		return "", fmt.Errorf("vtap_group_id is None")
 	}
 	shortUUID := createData.VTapGroupID
-	vtapGroup := &mysqlmodel.VTapGroup{}
+	vtapGroup := &metadbmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", *shortUUID)
@@ -900,7 +900,7 @@ func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGrou
 }
 
 func GetVTapGroupConfigByFilter(orgID int, args map[string]string) (string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -910,7 +910,7 @@ func GetVTapGroupConfigByFilter(orgID int, args map[string]string) (string, erro
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
-	vtapGroup := &mysqlmodel.VTapGroup{}
+	vtapGroup := &metadbmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
@@ -931,7 +931,7 @@ func GetVTapGroupConfigByFilter(orgID int, args map[string]string) (string, erro
 }
 
 func DeleteVTapGroupConfigByFilter(orgID int, args map[string]string) (string, error) {
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -941,7 +941,7 @@ func DeleteVTapGroupConfigByFilter(orgID int, args map[string]string) (string, e
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
-	vtapGroup := &mysqlmodel.VTapGroup{}
+	vtapGroup := &metadbmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)

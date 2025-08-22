@@ -106,7 +106,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 		azLcuuid := common.GetUUIDByOrgID(v.orgID, v.getStringPointerValue(rdsDetail.BasicInfo.ZoneId))
 		vpcLcuuid := common.GetUUIDByOrgID(v.orgID, v.getStringPointerValue(rdsDetail.BasicInfo.VpcId))
 		var rdsModel = common.RDS_MODEL_PRIMARY
-		if strings.HasPrefix(v.getStringPointerValue(rdsDetail.BasicInfo.NodeSpec), "rds.mysql.d1.n") {
+		if strings.HasPrefix(v.getStringPointerValue(rdsDetail.BasicInfo.NodeSpec), "rds.metadb.d1.n") {
 			rdsModel = common.RDS_MODEL_SHARE
 		}
 		rdss = append(rdss, model.RDSInstance{

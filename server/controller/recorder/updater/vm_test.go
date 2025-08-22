@@ -52,7 +52,7 @@ func (t *SuiteTest) getVMMock(mockDB bool) (*cache.Cache, cloudmodel.VM) {
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.VM{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, CreateMethod: common.CREATE_METHOD_LEARN, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.VM{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, CreateMethod: common.CREATE_METHOD_LEARN, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.VMs[cloudItem.Lcuuid] = &diffbase.VM{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, VPCLcuuid: cloudItem.VPCLcuuid}
 	}
 
@@ -73,13 +73,13 @@ func (t *SuiteTest) TestHandleAddVMSucess() {
 	updater := NewVM(cache_, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.VM
+	var addedItem *metadbmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VMs), 1)
 	assert.Equal(t.T(), addedItem.VPCID, vpcID)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VM{})
 }
 
 func (t *SuiteTest) TestHandleUpdateVMSucess() {
@@ -89,7 +89,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	updater := NewVM(cache, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var updatedItem *mysqlmodel.VM
+	var updatedItem *metadbmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Name, cloudItem.Name)
@@ -97,7 +97,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	diffBase := cache.DiffBaseDataSet.VMs[cloudItem.Lcuuid]
 	assert.Equal(t.T(), cache.GetSequence(), diffBase.GetSequence())
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VM{})
 }
 
 func (t *SuiteTest) TestHandleDeleteVMSuccess() {
@@ -107,9 +107,9 @@ func (t *SuiteTest) TestHandleDeleteVMSuccess() {
 	updater.HandleAddAndUpdate()
 	updater.HandleDelete()
 
-	var deletedItem *mysqlmodel.VM
+	var deletedItem *metadbmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }

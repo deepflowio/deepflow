@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChPodK8sLabel struct {
 		message.UpdatedPod,
 		*message.DeletedPods,
 		message.DeletedPods,
-		mysqlmodel.Pod,
-		mysqlmodel.ChPodK8sLabel,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sLabel,
 		IDKeyKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 			message.UpdatedPod,
 			*message.DeletedPods,
 			message.DeletedPods,
-			mysqlmodel.Pod,
-			mysqlmodel.ChPodK8sLabel,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sLabel,
 			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_LABEL,
@@ -61,12 +61,12 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
+	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChPodK8sLabel, 0)
+	targetsToAdd := make([]metadbmodel.ChPodK8sLabel, 0)
 	keysToDelete := make([]IDKeyKey, 0)
-	targetsToDelete := make([]mysqlmodel.ChPodK8sLabel, 0)
+	targetsToDelete := make([]metadbmodel.ChPodK8sLabel, 0)
 
 	if fieldsUpdate.Label.IsDifferent() {
 		_, new := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
@@ -77,8 +77,8 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sLabel{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sLabel{
+					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
 					Key:         k,
 					Value:       v,
 					TeamID:      md.GetTeamID(),
@@ -89,12 +89,12 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 			}
 			updateInfo := make(map[string]interface{})
 			if oldV != v {
-				var chItem mysqlmodel.ChPodK8sLabel
+				var chItem metadbmodel.ChPodK8sLabel
 				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 				if chItem.ID == 0 {
 					keysToAdd = append(keysToAdd, targetKey)
-					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sLabel{
-						ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
+					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sLabel{
+						ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
 						Key:         k,
 						Value:       v,
 						TeamID:      md.GetTeamID(),
@@ -110,8 +110,8 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
-				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodK8sLabel{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+				targetsToDelete = append(targetsToDelete, metadbmodel.ChPodK8sLabel{
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 					Key:      k,
 				})
 			}
@@ -126,12 +126,12 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKeyKey, targets []mysqlmodel.ChPodK8sLabel) {
+func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKeyKey, targets []metadbmodel.ChPodK8sLabel) {
 	_, labelMap := common.StrToJsonAndMap(source.Label)
 	for k, v := range labelMap {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
-		targets = append(targets, mysqlmodel.ChPodK8sLabel{
-			ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+		targets = append(targets, metadbmodel.ChPodK8sLabel{
+			ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 			Key:         k,
 			Value:       v,
 			TeamID:      md.GetTeamID(),
@@ -143,6 +143,6 @@ func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysqlmodel.
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sLabel, db *mysql.DB) {
+func (c *ChPodK8sLabel) softDeletedTargetsUpdated(targets []metadbmodel.ChPodK8sLabel, db *metadb.DB) {
 
 }

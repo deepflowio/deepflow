@@ -23,25 +23,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBLBTargetServer() *mysqlmodel.LBTargetServer {
-	return &mysqlmodel.LBTargetServer{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Port: rand.Intn(65535)}
+func newDBLBTargetServer() *metadbmodel.LBTargetServer {
+	return &metadbmodel.LBTargetServer{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Port: rand.Intn(65535)}
 }
 
 func (t *SuiteTest) TestAddLBTargetServerBatchSuccess() {
 	operator := NewLBTargetServer()
 	itemToAdd := newDBLBTargetServer()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.LBTargetServer{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.LBTargetServer{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.LBTargetServer
+	var addedItem *metadbmodel.LBTargetServer
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Port, itemToAdd.Port)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBTargetServer{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LBTargetServer{})
 }
 
 func (t *SuiteTest) TestUpdateLBTargetServerSuccess() {
@@ -54,11 +54,11 @@ func (t *SuiteTest) TestUpdateLBTargetServerSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.LBTargetServer
+	var updatedItem *metadbmodel.LBTargetServer
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Port, updateInfo["port"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBTargetServer{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LBTargetServer{})
 }
 
 func (t *SuiteTest) TestDeleteLBTargetServerBatchSuccess() {
@@ -68,7 +68,7 @@ func (t *SuiteTest) TestDeleteLBTargetServerBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.LBTargetServer
+	var deletedItem *metadbmodel.LBTargetServer
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

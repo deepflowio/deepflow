@@ -49,10 +49,10 @@ func (t *SuiteTest) getVInterfaceMock(mockDB bool) (*cache.Cache, cloudmodel.VIn
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
 		vifID := 100
-		t.db.Create(&mysqlmodel.VInterface{Name: cloudItem.Name, Base: mysqlmodel.Base{ID: vifID, Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.VInterface{Name: cloudItem.Name, Base: metadbmodel.Base{ID: vifID, Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.VInterfaces[cloudItem.Lcuuid] = &diffbase.VInterface{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 
-		t.db.Create(&mysqlmodel.LANIP{Base: mysqlmodel.Base{Lcuuid: cloudIP.Lcuuid}, Domain: domainLcuuid, VInterfaceID: vifID})
+		t.db.Create(&metadbmodel.LANIP{Base: metadbmodel.Base{Lcuuid: cloudIP.Lcuuid}, Domain: domainLcuuid, VInterfaceID: vifID})
 		cache_.DiffBaseDataSet.LANIPs[cloudIP.Lcuuid] = &diffbase.LANIP{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
@@ -77,17 +77,17 @@ func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	updater.HandleDelete()
 	ipUpdater.HandleDelete()
 
-	var addedItem *mysqlmodel.VInterface
+	var addedItem *metadbmodel.VInterface
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VInterfaces), 1)
 	assert.Equal(t.T(), addedItem.Type, cloudItem.Type)
-	var wanIP *mysqlmodel.WANIP
+	var wanIP *metadbmodel.WANIP
 	t.db.Where("vifid = ?", addedItem.ID).Find(&wanIP)
 	assert.Equal(t.T(), cloudIP.IP, wanIP.IP)
 	assert.Equal(t.T(), 1, len(cache_.DiffBaseDataSet.WANIPs))
 	assert.Equal(t.T(), 0, len(cache_.DiffBaseDataSet.LANIPs))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VInterface{})
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.WANIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VInterface{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.WANIP{})
 }

@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (b *DataSet) AddSubDomain(dbItem *mysqlmodel.SubDomain, seq int) {
+func (b *DataSet) AddSubDomain(dbItem *metadbmodel.SubDomain, seq int) {
 	b.SubDomains[dbItem.Lcuuid] = &SubDomain{
 		DiffBase: DiffBase{
 			Sequence: seq,

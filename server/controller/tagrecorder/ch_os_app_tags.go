@@ -20,17 +20,17 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChOSAppTags struct {
-	UpdaterComponent[mysqlmodel.ChOSAppTags, IDKey]
+	UpdaterComponent[metadbmodel.ChOSAppTags, IDKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
 	updater := &ChOSAppTags{
-		newUpdaterComponent[mysqlmodel.ChOSAppTags, IDKey](
+		newUpdaterComponent[metadbmodel.ChOSAppTags, IDKey](
 			RESOURCE_TYPE_CH_OS_APP_TAGS,
 		),
 	}
@@ -38,9 +38,9 @@ func NewChOSAppTags() *ChOSAppTags {
 	return updater
 }
 
-func (o *ChOSAppTags) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChOSAppTags, bool) {
-	var processes []mysqlmodel.Process
-	keyToItem := make(map[IDKey]mysqlmodel.ChOSAppTags)
+func (o *ChOSAppTags) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChOSAppTags, bool) {
+	var processes []metadbmodel.Process
+	keyToItem := make(map[IDKey]metadbmodel.ChOSAppTags)
 	gidToOsAppTagMap := make(map[int]map[string]string)
 
 	err := db.Select("gid", "os_app_tags").Find(&processes).Error
@@ -80,7 +80,7 @@ func (o *ChOSAppTags) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChOSAp
 		key := IDKey{
 			ID: gid,
 		}
-		keyToItem[key] = mysqlmodel.ChOSAppTags{
+		keyToItem[key] = metadbmodel.ChOSAppTags{
 			ID:        gid,
 			OSAPPTags: string(osAppTagsStr),
 		}
@@ -89,11 +89,11 @@ func (o *ChOSAppTags) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChOSAp
 	return keyToItem, true
 }
 
-func (o *ChOSAppTags) generateKey(dbItem mysqlmodel.ChOSAppTags) IDKey {
+func (o *ChOSAppTags) generateKey(dbItem metadbmodel.ChOSAppTags) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem mysqlmodel.ChOSAppTags) (map[string]interface{}, bool) {
+func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem metadbmodel.ChOSAppTags) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.OSAPPTags != newItem.OSAPPTags {
 		updateInfo["os_app_tags"] = newItem.OSAPPTags

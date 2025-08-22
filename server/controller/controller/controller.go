@@ -29,7 +29,7 @@ import (
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -89,8 +89,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
-	if err := mysql.GetDBs().Init(cfg.MySqlCfg); err != nil {
-		log.Errorf("init mysql failed: %s", err.Error())
+	if err := metadb.GetDBs().Init(cfg.MetadbCfg); err != nil {
+		log.Errorf("init metadb failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}
@@ -145,7 +145,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Trisolaris init")
 	// 启动trisolaris
-	tm := trisolaris.NewTrisolarisManager(&cfg.TrisolarisCfg, mysql.DefaultDB.DB)
+	tm := trisolaris.NewTrisolarisManager(&cfg.TrisolarisCfg, metadb.DefaultDB.DB)
 	go func() {
 		if err := tm.Start(); err != nil {
 			log.Errorf("trisolaris manager start failed: %s", err.Error())
@@ -181,7 +181,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	grpcStart(ctx, cfg)
 
 	if !cfg.ReportingDisabled {
-		go report.NewReportServer(mysql.DefaultDB.DB).StartReporting()
+		go report.NewReportServer(metadb.DefaultDB.DB).StartReporting()
 	}
 }
 

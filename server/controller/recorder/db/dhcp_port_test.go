@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBDHCPPort() *mysqlmodel.DHCPPort {
-	return &mysqlmodel.DHCPPort{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBDHCPPort() *metadbmodel.DHCPPort {
+	return &metadbmodel.DHCPPort{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddDHCPPortBatchSuccess() {
 	operator := NewDHCPPort()
 	itemToAdd := newDBDHCPPort()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.DHCPPort{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.DHCPPort{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.DHCPPort
+	var addedItem *metadbmodel.DHCPPort
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DHCPPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.DHCPPort{})
 }
 
 func (t *SuiteTest) TestUpdateDHCPPortSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateDHCPPortSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.DHCPPort
+	var updatedItem *metadbmodel.DHCPPort
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DHCPPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.DHCPPort{})
 }
 
 func (t *SuiteTest) TestDeleteDHCPPortBatchSuccess() {
@@ -66,27 +66,27 @@ func (t *SuiteTest) TestDeleteDHCPPortBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.DHCPPort
+	var deletedItem *metadbmodel.DHCPPort
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestDHCPPortCreateAndFind() {
 	lcuuid := uuid.New().String()
-	dhcPort := &mysqlmodel.DHCPPort{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	dhcPort := &metadbmodel.DHCPPort{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(dhcPort)
-	var resultDHCPPort *mysqlmodel.DHCPPort
+	var resultDHCPPort *metadbmodel.DHCPPort
 	err := t.db.Where("lcuuid = ? and name='' and az='' and region=''", lcuuid).First(&resultDHCPPort).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
 
-	resultDHCPPort = new(mysqlmodel.DHCPPort)
+	resultDHCPPort = new(metadbmodel.DHCPPort)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultDHCPPort)
 	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
 
-	resultDHCPPort = new(mysqlmodel.DHCPPort)
+	resultDHCPPort = new(metadbmodel.DHCPPort)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultDHCPPort)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

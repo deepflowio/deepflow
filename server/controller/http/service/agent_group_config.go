@@ -31,8 +31,8 @@ import (
 	agentconf "github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	querierConfig "github.com/deepflowio/deepflow/server/querier/config"
@@ -59,7 +59,7 @@ func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerCo
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {
 	return agentconf.ConvertTemplateYAMLToJSON(dynamicOptions)
 }
 
-func (a *AgentGroupConfig) getL7ProtocolsFromCK(db *mysql.DB) ([]string, error) {
+func (a *AgentGroupConfig) getL7ProtocolsFromCK(db *metadb.DB) ([]string, error) {
 	reqBody := url.Values{
 		"db":  {"flow_log"},
 		"sql": {"show tag l7_protocol values from l7_flow_log"},
@@ -207,7 +207,7 @@ func (a *AgentGroupConfig) getL7ProtocolsFromCK(db *mysql.DB) ([]string, error) 
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfig(groupLcuuid string, dataType int) ([]byte, error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		log.Infof("failed to get db info: %v", err)
 		return nil, err
@@ -233,7 +233,7 @@ func (a *AgentGroupConfig) strToBytes(data string, returnType int) ([]byte, erro
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfigs(dataType int) (interface{}, error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func (a *AgentGroupConfig) getStringYaml(data interface{}, dataType int) (string
 }
 
 func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data interface{}, dataType int) ([]byte, error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func (a *AgentGroupConfig) CreateAgentGroupConfig(groupLcuuid string, data inter
 	return a.strToBytes(agentGroupConfig.Yaml, dataType)
 }
 
-func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *mysql.DB, groupLcuuid string, newVersionYaml string) {
+func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *metadb.DB, groupLcuuid string, newVersionYaml string) {
 	var domains []model.Domain
 	if err := dbInfo.Select("id", "lcuuid").Find(&domains).Error; err != nil {
 		log.Errorf("failed to get domain info: %v", err)
@@ -368,7 +368,7 @@ func (a *AgentGroupConfig) compatibleWithOldVersion(dbInfo *mysql.DB, groupLcuui
 }
 
 func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data interface{}, dataType int) ([]byte, error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +408,7 @@ func (a *AgentGroupConfig) UpdateAgentGroupConfig(groupLcuuid string, data inter
 }
 
 func (a *AgentGroupConfig) DeleteAgentGroupConfig(groupLcuuid string) error {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return err
 	}

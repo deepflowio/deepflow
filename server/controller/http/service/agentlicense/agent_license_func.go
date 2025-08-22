@@ -19,9 +19,9 @@ package agentlicense
 import (
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func UpdateAgentLicenseFunction(tx *gorm.DB, userID int, newAgentGroup *mysqlmodel.VTapGroup, agents []mysqlmodel.VTap) error {
+func UpdateAgentLicenseFunction(tx *gorm.DB, userID int, newAgentGroup *metadbmodel.VTapGroup, agents []metadbmodel.VTap) error {
 	return nil
 }
