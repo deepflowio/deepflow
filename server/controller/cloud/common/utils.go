@@ -43,7 +43,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	controllermodel "github.com/deepflowio/deepflow/server/controller/model"
@@ -564,14 +564,14 @@ func InetNToA(ip uint32) string {
 }
 
 func GetVPCLcuuidFromUUIDGenerate(orgID int, uuidGenerate string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		uuidGenerate += strconv.Itoa(orgID)
 	}
 	return common.GetUUID(uuidGenerate+K8S_VPC_NAME, uuid.Nil)
 }
 
 func GetAZLcuuidFromUUIDGenerate(orgID int, uuidGenerate string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		uuidGenerate += strconv.Itoa(orgID)
 	}
 	lcuuid := common.GetUUID(uuidGenerate, uuid.Nil)

@@ -7,7 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	gomock "github.com/golang/mock/gomock"
 )

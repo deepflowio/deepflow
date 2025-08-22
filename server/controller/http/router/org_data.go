@@ -24,7 +24,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	metadbcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -32,13 +32,13 @@ import (
 )
 
 type ORGData struct {
-	mysqlCfg mysqlcfg.Config
+	metadbCfg metadbcfg.Config
 	cfg      *config.ControllerConfig
 }
 
 func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 	return &ORGData{
-		mysqlCfg: cfg.MetadbCfg,
+		metadbCfg: cfg.MetadbCfg,
 		cfg:      cfg,
 	}
 }
@@ -60,7 +60,7 @@ func (d *ORGData) Create(c *gin.Context) {
 		return
 	}
 
-	resp, err := service.CreateORGData(body, d.mysqlCfg)
+	resp, err := service.CreateORGData(body, d.metadbCfg)
 	response.JSON(c, response.SetData(map[string]interface{}{"DATABASE": resp}), response.SetError(err))
 }
 
@@ -70,7 +70,7 @@ func (d *ORGData) Delete(c *gin.Context) {
 		response.JSON(c, response.SetOptStatus(httpcommon.INVALID_POST_DATA), response.SetError(err))
 		return
 	}
-	err = service.DeleteORGData(orgID, d.mysqlCfg)
+	err = service.DeleteORGData(orgID, d.metadbCfg)
 	response.JSON(c, response.SetError(err))
 }
 
