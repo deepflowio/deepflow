@@ -35,7 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
@@ -344,7 +344,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 			return nil, response.ServiceError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain (%s)", domainCreate.KubernetesClusterID, subDomainCheck.Name))
 		}
 
-		if db.ORGID != mysqlcommon.DEFAULT_ORG_ID {
+		if db.ORGID != metadbcommon.DEFAULT_ORG_ID {
 			k8sClusterIDCreate += strconv.Itoa(db.ORGID)
 		}
 	}

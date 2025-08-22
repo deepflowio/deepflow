@@ -65,13 +65,13 @@ type Cloud struct {
 
 // TODO 添加参数
 func NewCloud(orgID int, domain metadbmodel.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
-	mysqlDB, err := metadb.GetDB(orgID)
+	metadbbbDB, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil
 	}
 
-	platform, err := platform.NewPlatform(domain, cfg, mysqlDB)
+	platform, err := platform.NewPlatform(domain, cfg, metadbbbDB)
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil
@@ -99,7 +99,7 @@ func NewCloud(orgID int, domain metadbmodel.Domain, cfg config.CloudConfig, ctx 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		orgID:       orgID,
-		db:          mysqlDB,
+		db:          metadbbbDB,
 		triggerTime: triggerTime,
 		basicInfo: model.BasicInfo{
 			OrgID:     orgID,
