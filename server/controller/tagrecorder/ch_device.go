@@ -96,7 +96,7 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.VM
 func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VM)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
@@ -200,7 +200,7 @@ func (c *ChHostDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.
 func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedHost) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedHostFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Host)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Host)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -303,7 +303,7 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVRouter) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVRouterFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VRouter)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VRouter)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -390,7 +390,7 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedDHCPPort) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedDHCPPortFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.DHCPPort)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.DHCPPort)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -478,7 +478,7 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *metadb
 func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNATGateway) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedNATGatewayFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.NATGateway)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.NATGateway)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -569,7 +569,7 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.LB
 func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedLB) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedLBFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.LB)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.LB)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -658,7 +658,7 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *metad
 func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRDSInstance) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedRDSInstanceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.RDSInstance)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.RDSInstance)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -747,7 +747,7 @@ func (c *ChRedisInstanceDevice) sourceToTarget(md *message.Metadata, source *met
 func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRedisInstance) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedRedisInstanceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.RedisInstance)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.RedisInstance)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -849,7 +849,7 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *metadb
 func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodService)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -935,7 +935,7 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.P
 func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Pod)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -1021,7 +1021,7 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodGroup) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodGroupFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodGroup)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodGroup)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 
@@ -1110,7 +1110,7 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNode) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNodeFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodNode)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNode)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
@@ -1203,7 +1203,7 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *metadb
 func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodCluster) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodClusterFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodCluster)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodCluster)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
@@ -1382,7 +1382,7 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *met
 func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedCustomService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedCustomServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.CustomService)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.CustomService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {

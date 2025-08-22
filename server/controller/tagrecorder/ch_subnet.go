@@ -88,7 +88,7 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 func (c *ChNetwork) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNetwork) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedNetworkFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Network)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Network)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

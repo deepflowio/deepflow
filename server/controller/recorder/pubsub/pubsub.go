@@ -114,7 +114,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 			}
 
 			if topic == TopicResourceBatchAddedMetadbItems {
-				info.GetSubscriber().(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMySQLItems())
+				info.GetSubscriber().(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg.GetMetadbItems())
 			}
 			if topic == TopicResourceBatchAddedFull {
 				info.GetSubscriber().(ResourceBatchAddedSubscriber).OnResourceBatchAdded(md, msg)
@@ -153,7 +153,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, MDPT, 
 				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids())
 			}
 			if topic == TopicResourceBatchDeletedMetadbItems {
-				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
+				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMetadbItems())
 			}
 			if topic == TopicResourceBatchDeletedFull {
 				info.GetSubscriber().(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg)

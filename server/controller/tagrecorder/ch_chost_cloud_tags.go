@@ -64,7 +64,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VM)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

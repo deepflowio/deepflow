@@ -50,9 +50,9 @@ type AnalyzerInfo struct {
 }
 
 type RebalanceData struct {
-	RegionToVTapNameToTraffic map[string]map[string]int64       `json:"RegionToVTapNameToTraffic"`
-	RegionToAZLcuuids         map[string][]string               `json:"RegionToAZLcuuids"`
-	AZToRegion                map[string]string                 `json:"AZToRegion"`
+	RegionToVTapNameToTraffic map[string]map[string]int64        `json:"RegionToVTapNameToTraffic"`
+	RegionToAZLcuuids         map[string][]string                `json:"RegionToAZLcuuids"`
+	AZToRegion                map[string]string                  `json:"AZToRegion"`
 	AZToVTaps                 map[string][]*metadbmodel.VTap     `json:"AZToVTaps"`
 	AZToAnalyzers             map[string][]*metadbmodel.Analyzer `json:"AZToAnalyzers"`
 }

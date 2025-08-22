@@ -84,7 +84,7 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *metadbmodel.
 func (c *ChPodIngress) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodIngress) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodIngressFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodIngress)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodIngress)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {

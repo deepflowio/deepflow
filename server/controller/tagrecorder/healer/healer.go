@@ -337,7 +337,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	}
 
 	msgData := MAPT(new(MAT))
-	msgData.SetMySQLItems(dbItems)
+	msgData.SetMetadbItems(dbItems)
 	targetSubscriber.OnResourceBatchAdded(h.msgMetadata, msgData)
 	return nil
 }

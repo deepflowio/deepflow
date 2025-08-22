@@ -68,7 +68,7 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedAZ) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedAZFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.AZ)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.AZ)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {

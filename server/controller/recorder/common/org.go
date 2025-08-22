@@ -24,7 +24,7 @@ import (
 )
 
 type ORG struct {
-	ID        int       // org id
+	ID        int        // org id
 	DB        *metadb.DB // org database connection
 	LogPrefix logger.Prefix
 }

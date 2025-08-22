@@ -84,7 +84,7 @@ func (c *ChPodService) sourceToTarget(md *message.Metadata, source *metadbmodel.
 func (c *ChPodService) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodService)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

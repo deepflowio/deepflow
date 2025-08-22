@@ -263,7 +263,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		u.notifyOnAdded(dbItems)
 
 		msgData := MAPT(new(MAT))
-		msgData.SetMySQLItems(dbItems)
+		msgData.SetMetadbItems(dbItems)
 		msgData.SetAddition(addition)
 		u.pubsub.PublishBatchAdded(u.msgMetadata, msgData)
 		u.Changed = true
@@ -280,7 +280,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		msgData.SetFields(structInfo)
 		// msgData.SetDiffBase(diffBase)
 		// msgData.SetCloudItem(cloudItem)
-		msgData.SetNewMySQL(dbItem)
+		msgData.SetNewMetadbItem(dbItem)
 		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
 		u.Changed = true
 	}
@@ -317,7 +317,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		}
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
-		msgData.SetMySQLItems(dbItems)
+		msgData.SetMetadbItems(dbItems)
 		msgData.SetAddition(addition)
 		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData)
 		u.Changed = true

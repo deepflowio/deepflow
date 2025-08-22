@@ -88,7 +88,7 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *metadbmodel.VPC) (k
 func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVPC) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVPCFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VPC)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VPC)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

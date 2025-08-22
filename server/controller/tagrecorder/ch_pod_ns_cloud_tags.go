@@ -64,7 +64,7 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 func (c *ChPodNSCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNamespace) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNamespaceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodNamespace)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNamespace)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

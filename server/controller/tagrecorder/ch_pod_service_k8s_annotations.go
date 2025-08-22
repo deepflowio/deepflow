@@ -61,7 +61,7 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 func (c *ChPodServiceK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodService)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	var chItem metadbmodel.ChPodServiceK8sAnnotations

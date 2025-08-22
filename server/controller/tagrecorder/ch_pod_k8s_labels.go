@@ -61,7 +61,7 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 func (c *ChPodK8sLabels) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Pod)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 

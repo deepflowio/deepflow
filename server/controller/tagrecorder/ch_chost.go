@@ -86,7 +86,7 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (
 func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.VM)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
