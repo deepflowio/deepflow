@@ -33,16 +33,16 @@ import (
 )
 
 type VTapRegister struct {
-	tapMode                         int
-	vTapGroupID                     string
-	defaultVTapGroup                string
-	defaultVTapGroupLicenseFuntions string
-	vTapAutoRegister                bool
-	agentUniqueIdentifier           int
-	teamID                          int
-	vTapInfo                        *VTapInfo
-	registerBy                      string
-	groupLicenseFunctions           string
+	tapMode                          int
+	vTapGroupID                      string
+	defaultVTapGroup                 string
+	defaultVTapGroupLicenseFunctions string
+	vTapAutoRegister                 bool
+	agentUniqueIdentifier            int
+	teamID                           int
+	vTapInfo                         *VTapInfo
+	registerBy                       string
+	groupLicenseFunctions            string
 	VTapLKData
 	ORGID
 }
@@ -125,12 +125,12 @@ func (r *VTapRegister) setRegisterBy(registerBy string) {
 }
 
 func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
-	r.groupLicenseFunctions = r.defaultVTapGroupLicenseFuntions
+	r.groupLicenseFunctions = r.defaultVTapGroupLicenseFunctions
 	if r.vTapGroupID != "" {
 		vtapGroup := &models.VTapGroup{}
-		ret := db.Where("short_uuid = ?", r.vTapGroupID).First(vtapGroup)
+		ret := db.Where("name = ?", r.vTapGroupID).Or("short_uuid = ?", r.vTapGroupID).First(vtapGroup)
 		if ret.Error != nil {
-			log.Error(r.Logf("vtap group(short_uuid=%s) not found", r.vTapGroupID))
+			log.Error(r.Logf("vtap group (name or short_uuid: %s) not found", r.vTapGroupID))
 			return r.defaultVTapGroup
 		} else {
 			r.groupLicenseFunctions = vtapGroup.LicenseFunctions
@@ -931,7 +931,7 @@ func (r *VTapRegister) registerVTap(done func()) {
 		log.Error(r.Log(err.Error()))
 		return
 	}
-	vtapConfig := r.vTapInfo.GetVTapConfigFromShortID(r.vTapGroupID)
+	vtapConfig := r.vTapInfo.GetVTapConfigByNameOrShortUUID(r.vTapGroupID)
 	if vtapConfig != nil {
 		r.tapMode = *vtapConfig.TapMode
 	} else {
@@ -939,7 +939,7 @@ func (r *VTapRegister) registerVTap(done func()) {
 	}
 	r.region = v.getRegion()
 	r.defaultVTapGroup = v.getDefaultVTapGroup()
-	r.defaultVTapGroupLicenseFuntions = v.getDefaultVTapGroupLicenseFunctions()
+	r.defaultVTapGroupLicenseFunctions = v.getDefaultVTapGroupLicenseFunctions()
 	r.vTapAutoRegister = v.getVTapAutoRegister()
 	log.Infof(r.Logf("register vtap: %s", r))
 	var vtap *models.VTap

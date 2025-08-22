@@ -378,9 +378,9 @@ func (e *AgentEvent) generateNoAgentCacheDynamicConfig() *api.DynamicConfig {
 }
 
 func (e *AgentEvent) generateNoAgentCacheUserConfig(groupID string, orgID int) *koanf.Koanf {
-	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
+	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigByNameOrShortUUID(groupID)
 	if vtapConfig == nil {
-		log.Warningf("not found vtap group short id (%s) config", groupID, logger.NewORGPrefix(orgID))
+		log.Warningf("vtap group config (name or short_uuid: %s) not found", groupID, logger.NewORGPrefix(orgID))
 		return koanf.New(".")
 	}
 	return vtapConfig.GetUserConfig()
