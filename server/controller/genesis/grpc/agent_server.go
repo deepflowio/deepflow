@@ -88,17 +88,18 @@ func (g *SynchronizerServer) GenerateCache() {
 				continue
 			}
 			key := fmt.Sprintf("%d-%s", orgID, group.ShortUUID)
-			if _, ok := g.workloadResouceEnabledCache.Get(key); !ok {
+			if _, ok := g.workloadResourceEnabledCache.Get(key); !ok {
 				var vtaps []model.VTap
 				db.Select("id").Where("vtap_group_lcuuid = ?", config.AgentGroupLcuuid).Find(&vtaps)
 				for _, vtap := range vtaps {
-					g.workloadResouceChangeEnabledCache.SetDefault(fmt.Sprintf("%d-%d", orgID, vtap.ID), nil)
+					g.workloadResourceChangeEnabledCache.SetDefault(fmt.Sprintf("%d-%d", orgID, vtap.ID), nil)
 				}
 			}
 			if group.ID == 1 && group.Name == "default" {
-				g.workloadResouceEnabledCache.SetDefault(fmt.Sprintf("%d-", orgID), true)
+				g.workloadResourceEnabledCache.SetDefault(fmt.Sprintf("%d-", orgID), true)
 			}
-			g.workloadResouceEnabledCache.SetDefault(key, true)
+			g.workloadResourceEnabledCache.SetDefault(key, true)
+			g.workloadResourceEnabledCache.SetDefault(fmt.Sprintf("%d-%s", orgID, group.Name), true)
 		}
 	}
 }
@@ -191,15 +192,15 @@ func (g *SynchronizerServer) AgentGenesisSync(ctx context.Context, request *agen
 	if vtapIP != "" && vtapMac != "" {
 		vtapKey = fmt.Sprintf("%s-%s", vtapIP, vtapMac)
 	}
-	_, enabled := g.workloadResouceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
+	_, enabled := g.workloadResourceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
 	if version == localVersion || platformData == nil {
 		// If the worload-v is modified to be enabled during the period of continuous heartbeat,
 		// it will trigger the re-reporting of the full data.
-		if _, ok := g.workloadResouceChangeEnabledCache.Get(vtap); ok {
+		if _, ok := g.workloadResourceChangeEnabledCache.Get(vtap); ok {
 			g.vtapToVersion.Store(vtap, uint64(0))
-			g.workloadResouceChangeEnabledCache.Delete(vtap)
+			g.workloadResourceChangeEnabledCache.Delete(vtap)
 			log.Debugf("genesis sync re-reporting from ip %s vtap_id %v", remote, vtapID, logger.NewORGPrefix(orgID))
 			return &agent.GenesisSyncResponse{}, nil
 		}

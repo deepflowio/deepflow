@@ -499,7 +499,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 }
 
 func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Config {
-	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
+	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigByNameOrShortUUID(groupID)
 	if vtapConfig == nil {
 		return nil
 	}
