@@ -33,13 +33,13 @@ import (
 
 type ORGData struct {
 	metadbCfg metadbcfg.Config
-	cfg      *config.ControllerConfig
+	cfg       *config.ControllerConfig
 }
 
 func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 	return &ORGData{
 		metadbCfg: cfg.MetadbCfg,
-		cfg:      cfg,
+		cfg:       cfg,
 	}
 }
 

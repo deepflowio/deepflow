@@ -85,6 +85,8 @@ type ControllerConfig struct {
 	FPermit      common.FPermit `yaml:"fpermit"`
 
 	MetadbCfg     metadb.Config
+	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
+	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
@@ -144,6 +146,9 @@ func (c *Config) Load(path string) {
 	}
 	// from ingester exporter setting
 	c.ControllerConfig.TrisolarisCfg.SetExportersEnabled(shared_common.ExportersEnabled(path))
+
+	c.ControllerConfig.MetadbCfg.InitFromMySQL(c.ControllerConfig.MySqlCfg)
+	c.ControllerConfig.MetadbCfg.InitFromPostgreSQL(c.ControllerConfig.PostgreSQLCfg)
 }
 
 func DefaultConfig() *Config {
