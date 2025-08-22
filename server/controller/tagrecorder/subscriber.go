@@ -266,7 +266,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
-	dbItems := m.GetMySQLItems().([]*MT)
+	dbItems := m.GetMetadbItems().([]*MT)
 	log.Infof("receive add message, resource type: %s, count: %d", s.subResourceTypeName, len(dbItems), logger.NewORGPrefix(md.GetORGID()))
 	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
@@ -279,7 +279,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMessage := msg.(MUPT)
-	dbItem := updateMessage.GetNewMySQL().(*MT)
+	dbItem := updateMessage.GetNewMetadbItem().(*MT)
 	dbItems := []*MT{dbItem}
 	db := md.GetDB()
 	// use add to complete addition and update of resource in ch table
@@ -294,7 +294,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	m := msg.(MDPT)
-	items := m.GetMySQLItems().([]*MT)
+	items := m.GetMetadbItems().([]*MT)
 	newItems := items
 	if hasHooker, ok := s.hookers[hookerDeletePage]; ok {
 		if hooker, ok := hasHooker.(deletePageHooker[MT, MDT, MDPT]); ok {

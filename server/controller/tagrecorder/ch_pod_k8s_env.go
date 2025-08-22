@@ -61,7 +61,7 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 func (c *ChPodK8sEnv) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.Pod)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodK8sEnv, 0)

@@ -84,7 +84,7 @@ type ControllerConfig struct {
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`
 
-	MetadbCfg      metadb.Config
+	MetadbCfg     metadb.Config
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 

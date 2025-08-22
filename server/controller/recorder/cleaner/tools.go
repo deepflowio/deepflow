@@ -107,7 +107,7 @@ func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Del
 	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) { // TODO use pubsub
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
 			msgData := MDPT(new(MDT))
-			msgData.SetMySQLItems(dbItems)
+			msgData.SetMetadbItems(dbItems)
 			if resourceType == ctrlCommon.RESOURCE_TYPE_PROCESS_EN {
 				msgData.SetAddition(getProcessMessageDeleteAddition(db, dbItems, resourceType, toolData)) // TODO optimize
 				log.Infof("process delete addition: %s", msgData.GetAddition(), db.LogPrefixORGID)

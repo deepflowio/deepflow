@@ -61,7 +61,7 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*metadbmodel.PodService)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodServiceK8sLabel, 0)
