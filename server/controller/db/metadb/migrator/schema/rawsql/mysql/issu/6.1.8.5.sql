@@ -1,0 +1,3 @@
+ALTER TABLE vinterface_ip ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+UPDATE db_version SET version = '6.1.8.5';

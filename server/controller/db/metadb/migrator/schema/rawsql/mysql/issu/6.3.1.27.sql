@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS ch_view_change (
+    `updated_at`          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_view_change;
+
+UPDATE db_version SET version='6.3.1.27';
