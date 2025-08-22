@@ -68,7 +68,7 @@ type VTapInfo struct {
 	lcuuidToVPCID                  map[string]int
 	hostIDToVPCID                  map[int]int
 	hypervNetworkHostIds           mapset.Set
-	vtapGroupShortIDToLcuuid       map[string]string
+	vtapGroupNameOrShortIDToLcuuid map[string]string
 	vtapGroupLcuuidToShortID       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
@@ -137,7 +137,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		lcuuidToVPCID:                  make(map[string]int),
 		hostIDToVPCID:                  make(map[int]int),
 		hypervNetworkHostIds:           mapset.NewSet(),
-		vtapGroupShortIDToLcuuid:       make(map[string]string),
+		vtapGroupNameOrShortIDToLcuuid: make(map[string]string),
 		vtapGroupLcuuidToShortID:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
@@ -252,14 +252,15 @@ func (v *VTapInfo) loadVTapGroup() {
 		return
 	}
 
-	vtapGroupShortIDToLcuuid := make(map[string]string)
+	vtapGroupNameOrShortIDToLcuuid := make(map[string]string)
 	vtapGroupLcuuidToShortID := make(map[string]string)
 	for _, vtapGroup := range vtapGroups {
-		vtapGroupShortIDToLcuuid[vtapGroup.ShortUUID] = vtapGroup.Lcuuid
+		vtapGroupNameOrShortIDToLcuuid[vtapGroup.Name] = vtapGroup.Lcuuid
+		vtapGroupNameOrShortIDToLcuuid[vtapGroup.ShortUUID] = vtapGroup.Lcuuid
 		vtapGroupLcuuidToShortID[vtapGroup.Lcuuid] = vtapGroup.ShortUUID
 	}
 
-	v.vtapGroupShortIDToLcuuid = vtapGroupShortIDToLcuuid
+	v.vtapGroupNameOrShortIDToLcuuid = vtapGroupNameOrShortIDToLcuuid
 	v.vtapGroupLcuuidToShortID = vtapGroupLcuuidToShortID
 }
 
@@ -504,11 +505,11 @@ func (v *VTapInfo) getAgentConfigs() {
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
 }
 
-func (v *VTapInfo) GetVTapConfigFromShortID(shortID string) *VTapConfig {
+func (v *VTapInfo) GetVTapConfigByNameOrShortUUID(nameOrShortUUID string) *VTapConfig {
 	if v == nil {
 		return nil
 	}
-	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
+	lcuuid, ok := v.vtapGroupNameOrShortIDToLcuuid[nameOrShortUUID]
 	if !ok {
 		return nil
 	}
@@ -527,7 +528,7 @@ func (v *VTapInfo) GetVTapLocalConfigByShortID(shortID string) string {
 	if v == nil {
 		return ""
 	}
-	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
+	lcuuid, ok := v.vtapGroupNameOrShortIDToLcuuid[shortID]
 	if !ok {
 		return ""
 	}
