@@ -153,6 +153,7 @@ func (g *SynchronizerServer) GenerateCache() {
 				g.workloadResourceEnabledCache.SetDefault(fmt.Sprintf("%d-", orgID), true)
 			}
 			g.workloadResourceEnabledCache.SetDefault(key, true)
+			g.workloadResourceEnabledCache.SetDefault(fmt.Sprintf("%d-%s", orgID, group.Name), true)
 		}
 	}
 }
