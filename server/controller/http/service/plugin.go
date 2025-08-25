@@ -72,7 +72,7 @@ func GetPlugin(db *metadb.DB, filter map[string]interface{}) ([]model.Plugin, er
 			Name:      plugin.Name,
 			Type:      plugin.Type,
 			UpdatedAt: plugin.UpdatedAt.Format(common.GO_BIRTHDAY),
-			User:      plugin.User,
+			UserName:  plugin.UserName,
 		}
 		resp = append(resp, temp)
 	}
