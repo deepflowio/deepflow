@@ -77,7 +77,7 @@ impl fmt::Display for TaggedFlow {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BoxedTaggedFlow(pub Box<TaggedFlow>);
 
 impl Sendable for BoxedTaggedFlow {
