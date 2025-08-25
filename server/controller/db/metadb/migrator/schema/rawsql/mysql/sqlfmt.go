@@ -31,7 +31,7 @@ func (f *SqlFmt) SetConfig(cfg config.Config) {
 }
 
 func (f *SqlFmt) GetRawSqlDirectory(parentDir string) string {
-	return parentDir + "/metadb"
+	return parentDir + "/mysql"
 }
 
 func (f *SqlFmt) CreateDatabase() string {
