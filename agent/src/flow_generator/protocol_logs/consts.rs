@@ -69,10 +69,6 @@ pub const SPAN_ID_TYPE: usize = 1;
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
-// Kafka constants
-pub const KAFKA_REQ_HEADER_LEN: usize = 14;
-pub const KAFKA_RESP_HEADER_LEN: usize = 8;
-
 // dubbo constants
 pub const DUBBO_MAGIC_HIGH: u8 = 0xda;
 pub const DUBBO_MAGIC_LOW: u8 = 0xbb;
