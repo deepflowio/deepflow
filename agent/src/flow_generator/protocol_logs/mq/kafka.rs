@@ -14,10 +14,16 @@
  * limitations under the License.
  */
 
-use std::num::NonZeroUsize;
+use std::{borrow::Cow, fmt, num::NonZeroUsize, str};
 
+use log::debug;
 use lru::LruCache;
-use serde::Serialize;
+use nom::{
+    bytes::complete::take,
+    number::complete::{be_i16, be_i32, be_i64, be_u16, be_u32},
+};
+use num_enum::FromPrimitive;
+use serde::{Serialize, Serializer};
 
 use crate::{
     common::{
@@ -29,10 +35,8 @@ use crate::{
     },
     config::handler::{LogParserConfig, TraceType},
     flow_generator::{
-        error::{Error, Result},
+        error,
         protocol_logs::{
-            consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
-            decode_base64_to_string,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -40,14 +44,527 @@ use crate::{
             L7ResponseStatus, LogMessageType,
         },
     },
-    utils::bytes::{read_i16_be, read_i32_be, read_i64_be, read_u16_be, read_u32_be},
 };
 
-const KAFKA_PRODUCE: u16 = 0;
-const KAFKA_FETCH: u16 = 1;
-const KAFKA_JOIN_GROUP: u16 = 11;
-const KAFKA_LEAVE_GROUP: u16 = 13;
-const KAFKA_SYNC_GROUP: u16 = 14;
+// Keys are from:
+//     https://github.com/apache/kafka/blob/56a3c6dde929763aaf74a801bd043fdd474a8ed2/clients/src/main/java/org/apache/kafka/common/protocol/ApiKeys.java#L41
+#[derive(Clone, Copy, Debug, FromPrimitive, Serialize)]
+#[repr(u16)]
+pub enum ApiKey {
+    Produce = 0,
+    Fetch = 1,
+    ListOffsets = 2,
+    Metadata = 3,
+    LeaderAndIsr = 4,
+    StopReplica = 5,
+    UpdateMetadata = 6,
+    ControlledShutdown = 7,
+    OffsetCommit = 8,
+    OffsetFetch = 9,
+    FindCoordinator = 10,
+    JoinGroup = 11,
+    Heartbeat = 12,
+    LeaveGroup = 13,
+    SyncGroup = 14,
+    DescribeGroups = 15,
+    ListGroups = 16,
+    SaslHandshake = 17,
+    ApiVersions = 18,
+    CreateTopics = 19,
+    DeleteTopics = 20,
+    DeleteRecords = 21,
+    InitProducerId = 22,
+    OffsetForLeaderEpoch = 23,
+    AddPartitionsToTxn = 24,
+    AddOffsetsToTxn = 25,
+    EndTxn = 26,
+    WriteTxnMarkers = 27,
+    TxnOffsetCommit = 28,
+    DescribeAcls = 29,
+    CreateAcls = 30,
+    DeleteAcls = 31,
+    DescribeConfigs = 32,
+    AlterConfigs = 33,
+    AlterReplicaLogDirs = 34,
+    DescribeLogDirs = 35,
+    SaslAuthenticate = 36,
+    CreatePartitions = 37,
+    CreateDelegationToken = 38,
+    RenewDelegationToken = 39,
+    ExpireDelegationToken = 40,
+    DescribeDelegationToken = 41,
+    DeleteGroups = 42,
+    ElectLeaders = 43,
+    IncrementalAlterConfigs = 44,
+    AlterPartitionReassignments = 45,
+    ListPartitionReassignments = 46,
+    OffsetDelete = 47,
+    DescribeClientQuotas = 48,
+    AlterClientQuotas = 49,
+    DescribeUserScramCredentials = 50,
+    AlterUserScramCredentials = 51,
+    Vote = 52,
+    BeginQuorumEpoch = 53,
+    EndQuorumEpoch = 54,
+    DescribeQuorum = 55,
+    AlterPartition = 56,
+    UpdateFeatures = 57,
+    Envelope = 58,
+    FetchSnapshot = 59,
+    DescribeCluster = 60,
+    DescribeProducers = 61,
+    BrokerRegistration = 62,
+    BrokerHeartbeat = 63,
+    UnregisterBroker = 64,
+    DescribeTransactions = 65,
+    ListTransactions = 66,
+    AllocateProducerIds = 67,
+    ConsumerGroupHeartbeat = 68,
+    ConsumerGroupDescribe = 69,
+    ControllerRegistration = 70,
+    GetTelemetrySubscriptions = 71,
+    PushTelemetry = 72,
+    AssignReplicasToDirs = 73,
+    ListConfigResources = 74,
+    DescribeTopicPartitions = 75,
+    ShareGroupHeartbeat = 76,
+    ShareGroupDescribe = 77,
+    ShareFetch = 78,
+    ShareAcknowledge = 79,
+    AddRaftVoter = 80,
+    RemoveRaftVoter = 81,
+    UpdateRaftVoter = 82,
+    InitializeShareGroupState = 83,
+    ReadShareGroupState = 84,
+    WriteShareGroupState = 85,
+    DeleteShareGroupState = 86,
+    ReadShareGroupStateSummary = 87,
+    StreamsGroupHeartbeat = 88,
+    StreamsGroupDescribe = 89,
+    DescribeShareGroupOffsets = 90,
+    AlterShareGroupOffsets = 91,
+    DeleteShareGroupOffsets = 92,
+    GetReplicaLogInfo = 93,
+
+    #[num_enum(catch_all)]
+    Unknown(u16),
+}
+
+impl Default for ApiKey {
+    fn default() -> Self {
+        Self::Unknown(u16::MAX)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Api {
+    pub key: ApiKey,
+    pub version: u16,
+}
+
+impl fmt::Display for Api {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} v{}", self.key, self.version)
+    }
+}
+
+impl Api {
+    fn header_versions(&self) -> Result<(u8, u8)> {
+        match (self.key, self.version) {
+            (ApiKey::Produce, 9..) => Ok((2, 1)),
+            (ApiKey::Produce, 0..) => Ok((1, 0)),
+            (ApiKey::Fetch, 12..) => Ok((2, 1)),
+            (ApiKey::Fetch, 0..) => Ok((1, 0)),
+            (ApiKey::JoinGroup, 6..) => Ok((2, 1)),
+            (ApiKey::JoinGroup, 0..) => Ok((1, 0)),
+            (ApiKey::LeaveGroup, 4..) => Ok((2, 1)),
+            (ApiKey::LeaveGroup, 0..) => Ok((1, 0)),
+            (ApiKey::SyncGroup, 4..) => Ok((2, 1)),
+            (ApiKey::SyncGroup, 0..) => Ok((1, 0)),
+            (ApiKey::ApiVersions, 3..) => Ok((2, 0)),
+            (ApiKey::ApiVersions, 0..) => Ok((1, 0)),
+            _ => Err(Error::UnsupportedApi(*self)),
+        }
+    }
+
+    fn request_header_version(&self) -> Result<u8> {
+        self.header_versions().map(|(req, _)| req)
+    }
+
+    fn response_header_version(&self) -> Result<u8> {
+        self.header_versions().map(|(_, resp)| resp)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum Error {
+    #[error("unsupported api {0}")]
+    UnsupportedApi(Api),
+    #[error("truncated")]
+    Truncated,
+    #[error("parse failed: {0}")]
+    ParseFailed(Cow<'static, str>),
+    #[error("correlation id not found")]
+    CorrelationIdNotFound,
+}
+
+impl From<nom::Err<nom::error::Error<&[u8]>>> for Error {
+    fn from(e: nom::Err<nom::error::Error<&[u8]>>) -> Self {
+        Error::ParseFailed(e.to_string().into())
+    }
+}
+
+impl From<Error> for error::Error {
+    fn from(e: Error) -> Self {
+        error::Error::L7LogParseFailed {
+            proto: L7Protocol::Kafka,
+            reason: e.to_string().into(),
+        }
+    }
+}
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+// the format of types can be found in: https://kafka.apache.org/protocol#protocol_types
+mod decoder {
+    use std::str;
+
+    use bytes::Buf;
+    use log::debug;
+    use nom::{
+        bytes::complete::take,
+        error::{Error as NomError, ErrorKind},
+        number::complete::{be_i16, be_i32, be_i8},
+        Err as NomErr, IResult,
+    };
+    use prost::encoding::decode_varint;
+
+    pub fn unsigned_varint(mut input: &[u8]) -> IResult<&[u8], u32> {
+        let data = &mut input;
+        match decode_varint(data) {
+            Ok(v) => {
+                if v > u32::MAX as u64 {
+                    return Err(NomErr::Failure(NomError::new(input, ErrorKind::MapRes)));
+                }
+                let remaining = data.remaining();
+                let offset = input.len() - remaining;
+                Ok((&input[offset..], v as u32))
+            }
+            Err(e) => {
+                debug!("varint decode failed: {:?}", e);
+                Err(NomErr::Failure(NomError::new(input, ErrorKind::MapRes)))
+            }
+        }
+    }
+
+    pub fn varint(input: &[u8]) -> IResult<&[u8], i32> {
+        unsigned_varint(input).map(|(input, uv)| (input, ((uv >> 1) as i32) ^ (-((uv & 1) as i32))))
+    }
+
+    pub fn varlong(mut input: &[u8]) -> IResult<&[u8], i64> {
+        let data = &mut input;
+        match decode_varint(data) {
+            Ok(v) => {
+                let remaining = data.remaining();
+                let offset = input.len() - remaining;
+                Ok((&input[offset..], ((v >> 1) as i64) ^ (-((v & 1) as i64))))
+            }
+            Err(e) => {
+                debug!("varint decode failed: {:?}", e);
+                Err(NomErr::Failure(NomError::new(input, ErrorKind::MapRes)))
+            }
+        }
+    }
+
+    #[inline]
+    fn str_helper(input: &[u8], length: usize) -> IResult<&[u8], &str> {
+        let (input, s) = take(length)(input)?;
+        match str::from_utf8(s) {
+            Ok(s) => Ok((input, s)),
+            Err(_) => Err(NomErr::Failure(NomError::new(input, ErrorKind::MapRes))),
+        }
+    }
+
+    pub fn string(input: &[u8]) -> IResult<&[u8], &str> {
+        let (input, length) = be_i16(input)?;
+        if length < 0 {
+            return Err(NomErr::Failure(NomError::new(input, ErrorKind::Verify)));
+        }
+        str_helper(input, length as usize)
+    }
+
+    pub fn compact_string(input: &[u8]) -> IResult<&[u8], &str> {
+        let (input, length) = unsigned_varint(input)?;
+        if length <= 1 {
+            return Ok((input, ""));
+        }
+        str_helper(input, length as usize - 1)
+    }
+
+    pub fn nullable_string(input: &[u8]) -> IResult<&[u8], &str> {
+        let (input, length) = be_i16(input)?;
+        if length <= 0 {
+            return Ok((input, ""));
+        }
+        str_helper(input, length as usize)
+    }
+
+    pub fn uuid(input: &[u8]) -> IResult<&[u8], uuid::Uuid> {
+        let (input, bytes) = take(16usize)(input)?;
+        Ok((input, uuid::Uuid::from_slice(bytes).unwrap()))
+    }
+
+    pub fn compact_nullable_string(input: &[u8]) -> IResult<&[u8], &str> {
+        compact_string(input)
+    }
+
+    pub fn nullable_bytes(input: &[u8]) -> IResult<&[u8], &[u8]> {
+        let (input, length) = be_i32(input)?;
+        if length <= 0 {
+            return Ok((input, &[]));
+        }
+        Ok(take(length as usize)(input)?)
+    }
+
+    pub fn compact_nullable_bytes(input: &[u8]) -> IResult<&[u8], &[u8]> {
+        let (input, length) = unsigned_varint(input)?;
+        if length <= 1 {
+            return Ok((input, &[]));
+        }
+        Ok(take(length as usize - 1)(input)?)
+    }
+
+    pub fn records(input: &[u8]) -> IResult<&[u8], ()> {
+        Ok((nullable_bytes(input)?.0, ()))
+    }
+
+    pub fn compact_records(input: &[u8]) -> IResult<&[u8], ()> {
+        Ok((compact_nullable_bytes(input)?.0, ()))
+    }
+
+    // ref: https://kafka.apache.org/documentation/#recordbatch
+    #[inline]
+    fn header_parser(input: &[u8]) -> IResult<&[u8], Vec<(&str, &str)>> {
+        // skip irrelevant fields until `recordsCount`, check reference for details
+        let records_count_offset = 8 + 4 + 4 + 1 + 4 + 2 + 4 + 8 + 8 + 8 + 2 + 4;
+        let input = take(records_count_offset as usize)(input)?.0;
+
+        let (mut input, records_count) = be_i32(input)?;
+        if records_count <= 0 {
+            return Ok((input, vec![]));
+        }
+
+        let mut headers = vec![];
+        for _ in 0..records_count {
+            // length
+            input = varint(input)?.0;
+            // attributes
+            input = be_i8(input)?.0;
+            // timestampDelta
+            input = varlong(input)?.0;
+            // offsetDelta
+            input = varlong(input)?.0;
+            // keyLength
+            let result = varint(input)?;
+            input = result.0;
+            // key
+            input = take(result.1 as usize)(input)?.0;
+            // valueLength
+            let result = varint(input)?;
+            input = result.0;
+            // value
+            input = take(result.1 as usize)(input)?.0;
+
+            // headersCount
+            let result = varint(input)?;
+            input = result.0;
+            if result.1 <= 0 {
+                continue;
+            }
+
+            // headers
+            for _ in 0..result.1 {
+                // headerKeyLength
+                let result = varint(input)?;
+                input = result.0;
+                // headerKey
+                let result = take(result.1 as usize)(input)?;
+                input = result.0;
+                let Ok(key) = str::from_utf8(result.1) else {
+                    continue;
+                };
+
+                // headerValueLength
+                let result = varint(input)?;
+                input = result.0;
+                // headerValue
+                let result = take(result.1 as usize)(input)?;
+                input = result.0;
+                let Ok(value) = str::from_utf8(result.1) else {
+                    continue;
+                };
+
+                headers.push((key, value));
+            }
+        }
+        Ok((input, headers))
+    }
+
+    // parse headers from records to extract trace_id and span_id
+    pub fn headers_from_records(input: &[u8]) -> IResult<&[u8], Vec<(&str, &str)>> {
+        let (input, records) = nullable_bytes(input)?;
+        if records.is_empty() {
+            return Ok((input, vec![]));
+        }
+        match header_parser(records) {
+            Ok((_, headers)) => Ok((input, headers)),
+            Err(e) => {
+                // some messages use the old format which is ignored at the moment
+                // ref: https://kafka.apache.org/39/documentation/#messageset
+                debug!("failed to parse headers from records: {:?}", e);
+                Ok((input, vec![]))
+            }
+        }
+    }
+
+    // parse headers from compact records to extract trace_id and span_id
+    pub fn headers_from_compact_records(input: &[u8]) -> IResult<&[u8], Vec<(&str, &str)>> {
+        let (input, records) = compact_nullable_bytes(input)?;
+        if records.is_empty() {
+            return Ok((input, vec![]));
+        }
+        match header_parser(records) {
+            Ok((_, headers)) => Ok((input, headers)),
+            Err(e) => {
+                // some messages use the old format which is ignored at the moment
+                // ref: https://kafka.apache.org/39/documentation/#messageset
+                debug!("failed to parse headers from records: {:?}", e);
+                Ok((input, vec![]))
+            }
+        }
+    }
+
+    pub fn array(
+        input: &[u8],
+        mut obj_decoder: impl FnMut(&[u8]) -> IResult<&[u8], ()>,
+    ) -> IResult<&[u8], ()> {
+        let (mut input, length) = be_i32(input)?;
+        if length <= 0 {
+            return Ok((input, ()));
+        }
+        for _ in 0..length {
+            let (sub_offset, _) = obj_decoder(input)?;
+            input = sub_offset;
+        }
+        Ok((input, ()))
+    }
+
+    pub fn compact_array(
+        input: &[u8],
+        mut obj_decoder: impl FnMut(&[u8]) -> IResult<&[u8], ()>,
+    ) -> IResult<&[u8], ()> {
+        let (mut input, length) = unsigned_varint(input)?;
+        if length <= 1 {
+            return Ok((input, ()));
+        }
+        for _ in 0..(length - 1) {
+            let (sub_offset, _) = obj_decoder(input)?;
+            input = sub_offset;
+        }
+        Ok((input, ()))
+    }
+
+    // fields are consumed but not parsed
+    // ref: https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields#KIP482:TheKafkaProtocolshouldSupportOptionalTaggedFields-Serialization
+    pub fn tagged_fields(input: &[u8]) -> IResult<&[u8], ()> {
+        let (mut input, length) = unsigned_varint(input)?;
+        for _ in 0..length {
+            // field tag
+            let (field, _) = unsigned_varint(input)?;
+            // field length
+            let (field, length) = unsigned_varint(field)?;
+            // field data
+            input = take(length as usize)(field)?.0;
+        }
+        Ok((input, ()))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn decode_varint_varlong() {
+            let testcases = vec![
+                // use [0xE, 0x0F] as remaining data because it looks like EOF
+                (vec![0x0, 0xE, 0x0F], Some(0), Some(0)),
+                (vec![0x1, 0xE, 0x0F], Some(-1), Some(-1)),
+                (vec![0x2, 0xE, 0x0F], Some(1), Some(1)),
+                (vec![0x81, 0x2, 0xE, 0x0F], Some(-129), Some(-129)),
+                // largest/smallest i32
+                (
+                    vec![0xFE, 0xFF, 0xFF, 0xFF, 0x0F, 0xE, 0x0F],
+                    Some(i32::MAX),
+                    Some(i32::MAX as i64),
+                ),
+                (
+                    vec![0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0xE, 0x0F],
+                    Some(i32::MIN),
+                    Some(i32::MIN as i64),
+                ),
+                // out of i32 range
+                (
+                    vec![0x80, 0x80, 0x80, 0x80, 0x10, 0xE, 0x0F],
+                    None,
+                    Some(i32::MAX as i64 + 1),
+                ),
+                // largest/smallest i64
+                (
+                    vec![
+                        0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xE, 0x0F,
+                    ],
+                    None,
+                    Some(i64::MAX),
+                ),
+                (
+                    vec![
+                        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xE, 0x0F,
+                    ],
+                    None,
+                    Some(i64::MIN),
+                ),
+                // out of i64 range
+                (
+                    vec![
+                        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0xE, 0x0F,
+                    ],
+                    None,
+                    None,
+                ),
+            ];
+            for (input, s32, s64) in testcases {
+                let result = varint(&input);
+                if let Some(exp) = s32 {
+                    assert!(result.is_ok());
+                    let (rest, v) = result.unwrap();
+                    assert_eq!(v, exp);
+                    assert_eq!(rest, &[0xe, 0x0f]);
+                } else {
+                    assert!(result.is_err(), "{:?}", result.unwrap());
+                }
+                let result = varlong(&input);
+                if let Some(exp) = s64 {
+                    assert!(result.is_ok());
+                    let (rest, v) = result.unwrap();
+                    assert_eq!(v, exp);
+                    assert_eq!(rest, &[0xe, 0x0f]);
+                } else {
+                    assert!(result.is_err(), "{:?}", result.unwrap());
+                }
+            }
+        }
+    }
+}
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
@@ -56,7 +573,7 @@ pub struct KafkaInfo {
     is_tls: bool,
 
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub correlation_id: u32,
+    pub correlation_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -65,10 +582,8 @@ pub struct KafkaInfo {
     // request
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: Option<u32>,
-    #[serde(skip)]
-    pub api_version: u16,
-    #[serde(rename = "request_type")]
-    pub api_key: u16,
+    #[serde(rename = "request_type", serialize_with = "serialize_api_as_api_key")]
+    pub api: Api,
     #[serde(skip)]
     pub client_id: String,
     // Extract only from KAFKA_PRODUCE and KAFKA_FETCH
@@ -100,15 +615,23 @@ pub struct KafkaInfo {
     command: Option<String>,
 }
 
+// omit version
+fn serialize_api_as_api_key<S>(v: &Api, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{:?}", v.key))
+}
+
 impl L7ProtocolInfoInterface for KafkaInfo {
     fn session_id(&self) -> Option<u32> {
-        Some(self.correlation_id)
+        self.correlation_id
     }
 
     fn merge_log(
         &mut self,
         other: &mut crate::common::l7_protocol_info::L7ProtocolInfo,
-    ) -> Result<()> {
+    ) -> error::Result<()> {
         if let L7ProtocolInfo::KafkaInfo(other) = other {
             self.merge(other);
         }
@@ -141,9 +664,6 @@ impl L7ProtocolInfoInterface for KafkaInfo {
 }
 
 impl KafkaInfo {
-    // https://kafka.apache.org/protocol.html
-    const API_KEY_MAX: u16 = 67;
-
     fn generate_endpoint(&self) -> Option<String> {
         if self.topic_name.is_empty() || self.partition < 0 {
             None
@@ -178,83 +698,10 @@ impl KafkaInfo {
     }
 
     pub fn check(&self) -> bool {
-        if self.api_key > Self::API_KEY_MAX {
+        if matches!(self.api.key, ApiKey::Unknown(_)) {
             return false;
         }
         return self.client_id.len() > 0 && self.client_id.is_ascii();
-    }
-
-    pub fn get_command(&self) -> Option<String> {
-        let command_str = [
-            "Produce",
-            "Fetch",
-            "ListOffsets",
-            "Metadata",
-            "LeaderAndIsr",
-            "StopReplica",
-            "UpdateMetadata",
-            "ControlledShutdown",
-            "OffsetCommit",
-            "OffsetFetch",
-            // 10
-            "FindCoordinator",
-            "JoinGroup",
-            "Heartbeat",
-            "LeaveGroup",
-            "SyncGroup",
-            "DescribeGroups",
-            "ListGroups",
-            "SaslHandshake",
-            "ApiVersions",
-            "CreateTopics",
-            // 20
-            "DeleteTopics",
-            "DeleteRecords",
-            "InitProducerId",
-            "OffsetForLeaderEpoch",
-            "AddPartitionsToTxn",
-            "AddOffsetsToTxn",
-            "EndTxn",
-            "WriteTxnMarkers",
-            "TxnOffsetCommit",
-            "DescribeAcls",
-            // 30
-            "CreateAcls",
-            "DeleteAcls",
-            "DescribeConfigs",
-            "AlterConfigs",
-            "AlterReplicaLogDirs",
-            "DescribeLogDirs",
-            "SaslAuthenticate",
-            "CreatePartitions",
-            "CreateDelegationToken",
-            "RenewDelegationToken",
-            // 40
-            "ExpireDelegationToken",
-            "DescribeDelegationToken",
-            "DeleteGroups",
-            "ElectLeaders",
-            "IncrementalAlterConfigs",
-            "AlterPartitionReassignments",
-            "ListPartitionReassignments",
-            "OffsetDelete",
-            "DescribeClientQuotas",
-            "AlterClientQuotas",
-            //50
-            "DescribeUserScramCredentials",
-            "AlterUserScramCredentials",
-            "AlterIsr",
-            "UpdateFeatures",
-            "DescribeCluster",
-            "DescribeProducers",
-            "DescribeTransactions",
-            "ListTransactions",
-            "AllocateProducerIds",
-        ];
-        match self.api_key {
-            0..=58 => Some(command_str[self.api_key as usize].to_string()),
-            _ => None,
-        }
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -276,6 +723,10 @@ impl KafkaInfo {
                     .unwrap_or_default()
                 || t.request_domain.is_on_blacklist(&self.topic_name);
         }
+    }
+
+    fn has_trace_info(&self) -> bool {
+        !self.trace_id.is_empty() && !self.span_id.is_empty()
     }
 }
 
@@ -305,16 +756,22 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
                 domain: f.topic_name,
                 ..Default::default()
             },
-            version: Some(f.api_version.to_string()),
+            version: Some(f.api.version.to_string()),
             resp: L7Response {
                 status: f.status,
                 code: f.status_code,
+                exception: match f.status_code {
+                    Some(KafkaLog::CODE_APIKEY_NOT_SUPPORTED) => {
+                        KafkaLog::EXCEPTION_APIKEY_NOT_SUPPORTED.to_owned()
+                    }
+                    _ => String::new(),
+                },
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
-                request_id: Some(f.correlation_id),
-                x_request_id_0: Some(f.correlation_id.to_string()),
-                x_request_id_1: Some(f.correlation_id.to_string()),
+                request_id: f.correlation_id,
+                x_request_id_0: f.correlation_id.map(|id| id.to_string()),
+                x_request_id_1: f.correlation_id.map(|id| id.to_string()),
                 attributes: if !attributes.is_empty() {
                     Some(attributes)
                 } else {
@@ -356,7 +813,7 @@ impl From<&KafkaInfo> for LogCache {
 
 pub struct KafkaLog {
     perf_stats: Option<L7PerfStats>,
-    sessions: LruCache<u32, (u16, u16)>,
+    sessions: LruCache<u32, Api>,
 }
 
 impl Default for KafkaLog {
@@ -370,10 +827,7 @@ impl Default for KafkaLog {
 
 impl L7ProtocolParserInterface for KafkaLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if !param.ebpf_type.is_raw_protocol()
-            || param.l4_protocol != IpProtocol::TCP
-            || payload.len() < KAFKA_REQ_HEADER_LEN
-        {
+        if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
             return false;
         }
         let mut info = KafkaInfo::default();
@@ -382,16 +836,45 @@ impl L7ProtocolParserInterface for KafkaLog {
         ok
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
+    fn parse_payload(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> error::Result<L7ParseResult> {
+        if param.l4_protocol != IpProtocol::TCP {
+            return Err(error::Error::InvalidIpProtocol);
+        }
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         let mut info = KafkaInfo::default();
-        Self::parse(self, payload, param.l4_protocol, param.direction, &mut info)?;
+        match Self::parse(self, payload, param.direction, &mut info) {
+            Ok(()) => {}
+            Err(Error::ParseFailed(e)) => {
+                // buffer may be truncated
+                // if api key is known and correlation id is parsed, treat it as a normal log
+                // otherwise return error
+                debug!("parse failed: {e}");
+                if matches!(info.api.key, ApiKey::Unknown(..)) || info.correlation_id.is_none() {
+                    return Err(Error::ParseFailed(e).into());
+                }
+                if info.msg_type == LogMessageType::Response {
+                    info.status = L7ResponseStatus::Ok;
+                }
+            }
+            Err(Error::UnsupportedApi(api)) if !matches!(api.key, ApiKey::Unknown(..)) => {
+                debug!("unsupported api: {api}");
+                if info.msg_type == LogMessageType::Response {
+                    info.status = L7ResponseStatus::Ok;
+                    info.status_code = Some(Self::CODE_APIKEY_NOT_SUPPORTED);
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
-        info.resource = match (info.api_key, info.msg_type) {
-            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
+        info.resource = match (info.api.key, info.msg_type) {
+            (ApiKey::Fetch, LogMessageType::Request) | (ApiKey::Fetch, LogMessageType::Session)
                 if !info.topic_name.is_empty() =>
             {
                 Some(format!(
@@ -399,8 +882,8 @@ impl L7ProtocolParserInterface for KafkaLog {
                     info.topic_name, info.partition, info.offset
                 ))
             }
-            (KAFKA_PRODUCE, LogMessageType::Response)
-            | (KAFKA_PRODUCE, LogMessageType::Session)
+            (ApiKey::Produce, LogMessageType::Response)
+            | (ApiKey::Produce, LogMessageType::Session)
                 if !info.topic_name.is_empty() =>
             {
                 Some(format!(
@@ -411,7 +894,7 @@ impl L7ProtocolParserInterface for KafkaLog {
             _ => None,
         };
 
-        info.command = info.get_command();
+        info.command = Some(format!("{:?}", info.api.key));
         info.endpoint = info.generate_endpoint();
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
@@ -448,1043 +931,597 @@ impl L7ProtocolParserInterface for KafkaLog {
 }
 
 impl KafkaLog {
-    const MSG_LEN_SIZE: usize = 4;
-    const MAX_TRACE_ID: usize = 255;
     const MAX_SESSION_PER_FLOW: usize = 32;
-    const MAX_VERSION: u16 = 12;
+    const CODE_APIKEY_NOT_SUPPORTED: i32 = -2;
+    const EXCEPTION_APIKEY_NOT_SUPPORTED: &str = "Type not yet inspected by DeepFlow";
 
-    fn decode_varint(buf: &[u8]) -> (usize, usize) {
-        let mut shift = 0;
-        let mut n = 0;
-        let mut x = 0;
-        while shift < 64 {
-            if n >= buf.len() {
-                return (0, 0);
-            }
-            let b = buf[n] as usize;
-            n += 1;
-            // The following is divided into three steps:
-            // 1: b&0x7F: Get 7 bits of valid data
-            // 2: (b & 0x7F) << shift: Since shift is small-endian, it is necessary to move 7bits
-            //    to the high position for each Byte of data processed
-            // 3: Perform or operations on x with the current byte
-            // =======================================================================================
-            // 下面这个分成三步走:
-            // 1: b & 0x7F: 获取下7bits有效数据
-            // 2: (b & 0x7F) << shift: 由于是小端序, 所以每次处理一个Byte数据, 都需要向高位移动7bits
-            // 3: 将数据x和当前的这个字节数据 | 在一起
-            x |= (b & 0x7F) << shift;
-            if (b & 0x80) == 0 {
-                return (x, n);
-            }
-            shift += 7;
-        }
-        return (0, 0);
-    }
+    // kafka message parsers
+    // references:
+    // - https://kafka.apache.org/protocol#protocol_api_keys
+    // - https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-kafka.c
+    // use kafka-apis.py to find the difference between different verisons of messages
 
-    fn decode_string(payload: &[u8]) -> Option<(String, usize)> {
-        if 2 > payload.len() {
-            return None;
+    fn decode_produce_request<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        let mut buffer = payload;
+
+        // transactional_id
+        if info.api.version >= 9 {
+            buffer = decoder::compact_nullable_string(buffer)?.0;
+        } else if info.api.version >= 3 {
+            buffer = decoder::nullable_string(buffer)?.0;
         }
 
-        let length = read_u16_be(payload) as usize;
-        if length == 0xffff {
-            return Some((String::new(), 2));
-        }
-        if length > payload[2..].len() {
-            return None;
-        }
+        // acks, timeout_ms
+        let skip = 2 + 4;
+        buffer = take(skip as usize)(buffer)?.0;
 
-        Some((
-            String::from_utf8_lossy(&payload[2..2 + length]).into_owned(),
-            length + 2,
-        ))
-    }
-
-    fn decode_topic_name(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        if let Some((name, length)) = Self::decode_string(payload) {
-            info.topic_name = name;
-            return Ok(length);
-        }
-
-        return Err(Error::KafkaLogParseFailed);
-    }
-
-    fn decode_compact_string(payload: &[u8]) -> Option<(String, usize)> {
-        let (total_len, header_len) = Self::decode_varint(payload);
-        if header_len == 0 || total_len == 0 || total_len < header_len {
-            return None;
-        }
-
-        let string_offset = header_len;
-        let string_len = total_len - header_len;
-        if string_len > payload[string_offset..].len() {
-            return None;
-        }
-
-        Some((
-            String::from_utf8_lossy(&payload[header_len..header_len + string_len]).into_owned(),
-            total_len,
-        ))
-    }
-
-    fn decode_compact_topic_name(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        if let Some((name, len)) = Self::decode_compact_string(payload) {
-            info.topic_name = name;
-            return Ok(len);
-        }
-
-        return Err(Error::KafkaLogParseFailed);
-    }
-
-    fn decode_produce_request(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = 0;
-        match info.api_version {
-            // Produce Request (Version: [1-2]) => acks timeout_ms [topic_data]
-            //   acks => INT16
-            //   timeout_ms => INT32
-            //   topic_data => name [partition_data]
-            //     name => STRING
-            //     partition_data => index records
-            //       index => INT32
-            //       records => RECORDS
-            0..=2 => {
-                // topic_data.name: INT16 + INT32 + [topic_data]
-                offset = 2 + 4 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
+        if info.api.version >= 9 {
+            // topic data
+            let _ = decoder::compact_array(buffer, |input| {
+                // topic data -> name
+                let (input, name) = decoder::compact_string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = name.to_string();
                 }
 
-                offset += Self::decode_topic_name(&payload[offset..], info)?;
-            }
-            // Produce Request (Version: [3-8]) => transactional_id acks timeout_ms [topic_data]
-            //   transactional_id => NULLABLE_STRING
-            //   acks => INT16
-            //   timeout_ms => INT32
-            //   topic_data => name [partition_data]
-            //     name => STRING
-            //     partition_data => index records
-            //       index => INT32
-            //       records => RECORDS
-            3..=8 => {
-                let Some((_, header_len)) = Self::decode_string(payload) else {
-                    return Err(Error::KafkaLogParseFailed);
-                };
-                // topic_data.name: NULLABLE_STRING + INT16 + INT32 + [topic_data]
-                offset = header_len + 2 + 4 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
+                // topic_data -> partition_data (p_data)
+                let input = decoder::compact_array(input, |input| {
+                    // p_data -> index
+                    let input = be_i32(input)?.0;
+                    // p_data -> records
+                    let input = if info.has_trace_info() {
+                        decoder::compact_records(input)?.0
+                    } else {
+                        let (input, headers) = decoder::headers_from_compact_records(input)?;
+                        Self::decode_trace_info(&headers, info);
+                        input
+                    };
+                    // p_data -> _tagged_fields
+                    let input = decoder::tagged_fields(input)?.0;
+                    Ok((input, ()))
+                })?
+                .0;
+
+                // topic_data -> _tagged_fields
+                let input = decoder::tagged_fields(input)?.0;
+
+                Ok((input, ()))
+            })?;
+
+            // _tagged_fields ignored
+        } else {
+            // topic data
+            let _ = decoder::array(buffer, |input| {
+                // topic data -> name
+                let (input, name) = decoder::string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = name.to_string();
                 }
 
-                offset += Self::decode_topic_name(&payload[offset..], info)?;
-            }
-            // Produce Request (Version: 9) => transactional_id acks timeout_ms [topic_data] TAG_BUFFER
-            //   transactional_id => COMPACT_NULLABLE_STRING
-            //   acks => INT16
-            //   timeout_ms => INT32
-            //   topic_data => name [partition_data] TAG_BUFFER
-            //     name => COMPACT_STRING
-            //     partition_data => index records TAG_BUFFER
-            //       index => INT32
-            //       records => COMPACT_RECORDS
-            9..=10 => {
-                let Some((_, header_len)) = Self::decode_string(payload) else {
-                    return Err(Error::KafkaLogParseFailed);
-                };
-                // topic_data: COMPACT_NULLABLE_STRING? + INT16 + INT32
-                offset = header_len + 2 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let (topic_data_count, header_len) = Self::decode_varint(&payload[offset..]);
-                if topic_data_count == 0 || offset + header_len > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += header_len;
+                // topic_data -> partition_data (p_data)
+                let input = decoder::array(input, |input| {
+                    // p_data -> index
+                    let input = be_i32(input)?.0;
+                    // p_data -> records
+                    let input = if info.has_trace_info() {
+                        decoder::records(input)?.0
+                    } else {
+                        let (input, headers) = decoder::headers_from_records(input)?;
+                        Self::decode_trace_info(&headers, info);
+                        input
+                    };
+                    Ok((input, ()))
+                })?
+                .0;
 
-                offset += Self::decode_compact_topic_name(&payload[offset..], info)?;
-            }
-            // TODO
-            _ => {}
-        }
-
-        Ok(offset)
-    }
-
-    fn decode_produce_response_partition(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = match info.api_version {
-            0..=8 => {
-                if 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let partition_respones_count = read_u32_be(payload);
-                if partition_respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-
-                4
-            }
-            9..=10 => {
-                let (partition_respones_count, partition_respones_header_len) =
-                    Self::decode_varint(payload);
-                if partition_respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-
-                partition_respones_header_len
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+                Ok((input, ()))
+            })?;
         };
 
-        if offset + 4 > payload.len() {
-            return Err(Error::KafkaLogParseFailed);
-        }
-        info.partition = read_i32_be(&payload[offset..]);
-        offset += 4;
-
-        if offset + 2 > payload.len() {
-            return Err(Error::KafkaLogParseFailed);
-        }
-        info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
-        offset += 2;
-
-        if offset + 8 > payload.len() {
-            return Err(Error::KafkaLogParseFailed);
-        }
-        info.offset = read_i64_be(&payload[offset..]);
-        offset += 8;
-
-        Ok(offset)
+        Ok(())
     }
 
-    fn decode_produce_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        match info.api_version {
-            // Produce Response (Version: 0) => [responses]
-            //   responses => name [partition_responses]
-            //     name => STRING
-            //     partition_responses => index error_code base_offset
-            //       index => INT32
-            //       error_code => INT16
-            //       base_offset => INT64
-            0..=8 => {
-                // topic name offset: [responses]
-                if 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let respones_count = read_u32_be(payload);
-                if respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_name_len = Self::decode_topic_name(&payload[4..], info)?;
+    fn decode_produce_response<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        let buffer = payload;
 
-                Self::decode_produce_response_partition(&payload[4 + topic_name_len..], info)?;
-            }
-            // Produce Response (Version: [9-10]) => [responses]
-            //   responses => name [partition_responses]
-            //     name => COMPACT_STRING
-            //     partition_responses => index error_code base_offset
-            //       index => INT32
-            //       error_code => INT16
-            //       base_offset => INT64
-            9..=10 => {
-                if 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
+        if info.api.version >= 9 {
+            // responses
+            let _ = decoder::compact_array(buffer, |input| {
+                // responses -> name
+                let (input, name) = decoder::compact_string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = name.to_string();
                 }
-                let respones_count = read_u16_be(payload);
-                // topic name offset: [responses]
-                if respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_name_len = Self::decode_compact_topic_name(&payload[2..], info)?;
 
-                Self::decode_produce_response_partition(&payload[2 + topic_name_len..], info)?;
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+                // responses -> partition_responses (pr)
+                let input = decoder::compact_array(input, |mut input| {
+                    // pr -> index
+                    (input, info.partition) = be_i32(input)?;
+                    // pr -> error_code
+                    let error_code = be_i16(input)?;
+                    input = error_code.0;
+                    info.status_code = Some(error_code.1 as i32);
+                    // pr -> base_offset
+                    (input, info.offset) = be_i64(input)?;
+                    // pr -> log_append_time_ms
+                    input = be_i64(input)?.0;
+                    // pr -> log_start_offset
+                    input = be_i64(input)?.0;
+                    // pr -> record_errors
+                    input = decoder::compact_array(input, |input| {
+                        // record_errors -> batch_index
+                        let input = be_i32(input)?.0;
+                        // record_errors -> batch_index_error_message
+                        let input = decoder::compact_nullable_string(input)?.0;
+                        // record_errors -> _tagged_fields
+                        let input = decoder::tagged_fields(input)?.0;
+
+                        Ok((input, ()))
+                    })?
+                    .0;
+                    // pr -> error_message
+                    input = decoder::compact_nullable_string(input)?.0;
+                    // pr -> _tagged_fields
+                    input = decoder::tagged_fields(input)?.0;
+
+                    Ok((input, ()))
+                })?
+                .0;
+
+                // responses -> _tagged_fields
+                let input = decoder::tagged_fields(input)?.0;
+
+                Ok((input, ()))
+            })?;
+
+            // throttle_time_ms, _tagged_fields ignored
+        } else {
+            // responses
+            let _ = decoder::array(buffer, |input| {
+                // responses -> name
+                let (input, name) = decoder::string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = name.to_string();
+                }
+
+                // responses -> partition_responses (pr)
+                let input = decoder::array(input, |mut input| {
+                    // pr -> index
+                    (input, info.partition) = be_i32(input)?;
+                    // pr -> error_code
+                    let error_code = be_i16(input)?;
+                    input = error_code.0;
+                    info.status_code = Some(error_code.1 as i32);
+                    // pr -> base_offset
+                    (input, info.offset) = be_i64(input)?;
+
+                    if info.api.version >= 2 {
+                        // pr -> log_append_time_ms
+                        input = be_i64(input)?.0;
+                    }
+
+                    if info.api.version >= 5 {
+                        // pr -> log_start_offset
+                        input = be_i64(input)?.0;
+                    }
+
+                    if info.api.version >= 8 {
+                        // pr -> record_errors
+                        input = decoder::array(input, |input| {
+                            // record_errors -> batch_index
+                            let input = be_i32(input)?.0;
+                            // record_errors -> batch_index_error_message
+                            let input = decoder::nullable_string(input)?.0;
+
+                            Ok((input, ()))
+                        })?
+                        .0;
+                        // pr -> error_message
+                        input = decoder::nullable_string(input)?.0;
+                    }
+
+                    Ok((input, ()))
+                })?
+                .0;
+
+                Ok((input, ()))
+            })?;
+
+            // throttle_time_ms ignored
         }
 
         Ok(())
     }
 
-    fn decode_fetch_request_topics_partitions(
-        payload: &[u8],
-        info: &mut KafkaInfo,
-    ) -> Result<usize> {
-        let offset = match info.api_version {
-            0..=8 => {
-                let mut offset = 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_count = read_u32_be(payload);
-                if topic_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
+    fn decode_fetch_request<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        let mut buffer = payload;
 
-                if offset + 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.partition = read_i32_be(&payload[offset..]);
-                offset += 4;
-
-                if offset + 8 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.offset = read_i64_be(&payload[offset..]);
-                offset += 8;
-
-                offset
-            }
-            9..=11 => {
-                let mut offset = 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_count = read_u32_be(payload);
-                if topic_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-
-                if offset + 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.partition = read_i32_be(&payload[offset..]);
-                offset += 8;
-
-                if offset + 8 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.offset = read_i64_be(&payload[offset..]);
-                offset += 8;
-
-                offset
-            }
-            12 => {
-                let (topic_count, mut offset) = Self::decode_varint(payload);
-                if topic_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-
-                if offset + 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.partition = read_i32_be(&payload[offset..]);
-                offset += 8;
-
-                if offset + 8 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.offset = read_i64_be(&payload[offset..]);
-                offset += 8;
-
-                offset
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+        let skip = match info.api.version {
+            // replica_id, max_wait_ms, min_bytes
+            0..=2 => 4 + 4 + 4,
+            // replica_id, max_wait_ms, min_bytes, max_bytes
+            3 => 4 + 4 + 4 + 4,
+            // replica_id, max_wait_ms, min_bytes, max_bytes, isolation_level
+            4..=6 => 4 + 4 + 4 + 4 + 1,
+            // replica_id, max_wait_ms, min_bytes, max_bytes, isolation_level, session_id, session_epoch
+            7..=14 => 4 + 4 + 4 + 4 + 1 + 4 + 4,
+            // max_wait_ms, min_bytes, max_bytes, isolation_level, session_id, session_epoch
+            _ => 4 + 4 + 4 + 1 + 4 + 4,
         };
+        buffer = take(skip as usize)(buffer)?.0;
 
-        Ok(offset)
-    }
+        if info.api.version >= 12 {
+            // topics
+            let _ = decoder::compact_array(buffer, |input| {
+                let input = if info.api.version >= 13 {
+                    // topic -> topic_id
+                    let (input, topic_id) = decoder::uuid(input)?;
+                    if info.topic_name.is_empty() {
+                        info.topic_name = topic_id.hyphenated().to_string();
+                    }
+                    input
+                } else {
+                    // topic -> topic
+                    let (input, topic) = decoder::compact_string(input)?;
+                    if info.topic_name.is_empty() {
+                        info.topic_name = topic.to_string();
+                    }
+                    input
+                };
 
-    fn decode_fetch_request_topics(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = match info.api_version {
-            0..=11 => {
-                let mut offset = 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_count = read_u32_be(payload);
-                if topic_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
+                // topic -> partitions
+                let input = decoder::compact_array(input, |input| {
+                    // partition -> partition
+                    let (input, partition) = be_i32(input)?;
+                    info.partition = partition;
 
-                offset += Self::decode_topic_name(&payload[offset..], info)?;
+                    // partition -> current_leader_epoch
+                    let input = be_i32(input)?.0;
 
-                offset
-            }
-            12 => {
-                if 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_count = read_u16_be(payload);
-                if topic_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
+                    // partition -> fetch_offset
+                    let (input, offset) = be_i64(input)?;
+                    info.offset = offset;
 
-                2 + Self::decode_compact_topic_name(&payload[2..], info)?
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
-        };
+                    // last_fetched_epoch, log_start_offset, partition_max_bytes
+                    let skip = 4 + 8 + 4;
+                    let input = take(skip as usize)(input)?.0;
 
-        offset += Self::decode_fetch_request_topics_partitions(&payload[offset..], info)?;
+                    // partition -> _tagged_fields
+                    let input = decoder::tagged_fields(input)?.0;
 
-        Ok(offset)
-    }
+                    Ok((input, ()))
+                })?
+                .0;
 
-    fn decode_fetch_request(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = 0;
-        match info.api_version {
-            // Fetch Request (Version: [0-2]) => replica_id max_wait_ms min_bytes [topics]
-            //   replica_id => INT32
-            //   max_wait_ms => INT32
-            //   min_bytes => INT32
-            //   topics => topic [partitions]
-            //     topic => STRING
-            //     partitions => partition fetch_offset partition_max_bytes
-            //       partition => INT32
-            //       fetch_offset => INT64
-            //       partition_max_bytes => INT32
-            0..=2 => {
-                // topics: INT32 + INT32 + INT32
-                offset = 4 + 4 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += Self::decode_fetch_request_topics(&payload[offset..], info)?;
-            }
-            // Fetch Request (Version: [3]) => replica_id max_wait_ms min_bytes [topics]
-            //   replica_id => INT32
-            //   max_wait_ms => INT32
-            //   min_bytes => INT32
-            //   max_bytes => INT32
-            //   topics => topic [partitions]
-            //     topic => STRING
-            //     partitions => partition fetch_offset partition_max_bytes
-            //       partition => INT32
-            //       fetch_offset => INT64
-            //       partition_max_bytes => INT32
-            3 => {
-                // topics: INT32 + INT32 + INT32 + INT32
-                offset = 4 + 4 + 4 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += Self::decode_fetch_request_topics(&payload[offset..], info)?;
-            }
-            // Fetch Request (Version: [4-6]) => replica_id max_wait_ms min_bytes [topics]
-            //   replica_id => INT32
-            //   max_wait_ms => INT32
-            //   min_bytes => INT32
-            //   max_bytes => INT32
-            //   isolation_level => INT8
-            //   topics => topic [partitions]
-            //     topic => STRING
-            //     partitions => partition fetch_offset partition_max_bytes
-            //       partition => INT32
-            //       fetch_offset => INT64
-            //       partition_max_bytes => INT32
-            4..=6 => {
-                // topics: INT32 + INT32 + INT32 + INT32 + INT8
-                offset = 4 + 4 + 4 + 4 + 1;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += Self::decode_fetch_request_topics(&payload[offset..], info)?;
-            }
-            // Fetch Request (Version: [7-12]) => replica_id max_wait_ms min_bytes [topics]
-            //   replica_id => INT32
-            //   max_wait_ms => INT32
-            //   min_bytes => INT32
-            //   max_bytes => INT32
-            //   isolation_level => INT8
-            //   session_id => INT32
-            //   session_epoch => INT32
-            //   topics => topic [partitions]
-            //     topic => STRING
-            //     partitions => partition fetch_offset partition_max_bytes
-            //       partition => INT32
-            //       fetch_offset => INT64
-            //       partition_max_bytes => INT32
-            7..=12 => {
-                // topics: INT32 + INT32 + INT32 + INT32 + INT8 + INT32 + INT32
-                offset = 4 + 4 + 4 + 4 + 1 + 4 + 4;
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += Self::decode_fetch_request_topics(&payload[offset..], info)?;
-            }
-            // TODO
-            _ => {}
-        }
-        Ok(offset)
-    }
+                // topic -> _tagged_fields
+                let input = decoder::tagged_fields(input)?.0;
 
-    fn decode_fetch_partition_response(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = match info.api_version {
-            0..=11 => {
-                if 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let partition_respones_count = read_u32_be(payload);
-                if partition_respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
+                Ok((input, ()))
+            });
+
+            // [forgotten_topics_data], rack_id, _tagged_fields ignored
+        } else {
+            // topics
+            let _ = decoder::array(buffer, |input| {
+                // topic -> topic
+                let (input, topic) = decoder::string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = topic.to_string();
                 }
 
-                4
-            }
-            12 => {
-                let (partition_respones_count, partition_respones_header_len) =
-                    Self::decode_varint(payload);
-                if partition_respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
+                // topic -> partitions
+                let input = decoder::array(input, |input| {
+                    // partition -> partition
+                    let (mut input, partition) = be_i32(input)?;
+                    info.partition = partition;
 
-                partition_respones_header_len
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
-        };
+                    if info.api.version >= 9 {
+                        // partition -> current_leader_epoch
+                        input = be_i32(input)?.0;
+                    }
 
-        if offset + 4 > payload.len() {
-            return Err(Error::KafkaLogParseFailed);
-        }
-        info.partition = read_i32_be(&payload[offset..]);
-        offset += 4;
+                    // partition -> fetch_offset
+                    let (mut input, offset) = be_i64(input)?;
+                    info.offset = offset;
 
-        if info.status_code.is_some() {
-            return Ok(offset);
+                    if info.api.version >= 5 {
+                        // partition ->log_start_offset
+                        input = be_i64(input)?.0;
+                    }
+
+                    // partition -> partition_max_bytes
+                    let input = be_i32(input)?.0;
+
+                    Ok((input, ()))
+                })?
+                .0;
+
+                Ok((input, ()))
+            });
+
+            // [forgotten_topics_data], rack_id ignored
         }
 
-        if offset + 2 > payload.len() {
-            return Err(Error::KafkaLogParseFailed);
-        }
-        info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
-        offset += 2;
-
-        Ok(offset)
+        Ok(())
     }
 
     fn decode_fetch_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        match info.api_version {
-            // Fetch Response (Version: 0) => [responses]
-            // responses => topic [partitions]
-            //   topic => STRING
-            //   partitions => partition_index error_code high_watermark records
-            //     partition_index => INT32
-            //     error_code => INT16
-            //     high_watermark => INT64
-            //     records => RECORDS
-            0 => {
-                // topic name offset: [responses]
-                if 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let respones_count = read_u32_be(payload);
-                if respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_name_len = Self::decode_topic_name(&payload[4..], info)?;
+        let mut buffer = payload;
 
-                Self::decode_fetch_partition_response(&payload[4 + topic_name_len..], info)?;
-            }
-            // Fetch Response (Version: [1-6]) => throttle_time_ms [responses]
-            // throttle_time_ms => INT32
-            // responses => topic [partitions]
-            //   topic => STRING
-            //   partitions => partition_index error_code high_watermark records
-            //     partition_index => INT32
-            //     error_code => INT16
-            //     high_watermark => INT64
-            //     records => RECORDS
-            1..=6 => {
-                if 8 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let respones_count = read_u32_be(&payload[4..]);
-                if respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let topic_name_len = Self::decode_topic_name(&payload[8..], info)?;
+        if info.api.version >= 1 {
+            // throttle_time_ms
+            buffer = be_i32(buffer)?.0;
+        }
 
-                Self::decode_fetch_partition_response(&payload[8 + topic_name_len..], info)?;
-            }
-            // Fetch Response (Version: [7]) => throttle_time_ms error_code session_id [responses]
-            // throttle_time_ms => INT32
-            // error_code => INT16
-            // session_id => INT32
-            // responses => topic [partitions]
-            //   topic => STRING
-            //   partitions => partition_index error_code high_watermark records
-            //     partition_index => INT32
-            //     error_code => INT16
-            //     high_watermark => INT64
-            //     records => RECORDS
-            7..=11 => {
-                let mut offset = 4;
-                if offset + 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
-                offset += 2 + 4;
+        if info.api.version >= 7 {
+            // error_code
+            let (b, status_code) = be_i16(buffer)?;
+            info.status_code = Some(status_code as i32);
+            // session_id
+            buffer = be_i32(b)?.0;
+        }
 
-                if offset + 4 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let respones_count = read_u32_be(&payload[offset..]);
-                if respones_count == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += 4;
+        // responses
+        if info.api.version >= 12 {
+            let _ = decoder::compact_array(buffer, |input| {
+                let input = if info.api.version >= 13 {
+                    // response -> topic_id
+                    let (input, topic_id) = decoder::uuid(input)?;
+                    if info.topic_name.is_empty() {
+                        info.topic_name = topic_id.hyphenated().to_string();
+                    }
+                    input
+                } else {
+                    // response -> topic
+                    let (input, topic) = decoder::compact_string(input)?;
+                    if info.topic_name.is_empty() {
+                        info.topic_name = topic.to_string();
+                    }
+                    input
+                };
 
-                let topic_name_len = Self::decode_topic_name(&payload[offset..], info)?;
-                offset += topic_name_len;
+                // response -> partitions
+                let input = decoder::compact_array(input, |input| {
+                    // partition -> partition_index
+                    let (input, partition) = be_i32(input)?;
+                    info.partition = partition;
 
-                Self::decode_fetch_partition_response(&payload[offset..], info)?;
-            }
-            // Fetch Response (Version: 12) => throttle_time_ms error_code session_id [responses] TAG_BUFFER
-            // throttle_time_ms => INT32
-            // error_code => INT16
-            // session_id => INT32
-            // responses => topic [partitions] TAG_BUFFER
-            //   topic => COMPACT_STRING
-            //   partitions => partition_index error_code high_watermark last_stable_offset log_start_offset [aborted_transactions] preferred_read_replica records TAG_BUFFER
-            //     partition_index => INT32
-            //     error_code => INT16
-            //     high_watermark => INT64
-            12 => {
-                let mut offset = 4;
-                if offset + 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
+                    // partition -> error_code
+                    let (input, error_code) = be_i16(input)?;
+                    match info.status_code.as_ref() {
+                        Some(c) if *c != 0 => (),
+                        _ => info.status_code = Some(error_code as i32),
+                    }
+
+                    // high_watermark, last_stable_offset, log_start_offset
+                    let skip = 8 + 8 + 8;
+                    let input = take(skip as usize)(input)?.0;
+
+                    // partition -> aborted_transactions
+                    let input = decoder::compact_array(input, |input| {
+                        // producer_id, first_offset
+                        let skip = 8 + 8;
+                        let input = take(skip as usize)(input)?.0;
+
+                        // _tagged_fields
+                        let input = decoder::tagged_fields(input)?.0;
+
+                        Ok((input, ()))
+                    })?
+                    .0;
+
+                    // partition -> preferred_read_replica
+                    let input = be_i32(input)?.0;
+
+                    // partition -> records
+                    let input = decoder::compact_records(input)?.0;
+
+                    // partition -> _tagged_fields
+                    let input = decoder::tagged_fields(input)?.0;
+
+                    Ok((input, ()))
+                })?
+                .0;
+
+                // response -> _tagged_fields
+                let input = decoder::tagged_fields(input)?.0;
+
+                Ok((input, ()))
+            })?;
+
+            // _tagged_fields ignored
+        } else {
+            let _ = decoder::array(buffer, |input| {
+                // response -> topic
+                let (input, topic) = decoder::string(input)?;
+                if info.topic_name.is_empty() {
+                    info.topic_name = topic.to_string();
                 }
-                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
-                offset += 2 + 4;
 
-                if offset > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                let (responses_counter, responses_header_len) =
-                    Self::decode_varint(&payload[offset..]);
-                // topic name offset: [responses]
-                if responses_counter == 0 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += responses_header_len;
+                // response -> partitions
+                let input = decoder::array(input, |input| {
+                    // partition -> partition_index
+                    let (input, partition) = be_i32(input)?;
+                    info.partition = partition;
 
-                let topic_name_len = Self::decode_compact_topic_name(&payload[offset..], info)?;
-                offset += topic_name_len;
+                    // partition -> error_code
+                    let (input, error_code) = be_i16(input)?;
+                    match info.status_code.as_ref() {
+                        Some(c) if *c != 0 => (),
+                        _ => info.status_code = Some(error_code as i32),
+                    }
 
-                Self::decode_fetch_partition_response(&payload[offset..], info)?;
-            }
-            // TODO
-            _ => {}
+                    // partition -> high_watermark
+                    let mut input = be_i64(input)?.0;
+
+                    if info.api.version >= 4 {
+                        // partition -> last_stable_offset
+                        input = be_i64(input)?.0;
+                    }
+
+                    if info.api.version >= 5 {
+                        // partition -> log_start_offset
+                        input = be_i64(input)?.0;
+                    }
+
+                    if info.api.version >= 4 {
+                        // partition -> aborted_transactions
+                        input = decoder::array(input, |input| {
+                            // producer_id, first_offset
+                            let skip = 8 + 8;
+                            let input = take(skip as usize)(input)?.0;
+
+                            Ok((input, ()))
+                        })?
+                        .0;
+                    }
+
+                    if info.api.version >= 11 {
+                        // partition -> preferred_read_replica
+                        input = be_i32(input)?.0;
+                    }
+
+                    // partition -> records
+                    let input = decoder::records(input)?.0;
+
+                    Ok((input, ()))
+                })?
+                .0;
+
+                Ok((input, ()))
+            })?;
         }
 
         Ok(())
     }
 
-    fn decode_leave_group_request(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = 0;
-        match info.api_version {
-            // LeaveGroup Request (Version: [0-3]) => group_id [members]
-            // group_id => STRING
-            // members => member_id group_instance_id
-            //   member_id => STRING
-            //   group_instance_id => NULLABLE_STRING
-            0..=3 => {
-                if let Some((group_id, group_id_len)) = Self::decode_string(payload) {
-                    info.group_id = group_id;
-                    offset = group_id_len;
-                }
-            }
-            // LeaveGroup Request (Version: [4-5]) => group_id [members] TAG_BUFFER
-            // group_id => COMPACT_STRING
-            // members => member_id group_instance_id reason TAG_BUFFER
-            //   member_id => COMPACT_STRING
-            //   group_instance_id => COMPACT_NULLABLE_STRING
-            //   reason => COMPACT_NULLABLE_STRING
-            4..=5 => {
-                // _tagged_fields
-                if payload.len() < 1 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += 1;
-
-                if let Some((group_id, group_id_len)) =
-                    Self::decode_compact_string(&payload[offset..])
-                {
-                    info.group_id = group_id;
-                    offset += group_id_len;
-                }
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
-        }
-
-        Ok(offset)
-    }
-
-    fn decode_leave_group_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        match info.api_version {
-            // LeaveGroup Response (Version: 0) => error_code
-            //   error_code => INT16
-            0 => {
-                if 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(payload) as i32);
-            }
-            // LeaveGroup Response (Version: 1) => throttle_time_ms error_code
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            1..=3 => {
-                if 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[4..]) as i32);
-            }
-            // LeaveGroup Response (Version: 4) => throttle_time_ms error_code
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            4..=5 => {
-                // _tagged_field
-                let offset = 1;
-                if offset + 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-
-                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
-        }
+    fn decode_join_group_request<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        // group_id
+        let group_id = if info.api.version >= 6 {
+            decoder::compact_string(payload)?.1
+        } else {
+            decoder::string(payload)?.1
+        };
+        info.group_id = group_id.to_owned();
 
         Ok(())
-    }
-
-    fn decode_join_group_request(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = 0;
-        match info.api_version {
-            // JoinGroup Request (Version: 0) => group_id session_timeout_ms member_id protocol_type [protocols]
-            //   group_id => STRING
-            //   session_timeout_ms => INT32
-            //   member_id => STRING
-            //   protocol_type => STRING
-            //   protocols => name metadata
-            //     name => STRING
-            //     metadata => BYTES
-            0..=5 => {
-                if let Some((group_id, group_id_len)) = Self::decode_string(payload) {
-                    info.group_id = group_id;
-                    offset = group_id_len;
-                }
-            }
-            // JoinGroup Request (Version: 9) => group_id session_timeout_ms rebalance_timeout_ms member_id group_instance_id protocol_type [protocols] reason TAG_BUFFER
-            //   group_id => COMPACT_STRING
-            //   session_timeout_ms => INT32
-            //   rebalance_timeout_ms => INT32
-            //   member_id => COMPACT_STRING
-            //   group_instance_id => COMPACT_NULLABLE_STRING
-            //   protocol_type => COMPACT_STRING
-            //   protocols => name metadata TAG_BUFFER
-            //     name => COMPACT_STRING
-            //     metadata => COMPACT_BYTES
-            //   reason => COMPACT_NULLABLE_STRING
-            6..=9 => {
-                // _tagged_fields
-                if payload.len() < 1 {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += 1;
-
-                if let Some((group_id, group_id_len)) =
-                    Self::decode_compact_string(&payload[offset..])
-                {
-                    info.group_id = group_id;
-                    offset += group_id_len;
-                }
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
-        }
-
-        Ok(offset)
     }
 
     fn decode_join_group_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        match info.api_version {
-            // JoinGroup Response (Version: 0) => error_code generation_id protocol_name leader member_id [members]
-            //   error_code => INT16
-            //   generation_id => INT32
-            //   protocol_name => STRING
-            //   leader => STRING
-            //   member_id => STRING
-            //   members => member_id metadata
-            //     member_id => STRING
-            //     metadata => BYTES
-            0..=1 => {
-                if 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(payload) as i32);
-            }
-            // JoinGroup Response (Version: 2) => throttle_time_ms error_code generation_id protocol_name leader member_id [members]
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            //   generation_id => INT32
-            //   protocol_name => STRING
-            //   leader => STRING
-            //   member_id => STRING
-            //   members => member_id metadata
-            //     member_id => STRING
-            //     metadata => BYTES
-            2..=5 => {
-                if 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[4..]) as i32);
-            }
-            // JoinGroup Response (Version: 6) => throttle_time_ms error_code generation_id protocol_name leader member_id [members]
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            //   generation_id => INT32
-            //   protocol_name => COMPACT_STRING
-            //   leader => COMPACT_STRING
-            //   member_id => COMPACT_STRING
-            //   members => member_id metadata
-            //     member_id => COMPACT_STRING
-            //     group_instance_id => COMPACT_NULLABLE_STRING
-            //     metadata => BYTES
-            6..=9 => {
-                // _tagged_field
-                let offset = 1;
-                if offset + 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+        let mut buffer = payload;
+
+        if info.api.version >= 2 {
+            // throttle_time_ms
+            buffer = be_i32(buffer)?.0;
         }
+
+        // error_code
+        let error_code = be_i16(buffer)?.1;
+        info.status_code = Some(error_code as i32);
 
         Ok(())
     }
 
-    fn decode_sync_group_request(payload: &[u8], info: &mut KafkaInfo) -> Result<usize> {
-        let mut offset = 0;
-        match info.api_version {
-            // SyncGroup Request (Version: [0-3]) => group_id generation_id member_id group_instance_id [assignments]
-            //   group_id => STRING
-            //   generation_id => INT32
-            //   member_id => STRING
-            //   group_instance_id => NULLABLE_STRING
-            //   assignments => member_id assignment
-            //     member_id => STRING
-            //     assignment => BYTES
-            0..=3 => {
-                if let Some((group_id, group_id_len)) = Self::decode_string(payload) {
-                    info.group_id = group_id;
-                    offset = group_id_len;
-                }
-            }
-            // SyncGroup Request (Version: [4-5]) => group_id generation_id member_id group_instance_id protocol_type protocol_name [assignments] TAG_BUFFER
-            //   group_id => COMPACT_STRING
-            //   generation_id => INT32
-            //   member_id => COMPACT_STRING
-            //   group_instance_id => COMPACT_NULLABLE_STRING
-            //   protocol_type => COMPACT_NULLABLE_STRING
-            //   protocol_name => COMPACT_NULLABLE_STRING
-            //   assignments => member_id assignment TAG_BUFFER
-            //     member_id => COMPACT_STRING
-            //     assignment => COMPACT_BYTES
-            4..=5 => {
-                // _tagged_field
-                if 1 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                offset += 1;
+    fn decode_leave_group_request<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        // group_id
+        let group_id = if info.api.version >= 4 {
+            decoder::compact_string(payload)?.1
+        } else {
+            decoder::string(payload)?.1
+        };
+        info.group_id = group_id.to_owned();
 
-                if let Some((group_id, group_id_len)) =
-                    Self::decode_compact_string(&payload[offset..])
-                {
-                    info.group_id = group_id;
-                    offset += group_id_len;
-                }
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+        Ok(())
+    }
+
+    fn decode_leave_group_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
+        let mut buffer = payload;
+
+        if info.api.version >= 1 {
+            // throttle_time_ms
+            buffer = be_i32(buffer)?.0;
         }
 
-        Ok(offset)
+        // error_code
+        let error_code = be_i16(buffer)?.1;
+        info.status_code = Some(error_code as i32);
+
+        Ok(())
+    }
+
+    fn decode_sync_group_request<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        // group_id
+        let group_id = if info.api.version >= 4 {
+            decoder::compact_string(payload)?.1
+        } else {
+            decoder::string(payload)?.1
+        };
+        info.group_id = group_id.to_owned();
+
+        Ok(())
     }
 
     fn decode_sync_group_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        match info.api_version {
-            // SyncGroup Response (Version: 0) => error_code assignment
-            //   error_code => INT16
-            //   assignment => BYTES
-            0 => {
-                if 2 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(payload) as i32);
-            }
-            // SyncGroup Response (Version: [1-3]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            //   protocol_type => COMPACT_NULLABLE_STRING
-            //   protocol_name => COMPACT_NULLABLE_STRING
-            //   assignment => COMPACT_BYTES
-            1..=3 => {
-                if 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[4..]) as i32);
-            }
-            // SyncGroup Response (Version: [4-5]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
-            //   throttle_time_ms => INT32
-            //   error_code => INT16
-            //   protocol_type => COMPACT_NULLABLE_STRING
-            //   protocol_name => COMPACT_NULLABLE_STRING
-            //   assignment => COMPACT_BYTES
-            4..=5 => {
-                // _tagged_fields
-                let offset = 1;
-                if offset + 6 > payload.len() {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
-            }
-            _ => return Err(Error::KafkaLogParseFailed),
+        let mut buffer = payload;
+
+        if info.api.version >= 1 {
+            // throttle_time_ms
+            buffer = be_i32(buffer)?.0;
         }
+
+        // error_code
+        let error_code = be_i16(buffer)?.1;
+        info.status_code = Some(error_code as i32);
 
         Ok(())
     }
 
-    fn decode_request_body(payload: &[u8], info: &mut KafkaInfo) {
-        let offset = match info.api_key {
-            // Support Version Range: [0, 9]
-            KAFKA_PRODUCE => Self::decode_produce_request(payload, info),
-            // Support Version Range: [0, 12]
-            KAFKA_FETCH => Self::decode_fetch_request(payload, info),
-            // Support Version Range: [0, 9]
-            KAFKA_JOIN_GROUP => Self::decode_join_group_request(payload, info),
-            // Support Version Range: [0, 5]
-            KAFKA_LEAVE_GROUP => Self::decode_leave_group_request(payload, info),
-            // Support Version Range: [0, 5]
-            KAFKA_SYNC_GROUP => Self::decode_sync_group_request(payload, info),
-            _ => return,
-        };
-        let payload = if let Ok(offset) = offset {
-            &payload[offset..]
-        } else {
-            payload
+    fn decode_api_versions_response(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
+        let error_code = be_i16(payload)?.1;
+        info.status_code = Some(error_code as i32);
+
+        Ok(())
+    }
+
+    fn decode_request_body<'a>(payload: &'a [u8], info: &mut KafkaInfo) -> Result<()> {
+        let _ = match info.api.key {
+            ApiKey::Produce => Self::decode_produce_request(payload, info)?,
+            ApiKey::Fetch => Self::decode_fetch_request(payload, info)?,
+            ApiKey::JoinGroup => Self::decode_join_group_request(payload, info)?,
+            ApiKey::LeaveGroup => Self::decode_leave_group_request(payload, info)?,
+            ApiKey::SyncGroup => Self::decode_sync_group_request(payload, info)?,
+            ApiKey::ApiVersions => (), // do nothing
+            _ => return Err(Error::UnsupportedApi(info.api)),
         };
 
-        // Trace info
-        let payload = String::from_utf8_lossy(payload);
-        Self::decode_sw8(&payload, info);
-        Self::decode_traceparent(&payload, info);
+        Ok(())
     }
 
-    fn decode_response_body(payload: &[u8], info: &mut KafkaInfo) {
-        match info.api_key {
-            // Support Version Range: [0, 10]
-            KAFKA_PRODUCE => {
-                let _ = Self::decode_produce_response(payload, info);
-            }
-            // Support Version Range: [0, 12]
-            KAFKA_FETCH => {
-                let _ = Self::decode_fetch_response(payload, info);
-            }
-            // Support Version Range: [0, 9]
-            KAFKA_JOIN_GROUP => {
-                let _ = Self::decode_join_group_response(payload, info);
-            }
-            // Support Version Range: [0, 5]
-            KAFKA_LEAVE_GROUP => {
-                let _ = Self::decode_leave_group_response(payload, info);
-            }
-            // Support Version Range: [0, 5]
-            KAFKA_SYNC_GROUP => {
-                let _ = Self::decode_sync_group_response(payload, info);
-            }
-            _ => return,
-        }
+    fn decode_response_body(payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
+        let _ = match info.api.key {
+            ApiKey::Produce => Self::decode_produce_response(payload, info)?,
+            ApiKey::Fetch => Self::decode_fetch_response(payload, info)?,
+            ApiKey::JoinGroup => Self::decode_join_group_response(payload, info)?,
+            ApiKey::LeaveGroup => Self::decode_leave_group_response(payload, info)?,
+            ApiKey::SyncGroup => Self::decode_sync_group_response(payload, info)?,
+            ApiKey::ApiVersions => Self::decode_api_versions_response(payload, info)?,
+            _ => return Err(Error::UnsupportedApi(info.api)),
+        };
+
+        Ok(())
     }
 
-    // traceparent: 00-TRACEID-SPANID-01
-    fn decode_traceparent(payload: &str, info: &mut KafkaInfo) {
-        let tag = TraceType::TraceParent.as_str();
-        let mut start = 0;
-        let mut trace_id = "";
-        while start < payload.len() {
-            if !payload.is_char_boundary(start) {
-                break;
+    fn decode_trace_info(headers: &[(&str, &str)], info: &mut KafkaInfo) {
+        for (k, v) in headers {
+            let tp = TraceType::from(*k);
+            if !matches!(tp, TraceType::TraceParent | TraceType::Sw8) {
+                continue;
             }
-            let index = payload[start..].find(tag);
-            if index.is_none() {
-                break;
+            if let Some(trace_id) = tp.decode_trace_id(v) {
+                info.trace_id = trace_id.to_string();
             }
-            let index = index.unwrap();
-
-            let start_index = payload[start + index..].find("00-");
-            if let Some(current_index) = start_index {
-                let trace_id_index = start + index + current_index + 3;
-                if !payload.is_char_boundary(trace_id_index) {
-                    start += index + tag.len();
-                    continue;
-                }
-                let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
-                if !payload.is_char_boundary(trace_id_index + trace_id_length) {
-                    start += index + tag.len();
-                    continue;
-                }
-                trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
-                break;
-            }
-            start += index + tag.len();
-        }
-
-        if trace_id.len() > 0 {
-            let mut segs = trace_id.split('-');
-            if let Some(seg) = segs.next() {
-                info.trace_id = seg.to_string();
-            }
-            if let Some(seg) = segs.next() {
-                info.span_id = seg.to_string();
-            }
-        }
-    }
-
-    // Example: 'sw8  1-{trace-id}-{other}'
-    fn decode_sw8(payload: &str, info: &mut KafkaInfo) {
-        let tag = TraceType::Sw8.as_str();
-        let mut start = 0;
-        let mut trace_id = "";
-        while start < payload.len() {
-            if !payload.is_char_boundary(start) {
-                break;
-            }
-            let index = payload[start..].find(tag);
-            if index.is_none() {
-                break;
-            }
-            let index = index.unwrap();
-
-            let start_index = payload[start + index..].find("1-");
-            if let Some(current_index) = start_index {
-                let trace_id_index = start + index + current_index + 2;
-                if !payload.is_char_boundary(trace_id_index) {
-                    start += index + tag.len();
-                    continue;
-                }
-                let trace_id_length = payload[trace_id_index..].len().min(Self::MAX_TRACE_ID);
-                if !payload.is_char_boundary(trace_id_index + trace_id_length) {
-                    start += index + tag.len();
-                    continue;
-                }
-                trace_id = &payload[trace_id_index..trace_id_index + trace_id_length];
-                break;
-            }
-            start += index + tag.len();
-        }
-
-        if trace_id.len() > 0 {
-            let mut segs = trace_id.split('-');
-            if let Some(seg) = segs.next() {
-                info.trace_id = decode_base64_to_string(seg);
-            }
-
-            if let (Some(parent_trace_segment_id), Some(parent_span_id)) =
-                (segs.next(), segs.next())
-            {
-                info.span_id = format!(
-                    "{}-{}",
-                    decode_base64_to_string(parent_trace_segment_id),
-                    parent_span_id
-                );
+            if let Some(span_id) = tp.decode_span_id(v) {
+                info.span_id = span_id.to_string();
             }
         }
     }
@@ -1493,83 +1530,87 @@ impl KafkaLog {
     // ================================================================================
     // The protocol identification is strictly checked to avoid misidentification.
     // The log analysis is not strictly checked because there may be length truncation
-    fn request(&mut self, payload: &[u8], strict: bool, info: &mut KafkaInfo) -> Result<()> {
-        let req_len = read_u32_be(payload);
-        info.req_msg_size = Some(req_len);
-        let client_id_len = read_u16_be(&payload[12..]) as usize;
-        if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
-            return Err(Error::KafkaLogParseFailed);
-        }
-
-        if strict && req_len as usize != payload.len() - Self::MSG_LEN_SIZE {
-            return Err(Error::KafkaLogParseFailed);
-        }
-
+    fn request(&mut self, payload: &[u8], check: bool, info: &mut KafkaInfo) -> Result<()> {
         info.msg_type = LogMessageType::Request;
-        info.api_key = read_u16_be(&payload[4..]);
-        info.api_version = read_u16_be(&payload[6..]);
-        if info.api_version > Self::MAX_VERSION {
-            return Err(Error::KafkaLogParseFailed);
+
+        let (payload, length) = be_u32(payload)?;
+        if check && length as usize != payload.len() {
+            return Err(Error::Truncated);
         }
-        info.correlation_id = read_u32_be(&payload[8..]);
-        info.client_id = String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
-        if !info.client_id.is_ascii() {
-            return Err(Error::KafkaLogParseFailed);
+        info.req_msg_size = Some(length);
+
+        let (payload, api_key) = be_u16(payload)?;
+        let (payload, version) = be_u16(payload)?;
+        info.api = Api {
+            key: ApiKey::from(api_key),
+            version,
+        };
+
+        let (payload, correlation_id) = be_i32(payload)?;
+        info.correlation_id = Some(correlation_id as u32);
+        if !check {
+            // do not update sessions on check_payload
+            self.sessions.push(info.correlation_id.unwrap(), info.api);
         }
 
-        self.sessions
-            .push(info.correlation_id, (info.api_key, info.api_version));
-        Self::decode_request_body(&payload[client_id_len + KAFKA_REQ_HEADER_LEN..], info);
+        let (payload, client_id) = decoder::nullable_string(payload)?;
+        if !client_id.is_ascii() {
+            return Err(Error::ParseFailed(
+                format!("client id {} is not ascii", client_id).into(),
+            ));
+        }
+        info.client_id = client_id.to_string();
+
+        let payload = if info.api.request_header_version()? == 2 {
+            decoder::tagged_fields(payload)?.0
+        } else {
+            payload
+        };
+        let _ = Self::decode_request_body(payload, info)?;
         Ok(())
     }
 
     fn response(&mut self, payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
-        info.resp_msg_size = Some(read_u32_be(payload));
-        info.correlation_id = read_u32_be(&payload[4..]);
         info.msg_type = LogMessageType::Response;
 
-        if let Some((key, version)) = self.sessions.peek(&info.correlation_id) {
-            info.api_key = *key;
-            info.api_version = *version;
-            Self::decode_response_body(&payload[KAFKA_RESP_HEADER_LEN..], info);
+        let (payload, length) = be_u32(payload)?;
+        info.resp_msg_size = Some(length);
 
-            if let Some(status_code) = info.status_code {
-                if status_code == 0 {
-                    info.status = L7ResponseStatus::Ok;
-                } else {
-                    info.status = L7ResponseStatus::ServerError;
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
+        let (payload, correlation_id) = be_i32(payload)?;
+        info.correlation_id = Some(correlation_id as u32);
+
+        let Some(api) = self.sessions.peek(&info.correlation_id.unwrap()) else {
+            return Err(Error::CorrelationIdNotFound);
+        };
+        info.api = *api;
+
+        let payload = if info.api.response_header_version()? == 1 {
+            decoder::tagged_fields(payload)?.0
+        } else {
+            payload
+        };
+        let _ = Self::decode_response_body(payload, info)?;
+
+        if let Some(status_code) = info.status_code {
+            if status_code == 0 {
+                info.status = L7ResponseStatus::Ok;
+            } else {
+                info.status = L7ResponseStatus::ServerError;
             }
         }
+
         Ok(())
     }
 
-    // reference:  https://kafka.apache.org/protocol.html#protocol_messages
     fn parse(
         &mut self,
         payload: &[u8],
-        proto: IpProtocol,
         direction: PacketDirection,
         info: &mut KafkaInfo,
     ) -> Result<()> {
-        if proto != IpProtocol::TCP {
-            return Err(Error::InvalidIpProtocol);
-        }
-
         match direction {
-            PacketDirection::ClientToServer => {
-                if payload.len() < KAFKA_REQ_HEADER_LEN {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                self.request(payload, false, info)?;
-            }
-            PacketDirection::ServerToClient => {
-                if payload.len() < KAFKA_RESP_HEADER_LEN {
-                    return Err(Error::KafkaLogParseFailed);
-                }
-                self.response(payload, info)?;
-            }
+            PacketDirection::ClientToServer => self.request(payload, false, info)?,
+            PacketDirection::ServerToClient => self.response(payload, info)?,
         }
         Ok(())
     }
@@ -1577,6 +1618,7 @@ impl KafkaLog {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
     use std::path::Path;
     use std::rc::Rc;
     use std::{cell::RefCell, fs};
@@ -1590,6 +1632,36 @@ mod tests {
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/kafka";
+
+    struct ValidateInfo<'a>(&'a KafkaInfo);
+
+    impl<'a> fmt::Display for ValidateInfo<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("KafkaInfo")
+                .field("msg_type", &self.0.msg_type)
+                .field("correlation_id", &self.0.correlation_id)
+                .field("api_key", &self.0.api.key)
+                .field("api_version", &self.0.api.version)
+                .field("client_id", &self.0.client_id)
+                .field("topic_name", &self.0.topic_name)
+                .field("partition", &self.0.partition)
+                .field("offset", &self.0.offset)
+                .field("group_id", &self.0.group_id)
+                .field("resource", &self.0.resource)
+                .field("endpoint", &self.0.endpoint)
+                .field("command", &self.0.command)
+                .field("status", &self.0.status)
+                .field("status_code", &self.0.status_code)
+                .field("req_msg_size", &self.0.req_msg_size)
+                .field("resp_msg_size", &self.0.resp_msg_size)
+                .field("captured_request_byte", &self.0.captured_request_byte)
+                .field("captured_response_byte", &self.0.captured_response_byte)
+                .field("rrt", &self.0.rrt)
+                .field("trace_id", &self.0.trace_id)
+                .field("span_id", &self.0.span_id)
+                .finish()
+        }
+    }
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
@@ -1629,16 +1701,12 @@ mod tests {
             if let Ok(info) = info {
                 match info.unwrap_single() {
                     L7ProtocolInfo::KafkaInfo(i) => {
-                        output.push_str(&format!("{:?} is_kafka: {}\n", i, is_kafka));
+                        let _ = write!(&mut output, "{} is_kafka: {is_kafka}\n", ValidateInfo(&i));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!(
-                    "{:?} is_kafka: {}\n",
-                    KafkaInfo::default(),
-                    is_kafka
-                ));
+                let _ = write!(&mut output, "is_kafka: {is_kafka}\n");
             }
         }
         output
@@ -1647,15 +1715,19 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
-            ("kafka.pcap", "kafka.result"),
-            ("produce.pcap", "produce.result"),
-            ("produce-v9.pcap", "produce-v9.result"),
-            ("kafka-sw8.pcap", "kafka-sw8.result"),
-            ("kafka-leave-v4.pcap", "kafka-leave-v4.result"),
-            ("kafka-sync-v5.pcap", "kafka-sync-v5.result"),
-            ("kafka-join-v7.pcap", "kafka-join-v7.result"),
-            ("kafka-fetch-v12.pcap", "kafka-fetch-v12.result"),
-            ("fetch-v12.pcap", "fetch-v12.result"),
+            ("00-produce-v2.pcap", "00-produce-v2.result"),
+            ("00-produce-v7-sw8.pcap", "00-produce-v7-sw8.result"),
+            ("00-produce-v9.pcap", "00-produce-v9.result"),
+            ("01-fetch-v12-ok.pcap", "01-fetch-v12-ok.result"),
+            ("01-fetch-v12-unknown.pcap", "01-fetch-v12-unknown.result"),
+            ("11-join-group-v7.pcap", "11-join-group-v7.result"),
+            ("13-leave-group-v4.pcap", "13-leave-group-v4.result"),
+            ("14-sync-group-v5.pcap", "14-sync-group-v5.result"),
+            ("18-api-versions-v3.pcap", "18-api-versions-v3.result"),
+            (
+                "mixed-with-unsupported.pcap",
+                "mixed-with-unsupported.result",
+            ),
         ];
 
         for item in files.iter() {
@@ -1679,7 +1751,7 @@ mod tests {
     fn check_perf() {
         let expected = vec![
             (
-                "kafka.pcap",
+                "18-api-versions-v3.pcap",
                 L7PerfStats {
                     request_count: 1,
                     response_count: 1,
@@ -1693,7 +1765,7 @@ mod tests {
                 },
             ),
             (
-                "kafka_fetch.pcap",
+                "01-fetch-v12-perf.pcap",
                 L7PerfStats {
                     request_count: 1,
                     response_count: 1,
@@ -1744,38 +1816,5 @@ mod tests {
             }
         }
         kafka.perf_stats.unwrap()
-    }
-
-    #[test]
-    fn trace_id() {
-        let payload =
-            "sw8-abckejaij,sw8  1-abcdefghi-jjaiejfeajf-1-jaifjei traceparent: 00-123456789-abcdefg-01".as_bytes();
-        let payload = String::from_utf8_lossy(payload);
-
-        let mut info = KafkaInfo::default();
-
-        KafkaLog::decode_sw8(&payload, &mut info);
-        assert_eq!(
-            info.trace_id, "abcdefghi",
-            "parse trace id {} unexcepted",
-            info.trace_id
-        );
-        assert_eq!(
-            info.span_id, "jjaiejfeajf-1",
-            "parse span id {} unexcepted",
-            info.span_id
-        );
-
-        KafkaLog::decode_traceparent(&payload, &mut info);
-        assert_eq!(
-            info.trace_id, "123456789",
-            "parse trace id {} unexcepted",
-            info.trace_id
-        );
-        assert_eq!(
-            info.span_id, "abcdefg",
-            "parse span id {} unexcepted",
-            info.span_id
-        );
     }
 }

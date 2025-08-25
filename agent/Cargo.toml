@@ -37,6 +37,7 @@ bincode = "2.0.0-rc.1"
 bitflags.workspace = true
 bollard = "0.16.1"
 bson = "2.7.0"
+bytes = "1.10"
 bytesize = "1.1.0"
 cadence = "0.27.0"
 cfg-if = "1.0"
@@ -104,6 +105,7 @@ time = "0.3.9"
 tokio = { version = "1.20.1", features = ["full"] }
 tonic.workspace = true
 tunnel = { path = "plugins/tunnel" }
+uuid = "1"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 zstd = "0.13.2"
