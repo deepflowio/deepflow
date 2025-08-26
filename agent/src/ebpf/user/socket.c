@@ -51,6 +51,7 @@
 #include "socket_trace_bpf_kprobe.c"
 
 static enum linux_kernel_type g_k_type;
+static bool use_kfunc_bin;		// Whether to use fentry/fexit binary eBPF bytecode
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 static bool unix_socket_feature_enable; // Whether to enable the kprobe feature.
@@ -2500,7 +2501,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	}
 
 	select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer, &buffer_sz,
-			  false);
+			  !use_kfunc_bin);
 
 	/*
 	 * Initialize datadump
@@ -3570,4 +3571,16 @@ void enable_unix_socket_feature(void)
 bool is_pure_kprobe_ebpf(void)
 {
 	return g_k_type == K_TYPE_KPROBE;
+}
+
+void enable_fentry(void)
+{
+	use_kfunc_bin = true;
+	ebpf_info("Enabled the fentry/fexit feature\n");
+}
+
+void disable_fentry(void)
+{
+	use_kfunc_bin = false;
+	ebpf_info("Disabled the fentry/fexit feature\n");
 }
