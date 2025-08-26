@@ -4100,6 +4100,42 @@ inputs:
 但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
+##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.fentry_enabled`
+
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        fentry_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+使用 fentry/fexit 特性说明
+- 相比传统的 kprobes，fentry 和 fexit 程序提供了更高的性能和可用性，可带来约 5%–10% 的性能提升。
+- 部分 Linux 内核对该特性支持不够完善，可能导致内核 BUG 和节点崩溃。已知的 BUG 修复包括：
+  - TencentOS Linux kernel 5.4.119 的修复
+    [https://github.com/torvalds/linux/commit/c3d6324f841bab2403be6419986e2b1d1068d423](https://github.com/torvalds/linux/commit/c3d6324f841bab2403be6419986e2b1d1068d423)
+  - Alibaba Cloud Linux kernel 5.10.23 的修复
+    [https://github.com/gregkh/linux/commit/e21d2b92354b3cd25dd774ebb0f0e52ff04a7861](https://github.com/gregkh/linux/commit/e21d2b92354b3cd25dd774ebb0f0e52ff04a7861)
+- 内核建议：若要启用 fentry/fexit 特性，推荐使用 Linux kernel 5.10.28 及以上版本，以确保稳定性和性能。
+
 #### 预处理 {#inputs.ebpf.socket.preprocess}
 
 ##### 乱序重排（OOOR）缓冲区大小 {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size}
