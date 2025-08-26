@@ -90,6 +90,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jarcoal/httpmock v1.3.1
 	github.com/jmoiron/sqlx v1.3.5
+	github.com/json-iterator/go v1.1.12
 	github.com/klauspost/compress v1.17.11
 	github.com/knadh/koanf/parsers/yaml v0.1.0
 	github.com/knadh/koanf/providers/rawbytes v0.1.0
@@ -237,7 +238,6 @@ require (
 	github.com/jonboulle/clockwork v0.3.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
