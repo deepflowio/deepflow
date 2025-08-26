@@ -20,6 +20,7 @@ import (
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/agent"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -40,18 +41,26 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		return EmptyGPIDResponse, nil
 	}
 	processInfo := gVTapInfo.GetAgentProcessInfo()
-	if in.GetAgentId() == 0 {
-		vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
-		vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
-		if vtapCache != nil {
-			log.Infof("receive debug gpid sync data by vtap(ctrl_ip: %s, ctrl_mac: %s vtap_id: %d  team_id: %s)",
-				in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID(), in.GetTeamId(), logger.NewORGPrefix(orgID))
-			return processInfo.GetGPIDResponseByVtapID(vtapCache.GetVTapID()), nil
-		}
-		log.Infof("receive invalid gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s team_id: %s), because vtap_id=%d(vtap is not registered)",
-			in.GetCtrlIp(), in.GetCtrlMac(), in.GetTeamId(), in.GetAgentId(), logger.NewORGPrefix(orgID))
-
+	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
+	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
+	if vtapCache == nil {
+		log.Infof("receive invalid gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s team_id: %s), because vtap is not cache",
+			in.GetCtrlIp(), in.GetCtrlMac(), in.GetTeamId(), logger.NewORGPrefix(orgID))
 		return EmptyGPIDResponse, nil
+	}
+	if in.GetAgentId() == 0 {
+		response := processInfo.GetGPIDResponseByVtapID(vtapCache.GetVTapID())
+		syncBytesSize := common.GetVarSize(response)
+		currentBufferSize := vtapCache.GetGRPCBufferSize()
+		grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, syncBytesSize)
+		if changed && grpcBufferSize > currentBufferSize {
+			vtapCache.UpdateLastGPIDSyncBytes(syncBytesSize)
+			log.Warningf("agent (%s) need sync gpid size: %d more than max buffer size: %d, stop sync", vtapCacheKey, syncBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
+			return EmptyGPIDResponse, nil
+		}
+		log.Infof("receive debug gpid sync data by vtap(ctrl_ip: %s, ctrl_mac: %s vtap_id: %d  team_id: %s)",
+			in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID(), in.GetTeamId(), logger.NewORGPrefix(orgID))
+		return response, nil
 	}
 
 	statsd.AddGPIDReceiveCounter(uint64(len(in.GetEntries())))
@@ -60,6 +69,14 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		in.GetCtrlIp(), in.GetCtrlMac(), in.GetAgentId(), in.GetTeamId(), len(in.GetEntries()), logger.NewORGPrefix(orgID))
 	processInfo.UpdateAgentGPIDReq(in)
 	resp := processInfo.GetGPIDResponseByReq(in)
+	syncBytesSize := common.GetVarSize(resp)
+	currentBufferSize := vtapCache.GetGRPCBufferSize()
+	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, syncBytesSize)
+	if changed && grpcBufferSize > currentBufferSize {
+		vtapCache.UpdateLastGPIDSyncBytes(syncBytesSize)
+		log.Warningf("agent (%s) need sync gpid size: %d more than max buffer size: %d, stop sync", vtapCacheKey, syncBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
+		return EmptyGPIDResponse, nil
+	}
 	log.Infof("send gpid response data(len=%d) to vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d, team_id: %s)",
 		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetAgentId(), in.GetTeamId(), logger.NewORGPrefix(orgID))
 	statsd.AddGPIDSendCounter(uint64(len(resp.GetEntries())))
