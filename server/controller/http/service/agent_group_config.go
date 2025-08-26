@@ -242,21 +242,26 @@ func (a *AgentGroupConfig) GetAgentGroupConfigs(dataType int) (interface{}, erro
 		return nil, err
 	}
 	if dataType == DataTypeJSON {
-		var jsonArray bytes.Buffer
-		jsonArray.WriteByte('{')
+		var response bytes.Buffer
+		response.WriteByte('{')
+
+		yamlArray := make([][]byte, 0, len(data))
+		for _, d := range data {
+			yamlArray = append(yamlArray, []byte(d.Yaml))
+		}
+		jsonArray, err := agentconf.BatchConvertYAMLToJSON(yamlArray)
+		if err != nil {
+			return nil, err
+		}
 		for i, d := range data {
 			if i > 0 {
-				jsonArray.WriteByte(',')
+				response.WriteByte(',')
 			}
-			bs, err := a.strToBytes(d.Yaml, dataType)
-			if err != nil {
-				return nil, err
-			}
-			jsonArray.WriteString(`"` + d.AgentGroupLcuuid + `":`)
-			jsonArray.Write(bs)
+			response.WriteString(`"` + d.AgentGroupLcuuid + `":`)
+			response.Write(jsonArray[i])
 		}
-		jsonArray.WriteByte('}')
-		return jsonArray.Bytes(), nil
+		response.WriteByte('}')
+		return response.Bytes(), nil
 	} else {
 		return data, nil
 	}
