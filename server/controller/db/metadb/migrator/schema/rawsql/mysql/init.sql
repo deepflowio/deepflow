@@ -1806,6 +1806,7 @@ CREATE TABLE IF NOT EXISTS analyzer (
     agg                     INTEGER DEFAULT 1,
     cpu_num                 INTEGER DEFAULT 0 COMMENT 'logical number of cpu',
     memory_size             BIGINT DEFAULT 0,
+    grpc_buffer_size        BIGINT DEFAULT 0,
     arch                    VARCHAR(256),
     os                      VARCHAR(256),
     kernel_version          VARCHAR(256),

@@ -17,10 +17,13 @@
 package agentsynchronize
 
 import (
+	"math"
+
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc/peer"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	common "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 )
 
 func getRemote(ctx context.Context) string {
@@ -37,4 +40,25 @@ func isPodVTap(vtapType int) bool {
 	default:
 		return false
 	}
+}
+
+func checkGRPCBufferSize(currentSize, sendBytes uint64) (uint64, bool) {
+	// the minimum size of the agent grpc buffer is 1MB
+	if currentSize < common.MEGA_BYTE {
+		return 0, false
+	}
+
+	requiredSize := uint64(math.Ceil(float64(sendBytes+common.BUFFER_SIZE_EXTRA)/common.MEGA_BYTE)) * common.MEGA_BYTE
+
+	// 检查是否需要增大缓冲区
+	if requiredSize > currentSize {
+		return requiredSize, true
+	}
+
+	// 检查是否可以减小缓冲区（小于当前大小的一半）
+	if requiredSize < currentSize/2 {
+		return requiredSize, true
+	}
+
+	return currentSize, false
 }

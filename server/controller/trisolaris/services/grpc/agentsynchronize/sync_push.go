@@ -350,11 +350,14 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	upgradeRevision := vtapCache.GetExpectedRevision()
 	skipInterface := gAgentInfo.GetAgentSkipInterface(vtapCache)
 	containers := gAgentInfo.GetAgentContainers(int(vtapCache.GetVTapID()))
-	return &api.SyncResponse{
+	userConfigData := e.marshalUserConfig(userConfig, vtapCache)
+	selfUpdateURL := gAgentInfo.GetSelfUpdateUrl()
+	currentBufferSize := in.GetCurrentGrpcBufferSize()
+	syncResponse := api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
-		UserConfig:          proto.String(e.marshalUserConfig(userConfig, vtapCache)),
+		UserConfig:          proto.String(userConfigData),
 		DynamicConfig:       dynamicConfig,
 		PlatformData:        platformData,
 		Groups:              groups,
@@ -365,9 +368,31 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		CaptureNetworkTypes: tapTypes,
 		Containers:          containers,
 		SkipInterface:       skipInterface,
-		SelfUpdateUrl:       proto.String(gAgentInfo.GetSelfUpdateUrl()),
+		SelfUpdateUrl:       proto.String(selfUpdateURL),
 		Revision:            proto.String(upgradeRevision),
-	}, nil
+	}
+	syncBytesSize := GetVarSize(syncResponse)
+	vtapCache.UpdateLastSyncBytes(syncBytesSize)
+	sendSize := vtapCache.GetGRPCBufferSize()
+	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, sendSize)
+	if !changed {
+		return &syncResponse, nil
+	}
+	log.Infof("agent (%s) need sync size: %d, change current buffer size: %d to %d", vtapCacheKey, syncBytesSize, currentBufferSize, grpcBufferSize, logger.NewORGPrefix(orgID))
+	if grpcBufferSize > currentBufferSize {
+		return &api.SyncResponse{
+			Status:            &STATUS_SUCCESS,
+			OnlyPartialFields: proto.Bool(true),
+			NewGrpcBufferSize: &grpcBufferSize,
+			UserConfig:        proto.String(userConfigData),
+			DynamicConfig:     dynamicConfig,
+			Containers:        containers,
+			SelfUpdateUrl:     proto.String(selfUpdateURL),
+			Revision:          proto.String(upgradeRevision),
+		}, nil
+	}
+	syncResponse.NewGrpcBufferSize = &grpcBufferSize
+	return &syncResponse, nil
 }
 
 func (e *AgentEvent) generateNoAgentCacheDynamicConfig() *api.DynamicConfig {
@@ -605,7 +630,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	skipInterface := gAgentInfo.GetAgentSkipInterface(vtapCache)
 	containers := gAgentInfo.GetAgentContainers(int(vtapCache.GetVTapID()))
-	return &api.SyncResponse{
+	syncResponse := api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
@@ -620,7 +645,18 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		VersionAcls:         proto.Uint64(versionPolicy),
 		CaptureNetworkTypes: tapTypes,
 		Containers:          containers,
-	}, nil
+	}
+	pushBytesSize := GetVarSize(syncResponse)
+	currentBufferSize := vtapCache.GetGRPCBufferSize()
+	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, pushBytesSize)
+	if changed && grpcBufferSize > currentBufferSize {
+		vtapCache.UpdateLastPushBytes(pushBytesSize)
+		log.Warningf("agent (%s) need push size: %d more than max buffer size: %d, stop push", vtapCacheKey, pushBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
+		return &api.SyncResponse{
+			Status: &STATUS_FAILED,
+		}, nil
+	}
+	return &syncResponse, nil
 }
 
 // The first push link sends full data
