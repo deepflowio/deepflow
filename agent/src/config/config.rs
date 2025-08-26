@@ -1000,6 +1000,7 @@ pub struct EbpfSocketTunning {
     pub max_capture_rate: u64,
     pub syscall_trace_id_disabled: bool,
     pub map_prealloc_disabled: bool,
+    pub fentry_enabled: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

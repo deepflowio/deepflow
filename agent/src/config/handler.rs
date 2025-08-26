@@ -3480,6 +3480,14 @@ impl ConfigHandler {
 
         let tunning = &mut ebpf.socket.tunning;
         let new_tunning = &mut new_ebpf.socket.tunning;
+        if tunning.fentry_enabled != new_tunning.fentry_enabled {
+            info!(
+                "Update inputs.ebpf.socket.tunning.fentry_enabled from {:?} to {:?}.",
+                tunning.fentry_enabled, new_tunning.fentry_enabled
+            );
+            tunning.fentry_enabled = new_tunning.fentry_enabled;
+            restart_agent = !first_run;
+        }
         if tunning.map_prealloc_disabled != new_tunning.map_prealloc_disabled {
             info!(
                 "Update inputs.ebpf.socket.tunning.map_prealloc_disabled from {:?} to {:?}.",
