@@ -19,7 +19,9 @@ package agent_config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -937,6 +939,220 @@ outputs:
 				t.Fatalf("Failed to write to file: %v", err)
 			}
 		})
+	}
+}
+
+func TestBatchConvertYAMLToJSON(t *testing.T) {
+	type args struct {
+		yamlDatas [][]byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    [][]byte
+		wantErr bool
+	}{
+		{
+			name: "empty input",
+			args: args{
+				yamlDatas: [][]byte{},
+			},
+			want:    [][]byte{},
+			wantErr: false,
+		},
+		{
+			name: "mixed valid and invalid",
+			args: args{
+				yamlDatas: [][]byte{
+					[]byte(""),
+					[]byte(`inputs:
+  proc:
+    process_matcher:
+      - match_regex: (python[23]|deepflow-server).*
+        match_type: ProcessName`),
+					[]byte(`invalid-yaml:
+  - item1
+  item2`),
+				},
+			},
+			want:    [][]byte{},
+			wantErr: true,
+		},
+		{
+			name: "all valid",
+			args: args{
+				yamlDatas: [][]byte{
+					[]byte(""),
+					[]byte(`global:
+  alerts:
+    check_core_file_disabled: true`),
+					[]byte(`inputs:
+  resources:
+    kubernetes:
+      api_resources: "- name: namespaces\n- name: nodes\n"`),
+				},
+			},
+			want: [][]byte{
+				[]byte("{}"),
+				[]byte("{\n  \"global\": {\n    \"alerts\": {\n      \"check_core_file_disabled\": true\n    }\n  }\n}"),
+				[]byte("{\n  \"inputs\": {\n    \"resources\": {\n      \"kubernetes\": {\n        \"api_resources\": \"- name: namespaces\\n- name: nodes\\n\"\n      }\n    }\n  }\n}"),
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := BatchConvertYAMLToJSON(tt.args.yamlDatas)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("BatchConvertYAMLToJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				assert.Equal(t, len(tt.want), len(got), "Number of returned JSONs does not match")
+				for i := range got {
+					assert.JSONEq(t, string(tt.want[i]), string(got[i]), "JSON output for item %d does not match", i)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkConvertYAMLToJSON(b *testing.B) {
+	yamlData := []byte(`
+global:
+  name: test-config
+  version: 1.0
+inputs:
+  proc:
+    enabled: true
+    proc_dir_path: /proc
+    process_matcher:
+      - match_regex: ".*"
+        match_type: "ProcessName"
+outputs:
+  flow_log:
+    enabled: true
+    filters:
+      l7_capture_network_types: [0, 1, 2]
+`)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ConvertYAMLToJSON(yamlData)
+		if err != nil {
+			b.Fatalf("ConvertYAMLToJSON() failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkBatchConvertYAMLToJSON(b *testing.B) {
+	yamlData := []byte(`
+global:
+  name: test-config
+  version: 1.0
+inputs:
+  proc:
+    enabled: true
+    proc_dir_path: /proc
+    process_matcher:
+      - match_regex: ".*"
+        match_type: "ProcessName"
+outputs:
+  flow_log:
+    enabled: true
+    filters:
+      l7_capture_network_types: [0, 1, 2]
+`)
+	yamlDatas := [][]byte{yamlData, yamlData, yamlData, yamlData, yamlData}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := BatchConvertYAMLToJSON(yamlDatas)
+		if err != nil {
+			b.Fatalf("BatchConvertYAMLToJSON() failed: %v", err)
+		}
+	}
+}
+
+func TestConvertConfigYAMLToJSON(t *testing.T) {
+	// Set the count of test files to process (you can modify this value)
+	count := 1
+
+	// Generate test file names based on count
+	testFiles := []string{}
+	for i := 1; i <= count; i++ {
+		filename := fmt.Sprintf("test_config_%d.yaml", i)
+		testFiles = append(testFiles, filename)
+	}
+
+	if len(testFiles) == 0 {
+		t.Skip("No test files configured, skipping test")
+	}
+
+	// Variables to track timing
+	var totalDuration time.Duration
+	var successfulConversions int
+
+	for _, filename := range testFiles {
+		// Extract index from filename for more descriptive test name
+		baseName := strings.TrimPrefix(filename, "test_config_")
+		indexPart := strings.TrimSuffix(baseName, ".yaml")
+		testName := fmt.Sprintf("config_%s", indexPart)
+
+		t.Run(testName, func(t *testing.T) {
+			// Read the test config file
+			yamlData, err := os.ReadFile(filename)
+			if err != nil {
+				t.Fatalf("Failed to read test file %s: %v", filename, err)
+			}
+
+			// Start timing the conversion
+			startTime := time.Now()
+
+			// Convert YAML to JSON
+			got, err := ConvertYAMLToJSON(yamlData)
+
+			// End timing and calculate duration
+			duration := time.Since(startTime)
+
+			if err != nil {
+				t.Errorf("ConvertYAMLToJSON() error = %v for file %s", err, filename)
+				return
+			}
+
+			// Log the conversion time for this file
+			t.Logf("Conversion time for %s: %v", filename, duration)
+
+			// Update totals for average calculation
+			totalDuration += duration
+			successfulConversions++
+
+			// Ensure output directory exists
+			os.Mkdir("test_tmp", 0755)
+
+			// Write the JSON output for inspection
+			jsonFilename := strings.TrimSuffix(filename, ".yaml") + ".json"
+			outputPath := fmt.Sprintf("test_tmp/conv_%s", jsonFilename)
+			if err = os.WriteFile(outputPath, got, os.ModePerm); err != nil {
+				t.Fatalf("Failed to write to file %s: %v", outputPath, err)
+			}
+
+			// Basic validation: check that we got valid JSON
+			var jsonData interface{}
+			if err := json.Unmarshal(got, &jsonData); err != nil {
+				t.Errorf("Generated JSON is invalid for file %s: %v", filename, err)
+			}
+
+			t.Logf("Successfully converted %s to JSON, output saved to %s", filename, outputPath)
+		})
+	}
+
+	// Log overall timing statistics
+	if successfulConversions > 0 {
+		averageDuration := totalDuration / time.Duration(successfulConversions)
+		t.Logf("=== Timing Summary ===")
+		t.Logf("Total conversions: %d", successfulConversions)
+		t.Logf("Total time: %v", totalDuration)
+		t.Logf("Average time per conversion: %v", averageDuration)
 	}
 }
 
