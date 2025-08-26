@@ -194,6 +194,7 @@ type VTap struct {
 	VtapGroupLcuuid     string    `gorm:"column:vtap_group_lcuuid;type:char(64);default:null" json:"VTAP_GROUP_LCUUID"`
 	CPUNum              int       `gorm:"column:cpu_num;type:int;default:0" json:"CPU_NUM"` // logical number of cpu
 	MemorySize          int64     `gorm:"column:memory_size;type:bigint;default:0" json:"MEMORY_SIZE"`
+	GRPCBufferSize      uint64    `gorm:"column:grpc_buffer_size;type:bigint;default:0" json:"GRPC_BUFFER_SIZE"`
 	Arch                string    `gorm:"column:arch;type:varchar(256);default:null" json:"ARCH"`
 	Os                  string    `gorm:"column:os;type:varchar(256);default:null" json:"OS"`
 	KernelVersion       string    `gorm:"column:kernel_version;type:varchar(256);default:null" json:"KERNEL_VERSION"`

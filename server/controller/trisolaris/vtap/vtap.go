@@ -1226,6 +1226,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.CPUNum = cacheVTap.GetCPUNum()
 			dbVTap.Owner = cacheVTap.GetOwner()
 			dbVTap.MemorySize = cacheVTap.GetMemorySize()
+			dbVTap.GRPCBufferSize = cacheVTap.GetGRPCBufferSize()
 			dbVTap.Arch = cacheVTap.GetArch()
 			dbVTap.Os = cacheVTap.GetOs()
 			dbVTap.KernelVersion = cacheVTap.GetKernelVersion()
