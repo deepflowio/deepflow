@@ -4185,6 +4185,45 @@ degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'
 Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
 Disabling memory preallocation will approximately reduce memory usage by 45MB.
 
+##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.fentry_enabled`
+
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        fentry_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Explanation of Using fentry/fexit Features
+- Compared to traditional kprobes, fentry and fexit programs offer higher performance and
+  availability, providing approximately 5%-10% performance improvement.
+- Some Linux kernels do not fully support this feature, which may lead to kernel bugs and
+  node crashes. Known bug fixes include:
+  - Bug fix for TencentOS Linux kernel 5.4.119
+    [https://github.com/torvalds/linux/commit/c3d6324f841bab2403be6419986e2b1d1068d423](https://github.com/torvalds/linux/commit/c3d6324f841bab2403be6419986e2b1d1068d423)
+  - Bug fix for Alibaba Cloud Linux kernel 5.10.23
+    [https://github.com/gregkh/linux/commit/e21d2b92354b3cd25dd774ebb0f0e52ff04a7861](https://github.com/gregkh/linux/commit/e21d2b92354b3cd25dd774ebb0f0e52ff04a7861)
+- Kernel recommendation: To enable the fentry/fexit feature, it is recommended to use Linux
+  kernel 5.10.28 or later to ensure stability and performance.
+
 #### Preprocess {#inputs.ebpf.socket.preprocess}
 
 ##### OOOR Cache Size {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size}

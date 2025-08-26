@@ -987,6 +987,12 @@ impl EbpfCollector {
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 
+        if config.ebpf.socket.tunning.fentry_enabled {
+            ebpf::enable_fentry();
+        } else {
+            ebpf::disable_fentry();
+        }
+
         // set ebpf dpdk enabled
         #[cfg(feature = "extended_observability")]
         ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
