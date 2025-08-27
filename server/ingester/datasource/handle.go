@@ -55,7 +55,7 @@ const (
 	EXT_METRICS                              = "ext_metrics"
 	PROMETHEUS                               = "prometheus"
 	EVENT_EVENT                              = "event.event"
-	EVENT_PERF_EVENT                         = "event.perf_event"
+	EVENT_FILE_EVENT                         = "event.file_event"
 	EVENT_ALERT_EVENT                        = "event.alert_event"
 	PROFILE                                  = "profile.in_process"
 	APPLOG                                   = "application_log.log"
@@ -75,7 +75,7 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	EXT_METRICS:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}, []string{}},
 	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
 	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
-	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}, []string{}},
+	EVENT_FILE_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"file_event"}, []string{}},
 	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
 	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
 	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
