@@ -32,7 +32,7 @@ import (
 
 func (d *Decoder) WriteK8sEvent(vtapId uint16, e *pb.KubernetesEvent) {
 	s := dbwriter.AcquireEventStore()
-	s.HasMetrics = false
+	s.IsFileEvent = false
 	s.Time = uint32(time.Duration(e.FirstTimestamp) / time.Millisecond) // us -> s
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(e.FirstTimestamp)
