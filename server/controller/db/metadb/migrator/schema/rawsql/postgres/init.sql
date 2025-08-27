@@ -1591,7 +1591,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, interval_time,
 VALUES (15, '事件-资源变更事件', 'event.event', 0, 30 * 24, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
-VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 7 * 24, gen_random_uuid());
+VALUES (16, '事件-IO 事件', 'event.file_event', 0, 7 * 24, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (17, '事件-告警事件', 'event.alert_event', 0, 30 * 24, gen_random_uuid());

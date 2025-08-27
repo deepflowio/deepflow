@@ -33,7 +33,7 @@ const TABLE_NAME_TRACE_TREE = "trace_tree"
 const TABLE_NAME_SPAN_WITH_TRACE_ID = "span_with_trace_id"
 const TABLE_NAME_L7_FLOW_LOG = "l7_flow_log"
 const TABLE_NAME_EVENT = "event"
-const TABLE_NAME_PERF_EVENT = "perf_event"
+const TABLE_NAME_FILE_EVENT = "file_event"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
 const TagServerChPrefix = "服务端"
@@ -56,7 +56,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
-	DB_NAME_EVENT:           []string{"event", "perf_event", "alert_event"},
+	DB_NAME_EVENT:           []string{"event", "file_event", "alert_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},

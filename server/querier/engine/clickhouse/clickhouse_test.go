@@ -569,8 +569,8 @@ var (
 	}, {
 		name:   "test_showsql",
 		db:     "event",
-		input:  "SHOW tag end_time values from perf_event",
-		output: []string{"SELECT field_value AS `value`, value AS `display_name` FROM flow_tag.`event_custom_field_value` WHERE `table` = 'perf_event' AND field_type = 'tag' AND field_name = 'end_time' GROUP BY `value`, `display_name` ORDER BY sum(count) desc LIMIT 10000"},
+		input:  "SHOW tag end_time values from file_event",
+		output: []string{"SELECT field_value AS `value`, value AS `display_name` FROM flow_tag.`event_custom_field_value` WHERE `table` = 'file_event' AND field_type = 'tag' AND field_name = 'end_time' GROUP BY `value`, `display_name` ORDER BY sum(count) desc LIMIT 10000"},
 	}, {
 		name:   "test_showsql",
 		db:     "prometheus",

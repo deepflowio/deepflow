@@ -48,10 +48,18 @@ ip                    , IP Address                   ,
 is_ipv4               , IPv4 Flag                    ,
 
 event_type            , Event Type                   ,
-event_desc            , Event Message                ,
 
 process_kname         , System Process               ,
 app_instance          , Application Instance         ,
 vtap                  , DeepFlow Agent               , Deprecated，please use agent.
 agent                 , DeepFlow Agent               ,
 signal_source         , Signal Source                ,
+
+mount_source          , Mount Source                 ,
+mount_point           , Mount Point                  ,
+file_dir              , File Dir                     ,
+file_name             , File Name                    ,
+file_type             , File Type                    ,
+offset                , Offset                       ,
+syscall_thread        , Syscall Thread               ,
+syscall_coroutine     , Syscall Coroutine            ,
