@@ -604,16 +604,16 @@ ingester:
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #alert-event-ttl-hour: 720
 
-  ## perf event data write config
-  #perf-event-ck-writer:
+  ## file event data write config
+  #file-event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5    # 超时写入时间
 
-  ## perf event table data retention time(unit: hour)
+  ## file event table data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
-  #perf-event-ttl-hour: 168
+  #file-event-ttl-hour: 168
 
   ## pcap data write config
   #pcap-ck-writer:
@@ -774,8 +774,8 @@ ingester:
   #k8s-event-decoder-queue-count: 1
   #k8s-event-decoder-queue-size: 4096
 
-  #perf-event-decoder-queue-count: 2
-  #perf-event-decoder-queue-size: 4096
+  #file-event-decoder-queue-count: 2
+  #file-event-decoder-queue-size: 4096
 
   ## unit: byte
   #flow-tag-cache-max-size: 262144
@@ -789,7 +789,7 @@ ingester:
   #  # randomly select an address that can be sent successfully. Kafka address format as: 'broker1.example.com:9092'
   #  endpoints: [broker1.example.com:9092, broker2.example.com:9092]
   #  # the data source that needs to be exported format as $db_name.$table_name, is also the topic name of Kafka
-  #  data-sources: # currently only supports 'flow_metrics.*', 'flow_log.l4/l7_flow_log', 'event.perf_event'
+  #  data-sources: # currently only supports 'flow_metrics.*', 'flow_log.l4/l7_flow_log', 'event.file_event'
   #  - flow_log.l7_flow_log
   #  # - flow_log.l4_flow_log
   #  # - flow_metrics.application_map.1s
@@ -800,7 +800,7 @@ ingester:
   #  # - flow_metrics.network_map.1m
   #  # - flow_metrics.network.1s
   #  # - flow_metrics.network.1m
-  #  # - event.perf_event
+  #  # - event.file_event
   #  # number of queues exported in parallel
   #  queue-count: 4
   #  # size of exporting queue

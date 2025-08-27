@@ -96,7 +96,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:         []string{"event"},
-		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
+		Tables:      []string{"event", "event_local"},
 		ColumnNames: []string{"process_kname"},
 		ColumnType:  ckdb.String,
 	},
@@ -133,7 +133,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:         []string{"event"},
-		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
+		Tables:      []string{"event", "event_local"},
 		ColumnNames: []string{"_id"},
 		ColumnType:  ckdb.UInt64,
 	},
@@ -160,7 +160,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:          []string{"event"},
-		Tables:       []string{"event_local", "event", "perf_event", "perf_event_local"},
+		Tables:       []string{"event_local", "event"},
 		ColumnNames:  []string{"team_id"},
 		ColumnType:   ckdb.UInt16,
 		DefaultValue: "1",
@@ -246,7 +246,7 @@ var ColumnRename65 = []*ColumnRenames{
 	},
 	{
 		Db:             "event",
-		Tables:         []string{"event", "event_local", "perf_event", "perf_event_local"},
+		Tables:         []string{"event", "event_local"},
 		OldColumnNames: []string{"vtap_id"},
 		NewColumnNames: []string{"agent_id"},
 		OldColumnTypes: []ckdb.ColumnType{ckdb.UInt16},

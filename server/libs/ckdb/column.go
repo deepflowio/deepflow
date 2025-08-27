@@ -101,6 +101,9 @@ const (
 	COLUMN_FIELD_TYPE                 = "field_type"
 	COLUMN_FIELD_VALUE                = "field_value"
 	COLUMN_FIELD_VALUE_TYPE           = "field_value_type"
+	COLUMN_FILE_DIR                   = "file_dir"
+	COLUMN_FILE_NAME                  = "file_name"
+	COLUMN_FILE_TYPE                  = "file_type"
 	COLUMN_FLOW_ID                    = "flow_id"
 	COLUMN_AGGREGATED_FLOW_IDS        = "aggregated_flow_ids"
 	COLUMN_FLOW_LOAD                  = "flow_load"
@@ -159,6 +162,8 @@ const (
 	COLUMN_METRICS_VALUES             = "metrics_values"
 	COLUMN_METRIC_ID                  = "metric_id"
 	COLUMN_METRIC_VALUE               = "metric_value"
+	COLUMN_MOUNT_SOURCE               = "mount_source"
+	COLUMN_MOUNT_POINT                = "mount_point"
 	COLUMN_NAT_REAL_IP4_0             = "nat_real_ip4_0"
 	COLUMN_NAT_REAL_IP4_1             = "nat_real_ip4_1"
 	COLUMN_NAT_REAL_PORT_0            = "nat_real_port_0"
@@ -166,6 +171,7 @@ const (
 	COLUMN_NAT_SOURCE                 = "nat_source"
 	COLUMN_NEW_FLOW                   = "new_flow"
 	COLUMN_OBSERVATION_POINT          = "observation_point"
+	COLUMN_OFFSET                     = "offset"
 	COLUMN_PACKET                     = "packet"
 	COLUMN_PACKET_BATCH               = "packet_batch"
 	COLUMN_PACKET_COUNT               = "packet_count"
@@ -279,8 +285,10 @@ const (
 	COLUMN_SYN_SEQ                    = "syn_seq"
 	COLUMN_SYSCALL_CAP_SEQ_0          = "syscall_cap_seq_0"
 	COLUMN_SYSCALL_CAP_SEQ_1          = "syscall_cap_seq_1"
+	COLUMN_SYSCALL_COROUTINE          = "syscall_coroutine"
 	COLUMN_SYSCALL_COROUTINE_0        = "syscall_coroutine_0"
 	COLUMN_SYSCALL_COROUTINE_1        = "syscall_coroutine_1"
+	COLUMN_SYSCALL_THREAD             = "syscall_thread"
 	COLUMN_SYSCALL_THREAD_0           = "syscall_thread_0"
 	COLUMN_SYSCALL_THREAD_1           = "syscall_thread_1"
 	COLUMN_SYSCALL_TRACE_ID_REQUEST   = "syscall_trace_id_request"
@@ -426,6 +434,9 @@ var ColumnNames = []string{
 	COLUMN_FIELD_TYPE,
 	COLUMN_FIELD_VALUE,
 	COLUMN_FIELD_VALUE_TYPE,
+	COLUMN_FILE_DIR,
+	COLUMN_FILE_NAME,
+	COLUMN_FILE_TYPE,
 	COLUMN_FLOW_ID,
 	COLUMN_AGGREGATED_FLOW_IDS,
 	COLUMN_FLOW_LOAD,
@@ -484,6 +495,8 @@ var ColumnNames = []string{
 	COLUMN_METRICS_VALUES,
 	COLUMN_METRIC_ID,
 	COLUMN_METRIC_VALUE,
+	COLUMN_MOUNT_SOURCE,
+	COLUMN_MOUNT_POINT,
 	COLUMN_NAT_REAL_IP4_0,
 	COLUMN_NAT_REAL_IP4_1,
 	COLUMN_NAT_REAL_PORT_0,
@@ -491,6 +504,7 @@ var ColumnNames = []string{
 	COLUMN_NAT_SOURCE,
 	COLUMN_NEW_FLOW,
 	COLUMN_OBSERVATION_POINT,
+	COLUMN_OFFSET,
 	COLUMN_PACKET,
 	COLUMN_PACKET_BATCH,
 	COLUMN_PACKET_COUNT,
@@ -604,8 +618,10 @@ var ColumnNames = []string{
 	COLUMN_SYN_SEQ,
 	COLUMN_SYSCALL_CAP_SEQ_0,
 	COLUMN_SYSCALL_CAP_SEQ_1,
+	COLUMN_SYSCALL_COROUTINE,
 	COLUMN_SYSCALL_COROUTINE_0,
 	COLUMN_SYSCALL_COROUTINE_1,
+	COLUMN_SYSCALL_THREAD,
 	COLUMN_SYSCALL_THREAD_0,
 	COLUMN_SYSCALL_THREAD_1,
 	COLUMN_SYSCALL_TRACE_ID_REQUEST,
