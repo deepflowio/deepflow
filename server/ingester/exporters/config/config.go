@@ -67,7 +67,7 @@ const (
 	APPLICATION_MAP_1S = DataSourceID(flow_metrics.APPLICATION_MAP_1S)
 )
 const (
-	PERF_EVENT = DataSourceID(flow_metrics.METRICS_TABLE_ID_MAX) + 1 + iota
+	FILE_EVENT = DataSourceID(flow_metrics.METRICS_TABLE_ID_MAX) + 1 + iota
 	L4_FLOW_LOG
 	L7_FLOW_LOG
 
@@ -83,7 +83,7 @@ var dataSourceStrings = []string{
 	NETWORK_MAP_1S:     "flow_metrics.network_map.1s",
 	APPLICATION_1S:     "flow_metrics.application.1s",
 	APPLICATION_MAP_1S: "flow_metrics.application_map.1s",
-	PERF_EVENT:         "event.perf_event",
+	FILE_EVENT:         "event.file_event",
 	L4_FLOW_LOG:        "flow_log.l4_flow_log",
 	L7_FLOW_LOG:        "flow_log.l7_flow_log",
 	MAX_DATASOURCE_ID:  "invalid_datasource",
@@ -98,7 +98,7 @@ var dataSourceTopicStrings = []string{
 	NETWORK_MAP_1S:     TOPIC_PREFIX + dataSourceStrings[NETWORK_MAP_1S],
 	APPLICATION_1S:     TOPIC_PREFIX + dataSourceStrings[APPLICATION_1S],
 	APPLICATION_MAP_1S: TOPIC_PREFIX + dataSourceStrings[APPLICATION_MAP_1S],
-	PERF_EVENT:         TOPIC_PREFIX + dataSourceStrings[PERF_EVENT],
+	FILE_EVENT:         TOPIC_PREFIX + dataSourceStrings[FILE_EVENT],
 	L4_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L4_FLOW_LOG],
 	L7_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L7_FLOW_LOG],
 	MAX_DATASOURCE_ID:  TOPIC_PREFIX + dataSourceStrings[MAX_DATASOURCE_ID],
@@ -146,7 +146,7 @@ func (d DataSourceID) TopicString() string {
 
 func (d DataSourceID) IsMap() bool {
 	switch d {
-	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, PERF_EVENT:
+	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, FILE_EVENT:
 		return false
 	default:
 		return true
@@ -626,7 +626,7 @@ const (
 	SERVICE_INFO
 	TRACING_INFO
 	CAPTURE_INFO
-	EVENT_INFO // perf_event only
+	EVENT_INFO // file_event only
 	DATA_LINK_LAYER
 
 	// metrics

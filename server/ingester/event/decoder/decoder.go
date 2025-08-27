@@ -130,15 +130,15 @@ func (d *Decoder) Run() {
 				}
 				d.handleResourceEvent(event)
 				event.Release()
-			case common.PERF_EVENT:
+			case common.FILE_EVENT:
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
-					log.Warning("get perf event decode queue data type wrong")
+					log.Warning("get file event decode queue data type wrong")
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
-				d.handlePerfEvent(recvBytes.VtapID, decoder)
+				d.handleFileEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.ALERT_EVENT:
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
@@ -164,9 +164,9 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
+func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	s := dbwriter.AcquireEventStore()
-	s.HasMetrics = true
+	s.IsFileEvent = true
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
@@ -186,8 +186,14 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
 		s.ProcessKName = string(e.ProcessKname)
-		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id", "offset")
-		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)), strconv.Itoa(int(ioData.OffBytes)))
+		s.FileName = string(ioData.Filename)
+		s.Offset = ioData.OffBytes
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
+		s.FileType = uint8(ioData.FileType)
+		s.FileDir = string(ioData.FileDir)
+		s.MountSource = string(ioData.MountSource)
+		s.MountPoint = string(ioData.MountPoint)
 		s.Bytes = ioData.BytesCount
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
@@ -263,7 +269,7 @@ func (d *Decoder) export(item exporterscommon.ExportItem) {
 	d.exporters.Put(d.eventType.DataSource(), d.index, item)
 }
 
-func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleFileEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
@@ -273,8 +279,8 @@ func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
 			d.counter.ErrorCount++
 			return
 		}
-		pbPerfEvent := &pb.ProcEvent{}
-		if err := pbPerfEvent.Unmarshal(bytes); err != nil {
+		pbFileEvent := &pb.ProcEvent{}
+		if err := pbFileEvent.Unmarshal(bytes); err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Errorf("proc event unmarshal failed, err: %s", err)
 			}
@@ -282,7 +288,7 @@ func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
 			continue
 		}
 		d.counter.OutCount++
-		d.WritePerfEvent(vtapId, pbPerfEvent)
+		d.WriteFileEvent(vtapId, pbFileEvent)
 	}
 }
 
@@ -306,7 +312,7 @@ func getAutoInstance(instanceID, instanceType, GProcessID uint32) (uint32, uint8
 
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	s := dbwriter.AcquireEventStore()
-	s.HasMetrics = false
+	s.IsFileEvent = false
 	s.Time = uint32(event.Time)
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = event.TimeMilli * 1000 // convert to microsecond

@@ -36,7 +36,7 @@ import (
 
 const (
 	DefaultPartition          = ckdb.TimeFuncTwelveHour
-	DefaultPerfEventPartition = ckdb.TimeFuncHour
+	DefaultFileEventPartition = ckdb.TimeFuncHour
 	IO_EVENT_TYPE_READ        = "read"
 	IO_EVENT_TYPE_WRITE       = "write"
 )
@@ -61,8 +61,8 @@ type EventStore struct {
 
 	Tagged uint8
 
-	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"perf_event_signal_source"` // Resource / File IO
-	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"perf_event_type"`
+	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"file_event_signal_source"` // Resource / File IO
+	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"file_event_type"`
 	EventDescription string
 	ProcessKName     string `json:"process_kname" category:"$tag" sub:"service_info"` // us
 
@@ -101,9 +101,17 @@ type EventStore struct {
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
-	HasMetrics bool
-	Bytes      uint32 `json:"bytes" category:"$metrics" sub:"throughput"`
-	Duration   uint64 `json:"duration" category:"$metrics" sub:"delay"`
+	IsFileEvent      bool
+	Bytes            uint32 `json:"bytes" category:"$metrics" sub:"throughput"`
+	Duration         uint64 `json:"duration" category:"$metrics" sub:"delay"`
+	FileName         string `json:"file_name" category:"$tag" sub:"event_info"`
+	FileType         uint8  `json:"file_type" category:"$tag" sub:"event_info" enumfile:"file_type"`
+	Offset           uint64 `json:"offset" category:"$tag" sub:"event_info"`
+	SyscallThread    uint32 `json:"syscall_thread" category:"$tag" sub:"tracing_info"`
+	SyscallCoroutine uint32 `json:"syscall_coroutine" category:"$tag" sub:"tracing_info"`
+	MountSource      string `json:"mount_source" category:"$tag" sub:"event_info"`
+	MountPoint       string `json:"mount_point" category:"$tag" sub:"event_info"`
+	FileDir          string `json:"file_dir" category:"$tag" sub:"event_info"`
 }
 
 func (e *EventStore) WriteBlock(block *ckdb.Block) {
@@ -152,10 +160,18 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 		e.AttributeValues,
 	)
 
-	if e.HasMetrics {
+	if e.IsFileEvent {
 		block.Write(
 			e.Bytes,
 			e.Duration,
+			e.FileName,
+			e.FileType,
+			e.Offset,
+			e.SyscallThread,
+			e.SyscallCoroutine,
+			e.MountSource,
+			e.MountPoint,
+			e.FileDir,
 		)
 	}
 }
@@ -165,8 +181,8 @@ func (e *EventStore) OrgID() uint16 {
 }
 
 func (e *EventStore) Table() string {
-	if e.HasMetrics {
-		return common.PERF_EVENT.TableName()
+	if e.IsFileEvent {
+		return common.FILE_EVENT.TableName()
 	}
 	return common.RESOURCE_EVENT.TableName() // the same as common.K8S_EVENT.TableName()
 }
@@ -176,8 +192,8 @@ func (e *EventStore) Release() {
 }
 
 func (e *EventStore) DataSource() uint32 {
-	if e.HasMetrics {
-		return uint32(config.PERF_EVENT)
+	if e.IsFileEvent {
+		return uint32(config.FILE_EVENT)
 	}
 	return uint32(config.MAX_DATASOURCE_ID)
 }
@@ -218,7 +234,7 @@ func (e *EventStore) SetId(time, analyzerID uint32) {
 	e._id = uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
-func EventColumns(hasMetrics bool) []*ckdb.Column {
+func EventColumns(isFileEvent bool) []*ckdb.Column {
 	columns := []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("_id", ckdb.UInt64),
@@ -264,10 +280,18 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 	}
-	if hasMetrics {
+	if isFileEvent {
 		columns = append(columns,
 			ckdb.NewColumn("bytes", ckdb.UInt32),
 			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒"),
+			ckdb.NewColumn("file_name", ckdb.String).SetComment("文件名"),
+			ckdb.NewColumn("file_type", ckdb.UInt8).SetComment("文件类型"),
+			ckdb.NewColumn("offset", ckdb.UInt64).SetComment("读写偏移"),
+			ckdb.NewColumn("syscall_thread", ckdb.UInt32),
+			ckdb.NewColumn("syscall_coroutine", ckdb.UInt32),
+			ckdb.NewColumn("mount_source", ckdb.LowCardinalityString),
+			ckdb.NewColumn("mount_point", ckdb.LowCardinalityString),
+			ckdb.NewColumn("file_dir", ckdb.String),
 		)
 	}
 	return columns
@@ -277,11 +301,11 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{timeKey, "signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
-	hasMetrics := false
+	isFileEvent := false
 	partition := DefaultPartition
-	if table == common.PERF_EVENT.TableName() {
-		hasMetrics = true
-		partition = DefaultPerfEventPartition
+	if table == common.FILE_EVENT.TableName() {
+		isFileEvent = true
+		partition = DefaultFileEventPartition
 	}
 
 	return &ckdb.Table{
@@ -290,7 +314,7 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
-		Columns:         EventColumns(hasMetrics),
+		Columns:         EventColumns(isFileEvent),
 		TimeKey:         timeKey,
 		TTL:             ttl,
 		PartitionFunc:   partition,
