@@ -333,8 +333,8 @@ func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 		switch table {
 		case "event":
 			return GetResourceEventMetrics()
-		case "perf_event":
-			return GetResourcePerfEventMetrics()
+		case "file_event":
+			return GetResourceFileEventMetrics()
 		case "alert_event":
 			return GetAlarmEventMetrics()
 		}
@@ -687,9 +687,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "event":
 			metrics = RESOURCE_EVENT_METRICS
 			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
-		case "perf_event":
-			metrics = RESOURCE_PERF_EVENT_METRICS
-			replaceMetrics = RESOURCE_PERF_EVENT_METRICS_REPLACE
+		case "file_event":
+			metrics = RESOURCE_FILE_EVENT_METRICS
+			replaceMetrics = RESOURCE_FILE_EVENT_METRICS_REPLACE
 		case "alert_event":
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE
