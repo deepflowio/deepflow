@@ -54,3 +54,12 @@ app_instance               , 应用实例                   ,
 vtap                       , 采集器                     , 已废弃，请使用 agent。
 agent                      , 采集器                     ,
 signal_source              , 信号源                     ,
+
+mount_source               , 挂载源                     ,
+mount_point                , 挂载点                     ,
+file_dir                   , 文件夹                     ,
+file_name                  , 文件名                     ,
+file_type                  , 文件类型                   ,
+offset                     , 偏移量                     ,
+syscall_thread             , Syscall 线程               ,
+syscall_coroutine          , Syscall 协程               ,

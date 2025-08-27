@@ -18,13 +18,13 @@ package metrics
 
 import ()
 
-var RESOURCE_PERF_EVENT_METRICS = map[string]*Metrics{}
+var RESOURCE_FILE_EVENT_METRICS = map[string]*Metrics{}
 
-var RESOURCE_PERF_EVENT_METRICS_REPLACE = map[string]*Metrics{
+var RESOURCE_FILE_EVENT_METRICS_REPLACE = map[string]*Metrics{
 	"log_count": NewReplaceMetrics("1", ""),
 }
 
-func GetResourcePerfEventMetrics() map[string]*Metrics {
+func GetResourceFileEventMetrics() map[string]*Metrics {
 	// TODO: 特殊指标量修改
-	return RESOURCE_PERF_EVENT_METRICS
+	return RESOURCE_FILE_EVENT_METRICS
 }
