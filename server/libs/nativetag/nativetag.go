@@ -35,7 +35,7 @@ type NativeTagTable uint8
 const (
 	APPLICATION_LOG NativeTagTable = iota
 	EVENT_EVENT
-	EVENT_PERF_EVENT
+	EVENT_FILE_EVENT
 	L7_FLOW_LOG
 	DEEPFLOW_ADMIN
 	DEEPFLOW_TENANT
@@ -48,7 +48,7 @@ const (
 var NativeTagDatabaseNames = [MAX_NATIVE_TAG_TABLE]string{
 	APPLICATION_LOG:  "application_log",
 	EVENT_EVENT:      "event",
-	EVENT_PERF_EVENT: "event",
+	EVENT_FILE_EVENT: "event",
 	L7_FLOW_LOG:      "flow_log",
 	DEEPFLOW_ADMIN:   "deepflow_admin",
 	DEEPFLOW_TENANT:  "deepflow_tenant",
@@ -59,7 +59,7 @@ var NativeTagDatabaseNames = [MAX_NATIVE_TAG_TABLE]string{
 var NativeTagTableNames = [MAX_NATIVE_TAG_TABLE]string{
 	APPLICATION_LOG:  "log",
 	EVENT_EVENT:      "event",
-	EVENT_PERF_EVENT: "perf_event",
+	EVENT_FILE_EVENT: "file_event",
 	L7_FLOW_LOG:      "l7_flow_log",
 	DEEPFLOW_ADMIN:   "deepflow_server",
 	DEEPFLOW_TENANT:  "deepflow_collector",
