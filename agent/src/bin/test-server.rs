@@ -190,6 +190,7 @@ impl TestServer {
                 hostname: Some("testsrv-agent-01".to_string()),
                 group_id: None,
             }),
+            ..Default::default()
         }
     }
 }
