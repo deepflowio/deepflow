@@ -239,7 +239,7 @@ func GetMetrics(field, db, table, orgID string, nativeField map[string]*Metrics)
 		return metric, true
 	}
 	// dynamic metrics
-	if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG, ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_PERF_EVENT}, table) {
+	if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG, ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_FILE_EVENT}, table) {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -343,8 +343,8 @@ func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 		switch table {
 		case "event":
 			return GetResourceEventMetrics()
-		case "perf_event":
-			return GetResourcePerfEventMetrics()
+		case "file_event":
+			return GetResourceFileEventMetrics()
 		case "alert_event":
 			return GetAlarmEventMetrics()
 		}
@@ -371,7 +371,7 @@ func GetMetricsDescriptionsByDBTable(db, table string, allMetrics map[string]*Me
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
 		// dynamic metrics
-		if (slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG, ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_PERF_EVENT}, table)) && strings.Contains(field, "-") {
+		if (slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG, ckcommon.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{ckcommon.TABLE_NAME_L7_FLOW_LOG, ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_FILE_EVENT}, table)) && strings.Contains(field, "-") {
 			index := strings.LastIndex(field, "-")
 			field = field[:index]
 		}
@@ -655,9 +655,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "event":
 			metrics = RESOURCE_EVENT_METRICS
 			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
-		case "perf_event":
-			metrics = RESOURCE_PERF_EVENT_METRICS
-			replaceMetrics = RESOURCE_PERF_EVENT_METRICS_REPLACE
+		case "file_event":
+			metrics = RESOURCE_FILE_EVENT_METRICS
+			replaceMetrics = RESOURCE_FILE_EVENT_METRICS_REPLACE
 		case "alert_event":
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE
