@@ -61,9 +61,17 @@ type EventBlock struct {
 	ColAttributeNames   *proto.ColArr[string]
 	ColAttributeValues  *proto.ColArr[string]
 
-	HasMetrics  bool
-	ColBytes    proto.ColUInt32
-	ColDuration proto.ColUInt64
+	IsFileEvent         bool
+	ColBytes            proto.ColUInt32
+	ColDuration         proto.ColUInt64
+	ColFileName         proto.ColStr
+	ColFileType         proto.ColUInt8
+	ColOffset           proto.ColUInt64
+	ColSyscallThread    proto.ColUInt32
+	ColSyscallCoroutine proto.ColUInt32
+	ColMountSource      *proto.ColLowCardinality[string]
+	ColMountPoint       *proto.ColLowCardinality[string]
+	ColFileDir          proto.ColStr
 
 	*nativetag.NativeTagsBlock
 }
@@ -106,6 +114,11 @@ func (b *EventBlock) Reset() {
 	b.ColAttributeValues.Reset()
 	b.ColBytes.Reset()
 	b.ColDuration.Reset()
+	b.ColFileName.Reset()
+	b.ColFileType.Reset()
+	b.ColOffset.Reset()
+	b.ColSyscallThread.Reset()
+	b.ColSyscallCoroutine.Reset()
 	if b.NativeTagsBlock != nil {
 		b.NativeTagsBlock.Reset()
 	}
@@ -149,10 +162,18 @@ func (b *EventBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_ATTRIBUTE_NAMES, Data: b.ColAttributeNames},
 		proto.InputColumn{Name: ckdb.COLUMN_ATTRIBUTE_VALUES, Data: b.ColAttributeValues},
 	)
-	if b.HasMetrics {
+	if b.IsFileEvent {
 		input = append(input,
 			proto.InputColumn{Name: ckdb.COLUMN_BYTES, Data: &b.ColBytes},
 			proto.InputColumn{Name: ckdb.COLUMN_DURATION, Data: &b.ColDuration},
+			proto.InputColumn{Name: ckdb.COLUMN_FILE_NAME, Data: &b.ColFileName},
+			proto.InputColumn{Name: ckdb.COLUMN_FILE_TYPE, Data: &b.ColFileType},
+			proto.InputColumn{Name: ckdb.COLUMN_OFFSET, Data: &b.ColOffset},
+			proto.InputColumn{Name: ckdb.COLUMN_SYSCALL_THREAD, Data: &b.ColSyscallThread},
+			proto.InputColumn{Name: ckdb.COLUMN_SYSCALL_COROUTINE, Data: &b.ColSyscallCoroutine},
+			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_SOURCE, Data: b.ColMountSource},
+			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_POINT, Data: b.ColMountPoint},
+			proto.InputColumn{Name: ckdb.COLUMN_FILE_DIR, Data: &b.ColFileDir},
 		)
 	}
 	if b.NativeTagsBlock != nil {
@@ -163,13 +184,15 @@ func (b *EventBlock) ToInput(input proto.Input) proto.Input {
 
 func (n *EventStore) NewColumnBlock() ckdb.CKColumnBlock {
 	b := &EventBlock{
-		HasMetrics:         n.HasMetrics,
+		IsFileEvent:        n.IsFileEvent,
 		ColEventType:       new(proto.ColStr).LowCardinality(),
 		ColAttributeNames:  new(proto.ColStr).LowCardinality().Array(),
 		ColAttributeValues: new(proto.ColStr).Array(),
+		ColMountSource:     new(proto.ColStr).LowCardinality(),
+		ColMountPoint:      new(proto.ColStr).LowCardinality(),
 	}
-	if n.HasMetrics {
-		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PERF_EVENT)
+	if n.IsFileEvent {
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_EVENT)
 	} else {
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_EVENT)
 	}
@@ -215,6 +238,15 @@ func (n *EventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColAttributeValues.Append(n.AttributeValues)
 	block.ColBytes.Append(n.Bytes)
 	block.ColDuration.Append(n.Duration)
+	block.ColFileName.Append(n.FileName)
+	block.ColFileType.Append(n.FileType)
+	block.ColOffset.Append(n.Offset)
+	block.ColSyscallThread.Append(n.SyscallThread)
+	block.ColSyscallCoroutine.Append(n.SyscallCoroutine)
+	block.ColMountSource.Append(n.MountSource)
+	block.ColMountPoint.Append(n.MountPoint)
+	block.ColFileDir.Append(n.FileDir)
+
 	if block.NativeTagsBlock != nil {
 		block.NativeTagsBlock.AppendToColumnBlock(n.AttributeNames, n.AttributeValues, nil, nil)
 	}
