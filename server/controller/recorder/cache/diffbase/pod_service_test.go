@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
@@ -20,8 +20,8 @@ func TestPodServiceExternalIPSync(t *testing.T) {
 	toolDataSet := &tool.DataSet{}
 
 	// 测试场景1：AddPodService 应该正确设置 ExternalIP
-	dbItem := &mysqlmodel.PodService{
-		Base: mysqlmodel.Base{
+	dbItem := &metadbmodel.PodService{
+		Base: metadbmodel.Base{
 			Lcuuid: "test-lcuuid-1",
 		},
 		Name:             "test-service",

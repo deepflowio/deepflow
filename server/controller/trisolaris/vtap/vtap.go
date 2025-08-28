@@ -37,7 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	mysql_model "github.com/deepflowio/deepflow/server/controller/db/mysql/model" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
+	metadb_model "github.com/deepflowio/deepflow/server/controller/db/metadb/model" // FIXME: To avoid ambiguity, name the package either metadb_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -105,7 +105,7 @@ type VTapInfo struct {
 	chVTapRegister    chan struct{}
 	chRegisterSuccess chan struct{}
 
-	vtaps                            []*mysql_model.VTap
+	vtaps                            []*metadb_model.VTap
 	db                               *gorm.DB
 	region                           *string
 	defaultVTapGroup                 *string
@@ -175,7 +175,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 	return vTapInfo
 }
 
-func (v *VTapInfo) AddVTapCache(vtap *mysql_model.VTap) {
+func (v *VTapInfo) AddVTapCache(vtap *metadb_model.VTap) {
 	vTapCache := NewVTapCache(vtap, v)
 	vTapCache.init()
 	v.vTapPlatformData.setPlatformDataByVTap(v.metaData, vTapCache)
@@ -212,7 +212,7 @@ func (v *VTapInfo) DeleteVTapCache(key string) {
 	}
 }
 
-func (v *VTapInfo) UpdateVTapCache(key string, vtap *mysql_model.VTap) {
+func (v *VTapInfo) UpdateVTapCache(key string, vtap *metadb_model.VTap) {
 	vTapCache := v.GetVTapCache(key)
 	if vTapCache == nil {
 		log.Error(v.Logf("vtap no cache. %s", key))
@@ -227,7 +227,7 @@ func (v *VTapInfo) loadRegion() string {
 		return ""
 	}
 	ctrlIP := v.config.NodeIP
-	azConMgr := dbmgr.DBMgr[mysql_model.AZControllerConnection](v.db)
+	azConMgr := dbmgr.DBMgr[metadb_model.AZControllerConnection](v.db)
 	azConn, err := azConMgr.GetFromControllerIP(ctrlIP)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf(v.Logf("controller (%s) az connection not in DB", ctrlIP))
@@ -239,7 +239,7 @@ func (v *VTapInfo) loadRegion() string {
 }
 
 func (v *VTapInfo) loadDefaultVTapGroup() string {
-	defaultVTapGroup, err := dbmgr.DBMgr[mysql_model.VTapGroup](v.db).GetFromID(DEFAULT_VTAP_GROUP_ID)
+	defaultVTapGroup, err := dbmgr.DBMgr[metadb_model.VTapGroup](v.db).GetFromID(DEFAULT_VTAP_GROUP_ID)
 	if err != nil {
 		log.Errorf(v.Logf("no default vtap group, err(%s)", err))
 		return ""
@@ -251,7 +251,7 @@ func (v *VTapInfo) loadDefaultVTapGroup() string {
 }
 
 func (v *VTapInfo) loadVTapGroup() {
-	vtapGroups, err := dbmgr.DBMgr[mysql_model.VTapGroup](v.db).Gets()
+	vtapGroups, err := dbmgr.DBMgr[metadb_model.VTapGroup](v.db).Gets()
 	if err != nil {
 		log.Errorf(v.Logf("get vtap group failed, err(%s)", err))
 		return
@@ -327,7 +327,7 @@ func (v *VTapInfo) loadDeviceData() {
 			}
 			vpcID := 0
 			for vif := range vifs.Iter() {
-				hVif := vif.(*mysql_model.VInterface)
+				hVif := vif.(*metadb_model.VInterface)
 				if network, ok := idToNetwork[hVif.NetworkID]; ok {
 					if vpcID < network.VPCID {
 						vpcID = network.VPCID
@@ -398,7 +398,7 @@ func (v *VTapInfo) loadTapPortsData() {
 
 func (v *VTapInfo) loadPlugins() {
 	pluginNameToUpdateTime := make(map[string]uint32)
-	plugins, err := dbmgr.DBMgr[mysql_model.Plugin](v.db).GetFields([]string{"name", "updated_at"})
+	plugins, err := dbmgr.DBMgr[metadb_model.Plugin](v.db).GetFields([]string{"name", "updated_at"})
 	if err != nil {
 		log.Error(v.Logf("%s", err))
 		return
@@ -423,7 +423,7 @@ func (v *VTapInfo) loadKubernetesCluster() {
 }
 
 func (v *VTapInfo) loadVTaps() {
-	vtaps, err := dbmgr.DBMgr[mysql_model.VTap](v.db).Gets()
+	vtaps, err := dbmgr.DBMgr[metadb_model.VTap](v.db).Gets()
 	if err != nil {
 		log.Error(v.Logf("%s", err))
 		return
@@ -797,7 +797,7 @@ func (v *VTapInfo) CheckClusterOwner(k8sClusterMD5 string) bool {
 	return true
 }
 
-func GetKey(vtap *mysql_model.VTap) string {
+func GetKey(vtap *metadb_model.VTap) string {
 	if vtap.CtrlMac == "" {
 		return vtap.CtrlIP
 	}
@@ -805,7 +805,7 @@ func GetKey(vtap *mysql_model.VTap) string {
 }
 
 func (v *VTapInfo) updateVTapInfo() {
-	dbKeyToVTap := make(map[string]*mysql_model.VTap)
+	dbKeyToVTap := make(map[string]*metadb_model.VTap)
 	dbKeys := mapset.NewSet()
 	dbVTapIDs := mapset.NewSet()
 	if v.vtaps != nil {
@@ -1159,7 +1159,7 @@ func (v *VTapInfo) updateCacheToDB() {
 		return
 	}
 
-	controllerMgr := dbmgr.DBMgr[mysql_model.Controller](v.db)
+	controllerMgr := dbmgr.DBMgr[metadb_model.Controller](v.db)
 	options := controllerMgr.WithName(hostName)
 	controller, err := controllerMgr.GetByOption(options)
 	if err != nil {
@@ -1172,10 +1172,10 @@ func (v *VTapInfo) updateCacheToDB() {
 		return
 	}
 	hostIP := config.NodeIP
-	updateVTaps := []*mysql_model.VTap{}
-	keytoDBVTap := make(map[string]*mysql_model.VTap)
+	updateVTaps := []*metadb_model.VTap{}
+	keytoDBVTap := make(map[string]*metadb_model.VTap)
 
-	dbVTaps, err := dbmgr.DBMgr[mysql_model.VTap](v.db).Gets()
+	dbVTaps, err := dbmgr.DBMgr[metadb_model.VTap](v.db).Gets()
 	if err != nil {
 		log.Error(v.Logf("get db vtap failed, %s", err))
 		return
@@ -1283,7 +1283,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			updateVTaps = append(updateVTaps, dbVTap)
 		}
 	}
-	vTapmgr := dbmgr.DBMgr[mysql_model.VTap](v.db)
+	vTapmgr := dbmgr.DBMgr[metadb_model.VTap](v.db)
 	if len(updateVTaps) > 0 {
 		log.Infof(v.Logf("update vtap count(%d)", len(updateVTaps)))
 		vTapmgr.AgentUpdateBulk(v.ORGID.GetORGID(), updateVTaps)

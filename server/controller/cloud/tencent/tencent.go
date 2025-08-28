@@ -32,7 +32,7 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -86,7 +86,7 @@ type tencentProtocolPort struct {
 	protocol string
 }
 
-func NewTencent(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
+func NewTencent(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

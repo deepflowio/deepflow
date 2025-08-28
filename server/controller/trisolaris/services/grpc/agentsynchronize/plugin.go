@@ -24,8 +24,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	api "github.com/deepflowio/deepflow/message/agent"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -51,7 +51,7 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginDat
 		return nil, fmt.Errorf("the plugin request data type(%d) or name(%s) is empty",
 			r.GetPluginType(), r.GetPluginName())
 	}
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, fmt.Errorf("get db failed")
 	}

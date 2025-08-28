@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChTapType struct {
-	UpdaterComponent[mysqlmodel.ChTapType, TapTypeKey]
+	UpdaterComponent[metadbmodel.ChTapType, TapTypeKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	updater := &ChTapType{
-		newUpdaterComponent[mysqlmodel.ChTapType, TapTypeKey](
+		newUpdaterComponent[metadbmodel.ChTapType, TapTypeKey](
 			RESOURCE_TYPE_TAP_TYPE,
 		),
 		resourceTypeToIconID,
@@ -37,17 +37,17 @@ func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	return updater
 }
 
-func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysqlmodel.ChTapType, bool) {
-	var tapTypes []mysqlmodel.TapType
+func (t *ChTapType) generateNewData(db *metadb.DB) (map[TapTypeKey]metadbmodel.ChTapType, bool) {
+	var tapTypes []metadbmodel.TapType
 	err := db.Unscoped().Find(&tapTypes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(t.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[TapTypeKey]mysqlmodel.ChTapType)
+	keyToItem := make(map[TapTypeKey]metadbmodel.ChTapType)
 	for _, tapType := range tapTypes {
-		keyToItem[TapTypeKey{Value: tapType.Value}] = mysqlmodel.ChTapType{
+		keyToItem[TapTypeKey{Value: tapType.Value}] = metadbmodel.ChTapType{
 			Value: tapType.Value,
 			Name:  tapType.Name,
 		}
@@ -55,11 +55,11 @@ func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysqlmodel.ChT
 	return keyToItem, true
 }
 
-func (t *ChTapType) generateKey(dbItem mysqlmodel.ChTapType) TapTypeKey {
+func (t *ChTapType) generateKey(dbItem metadbmodel.ChTapType) TapTypeKey {
 	return TapTypeKey{Value: dbItem.Value}
 }
 
-func (t *ChTapType) generateUpdateInfo(oldItem, newItem mysqlmodel.ChTapType) (map[string]interface{}, bool) {
+func (t *ChTapType) generateUpdateInfo(oldItem, newItem metadbmodel.ChTapType) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

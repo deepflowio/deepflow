@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ChOSAppTag struct {
-	UpdaterComponent[mysqlmodel.ChOSAppTag, IDKeyKey]
+	UpdaterComponent[metadbmodel.ChOSAppTag, IDKeyKey]
 }
 
 func NewChOSAppTag() *ChOSAppTag {
 	updater := &ChOSAppTag{
-		newUpdaterComponent[mysqlmodel.ChOSAppTag, IDKeyKey](
+		newUpdaterComponent[metadbmodel.ChOSAppTag, IDKeyKey](
 			RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
 	}
@@ -37,9 +37,9 @@ func NewChOSAppTag() *ChOSAppTag {
 	return updater
 }
 
-func (o *ChOSAppTag) generateNewData(db *mysql.DB) (map[IDKeyKey]mysqlmodel.ChOSAppTag, bool) {
-	var processes []mysqlmodel.Process
-	keyToItem := make(map[IDKeyKey]mysqlmodel.ChOSAppTag)
+func (o *ChOSAppTag) generateNewData(db *metadb.DB) (map[IDKeyKey]metadbmodel.ChOSAppTag, bool) {
+	var processes []metadbmodel.Process
+	keyToItem := make(map[IDKeyKey]metadbmodel.ChOSAppTag)
 	gidToOsAppTagMap := make(map[int]map[string]string)
 
 	err := db.Select("gid", "os_app_tags").Find(&processes).Error
@@ -76,7 +76,7 @@ func (o *ChOSAppTag) generateNewData(db *mysql.DB) (map[IDKeyKey]mysqlmodel.ChOS
 				ID:  gid,
 				Key: key,
 			}
-			keyToItem[itemKey] = mysqlmodel.ChOSAppTag{
+			keyToItem[itemKey] = metadbmodel.ChOSAppTag{
 				ID:    gid,
 				Key:   key,
 				Value: value,
@@ -86,11 +86,11 @@ func (o *ChOSAppTag) generateNewData(db *mysql.DB) (map[IDKeyKey]mysqlmodel.ChOS
 	return keyToItem, true
 }
 
-func (o *ChOSAppTag) generateKey(dbItem mysqlmodel.ChOSAppTag) IDKeyKey {
+func (o *ChOSAppTag) generateKey(dbItem metadbmodel.ChOSAppTag) IDKeyKey {
 	return IDKeyKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (o *ChOSAppTag) generateUpdateInfo(oldItem, newItem mysqlmodel.ChOSAppTag) (map[string]interface{}, bool) {
+func (o *ChOSAppTag) generateUpdateInfo(oldItem, newItem metadbmodel.ChOSAppTag) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

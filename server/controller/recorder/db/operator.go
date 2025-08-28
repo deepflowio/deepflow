@@ -19,8 +19,8 @@ package db
 import (
 	"slices"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -28,7 +28,7 @@ import (
 
 var log = logger.MustGetLogger("recorder.db")
 
-type Operator[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint] interface {
+type Operator[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint] interface {
 	// 批量插入数据
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
@@ -39,7 +39,7 @@ type Operator[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.Asset
 	GetSoftDelete() bool
 }
 
-type OperatorBase[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint] struct {
+type OperatorBase[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint] struct {
 	metadata *rcommon.Metadata
 
 	resourceTypeName        string
@@ -51,7 +51,7 @@ type OperatorBase[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.A
 	toLoggable bool
 }
 
-func newOperatorBase[MPT mysqlmodel.AssetResourceConstraintPtr[MT], MT mysqlmodel.AssetResourceConstraint](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
+func newOperatorBase[MPT metadbmodel.AssetResourceConstraintPtr[MT], MT metadbmodel.AssetResourceConstraint](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
 	return OperatorBase[MPT, MT]{
 		resourceTypeName: resourceTypeName,
 		softDelete:       softDelete,
@@ -96,7 +96,7 @@ func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	// 		2. We need to use the ids of the created items
 	// 		3. Ids are not allocated by ourselves
 	// 		4. Use gorm to insert batch data
-	if mysql.GetConfig().AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
+	if metadb.GetConfig().AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
 		o.metadata.DB.Select(o.fieldsNeededAfterCreate).Where("lcuuid IN ?", lcuuidsToAdd).Find(&itemsToAdd)
 	}
 

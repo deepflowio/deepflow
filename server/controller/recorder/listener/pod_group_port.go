@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewPodGroupPort(c *cache.Cache) *PodGroupPort {
 	return listener
 }
 
-func (p *PodGroupPort) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroupPort) {
+func (p *PodGroupPort) OnUpdaterAdded(addedDBItems []*metadbmodel.PodGroupPort) {
 	p.cache.AddPodGroupPorts(addedDBItems)
 }
 
@@ -42,6 +42,6 @@ func (p *PodGroupPort) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroupPort, diff
 	diffBase.Update(cloudItem)
 }
 
-func (p *PodGroupPort) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroupPort) {
+func (p *PodGroupPort) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodGroupPort) {
 	p.cache.DeletePodGroupPorts(lcuuids)
 }

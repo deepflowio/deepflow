@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
+	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	dbmgr "github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"

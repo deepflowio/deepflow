@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChChostCloudTag struct {
 		message.UpdatedVM,
 		*message.DeletedVMs,
 		message.DeletedVMs,
-		mysqlmodel.VM,
-		mysqlmodel.ChChostCloudTag,
+		metadbmodel.VM,
+		metadbmodel.ChChostCloudTag,
 		IDKeyKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChChostCloudTag() *ChChostCloudTag {
 			message.UpdatedVM,
 			*message.DeletedVMs,
 			message.DeletedVMs,
-			mysqlmodel.VM,
-			mysqlmodel.ChChostCloudTag,
+			metadbmodel.VM,
+			metadbmodel.ChChostCloudTag,
 			IDKeyKey,
 		](
 			common.RESOURCE_TYPE_VM_EN, RESOURCE_TYPE_CH_CHOST_CLOUD_TAG,
@@ -61,15 +61,15 @@ func NewChChostCloudTag() *ChChostCloudTag {
 func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
 	db := md.GetDB()
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
+	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	new := map[string]string{}
 	old := map[string]string{}
 	updateInfo := make(map[string]interface{})
 	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChChostCloudTag, 0)
+	targetsToAdd := make([]metadbmodel.ChChostCloudTag, 0)
 	keysToDelete := make([]IDKeyKey, 0)
-	targetsToDelete := make([]mysqlmodel.ChChostCloudTag, 0)
+	targetsToDelete := make([]metadbmodel.ChChostCloudTag, 0)
 
 	if !fieldsUpdate.LearnedCloudTags.IsDifferent() && !fieldsUpdate.CustomCloudTags.IsDifferent() {
 		return
@@ -109,8 +109,8 @@ func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 		targetKey := NewIDKeyKey(sourceID, k)
 		if !ok {
 			keysToAdd = append(keysToAdd, targetKey)
-			targetsToAdd = append(targetsToAdd, mysqlmodel.ChChostCloudTag{
-				ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+			targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
+				ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 				Key:      k,
 				Value:    v,
 				TeamID:   md.GetTeamID(),
@@ -120,12 +120,12 @@ func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 		}
 
 		if oldV != v {
-			var chItem mysqlmodel.ChChostCloudTag
+			var chItem metadbmodel.ChChostCloudTag
 			db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 			if chItem.ID == 0 {
 				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChChostCloudTag{
-					ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+				targetsToAdd = append(targetsToAdd, metadbmodel.ChChostCloudTag{
+					ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 					Key:      k,
 					Value:    v,
 					TeamID:   md.GetTeamID(),
@@ -140,8 +140,8 @@ func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 	for k := range old {
 		if _, ok := new[k]; !ok {
 			keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
-			targetsToDelete = append(targetsToDelete, mysqlmodel.ChChostCloudTag{
-				ChIDBase: mysqlmodel.ChIDBase{ID: sourceID},
+			targetsToDelete = append(targetsToDelete, metadbmodel.ChChostCloudTag{
+				ChIDBase: metadbmodel.ChIDBase{ID: sourceID},
 				Key:      k,
 			})
 		}
@@ -156,12 +156,12 @@ func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.VM) (keys []IDKeyKey, targets []mysqlmodel.ChChostCloudTag) {
+func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (keys []IDKeyKey, targets []metadbmodel.ChChostCloudTag) {
 	cloudTagMap := MergeCloudTags(source.LearnedCloudTags, source.CustomCloudTags)
 	for k, v := range cloudTagMap {
 		keys = append(keys, NewIDKeyKey(source.ID, k))
-		targets = append(targets, mysqlmodel.ChChostCloudTag{
-			ChIDBase: mysqlmodel.ChIDBase{ID: source.ID},
+		targets = append(targets, metadbmodel.ChChostCloudTag{
+			ChIDBase: metadbmodel.ChIDBase{ID: source.ID},
 			Key:      k,
 			Value:    v,
 			TeamID:   md.GetTeamID(),
@@ -172,6 +172,6 @@ func (c *ChChostCloudTag) sourceToTarget(md *message.Metadata, source *mysqlmode
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) softDeletedTargetsUpdated(targets []mysqlmodel.ChChostCloudTag, db *mysql.DB) {
+func (c *ChChostCloudTag) softDeletedTargetsUpdated(targets []metadbmodel.ChChostCloudTag, db *metadb.DB) {
 
 }

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
@@ -60,7 +60,7 @@ func (r *RebalanceCheck) Start(sCtx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				for _, db := range mysql.GetDBs().All() {
+				for _, db := range metadb.GetDBs().All() {
 					r.controllerRebalance(db)
 					if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 						r.analyzerRebalance(db)
@@ -112,7 +112,7 @@ func (r *RebalanceCheck) Stop() {
 	log.Info("rebalance check stopped")
 }
 
-func (r *RebalanceCheck) controllerRebalance(db *mysql.DB) {
+func (r *RebalanceCheck) controllerRebalance(db *metadb.DB) {
 	controllers, err := service.GetControllers(common.DEFAULT_ORG_ID, map[string]string{})
 	if err != nil {
 		log.Errorf("get controllers failed, (%v)", err, db.LogPrefixORGID)
@@ -139,7 +139,7 @@ func (r *RebalanceCheck) controllerRebalance(db *mysql.DB) {
 	}
 }
 
-func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
+func (r *RebalanceCheck) analyzerRebalance(db *metadb.DB) {
 	// check if need rebalance
 	analyzers, err := service.GetAnalyzers(db.ORGID, map[string]interface{}{})
 	if err != nil {
@@ -167,7 +167,7 @@ func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
 }
 
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
-	for _, db := range mysql.GetDBs().All() {
+	for _, db := range metadb.GetDBs().All() {
 		log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration, db.LogPrefixORGID)
 		analyzerInfo := rebalance.NewAnalyzerInfo(false)
 		result, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
@@ -196,7 +196,7 @@ func sendWeight(ctx context.Context, dataDuration int) {
 				log.Infof("agent traffic context done")
 				return
 			case <-ticker.C:
-				for _, db := range mysql.GetDBs().All() {
+				for _, db := range metadb.GetDBs().All() {
 					analyzerInfo := rebalance.NewAnalyzerInfo(true)
 					_, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
 					if err != nil {

@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPeerConnection() *mysqlmodel.PeerConnection {
-	return &mysqlmodel.PeerConnection{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPeerConnection() *metadbmodel.PeerConnection {
+	return &metadbmodel.PeerConnection{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPeerConnectionBatchSuccess() {
 	operator := NewPeerConnection()
 	itemToAdd := newDBPeerConnection()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PeerConnection{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PeerConnection{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PeerConnection
+	var addedItem *metadbmodel.PeerConnection
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PeerConnection{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PeerConnection{})
 }
 
 func (t *SuiteTest) TestUpdatePeerConnectionSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePeerConnectionSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.PeerConnection
+	var updatedItem *metadbmodel.PeerConnection
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PeerConnection{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PeerConnection{})
 }
 
 func (t *SuiteTest) TestDeletePeerConnectionBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeletePeerConnectionBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PeerConnection
+	var deletedItem *metadbmodel.PeerConnection
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 )
@@ -40,7 +40,7 @@ type domainStatsd struct {
 	chostPodNodeConn *CleanerCounter
 }
 
-func newDomainStatsd(org *common.ORG, domain *mysqlmodel.Domain) *domainStatsd {
+func newDomainStatsd(org *common.ORG, domain *metadbmodel.Domain) *domainStatsd {
 	return &domainStatsd{
 		org:    org,
 		lcuuid: domain.Lcuuid,

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewHost(c *cache.Cache, eq *queue.OverwriteQueue) *Host {
 	return listener
 }
 
-func (h *Host) OnUpdaterAdded(addedDBItems []*mysqlmodel.Host) {
+func (h *Host) OnUpdaterAdded(addedDBItems []*metadbmodel.Host) {
 	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddHosts(addedDBItems)
 }
@@ -49,7 +49,7 @@ func (h *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *diffbase.H
 	h.cache.UpdateHost(cloudItem)
 }
 
-func (h *Host) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Host) {
+func (h *Host) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Host) {
 	h.eventProducer.ProduceByDelete(lcuuids)
 	h.cache.DeleteHosts(lcuuids)
 }

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewVRouter(c *cache.Cache, eq *queue.OverwriteQueue) *VRouter {
 	return listener
 }
 
-func (r *VRouter) OnUpdaterAdded(addedDBItems []*mysqlmodel.VRouter) {
+func (r *VRouter) OnUpdaterAdded(addedDBItems []*metadbmodel.VRouter) {
 	r.eventProducer.ProduceByAdd(addedDBItems)
 	r.cache.AddVRouters(addedDBItems)
 }
@@ -49,7 +49,7 @@ func (r *VRouter) OnUpdaterUpdated(cloudItem *cloudmodel.VRouter, diffBase *diff
 	r.cache.UpdateVRouter(cloudItem)
 }
 
-func (r *VRouter) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VRouter) {
+func (r *VRouter) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.VRouter) {
 	r.eventProducer.ProduceByDelete(lcuuids)
 	r.cache.DeleteVRouters(lcuuids)
 }

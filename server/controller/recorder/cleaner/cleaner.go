@@ -25,8 +25,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -116,7 +116,7 @@ func (c *Cleaners) timedCleanDeletedData(sContext context.Context) {
 }
 
 func (c *Cleaners) checkORGs() error {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Errorf("failed to get db for org ids: %s", err.Error())
 		return err
@@ -258,7 +258,7 @@ func (c *Cleaner) closeStatsd() {
 }
 
 func (c *Cleaner) refreshStatsd() {
-	var domains []*mysqlmodel.Domain
+	var domains []*metadbmodel.Domain
 	if err := c.org.DB.Find(&domains).Error; err != nil {
 		log.Errorf("failed to get domain: %s", err.Error(), c.org.LogPrefix)
 		return
@@ -310,30 +310,30 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
 	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY), c.org.LogPrefix)
-	pageDeleteExpiredAndPublish[*message.DeletedRegions, message.DeletedRegions, mysqlmodel.Region](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REGION_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedAZs, message.DeletedAZs, mysqlmodel.AZ](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_AZ_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedHosts, message.DeletedHosts, mysqlmodel.Host](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_HOST_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedVMs, message.DeletedVMs, mysqlmodel.VM](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VM_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedVPCs, message.DeletedVPCs, mysqlmodel.VPC](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VPC_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedNetworks, message.DeletedNetworks, mysqlmodel.Network](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedVRouters, message.DeletedVRouters, mysqlmodel.VRouter](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedDHCPPorts, message.DeletedDHCPPorts, mysqlmodel.DHCPPort](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedNATGateways, message.DeletedNATGateways, mysqlmodel.NATGateway](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedLBs, message.DeletedLBs, mysqlmodel.LB](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedLBListeners, message.DeletedLBListeners, mysqlmodel.LBListener](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedCENs, message.DeletedCENs, mysqlmodel.CEN](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_CEN_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPeerConnections, message.DeletedPeerConnections, mysqlmodel.PeerConnection](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedRDSInstances, message.DeletedRDSInstances, mysqlmodel.RDSInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedRedisInstances, message.DeletedRedisInstances, mysqlmodel.RedisInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodClusters, message.DeletedPodClusters, mysqlmodel.PodCluster](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodNodes, message.DeletedPodNodes, mysqlmodel.PodNode](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodNamespaces, message.DeletedPodNamespaces, mysqlmodel.PodNamespace](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodIngresses, message.DeletedPodIngresses, mysqlmodel.PodIngress](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodServices, message.DeletedPodServices, mysqlmodel.PodService](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodGroups, message.DeletedPodGroups, mysqlmodel.PodGroup](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, mysqlmodel.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedPods, message.DeletedPods, mysqlmodel.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData, c.cfg.MySQLBatchSize)
-	pageDeleteExpiredAndPublish[*message.DeletedProcesses, message.DeletedProcesses, mysqlmodel.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedRegions, message.DeletedRegions, metadbmodel.Region](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REGION_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedAZs, message.DeletedAZs, metadbmodel.AZ](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_AZ_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedHosts, message.DeletedHosts, metadbmodel.Host](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_HOST_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedVMs, message.DeletedVMs, metadbmodel.VM](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VM_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedVPCs, message.DeletedVPCs, metadbmodel.VPC](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VPC_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedNetworks, message.DeletedNetworks, metadbmodel.Network](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedVRouters, message.DeletedVRouters, metadbmodel.VRouter](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedDHCPPorts, message.DeletedDHCPPorts, metadbmodel.DHCPPort](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedNATGateways, message.DeletedNATGateways, metadbmodel.NATGateway](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedLBs, message.DeletedLBs, metadbmodel.LB](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedLBListeners, message.DeletedLBListeners, metadbmodel.LBListener](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedCENs, message.DeletedCENs, metadbmodel.CEN](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_CEN_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPeerConnections, message.DeletedPeerConnections, metadbmodel.PeerConnection](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedRDSInstances, message.DeletedRDSInstances, metadbmodel.RDSInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedRedisInstances, message.DeletedRedisInstances, metadbmodel.RedisInstance](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodClusters, message.DeletedPodClusters, metadbmodel.PodCluster](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodNodes, message.DeletedPodNodes, metadbmodel.PodNode](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodNamespaces, message.DeletedPodNamespaces, metadbmodel.PodNamespace](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodIngresses, message.DeletedPodIngresses, metadbmodel.PodIngress](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodServices, message.DeletedPodServices, metadbmodel.PodService](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodGroups, message.DeletedPodGroups, metadbmodel.PodGroup](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, metadbmodel.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData, c.cfg.MySQLBatchSize)
+	pageDeleteExpiredAndPublish[*message.DeletedProcesses, message.DeletedProcesses, metadbmodel.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData, c.cfg.MySQLBatchSize)
 	log.Info("clean soft deleted resources completed", c.org.LogPrefix)
 }
 
@@ -342,7 +342,7 @@ func (c *Cleaner) cleanDirtyData() {
 		log.Error("failed to load tool data", c.org.LogPrefix)
 		return
 	}
-	var domains []*mysqlmodel.Domain
+	var domains []*metadbmodel.Domain
 	if err := c.org.DB.Find(&domains).Error; err != nil {
 		log.Errorf("failed to get domain: %s", err.Error(), c.org.LogPrefix)
 		return
@@ -366,9 +366,9 @@ func (c *Cleaner) cleanDirtyData() {
 }
 
 func (c *Cleaner) cleanHostDirty(domainLcuuid string) {
-	deviceIDs := getIDs[mysqlmodel.Host](c.org.DB, domainLcuuid)
+	deviceIDs := getIDs[metadbmodel.Host](c.org.DB, domainLcuuid)
 	if len(deviceIDs) != 0 {
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_HOST, deviceIDs,
 		)
@@ -382,9 +382,9 @@ func (c *Cleaner) cleanHostDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
-	vmIDs := getIDs[mysqlmodel.VM](c.org.DB, domainLcuuid)
+	vmIDs := getIDs[metadbmodel.VM](c.org.DB, domainLcuuid)
 	if len(vmIDs) != 0 {
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs,
 		)
@@ -395,7 +395,7 @@ func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
 			c.fillStatsd(domainLcuuid, tagTypeDeviceIPConn, len(vifs))
 		}
 
-		vmPodNodeConns, _ := WhereFindPtr[mysqlmodel.VMPodNodeConnection](
+		vmPodNodeConns, _ := WhereFindPtr[metadbmodel.VMPodNodeConnection](
 			c.org.DB,
 			"domain = ? AND vm_id NOT IN ?", domainLcuuid, vmIDs,
 		)
@@ -409,9 +409,9 @@ func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanNetworkDirty(domainLcuuid string) {
-	networkIDs := getIDs[mysqlmodel.Network](c.org.DB, domainLcuuid)
+	networkIDs := getIDs[metadbmodel.Network](c.org.DB, domainLcuuid)
 	if len(networkIDs) != 0 {
-		subnets, _ := WhereFindPtr[mysqlmodel.Subnet](
+		subnets, _ := WhereFindPtr[metadbmodel.Subnet](
 			c.org.DB,
 			"domain = ? AND vl2id NOT IN ?", domainLcuuid, networkIDs,
 		)
@@ -423,9 +423,9 @@ func (c *Cleaner) cleanNetworkDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanVRouterDirty(domainLcuuid string) {
-	vrouterIDs := getIDs[mysqlmodel.VRouter](c.org.DB, domainLcuuid)
+	vrouterIDs := getIDs[metadbmodel.VRouter](c.org.DB, domainLcuuid)
 	if len(vrouterIDs) != 0 {
-		rts, _ := WhereFindPtr[mysqlmodel.RoutingTable](
+		rts, _ := WhereFindPtr[metadbmodel.RoutingTable](
 			c.org.DB,
 			"domain = ? AND vnet_id NOT IN ?", domainLcuuid, vrouterIDs,
 		)
@@ -434,7 +434,7 @@ func (c *Cleaner) cleanVRouterDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts), c.org.LogPrefix)
 		}
 
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VROUTER, vrouterIDs,
 		)
@@ -448,9 +448,9 @@ func (c *Cleaner) cleanVRouterDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
-	podIngressIDs := getIDs[mysqlmodel.PodIngress](c.org.DB, domainLcuuid)
+	podIngressIDs := getIDs[metadbmodel.PodIngress](c.org.DB, domainLcuuid)
 	if len(podIngressIDs) != 0 {
-		podIngressRules, _ := WhereFindPtr[mysqlmodel.PodIngressRule](
+		podIngressRules, _ := WhereFindPtr[metadbmodel.PodIngressRule](
 			c.org.DB,
 			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
@@ -459,7 +459,7 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules), c.org.LogPrefix)
 		}
 
-		podIngressRuleBkds, _ := WhereFindPtr[mysqlmodel.PodIngressRuleBackend](
+		podIngressRuleBkds, _ := WhereFindPtr[metadbmodel.PodIngressRuleBackend](
 			c.org.DB,
 			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
@@ -468,22 +468,22 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds), c.org.LogPrefix)
 		}
 
-		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
 			c.org.DB,
 			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
-			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, mysqlmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podServices), c.org.LogPrefix)
 		}
 	}
 }
 
 func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
-	podServiceIDs := getIDs[mysqlmodel.PodService](c.org.DB, domainLcuuid)
+	podServiceIDs := getIDs[metadbmodel.PodService](c.org.DB, domainLcuuid)
 	if len(podServiceIDs) != 0 {
-		podServicePorts, _ := WhereFindPtr[mysqlmodel.PodServicePort](
+		podServicePorts, _ := WhereFindPtr[metadbmodel.PodServicePort](
 			c.org.DB,
 			"domain = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
 		)
@@ -492,7 +492,7 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts), c.org.LogPrefix)
 		}
 
-		podGroupPorts, _ := WhereFindPtr[mysqlmodel.PodGroupPort](
+		podGroupPorts, _ := WhereFindPtr[metadbmodel.PodGroupPort](
 			c.org.DB,
 			"domain = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
 		)
@@ -501,7 +501,7 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts), c.org.LogPrefix)
 		}
 
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs,
 		)
@@ -515,9 +515,9 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
-	podGroupIDs := getIDs[mysqlmodel.PodGroup](c.org.DB, domainLcuuid)
+	podGroupIDs := getIDs[metadbmodel.PodGroup](c.org.DB, domainLcuuid)
 	if len(podGroupIDs) != 0 {
-		podGroupPorts, _ := WhereFindPtr[mysqlmodel.PodGroupPort](
+		podGroupPorts, _ := WhereFindPtr[metadbmodel.PodGroupPort](
 			c.org.DB,
 			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
@@ -526,17 +526,17 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podGroupPorts), c.org.LogPrefix)
 		}
 
-		pods, _ := WhereFindPtr[mysqlmodel.Pod](
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
 			c.org.DB,
 			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
-			publishTagrecorder[*message.DeletedPods, message.DeletedPods, mysqlmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods), c.org.LogPrefix)
 		}
 
-		podReplicaSets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
+		podReplicaSets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
 			c.org.DB,
 			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
@@ -548,9 +548,9 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
-	podNodeIDs := getIDs[mysqlmodel.PodNode](c.org.DB, domainLcuuid)
+	podNodeIDs := getIDs[metadbmodel.PodNode](c.org.DB, domainLcuuid)
 	if len(podNodeIDs) != 0 {
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs,
 		)
@@ -561,7 +561,7 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 			c.fillStatsd(domainLcuuid, tagTypeDeviceIPConn, len(vifs))
 		}
 
-		vmPodNodeConns, _ := WhereFindPtr[mysqlmodel.VMPodNodeConnection](
+		vmPodNodeConns, _ := WhereFindPtr[metadbmodel.VMPodNodeConnection](
 			c.org.DB,
 			"domain = ? AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
 		)
@@ -572,22 +572,22 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 			c.fillStatsd(domainLcuuid, tagTypeCHostPodNodeConn, len(vmPodNodeConns))
 		}
 
-		pods, _ := WhereFindPtr[mysqlmodel.Pod](
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
 			c.org.DB,
 			"domain = ? AND pod_node_id != 0 AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
-			publishTagrecorder[*message.DeletedPods, message.DeletedPods, mysqlmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods), c.org.LogPrefix)
 		}
 	}
 }
 
 func (c *Cleaner) cleanPodDirty(domainLcuuid string) {
-	podIDs := getIDs[mysqlmodel.Pod](c.org.DB, domainLcuuid)
+	podIDs := getIDs[metadbmodel.Pod](c.org.DB, domainLcuuid)
 	if len(podIDs) != 0 {
-		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
+		vifs, _ := WhereFindPtr[metadbmodel.VInterface](
 			c.org.DB,
 			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs,
 		)
@@ -601,129 +601,129 @@ func (c *Cleaner) cleanPodDirty(domainLcuuid string) {
 }
 
 func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
-	podClusterIDs := getIDs[mysqlmodel.PodCluster](c.org.DB, domainLcuuid)
+	podClusterIDs := getIDs[metadbmodel.PodCluster](c.org.DB, domainLcuuid)
 	if len(podClusterIDs) != 0 {
-		pods, _ := WhereFindPtr[mysqlmodel.Pod](
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
-			publishTagrecorder[*message.DeletedPods, message.DeletedPods, mysqlmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, pods), c.org.LogPrefix)
 		}
-		podReplicasets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
+		podReplicasets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podReplicasets) != 0 {
 			c.org.DB.Unscoped().Delete(&podReplicasets)
-			publishTagrecorder[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, mysqlmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, metadbmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podReplicasets), c.org.LogPrefix)
 		}
-		podGroups, _ := WhereFindPtr[mysqlmodel.PodGroup](
+		podGroups, _ := WhereFindPtr[metadbmodel.PodGroup](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podGroups) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroups)
-			publishTagrecorder[*message.DeletedPodGroups, message.DeletedPodGroups, mysqlmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodGroups, message.DeletedPodGroups, metadbmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podGroups), c.org.LogPrefix)
 		}
-		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
-			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, mysqlmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podServices), c.org.LogPrefix)
 		}
-		podIngresses, _ := WhereFindPtr[mysqlmodel.PodIngress](
+		podIngresses, _ := WhereFindPtr[metadbmodel.PodIngress](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podIngresses) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngresses)
-			publishTagrecorder[*message.DeletedPodIngresses, message.DeletedPodIngresses, mysqlmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodIngresses, message.DeletedPodIngresses, metadbmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podIngresses), c.org.LogPrefix)
 		}
-		podNamespaces, _ := WhereFindPtr[mysqlmodel.PodNamespace](
+		podNamespaces, _ := WhereFindPtr[metadbmodel.PodNamespace](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podNamespaces) != 0 {
 			c.org.DB.Unscoped().Delete(&podNamespaces)
-			publishTagrecorder[*message.DeletedPodNamespaces, message.DeletedPodNamespaces, mysqlmodel.PodNamespace](c.org.DB, podNamespaces, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodNamespaces, message.DeletedPodNamespaces, metadbmodel.PodNamespace](c.org.DB, podNamespaces, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podNamespaces), c.org.LogPrefix)
 		}
-		podNodes, _ := WhereFindPtr[mysqlmodel.PodNode](
+		podNodes, _ := WhereFindPtr[metadbmodel.PodNode](
 			c.org.DB,
 			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podNodes) != 0 {
 			c.org.DB.Unscoped().Delete(&podNodes)
-			publishTagrecorder[*message.DeletedPodNodes, message.DeletedPodNodes, mysqlmodel.PodNode](c.org.DB, podNodes, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodNodes, message.DeletedPodNodes, metadbmodel.PodNode](c.org.DB, podNodes, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, podNodes), c.org.LogPrefix)
 		}
 	}
 }
 
 func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
-	podNamespaceIDs := getIDs[mysqlmodel.PodNamespace](c.org.DB, domainLcuuid)
+	podNamespaceIDs := getIDs[metadbmodel.PodNamespace](c.org.DB, domainLcuuid)
 	if len(podNamespaceIDs) != 0 {
-		pods, _ := WhereFindPtr[mysqlmodel.Pod](
+		pods, _ := WhereFindPtr[metadbmodel.Pod](
 			c.org.DB,
 			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
-			publishTagrecorder[*message.DeletedPods, message.DeletedPods, mysqlmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, pods), c.org.LogPrefix)
 		}
-		podGroups, _ := WhereFindPtr[mysqlmodel.PodGroup](
+		podGroups, _ := WhereFindPtr[metadbmodel.PodGroup](
 			c.org.DB,
 			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podGroups) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroups)
-			publishTagrecorder[*message.DeletedPodGroups, message.DeletedPodGroups, mysqlmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodGroups, message.DeletedPodGroups, metadbmodel.PodGroup](c.org.DB, podGroups, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podGroups), c.org.LogPrefix)
 		}
-		podReplicasets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
+		podReplicasets, _ := WhereFindPtr[metadbmodel.PodReplicaSet](
 			c.org.DB,
 			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podReplicasets) != 0 {
 			c.org.DB.Unscoped().Delete(&podReplicasets)
-			publishTagrecorder[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, mysqlmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodReplicaSets, message.DeletedPodReplicaSets, metadbmodel.PodReplicaSet](c.org.DB, podReplicasets, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podReplicasets), c.org.LogPrefix)
 		}
-		podIngresses, _ := WhereFindPtr[mysqlmodel.PodIngress](
+		podIngresses, _ := WhereFindPtr[metadbmodel.PodIngress](
 			c.org.DB,
 			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podIngresses) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngresses)
-			publishTagrecorder[*message.DeletedPodIngresses, message.DeletedPodIngresses, mysqlmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodIngresses, message.DeletedPodIngresses, metadbmodel.PodIngress](c.org.DB, podIngresses, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podIngresses), c.org.LogPrefix)
 		}
-		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
+		podServices, _ := WhereFindPtr[metadbmodel.PodService](
 			c.org.DB,
 			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
-			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, mysqlmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
+			publishTagrecorder[*message.DeletedPodServices, message.DeletedPodServices, metadbmodel.PodService](c.org.DB, podServices, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, c.toolData)
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, podServices), c.org.LogPrefix)
 		}
 	}
 }
 
 func (c *Cleaner) cleanVInterfaceDirty(domainLcuuid string) {
-	vifIDs := getIDs[mysqlmodel.VInterface](c.org.DB, domainLcuuid)
+	vifIDs := getIDs[metadbmodel.VInterface](c.org.DB, domainLcuuid)
 	if len(vifIDs) != 0 {
-		lanIPs, _ := WhereFindPtr[mysqlmodel.LANIP](
+		lanIPs, _ := WhereFindPtr[metadbmodel.LANIP](
 			c.org.DB,
 			"domain = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
 		)
@@ -732,7 +732,7 @@ func (c *Cleaner) cleanVInterfaceDirty(domainLcuuid string) {
 			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs), c.org.LogPrefix)
 		}
 
-		wanIPs, _ := WhereFindPtr[mysqlmodel.WANIP](
+		wanIPs, _ := WhereFindPtr[metadbmodel.WANIP](
 			c.org.DB,
 			"domain = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
 		)

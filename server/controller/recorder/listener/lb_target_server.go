@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewLBTargetServer(c *cache.Cache) *LBTargetServer {
 	return listener
 }
 
-func (l *LBTargetServer) OnUpdaterAdded(addedDBItems []*mysqlmodel.LBTargetServer) {
+func (l *LBTargetServer) OnUpdaterAdded(addedDBItems []*metadbmodel.LBTargetServer) {
 	l.cache.AddLBTargetServers(addedDBItems)
 }
 
@@ -42,6 +42,6 @@ func (l *LBTargetServer) OnUpdaterUpdated(cloudItem *cloudmodel.LBTargetServer, 
 	diffBase.Update(cloudItem)
 }
 
-func (l *LBTargetServer) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.LBTargetServer) {
+func (l *LBTargetServer) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.LBTargetServer) {
 	l.cache.DeleteLBTargetServers(lcuuids)
 }
