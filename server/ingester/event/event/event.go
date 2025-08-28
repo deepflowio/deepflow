@@ -41,7 +41,7 @@ import (
 type Event struct {
 	Config          *config.Config
 	ResourceEventor *Eventor
-	PerfEventor     *Eventor
+	FileEventor     *Eventor
 	AlertEventor    *Eventor
 	K8sEventor      *Eventor
 }
@@ -59,7 +59,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
-	perfEventor, err := NewEventor(common.PERF_EVENT, config, recv, manager, platformDataManager, exporters)
+	fileEventor, err := NewEventor(common.FILE_EVENT, config, recv, manager, platformDataManager, exporters)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 	return &Event{
 		Config:          config,
 		ResourceEventor: resourceEventor,
-		PerfEventor:     perfEventor,
+		FileEventor:     fileEventor,
 		AlertEventor:    alertEventor,
 		K8sEventor:      k8sEventor,
 	}, nil
@@ -138,9 +138,9 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 	var msgType datatype.MessageType
 
 	switch eventType {
-	case common.PERF_EVENT:
-		queueCount = config.PerfDecoderQueueCount
-		queueSize = config.PerfDecoderQueueSize
+	case common.FILE_EVENT:
+		queueCount = config.FileEventDecoderQueueCount
+		queueSize = config.FileEventDecoderQueueSize
 		msgType = datatype.MESSAGE_TYPE_PROC_EVENT
 	case common.K8S_EVENT:
 		queueCount = config.K8sDecoderQueueCount
@@ -207,14 +207,14 @@ func (e *Eventor) Close() {
 
 func (e *Event) Start() {
 	e.ResourceEventor.Start()
-	e.PerfEventor.Start()
+	e.FileEventor.Start()
 	e.AlertEventor.Start()
 	e.K8sEventor.Start()
 }
 
 func (e *Event) Close() error {
 	e.ResourceEventor.Close()
-	e.PerfEventor.Close()
+	e.FileEventor.Close()
 	e.AlertEventor.Close()
 	e.K8sEventor.Close()
 	return nil
