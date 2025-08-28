@@ -88,6 +88,7 @@ impl RpcDebugger {
             &self.status,
             0,
             &exception_handler,
+            1 << 20,
         );
         let resp = self.session.grpc_sync(req).await?;
         Ok(resp)

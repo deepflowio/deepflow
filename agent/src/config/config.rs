@@ -2589,7 +2589,7 @@ pub struct Communication {
     pub max_escape_duration: Duration,
     pub ingester_ip: String,
     pub ingester_port: u16,
-    #[serde(deserialize_with = "deser_usize_with_mega_unit")]
+    #[serde(skip)]
     pub grpc_buffer_size: usize,
     pub max_throughput_to_ingester: u64,
     #[serde(deserialize_with = "to_traffic_overflow_action")]
@@ -2598,6 +2598,8 @@ pub struct Communication {
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
 }
+
+pub const GRPC_BUFFER_SIZE_MIN: usize = 1 << 20;
 
 impl Default for Communication {
     fn default() -> Self {
@@ -2608,7 +2610,7 @@ impl Default for Communication {
             proxy_controller_port: 30035,
             ingester_ip: "".to_string(),
             ingester_port: 30033,
-            grpc_buffer_size: 5 << 20,
+            grpc_buffer_size: GRPC_BUFFER_SIZE_MIN,
             max_throughput_to_ingester: 100,
             ingester_traffic_overflow_action: TrafficOverflowAction::Waiting,
             request_via_nat_ip: false,
@@ -3453,7 +3455,11 @@ impl UserConfig {
         config
     }
 
-    pub fn set_dynamic_config(&mut self, dynamic_config: &agent::DynamicConfig) {
+    pub fn set_dynamic_config_and_grpc_buffer_size(
+        &mut self,
+        dynamic_config: &agent::DynamicConfig,
+        new_grpc_buffer_size: u64,
+    ) {
         self.global.common.kubernetes_api_enabled = dynamic_config.kubernetes_api_enabled();
         self.global.common.enabled = dynamic_config.enabled();
         self.global.common.region_id = dynamic_config.region_id();
@@ -3465,6 +3471,7 @@ impl UserConfig {
         self.global.common.agent_type = dynamic_config.agent_type();
         self.global.common.secret_key = dynamic_config.secret_key().to_string();
         self.global.self_monitoring.hostname = dynamic_config.hostname().to_string();
+        self.global.communication.grpc_buffer_size = new_grpc_buffer_size as usize;
     }
 }
 

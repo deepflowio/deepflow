@@ -52,6 +52,7 @@ use super::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
         RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
+        GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -4025,12 +4026,16 @@ impl ConfigHandler {
             communication.request_via_nat_ip = new_communication.request_via_nat_ip;
         }
         if communication.grpc_buffer_size != new_communication.grpc_buffer_size {
-            info!(
-                "Update global.communication.grpc_buffer_size from {:?} to {:?}.",
-                communication.grpc_buffer_size, new_communication.grpc_buffer_size
-            );
             communication.grpc_buffer_size = new_communication.grpc_buffer_size;
-            session.set_rx_size(new_communication.grpc_buffer_size);
+
+            if new_communication.grpc_buffer_size > 0 {
+                info!(
+                    "Update global.communication.grpc_buffer_size from {:?} to {:?}, and it is actually used {:?}.",
+                    communication.grpc_buffer_size, new_communication.grpc_buffer_size, new_communication.grpc_buffer_size.max(GRPC_BUFFER_SIZE_MIN)
+                );
+
+                session.set_rx_size(new_communication.grpc_buffer_size.max(GRPC_BUFFER_SIZE_MIN));
+            }
         }
         if communication.max_throughput_to_ingester != new_communication.max_throughput_to_ingester
         {

@@ -541,6 +541,12 @@ impl Status {
         self.ntp_enabled = user_config.global.ntp.enabled;
         self.ntp_max_interval = user_config.global.ntp.max_drift;
         self.ntp_min_interval = user_config.global.ntp.min_drift;
+
+        let wait_ntp = self.ntp_enabled && self.first;
+        if resp.only_partial_fields() {
+            return (false, wait_ntp, has_invalid_log);
+        }
+
         let (updated_platform, invalid_log) = self.get_platform_data(resp, enabled_invalid_log);
         if updated_platform {
             self.modify_platform(
@@ -559,21 +565,7 @@ impl Status {
         updated |= updated_acl;
         has_invalid_log |= invalid_log;
 
-        updated = self.get_local_epc(&resp.dynamic_config.clone().unwrap_or(DynamicConfig {
-            kubernetes_api_enabled: None,
-            region_id: None,
-            pod_cluster_id: None,
-            vpc_id: None,
-            agent_id: None,
-            team_id: None,
-            organize_id: None,
-            secret_key: None,
-            enabled: None,
-            hostname: None,
-            agent_type: None,
-            group_id: None,
-        })) || updated;
-        let wait_ntp = self.ntp_enabled && self.first;
+        updated = self.get_local_epc(&resp.dynamic_config.clone().unwrap_or_default()) || updated;
 
         (updated, wait_ntp, has_invalid_log)
     }
@@ -698,6 +690,7 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
         time_diff: i64,
         exception_handler: &ExceptionHandler,
+        grpc_buffer_size: u64,
     ) -> pb::SyncRequest {
         let status = status.read();
 
@@ -770,6 +763,7 @@ impl Synchronizer {
             agent_unique_identifier: Some(pb::AgentIdentifier::from(
                 static_config.agent_unique_identifier,
             ) as i32),
+            current_grpc_buffer_size: Some(grpc_buffer_size),
             ..Default::default()
         }
     }
@@ -818,6 +812,10 @@ impl Synchronizer {
         resp: &pb::SyncResponse,
         enabled_invalid_log: bool,
     ) -> (Vec<pb::Segment>, Vec<MacAddr>, Vec<MacAddr>, bool) {
+        if resp.only_partial_fields() {
+            return (vec![], vec![], vec![], false);
+        }
+
         let segments = if capture_mode == PacketCaptureType::Analyzer {
             resp.remote_segments.clone()
         } else {
@@ -937,7 +935,10 @@ impl Synchronizer {
         }
         let mut user_config: UserConfig = user_config.unwrap();
         if let Some(dynamic_config) = resp.dynamic_config.as_ref() {
-            user_config.set_dynamic_config(dynamic_config);
+            user_config.set_dynamic_config_and_grpc_buffer_size(
+                dynamic_config,
+                resp.new_grpc_buffer_size(),
+            );
             match &dynamic_config.group_id {
                 Some(id) if !id.is_empty() => {
                     agent_id.write().group_id = id.to_owned();
@@ -946,6 +947,13 @@ impl Synchronizer {
             }
         }
         user_config.adjust();
+
+        if resp.only_partial_fields() {
+            info!(
+                "Grpc recv only_partial_fields message and update grpc_buffer_size to {}.",
+                user_config.global.communication.grpc_buffer_size
+            );
+        }
 
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
@@ -1038,17 +1046,23 @@ impl Synchronizer {
         }
 
         let mut status_guard = status.write();
-        let blacklist = status_guard.get_blacklist(&resp);
         status_guard.first = false;
-        drop(status_guard);
+        if resp.only_partial_fields() {
+            drop(status_guard);
 
-        agent_state.update_config(ChangedConfig {
-            user_config,
-            blacklist,
-            vm_mac_addrs: macs,
-            gateway_vmac_addrs,
-            tap_types: resp.capture_network_types,
-        });
+            agent_state.update_partial_config(user_config);
+        } else {
+            let blacklist = status_guard.get_blacklist(&resp);
+            drop(status_guard);
+
+            agent_state.update_config(ChangedConfig {
+                user_config,
+                blacklist,
+                vm_mac_addrs: macs,
+                gateway_vmac_addrs,
+                tap_types: resp.capture_network_types,
+            });
+        }
     }
 
     fn grpc_failed_log(grpc_failed_count: &mut usize, detail: String) {
@@ -1086,6 +1100,7 @@ impl Synchronizer {
                         &status,
                         ntp_diff.load(Ordering::Relaxed),
                         &exception_handler,
+                        session.get_rx_size(),
                     ))
                     .await;
                 let version = session.get_version();
@@ -1119,6 +1134,9 @@ impl Synchronizer {
                         break;
                     }
                     let message = message.unwrap();
+
+                    session.update_message_counter(message.encoded_len());
+
                     match message.status() {
                         pb::Status::Failed => {
                             exception_handler.set(Exception::ControllerSocketError);
@@ -1353,6 +1371,9 @@ impl Synchronizer {
             if !running.load(Ordering::SeqCst) {
                 return Err("upgrade terminated".to_owned());
             }
+
+            session.update_message_counter(message.encoded_len());
+
             if message.status() != pb::Status::Success {
                 return Err("upgrade failed in server response".to_owned());
             }
@@ -1578,7 +1599,7 @@ impl Synchronizer {
                     agent_type: Some(AgentType::TtProcess.into()),
                     ..Default::default()
                 };
-                user_config.set_dynamic_config(&dynamic_config);
+                user_config.set_dynamic_config_and_grpc_buffer_size(&dynamic_config, 5 << 20);
 
                 for listener in flow_acl_listener.lock().unwrap().iter_mut() {
                     let _ = listener.flow_acl_change(
@@ -1657,13 +1678,13 @@ impl Synchronizer {
                         status.hostname,
                     )
                 }
-
                 let request = Synchronizer::generate_sync_request(
                     &agent_id,
                     &static_config,
                     &status,
                     ntp_diff.load(Ordering::Relaxed),
                     &exception_handler,
+                    session.get_rx_size(),
                 );
                 debug!("grpc sync request: {:?}", request);
 
