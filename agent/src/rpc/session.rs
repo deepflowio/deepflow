@@ -24,6 +24,7 @@ use anyhow::{anyhow, Result};
 use log::{debug, error, info};
 use md5::{Digest, Md5};
 use parking_lot::RwLock;
+use prost::Message;
 use tonic::transport::Channel;
 
 use crate::{
@@ -87,7 +88,7 @@ macro_rules! response_size {
 }
 
 macro_rules! sync_grpc_call {
-    ($self:ident, $func:ident, $request:ident, $enpoint:ident) => {{
+    ($self:ident, $func:ident, $request:ident, $endpoint:ident) => {{
         use prost::Message;
 
         let prefix = std::concat!("grpc ", stringify!($func));
@@ -108,7 +109,7 @@ macro_rules! sync_grpc_call {
         let response = client.$func($request).await;
         log::trace!("{} receive response", prefix);
         let now_elapsed = now.elapsed();
-        $self.counters[$enpoint].delay.update(now_elapsed);
+        $self.counters[$endpoint].delay.update(now_elapsed);
         if log::log_enabled!(log::Level::Debug) {
             debug!(
                 "{} latency {:?}ms request {}B response {}",
@@ -118,6 +119,19 @@ macro_rules! sync_grpc_call {
                 response_size!($func, response),
             );
         }
+        response
+    }};
+}
+
+macro_rules! sync_grpc_call_unary {
+    ($self:ident, $func:ident, $request:ident, $endpoint:ident) => {{
+        use prost::Message;
+
+        let response = sync_grpc_call!($self, $func, $request, $endpoint);
+        if let Ok(message) = &response {
+            $self.update_message_counter(message.get_ref().encoded_len());
+        };
+
         response
     }};
 }
@@ -137,6 +151,7 @@ pub struct Session {
     client: RwLock<Client>,
     exception_handler: ExceptionHandler,
     counters: Vec<Arc<GrpcCallCounter>>,
+    message_counter: Arc<GrpcMessageCounter>,
 }
 
 impl Session {
@@ -160,6 +175,18 @@ impl Session {
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
             );
         }
+        let message_counter = Arc::new(GrpcMessageCounter::default());
+        let default_grpc_buffer_size =
+            crate::config::config::Communication::default().grpc_buffer_size;
+
+        message_counter
+            .max_capacity
+            .store(default_grpc_buffer_size as u64, Ordering::Relaxed);
+
+        stats_collector.register_countable(
+            &stats::NoTagModule("grpc_message"),
+            Countable::Ref(Arc::downgrade(&message_counter) as Weak<dyn RefCountable>),
+        );
 
         let config = Config {
             ips: controller_ips,
@@ -175,10 +202,11 @@ impl Session {
             version: AtomicU64::new(0),
             client: RwLock::new(Client {
                 channel: None,
-                rx_size: crate::config::config::Communication::default().grpc_buffer_size,
+                rx_size: default_grpc_buffer_size,
             }),
             exception_handler,
             counters,
+            message_counter,
             controller_cert_file_prefix,
         }
     }
@@ -222,8 +250,30 @@ impl Session {
         let mut c = self.client.write();
         if c.rx_size != size {
             c.rx_size = size;
+            self.message_counter
+                .max_capacity
+                .store(size as u64, Ordering::Relaxed);
             self.version.fetch_add(1, Ordering::SeqCst);
         }
+    }
+
+    pub fn get_rx_size(&self) -> u64 {
+        let c = self.client.read();
+
+        c.rx_size as u64
+    }
+
+    pub fn update_message_counter(&self, size: usize) {
+        let _ =
+            self.message_counter
+                .max_size
+                .fetch_update(Ordering::Acquire, Ordering::Relaxed, |x| {
+                    if size as u64 > x {
+                        Some(size as u64)
+                    } else {
+                        None
+                    }
+                });
     }
 
     pub fn get_current_server(&self) -> (String, u16) {
@@ -308,6 +358,9 @@ impl Session {
             let now_elapsed = now.elapsed();
             self.counters[SYNC_ENDPOINT].delay.update(now_elapsed);
             debug!("grpc sync latency {:?}ms", now_elapsed.as_millis());
+            if let Ok(message) = &response {
+                self.update_message_counter(message.get_ref().encoded_len());
+            };
             response
         }
     }
@@ -339,21 +392,21 @@ impl Session {
         request: agent::NtpRequest,
     ) -> Result<tonic::Response<agent::NtpResponse>, tonic::Status> {
         // Ntp rpc name is `query`
-        sync_grpc_call!(self, query, request, NTP_ENDPOINT)
+        sync_grpc_call_unary!(self, query, request, NTP_ENDPOINT)
     }
 
     pub async fn grpc_genesis_sync_with_statsd(
         &self,
         request: agent::GenesisSyncRequest,
     ) -> Result<tonic::Response<agent::GenesisSyncResponse>, tonic::Status> {
-        sync_grpc_call!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
+        sync_grpc_call_unary!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
     }
 
     pub async fn grpc_kubernetes_api_sync_with_statsd(
         &self,
         request: agent::KubernetesApiSyncRequest,
     ) -> Result<tonic::Response<agent::KubernetesApiSyncResponse>, tonic::Status> {
-        sync_grpc_call!(
+        sync_grpc_call_unary!(
             self,
             kubernetes_api_sync,
             request,
@@ -365,7 +418,7 @@ impl Session {
         &self,
         request: agent::KubernetesClusterIdRequest,
     ) -> Result<tonic::Response<agent::KubernetesClusterIdResponse>, tonic::Status> {
-        sync_grpc_call!(
+        sync_grpc_call_unary!(
             self,
             get_kubernetes_cluster_id,
             request,
@@ -377,7 +430,7 @@ impl Session {
         &self,
         request: agent::GpidSyncRequest,
     ) -> Result<tonic::Response<agent::GpidSyncResponse>, tonic::Status> {
-        sync_grpc_call!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
+        sync_grpc_call_unary!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
     }
 
     pub async fn grpc_plugin(
@@ -412,6 +465,9 @@ impl Session {
             if message.status.unwrap_or_default() != Status::Success as i32 {
                 return Err(anyhow!("fetch wasm prog fail, server return non success"));
             }
+
+            self.update_message_counter(message.encoded_len());
+
             if let Some(d) = message.content {
                 data.extend(d);
             }
@@ -679,6 +735,32 @@ impl RefCountable for GrpcCallCounter {
                 "delay_count",
                 CounterType::Gauged,
                 CounterValue::Unsigned(delay_count),
+            ),
+        ]
+    }
+}
+
+#[derive(Default)]
+pub struct GrpcMessageCounter {
+    pub max_capacity: AtomicU64,
+    pub max_size: AtomicU64,
+}
+
+impl RefCountable for GrpcMessageCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let max_capacity = self.max_capacity.load(Ordering::Relaxed) as u64;
+        let max_size = self.max_size.swap(0, Ordering::Relaxed) as u64;
+
+        vec![
+            (
+                "max_capacity",
+                CounterType::Gauged,
+                CounterValue::Unsigned(max_capacity),
+            ),
+            (
+                "max_size",
+                CounterType::Gauged,
+                CounterValue::Unsigned(max_size),
             ),
         ]
     }
