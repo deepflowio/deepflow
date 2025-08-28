@@ -286,27 +286,6 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 	}
 
 	if t.Aggr1S {
-		aggrTableCreateSQL, err := QuerySQLStringResult(conn, fmt.Sprintf("SHOW CREATE TABLE %s", t.AggrTable1S(orgID)))
-		if err != nil {
-			log.Warningf("query 1s agg table failed: %s", err)
-		}
-		if t.IsAggrTableWrong(aggrTableCreateSQL) {
-			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1S(orgID)); err != nil {
-				log.Warningf("drop 1s agg table failed: %s", err)
-			}
-		}
-
-		localTableCreateSQL, err := QuerySQLStringResult(conn, fmt.Sprintf("SHOW CREATE TABLE %s", t.LocalTable1S(orgID)))
-		if err != nil {
-			log.Warningf("query 1s local table failed: %s", err)
-		}
-
-		if t.IsLocalTableWrong(localTableCreateSQL) {
-			if err := ExecSQL(conn, t.MakeLocalTableDropSQL1S(orgID)); err != nil {
-				log.Warningf("drop 1s local table failed: %s", err)
-			}
-		}
-
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1S(orgID)); err != nil {
 			log.Warningf("create 1s agg table failed: %s", err)
 		}
@@ -319,7 +298,6 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 		if err := ExecSQL(conn, t.MakeAggrGlobalTableCreateSQL1S(orgID)); err != nil {
 			log.Warningf("create 1s global table failed: %s", err)
 		}
-
 	}
 
 	// ByConity not support modify timezone
