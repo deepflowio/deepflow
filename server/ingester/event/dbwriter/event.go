@@ -165,7 +165,6 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 			e.Bytes,
 			e.Duration,
 			e.FileName,
-			e.FileName,
 			e.FileType,
 			e.Offset,
 			e.SyscallThread,
@@ -303,9 +302,11 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 	engine := ckdb.MergeTree
 	orderKeys := []string{timeKey, "signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
 	isFileEvent := false
+	aggr1s := false
 	partition := DefaultPartition
 	if table == common.FILE_EVENT.TableName() {
 		isFileEvent = true
+		aggr1s = true
 		partition = DefaultFileEventPartition
 	}
 
@@ -325,7 +326,7 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
-		Aggr1S:          true,
+		Aggr1S:          aggr1s,
 		AggrTableSuffix: "_metrics",
 		AggrCounted:     true,
 	}
