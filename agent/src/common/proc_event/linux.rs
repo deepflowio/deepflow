@@ -79,6 +79,10 @@ impl From<IoEventData> for metric::IoEventData {
             latency: io_event_data.latency,
             off_bytes: io_event_data.off_bytes,
             filename: io_event_data.filename,
+            mount_source: Vec::new(), // FIXME
+            mount_point: Vec::new(),  // FIXME
+            file_dir: Vec::new(),     // FIXME
+            file_type: 1,             // FIXME
         }
     }
 }

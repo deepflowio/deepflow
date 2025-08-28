@@ -235,12 +235,23 @@ enum IoOperation {
     Read = 1;
 }
 
+enum FileType {
+    Unknown = 0;
+    Regular = 1; // A file stored on the local disk.
+    Virtual = 2; // A file virtually created by the kernel, such as those in `procfs`, `sysfs`, etc.
+    Network = 3; // A file stored on a remote `NAS` or `NFS` system.
+}
+
 message IoEventData {
     uint32 bytes_count = 1;
     IoOperation operation = 2;
     uint64 latency = 3;
     bytes filename = 4; // a bytes array ending with \0, length: is the actual length of the string
     uint64 off_bytes = 5; // the number of bytes of offset within the file content
+    bytes mount_source = 6;
+    bytes mount_point= 7;
+    bytes file_dir = 8;
+    FileType file_type = 9;
 }
 
 enum EventType {
