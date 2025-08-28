@@ -61,6 +61,7 @@ const (
 	APPLOG                                   = "application_log.log"
 	DEEPFLOW_TENANT                          = "deepflow_tenant"
 	DEEPFLOW_ADMIN                           = "deepflow_admin"
+	PROFILE_METRICS                          = "profile.in_process_metrics"
 )
 
 // to modify the datasource TTL, you need to also modify the 'flow_tag' database tables.
@@ -76,10 +77,11 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
 	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}, []string{}},
 	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
-	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process", "in_process.1s_agg"}, []string{}},
+	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
 	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
 	DEEPFLOW_TENANT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
 	DEEPFLOW_ADMIN:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 14, "deepflow_admin", []string{"deepflow_server"}, []string{}},
+	PROFILE_METRICS:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 15, "profile", []string{"in_process_metrics.1s_agg"}, []string{}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {

@@ -183,6 +183,7 @@ type Table struct {
 	PrimaryKeyCount int          // 一级索引的key的个数, 从orderKeys中数前n个,
 	Aggr1H1D        bool         // 是否创建 1h/1d 表
 	Aggr1S          bool         // 是否创建 1s 表
+	AggrTableSuffix string
 }
 
 func (t *Table) OrgDatabase(orgID uint16) string {
@@ -386,7 +387,7 @@ func (t *Table) IsLocalTableWrong(createTableSql string) bool {
 }
 
 func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
-	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 }
 
 func (t *Table) AggrTable1S(orgID uint16) string {
@@ -394,7 +395,7 @@ func (t *Table) AggrTable1S(orgID uint16) string {
 }
 
 func (t *Table) LocalTable1S(orgID uint16) string {
-	return fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tablePrefix(), AggregationSecond.String())
+	return fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tableAggrPrefix(), AggregationSecond.String())
 }
 
 func (t *Table) MakeLocalTableDropSQL1S(orgID uint16) string {
@@ -473,8 +474,12 @@ func (t *Table) tablePrefix() string {
 	return strings.Split(t.GlobalName, ".")[0]
 }
 
+func (t *Table) tableAggrPrefix() string {
+	return t.tablePrefix() + t.AggrTableSuffix
+}
+
 func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInterval, ttlHour int) string {
-	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 	columns := []string{}
 	groupKeys := t.OrderKeys
 	for _, c := range t.Columns {
@@ -537,8 +542,8 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 }
 
 func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
-	tableMv := fmt.Sprintf("%s.`%s.%s_mv`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
-	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableMv := fmt.Sprintf("%s.`%s.%s_mv`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 	tableBase := fmt.Sprintf("%s.`%s%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.BaseTable())
 
 	if t.DBType == CKDBTypeByconity {
@@ -588,10 +593,10 @@ func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationI
 }
 
 func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval AggregationInterval) string {
-	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
-	tableLocal := fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+	tableAgg := fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
+	tableLocal := fmt.Sprintf("%s.`%s.%s_local`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 	if t.DBType == CKDBTypeByconity {
-		tableLocal = fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tablePrefix(), aggrInterval.String())
+		tableLocal = fmt.Sprintf("%s.`%s.%s`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 	}
 
 	columns := []string{}
@@ -636,8 +641,8 @@ func (t *Table) MakeAggrGlobalTableCreateSQL(orgID uint16, aggrInterval Aggregat
 	if t.DBType == CKDBTypeByconity {
 		return t.MakeAggrLocalTableCreateSQL(orgID, aggrInterval)
 	}
-	tableGlobal := fmt.Sprintf("%s.%s", t.tablePrefix(), aggrInterval.String())
-	tableLocal := fmt.Sprintf("%s.%s_local", t.tablePrefix(), aggrInterval.String())
+	tableGlobal := fmt.Sprintf("%s.%s", t.tableAggrPrefix(), aggrInterval.String())
+	tableLocal := fmt.Sprintf("%s.%s_local", t.tableAggrPrefix(), aggrInterval.String())
 
 	engine := fmt.Sprintf(Distributed.String(), t.Cluster, t.OrgDatabase(orgID), tableLocal)
 	createTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE = %s",
