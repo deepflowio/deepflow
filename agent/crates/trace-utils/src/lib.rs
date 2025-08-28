@@ -23,7 +23,8 @@ cfg_if::cfg_if! {
         pub(crate) mod utils;
 
         use std::io::Write;
-
+        use std::fs;
+        use std::process::{Command, Stdio};
         use unwind::{python::PythonUnwindTable, UnwindTable};
 
         #[no_mangle]
@@ -122,6 +123,64 @@ cfg_if::cfg_if! {
                 Some(offset) => offset as i32,
                 None => -1,
             }
+        }
+
+        /// protect_cpu_affinity
+        ///
+        /// This function checks whether a process named "numad" is running.
+        /// If found, it attempts to execute `numad -x <current PID>` to disable
+        /// numad from interfering with CPU affinity settings.
+        ///
+        /// Return values:
+        ///   0  -> "numad" not found
+        ///   1  -> "numad" found and execution succeeded
+        ///  -1  -> "numad" found but execution failed
+        #[no_mangle]
+        pub unsafe extern "C" fn protect_cpu_affinity() -> i32 {
+            let mut numad_path: Option<String> = None;
+
+            // Iterate over /proc directory
+            if let Ok(entries) = fs::read_dir("/proc") {
+                for entry in entries.flatten() {
+                    let file_name = entry.file_name();
+                    let pid_str = file_name.to_string_lossy();
+
+                    // Skip non-numeric directories
+                    if !pid_str.chars().all(|c| c.is_digit(10)) {
+                        continue;
+                    }
+
+                    let comm_path = entry.path().join("comm");
+                    if let Ok(name) = fs::read_to_string(&comm_path) {
+                        if name.trim() == "numad" {
+                            let exe_path = entry.path().join("exe");
+                            if let Ok(path) = fs::read_link(&exe_path) {
+                                numad_path = Some(path.to_string_lossy().to_string());
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(path) = numad_path {
+                let pid = std::process::id();
+                //let cmd_str = format!("{} -x {}", path, pid);
+                //println!("Executing command: {}", cmd_str);
+                let status = Command::new(&path)
+                    .arg("-x")
+                    .arg(pid.to_string())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .status();
+
+                match status {
+                    Ok(s) if s.success() => return 1,
+                    _ => return -1,
+                }
+            }
+
+            0
         }
     }
 }

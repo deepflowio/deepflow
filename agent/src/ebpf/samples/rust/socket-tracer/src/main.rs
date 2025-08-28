@@ -387,6 +387,19 @@ fn get_counter(counter_type: u32) -> u32 {
     }
 }
 
+pub fn protect_cpu_affinity() {
+    unsafe {
+        let ret = trace_utils::protect_cpu_affinity();
+
+        match ret {
+            0 => println!("numad not found"),
+            1 => println!("numad found and execution succeeded"),
+            -1 => println!("numad found but execution failed"),
+            _ => println!("unexpected return value: {}", ret),
+        }
+    }
+}
+
 fn main() {
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info")
@@ -398,6 +411,7 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
+        protect_cpu_affinity();
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);

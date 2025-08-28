@@ -410,6 +410,18 @@ impl Trident {
         sidecar_mode: bool,
         cgroups_disabled: bool,
     ) -> Result<Trident> {
+        // To prevent 'numad' from interfering with the CPU
+        // affinity settings of deepflow-agent
+        unsafe {
+            let ret = trace_utils::protect_cpu_affinity();
+
+            match ret {
+                0 => info!("numad not found"),
+                1 => info!("numad found and execution succeeded"),
+                -1 => info!("numad found but execution failed"),
+                _ => info!("numad unexpected return value: {}", ret),
+            }
+        }
         let config = match agent_mode {
             RunningMode::Managed => {
                 match Config::load_from_file(config_path.as_ref()) {
