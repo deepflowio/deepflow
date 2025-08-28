@@ -204,6 +204,7 @@ func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType strin
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 		Aggr1S:          true,
+		AggrTableSuffix: "_metrics",
 	}
 }
 
