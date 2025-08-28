@@ -1133,6 +1133,7 @@ global:
 **标签**:
 
 `hot_update`
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -4100,7 +4101,7 @@ inputs:
 但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
-##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
+##### 启用fentry/fexit特性 {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **标签**:
 
@@ -4109,7 +4110,6 @@ inputs:
 **FQCN**:
 
 `inputs.ebpf.socket.tunning.fentry_enabled`
-
 
 **默认值**:
 ```yaml

@@ -279,6 +279,25 @@ impl AgentState {
         sg.1.replace(config);
         self.notifier.notify_one();
     }
+
+    pub fn update_partial_config(&self, user_config: UserConfig) {
+        if self.terminated.load(Ordering::Relaxed) {
+            // when state is Terminated, main thread should still be notified for exiting
+            self.notifier.notify_one();
+            return;
+        }
+        let mut sg = self.state.lock().unwrap();
+        sg.0.enabled = user_config.global.common.enabled;
+        if let Some(changed_config) = sg.1.as_mut() {
+            changed_config.user_config = user_config;
+        } else {
+            sg.1.replace(ChangedConfig {
+                user_config,
+                ..Default::default()
+            });
+        }
+        self.notifier.notify_one();
+    }
 }
 
 pub struct VersionInfo {
