@@ -87,7 +87,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 			response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
 			response.Details = append(response.Details, azVTapRebalanceResult.Details...)
 		}
-		if !r.onlyWeight && azVTapRebalanceResult != nil &&
+		if !r.reportWeightOnly && azVTapRebalanceResult != nil &&
 			azVTapRebalanceResult.TotalSwitchVTapNum != 0 {
 			for vtapID, changeInfo := range vTapIDToChangeInfo {
 				if !ifCheckout && changeInfo.OldIP != changeInfo.NewIP {
@@ -120,7 +120,9 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 			}
 		}
 
-		r.updateCounter(db, vTapIDToVTap, vtapNameToID, vTapIDToChangeInfo)
+		if r.reportWeightOnly {
+			r.updateCounter(db, vTapIDToVTap, vtapNameToID, vTapIDToChangeInfo)
+		}
 	}
 
 	allVTapNameToID := make(map[string]int, len(r.dbInfo.VTaps))
@@ -634,7 +636,7 @@ func (r *AnalyzerInfo) getVTapTraffic(db *mysql.DB, dataDuration int, regionToAZ
 }
 
 type Query struct {
-	onlyWeight bool
+	reportWeightOnly bool
 }
 
 func (q *Query) GetAgentDispatcher(orgDB *mysql.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
@@ -664,7 +666,7 @@ func (q *Query) GetAgentDispatcher(orgDB *mysql.DB, domainPrefix string, dataDur
 		return nil, fmt.Errorf("curl (%s) failed, db (%s), sql: %s, err: %s", queryURL, db, sql, err)
 	}
 	defer resp.Body.Close()
-	if !q.onlyWeight {
+	if !q.reportWeightOnly {
 		log.Infof("curl(%s) query data time since(%v), db(%s) sql(%s)",
 			queryURL, time.Since(t), db, sql, orgDB.LogPrefixORGID, orgDB.LogPrefixName)
 	}
@@ -726,7 +728,7 @@ func (r *AnalyzerInfo) updateCounter(db *mysql.DB, vtapIDToVTap map[int]*mysqlmo
 			continue
 		}
 		isAnalyzerChanged := uint64(0)
-		if !r.onlyWeight {
+		if !r.reportWeightOnly {
 			if changeInfo.OldIP != changeInfo.NewIP {
 				isAnalyzerChanged = uint64(1)
 			}

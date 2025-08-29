@@ -40,7 +40,15 @@ type DBInfo struct {
 }
 
 type AnalyzerInfo struct {
-	onlyWeight bool
+	// true(Weight Reporting Mode).
+	// The intended behavior is to perform all the traffic and weight calculations
+	// but only to report the final agent weights as metrics via statsd.
+	// It should not perform any actual rebalancing or database updates.
+	//
+	// false(Weight Rebalancing Mode).
+	// This mode is used to perform an actual rebalance check.
+	// It calculates traffic and determines if any agents need to be moved between analyzers.
+	reportWeightOnly bool
 
 	dbInfo *DBInfo
 	db     DB
@@ -57,12 +65,12 @@ type RebalanceData struct {
 	AZToAnalyzers             map[string][]*mysqlmodel.Analyzer `json:"AZToAnalyzers"`
 }
 
-func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
+func NewAnalyzerInfo(reportWeightOnly bool) *AnalyzerInfo {
 	return &AnalyzerInfo{
-		onlyWeight: onlyWeight,
-		dbInfo:     &DBInfo{},
+		reportWeightOnly: reportWeightOnly,
+		dbInfo:           &DBInfo{},
 		query: &Query{
-			onlyWeight: onlyWeight,
+			reportWeightOnly: reportWeightOnly,
 		},
 	}
 }
