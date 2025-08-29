@@ -412,14 +412,18 @@ impl Trident {
     ) -> Result<Trident> {
         // To prevent 'numad' from interfering with the CPU
         // affinity settings of deepflow-agent
-        unsafe {
-            let ret = trace_utils::protect_cpu_affinity();
-
-            match ret {
-                0 => info!("numad not found"),
-                1 => info!("numad found and execution succeeded"),
-                -1 => info!("numad found but execution failed"),
-                _ => info!("numad unexpected return value: {}", ret),
+        match trace_utils::protect_cpu_affinity() {
+            Ok(()) => info!("CPU affinity protected successfully"),
+            Err(e) => {
+                // Distinguish between "numad not found" (normal) and other errors
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    info!("numad process not found, skipping CPU affinity protection (normal)");
+                } else {
+                    warn!(
+                        "Failed to protect CPU affinity due to unexpected error: {}",
+                        e
+                    );
+                }
             }
         }
         let config = match agent_mode {
