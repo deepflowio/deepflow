@@ -49,57 +49,58 @@ func NewRebalanceCheck(cfg config.MonitorConfig, ctx context.Context) *Rebalance
 
 func (r *RebalanceCheck) Start(sCtx context.Context) {
 	log.Info("rebalance check start")
-	go func() {
-		if !r.cfg.AutoRebalanceVTap {
-			return
-		}
+	// If auto rebalance vtap is disabled, return
+	if !r.cfg.AutoRebalanceVTap {
+		log.Info("auto rebalance vtap is disabled")
+		return
+	}
 
+	// Goroutine for controller and analyzer rebalance check by agent count
+	go func() {
 		ticker := time.NewTicker(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second)
 		defer ticker.Stop()
-	LOOP1:
 		for {
 			select {
 			case <-ticker.C:
 				for _, db := range metadb.GetDBs().All() {
-					r.controllerRebalance(db)
+					r.rebalanceControllerByAgentCount(db)
 					if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-						r.analyzerRebalance(db)
+						r.rebalanceAnalyzerByAgentCount(db)
 					}
 				}
 			case <-sCtx.Done():
-				break LOOP1
+				return
 			case <-r.vCtx.Done():
-				break LOOP1
+				return
 			}
 		}
 	}()
 
+	// Goroutine for analyzer rebalance check by ingested data (traffic)
+	if r.cfg.IngesterLoadBalancingConfig.Algorithm != common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+		return
+	}
 	go func() {
-		if !r.cfg.AutoRebalanceVTap {
-			return
-		}
-
-		if r.cfg.IngesterLoadBalancingConfig.Algorithm != common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-			return
-		}
-
 		duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
-		r.analyzerRebalanceByTraffic(duration)
+		// Initial check
+		r.rebalanceAnalyzerByTraffic(duration)
 
-		// report agent weight every 10 secends
-		sendWeight(sCtx, duration)
+		rebalanceTicker := time.NewTicker(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second)
+		defer rebalanceTicker.Stop()
 
-		ticker := time.NewTicker(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second)
-		defer ticker.Stop()
-	LOOP2:
+		reportWeightTicker := time.NewTicker(intervalSendWeight)
+		defer reportWeightTicker.Stop()
+
 		for {
 			select {
-			case <-ticker.C:
-				r.analyzerRebalanceByTraffic(duration)
+			case <-rebalanceTicker.C:
+				r.rebalanceAnalyzerByTraffic(duration)
+			case <-reportWeightTicker.C:
+				r.reportAgentWeight(duration)
 			case <-sCtx.Done():
-				break LOOP2
+				return
 			case <-r.vCtx.Done():
-				break LOOP2
+				return
 			}
 		}
 	}()
@@ -112,7 +113,7 @@ func (r *RebalanceCheck) Stop() {
 	log.Info("rebalance check stopped")
 }
 
-func (r *RebalanceCheck) controllerRebalance(db *metadb.DB) {
+func (r *RebalanceCheck) rebalanceControllerByAgentCount(db *metadb.DB) {
 	controllers, err := service.GetControllers(common.DEFAULT_ORG_ID, map[string]string{})
 	if err != nil {
 		log.Errorf("get controllers failed, (%v)", err, db.LogPrefixORGID)
@@ -139,7 +140,7 @@ func (r *RebalanceCheck) controllerRebalance(db *metadb.DB) {
 	}
 }
 
-func (r *RebalanceCheck) analyzerRebalance(db *metadb.DB) {
+func (r *RebalanceCheck) rebalanceAnalyzerByAgentCount(db *metadb.DB) {
 	// check if need rebalance
 	analyzers, err := service.GetAnalyzers(db.ORGID, map[string]interface{}{})
 	if err != nil {
@@ -166,7 +167,7 @@ func (r *RebalanceCheck) analyzerRebalance(db *metadb.DB) {
 	}
 }
 
-func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
+func (r *RebalanceCheck) rebalanceAnalyzerByTraffic(dataDuration int) {
 	for _, db := range metadb.GetDBs().All() {
 		log.Infof("check analyzer rebalance, traffic duration(%vs)", dataDuration, db.LogPrefixORGID)
 		analyzerInfo := rebalance.NewAnalyzerInfo(false)
@@ -185,26 +186,13 @@ func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 	}
 }
 
-func sendWeight(ctx context.Context, dataDuration int) {
-	go func() {
-		ticker := time.NewTicker(intervalSendWeight)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				log.Infof("agent traffic context done")
-				return
-			case <-ticker.C:
-				for _, db := range metadb.GetDBs().All() {
-					analyzerInfo := rebalance.NewAnalyzerInfo(true)
-					_, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
-					if err != nil {
-						log.Errorf("fail to rebalance analyzer by data(if check: true): %v", err, db.LogPrefixORGID)
-						return
-					}
-				}
-			}
+func (r *RebalanceCheck) reportAgentWeight(dataDuration int) {
+	for _, db := range metadb.GetDBs().All() {
+		analyzerInfo := rebalance.NewAnalyzerInfo(true)
+		_, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
+		if err != nil {
+			log.Errorf("fail to rebalance analyzer by data(if check: true): %v", err, db.LogPrefixORGID)
+			return
 		}
-	}()
+	}
 }
