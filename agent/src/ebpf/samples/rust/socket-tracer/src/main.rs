@@ -26,6 +26,7 @@ use std::net::IpAddr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
+use log::info;
 
 extern "C" {
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
@@ -387,19 +388,6 @@ fn get_counter(counter_type: u32) -> u32 {
     }
 }
 
-pub fn protect_cpu_affinity() {
-    unsafe {
-        let ret = trace_utils::protect_cpu_affinity();
-
-        match ret {
-            0 => println!("numad not found"),
-            1 => println!("numad found and execution succeeded"),
-            -1 => println!("numad found but execution failed"),
-            _ => println!("unexpected return value: {}", ret),
-        }
-    }
-}
-
 fn main() {
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info")
@@ -410,8 +398,18 @@ fn main() {
 
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
+    match trace_utils::protect_cpu_affinity() {
+        Ok(()) => info!("CPU affinity protected successfully"),
+        Err(e) => {
+            // Distinguish between "numad not found" (normal) and other errors
+            if e.kind() == std::io::ErrorKind::NotFound {
+                println!("numad process not found, skipping CPU affinity protection (normal)");
+            } else {
+                println!("Failed to protect CPU affinity due to unexpected error: {}", e);
+            }
+        }
+    }
     unsafe {
-        protect_cpu_affinity();
         enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);

@@ -896,15 +896,11 @@ static void process_event(struct process_event_t *e)
 		 * "numad -x " to exclude the agent.
 		 */
 		if (strcmp((const char *)e->name, "numad") == 0 && process_exists(e->pid)) {
-			int ret = protect_cpu_affinity();
+			int ret = protect_cpu_affinity_c();
 			if (ret == 0)
-				ebpf_info("numad(pid %d) not found\n", e->pid);
-			else if (ret == 1)
 				ebpf_info("numad(pid %d) found and execution succeeded\n", e->pid);
-			else if (ret == -1)
-				ebpf_info("numad(pid %d) found but execution failed\n", e->pid);
 			else
-				ebpf_info("numad(pid %d) unexpected return value: %d\n", e->pid, ret);
+				ebpf_info("numad(pid %d) execution failed\n", e->pid);
 		}
 
 		update_proc_info_cache(e->pid, PROC_EXEC);
