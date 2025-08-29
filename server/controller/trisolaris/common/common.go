@@ -115,6 +115,10 @@ const (
 
 	DISABLED = 0
 	ENABLED  = 1
+
+	MEGA_BYTE = 1024 * 1024
+
+	BUFFER_SIZE_EXTRA = 512 * 1024 // 512KB
 )
 
 const (

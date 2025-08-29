@@ -275,6 +275,12 @@ type VTapCache struct {
 	pushVersionPolicy       uint64
 	pushVersionGroups       uint64
 
+	// grpc buffer size
+	grpcBufferSize    uint64
+	lastSyncBytes     uint64
+	lastPushBytes     uint64
+	lastGPIDSyncBytes uint64
+
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
 	// ID of the container cluster where the container type vtap resides
@@ -308,6 +314,7 @@ func (c *VTapCache) String() ([]byte, error) {
 		"syncedControllerAt":      c.GetSyncedControllerAt(),
 		"syncedTSDBAt":            c.GetSyncedTSDBAt(),
 		"bootTime":                c.GetBootTime(),
+		"grpcBufferSize":          c.GetGRPCBufferSize(),
 		"exceptions":              c.GetExceptions(),
 		"vTapGroupLcuuid":         c.GetVTapGroupLcuuid(),
 		"vTapGroupShortID":        c.GetVTapGroupShortID(),
@@ -378,6 +385,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.vTapGroupShortID = proto.String(vTapInfo.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 	vTapCache.cpuNum = vtap.CPUNum
 	vTapCache.memorySize = vtap.MemorySize
+	vTapCache.grpcBufferSize = vtap.GRPCBufferSize
 	vTapCache.arch = proto.String(vtap.Arch)
 	vTapCache.os = proto.String(vtap.Os)
 	vTapCache.kernelVersion = proto.String(vtap.KernelVersion)
@@ -1640,6 +1648,29 @@ func (c *VTapCache) setAgentRemoteSegments(segments []*agent.Segment) {
 
 func (c *VTapCache) GetAgentRemoteSegments() []*agent.Segment {
 	return c.agentRemoteSegments
+}
+
+func (c *VTapCache) UpdateLastSyncBytes(bytes uint64) {
+	c.lastSyncBytes = bytes
+	c.grpcBufferSize = c.maxGRPCBytes()
+}
+
+func (c *VTapCache) UpdateLastPushBytes(bytes uint64) {
+	c.lastPushBytes = bytes
+	c.grpcBufferSize = c.maxGRPCBytes()
+}
+
+func (c *VTapCache) UpdateLastGPIDSyncBytes(bytes uint64) {
+	c.lastGPIDSyncBytes = bytes
+	c.grpcBufferSize = c.maxGRPCBytes()
+}
+
+func (c *VTapCache) maxGRPCBytes() uint64 {
+	return max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes)
+}
+
+func (c *VTapCache) GetGRPCBufferSize() uint64 {
+	return c.grpcBufferSize
 }
 
 type VTapCacheMap struct {
