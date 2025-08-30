@@ -20,6 +20,7 @@
 #include <sched.h>
 #include <sys/prctl.h>
 #include <arpa/inet.h>
+#include <signal.h>
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
@@ -41,6 +42,7 @@
 #include "perf_reader.h"
 #include "common_utils.h"
 #include "extended/extended.h"
+#include "trace_utils.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_3_10_0.c"
@@ -865,11 +867,42 @@ static struct tracer_sockopts datadump_sockopts = {
 	.get = datadump_sockopt_get,
 };
 
+static inline int process_exists(pid_t pid)
+{
+	if (kill(pid, 0) == 0) {
+		return 1; // exists, and we have permission
+	}
+
+	if (errno == EPERM) {
+		ebpf_info("Pid %d exists, but no permission\n", pid);
+		return 1;
+	}
+
+	return 0; // does not exist
+}
+
 static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
 		if (e->maybe_thread && !is_user_process(e->pid))
 			return;
+
+		/*
+		 * To prevent 'numad' from interfering with the CPU
+		 * affinity settings of deepflow-agent, the following
+		 * actions are taken:
+		 * If deepflow-agent starts before numad, use eBPF
+		 * process monitor to detect numad startup and run
+		 * "numad -x " to exclude the agent.
+		 */
+		if (strcmp((const char *)e->name, "numad") == 0 && process_exists(e->pid)) {
+			int ret = protect_cpu_affinity_c();
+			if (ret == 0)
+				ebpf_info("numad(pid %d) found and execution succeeded\n", e->pid);
+			else
+				ebpf_info("numad(pid %d) execution failed\n", e->pid);
+		}
+
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		unwind_process_exec(e->pid);
 		extended_process_exec(e->pid);
