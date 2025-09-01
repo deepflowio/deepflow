@@ -20,11 +20,17 @@ cfg_if::cfg_if! {
         pub mod error;
         pub mod maps;
         pub mod unwind;
-        pub(crate) mod utils;
+        pub mod utils;
 
+        // Standard library
         use std::io::Write;
 
+        // Third-party crates
+        use log::info;
+
+        // Crate internal modules
         use unwind::{python::PythonUnwindTable, UnwindTable};
+        pub use utils::protect_cpu_affinity;
 
         #[no_mangle]
         pub unsafe extern "C" fn unwind_table_create(
@@ -121,6 +127,17 @@ cfg_if::cfg_if! {
             match btf::read_offset_of_stack_in_task_struct() {
                 Some(offset) => offset as i32,
                 None => -1,
+            }
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn protect_cpu_affinity_c() -> i32 {
+            match protect_cpu_affinity() {
+                Ok(()) => 0,   // Success -> return 0 to C
+                Err(e) => {
+                    info!("protect_cpu_affinity_c failed: {e}");
+                    -1        // Failure -> return -1 to C
+                }
             }
         }
     }
