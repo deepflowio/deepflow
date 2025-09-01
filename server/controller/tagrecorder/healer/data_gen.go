@@ -40,7 +40,7 @@ type dataGenerator interface {
 	setHasDuplicateID(bool) dataGenerator
 	setTableName(tableName string) dataGenerator
 	setGroupSortOrder(order string) dataGenerator
-	setInSubDomain(bool) dataGenerator
+	setFilterSubDomain(bool) dataGenerator
 	setChDeviceTypes(...int) dataGenerator
 	setAdditionalSelectField(...string) dataGenerator
 	setUnscoped(bool) dataGenerator
@@ -49,48 +49,47 @@ type dataGenerator interface {
 func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 	var dg dataGenerator
 	realID := "id"
-	inSubDomain := true
+	filterSubDomain := true
 	hasDuplicateID := false
 	tableName := ""
 	useLatestUpdatedAt := "ASC"
 	switch resourceType {
 	case common.RESOURCE_TYPE_AZ_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.AZ](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_VM_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.VM](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case common.RESOURCE_TYPE_HOST_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.Host](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_VPC_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.VPC](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case common.RESOURCE_TYPE_NETWORK_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.Network](md, resourceType)
-		inSubDomain = false
 	case common.RESOURCE_TYPE_VROUTER_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.VRouter](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case common.RESOURCE_TYPE_DHCP_PORT_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.DHCPPort](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_NAT_GATEWAY_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.NATGateway](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case common.RESOURCE_TYPE_LB_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.LB](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_RDS_INSTANCE_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.RDSInstance](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case common.RESOURCE_TYPE_REDIS_INSTANCE_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.RedisInstance](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.PodCluster](md, resourceType)
@@ -116,22 +115,23 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 
 	case common.RESOURCE_TYPE_CUSTOM_SERVICE_EN:
 		dg = newDataGeneratorComponent[mysqlmodel.CustomService](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_DEVICE:
 		dg = newDataGeneratorComponent[healerChDevice](md, resourceType)
 		realID = "deviceid" // ch_device uses deviceid as the real id field
+		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_AZ:
 		dg = newDataGeneratorComponent[mysqlmodel.ChAZ](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST:
 		dg = newDataGeneratorComponent[mysqlmodel.ChChost](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_VPC:
 		dg = newDataGeneratorComponent[mysqlmodel.ChVPC](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_NETWORK:
 		dg = newDataGeneratorComponent[mysqlmodel.ChNetwork](md, resourceType)
 
@@ -155,12 +155,12 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG:
 		dg = newDataGeneratorComponent[mysqlmodel.ChChostCloudTag](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 		hasDuplicateID = true
 		tableName = "ch_chost_cloud_tag"
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS:
 		dg = newDataGeneratorComponent[mysqlmodel.ChChostCloudTags](md, resourceType)
-		inSubDomain = false
+		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG:
 		dg = newDataGeneratorComponent[mysqlmodel.ChPodNSCloudTag](md, resourceType)
 		hasDuplicateID = true
@@ -202,7 +202,7 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 		return nil
 	}
 	return dg.setRealIDField(realID).
-		setInSubDomain(inSubDomain).
+		setFilterSubDomain(filterSubDomain).
 		setHasDuplicateID(hasDuplicateID).
 		setTableName(tableName).
 		setGroupSortOrder(useLatestUpdatedAt)
@@ -210,12 +210,12 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 
 func newDataGeneratorComponent[GT dataGeneratorModel](md metadata.Platform, resourceType string) dataGenerator {
 	dataGeneratorComponent := &dataGeneratorComponent[GT]{
-		md:            md,
-		resourceType:  resourceType,
-		realIDField:   "id",
-		inSubDomain:   true, // default is true, used for query
-		idToUpdatedAt: make(map[int]time.Time),
-		unscoped:      true, // default is true, used for query
+		md:              md,
+		resourceType:    resourceType,
+		realIDField:     "id",
+		filterSubDomain: true, // default is true, used for query
+		idToUpdatedAt:   make(map[int]time.Time),
+		unscoped:        true, // default is true, used for query
 	}
 	return dataGeneratorComponent
 }
@@ -224,17 +224,23 @@ type dataGeneratorComponent[GT dataGeneratorModel] struct {
 	md metadata.Platform
 
 	resourceType  string
-	inSubDomain   bool // whether the resource may be in sub domain, used for query
 	idToUpdatedAt map[int]time.Time
-	// the field used to query the resource, usually the id field, but can be other fields like gid, deviceid.
+
+	// The following fields are used in query conditions
+	// filterSubDomain indicates whether to add a sub_domain filter condition. The assignment logic is:
+	// For source resources, if they may be sub_domain resources, set to true;
+	// For ch resources, also set based on whether the source resource may be a sub_domain.
+	filterSubDomain bool
+	// realIDField specifies the resource key value, default is id, but can be other fields like gid, deviceid.
 	realIDField string
-	// whether the resource has duplicate id, if true, we need to use the latest updated_at to determine which one to use. Default is false.
+	// Whether the resource has duplicate id, if true (for example, the gid field in the process table),
+	// We need to use the latest updated_at to determine which one to use. Default is false.
 	hasDuplicateID bool
-	// set when hasDuplicateID is true.
-	// table name of the resource, used for query.
+	// Set when hasDuplicateID is true.
+	// Table name of the resource, used for query.
 	tableName string
-	// set when hasDuplicateID is true.
-	// whether to use the latest updated_at, if true, we will use the latest updated_at to determine which one to use.
+	// Set when hasDuplicateID is true.
+	// Whether to use the latest updated_at, if true, we will use the latest updated_at to determine which one to use.
 	groupSortOrder string // "ASC" or "DESC", default is "ASC"
 
 	// TODO refactor
@@ -279,8 +285,8 @@ func (s *dataGeneratorComponent[GT]) setGroupSortOrder(groupSortOrder string) da
 	return s
 }
 
-func (s *dataGeneratorComponent[GT]) setInSubDomain(inSubDomain bool) dataGenerator {
-	s.inSubDomain = inSubDomain
+func (s *dataGeneratorComponent[GT]) setFilterSubDomain(filterSubDomain bool) dataGenerator {
+	s.filterSubDomain = filterSubDomain
 	return s
 }
 
@@ -308,6 +314,8 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 	item := new(GT)
 	query := s.md.DB.Model(&item)
 
+	// selectFieldsStr is used to select the fields in the query,
+	// it contains the updated_at field, andthe realIDField which may not be id field in source table but is used as id in ch tables.
 	selectFieldsStr := s.realIDField + ", updated_at"
 	if len(s.additionalSelectFields) > 0 {
 		selectFieldsStr += ", " + strings.Join(s.additionalSelectFields, ", ")
@@ -321,12 +329,12 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 	appendDomainCond := func(q *gorm.DB) *gorm.DB {
 		if strings.HasPrefix(s.resourceType, "ch_") {
 			q = q.Where("domain_id = ?", s.md.GetDomainID())
-			if s.inSubDomain {
+			if s.filterSubDomain {
 				q = q.Where("sub_domain_id = ?", s.md.GetSubDomainID())
 			}
 		} else {
 			q = q.Where("domain = ?", s.md.GetDomainLcuuid())
-			if s.inSubDomain {
+			if s.filterSubDomain {
 				q = q.Where("sub_domain = ?", s.md.GetSubDomainLcuuid())
 			}
 		}

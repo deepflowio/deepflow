@@ -1434,6 +1434,9 @@ func (t *DataSet) GetMacByVInterfaceLcuuid(vifLcuuid string) (string, bool) {
 }
 
 func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
+	if id == 0 {
+		return "", true
+	}
 	if id == t.publicNetworkID {
 		return rcommon.PUBLIC_NETWORK_LCUUID, true
 	}

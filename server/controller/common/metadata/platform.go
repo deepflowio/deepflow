@@ -61,6 +61,10 @@ func (m Platform) Copy() Platform {
 	}
 }
 
+func (m Platform) IsSubDomainValid() bool {
+	return m.subDomain.ID != 0
+}
+
 func (m Platform) GetDB() *mysql.DB {
 	return m.DB
 }
