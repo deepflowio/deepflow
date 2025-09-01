@@ -15,23 +15,11 @@
  */
 
 use std::{
-    cell::OnceCell,
-    collections::HashMap,
-    ffi::CStr,
-    fs,
-    io::Write,
-    mem,
-    path::{Path, PathBuf},
-    slice,
+    cell::OnceCell, collections::HashMap, ffi::CStr, fs, io::Write, mem, path::PathBuf, slice,
 };
 
 use libc::c_void;
 use log::{debug, trace, warn};
-use object::{
-    elf,
-    read::elf::{FileHeader, ProgramHeader, SectionHeader},
-    Object, ObjectSymbol,
-};
 use regex::Regex;
 use semver::{Version, VersionReq};
 
@@ -41,6 +29,8 @@ use crate::{
     utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
 
+use super::elf_utils::MappedFile;
+
 fn error_not_python(pid: u32) -> Error {
     Error::BadInterpreterType(pid, "python")
 }
@@ -49,134 +39,40 @@ fn error_not_supported_version(pid: u32, version: Version) -> Error {
     Error::BadInterpreterVersion(pid, "python", version)
 }
 
-struct MappedFile {
-    path: PathBuf,
-    contents: Vec<u8>,
-    mem_start: u64,
+// Python-specific version extraction utilities
+thread_local! {
+    static PYTHON_VERSION_REGEX: OnceCell<Regex> = OnceCell::new();
 }
 
-impl MappedFile {
-    fn load(&mut self) -> Result<()> {
-        if self.contents.is_empty() {
-            self.contents = fs::read(&self.path)?;
+const PYTHON_VERSION_REGEX_STR: &str =
+    r"((2|3)\.(3|4|5|6|7|8|9|10|11|12|13)(\.\d{1,2})?)((a|b|c|rc)\d{1,2})?\+?";
+
+fn parse_python_version(cap: regex::Captures) -> Option<Version> {
+    Some(Version::new(
+        cap.get(2)?.as_str().parse().ok()?,
+        cap.get(3)?.as_str().parse().ok()?,
+        cap.get(4)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or_default(),
+    ))
+}
+
+/// Extract Python version from filename (e.g., "python3.10" -> 3.10.0)
+fn extract_version_from_filename(file: &MappedFile) -> Option<Version> {
+    let filename = file.file_name()?;
+    let cap = PYTHON_VERSION_REGEX.with(|r| {
+        r.get_or_init(|| Regex::new(PYTHON_VERSION_REGEX_STR).unwrap())
+            .captures(filename)
+    })?;
+    match parse_python_version(cap) {
+        Some(v) => Some(v),
+        None => {
+            debug!(
+                "Cannot find python version from file {}",
+                file.path.display()
+            );
+            None
         }
-        Ok(())
-    }
-
-    fn has_any_symbols(&mut self, symbols: &[&str]) -> Result<bool> {
-        self.load()?;
-        let obj = object::File::parse(&*self.contents)?;
-        Ok(obj.symbols().chain(obj.dynamic_symbols()).any(|s| {
-            if let Ok(name) = s.name() {
-                for sym in symbols {
-                    if &name == sym {
-                        return true;
-                    }
-                }
-            }
-            false
-        }))
-    }
-
-    thread_local! {
-        static VERSION_REGEX: OnceCell<Regex> = OnceCell::new();
-    }
-
-    const VERSION_REGEX_STR: &'static str =
-        r"((2|3)\.(3|4|5|6|7|8|9|10|11|12|13)(\.\d{1,2})?)((a|b|c|rc)\d{1,2})?\+?";
-    // parse captures of previous regex
-    fn parse_version(cap: regex::Captures) -> Option<Version> {
-        Some(Version::new(
-            cap.get(2)?.as_str().parse().ok()?,
-            cap.get(3)?.as_str().parse().ok()?,
-            cap.get(4)
-                .and_then(|m| m.as_str().parse().ok())
-                .unwrap_or_default(),
-        ))
-    }
-
-    fn version(&self) -> Option<Version> {
-        if let Some(c) = self
-            .path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .and_then(|s| {
-                Self::VERSION_REGEX.with(|r| {
-                    r.get_or_init(|| Regex::new(Self::VERSION_REGEX_STR).unwrap())
-                        .captures(s)
-                })
-            })
-        {
-            match Self::parse_version(c) {
-                Some(v) => return Some(v),
-                None => debug!(
-                    "Cannot find python version from file {}",
-                    self.path.display()
-                ),
-            }
-        }
-        None
-    }
-
-    fn find_text_section_program_header<P: AsRef<Path>>(
-        path: P,
-        data: &[u8],
-    ) -> Result<Option<&elf::ProgramHeader64<object::Endianness>>> {
-        let elf = elf::FileHeader64::<object::Endianness>::parse(data)?;
-        let endian = elf.endian()?;
-        let sec_headers = elf.section_headers(endian, data)?;
-        let sec_strs = elf.section_strings(endian, data, sec_headers)?;
-        let Some(th) = sec_headers
-            .iter()
-            .find(|h| h.name(endian, sec_strs) == Ok(".text".as_bytes()))
-        else {
-            debug!("Cannot find .text section in {}", path.as_ref().display());
-            return Ok(None);
-        };
-        for ph in elf.program_headers(endian, data)? {
-            if ph.p_type(endian) == elf::PT_LOAD && ph.p_flags(endian) & elf::PF_X != 0 {
-                let th_addr = th.sh_addr(endian);
-                let ph_vaddr = ph.p_vaddr(endian);
-                let ph_memsz = ph.p_memsz(endian);
-                if th_addr >= ph_vaddr && th_addr < ph_vaddr + ph_memsz {
-                    return Ok(Some(ph));
-                }
-            }
-        }
-        trace!(
-            "Cannot find .text section program header in {}",
-            path.as_ref().display()
-        );
-        Ok(None)
-    }
-
-    // Adding symbol address with so base address seemed ok at the moment, but not sure if it's always correct
-    // Mark this function as dead code for now
-    #[allow(dead_code)]
-    fn base_address(&mut self) -> Result<u64> {
-        self.load()?;
-        let elf = elf::FileHeader64::<object::Endianness>::parse(&*self.contents)?;
-        let endian = elf.endian()?;
-        let Some(ph) = Self::find_text_section_program_header(&self.path, &*self.contents)? else {
-            return Ok(self.mem_start);
-        };
-        trace!(
-            "mem_start: 0x{:x}, p_vaddr: 0x{:x}",
-            self.mem_start,
-            ph.p_vaddr(endian)
-        );
-        Ok(self.mem_start.saturating_sub(ph.p_vaddr(endian)))
-    }
-
-    fn find_symbol_address(&mut self, name: &str) -> Result<Option<u64>> {
-        self.load()?;
-        let ba = self.base_address()?;
-        let obj = object::File::parse(&*self.contents)?;
-        Ok(obj
-            .symbols()
-            .chain(obj.dynamic_symbols())
-            .find(|s| s.name().map(|n| n == name).unwrap_or(false))
-            .map(|s| s.address() + ba))
     }
 }
 
@@ -211,23 +107,15 @@ impl Interpreter {
 
     fn new(pid: u32, exe: &MemoryArea, lib: Option<&MemoryArea>) -> Result<Self> {
         let base: PathBuf = ["/proc", &pid.to_string(), "root"].iter().collect();
-        let mut exe = MappedFile {
-            path: base.join(&exe.path[1..]),
-            contents: vec![],
-            mem_start: exe.mx_start,
-        };
-        let mut lib = lib.map(|m| MappedFile {
-            path: base.join(&m.path[1..]),
-            contents: vec![],
-            mem_start: m.mx_start,
-        });
+        let mut exe = MappedFile::new(base.join(&exe.path[1..]), exe.mx_start);
+        let mut lib = lib.map(|m| MappedFile::new(base.join(&m.path[1..]), m.mx_start));
         if !Self::is_python(&mut exe, lib.as_mut())? {
             return Err(error_not_python(pid));
         }
         // extract python version from executable and library name which is simple and probably good enough
         let mut version = None;
         for file in [Some(&exe), lib.as_ref()] {
-            if let Some(v) = file.and_then(|f| f.version()) {
+            if let Some(v) = file.and_then(extract_version_from_filename) {
                 version.replace(v);
             }
         }
@@ -255,13 +143,7 @@ impl Interpreter {
     }
 
     fn is_python(exe: &mut MappedFile, lib: Option<&mut MappedFile>) -> Result<bool> {
-        if exe
-            .path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .map(|s| s.contains("python"))
-            .unwrap_or(false)
-        {
+        if exe.file_name_contains("python") {
             exe.has_any_symbols(&Self::EXE_SYMBOLS)
         } else if let Some(lib) = lib {
             lib.has_any_symbols(&Self::LIB_SYMBOLS)

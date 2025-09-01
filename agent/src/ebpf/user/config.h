@@ -71,15 +71,22 @@
 #define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
 #define MAP_PYTHON_UNWIND_INFO_NAME     "__python_unwind_info_map"
 #define MAP_PYTHON_OFFSETS_NAME         "__python_offsets_map"
+#define MAP_PHP_UNWIND_INFO_NAME        "__php_unwind_info_map"
+#define MAP_PHP_OFFSETS_NAME            "__php_offsets_map"
+#define MAP_V8_UNWIND_INFO_NAME         "__v8_unwind_info_map"
 #define MAP_SYMBOL_TABLE_NAME           "__symbol_table"
 
-#define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
+#define PROFILE_PG_CNT_DEF              16	// perf ring-buffer page count
 
-#define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
-#define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
-#define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
-#define PROG_LUA_UNWIND_FOR_PE      "df_PE_lua_unwind"
-#define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
+#define MAP_CP_PROGS_JMP_PE_NAME        "__cp_progs_jmp_pe_map"
+#define PROG_DWARF_UNWIND_FOR_PE        "df_PE_dwarf_unwind"
+#define PROG_PYTHON_UNWIND_FOR_PE       "df_PE_python_unwind"
+#define PROG_LUA_UNWIND_FOR_PE          "df_PE_lua_unwind"
+#define PROG_PHP_UNWIND_FOR_PE          "df_PE_php_unwind"
+#define PROG_V8_UNWIND_FOR_PE           "df_PE_v8_unwind"
+#define PROG_DWARF_UNWIND_BEFORE_V8_FOR_PE   "df_PE_dwarf_unwind_before_v8"
+#define PROG_DWARF_UNWIND_BEFORE_PHP_FOR_PE  "df_PE_dwarf_unwind_before_php"
+#define PROG_ONCPU_OUTPUT_FOR_PE        "df_PE_oncpu_output"
 
 // lua related maps
 #define MAP_LUA_LANG_FLAGS_NAME         "__lang_flags_map"
@@ -87,7 +94,6 @@
 #define MAP_LUA_OFFSETS_NAME            "__lua_offsets_map"
 #define MAP_LUAJIT_OFFSETS_NAME         "__luajit_offsets_map"
 #define MAP_LUA_TSTATE_NAME             "__lua_tstate_map"
-
 
 #define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
 #define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"
@@ -118,6 +124,10 @@ enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
 	PROG_LUA_UNWIND_PE_IDX,
+	PROG_PHP_UNWIND_PE_IDX,
+	PROG_V8_UNWIND_PE_IDX,
+	PROG_DWARF_UNWIND_BEFORE_V8_PE_IDX,  // DWARF unwinding before V8 interpreter unwinding
+	PROG_DWARF_UNWIND_BEFORE_PHP_PE_IDX, // DWARF unwinding before PHP interpreter unwinding
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };
@@ -156,6 +166,10 @@ enum cfg_feature_idx {
 	FEATURE_PROFILE_MEMORY,
 	FEATURE_SOCKET_TRACER,
 	FEATURE_DWARF_UNWINDING,
+	// Language-specific profiling features
+	FEATURE_PROFILE_PYTHON,
+	FEATURE_PROFILE_PHP,
+	FEATURE_PROFILE_V8,
 	FEATURE_MAX,
 };
 
@@ -167,6 +181,9 @@ enum cfg_feature_idx {
 #define FEATURE_FLAG_PROFILE_MEMORY		(1 << FEATURE_PROFILE_MEMORY)
 #define FEATURE_FLAG_SOCKET_TRACER		(1 << FEATURE_SOCKET_TRACER)
 #define FEATURE_FLAG_DWARF_UNWINDING		(1 << FEATURE_DWARF_UNWINDING)
+#define FEATURE_FLAG_PROFILE_PYTHON		(1 << FEATURE_PROFILE_PYTHON)
+#define FEATURE_FLAG_PROFILE_PHP		(1 << FEATURE_PROFILE_PHP)
+#define FEATURE_FLAG_PROFILE_V8			(1 << FEATURE_PROFILE_V8)
 
 #define FEATURE_FLAG_PROFILE				(FEATURE_FLAG_PROFILE_ONCPU | FEATURE_FLAG_PROFILE_OFFCPU | FEATURE_FLAG_PROFILE_MEMORY)
 
@@ -227,7 +244,7 @@ enum cfg_feature_idx {
 #endif
 
 /*
- * continuous profiler 
+ * continuous profiler
  */
 #define MAP_STACK_A_NAME	"__stack_map_a"
 #define MAP_STACK_B_NAME	"__stack_map_b"
@@ -329,7 +346,7 @@ enum cfg_feature_idx {
  */
 #define CHECK_MAP_EXCEEDED_PERIOD 100	// 100 ticks(1 seconds)
 
-/* 
+/*
  * Used to check whether the kernel adaptation is successful, here is the
  * check cycle time (unit is milliseconds).
  */
@@ -357,7 +374,7 @@ enum cfg_feature_idx {
  * below:
  *
  * User-received  eBPF (Kernel) Data  Description
- * Order          recv-time (ns)	     
+ * Order          recv-time (ns)
  * ---------------------------------------------------------
  * 0	       1043099273143475	   First stack data with stack ID 'A'
  * 1	       1043099276726460    Successfully removed 'A' from the stack map
@@ -384,7 +401,7 @@ enum cfg_feature_idx {
  * For non-Java programs, symbol loading will also be randomly delayed
  * (time range: 0 to PROFILER_DEFER_RANDOM_MAX).
  *
- * The random value has a maximum limit specified above(measured in seconds). 
+ * The random value has a maximum limit specified above(measured in seconds).
  */
 
 #define PROFILER_DEFER_RANDOM_MAX 60	// 60 seconds

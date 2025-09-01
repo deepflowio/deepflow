@@ -17,9 +17,9 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use profiler::ebpf::*;
 use std::env;
 use std::ffi::CString;
-use profiler::ebpf::*;
 use std::ptr;
 use std::sync::Mutex;
 use std::thread;
@@ -119,9 +119,13 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, _sd: *mut SK_BPF_DATA) -> c_int { 0 }
+extern "C" fn socket_trace_callback(_: *mut c_void, _queue_id: c_int, _sd: *mut SK_BPF_DATA) -> c_int { 0 }
 
-extern "C" fn continuous_profiler_callback(_: *mut c_void, queue_id: c_int, cp: *mut stack_profile_data) -> c_int {
+extern "C" fn continuous_profiler_callback(
+    _: *mut c_void,
+    _queue_id: c_int,
+    cp: *mut stack_profile_data,
+) -> c_int {
     unsafe {
         process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count as u32, 1);
@@ -156,13 +160,110 @@ fn get_counter(counter_type: u32) -> u32 {
     }
 }
 
+fn print_help(program_name: &str) {
+    println!("DeepFlow eBPF Profiler - Continuous CPU Profiling Tool");
+    println!();
+    println!("USAGE:");
+    println!("    {} <pid1> [pid2] [pid3] ...", program_name);
+    println!("    {} --help | -h", program_name);
+    println!();
+    println!("ARGUMENTS:");
+    println!("    <pid1> [pid2] ...    Process IDs to profile (must be positive integers)");
+    println!();
+    println!("OPTIONS:");
+    println!("    -h, --help          Show this help message and exit");
+    println!();
+    println!("DESCRIPTION:");
+    println!("    This tool performs continuous CPU profiling of specified processes using eBPF.");
+    println!(
+        "    It captures stack traces at 97Hz frequency and supports multi-language profiling"
+    );
+    println!("    for Python, PHP, and Node.js applications with DWARF unwinding.");
+    println!();
+    println!("    The profiler will:");
+    println!("    - Run for 150 seconds by default");
+    println!("    - Generate flame graph data suitable for visualization");
+    println!("    - Support both kernel and user-space stack unwinding");
+    println!("    - Automatically detect and profile Python, PHP, and Node.js processes");
+    println!();
+    println!("EXAMPLES:");
+    println!(
+        "    {}  1234                    # Profile single process",
+        program_name
+    );
+    println!(
+        "    {}  1234 5678              # Profile multiple processes",
+        program_name
+    );
+    println!(
+        "    {}  1234 5678 9012         # Profile three processes",
+        program_name
+    );
+    println!();
+    println!("NOTE:");
+    println!("    - Requires root privileges to load eBPF programs");
+    println!("    - Target processes should be running when profiler starts");
+    println!("    - Output suitable for flame graph generation:");
+    println!(
+        "      cat ./.profiler.folded | ./flamegraph.pl --color=io --countname=ms > profiler.svg"
+    );
+}
+
 fn main() {
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info")
     }
     env_logger::builder()
-      .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
-      .init();
+        .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+        .init();
+
+    let args: Vec<String> = env::args().collect();
+
+    // Check for help flags
+    if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
+        print_help(&args[0]);
+        ::std::process::exit(0);
+    }
+
+    // Parse PIDs from command line arguments
+    let pids: Vec<c_int> = if args.len() > 1 {
+        let mut parsed_pids = Vec::new();
+        let mut invalid_args = Vec::new();
+
+        for arg in &args[1..] {
+            match arg.parse::<c_int>() {
+                Ok(pid) if pid > 0 => parsed_pids.push(pid),
+                Ok(pid) => {
+                    eprintln!("Warning: Invalid PID '{}' (must be > 0), ignoring", pid);
+                    invalid_args.push(arg.clone());
+                }
+                Err(_) => {
+                    eprintln!("Warning: '{}' is not a valid PID, ignoring", arg);
+                    invalid_args.push(arg.clone());
+                }
+            }
+        }
+
+        if !invalid_args.is_empty() && parsed_pids.is_empty() {
+            eprintln!("Error: No valid PIDs provided");
+            print_help(&args[0]);
+            ::std::process::exit(1);
+        }
+
+        parsed_pids
+    } else {
+        eprintln!("Error: No PIDs provided");
+        print_help(&args[0]);
+        ::std::process::exit(1);
+    };
+
+    if pids.is_empty() {
+        eprintln!("Error: No valid PIDs provided");
+        print_help(&args[0]);
+        ::std::process::exit(1);
+    }
+
+    println!("Profiling PIDs: {:?}", pids);
 
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
@@ -175,7 +276,7 @@ fn main() {
             ::std::process::exit(1);
         }
 
-	set_bpf_map_prealloc(false);
+        set_bpf_map_prealloc(false);
 
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
@@ -197,24 +298,26 @@ fn main() {
 
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
-        if start_continuous_profiler(97, 60, continuous_profiler_callback, &contexts as *const [*mut c_void; PROFILER_CTX_NUM]) != 0 {
+        if start_continuous_profiler(
+            97,
+            60,
+            continuous_profiler_callback,
+            &contexts as *const [*mut c_void; PROFILER_CTX_NUM],
+        ) != 0
+        {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
 
-        let pids: [c_int; 6] = [5346, 6963, 19966, 23117, 24412, 26611];
-        let num: c_int = pids.len() as c_int;
-        let result = set_feature_pids(FEATURE_PROFILE_ONCPU, pids.as_ptr(), num);
+        let pids_array: Vec<c_int> = pids.clone();
+        let num: c_int = pids_array.len() as c_int;
+        let result = set_feature_pids(FEATURE_PROFILE_ONCPU, pids_array.as_ptr(), num);
         println!("Result {}", result);
-        let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids.as_ptr(), num);
+        let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids_array.as_ptr(), num);
         println!("Result {}", result);
 
-        set_dwarf_regex(
-            CString::new("^(python.*)$".as_bytes())
-                .unwrap()
-                .as_c_str()
-                .as_ptr(),
-        );
+        // No need for set_dwarf_regex() when using set_feature_pids(FEATURE_DWARF_UNWINDING)
+        // The explicit PID list takes precedence and skips regex matching
 
         // CPUID will not be included in the aggregation of stack trace data.
         set_profiler_cpu_aggregation(0);
@@ -235,20 +338,20 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(150));
+        thread::sleep(Duration::from_secs(300));
         stop_continuous_profiler(&mut contexts as *mut [*mut c_void; PROFILER_CTX_NUM]);
         print!(
-          "====== capture count {}, sum {}\n",
-          get_counter(0),
-          get_counter(1)
+            "====== capture count {}, sum {}\n",
+            get_counter(0),
+            get_counter(1)
         );
         release_flame_graph_hash();
     }
 
     loop {
         thread::sleep(Duration::from_secs(30));
-	    // unsafe {
+        // unsafe {
         //     show_collect_pool();
-	    // }
+        // }
     }
 }
