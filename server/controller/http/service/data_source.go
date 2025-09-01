@@ -98,6 +98,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-IO 事件",      // event.perf_event
 	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
+	"应用-性能剖析指标",     // profile.in_process_metrics
 	"网络-网络策略",       // flow_metrics.traffic_policy
 	"日志-日志数据",       // application_log.log
 }

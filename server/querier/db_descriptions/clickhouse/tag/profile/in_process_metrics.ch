@@ -1,5 +1,4 @@
 # Name                     , DisplayName                , Description
-_id                        , UID                        ,
 time                       , 时间                       ,
 
 region                     , 区域                       ,
@@ -47,15 +46,8 @@ app_service                , 应用服务                    ,
 app_instance               , 应用实例                    ,
 process_id                 , 进程 ID                     ,
 
-trace_id                   , TraceID                    ,
-span_name                  , Span名称                    ,
-
 vtap                       , 采集器                      , 已废弃，请使用 agent。
 agent                      , 采集器                      ,
 
-profile_value_unit         , 指标单位                    ,
 profile_event_type         , 剖析类型                    ,
-profile_create_timestamp   , 聚合时间                    ,
-profile_in_timestamp       , 写入时间                    ,
 profile_language_type      , 语言类型                    ,
-profile_id                 , ProfileID                   ,
