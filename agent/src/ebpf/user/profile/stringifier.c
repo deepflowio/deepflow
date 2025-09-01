@@ -615,7 +615,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	/*
 	 * Firstly, search the stack-trace hash to see if the
-	 * stack trace string has already been stored. 
+	 * stack trace string has already been stored.
 	 */
 	stack_str_hash_kv kv;
 	kv.key = (u64) stack_id;
@@ -787,7 +787,13 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		// Check if this is PHP process for special handling
+		if (is_php_process(v->tgid)) {
+			offset += merge_php_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		} else {
+			// Default Python/other interpreter handling
+			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		}
 	} else if (i_trace_str) {
 		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
 	} else if (u_trace_str) {
@@ -805,7 +811,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	if (offset == 0) {
-		/* 
+		/*
 		 * The kernel can indicate the invalidity of a stack ID in two
 		 * different ways:
 		 *

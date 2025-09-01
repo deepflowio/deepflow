@@ -164,6 +164,24 @@ fn main() {
       .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
       .init();
 
+    let args: Vec<String> = env::args().collect();
+
+    // Parse PIDs from command line arguments
+    let pids: Vec<c_int> = if args.len() > 1 {
+        args[1..].iter().filter_map(|arg| arg.parse::<c_int>().ok()).collect()
+    } else {
+        println!("Usage: {} <pid1> [pid2] [pid3] ...", args[0]);
+        println!("Using default PIDs for testing...");
+        vec![5346, 6963, 19966, 23117, 24412, 26611]
+    };
+
+    if pids.is_empty() {
+        println!("Error: No valid PIDs provided");
+        ::std::process::exit(1);
+    }
+
+    println!("Profiling PIDs: {:?}", pids);
+
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
@@ -202,15 +220,16 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        let pids: [c_int; 6] = [5346, 6963, 19966, 23117, 24412, 26611];
-        let num: c_int = pids.len() as c_int;
-        let result = set_feature_pids(FEATURE_PROFILE_ONCPU, pids.as_ptr(), num);
+        let pids_array: Vec<c_int> = pids.clone();
+        let num: c_int = pids_array.len() as c_int;
+        let result = set_feature_pids(FEATURE_PROFILE_ONCPU, pids_array.as_ptr(), num);
         println!("Result {}", result);
-        let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids.as_ptr(), num);
+        let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids_array.as_ptr(), num);
         println!("Result {}", result);
 
+        // Set regex to match both Python and PHP processes
         set_dwarf_regex(
-            CString::new("^(python.*)$".as_bytes())
+            CString::new("^(python.*|php.*)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),

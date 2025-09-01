@@ -71,12 +71,15 @@
 #define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
 #define MAP_PYTHON_UNWIND_INFO_NAME     "__python_unwind_info_map"
 #define MAP_PYTHON_OFFSETS_NAME         "__python_offsets_map"
+#define MAP_PHP_UNWIND_INFO_NAME        "__php_unwind_info_map"
+#define MAP_PHP_OFFSETS_NAME            "__php_offsets_map"
 #define MAP_SYMBOL_TABLE_NAME          "__symbol_table"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
 #define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
+#define PROG_PHP_UNWIND_FOR_PE      "df_PE_php_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
 // 增加 lua 相关的程序名
 
@@ -108,6 +111,7 @@ enum {
 enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
+	PROG_PHP_UNWIND_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };
@@ -217,7 +221,7 @@ enum cfg_feature_idx {
 #endif
 
 /*
- * continuous profiler 
+ * continuous profiler
  */
 #define MAP_STACK_A_NAME	"__stack_map_a"
 #define MAP_STACK_B_NAME	"__stack_map_b"
@@ -319,7 +323,7 @@ enum cfg_feature_idx {
  */
 #define CHECK_MAP_EXCEEDED_PERIOD 100	// 100 ticks(1 seconds)
 
-/* 
+/*
  * Used to check whether the kernel adaptation is successful, here is the
  * check cycle time (unit is milliseconds).
  */
@@ -347,7 +351,7 @@ enum cfg_feature_idx {
  * below:
  *
  * User-received  eBPF (Kernel) Data  Description
- * Order          recv-time (ns)	     
+ * Order          recv-time (ns)
  * ---------------------------------------------------------
  * 0	       1043099273143475	   First stack data with stack ID 'A'
  * 1	       1043099276726460    Successfully removed 'A' from the stack map
@@ -374,7 +378,7 @@ enum cfg_feature_idx {
  * For non-Java programs, symbol loading will also be randomly delayed
  * (time range: 0 to PROFILER_DEFER_RANDOM_MAX).
  *
- * The random value has a maximum limit specified above(measured in seconds). 
+ * The random value has a maximum limit specified above(measured in seconds).
  */
 
 #define PROFILER_DEFER_RANDOM_MAX 60	// 60 seconds
