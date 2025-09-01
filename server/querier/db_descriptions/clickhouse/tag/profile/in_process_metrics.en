@@ -1,5 +1,4 @@
 # Name                     , DisplayName                   , Description
-_id                        , UID                           ,
 time                       , Time                          , Round end_time to seconds.
 
 region                     , Region                        ,
@@ -47,15 +46,8 @@ app_service                , Application Service           ,
 app_instance               , Application Instance          ,
 process_id                 , Process ID                    ,
 
-trace_id                   , TraceID                       ,
-span_name                  , Span Name                     ,
-
 vtap                       , DeepFlow Agent                , Deprecated，please use agent.
 agent                      , DeepFlow Agent                ,
 
-profile_value_unit         , Metric Unit                   ,
 profile_event_type         , Profile Type                  ,
-profile_create_timestamp   , Aggregate Time                ,
-profile_in_timestamp       , Ingest Time                   ,
 profile_language_type      , Language Type                 ,
-profile_id                 , ProfileID                     ,
