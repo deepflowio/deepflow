@@ -260,6 +260,8 @@ pub struct HttpInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    biz_type: u8,
+
     #[serde(skip)]
     attributes: Vec<KeyVal>,
 
@@ -317,6 +319,10 @@ impl HttpInfo {
         // extend attribute
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
+        }
+
+        if custom.biz_type > 0 {
+            self.biz_type = custom.biz_type;
         }
     }
 }
@@ -388,6 +394,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
     }
+
+    fn get_biz_type(&self) -> u8 {
+        self.biz_type
+    }
 }
 
 impl HttpInfo {
@@ -447,6 +457,9 @@ impl HttpInfo {
 
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
+        }
+        if other.biz_type > 0 {
+            self.biz_type = other.biz_type;
         }
         super::swap_if!(self, trace_id, is_empty, other);
         super::swap_if!(self, span_id, is_empty, other);
