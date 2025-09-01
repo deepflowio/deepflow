@@ -15,23 +15,19 @@
  */
 
 use std::collections::VecDeque;
-
-use libc::{__u64, c_int, c_void};
-
-use procfs::process::all_processes;
 use std::ffi::CString;
 use std::fs::File;
 use std::io;
-use std::mem::ManuallyDrop;
-use std::os::fd::FromRawFd;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 
+use libc::{__u64, c_int, c_void};
 use nix::sched::setns;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{execve, fork, ForkResult};
+use procfs::process::all_processes;
 
 #[derive(Default)]
 pub struct IdGenerator {
@@ -133,73 +129,75 @@ pub fn protect_cpu_affinity() -> io::Result<()> {
 
     let need_setns = self_pid_ns != target_pid_ns;
 
-    // Only open namespace FDs if needed
-    let mut ns_files: Vec<File> = Vec::new();
-    if need_setns {
-        // Since "numad" communicates via SysV message queues, the "ipc" namespace must also be included.
-        // If the target process is in a different IPC namespace, then even if the PID and mount namespaces match,
-        // System V message queues (msgget/msgrcv/msgsnd) cannot be shared.
-        // Joining the same IPC namespace ensures that both processes can access the same
-        // message queue identified by the common key (e.g., 0xdeadbeef).
-        for ns in ["pid", "mnt", "ipc"] {
-            let path = format!("/proc/{}/ns/{}", numad_pid, ns);
-            ns_files.push(File::open(&path).map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("failed to open {}: {}", path, e),
-                )
-            })?);
-        }
-    }
-
-    match unsafe { fork() } {
-        Ok(ForkResult::Parent { child }) => {
-            drop(ns_files); // parent drops FDs
-            match waitpid(child, None).map_err(|e| io::Error::new(io::ErrorKind::Other, e))? {
-                WaitStatus::Exited(_, 0) => Ok(()),
-                WaitStatus::Exited(_, code) => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("helper exited with code {}", code),
-                )),
-                WaitStatus::Signaled(_, sig, _) => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("helper killed by signal {:?}", sig),
-                )),
-                other => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("unexpected wait status: {:?}", other),
-                )),
-            }
-        }
-        Ok(ForkResult::Child) => {
-            if need_setns {
-                for fd in ns_files.iter().map(|f| f.as_raw_fd()) {
-                    let file = unsafe { ManuallyDrop::new(File::from_raw_fd(fd)) };
-                    if let Err(e) = setns(&*file, nix::sched::CloneFlags::empty()) {
-                        eprintln!("setns failed for fd {}: {:?}", fd, e);
-                        unsafe { libc::_exit(1) };
-                    }
+    // Fork a helper process to run `numad -x <agent_pid>` inside the proper namespaces.
+    //
+    // Safety:
+    // - `fork()` is unsafe because it only replicates the calling thread. We hold a global mutex
+    //   so no other threads call this concurrently.
+    // - In the child branch, only async-signal-safe functions are used (`setns`, `execve`, `_exit`).
+    // - Rust destructors are avoided in the child by immediately calling `_exit` on any failure.
+    unsafe {
+        match fork() {
+            Ok(ForkResult::Parent { child }) => {
+                // Parent drops any state; wait for child to finish.
+                match waitpid(child, None).map_err(|e| io::Error::new(io::ErrorKind::Other, e))? {
+                    WaitStatus::Exited(_, 0) => Ok(()),
+                    WaitStatus::Exited(_, code) => Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("helper exited with code {}", code),
+                    )),
+                    WaitStatus::Signaled(_, sig, _) => Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("helper killed by signal {:?}", sig),
+                    )),
+                    other => Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("unexpected wait status: {:?}", other),
+                    )),
                 }
             }
+            Ok(ForkResult::Child) => {
+                if need_setns {
+                    // Since "numad" communicates via SysV message queues, the "ipc" namespace must also be included.
+                    // If the target process is in a different IPC namespace, then even if the PID and mount namespaces match,
+                    // System V message queues (msgget/msgrcv/msgsnd) cannot be shared.
+                    // Joining the same IPC namespace ensures that both processes can access the same
+                    // message queue identified by the common key (e.g., 0xdeadbeef).
+                    for ns in ["pid", "mnt", "ipc"] {
+                        let path = format!("/proc/{}/ns/{}", numad_pid, ns);
+                        let file = match File::open(&path) {
+                            Ok(f) => f,
+                            Err(e) => {
+                                eprintln!("failed to open {}: {}", path, e);
+                                libc::_exit(1);
+                            }
+                        };
 
-            let prog =
-                CString::new(numad_exe.clone()).unwrap_or_else(|_| unsafe { libc::_exit(127) });
-            let arg0 = CString::new(numad_exe).unwrap_or_else(|_| unsafe { libc::_exit(127) });
-            let arg1 = CString::new("-x").unwrap_or_else(|_| unsafe { libc::_exit(127) });
-            let arg2 =
-                CString::new(agent_pid.to_string()).unwrap_or_else(|_| unsafe { libc::_exit(127) });
+                        if let Err(e) = setns(&file, nix::sched::CloneFlags::empty()) {
+                            eprintln!("setns failed for {} (fd {}): {:?}", ns, file.as_raw_fd(), e);
+                            libc::_exit(1);
+                        }
+                    }
+                }
 
-            let argv = &[arg0.as_c_str(), arg1.as_c_str(), arg2.as_c_str()];
-            let envp: &[&std::ffi::CStr] = &[];
-            execve(&prog, argv, envp).unwrap_or_else(|e| {
-                eprintln!("execve failed: {:?}", e);
-                unsafe { libc::_exit(127) }
-            });
-            unsafe { libc::_exit(127) }
+                let prog = CString::new(numad_exe.clone()).unwrap_or_else(|_| libc::_exit(127));
+                let arg0 = CString::new(numad_exe).unwrap_or_else(|_| libc::_exit(127));
+                let arg1 = CString::new("-x").unwrap_or_else(|_| libc::_exit(127));
+                let arg2 = CString::new(agent_pid.to_string()).unwrap_or_else(|_| libc::_exit(127));
+
+                let argv = &[arg0.as_c_str(), arg1.as_c_str(), arg2.as_c_str()];
+                let envp: &[&std::ffi::CStr] = &[];
+
+                execve(&prog, argv, envp).unwrap_or_else(|e| {
+                    eprintln!("execve failed: {:?}", e);
+                    libc::_exit(127);
+                });
+                libc::_exit(127);
+            }
+            Err(e) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("fork failed: {}", e),
+            )),
         }
-        Err(e) => Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("fork failed: {}", e),
-        )),
     }
 }

@@ -22,12 +22,14 @@ cfg_if::cfg_if! {
         pub mod unwind;
         pub mod utils;
 
-        use log::info;
-
+        // Standard library
         use std::io::Write;
 
-        use unwind::{python::PythonUnwindTable, UnwindTable};
+        // Third-party crates
+        use log::info;
 
+        // Crate internal modules
+        use unwind::{python::PythonUnwindTable, UnwindTable};
         pub use utils::protect_cpu_affinity;
 
         #[no_mangle]
