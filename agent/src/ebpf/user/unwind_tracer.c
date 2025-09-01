@@ -55,6 +55,9 @@ static unwind_table_t *g_unwind_table = NULL;
 static pthread_mutex_t g_python_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static python_unwind_table_t *g_python_unwind_table = NULL;
 
+static pthread_mutex_t g_php_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
+static php_unwind_table_t *g_php_unwind_table = NULL;
+
 static struct {
     bool dwarf_enabled;
     struct {
@@ -229,6 +232,18 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_python_unwind_table = python_table;
     pthread_mutex_unlock(&g_python_unwind_table_lock);
 
+    // Initialize PHP unwinding tables
+    int php_unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_PHP_UNWIND_INFO_NAME);
+    int php_offsets_map_fd = bpf_table_get_fd(tracer, MAP_PHP_OFFSETS_NAME);
+    if (php_unwind_info_map_fd < 0 || php_offsets_map_fd < 0) {
+        ebpf_warning("Failed to get PHP unwind info map fd or offsets map fd\n");
+        return -1;
+    }
+    php_unwind_table_t *php_table = php_unwind_table_create(php_unwind_info_map_fd, php_offsets_map_fd);
+    pthread_mutex_lock(&g_php_unwind_table_lock);
+    g_php_unwind_table = php_table;
+    pthread_mutex_unlock(&g_php_unwind_table_lock);
+
     // TODO: 创建 lua 剖析使用的 bpf table 并设置大小
 
     return 0;
@@ -294,6 +309,13 @@ void unwind_tracer_drop() {
         g_python_unwind_table = NULL;
     }
     pthread_mutex_unlock(&g_python_unwind_table_lock);
+
+    pthread_mutex_lock(&g_php_unwind_table_lock);
+    if (g_php_unwind_table) {
+        php_unwind_table_destroy(g_php_unwind_table);
+        g_php_unwind_table = NULL;
+    }
+    pthread_mutex_unlock(&g_php_unwind_table_lock);
 }
 
 void unwind_process_exec(int pid) {
@@ -320,6 +342,7 @@ void unwind_events_handle(void) {
     int count = 0;
     pthread_mutex_lock(&g_unwind_table_lock);
     pthread_mutex_lock(&g_python_unwind_table_lock);
+    pthread_mutex_lock(&g_php_unwind_table_lock);
     do {
         event = get_first_event(&proc_events);
         if (!event)
@@ -339,6 +362,11 @@ void unwind_events_handle(void) {
             pthread_mutex_unlock(&tracer->mutex_probes_lock);
         }
 
+        if (tracer && is_php_process(event->pid)) {
+            php_unwind_table_load(g_php_unwind_table, event->pid);
+            // Note: PHP profiling doesn't require uprobe registration like Python
+        }
+
         if (tracer && is_lua_process(event->pid)) {
             // TODO: 加载 lua 剖析使用的 bpf table
             // TODO: 如果有相关 uprobe 则注册
@@ -352,6 +380,7 @@ void unwind_events_handle(void) {
         process_event_free(event);
 
     } while (true);
+    pthread_mutex_unlock(&g_php_unwind_table_lock);
     pthread_mutex_unlock(&g_python_unwind_table_lock);
     pthread_mutex_unlock(&g_unwind_table_lock);
 }
@@ -390,6 +419,12 @@ void unwind_process_exit(int pid) {
         python_unwind_table_unload(g_python_unwind_table, pid);
     }
     pthread_mutex_unlock(&g_python_unwind_table_lock);
+
+    pthread_mutex_lock(&g_php_unwind_table_lock);
+    if (g_php_unwind_table) {
+        php_unwind_table_unload(g_php_unwind_table, pid);
+    }
+    pthread_mutex_unlock(&g_php_unwind_table_lock);
 
     // TODO: 卸载 lua 剖析使用的 bpf table
 }

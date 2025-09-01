@@ -119,6 +119,9 @@ MAP_HASH(python_tstate_addr_map, __u32, __u64, 65536, FEATURE_FLAG_PROFILE)
 MAP_HASH(python_unwind_info_map, __u32, python_unwind_info_t, 65536, FEATURE_FLAG_PROFILE)
 MAP_HASH(python_offsets_map, __u8, python_offsets_t, 1, FEATURE_FLAG_PROFILE)
 
+MAP_HASH(php_unwind_info_map, __u32, php_unwind_info_t, 65536, FEATURE_FLAG_PROFILE)
+MAP_HASH(php_offsets_map, __u8, php_offsets_t, 1, FEATURE_FLAG_PROFILE)
+
 struct bpf_map_def SEC("maps") __symbol_table = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(symbol_t),
@@ -150,6 +153,9 @@ typedef struct {
 
 	void *py_frame_ptr;
 	__u8 py_offsets_id;
+
+	void *php_execute_data_ptr;
+	__u8 php_offsets_id;
 } unwind_state_t;
 
 /*
@@ -169,6 +175,10 @@ MAP_PERARRAY(heap, __u32, unwind_state_t, 1, FEATURE_FLAG_PROFILE_ONCPU | FEATUR
 
 static inline __attribute__ ((always_inline))
 int pre_python_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx);
+
+static inline __attribute__ ((always_inline))
+int pre_php_unwind(void *ctx, unwind_state_t * state,
 		 map_group_t *maps, int jmp_idx);
 
 #else
@@ -599,6 +609,12 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		pre_python_unwind(ctx, state, &oncpu_maps, PROG_PYTHON_UNWIND_PE_IDX);
 	}
 
+	php_unwind_info_t *php_unwind_info =
+	    php_unwind_info_map__lookup(&state->key.tgid);
+	if (php_unwind_info != NULL) {
+		pre_php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
+	}
+
 	// TODO: 如果 tgid（PID）在 lua 的 map 中，调用 lua 剖析的程序（可以参考 pre_python_unwind 的实现）
 
 	process_shard_list_t *shard_list =
@@ -906,6 +922,7 @@ __u32 get_symbol_id(symbol_t * symbol)
 	return id;
 }
 
+
 static inline __attribute__ ((always_inline))
 int pre_python_unwind(void *ctx, unwind_state_t * state,
 		 map_group_t *maps, int jmp_idx) {
@@ -943,6 +960,35 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
 	     thread_state + py_offsets->thread_state.frame) != 0) {
         return 0;
 	}
+
+	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	return 0;
+}
+
+static inline __attribute__ ((always_inline))
+int pre_php_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx) {
+	php_unwind_info_t *php_unwind_info =
+	    php_unwind_info_map__lookup(&state->key.tgid);
+	if (php_unwind_info == NULL) {
+        return 0;
+	}
+	state->php_offsets_id = php_unwind_info->offsets_id;
+
+	php_offsets_t *php_offsets =
+	    php_offsets_map__lookup(&state->php_offsets_id);
+	if (php_offsets == NULL) {
+        return 0;
+	}
+
+	void *execute_data_ptr;
+	if (bpf_probe_read_user
+	    (&execute_data_ptr, sizeof(execute_data_ptr),
+	     (void *)php_unwind_info->executor_globals_address + php_offsets->executor_globals.current_execute_data) != 0) {
+        return 0;
+	}
+
+	state->php_execute_data_ptr = execute_data_ptr;
 
 	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
 	return 0;
@@ -1004,6 +1050,113 @@ output:
 	return 0;
 }
 
+// PHP symbol reading function
+static inline __attribute__ ((always_inline))
+__u32 read_php_symbol(php_offsets_t * php_offsets, void *execute_data_ptr,
+		      void *zend_function_ptr, symbol_t * symbol)
+{
+	if (zend_function_ptr == NULL) {
+		return 0;
+	}
+
+	__builtin_memset(symbol, 0, sizeof(*symbol));
+
+	// Read function name from zend_function->common.function_name
+	void *function_name_ptr;
+	if (bpf_probe_read_user(&function_name_ptr, sizeof(function_name_ptr),
+				zend_function_ptr + php_offsets->function.common_funcname) != 0) {
+		return 0;
+	}
+
+	if (function_name_ptr) {
+		// Read the string data from zend_string
+		bpf_probe_read_user_str(&symbol->method_name,
+					sizeof(symbol->method_name),
+					function_name_ptr + php_offsets->string.val);
+	}
+
+	// Try to read class name from zend_function->common.scope
+	void *scope_ptr;
+	if (bpf_probe_read_user(&scope_ptr, sizeof(scope_ptr),
+				zend_function_ptr + php_offsets->function.common_scope) == 0 && scope_ptr) {
+		void *class_name_ptr;
+		if (bpf_probe_read_user(&class_name_ptr, sizeof(class_name_ptr),
+					scope_ptr + php_offsets->class_entry.name) == 0 && class_name_ptr) {
+			bpf_probe_read_user_str(&symbol->class_name,
+						sizeof(symbol->class_name),
+						class_name_ptr + php_offsets->string.val);
+		}
+	}
+
+	// Read line number from zend_execute_data->opline->lineno
+	void *opline_ptr;
+	__u32 lineno = 0;
+	if (bpf_probe_read_user(&opline_ptr, sizeof(opline_ptr),
+				execute_data_ptr + php_offsets->execute_data.opline) == 0 && opline_ptr) {
+		bpf_probe_read_user(&lineno, sizeof(lineno),
+				    opline_ptr + php_offsets->op.lineno);
+	}
+
+	return lineno;
+}
+
+static inline __attribute__ ((always_inline))
+int php_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx) {
+	if (state->php_execute_data_ptr == NULL) {
+		goto output;
+	}
+
+	php_offsets_t *php_offsets =
+	    php_offsets_map__lookup(&state->php_offsets_id);
+	if (php_offsets == NULL) {
+		goto output;
+	}
+
+	symbol_t symbol;
+
+#pragma unroll
+	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
+		// Read zend_execute_data->function
+		void *zend_function_ptr;
+		if (bpf_probe_read_user(&zend_function_ptr, sizeof(zend_function_ptr),
+					state->php_execute_data_ptr + php_offsets->execute_data.function) != 0) {
+			goto output;
+		}
+
+		if (zend_function_ptr == NULL) {
+			goto output;
+		}
+
+		__builtin_memset(&symbol, 0, sizeof(symbol));
+		__u64 lineno = read_php_symbol(php_offsets, state->php_execute_data_ptr, zend_function_ptr, &symbol);
+		
+		if (lineno == 0) {
+			goto output;
+		}
+
+		__u64 symbol_id = get_symbol_id(&symbol);
+		add_frame(&state->intp_stack, (lineno << 32) | symbol_id);
+
+		// Move to previous execute_data
+		if (bpf_probe_read_user(&state->php_execute_data_ptr, sizeof(void *),
+					state->php_execute_data_ptr + php_offsets->execute_data.prev_execute_data) != 0) {
+			goto output;
+		}
+
+		if (!state->php_execute_data_ptr) {
+			goto output;
+		}
+	}
+
+	if (++state->runs < UNWIND_PROG_MAX_RUN) {
+		bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	}
+
+output:
+	return 0;
+}
+
 PROGPE(python_unwind) (struct bpf_perf_event_data * ctx) {
 	__u32 count_idx;
 
@@ -1024,6 +1177,48 @@ PROGPE(python_unwind) (struct bpf_perf_event_data * ctx) {
 	}
 
 	python_unwind(ctx, state, &oncpu_maps, PROG_PYTHON_UNWIND_PE_IDX);
+
+	process_shard_list_t *shard_list =
+	    process_shard_list_table__lookup(&state->key.tgid);
+	if (shard_list != NULL) {
+		state->key.flags |= STACK_TRACE_FLAGS_DWARF;
+
+		int ret =
+		    get_usermode_regs((struct pt_regs *)&ctx->regs,
+				      &state->regs);
+		if (ret == 0) {
+			bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+				      PROG_DWARF_UNWIND_PE_IDX);
+		}
+		__sync_fetch_and_add(error_count_ptr, 1);
+		return 0;
+	}
+
+	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+		      PROG_ONCPU_OUTPUT_PE_IDX);
+	return 0;
+}
+
+PROGPE(php_unwind) (struct bpf_perf_event_data * ctx) {
+	__u32 count_idx;
+
+	count_idx = ERROR_IDX;
+	__u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+
+	if (error_count_ptr == NULL) {
+		count_idx = ERROR_IDX;
+		__u64 err_val = 1;
+		profiler_state_map__update(&count_idx, &err_val);
+		return -1;
+	}
+
+	__u32 zero = 0;
+	unwind_state_t *state = heap__lookup(&zero);
+	if (state == NULL) {
+		return 0;
+	}
+
+	php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
 
 	process_shard_list_t *shard_list =
 	    process_shard_list_table__lookup(&state->key.tgid);

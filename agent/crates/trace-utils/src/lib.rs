@@ -27,7 +27,7 @@ use std::io::Write;
 use log::info;
 
 // Crate internal modules
-use unwind::{python::PythonUnwindTable, UnwindTable};
+use unwind::{php::PhpUnwindTable, python::PythonUnwindTable, UnwindTable};
 pub use utils::protect_cpu_affinity;
 
 #[no_mangle]
@@ -93,6 +93,32 @@ pub unsafe extern "C" fn python_unwind_table_load(table: *mut PythonUnwindTable,
 
 #[no_mangle]
 pub unsafe extern "C" fn python_unwind_table_unload(table: *mut PythonUnwindTable, pid: u32) {
+    (*table).unload(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_create(
+    unwind_info_map_fd: i32,
+    offsets_map_fd: i32,
+) -> *mut PhpUnwindTable {
+    let table = Box::new(PhpUnwindTable::new(unwind_info_map_fd, offsets_map_fd));
+    Box::into_raw(table)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_destroy(table: *mut PhpUnwindTable) {
+    if !table.is_null() {
+        std::mem::drop(Box::from_raw(table));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_load(table: *mut PhpUnwindTable, pid: u32) {
+    (*table).load(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_unload(table: *mut PhpUnwindTable, pid: u32) {
     (*table).unload(pid);
 }
 

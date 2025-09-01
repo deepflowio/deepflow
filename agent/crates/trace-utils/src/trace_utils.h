@@ -81,6 +81,12 @@ typedef struct {
 } python_unwind_info_t;
 
 typedef struct {
+    uint64_t executor_globals_address;
+    uint64_t jit_return_address;
+    uint8_t offsets_id;
+} php_unwind_info_t;
+
+typedef struct {
     int64_t current_frame;
 } py_cframe_t;
 
@@ -150,13 +156,58 @@ typedef struct {
     py_type_object_t type_object;
 } python_offsets_t;
 
+typedef struct {
+    uint16_t current_execute_data;
+} php_executor_globals_t;
+
+typedef struct {
+    uint8_t opline;
+    uint8_t function;
+    uint8_t this_type_info;
+    uint8_t prev_execute_data;
+} php_execute_data_t;
+
+typedef struct {
+    uint8_t common_type;
+    uint8_t common_funcname;
+    uint8_t common_scope;
+    uint32_t op_array_filename;
+    uint32_t op_array_linestart;
+    uint32_t sizeof_struct;
+} php_function_t;
+
+typedef struct {
+    uint64_t val;
+} php_string_t;
+
+typedef struct {
+    uint8_t lineno;
+} php_op_t;
+
+typedef struct {
+    uint64_t name;
+} php_class_entry_t;
+
+typedef struct {
+    php_executor_globals_t executor_globals;
+    php_execute_data_t execute_data;
+    php_function_t function;
+    php_string_t string;
+    php_op_t op;
+    php_class_entry_t class_entry;
+} php_offsets_t;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
 
 bool is_lua_process(uint32_t pid);
 
 bool is_python_process(uint32_t pid);
 
+bool is_php_process(uint32_t pid);
+
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+size_t merge_php_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
                                                   int32_t offsets_map_fd);
@@ -166,6 +217,17 @@ void python_unwind_table_destroy(python_unwind_table_t *table);
 void python_unwind_table_load(python_unwind_table_t *table, uint32_t pid);
 
 void python_unwind_table_unload(python_unwind_table_t *table, uint32_t pid);
+
+typedef struct php_unwind_table_t php_unwind_table_t;
+
+php_unwind_table_t *php_unwind_table_create(int32_t unwind_info_map_fd,
+                                            int32_t offsets_map_fd);
+
+void php_unwind_table_destroy(php_unwind_table_t *table);
+
+void php_unwind_table_load(php_unwind_table_t *table, uint32_t pid);
+
+void php_unwind_table_unload(php_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
 
