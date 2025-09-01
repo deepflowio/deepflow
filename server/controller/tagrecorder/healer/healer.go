@@ -42,90 +42,52 @@ func NewHealers(md metadata.Platform) *Healers {
 		message.MetadataPlatform(md),
 		message.MetadataSoftDelete(false), // no soft delete in healer
 	)
+
 	h.healers = []Healer{
-		newHealer[metadbmodel.Host, metadbmodel.ChDevice, *message.AddedHosts](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_HOST_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_HOST)),
-		newHealer[metadbmodel.VM, metadbmodel.ChDevice, *message.AddedVMs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VM)),
-		newHealer[metadbmodel.VRouter, metadbmodel.ChDevice, *message.AddedVRouters](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VROUTER_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VROUTER)),
-		newHealer[metadbmodel.DHCPPort, metadbmodel.ChDevice, *message.AddedDHCPPorts](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_DHCP_PORT_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_DHCP_PORT)),
-		newHealer[metadbmodel.NATGateway, metadbmodel.ChDevice, *message.AddedNATGateways](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_NAT_GATEWAY_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_NAT_GATEWAY)),
-		newHealer[metadbmodel.LB, metadbmodel.ChDevice, *message.AddedLBs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_LB_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_LB)),
-		newHealer[metadbmodel.RDSInstance, metadbmodel.ChDevice, *message.AddedRDSInstances](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_RDS_INSTANCE_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_RDS_INSTANCE)),
-		newHealer[metadbmodel.RedisInstance, metadbmodel.ChDevice, *message.AddedRedisInstances](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_REDIS_INSTANCE_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_REDIS_INSTANCE)),
 		newHealer[metadbmodel.PodNode, metadbmodel.ChDevice, *message.AddedPodNodes](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NODE_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_NODE)),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_NODE).
+				setFilterSubDomain(true)),
 		newHealer[metadbmodel.PodService, metadbmodel.ChDevice, *message.AddedPodServices](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_SERVICE_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_SERVICE)),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_SERVICE).
+				setFilterSubDomain(true)),
 		newHealer[metadbmodel.Pod, metadbmodel.ChDevice, *message.AddedPods](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD)),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(common.VIF_DEVICE_TYPE_POD).
+				setFilterSubDomain(true)),
 		newHealer[metadbmodel.PodCluster, metadbmodel.ChDevice, *message.AddedPodClusters](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_CLUSTER_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_CLUSTER)),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(common.VIF_DEVICE_TYPE_POD_CLUSTER).
+				setFilterSubDomain(true)),
 		newHealer[metadbmodel.PodGroup, metadbmodel.ChDevice, *message.AddedPodGroups](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_GROUP_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(
-				common.VIF_DEVICE_TYPE_POD_GROUP_CLONESET,
-				common.VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET,
-				common.VIF_DEVICE_TYPE_POD_GROUP_RC,
-				common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
-				common.VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT,
-				common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
-			),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(
+					common.VIF_DEVICE_TYPE_POD_GROUP_CLONESET,
+					common.VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET,
+					common.VIF_DEVICE_TYPE_POD_GROUP_RC,
+					common.VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
+					common.VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT,
+					common.VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
+				).
+				setFilterSubDomain(true),
 		),
 		newHealer[metadbmodel.Process, metadbmodel.ChDevice, *message.AddedProcesses](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_GPROCESS)),
-		newHealer[metadbmodel.CustomService, metadbmodel.ChDevice, *message.AddedCustomServices](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_CUSTOM_SERVICE)),
-
-		newHealer[metadbmodel.AZ, metadbmodel.ChAZ, *message.AddedAZs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
-
-		newHealer[metadbmodel.VM, metadbmodel.ChChost, *message.AddedVMs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
-
-		newHealer[metadbmodel.VPC, metadbmodel.ChVPC, *message.AddedVPCs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
+			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).
+				setChDeviceTypes(common.VIF_DEVICE_TYPE_GPROCESS).
+				setFilterSubDomain(true)),
 		newHealer[metadbmodel.Network, metadbmodel.ChNetwork, *message.AddedNetworks](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_NETWORK_EN),
@@ -165,14 +127,6 @@ func NewHealers(md metadata.Platform) *Healers {
 			newDataGenerator(md, common.RESOURCE_TYPE_PROCESS_EN),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_GPROCESS)),
 
-		newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTag, *message.AddedVMs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
-		newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTags, *message.AddedVMs](
-			msgMetadata,
-			newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
-			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),
 		newHealer[metadbmodel.PodNamespace, metadbmodel.ChPodNSCloudTag, *message.AddedPodNamespaces](
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_NAMESPACE_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
@@ -221,6 +175,75 @@ func NewHealers(md metadata.Platform) *Healers {
 			msgMetadata,
 			newDataGenerator(md, common.RESOURCE_TYPE_POD_EN).setAdditionalSelectField("annotation").setUnscoped(false),
 			newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS)),
+	}
+
+	// The following resources do not exist in sub_domain data, so no check and healing is needed
+	if !md.IsSubDomainValid() {
+		h.healers = append(
+			h.healers,
+			[]Healer{
+				newHealer[metadbmodel.Host, metadbmodel.ChDevice, *message.AddedHosts](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_HOST_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_HOST)),
+				newHealer[metadbmodel.VM, metadbmodel.ChDevice, *message.AddedVMs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VM)),
+				newHealer[metadbmodel.VRouter, metadbmodel.ChDevice, *message.AddedVRouters](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VROUTER_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VROUTER)),
+				newHealer[metadbmodel.DHCPPort, metadbmodel.ChDevice, *message.AddedDHCPPorts](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_DHCP_PORT_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_DHCP_PORT)),
+				newHealer[metadbmodel.NATGateway, metadbmodel.ChDevice, *message.AddedNATGateways](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_NAT_GATEWAY_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_NAT_GATEWAY)),
+				newHealer[metadbmodel.LB, metadbmodel.ChDevice, *message.AddedLBs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_LB_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_LB)),
+				newHealer[metadbmodel.RDSInstance, metadbmodel.ChDevice, *message.AddedRDSInstances](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_RDS_INSTANCE_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_RDS_INSTANCE)),
+				newHealer[metadbmodel.RedisInstance, metadbmodel.ChDevice, *message.AddedRedisInstances](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_REDIS_INSTANCE_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_REDIS_INSTANCE)),
+				newHealer[metadbmodel.CustomService, metadbmodel.ChDevice, *message.AddedCustomServices](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_CUSTOM_SERVICE)),
+
+				newHealer[metadbmodel.AZ, metadbmodel.ChAZ, *message.AddedAZs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
+
+				newHealer[metadbmodel.VM, metadbmodel.ChChost, *message.AddedVMs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
+
+				newHealer[metadbmodel.VPC, metadbmodel.ChVPC, *message.AddedVPCs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
+
+				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTag, *message.AddedVMs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
+				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTags, *message.AddedVMs](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),
+			}...,
+		)
 	}
 	return h
 }
@@ -324,9 +347,9 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	if len(sourceIDs) == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, h.msgMetadata.LogPrefixes)
+	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, len(sourceIDs), h.msgMetadata.LogPrefixes)
 	var dbItems []*MT
-	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.sourceDataGen.getRealIDField()), sourceIDs).Find(&dbItems).Error; err != nil {
+	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.sourceDataGen.getRealIDField()), sourceIDs).Find(&dbItems).Error; err != nil {
 		log.Errorf("failed to find %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 		return err
 	}
@@ -346,11 +369,11 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 	if len(targetIDs) == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer (source: %s) force delete data, ids: %v", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, h.msgMetadata.LogPrefixes)
+	log.Infof("tagrecorder %s healer (source: %s) force delete (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, len(targetIDs), h.msgMetadata.LogPrefixes)
 	var dbItems []*CT
-	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN ?", h.targetDataGen.getRealIDField()), targetIDs)
+	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.targetDataGen.getRealIDField()), targetIDs)
 	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
-		delExec = delExec.Where("devicetype IN ?", h.targetDataGen.getChDeviceTypes())
+		delExec = delExec.Where("devicetype IN (?)", h.targetDataGen.getChDeviceTypes())
 	}
 	if err := delExec.Delete(&dbItems).Error; err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
