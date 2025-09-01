@@ -988,7 +988,7 @@ func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	podGroupType := fieldsUpdate.Type.GetNew()
+	podGroupType := newSource.Type
 	c.updateOrSync(db, DeviceKey{DeviceType: common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
 		DeviceID: sourceID}, updateInfo)
 }
