@@ -17,13 +17,16 @@
 package agent_config
 
 import (
-	"encoding/json"
+	jsoniter "github.com/json-iterator/go"
+
 	"fmt"
 	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 const (
 	keyCommentSuffix = "_comment"
@@ -47,6 +50,34 @@ func ConvertYAMLToJSON(yamlData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("new data formatter error: %v", err)
 	}
 	return dataFmt.mapToJSON(keyToComment)
+}
+
+func BatchConvertYAMLToJSON(yamlDatas [][]byte) ([][]byte, error) {
+	if len(yamlDatas) == 0 {
+		return [][]byte{}, nil
+	}
+	keyToComment, err := NewTemplateFormatter(YamlAgentGroupConfigTemplate).GenerateKeyToComment()
+	if err != nil {
+		return [][]byte{}, fmt.Errorf("generate key to comment error: %v", err)
+	}
+	jsonDatas := make([][]byte, 0, len(yamlDatas))
+	for _, yamlData := range yamlDatas {
+		if len(yamlData) == 0 {
+			jsonDatas = append(jsonDatas, []byte("{}"))
+			continue
+		}
+		dataFmt := NewDataFormatter()
+		err = dataFmt.LoadYAMLData(yamlData)
+		if err != nil {
+			return [][]byte{}, fmt.Errorf("load yaml data error: %v", err)
+		}
+		jsonData, err := dataFmt.mapToJSON(keyToComment)
+		if err != nil {
+			return [][]byte{}, fmt.Errorf("map to json error: %v", err)
+		}
+		jsonDatas = append(jsonDatas, jsonData)
+	}
+	return jsonDatas, nil
 }
 
 func ValidateYAML(yamlData []byte) error {
