@@ -31,6 +31,8 @@ const DB_NAME_APPLICATION_LOG = "application_log"
 const TABLE_NAME_VTAP_ACL = "traffic_policy"
 const TABLE_NAME_TRACE_TREE = "trace_tree"
 const TABLE_NAME_SPAN_WITH_TRACE_ID = "span_with_trace_id"
+const TABLE_NAME_IN_PROCESS = "in_process"
+const TABLE_NAME_IN_PROCESS_METRICS = "in_process_metrics"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
 const TagServerChPrefix = "服务端"
@@ -46,7 +48,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
 	DB_NAME_EVENT:           []string{"event", "perf_event", "alert_event"},
-	DB_NAME_PROFILE:         []string{"in_process"},
+	DB_NAME_PROFILE:         []string{"in_process", TABLE_NAME_IN_PROCESS_METRICS},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},
 }

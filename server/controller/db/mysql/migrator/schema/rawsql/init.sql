@@ -2220,6 +2220,9 @@ INSERT INTO data_source (id, display_name, data_table_collection, base_data_sour
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (24, '应用-指标（天级）', 'flow_metrics.application*', 23, 86400, 30*24, 'Sum', 'Avg', @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+                 VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3*24, 'Sum', 'Avg', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS voucher (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,

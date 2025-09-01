@@ -340,7 +340,7 @@ func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
-		case "in_process":
+		case "in_process", ckcommon.TABLE_NAME_IN_PROCESS_METRICS:
 			return GetInProcessMetrics()
 		}
 	case ckcommon.DB_NAME_APPLICATION_LOG:
@@ -696,7 +696,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
-		case "in_process":
+		case "in_process", ckcommon.TABLE_NAME_IN_PROCESS_METRICS:
 			metrics = IN_PROCESS_METRICS
 			replaceMetrics = IN_PROCESS_METRICS_REPLACE
 		}
