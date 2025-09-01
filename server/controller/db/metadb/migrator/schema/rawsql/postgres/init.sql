@@ -1618,6 +1618,9 @@ VALUES (23, '应用-指标（小时级）', 'flow_metrics.application*', 8, 3600
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
 VALUES (24, '应用-指标（天级）', 'flow_metrics.application*', 23, 86400, 30 * 24, 'Sum', 'Avg', gen_random_uuid());
 
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3 * 24, 'Sum', 'Avg', gen_random_uuid());
+
 CREATE TABLE IF NOT EXISTS report (
     id                      SERIAL PRIMARY KEY,
     title                   VARCHAR(200) NOT NULL DEFAULT '',
