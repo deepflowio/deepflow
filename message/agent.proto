@@ -124,6 +124,8 @@ message SyncRequest {
     optional string kubernetes_cluster_id = 45;    // 仅对容器类型的 agent 有意义
     optional string kubernetes_cluster_name = 46;  // 仅对容器类型的 agent 有意义
     optional string kubernetes_cluster_md5 = 47;  // 仅对容器类型的 agent 有意义
+
+    optional uint64 current_grpc_buffer_size = 50;  // Unit: Bytes
 }
 
 enum Status {
@@ -404,6 +406,19 @@ message SyncResponse {
     repeated SkipInterface skip_interface = 15;
 
     optional DynamicConfig dynamic_config = 20;
+
+    // When the controller determines that the agent needs to adjust `current_grpc_buffer_size`,
+    // this value is set to true. At this time, only the following fields in the message are valid:
+    // - status
+    // - user_config
+    // - revision
+    // - self_update_url
+    // - containers
+    // - dynamic_config
+    // - only_partial_fields
+    // - new_grpc_buffer_size
+    optional bool only_partial_fields = 30 [default = false];
+    optional uint64 new_grpc_buffer_size = 31;  // 0 indicates no adjustment needed. Unit: Bytes.
 }
 
 message UpgradeRequest {
