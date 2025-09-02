@@ -413,6 +413,7 @@ impl Trident {
     ) -> Result<Trident> {
         // To prevent 'numad' from interfering with the CPU
         // affinity settings of deepflow-agent
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         match trace_utils::protect_cpu_affinity() {
             Ok(()) => info!("CPU affinity protected successfully"),
             Err(e) => {
