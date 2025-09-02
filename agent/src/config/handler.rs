@@ -4026,8 +4026,6 @@ impl ConfigHandler {
             communication.request_via_nat_ip = new_communication.request_via_nat_ip;
         }
         if communication.grpc_buffer_size != new_communication.grpc_buffer_size {
-            communication.grpc_buffer_size = new_communication.grpc_buffer_size;
-
             if new_communication.grpc_buffer_size > 0 {
                 info!(
                     "Update global.communication.grpc_buffer_size from {:?} to {:?}, and it is actually used {:?}.",
@@ -4036,6 +4034,7 @@ impl ConfigHandler {
 
                 session.set_rx_size(new_communication.grpc_buffer_size.max(GRPC_BUFFER_SIZE_MIN));
             }
+            communication.grpc_buffer_size = new_communication.grpc_buffer_size;
         }
         if communication.max_throughput_to_ingester != new_communication.max_throughput_to_ingester
         {
