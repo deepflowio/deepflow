@@ -622,17 +622,18 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 知识图谱
 	b.Protocol = uint8(log.Base.Protocol)
 
-	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
-
 	// if ProcessId exists and GpId does not exist, get GpId through ProcessId
 	if l.ProcessId_0 != 0 && l.Gpid_0 == 0 {
 		b.GPID0 = platformData.QueryProcessInfo(b.OrgId, uint16(l.VtapId), l.ProcessId_0)
+		l.Gpid_0 = b.GPID0
 		b.TagSource0 |= uint8(flow_metrics.ProcessId)
 	}
 	if l.ProcessId_1 != 0 && l.Gpid_1 == 0 {
 		b.GPID1 = platformData.QueryProcessInfo(b.OrgId, uint16(l.VtapId), l.ProcessId_1)
+		l.Gpid_1 = b.GPID1
 		b.TagSource1 |= uint8(flow_metrics.ProcessId)
 	}
+	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {
