@@ -59,10 +59,13 @@ var SYS_MEMORY_METRIC_TO_MESSAGE = map[string]api.SysMemoryMetric{
 	"available": AVAILABLE_SYS_MEMORY_METRIC,
 }
 
-type VTapEvent struct{}
+type RemoteExecute struct{}
+type VTapEvent struct {
+	RemoteExecute *RemoteExecute
+}
 
 func NewVTapEvent() *VTapEvent {
-	return &VTapEvent{}
+	return &VTapEvent{RemoteExecute: &RemoteExecute{}}
 }
 
 func (e *VTapEvent) getPlugins(vConfig *vtap.VTapConfig) *api.PluginConfig {
