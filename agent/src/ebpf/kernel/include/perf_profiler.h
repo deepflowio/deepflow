@@ -96,4 +96,19 @@ typedef struct {
 
 #define MAX_SYMBOL_NUM 1024
 
+// V8 profiling support
+// V8 types are defined in trace_utils.h which is included separately
+
+// V8 tagged pointer constants
+#define V8_HEAP_OBJECT_TAG        0x1
+#define V8_HEAP_OBJECT_TAG_MASK   0x3
+#define V8_SMI_TAG                0x0
+#define V8_SMI_TAG_MASK           0x1
+#define V8_SMI_TAG_SHIFT          32
+#define V8_SMI_VALUE_SHIFT        32
+
+// V8 unwinding constants
+#define V8_FRAMES_PER_RUN         16
+#define V8_FP_CONTEXT_SIZE        64
+
 #endif /* DF_BPF_PERF_PROFILER_H */
