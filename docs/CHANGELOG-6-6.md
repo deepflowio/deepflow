@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix: disk io log level from warn to debug [#10382](https://github.com/deepflowio/deepflow/pull/10382) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: update auto_service/instance when gpid from process_id [#10373](https://github.com/deepflowio/deepflow/pull/10373) by [lzf575](https://github.com/lzf575)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +48,7 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: refactors remote_execute api in lower version agent [#10375](https://github.com/deepflowio/deepflow/pull/10375) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
