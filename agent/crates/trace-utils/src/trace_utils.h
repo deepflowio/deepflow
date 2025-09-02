@@ -182,4 +182,5 @@ void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);
 
-#endif  /* TRACE_UTILS_H */
+int protect_cpu_affinity_c(void);
+#endif /* TRACE_UTILS_H */
