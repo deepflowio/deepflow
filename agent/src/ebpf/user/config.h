@@ -73,6 +73,8 @@
 #define MAP_PYTHON_OFFSETS_NAME         "__python_offsets_map"
 #define MAP_PHP_UNWIND_INFO_NAME        "__php_unwind_info_map"
 #define MAP_PHP_OFFSETS_NAME            "__php_offsets_map"
+#define MAP_V8_UNWIND_INFO_NAME         "__v8_unwind_info_map"
+#define MAP_V8_OFFSETS_NAME             "__v8_offsets_map"
 #define MAP_SYMBOL_TABLE_NAME          "__symbol_table"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
@@ -80,6 +82,9 @@
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
 #define PROG_PHP_UNWIND_FOR_PE      "df_PE_php_unwind"
+#define PROG_V8_UNWIND_FOR_PE       "df_PE_v8_unwind"
+#define PROG_V8_FRAME_UNWINDER_FOR_PE "df_PE_v8_frame_unwinder"
+#define PROG_V8_FRAME_ANALYZER_FOR_PE "df_PE_v8_frame_analyzer"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
 // 增加 lua 相关的程序名
 
@@ -112,6 +117,9 @@ enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
 	PROG_PHP_UNWIND_PE_IDX,
+	PROG_V8_UNWIND_PE_IDX,
+	PROG_V8_FRAME_UNWINDER_PE_IDX,
+	PROG_V8_FRAME_ANALYZER_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };

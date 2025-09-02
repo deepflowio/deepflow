@@ -197,6 +197,53 @@ typedef struct {
     php_class_entry_t class_entry;
 } php_offsets_t;
 
+typedef struct {
+    uint64_t isolate_address;
+    uint8_t offsets_id;
+    uint32_t version;
+} v8_unwind_info_t;
+
+typedef struct {
+    int16_t marker;
+    int16_t function;
+    int16_t bytecode_offset;
+} v8_frame_pointers_t;
+
+typedef struct {
+    uint16_t shared;
+    uint16_t code;
+} v8_js_function_t;
+
+typedef struct {
+    uint16_t name_or_scope_info;
+    uint16_t function_data;
+    uint16_t script_or_debug_info;
+} v8_shared_function_info_t;
+
+typedef struct {
+    uint16_t instruction_start;
+    uint16_t instruction_size;
+    uint16_t flags;
+} v8_code_t;
+
+typedef struct {
+    uint16_t name;
+    uint16_t source;
+} v8_script_t;
+
+typedef struct {
+    uint16_t source_position_table;
+} v8_bytecode_array_t;
+
+typedef struct {
+    v8_frame_pointers_t frame_pointers;
+    v8_js_function_t js_function;
+    v8_shared_function_info_t shared_function_info;
+    v8_code_t code;
+    v8_script_t script;
+    v8_bytecode_array_t bytecode_array;
+} v8_offsets_t;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
 
 bool is_lua_process(uint32_t pid);
@@ -205,9 +252,13 @@ bool is_python_process(uint32_t pid);
 
 bool is_php_process(uint32_t pid);
 
+bool is_v8_process(uint32_t pid);
+
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
 size_t merge_php_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+size_t merge_v8_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
                                                   int32_t offsets_map_fd);
@@ -228,6 +279,17 @@ void php_unwind_table_destroy(php_unwind_table_t *table);
 void php_unwind_table_load(php_unwind_table_t *table, uint32_t pid);
 
 void php_unwind_table_unload(php_unwind_table_t *table, uint32_t pid);
+
+typedef struct v8_unwind_table_t v8_unwind_table_t;
+
+v8_unwind_table_t *v8_unwind_table_create(int32_t unwind_info_map_fd,
+                                          int32_t offsets_map_fd);
+
+void v8_unwind_table_destroy(v8_unwind_table_t *table);
+
+void v8_unwind_table_load(v8_unwind_table_t *table, uint32_t pid);
+
+void v8_unwind_table_unload(v8_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
 

@@ -227,9 +227,9 @@ fn main() {
         let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids_array.as_ptr(), num);
         println!("Result {}", result);
 
-        // Set regex to match both Python and PHP processes
+        // Set regex to match Python, PHP, and Node.js processes
         set_dwarf_regex(
-            CString::new("^(python.*|php.*)$".as_bytes())
+            CString::new("^(python.*|php.*|node.*|nodejs.*)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),

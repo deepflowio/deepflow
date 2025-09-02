@@ -790,6 +790,9 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		// Check if this is PHP process for special handling
 		if (is_php_process(v->tgid)) {
 			offset += merge_php_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		} else if (is_v8_process(v->tgid)) {
+			// V8/Node.js process handling
+			offset += merge_v8_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		} else {
 			// Default Python/other interpreter handling
 			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
