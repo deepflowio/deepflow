@@ -458,7 +458,7 @@ impl RefCountable for DiskMonitor {
                 *last = now;
             }
             None => {
-                warn!("get disk {} io failed.", self.name);
+                debug!("get disk {} io failed.", self.name);
             }
         }
         metrics
