@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: disk io log level from warn to debug [#10381](https://github.com/deepflowio/deepflow/pull/10381) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: test-server support set grpc-buffer-size [#10376](https://github.com/deepflowio/deepflow/pull/10376) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: update auto_service/instance when gpid from process_id [#10372](https://github.com/deepflowio/deepflow/pull/10372) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Fix CPU affinity interference from numad for agent [#10370](https://github.com/deepflowio/deepflow/pull/10370) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8817](https://github.com/deepflowio/deepflow/pull/8817) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8816](https://github.com/deepflowio/deepflow/pull/8816) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8814](https://github.com/deepflowio/deepflow/pull/8814) by [lzf575](https://github.com/lzf575)
@@ -276,6 +280,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: perf_event table change to file_event [#10365](https://github.com/deepflowio/deepflow/pull/10365) by [lzf575](https://github.com/lzf575)
+* feat: auto grpc buffer size [#10348](https://github.com/deepflowio/deepflow/pull/10348) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF Add a Musl flag option (#9022) [#9024](https://github.com/deepflowio/deepflow/pull/9024) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9021](https://github.com/deepflowio/deepflow/pull/9021) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9013](https://github.com/deepflowio/deepflow/pull/9013) by [yinjiping](https://github.com/yinjiping)
