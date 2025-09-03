@@ -97,6 +97,8 @@ OBJS := user/elf.o \
 	$(patsubst %.c,%.o,$(wildcard user/extended/*.c)) \
 	$(patsubst %.c,%.o,$(wildcard user/extended/profile/*.c)) \
 	user/profile/perf_profiler.o \
+	user/profile/off_cpu_profiler.o \
+	user/profile/off_cpu_integration.o \
 	user/profile/stringifier.o \
 	user/profile/java/jvm_symbol_collect.o \
 	user/profile/java/collect_symbol_files.o

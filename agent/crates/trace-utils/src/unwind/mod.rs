@@ -14,9 +14,33 @@
  * limitations under the License.
  */
 
+pub mod cache;
+pub mod constants;
 pub mod dwarf;
+pub mod error_recovery;
+pub mod integration;
 pub mod lua;
+pub mod monitoring;
+pub mod nodejs;
+pub mod php;
 pub mod python;
+pub mod symbol_resolver;
+
+// Version-specific offset system modules
+pub mod php_offsets;
+pub mod runtime_detector;
+pub mod v8_offsets;
+pub mod version_compatibility;
+pub mod version_manager;
+pub mod version_specific_offsets;
+
+// Modernized profiler implementations
+pub mod nodejs_modernized;
+pub mod php_modernized;
+
+// Test modules
+#[cfg(test)]
+pub mod tests;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
@@ -597,3 +621,32 @@ impl AsMut<UnwindEntryShard> for BoxedShard {
         unsafe { self.0.as_mut() }
     }
 }
+
+// Re-export language-specific profilers
+pub use self::nodejs::NodeJSUnwindTable;
+pub use self::php::PHPUnwindTable;
+pub use self::python::PythonUnwindTable;
+
+// Re-export enhanced profiler components
+pub use self::constants::*;
+pub use self::error_recovery::{CircuitBreaker, ErrorRecoveryCoordinator, RecoveryStats};
+pub use self::integration::{EnhancedMultiLanguageProfiler, ProfilerConfig};
+pub use self::monitoring::{PerformanceMonitor, ProfilerError, ProfilerMetrics, ProfilerResult};
+pub use self::symbol_resolver::{RuntimeType, StackTrace, Symbol, SymbolResolverRegistry};
+
+// Re-export version-specific offset system
+pub use self::runtime_detector::RuntimeDetector;
+pub use self::version_compatibility::{
+    CompatibilityIssue, CompatibilityStatus, CompatibilitySummary, IssueSeverity,
+    VersionCompatibilityChecker, VersionDetectionResult,
+};
+pub use self::version_manager::{VersionManagerStats, VersionSpecificOffsetManager};
+pub use self::version_specific_offsets::*;
+
+// Re-export modernized profiler implementations
+pub use self::nodejs_modernized::{
+    ModernizedNodeJSUnwindTable, NodeJSUnwindStats as ModernizedNodeJSUnwindStats,
+};
+pub use self::php_modernized::{
+    ModernizedPHPUnwindTable, PHPUnwindStats as ModernizedPHPUnwindStats,
+};

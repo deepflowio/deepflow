@@ -31,6 +31,26 @@ pub enum Error {
     BadInterpreterType(u32, &'static str),
     #[error("Process#{0} {1} v{2} not supported")]
     BadInterpreterVersion(u32, &'static str, Version),
+    #[error("{0}")]
+    Generic(String),
+}
+
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Error::Generic(s)
+    }
+}
+
+impl From<&str> for Error {
+    fn from(s: &str) -> Self {
+        Error::Generic(s.to_string())
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(e: std::num::ParseIntError) -> Self {
+        Error::Generic(format!("Parse error: {}", e))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
