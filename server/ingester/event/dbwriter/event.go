@@ -61,8 +61,8 @@ type EventStore struct {
 
 	Tagged uint8
 
-	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"perf_event_signal_source"` // Resource / File IO
-	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"perf_event_type"`
+	SignalSource     uint8  `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"file_event_signal_source"` // Resource / File IO
+	EventType        string `json:"event_type" category:"$tag" sub:"event_info" enumfile:"file_event_type"`
 	EventDescription string
 	ProcessKName     string `json:"process_kname" category:"$tag" sub:"service_info"` // us
 
@@ -237,62 +237,62 @@ func (e *EventStore) SetId(time, analyzerID uint32) {
 
 func EventColumns(isFileEvent bool) []*ckdb.Column {
 	columns := []*ckdb.Column{
-		ckdb.NewColumn("time", ckdb.DateTime),
-		ckdb.NewColumn("_id", ckdb.UInt64),
-		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
-		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+		ckdb.NewColumn("time", ckdb.DateTime).SetGroupBy(),
+		ckdb.NewColumn("_id", ckdb.UInt64).SetIgnoredInAggrTable().SetIgnoredInAggrTable(),
+		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒").SetIgnoredInAggrTable(),
 
-		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充, 用于调试"),
+		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充, 用于调试").SetIgnoredInAggrTable(),
 
-		ckdb.NewColumn("signal_source", ckdb.UInt8).SetComment("事件来源"),
-		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
-		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
-		ckdb.NewColumn("process_kname", ckdb.String).SetComment("系统进程"),
+		ckdb.NewColumn("signal_source", ckdb.UInt8).SetComment("事件来源").SetGroupBy(),
+		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型").SetGroupBy(),
+		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("process_kname", ckdb.String).SetComment("系统进程").SetGroupBy(),
 
-		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
+		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID").SetGroupBy(),
 
-		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
-		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
-		ckdb.NewColumn("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID"),
-		ckdb.NewColumn("host_id", ckdb.UInt16).SetComment("宿主机ID"),
-		ckdb.NewColumn("pod_id", ckdb.UInt32).SetComment("容器ID"),
-		ckdb.NewColumn("pod_node_id", ckdb.UInt32).SetComment("容器节点ID"),
-		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID"),
-		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID"),
-		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID"),
+		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID").SetAggrLast(),
+		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID").SetAggrLast(),
+		ckdb.NewColumn("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID").SetGroupBy(),
+		ckdb.NewColumn("host_id", ckdb.UInt16).SetComment("宿主机ID").SetAggrLast(),
+		ckdb.NewColumn("pod_id", ckdb.UInt32).SetComment("容器ID").SetGroupBy(),
+		ckdb.NewColumn("pod_node_id", ckdb.UInt32).SetComment("容器节点ID").SetAggrLast(),
+		ckdb.NewColumn("pod_ns_id", ckdb.UInt16).SetComment("容器命名空间ID").SetAggrLast(),
+		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID").SetAggrLast(),
+		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID").SetAggrLast(),
 
-		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
-		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
-		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
-		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("采集器ID"),
-		ckdb.NewColumn("subnet_id", ckdb.UInt16),
-		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
-		ckdb.NewColumn("ip4", ckdb.IPv4),
-		ckdb.NewColumn("ip6", ckdb.IPv6),
+		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型").SetGroupBy(),
+		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID").SetGroupBy(),
+		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID").SetGroupBy(),
+		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("采集器ID").SetGroupBy(),
+		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetAggrLast(),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetGroupBy(),
+		ckdb.NewColumn("ip4", ckdb.IPv4).SetGroupBy(),
+		ckdb.NewColumn("ip6", ckdb.IPv6).SetGroupBy(),
 
-		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("Team ID"),
+		ckdb.NewColumn("team_id", ckdb.UInt16).SetComment("Team ID").SetGroupBy(),
 
-		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
-		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
-		ckdb.NewColumn("auto_service_id", ckdb.UInt32),
-		ckdb.NewColumn("auto_service_type", ckdb.UInt8),
-		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
+		ckdb.NewColumn("auto_instance_id", ckdb.UInt32).SetAggrLast(),
+		ckdb.NewColumn("auto_instance_type", ckdb.UInt8).SetAggrLast(),
+		ckdb.NewColumn("auto_service_id", ckdb.UInt32).SetAggrLast(),
+		ckdb.NewColumn("auto_service_type", ckdb.UInt8).SetAggrLast(),
+		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance").SetGroupBy(),
 
-		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
-		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
+		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性").SetIgnoredInAggrTable(),
+		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值").SetIgnoredInAggrTable(),
 	}
 	if isFileEvent {
 		columns = append(columns,
-			ckdb.NewColumn("bytes", ckdb.UInt32),
-			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒"),
-			ckdb.NewColumn("file_name", ckdb.String).SetComment("文件名"),
-			ckdb.NewColumn("file_type", ckdb.UInt8).SetComment("文件类型"),
-			ckdb.NewColumn("offset", ckdb.UInt64).SetComment("读写偏移"),
-			ckdb.NewColumn("syscall_thread", ckdb.UInt32),
-			ckdb.NewColumn("syscall_coroutine", ckdb.UInt32),
-			ckdb.NewColumn("mount_source", ckdb.LowCardinalityString),
-			ckdb.NewColumn("mount_point", ckdb.LowCardinalityString),
-			ckdb.NewColumn("file_dir", ckdb.String),
+			ckdb.NewColumn("bytes", ckdb.UInt32).SetAggrSum().SetAggrSum(),
+			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒").SetAggrMaxAndAvgDurationValue(),
+			ckdb.NewColumn("file_name", ckdb.String).SetComment("文件名").SetIgnoredInAggrTable(),
+			ckdb.NewColumn("file_type", ckdb.UInt8).SetComment("文件类型").SetGroupBy(),
+			ckdb.NewColumn("offset", ckdb.UInt64).SetComment("读写偏移").SetIgnoredInAggrTable(),
+			ckdb.NewColumn("syscall_thread", ckdb.UInt32).SetGroupBy(),
+			ckdb.NewColumn("syscall_coroutine", ckdb.UInt32).SetGroupBy(),
+			ckdb.NewColumn("mount_source", ckdb.LowCardinalityString).SetGroupBy(),
+			ckdb.NewColumn("mount_point", ckdb.LowCardinalityString).SetGroupBy(),
+			ckdb.NewColumn("file_dir", ckdb.String).SetGroupBy(),
 		)
 	}
 	return columns
@@ -325,6 +325,9 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
+		Aggr1S:          true,
+		AggrTableSuffix: "_metrics",
+		AggrCounted:     true,
 	}
 }
 

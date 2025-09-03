@@ -184,6 +184,8 @@ type Table struct {
 	PrimaryKeyCount int          // 一级索引的key的个数, 从orderKeys中数前n个,
 	Aggr1H1D        bool         // 是否创建 1h/1d 表
 	Aggr1S          bool         // 是否创建 1s 表
+	AggrTableSuffix string
+	AggrCounted     bool // 聚合表是否添加count 字段
 }
 
 func (t *Table) OrgDatabase(orgID uint16) string {
@@ -511,10 +513,19 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 			case AggrLastAndSum, AggrLastAndSumProfileValue:
 				columns = append(columns, fmt.Sprintf("%s_last %s %s", c.Name, c.Type.String(), codec))
 				columns = append(columns, fmt.Sprintf("%s_sum__agg AggregateFunction(sum, %s)", c.Name, c.Type.String()))
+			case AggrMaxAndAvgDurationValue:
+				columns = append(columns, fmt.Sprintf("%s_max__agg AggregateFunction(max, %s)", c.Name, c.Type.String()))
+				columns = append(columns, fmt.Sprintf("%s_avg__agg AggregateFunction(avg, %s)", c.Name, c.Type.String()))
+				columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(sum, %s)", c.Name, c.Type.String()))
+			case AggrMax, AggrSum, AggrAvg:
+				columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(%s, %s)", c.Name, c.Aggr, c.Type.String()))
 			default:
 				columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(%s, %s)", c.Name, getAggr(c), c.Type.String()))
 			}
 		}
+	}
+	if t.AggrCounted {
+		columns = append(columns, fmt.Sprintf("count__agg AggregateFunction(sum, %s)", UInt32))
 	}
 
 	engine := AggregatingMergeTree.String()
@@ -574,11 +585,20 @@ func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationI
 				case AggrLastAndSum, AggrLastAndSumProfileValue:
 					columns = append(columns, fmt.Sprintf("anyLast(%s) AS %s_last", c.Name, c.Name))
 					columns = append(columns, fmt.Sprintf("sumState(%s) AS %s_sum__agg", c.Name, c.Name))
+				case AggrSum, AggrMax, AggrAvg:
+					columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", c.Aggr, c.Name, c.Name))
+				case AggrMaxAndAvgDurationValue:
+					columns = append(columns, fmt.Sprintf("maxState(%s) AS %s_max__agg", c.Name, c.Name))
+					columns = append(columns, fmt.Sprintf("avgState(%s) AS %s_avg__agg", c.Name, c.Name))
+					columns = append(columns, fmt.Sprintf("sumState(%s) AS %s__agg", c.Name, c.Name))
 				default:
 					columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", getAggr(c), c.Name, c.Name))
 				}
 			}
 		}
+	}
+	if t.AggrCounted {
+		columns = append(columns, "sumState(toUInt32(1)) AS count__agg")
 	}
 
 	return fmt.Sprintf(`CREATE MATERIALIZED VIEW IF NOT EXISTS %s TO %s
@@ -618,10 +638,17 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s_sum", c.Name, c.Name))
 			case AggrLastAndSumProfileValue:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s", c.Name, c.Name))
+			case AggrMaxAndAvgDurationValue:
+				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_max__agg) AS max_%s", c.Name, c.Name))
+				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_avg__agg) AS avg_%s", c.Name, c.Name))
+				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 			default:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 			}
 		}
+	}
+	if t.AggrCounted {
+		columns = append(columns, "finalizeAggregation(count__agg) AS count")
 	}
 
 	return fmt.Sprintf(`
