@@ -28,4 +28,4 @@ CALL AddColumnIfNotExists('vtap', 'grpc_buffer_size', 'BIGINT DEFAULT 0', 'memor
 
 DROP PROCEDURE AddColumnIfNotExists;
 
-UPDATE db_version SET version='7.0.1.31';
+UPDATE db_version SET version='7.1.0.0';
