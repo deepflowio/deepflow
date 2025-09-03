@@ -34,26 +34,6 @@ typedef u32 kern_dev_t;
 #define DEV_INVALID ((kern_dev_t)-1)
 
 /**
- * Filesystem type categories
- * - FS_TYPE_UNKNOWN = Unknown type
- * - FS_TYPE_REGULAR = Local disk filesystem (ext4, xfs, btrfs, etc.)
- * - FS_TYPE_VIRTUAL = Virtual filesystem (proc, sysfs, tmpfs, etc.)
- * - FS_TYPE_NETWORK = Network filesystem (nfs, cifs, ceph, etc.)
- */
-typedef enum {
-	FS_TYPE_UNKNOWN = 0,
-	FS_TYPE_REGULAR = 1,
-	FS_TYPE_VIRTUAL = 2,
-	FS_TYPE_NETWORK = 3
-} fs_type_t;
-
-/// Mapping from filesystem name to type
-typedef struct {
-	const char *name;
-	fs_type_t type;
-} fs_map_t;
-
-/**
  * struct mount_entry - Represents a mount point within a mount namespace
  * @list:         Linked list node for chaining multiple mount entries
  * @s_dev:        Device ID (from stat.st_dev), typically encoded as major:minor
@@ -64,7 +44,7 @@ typedef struct {
 struct mount_entry {
 	struct list_head list;
 	kern_dev_t s_dev;
-	fs_type_t file_type;
+	bool is_nfs;
 	char *mount_point;
 	char *mount_source;
 };
@@ -157,11 +137,11 @@ int mount_info_cache_remove(pid_t pid, u64 mntns_id);
  * @param[out] mount_path     Output buffer for mount point path
  * @param[out] mount_source   Output buffer for mount source (e.g., device or NFS path)
  * @param[in]  mount_size     Size of output buffers
- * @param[out] file_type      File type
+ * @param[out] is_nfs         Set to true if the mount is NFS
  */
-void get_mount_info(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
-		    char *mount_path, char *mount_source,
-		    int mount_size, fs_type_t *file_type);
+void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
+			   char *mount_path, char *mount_source,
+			   int mount_size, bool * is_nfs);
 
 /**
  * @brief Copy and transform event data containing file paths from eBPF trace.
@@ -174,12 +154,12 @@ void get_mount_info(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
  * @param[in]  len           Length of destination buffer
  * @param[in]  mount_point   Mount point path
  * @param[in]  mount_source  Mount source path
- * @param[in]  file_type     File type (FS_TYPE_REGULAR, FS_TYPE_VIRTUAL, FS_TYPE_NETWORK)
+ * @param[in]  is_nfs        True if mount is NFS
  * @return Number of bytes written to dst
  */
-uint32_t copy_file_metrics(int pid, void *dst, void *src, int len,
-			   const char *mount_point,
-			   const char *mount_source, fs_type_t file_type);
+uint32_t copy_regular_file_data(int pid, void *dst, void *src, int len,
+				const char *mount_point,
+				const char *mount_source, bool is_nfs);
 /**
  * @brief Check for changes in the host root mount namespace's mount information.
  *
@@ -236,22 +216,4 @@ void check_and_cleanup_mount_info(pid_t pid, u64 mntns_id);
  * for future accumulation of mount memory size statistics.
  */
 void collect_mount_info_stats(bool output_log);
-
-/**
- * fs_type_to_string - Convert a filesystem type enum to a human-readable string.
- *
- * @type: The filesystem type, one of FS_TYPE_UNKNOWN, FS_TYPE_REGULAR, 
- *        FS_TYPE_VIRTUAL, or FS_TYPE_NETWORK.
- *
- * Returns:
- *   A constant string representing the filesystem type:
- *   - "regular" for FS_TYPE_REGULAR
- *   - "virtual" for FS_TYPE_VIRTUAL
- *   - "network" for FS_TYPE_NETWORK
- *   - "unknown" for FS_TYPE_UNKNOWN or any unrecognized value
- *
- * This function is safe to use for logging, debugging, or displaying
- * filesystem type information in a human-readable format.
- */
-const char *fs_type_to_string(fs_type_t type);
 #endif /* DF_USER_MOUNT_H */

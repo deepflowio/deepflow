@@ -210,7 +210,7 @@ int create_and_init_proc_info_caches(void);
  * @param mount_point  Output buffer to store the mount point path matching `s_dev`.
  * @param mount_source Output buffer to store the mount source path.
  * @param mount_size   Size of the `mount_point` buffer in bytes.
- * @param file_type    File type
+ * @param is_nfs       Is it an NFS file system?
  *
  * @return
  *    0 : Successfully found process info in cache and retrieved data.
@@ -224,7 +224,7 @@ int create_and_init_proc_info_caches(void);
 int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 			     uint8_t *name, int name_size, kern_dev_t s_dev,
 			     char *mount_point, char *mount_source,
-			     int mount_size, fs_type_t *file_type);
+			     int mount_size, bool *is_nfs);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers
