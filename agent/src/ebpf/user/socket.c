@@ -1126,7 +1126,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	int len;
 	void *data_buf_ptr;
 	char mount_point[MAX_PATH_LENGTH], mount_source[MAX_PATH_LENGTH];
-	bool is_nfs = false;
+	fs_type_t file_type = FS_TYPE_UNKNOWN;
 
 	// 所有载荷的数据总大小（去掉头）
 	int alloc_len = buf->len - offsetof(typeof(struct __socket_data),
@@ -1204,7 +1204,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 						       submit_data->process_kname,
 						       sizeof(submit_data->process_kname),
 						       s_dev, mount_point, mount_source,
-						       sizeof(mount_point), &is_nfs);
+						       sizeof(mount_point), &file_type);
 
 			// Not found in the process cache, attempting to retrieve from procfs.
 			if (ret) {
@@ -1225,9 +1225,8 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 			if (s_dev != DEV_INVALID && mount_point[0] == '\0') {
 				u64 mntns_id = 0;
-                        	find_mount_point_path(sd->tgid, &mntns_id, s_dev,
-						      mount_point, mount_source,
-						      sizeof(mount_point), &is_nfs);
+                        	get_mount_info(sd->tgid, &mntns_id, s_dev, mount_point, mount_source,
+					       sizeof(mount_point), &file_type);
 			}
 
 			submit_data->process_kname[sizeof(submit_data->process_kname) -
@@ -1267,10 +1266,10 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			}
 			if (sd->source == DATA_SOURCE_IO_EVENT) {
 				len =
-				    copy_regular_file_data(sd->tgid, submit_data->cap_data
-							   + offset, sd->data,
-							   len, mount_point,
-							   mount_source, is_nfs);
+				    copy_file_metrics(sd->tgid, submit_data->cap_data
+						      + offset, sd->data,
+						      len, mount_point,
+						      mount_source, file_type);
 			} else {
 				memcpy_fast(submit_data->cap_data + offset,
 					    sd->data, len);
@@ -3164,16 +3163,23 @@ int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf,
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
-				 "latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+				 "latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
+				 "file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
+				 "mountinfo file %s\n",
 				 event->bytes_count, event->operation,
-				 event->offset, event->latency, event->filename,
-				 path_len, mount_file_tag);
+				 event->offset, event->latency, event->mount_source,
+				 event->mount_point, event->file_dir, event->filename,
+				 path_len, fs_type_to_string(event->file_type), mount_file_tag);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
-			"latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+			"latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
+			"file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
+			"mountinfo file %s\n",
 			event->bytes_count, event->operation, event->offset,
-			event->latency, event->filename, path_len, mount_file_tag);
+			event->latency, event->mount_source, event->mount_point,
+			event->file_dir, event->filename, path_len,
+			fs_type_to_string(event->file_type), mount_file_tag);
 
 		fflush(stdout);
 	}
