@@ -9,6 +9,9 @@
 #### New Feature
 
 #### Bug Fix
+* Revert "fix: update auto_service/instance when gpid from process_id" [#10401](https://github.com/deepflowio/deepflow/pull/10401) by [lzf575](https://github.com/lzf575)
+* fix: support biz_type at HOOK_POINT_HTTP_REQ/RESP [#10395](https://github.com/deepflowio/deepflow/pull/10395) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - Add conditional compilation to protect_cpu_affinity() [#10380](https://github.com/deepflowio/deepflow/pull/10380) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +49,9 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support grpc cache size auto adjusted [#10402](https://github.com/deepflowio/deepflow/pull/10402) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: auto grpc buffer size [#10398](https://github.com/deepflowio/deepflow/pull/10398) by [askyrie](https://github.com/askyrie)
+* feat: add grpc_buffer_size [#10393](https://github.com/deepflowio/deepflow/pull/10393) by [askyrie](https://github.com/askyrie)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
