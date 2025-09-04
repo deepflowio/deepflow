@@ -18,6 +18,7 @@ package vtap
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -27,7 +28,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var ALL_DOMAIMS = []string{"0"}
+var ALL_DOMAINS = []string{"0"}
 
 type VTapPlatformData struct {
 
@@ -136,9 +137,10 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 	if vtapConfig == nil || vtapConfig.PodClusterInternalIP == nil {
 		return
 	}
-	log.Debug(v.Logf("%d %s", vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains))
+	domains := vtapConfig.getDomainFilters()
+	log.Debug(v.Logf("%d %v", vtapConfig.PodClusterInternalIP, domains))
 	if *vtapConfig.PodClusterInternalIP == ALL_CLUSTERS &&
-		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
+		slices.Equal(domains, ALL_DOMAINS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=所有集群
 		// 所有云平台所有数据
 
@@ -156,7 +158,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		}
 		domainToAllPlatformData := p.GetDomainToAllPlatformData()
 		domainAllData := metadata.NewPlatformData("platformDataType1", "", 0, PLATFORM_DATA_TYPE_1)
-		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+		for _, domainLcuuid := range domains {
 			domainData := domainToAllPlatformData[domainLcuuid]
 			if domainData == nil {
 				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -170,7 +172,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		c.setVTapPlatformData(domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
 	} else if *vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
-		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
+		slices.Equal(domains, ALL_DOMAINS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
 		// 所有云平台中devicetype != POD/容器服务的所有接口，采集器所在集群devicetype=POD/容器服务的所有接口
 
@@ -218,7 +220,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 			}
 			domainToAllPlatformData := p.GetDomainToAllPlatformData()
 			domainAllData := metadata.NewPlatformData("platformDataBMDedicated", "", 0, PLATFORM_DATA_BM_DEDICATED)
-			for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+			for _, domainLcuuid := range domains {
 				domainData := domainToAllPlatformData[domainLcuuid]
 				if domainData == nil {
 					log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -246,7 +248,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 		domainToPlatformDataExceptPod := p.GetDomainToPlatformDataExceptPod()
 		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
 		domainAllData := metadata.NewPlatformData("platformDataType3", "", 0, PLATFORM_DATA_TYPE_3)
-		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+		for _, domainLcuuid := range domains {
 			domainData := domainToPlatformDataExceptPod[domainLcuuid]
 			if domainData == nil {
 				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -261,7 +263,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(md *metadata.MetaData, c *VTapC
 				log.Errorf(v.Logf("domain(%s) no platform data", podDomain))
 				continue
 			}
-			if Find[string](vtapConfig.ConvertedDomains, podDomain) {
+			if Find[string](domains, podDomain) {
 				domainAllData.MergeInterfaces(vtapDomainData)
 			} else {
 				domainAllData.Merge(vtapDomainData)
