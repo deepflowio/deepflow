@@ -254,7 +254,7 @@ struct user_io_event_buffer {
 	// The number of bytes of offset within the file content
 	__u64 offset;
 
-	int file_type;
+	__u32 file_type;
 	// strings terminated with \0
 	char filename[FILE_NAME_SZ];
 	char mount_source[MOUNT_SOURCE_SZ];

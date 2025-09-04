@@ -21,7 +21,15 @@
 #define MAX_EVENTS_BURST           	32	// The number of events in batch processing
 #define BOOT_TIME_UPDATE_PERIOD		60	// 系统启动时间更新周期, 单位：秒
 #define DENTRY_NAME_SIZE		256  	// Maximum length of a directory entry name
-#define FILE_NAME_SZ			DENTRY_NAME_SIZE
+
+/*
+ *  Note: The following settings are related to the offset
+ *  calculations in Rust, in the file 
+ *  `agent/src/common/proc_event/linux.rs`.
+ *  If the values of the four macros below are modified, the
+ *  Rust file must be updated accordingly.
+ */
+#define FILE_NAME_SZ			256
 #define MOUNT_SOURCE_SZ			512
 #define MOUNT_POINT_SZ			256
 #define FILE_PATH_SZ			512
