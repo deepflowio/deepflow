@@ -17,8 +17,6 @@
 package agentsynchronize
 
 import (
-	"math"
-
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc/peer"
 
@@ -48,7 +46,7 @@ func checkGRPCBufferSize(currentSize, sendBytes uint64) (uint64, bool) {
 		return 0, false
 	}
 
-	requiredSize := uint64(math.Ceil(float64(sendBytes+common.BUFFER_SIZE_EXTRA)/common.MEGA_BYTE)) * common.MEGA_BYTE
+	requiredSize := common.CalculateBufferSize(sendBytes)
 
 	// 检查是否需要增大缓冲区
 	if requiredSize > currentSize {
