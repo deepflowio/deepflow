@@ -124,6 +124,12 @@ fn all_supported_commands() -> Vec<Command> {
             ..Default::default()
         },
         Command {
+            cmdline: "date",
+            output_format: OutputFormat::Text,
+            command_type: CMD_TYPE_SYSTEM,
+            ..Default::default()
+        },
+        Command {
             cmdline: "netstat -tunp",
             output_format: OutputFormat::Text,
             desc: "netstat",
