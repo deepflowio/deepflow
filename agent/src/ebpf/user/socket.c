@@ -982,6 +982,30 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	return ETR_OK;
 }
 
+/**
+ * Calculate the extra memory size required when allocating,
+ * due to file I/O events and the need to pass mount-related
+ * information. These details are obtained in user space and
+ * are not stored in the kernel structures, so additional
+ * memory must be reserved to hold them.
+ */
+static inline int get_additional_memory_size(struct __socket_data_buffer *buf)
+{
+	int i, start = 0, extra_size = 0;
+	struct __socket_data *sd;
+	for (i = 0; i < buf->events_num; i++) {
+		sd = (struct __socket_data *)&buf->data[start];
+		if (sd->source == DATA_SOURCE_IO_EVENT) {
+			extra_size += (sizeof(struct user_io_event_buffer) - sd->data_len);
+		}
+		start +=
+		    (offsetof(typeof(struct __socket_data), data) +
+		     sd->data_len);
+	}
+
+	return extra_size;
+}	
+
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
@@ -1125,7 +1149,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	struct socket_bpf_data *submit_data;
 	int len;
 	void *data_buf_ptr;
-	char mount_point[MAX_PATH_LENGTH], mount_source[MAX_PATH_LENGTH];
+	char mount_point[MAX_PATH_LENGTH] = {0}, mount_source[MAX_PATH_LENGTH] = {0};
 	fs_type_t file_type = FS_TYPE_UNKNOWN;
 
 	// 所有载荷的数据总大小（去掉头）
@@ -1134,6 +1158,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	alloc_len += sizeof(*submit_data) * buf->events_num;	// 计算长度包含要提交的数据的头
 	alloc_len += sizeof(struct mem_block_head) * buf->events_num;	// 包含内存块head
 	alloc_len += sizeof(sd->extra_data) * buf->events_num;	// 可能包含额外数据
+	alloc_len += get_additional_memory_size(buf);
 	alloc_len = CACHE_LINE_ROUNDUP(alloc_len);	// 保持cache line对齐
 
 	void *socket_data_buff = malloc(alloc_len);

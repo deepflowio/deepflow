@@ -663,7 +663,6 @@ copy_event:
 				       sizeof(u_event->file_dir));
 	}
 
-	buffer_len = temp_index + 1;
 	u_event->bytes_count = event->bytes_count;
 	u_event->operation = event->operation;
 	u_event->latency = event->latency;
