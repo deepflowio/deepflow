@@ -1438,12 +1438,12 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 		}
 	}
 
-	if !SliceEqual[string](r.subnetPrefix, o.subnetPrefix) {
+	if !slices.Equal(r.subnetPrefix, o.subnetPrefix) {
 		log.Info(r.Log("platform subnet changed"))
 		return false
 	}
 
-	if !SliceEqual[string](r.subnetMask, o.subnetMask) {
+	if !slices.Equal(r.subnetMask, o.subnetMask) {
 		log.Info(r.Log("platform subnet changed"))
 		return false
 	}

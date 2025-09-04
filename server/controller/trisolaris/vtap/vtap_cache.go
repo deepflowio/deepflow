@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +53,6 @@ type VTapConfig struct {
 	ConvertedL7LogIgnoreTapSides []uint32
 	ConvertedL7LogStoreTapTypes  []uint32
 	ConvertedDecapType           []uint32
-	ConvertedDomains             []string
 	ConvertedWasmPlugins         []string
 	ConvertedSoPlugins           []string
 	PluginNewUpdateTime          uint32
@@ -109,10 +107,6 @@ func (f *VTapConfig) convertData() {
 			log.Error(err)
 		}
 	}
-	if f.Domains != nil && len(*f.Domains) != 0 {
-		f.ConvertedDomains = strings.Split(*f.Domains, ",")
-	}
-	sort.Strings(f.ConvertedDomains)
 
 	if f.WasmPlugins != nil && len(*f.WasmPlugins) != 0 {
 		f.ConvertedWasmPlugins = strings.Split(*f.WasmPlugins, ",")
@@ -152,20 +146,19 @@ func (f *VTapConfig) modifyUserConfig(c *VTapCache) {
 	if !f.UserConfig.Exists(CONFIG_KEY_INGESTER_IP) {
 		f.UserConfig.Set(CONFIG_KEY_INGESTER_IP, c.GetTSDBIP())
 	}
-	domainFilters := f.UserConfig.Strings(CONFIG_KEY_DOMAIN_FILTER)
-	if len(domainFilters) > 0 {
-		sort.Strings(domainFilters)
-	} else {
-		domainFilters = []string{"0"}
-	}
-	f.UserConfig.Set(CONFIG_KEY_DOMAIN_FILTER, domainFilters)
 }
 
 func (f *VTapConfig) getDomainFilters() []string {
 	if f.UserConfig == nil {
-		return nil
+		return ALL_DOMAINS
 	}
-	return f.UserConfig.Strings(CONFIG_KEY_DOMAIN_FILTER)
+
+	domains := f.UserConfig.Strings(CONFIG_KEY_DOMAIN_FILTER)
+	if len(domains) == 0 {
+		return ALL_DOMAINS
+	}
+
+	return domains
 }
 
 func (f *VTapConfig) getPodClusterInternalIP() bool {
@@ -1536,7 +1529,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *metadbmodel.VTap) {
 	newPodDomains := v.getVTapPodDomains(c)
 	oldPodDomains := c.getPodDomains()
 	// podDomain 发生变化重新生成平台数据
-	if !SliceEqual[string](newPodDomains, oldPodDomains) {
+	if !slices.Equal(newPodDomains, oldPodDomains) {
 		c.updatePodDomains(newPodDomains)
 		v.setVTapChangedForPD()
 	}
