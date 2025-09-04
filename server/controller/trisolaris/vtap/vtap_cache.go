@@ -1652,21 +1652,21 @@ func (c *VTapCache) GetAgentRemoteSegments() []*agent.Segment {
 
 func (c *VTapCache) UpdateLastSyncBytes(bytes uint64) {
 	c.lastSyncBytes = bytes
-	c.grpcBufferSize = c.maxGRPCBytes()
+	c.grpcBufferSize = c.calculateGRPCBytes()
 }
 
 func (c *VTapCache) UpdateLastPushBytes(bytes uint64) {
 	c.lastPushBytes = bytes
-	c.grpcBufferSize = c.maxGRPCBytes()
+	c.grpcBufferSize = c.calculateGRPCBytes()
 }
 
 func (c *VTapCache) UpdateLastGPIDSyncBytes(bytes uint64) {
 	c.lastGPIDSyncBytes = bytes
-	c.grpcBufferSize = c.maxGRPCBytes()
+	c.grpcBufferSize = c.calculateGRPCBytes()
 }
 
-func (c *VTapCache) maxGRPCBytes() uint64 {
-	return max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes)
+func (c *VTapCache) calculateGRPCBytes() uint64 {
+	return CalculateBufferSize(max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes))
 }
 
 func (c *VTapCache) GetGRPCBufferSize() uint64 {
