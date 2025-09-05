@@ -18,6 +18,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/op/go-logging"
@@ -338,6 +339,7 @@ func (c *Cache) refreshRegions() {
 	}
 
 	c.AddRegions(regions)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_REGION_EN)+fmt.Sprintf(" count: %d", len(regions)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddAZ(item *metadbmodel.AZ) {
@@ -374,6 +376,7 @@ func (c *Cache) refreshAZs() {
 	}
 
 	c.AddAZs(azs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_AZ_EN)+fmt.Sprintf(" count: %d", len(azs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddSubDomain(item *metadbmodel.SubDomain) {
@@ -408,6 +411,7 @@ func (c *Cache) refreshSubDomains() {
 	}
 
 	c.AddSubDomains(subDomains)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN)+fmt.Sprintf(" count: %d", len(subDomains)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddHost(item *metadbmodel.Host) {
@@ -457,6 +461,7 @@ func (c *Cache) refreshHosts() {
 	}
 
 	c.AddHosts(hosts)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_HOST_EN)+fmt.Sprintf(" count: %d", len(hosts)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVM(item *metadbmodel.VM) {
@@ -495,6 +500,7 @@ func (c *Cache) refreshVMs() {
 	}
 
 	c.AddVMs(vms)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_EN)+fmt.Sprintf(" count: %d", len(vms)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVPCs(items []*metadbmodel.VPC) {
@@ -523,6 +529,7 @@ func (c *Cache) refreshVPCs() {
 	}
 
 	c.AddVPCs(vpcs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VPC_EN)+fmt.Sprintf(" count: %d", len(vpcs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddNetwork(item *metadbmodel.Network) {
@@ -598,6 +605,7 @@ func (c *Cache) refreshSubnets(networkIDs []int) {
 	}
 
 	c.AddSubnets(subnets)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN)+fmt.Sprintf(" count: %d", len(subnets)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVRouter(item *metadbmodel.VRouter) {
@@ -636,6 +644,7 @@ func (c *Cache) refreshVRouters() []int {
 		vrouterIDs = append(vrouterIDs, item.ID)
 		c.AddVRouter(item)
 	}
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN)+fmt.Sprintf(" count: %d", len(vrouters)), c.metadata.LogPrefixes)
 	return vrouterIDs
 }
 
@@ -661,6 +670,7 @@ func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 	}
 
 	c.AddRoutingTables(routingTables)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN)+fmt.Sprintf(" count: %d", len(routingTables)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddDHCPPorts(items []*metadbmodel.DHCPPort) {
@@ -693,6 +703,7 @@ func (c *Cache) refreshDHCPPorts() {
 	}
 
 	c.AddDHCPPorts(dhcpPorts)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN)+fmt.Sprintf(" count: %d", len(dhcpPorts)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVInterfaces(items []*metadbmodel.VInterface) {
@@ -723,6 +734,7 @@ func (c *Cache) refreshVInterfaces() {
 	}
 
 	c.AddVInterfaces(vifs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN)+fmt.Sprintf(" count: %d", len(vifs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddWANIPs(items []*metadbmodel.WANIP) {
@@ -749,6 +761,7 @@ func (c *Cache) refreshWANIPs() {
 	}
 
 	c.AddWANIPs(wanIPs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN)+fmt.Sprintf(" count: %d", len(wanIPs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddLANIPs(items []*metadbmodel.LANIP) {
@@ -775,6 +788,7 @@ func (c *Cache) refreshLANIPs() {
 	}
 
 	c.AddLANIPs(lanIPs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN)+fmt.Sprintf(" count: %d", len(lanIPs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddFloatingIPs(items []*metadbmodel.FloatingIP) {
@@ -799,6 +813,7 @@ func (c *Cache) refreshFloatingIPs() {
 	}
 
 	c.AddFloatingIPs(floatingIPs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN)+fmt.Sprintf(" count: %d", len(floatingIPs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddNATGateways(items []*metadbmodel.NATGateway) {
@@ -831,6 +846,7 @@ func (c *Cache) refreshNATGateways() {
 	}
 
 	c.AddNATGateways(natGateways)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN)+fmt.Sprintf(" count: %d", len(natGateways)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddNATVMConnections(items []*metadbmodel.NATVMConnection) {
@@ -857,6 +873,7 @@ func (c *Cache) refreshNATVMConnections() {
 	}
 
 	c.AddNATVMConnections(natVMConnections)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN)+fmt.Sprintf(" count: %d", len(natVMConnections)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddNATRules(items []*metadbmodel.NATRule) {
@@ -883,6 +900,7 @@ func (c *Cache) refreshNATRules() {
 	}
 
 	c.AddNATRules(natRules)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN)+fmt.Sprintf(" count: %d", len(natRules)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddLBs(items []*metadbmodel.LB) {
@@ -913,6 +931,7 @@ func (c *Cache) refreshLBs() {
 	}
 
 	c.AddLBs(lbs)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_EN)+fmt.Sprintf(" count: %d", len(lbs)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddLBVMConnections(items []*metadbmodel.LBVMConnection) {
@@ -939,6 +958,7 @@ func (c *Cache) refreshLBVMConnections() {
 	}
 
 	c.AddLBVMConnections(lbVMConnections)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN)+fmt.Sprintf(" count: %d", len(lbVMConnections)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddLBListeners(items []*metadbmodel.LBListener) {
@@ -965,6 +985,7 @@ func (c *Cache) refreshLBListeners() {
 	}
 
 	c.AddLBListeners(listeners)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN)+fmt.Sprintf(" count: %d", len(listeners)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddLBTargetServers(items []*metadbmodel.LBTargetServer) {
@@ -989,6 +1010,7 @@ func (c *Cache) refreshLBTargetServers() {
 	}
 
 	c.AddLBTargetServers(servers)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN)+fmt.Sprintf(" count: %d", len(servers)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPeerConnections(items []*metadbmodel.PeerConnection) {
@@ -1015,6 +1037,7 @@ func (c *Cache) refreshPeeConnections() {
 	}
 
 	c.AddPeerConnections(peerConnections)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN)+fmt.Sprintf(" count: %d", len(peerConnections)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddCENs(items []*metadbmodel.CEN) {
@@ -1041,6 +1064,7 @@ func (c *Cache) refreshCENs() {
 	}
 
 	c.AddCENs(cens)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CEN_EN)+fmt.Sprintf(" count: %d", len(cens)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddRDSInstances(items []*metadbmodel.RDSInstance) {
@@ -1073,6 +1097,7 @@ func (c *Cache) refreshRDSInstances() {
 	}
 
 	c.AddRDSInstances(instances)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN)+fmt.Sprintf(" count: %d", len(instances)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddRedisInstances(items []*metadbmodel.RedisInstance) {
@@ -1105,6 +1130,7 @@ func (c *Cache) refreshRedisInstances() {
 	}
 
 	c.AddRedisInstances(instances)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN)+fmt.Sprintf(" count: %d", len(instances)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodClusters(items []*metadbmodel.PodCluster) {
@@ -1133,6 +1159,7 @@ func (c *Cache) refreshPodClusters() {
 	}
 
 	c.AddPodClusters(podClusters)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN)+fmt.Sprintf(" count: %d", len(podClusters)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodNodes(items []*metadbmodel.PodNode) {
@@ -1163,6 +1190,7 @@ func (c *Cache) refreshPodNodes() {
 	}
 
 	c.AddPodNodes(podNodes)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN)+fmt.Sprintf(" count: %d", len(podNodes)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVMPodNodeConnections(items []*metadbmodel.VMPodNodeConnection) {
@@ -1189,6 +1217,7 @@ func (c *Cache) refreshVMPodNodeConnections() {
 	}
 
 	c.AddVMPodNodeConnections(connections)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN)+fmt.Sprintf(" count: %d", len(connections)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodNamespaces(items []*metadbmodel.PodNamespace) {
@@ -1215,6 +1244,7 @@ func (c *Cache) refreshPodNamespaces() {
 	}
 
 	c.AddPodNamespaces(podNamespaces)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN)+fmt.Sprintf(" count: %d", len(podNamespaces)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodIngress(item *metadbmodel.PodIngress) {
@@ -1249,6 +1279,7 @@ func (c *Cache) refreshPodIngresses() []int {
 		podIngressIDs = append(podIngressIDs, item.ID)
 		c.AddPodIngress(item)
 	}
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN)+fmt.Sprintf(" count: %d", len(podIngresses)), c.metadata.LogPrefixes)
 	return podIngressIDs
 }
 
@@ -1280,6 +1311,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 	}
 
 	c.AddPodIngressRules(podIngressRules)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN)+fmt.Sprintf(" count: %d", len(podIngressRules)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodIngressRuleBackends(items []*metadbmodel.PodIngressRuleBackend) {
@@ -1308,6 +1340,7 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 	}
 
 	c.AddPodIngressRuleBackends(podIngressRuleBackends)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN)+fmt.Sprintf(" count: %d", len(podIngressRuleBackends)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodService(item *metadbmodel.PodService) {
@@ -1346,6 +1379,7 @@ func (c *Cache) refreshPodServices() []int {
 		podServiceIDs = append(podServiceIDs, item.ID)
 		c.AddPodService(item)
 	}
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN)+fmt.Sprintf(" count: %d", len(podServices)), c.metadata.LogPrefixes)
 	return podServiceIDs
 }
 
@@ -1375,6 +1409,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 	}
 
 	c.AddPodServicePorts(podServicePorts)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN)+fmt.Sprintf(" count: %d", len(podServicePorts)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodGroups(items []*metadbmodel.PodGroup) {
@@ -1401,6 +1436,7 @@ func (c *Cache) refreshPodGroups() {
 	}
 
 	c.AddPodGroups(podGroups)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN)+fmt.Sprintf(" count: %d", len(podGroups)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodGroupPorts(items []*metadbmodel.PodGroupPort) {
@@ -1429,6 +1465,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 	}
 
 	c.AddPodGroupPorts(podGroupPorts)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN)+fmt.Sprintf(" count: %d", len(podGroupPorts)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodReplicaSets(items []*metadbmodel.PodReplicaSet) {
@@ -1455,6 +1492,7 @@ func (c *Cache) refreshPodReplicaSets() {
 	}
 
 	c.AddPodReplicaSets(podReplicaSets)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN)+fmt.Sprintf(" count: %d", len(podReplicaSets)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPods(items []*metadbmodel.Pod) {
@@ -1485,6 +1523,7 @@ func (c *Cache) refreshPods() {
 	}
 
 	c.AddPods(pods)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_EN)+fmt.Sprintf(" count: %d", len(pods)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddConfigMaps(items []*metadbmodel.ConfigMap) {
@@ -1510,6 +1549,7 @@ func (c *Cache) refreshConfigMaps() {
 		return
 	}
 	c.AddConfigMaps(configMaps)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN)+fmt.Sprintf(" count: %d", len(configMaps)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddPodGroupConfigMapConnections(items []*metadbmodel.PodGroupConfigMapConnection) {
@@ -1536,6 +1576,7 @@ func (c *Cache) refreshPodGroupConfigMapConnections() {
 		return
 	}
 	c.AddPodGroupConfigMapConnections(items)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN)+fmt.Sprintf(" count: %d", len(items)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddProcesses(items []*metadbmodel.Process) {
@@ -1565,6 +1606,7 @@ func (c *Cache) refreshProcesses() {
 	}
 
 	c.AddProcesses(processes)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN)+fmt.Sprintf(" count: %d", len(processes)), c.metadata.LogPrefixes)
 }
 
 func (c *Cache) AddVIPs(items []*metadbmodel.VIP) {
@@ -1589,6 +1631,7 @@ func (c *Cache) refreshVIP() {
 	}
 
 	c.AddVIPs(vips)
+	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VIP_EN)+fmt.Sprintf(" count: %d", len(vips)), c.metadata.LogPrefixes)
 }
 
 // RefreshVTaps refreshes vtap data for every regular domain synchronization
