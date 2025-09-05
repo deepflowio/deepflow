@@ -303,6 +303,8 @@ const (
 	AggrLast
 	AggrLastAndSum
 	AggrLastAndSumProfileValue
+	AggrMaxAndAvgDurationValue
+	AggrMax
 )
 
 var aggrTypeString = []string{
@@ -312,6 +314,8 @@ var aggrTypeString = []string{
 	AggrLast:                   "last",
 	AggrLastAndSum:             "last and sum",
 	AggrLastAndSumProfileValue: "last and sum profile value",
+	AggrMaxAndAvgDurationValue: "max and avg duration value",
+	AggrMax:                    "max",
 }
 
 func (t AggrType) String() string {
@@ -363,6 +367,11 @@ func (c *Column) SetAggr(a AggrType) *Column {
 	return c
 }
 
+func (c *Column) SetAggrSum() *Column {
+	c.Aggr = AggrSum
+	return c
+}
+
 func (c *Column) SetAggrLast() *Column {
 	c.Aggr = AggrLast
 	return c
@@ -370,6 +379,11 @@ func (c *Column) SetAggrLast() *Column {
 
 func (c *Column) SetAggrLastAndSumProfileValue() *Column {
 	c.Aggr = AggrLastAndSumProfileValue
+	return c
+}
+
+func (c *Column) SetAggrMaxAndAvgDurationValue() *Column {
+	c.Aggr = AggrMaxAndAvgDurationValue
 	return c
 }
 

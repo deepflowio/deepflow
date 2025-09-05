@@ -47,41 +47,43 @@ type DatasourceInfo struct {
 }
 
 const (
-	DEEPFLOW_SYSTEM   DatasourceModifiedOnly = "deepflow_system"
-	L4_FLOW_LOG                              = "flow_log.l4_flow_log"
-	L7_FLOW_LOG                              = "flow_log.l7_flow_log"
-	L4_PACKET                                = "flow_log.l4_packet"
-	L7_PACKET                                = "flow_log.l7_packet"
-	EXT_METRICS                              = "ext_metrics"
-	PROMETHEUS                               = "prometheus"
-	EVENT_EVENT                              = "event.event"
-	EVENT_FILE_EVENT                         = "event.file_event"
-	EVENT_ALERT_EVENT                        = "event.alert_event"
-	PROFILE                                  = "profile.in_process"
-	APPLOG                                   = "application_log.log"
-	DEEPFLOW_TENANT                          = "deepflow_tenant"
-	DEEPFLOW_ADMIN                           = "deepflow_admin"
-	PROFILE_METRICS                          = "profile.in_process_metrics"
+	DEEPFLOW_SYSTEM    DatasourceModifiedOnly = "deepflow_system"
+	L4_FLOW_LOG                               = "flow_log.l4_flow_log"
+	L7_FLOW_LOG                               = "flow_log.l7_flow_log"
+	L4_PACKET                                 = "flow_log.l4_packet"
+	L7_PACKET                                 = "flow_log.l7_packet"
+	EXT_METRICS                               = "ext_metrics"
+	PROMETHEUS                                = "prometheus"
+	EVENT_EVENT                               = "event.event"
+	EVENT_FILE_EVENT                          = "event.file_event"
+	EVENT_ALERT_EVENT                         = "event.alert_event"
+	PROFILE                                   = "profile.in_process"
+	APPLOG                                    = "application_log.log"
+	DEEPFLOW_TENANT                           = "deepflow_tenant"
+	DEEPFLOW_ADMIN                            = "deepflow_admin"
+	PROFILE_METRICS                           = "profile.in_process_metrics"
+	FILE_EVNET_METRICS                        = "event.file_event_metrics"
 )
 
 // to modify the datasource TTL, you need to also modify the 'flow_tag' database tables.
 // FIXME: only the 'prometheus' database is supported now, and the remaining databases will be completed in the future.
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
-	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{"deepflow_system"}, []string{}},
-	L4_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}, []string{}},
-	L7_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}, []string{}},
-	L4_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}, []string{}},
-	L7_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}, []string{}},
-	EXT_METRICS:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}, []string{}},
-	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
-	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
-	EVENT_FILE_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"file_event"}, []string{}},
-	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
-	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
-	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
-	DEEPFLOW_TENANT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
-	DEEPFLOW_ADMIN:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 14, "deepflow_admin", []string{"deepflow_server"}, []string{}},
-	PROFILE_METRICS:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 15, "profile", []string{"in_process_metrics.1s_agg"}, []string{}},
+	DEEPFLOW_SYSTEM:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{"deepflow_system"}, []string{}},
+	L4_FLOW_LOG:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}, []string{}},
+	L7_FLOW_LOG:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}, []string{}},
+	L4_PACKET:          {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}, []string{}},
+	L7_PACKET:          {int(flow_metrics.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}, []string{}},
+	EXT_METRICS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}, []string{}},
+	PROMETHEUS:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
+	EVENT_EVENT:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
+	EVENT_FILE_EVENT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"file_event"}, []string{}},
+	EVENT_ALERT_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
+	PROFILE:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
+	APPLOG:             {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
+	DEEPFLOW_TENANT:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
+	DEEPFLOW_ADMIN:     {int(flow_metrics.METRICS_TABLE_ID_MAX) + 14, "deepflow_admin", []string{"deepflow_server"}, []string{}},
+	PROFILE_METRICS:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 15, "profile", []string{"in_process_metrics.1s_agg"}, []string{}},
+	FILE_EVNET_METRICS: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 16, "event", []string{"file_event_metrics.1s_agg"}, []string{}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
