@@ -89,6 +89,7 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(md *message.Metadata, upd
 				}},
 				db,
 			)
+			return
 		}
 	}
 	c.updateOrSync(db, targetKey, updateInfo)
