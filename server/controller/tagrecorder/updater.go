@@ -177,6 +177,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() {
 		itemsToAdd := []MT{}
 		keysToDelete := []KT{}
 		itemsToDelete := []MT{}
+		isUpdate := false
 		if newOK && oldOK {
 			for key, newDBItem := range newKeyToDBItem {
 				oldDBItem, exists := oldKeyToDBItem[key]
@@ -190,6 +191,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() {
 						if err != nil {
 							log.Errorf("failed to update %s: %s", b.resourceTypeName, err, db.LogPrefixORGID)
 						}
+						isUpdate = true
 					}
 				}
 			}
@@ -212,6 +214,9 @@ func (b *UpdaterComponent[MT, KT]) Refresh() {
 				if err != nil {
 					log.Errorf("failed to delete %s: %s", b.resourceTypeName, err, db.LogPrefixORGID)
 				}
+			}
+			if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 && !isUpdate {
+				b.ResourceUpdateAtInfoUpdated(db)
 			}
 		}
 	}
@@ -248,4 +253,13 @@ func (b *UpdaterComponent[MT, KT]) generateOneData(db *metadb.DB) (map[KT]MT, bo
 		idToItem[b.updaterDG.generateKey(item)] = item
 	}
 	return idToItem, true
+}
+
+// Update updated_at when resource is deleted
+func (b *UpdaterComponent[MT, KT]) ResourceUpdateAtInfoUpdated(db *metadb.DB) {
+	var updateItems []MT
+	err := db.Unscoped().First(&updateItems).Error
+	if err == nil {
+		db.Save(updateItems)
+	}
 }
