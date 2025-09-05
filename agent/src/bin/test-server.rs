@@ -61,6 +61,9 @@ pub struct Config {
     /// Displays the details of the agent information
     #[clap(short = 's', long, value_enum, default_value_t = Detail::None)]
     detail: Detail,
+    /// Set grpc buffer size, Unit: M
+    #[clap(short = 'g', long, default_value_t = 0)]
+    grpc_buffer_size: u64,
 }
 
 #[derive(Debug, Default)]
@@ -149,6 +152,7 @@ impl TestServer {
 
     fn set_config(&mut self, config: Config) {
         self.config = config;
+        self.config.grpc_buffer_size = self.config.grpc_buffer_size << 20;
 
         self.update_agent_config();
     }
@@ -190,6 +194,12 @@ impl TestServer {
                 hostname: Some("testsrv-agent-01".to_string()),
                 group_id: None,
             }),
+            only_partial_fields: if self.config.grpc_buffer_size > 0 {
+                Some(true)
+            } else {
+                None
+            },
+            new_grpc_buffer_size: Some(self.config.grpc_buffer_size),
             ..Default::default()
         }
     }

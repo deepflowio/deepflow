@@ -1165,6 +1165,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     vtap_group_lcuuid       VARCHAR(64) DEFAULT NULL,
     cpu_num                 INTEGER DEFAULT 0,
     memory_size             BIGINT DEFAULT 0,
+    grpc_buffer_size        BIGINT DEFAULT 0,
     arch                    VARCHAR(256),
     os                      VARCHAR(256),
     kernel_version          VARCHAR(256),
@@ -2282,6 +2283,7 @@ CREATE TABLE IF NOT EXISTS ch_region (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_region;
+CREATE INDEX ch_region_updated_at_index ON ch_region(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_az (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2292,6 +2294,7 @@ CREATE TABLE IF NOT EXISTS ch_az (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_az;
+CREATE INDEX ch_az_updated_at_index ON ch_az(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_l3_epc (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2303,6 +2306,7 @@ CREATE TABLE IF NOT EXISTS ch_l3_epc (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_l3_epc;
+CREATE INDEX ch_l3_epc_updated_at_index ON ch_l3_epc(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_subnet (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2315,6 +2319,7 @@ CREATE TABLE IF NOT EXISTS ch_subnet (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_subnet;
+CREATE INDEX ch_subnet_updated_at_index ON ch_subnet(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_ip_relation (
     l3_epc_id           INTEGER NOT NULL,
@@ -2334,6 +2339,7 @@ CREATE TABLE IF NOT EXISTS ch_ip_relation (
     PRIMARY KEY (l3_epc_id, ip)
 );
 TRUNCATE TABLE ch_ip_relation;
+CREATE INDEX ch_ip_relation_updated_at_index ON ch_ip_relation(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_cluster (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2345,6 +2351,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_cluster (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_cluster;
+CREATE INDEX ch_pod_cluster_updated_at_index ON ch_pod_cluster(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_node (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2357,6 +2364,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_node (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_node;
+CREATE INDEX ch_pod_node_updated_at_index ON ch_pod_node(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2369,6 +2377,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_ns;
+CREATE INDEX ch_pod_ns_updated_at_index ON ch_pod_ns(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_group (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2383,6 +2392,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_group (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_group;
+CREATE INDEX ch_pod_group_updated_at_index ON ch_pod_group(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2399,6 +2409,7 @@ CREATE TABLE IF NOT EXISTS ch_pod (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod;
+CREATE INDEX ch_pod_updated_at_index ON ch_pod(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_device (
     devicetype              INTEGER NOT NULL,
@@ -2426,6 +2437,7 @@ CREATE TABLE IF NOT EXISTS ch_lb_listener (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_lb_listener;
+CREATE INDEX ch_lb_listener_updated_at_index ON ch_lb_listener(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2438,6 +2450,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_ingress;
+CREATE INDEX ch_pod_ingress_updated_at_index ON ch_pod_ingress(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     id                      INTEGER NOT NULL,
@@ -2451,8 +2464,9 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, key)
 );
-CREATE INDEX ch_pod_k8s_label_id_updated_at_index ON ch_pod_k8s_label(domain_id, sub_domain_id, id, updated_at);
 TRUNCATE TABLE ch_pod_k8s_label;
+CREATE INDEX ch_pod_k8s_label_id_updated_at_index ON ch_pod_k8s_label(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_k8s_label_updated_at_index ON ch_pod_k8s_label(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
     id                  INTEGER NOT NULL PRIMARY KEY,
@@ -2465,6 +2479,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_k8s_labels;
+CREATE INDEX ch_pod_k8s_labels_updated_at_index ON ch_pod_k8s_labels(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
     id                      INTEGER NOT NULL,
@@ -2477,6 +2492,7 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
 );
 TRUNCATE TABLE ch_chost_cloud_tag;
 CREATE INDEX ch_chost_cloud_tag_id_updated_at_index ON ch_chost_cloud_tag(domain_id, id, updated_at);
+CREATE INDEX ch_chost_cloud_tag_updated_at_index ON ch_chost_cloud_tag(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
     id                      INTEGER NOT NULL,
@@ -2490,6 +2506,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
 );
 TRUNCATE TABLE ch_pod_ns_cloud_tag;
 CREATE INDEX ch_pod_ns_cloud_tag_id_updated_at_index ON ch_pod_ns_cloud_tag(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_ns_cloud_tag_updated_at_index ON ch_pod_ns_cloud_tag(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2499,6 +2516,7 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_chost_cloud_tags;
+CREATE INDEX ch_chost_cloud_tags_updated_at_index ON ch_chost_cloud_tags(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2509,6 +2527,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
+CREATE INDEX ch_pod_ns_cloud_tags_updated_at_index ON ch_pod_ns_cloud_tags(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
     id                      INTEGER NOT NULL,
@@ -2521,6 +2540,7 @@ CREATE TABLE IF NOT EXISTS ch_os_app_tag (
     PRIMARY KEY (id, key)
 );
 TRUNCATE TABLE ch_os_app_tag;
+CREATE INDEX ch_os_app_tag_updated_at_index ON ch_os_app_tag(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2531,6 +2551,7 @@ CREATE TABLE IF NOT EXISTS ch_os_app_tags (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_os_app_tags;
+CREATE INDEX ch_os_app_tags_updated_at_index ON ch_os_app_tags(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_gprocess (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2544,6 +2565,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_gprocess;
+CREATE INDEX ch_gprocess_updated_at_index ON ch_gprocess(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
     id                      INTEGER NOT NULL,
@@ -2559,6 +2581,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
 );
 TRUNCATE TABLE ch_pod_service_k8s_label;
 CREATE INDEX ch_pod_service_k8s_label_id_updated_at_index ON ch_pod_service_k8s_label(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_service_k8s_label_updated_at_index ON ch_pod_service_k8s_label(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2571,6 +2594,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_service_k8s_labels;
+CREATE INDEX ch_pod_service_k8s_labels_updated_at_index ON ch_pod_service_k8s_labels(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     id                      INTEGER NOT NULL,
@@ -2586,6 +2610,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
 );
 TRUNCATE TABLE ch_pod_k8s_annotation;
 CREATE INDEX ch_pod_k8s_annotation_id_updated_at_index ON ch_pod_k8s_annotation(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_k8s_annotation_updated_at_index ON ch_pod_k8s_annotation(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2598,6 +2623,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_k8s_annotations;
+CREATE INDEX ch_pod_k8s_annotations_updated_at_index ON ch_pod_k8s_annotations(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
     id                      INTEGER NOT NULL,
@@ -2613,6 +2639,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
 );
 TRUNCATE TABLE ch_pod_service_k8s_annotation;
 CREATE INDEX ch_pod_service_k8s_annotation_id_updated_at_index ON ch_pod_service_k8s_annotation(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_service_k8s_annotation_updated_at_index ON ch_pod_service_k8s_annotation(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2625,6 +2652,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_service_k8s_annotations;
+CREATE INDEX ch_pod_service_k8s_annotations_updated_at_index ON ch_pod_service_k8s_annotations(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     id                      INTEGER NOT NULL,
@@ -2640,6 +2668,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
 );
 TRUNCATE TABLE ch_pod_k8s_env;
 CREATE INDEX ch_pod_k8s_env_id_updated_at_index ON ch_pod_k8s_env(domain_id, sub_domain_id, id, updated_at);
+CREATE INDEX ch_pod_k8s_env_updated_at_index ON ch_pod_k8s_env(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2652,6 +2681,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_k8s_envs;
+CREATE INDEX ch_pod_k8s_envs_updated_at_index ON ch_pod_k8s_envs(updated_at);
 
 
 CREATE TABLE IF NOT EXISTS ch_pod_service (
@@ -2665,6 +2695,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_service (
     updated_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_pod_service;
+CREATE INDEX ch_pod_service_updated_at_index ON ch_pod_service(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_chost (
     id                          INTEGER NOT NULL PRIMARY KEY,
@@ -2679,6 +2710,7 @@ CREATE TABLE IF NOT EXISTS ch_chost (
     updated_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_chost;
+CREATE INDEX ch_chost_updated_at_index ON ch_chost(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_vtap_port (
     vtap_id                 INTEGER NOT NULL,
@@ -2701,6 +2733,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap_port (
 );
 TRUNCATE TABLE ch_vtap_port;
 COMMENT ON COLUMN ch_vtap_port.mac_type IS '1:tap_mac,2:mac';
+CREATE INDEX ch_vtap_port_updated_at_index ON ch_vtap_port(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_vtap (
     id                      INTEGER NOT NULL PRIMARY KEY,
@@ -2716,6 +2749,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_vtap;
+CREATE INDEX ch_vtap_updated_at_index ON ch_vtap(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_tap_type (
     value                   INTEGER NOT NULL PRIMARY KEY,
@@ -2723,6 +2757,7 @@ CREATE TABLE IF NOT EXISTS ch_tap_type (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_tap_type;
+CREATE INDEX ch_tap_type_updated_at_index ON ch_tap_type(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_node_type (
     resource_type           INTEGER NOT NULL DEFAULT 0 PRIMARY KEY,
@@ -2730,6 +2765,7 @@ CREATE TABLE IF NOT EXISTS ch_node_type (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_node_type;
+CREATE INDEX ch_node_type_updated_at_index ON ch_node_type(updated_at);
 
 
 CREATE TABLE IF NOT EXISTS ch_string_enum (
@@ -2743,6 +2779,7 @@ CREATE TABLE IF NOT EXISTS ch_string_enum (
     PRIMARY KEY (tag_name, value)
 );
 TRUNCATE TABLE ch_string_enum;
+CREATE INDEX ch_string_enum_updated_at_index ON ch_string_enum(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_int_enum (
     tag_name                VARCHAR(256) NOT NULL,
@@ -2755,6 +2792,7 @@ CREATE TABLE IF NOT EXISTS ch_int_enum (
     PRIMARY KEY (tag_name, value)
 );
 TRUNCATE TABLE ch_int_enum;
+CREATE INDEX ch_int_enum_updated_at_index ON ch_int_enum(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_app_label (
     label_name_id      INTEGER NOT NULL,
@@ -2764,6 +2802,7 @@ CREATE TABLE IF NOT EXISTS ch_app_label (
     PRIMARY KEY (label_name_id, label_value_id)
 );
 TRUNCATE TABLE ch_app_label;
+CREATE INDEX ch_app_label_updated_at_index ON ch_app_label(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_target_label (
     metric_id          INTEGER NOT NULL,
@@ -2774,6 +2813,7 @@ CREATE TABLE IF NOT EXISTS ch_target_label (
     PRIMARY KEY (metric_id, label_name_id, target_id)
 );
 TRUNCATE TABLE ch_target_label;
+CREATE INDEX ch_target_label_updated_at_index ON ch_target_label(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_label_name (
     id                  INTEGER NOT NULL PRIMARY KEY,
@@ -2781,6 +2821,7 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_label_name (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_prometheus_label_name;
+CREATE INDEX ch_prometheus_label_name_updated_at_index ON ch_prometheus_label_name(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_metric_name (
     id                  INTEGER NOT NULL PRIMARY KEY,
@@ -2788,6 +2829,7 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_metric_name (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_prometheus_metric_name;
+CREATE INDEX ch_prometheus_metric_name_updated_at_index ON ch_prometheus_metric_name(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
     id                          INTEGER NOT NULL PRIMARY KEY,
@@ -2797,6 +2839,7 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
     updated_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_prometheus_metric_app_label_layout;
+CREATE INDEX ch_prometheus_metric_app_label_layout_updated_at_index ON ch_prometheus_metric_app_label_layout(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
     target_id                   INTEGER NOT NULL PRIMARY KEY,
@@ -2805,6 +2848,7 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
     updated_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_prometheus_target_label_layout;
+CREATE INDEX ch_prometheus_target_label_layout_updated_at_index ON ch_prometheus_target_label_layout(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_policy (
     tunnel_type     INTEGER NOT NULL,
@@ -2816,6 +2860,7 @@ CREATE TABLE IF NOT EXISTS ch_policy (
     PRIMARY KEY (tunnel_type, acl_gid)
 );
 TRUNCATE TABLE ch_policy;
+CREATE INDEX ch_policy_updated_at_index ON ch_policy(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
     id              SERIAL PRIMARY KEY,
@@ -2824,6 +2869,7 @@ CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_npb_tunnel;
+CREATE INDEX ch_npb_tunnel_updated_at_index ON ch_npb_tunnel(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_alarm_policy (
     id              SERIAL PRIMARY KEY,
@@ -2833,6 +2879,7 @@ CREATE TABLE IF NOT EXISTS ch_alarm_policy (
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_alarm_policy;
+CREATE INDEX ch_alarm_policy_updated_at_index ON ch_alarm_policy(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_user (
     id              SERIAL PRIMARY KEY,
@@ -2840,6 +2887,7 @@ CREATE TABLE IF NOT EXISTS ch_user (
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE ch_user;
+CREATE INDEX ch_user_updated_at_index ON ch_user(updated_at);
 
 CREATE TABLE IF NOT EXISTS custom_service (
     id                  SERIAL PRIMARY KEY,
@@ -2859,6 +2907,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS custom_service_name_idx ON custom_service(name
 COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT';
 COMMENT ON COLUMN custom_service.domain IS 'reserved for backend';
 COMMENT ON COLUMN custom_service.resource IS 'separated by ,';
+CREATE INDEX custom_service_updated_at_index ON custom_service(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_tag_last_updated_at (
     table_name           VARCHAR(64) NOT NULL PRIMARY KEY,
