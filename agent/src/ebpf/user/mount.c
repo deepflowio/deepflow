@@ -119,9 +119,9 @@ static bool has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
 	return false;
 }
 
-void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
-			   char *mount_path, char *mount_source,
-			   int mount_size, bool * is_nfs)
+void get_mount_info(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
+		    char *mount_path, char *mount_source,
+		    int mount_size, fs_type_t * file_type)
 {
 	struct list_head *p, *n;
 	struct mount_entry *e;
@@ -145,9 +145,11 @@ void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
 	list_for_each_safe(p, n, &m->mount_head) {
 		e = container_of(p, struct mount_entry, list);
 		if (e && e->s_dev == s_dev) {
-			fast_strncat_trunc(e->mount_point, "", mount_path, mount_size);
-			fast_strncat_trunc(e->mount_source, "", mount_source, mount_size);
-			*is_nfs = e->is_nfs;
+			fast_strncat_trunc(e->mount_point, "", mount_path,
+					   mount_size);
+			fast_strncat_trunc(e->mount_source, "", mount_source,
+					   mount_size);
+			*file_type = e->file_type;
 			break;
 		}
 	}
@@ -255,6 +257,82 @@ static int add_mount_info_to_cache(pid_t pid, struct mount_info *m)
 	return 0;
 }
 
+/// Static mapping table, common filesystems placed first for faster matching
+static const fs_map_t fs_map[] = {
+	// Most common filesystems first
+	{"ext4", FS_TYPE_REGULAR},
+	{"xfs", FS_TYPE_REGULAR},
+	{"proc", FS_TYPE_VIRTUAL},
+	{"sysfs", FS_TYPE_VIRTUAL},
+	{"nfs", FS_TYPE_NETWORK},
+	{"nfs4", FS_TYPE_NETWORK},
+
+	// Other local filesystems
+	{"ext2", FS_TYPE_REGULAR},
+	{"ext3", FS_TYPE_REGULAR},
+	{"btrfs", FS_TYPE_REGULAR},
+	{"f2fs", FS_TYPE_REGULAR},
+	{"zfs", FS_TYPE_REGULAR},
+
+	// Other virtual filesystems
+	{"devtmpfs", FS_TYPE_VIRTUAL},
+	{"tmpfs", FS_TYPE_VIRTUAL},
+	{"cgroup", FS_TYPE_VIRTUAL},
+	{"cgroup2", FS_TYPE_VIRTUAL},
+	{"mqueue", FS_TYPE_VIRTUAL},
+	{"debugfs", FS_TYPE_VIRTUAL},
+	{"tracefs", FS_TYPE_VIRTUAL},
+	{"securityfs", FS_TYPE_VIRTUAL},
+	{"configfs", FS_TYPE_VIRTUAL},
+	{"pstore", FS_TYPE_VIRTUAL},
+	{"overlay", FS_TYPE_VIRTUAL},
+
+	// Other network filesystems
+	{"cifs", FS_TYPE_NETWORK},
+	{"smb3", FS_TYPE_NETWORK},
+	{"ceph", FS_TYPE_NETWORK},
+	{"glusterfs", FS_TYPE_NETWORK},
+	{"9p", FS_TYPE_NETWORK},
+
+	{NULL, FS_TYPE_UNKNOWN}	// Sentinel
+};
+
+const char *fs_type_to_string(fs_type_t type)
+{
+	switch (type) {
+	case FS_TYPE_REGULAR:
+		return "regular";
+	case FS_TYPE_VIRTUAL:
+		return "virtual";
+	case FS_TYPE_NETWORK:
+		return "network";
+	case FS_TYPE_UNKNOWN:
+	default:
+		return "unknown";
+	}
+}
+
+/**
+ * Determine filesystem category from fstype (string from /proc/<pid>/mountinfo)
+ * @param fstype - filesystem type string
+ * @return fs_type_t - enum category (LOCAL / VIRTUAL / NETWORK / UNKNOWN)
+ */
+static fs_type_t get_fs_type(const char *fstype)
+{
+	if (!fstype)
+		return FS_TYPE_UNKNOWN;
+
+	if (strncmp(fstype, "fuse", 4) == 0)
+		return FS_TYPE_VIRTUAL;
+
+	for (int i = 0; fs_map[i].name != NULL; i++) {
+		if (strcmp(fstype, fs_map[i].name) == 0) {
+			return fs_map[i].type;
+		}
+	}
+	return FS_TYPE_UNKNOWN;
+}
+
 static int build_mount_info(pid_t pid, struct list_head *mount_head,
 			    u32 * bytes_count)
 {
@@ -285,18 +363,6 @@ static int build_mount_info(pid_t pid, struct list_head *mount_head,
 		if (matched != 8)
 			continue;
 
-		bool is_nfs = strncmp("nfs", fs_type, 3) == 0;
-		/*
-		 * Filter out bind mounts, because for bind mounts, the data obtained via eBPF starts from
-		 * `[fs_root]`, which is already a path on the host. There's no need to translate it into
-		 * the mount point path inside the container.
-		 * For example, a path like `/var/lib/mysql/xxxx.data` is already a host path and does not
-		 * need to be translated into `/bitnami/mysql/xxxx.data` (which is the container path).
-		 * e.g.: 1729 1710 253:0 /var/lib/mysql /bitnami/mysql rw,relatime - xfs /dev/mapper/centos-root rw,attr2,inode64,noquota
-		 */
-		if (!(root[0] == '/' && root[1] == '\0') && !is_nfs)
-			continue;
-
 		kern_dev_t s_dev = ((major & 0xfff) << 20) | (minor & 0xfffff);
 		if (has_mount_entry(mount_head, s_dev))
 			continue;
@@ -309,7 +375,7 @@ static int build_mount_info(pid_t pid, struct list_head *mount_head,
 		}
 
 		entry->s_dev = s_dev;
-		entry->is_nfs = is_nfs;
+		entry->file_type = get_fs_type(fs_type);
 		entry->mount_point = strdup(mount_point);
 		if (entry->mount_point == NULL) {
 			free(entry);
@@ -500,14 +566,11 @@ void check_root_mount_info(bool output_log)
  * Replace the longest suffix of str1 (that is a prefix of str2) with str1.
  * Result is written to 'out' with a maximum size of 'out_size'.
  * e.g.:
- *    const char *str1 = "10.33.49.27:/srv/nfs/data"; (mount source)
- *    const char *str2 = "/nfs/data/ddd"; (file path via eBPF)
- *    const char *new_prefix = "/mnt/nfs"; (mount point)
- * target: "10.33.49.27:/srv/nfs/data/ddd"
+ *    const char *str1 = "/mnt/nfs"; (mount point)
+ *    const char *str2 = "/nfs/data/"; (file dir via eBPF)
+ * target: "/mnt/nfs/data/"
  */
-static int replace_suffix_prefix(const char *str1, const char *str2,
-				 const char *new_prefix
-				 __attribute__ ((unused)), char *out,
+static int replace_suffix_prefix(const char *str1, const char *str2, char *out,
 				 size_t out_size)
 {
 	size_t len1 = strlen(str1);
@@ -521,7 +584,7 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 		// Check if this suffix matches the prefix of str2
 		if (suffix_len <= len2
 		    && strncmp(suffix, str2, suffix_len) == 0) {
-			// Match found: replace the suffix with new_prefix
+			// Match found: replace the suffix with str2
 			return fast_strncat_trunc(str1, str2 + suffix_len, out,
 						  out_size);
 		}
@@ -531,9 +594,9 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 	return fast_strncat_trunc(str1, str2, out, out_size);
 }
 
-u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
-			   const char *mount_point, const char *mount_source,
-			   bool is_nfs)
+u32 copy_file_metrics(int pid, void *dst, void *src, int len,
+		      const char *mount_point, const char *mount_source,
+		      fs_type_t file_type)
 {
 	if (len <= 0)
 		return 0;
@@ -553,7 +616,6 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 		buffer_len = len - buf_offset;
 	}
 
-	int event_len;
 	int i, temp_index = 0;
 	char temp[buffer_len + 1];
 	temp[0] = '\0';
@@ -572,14 +634,10 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 
 	char *p;
 	int copy_len;
-	for (i = buffer_len - 2; i >= 0; i--) {
-		if (i == 0) {
-			p = &buffer[0];
-		} else {
-			if (buffer[i] != '\0')
-				continue;
-			p = &buffer[i + 1];
-		}
+	for (i = buffer_len - 2; i > 0; i--) {
+		if (buffer[i] != '\0')
+			continue;
+		p = &buffer[i + 1];
 
 		copy_len =
 		    fast_strncat_trunc(p, (temp_index > 0 && i != 0) ? "/" : "",
@@ -590,11 +648,11 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 
 copy_event:
 	u_event = (struct user_io_event_buffer *)dst;
-	buffer = u_event->filename;
-	if (is_nfs) {
+	buffer = u_event->file_dir;
+	if (file_type == FS_TYPE_NETWORK) {
 		temp_index =
-		    replace_suffix_prefix(mount_source, temp, mount_point,
-					  buffer, sizeof(event->filename));
+		    replace_suffix_prefix(mount_point, temp, buffer,
+					  sizeof(u_event->file_dir));
 	} else {
 		const char *point = mount_point;
 		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
@@ -602,15 +660,19 @@ copy_event:
 			point = "";
 		temp_index =
 		    fast_strncat_trunc(point, temp, buffer,
-				       sizeof(event->filename));
+				       sizeof(u_event->file_dir));
 	}
 
-	buffer_len = temp_index + 1;
 	u_event->bytes_count = event->bytes_count;
 	u_event->operation = event->operation;
 	u_event->latency = event->latency;
 	u_event->offset = event->offset;
-	event_len = offsetof(typeof(struct user_io_event_buffer),
-			     filename) + buffer_len;
-	return event_len;
+	u_event->file_type = file_type;
+	strcpy_s_inline(u_event->mount_source, sizeof(u_event->mount_source),
+			mount_source, strlen(mount_source));
+	strcpy_s_inline(u_event->mount_point, sizeof(u_event->mount_point),
+			mount_point, strlen(mount_point));
+	strcpy_s_inline(u_event->filename, sizeof(u_event->filename),
+			event->filename, strlen(event->filename));
+	return sizeof(*u_event);
 }
