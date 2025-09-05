@@ -119,6 +119,9 @@ func (b *EventBlock) Reset() {
 	b.ColOffset.Reset()
 	b.ColSyscallThread.Reset()
 	b.ColSyscallCoroutine.Reset()
+	b.ColMountSource.Reset()
+	b.ColMountPoint.Reset()
+	b.ColFileDir.Reset()
 	if b.NativeTagsBlock != nil {
 		b.NativeTagsBlock.Reset()
 	}
