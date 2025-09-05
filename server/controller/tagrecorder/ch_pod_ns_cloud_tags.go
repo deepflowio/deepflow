@@ -96,8 +96,7 @@ func (c *ChPodNSCloudTags) onResourceUpdated(md *message.Metadata, updateMessage
 				}},
 				db,
 			)
-		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
+			return
 		}
 	}
 	c.updateOrSync(db, targetKey, updateInfo)
