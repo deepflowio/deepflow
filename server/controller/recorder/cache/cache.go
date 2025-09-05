@@ -88,6 +88,7 @@ type Cache struct {
 
 	DiffBaseDataSet *diffbase.DataSet
 	ToolDataSet     *tool.DataSet
+	refreshFailed   bool // 用于记录单次整体刷新结果,在每次刷新前重置
 
 	tagrecorderHealers *tagrecorderHealer.Healers // tagrecorder 的 healer，用于处理 tag 相关的资源
 }
@@ -213,9 +214,13 @@ func (c *Cache) Refresh() {
 
 	c.triggerTagrecorderHealers()
 
+	oldDiffBaseDataSet := c.DiffBaseDataSet
+	oldToolDataSet := c.ToolDataSet
+
 	c.DiffBaseDataSet = diffbase.NewDataSet(c.metadata)
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
 	c.SetLogLevel(logging.DEBUG, RefreshSignalCallerSelfHeal)
+	c.refreshFailed = false
 
 	// 分类刷新资源的相关缓存
 
@@ -268,6 +273,12 @@ func (c *Cache) Refresh() {
 	c.refreshWANIPs()
 	c.refreshLANIPs()
 	c.refreshProcesses()
+
+	if c.refreshFailed {
+		log.Errorf("cache refresh failed, sequence now: %d", c.Sequence, c.metadata.LogPrefixes)
+		c.DiffBaseDataSet = oldDiffBaseDataSet
+		c.ToolDataSet = oldToolDataSet
+	}
 }
 
 func (c *Cache) AddRegion(item *mysqlmodel.Region) {
@@ -307,6 +318,7 @@ func (c *Cache) refreshRegions() {
 	var azs []*mysqlmodel.AZ
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_AZ_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -320,6 +332,7 @@ func (c *Cache) refreshRegions() {
 		"create_method = ? AND lcuuid IN ?", ctrlrcommon.CREATE_METHOD_LEARN, regionLcuuids,
 	).Find(&regions).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_REGION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -355,6 +368,7 @@ func (c *Cache) refreshAZs() {
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_AZ_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -388,6 +402,7 @@ func (c *Cache) refreshSubDomains() {
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&subDomains).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -436,6 +451,7 @@ func (c *Cache) refreshHosts() {
 		},
 	).Find(&hosts).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_HOST_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -473,6 +489,7 @@ func (c *Cache) refreshVMs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_EN), c.metadata.LogPrefixes)
 	vms, err := rcommon.PageWhereFind[mysqlmodel.VM](c.metadata, c.getConditonDomainCreateMethod())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -500,6 +517,7 @@ func (c *Cache) refreshVPCs() {
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&vpcs).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VPC_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -534,6 +552,7 @@ func (c *Cache) refreshNetworks() []int {
 	networkIDs := []int{}
 	networks, err := rcommon.PageWhereFind[mysqlmodel.Network](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid(), ctrlrcommon.CREATE_METHOD_LEARN)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err), c.metadata.LogPrefixes)
 		return networkIDs
 	}
@@ -546,6 +565,7 @@ func (c *Cache) refreshNetworks() []int {
 	var publicNetwork *mysqlmodel.Network
 	err = c.metadata.DB.Where("lcuuid = ?", rcommon.PUBLIC_NETWORK_LCUUID).First(&publicNetwork).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err), c.metadata.LogPrefixes)
 		return networkIDs
 	}
@@ -572,6 +592,7 @@ func (c *Cache) refreshSubnets(networkIDs []int) {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN), c.metadata.LogPrefixes)
 	subnets, err := rcommon.PageWhereFind[mysqlmodel.Subnet](c.metadata, "vl2id IN ?", networkIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -606,6 +627,7 @@ func (c *Cache) refreshVRouters() []int {
 	vrouterIDs := []int{}
 	vrouters, err := rcommon.PageWhereFind[mysqlmodel.VRouter](c.metadata, c.getConditionDomain())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, err), c.metadata.LogPrefixes)
 		return vrouterIDs
 	}
@@ -633,6 +655,7 @@ func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN), c.metadata.LogPrefixes)
 	routingTables, err := rcommon.PageWhereFind[mysqlmodel.RoutingTable](c.metadata, "vnet_id IN ?", vrouterIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -664,6 +687,7 @@ func (c *Cache) refreshDHCPPorts() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&dhcpPorts).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -693,6 +717,7 @@ func (c *Cache) refreshVInterfaces() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN), c.metadata.LogPrefixes)
 	vifs, err := rcommon.PageWhereFind[mysqlmodel.VInterface](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid(), ctrlrcommon.CREATE_METHOD_LEARN)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -718,6 +743,7 @@ func (c *Cache) refreshWANIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN), c.metadata.LogPrefixes)
 	wanIPs, err := rcommon.PageWhereFind[mysqlmodel.WANIP](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid(), ctrlrcommon.CREATE_METHOD_LEARN)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -743,6 +769,7 @@ func (c *Cache) refreshLANIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN), c.metadata.LogPrefixes)
 	lanIPs, err := rcommon.PageWhereFind[mysqlmodel.LANIP](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid(), ctrlrcommon.CREATE_METHOD_LEARN)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -766,6 +793,7 @@ func (c *Cache) refreshFloatingIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN), c.metadata.LogPrefixes)
 	floatingIPs, err := rcommon.PageWhereFind[mysqlmodel.FloatingIP](c.metadata, c.getConditionDomain())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -797,6 +825,7 @@ func (c *Cache) refreshNATGateways() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natGateways).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -822,6 +851,7 @@ func (c *Cache) refreshNATVMConnections() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natVMConnections).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -847,6 +877,7 @@ func (c *Cache) refreshNATRules() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natRules).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -876,6 +907,7 @@ func (c *Cache) refreshLBs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_EN), c.metadata.LogPrefixes)
 	lbs, err := rcommon.PageWhereFind[mysqlmodel.LB](c.metadata, c.getConditionDomain())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -901,6 +933,7 @@ func (c *Cache) refreshLBVMConnections() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&lbVMConnections).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -926,6 +959,7 @@ func (c *Cache) refreshLBListeners() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN), c.metadata.LogPrefixes)
 	listeners, err := rcommon.PageWhereFind[mysqlmodel.LBListener](c.metadata, c.getConditionDomain())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -949,6 +983,7 @@ func (c *Cache) refreshLBTargetServers() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN), c.metadata.LogPrefixes)
 	servers, err := rcommon.PageWhereFind[mysqlmodel.LBTargetServer](c.metadata, c.getConditionDomain())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -974,6 +1009,7 @@ func (c *Cache) refreshPeeConnections() {
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&peerConnections).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -999,6 +1035,7 @@ func (c *Cache) refreshCENs() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&cens).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CEN_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1030,6 +1067,7 @@ func (c *Cache) refreshRDSInstances() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1061,6 +1099,7 @@ func (c *Cache) refreshRedisInstances() {
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1088,6 +1127,7 @@ func (c *Cache) refreshPodClusters() {
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid()).Find(&podClusters).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1117,6 +1157,7 @@ func (c *Cache) refreshPodNodes() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), c.metadata.LogPrefixes)
 	podNodes, err := rcommon.PageWhereFind[mysqlmodel.PodNode](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1142,6 +1183,7 @@ func (c *Cache) refreshVMPodNodeConnections() {
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid()).Find(&connections).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1167,6 +1209,7 @@ func (c *Cache) refreshPodNamespaces() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN), c.metadata.LogPrefixes)
 	podNamespaces, err := rcommon.PageWhereFind[mysqlmodel.PodNamespace](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1197,6 +1240,7 @@ func (c *Cache) refreshPodIngresses() []int {
 	podIngressIDs := []int{}
 	podIngresses, err := rcommon.PageWhereFind[mysqlmodel.PodIngress](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, err), c.metadata.LogPrefixes)
 		return podIngressIDs
 	}
@@ -1230,6 +1274,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 
 	podIngressRules, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRule](c.metadata, "pod_ingress_id IN ?", podIngressIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1257,6 +1302,7 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 
 	podIngressRuleBackends, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRuleBackend](c.metadata, "pod_ingress_id IN ?", podIngressIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1291,6 +1337,7 @@ func (c *Cache) refreshPodServices() []int {
 	podServiceIDs := []int{}
 	podServices, err := rcommon.PageWhereFind[mysqlmodel.PodService](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, err), c.metadata.LogPrefixes)
 		return podServiceIDs
 	}
@@ -1322,6 +1369,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 
 	podServicePorts, err := rcommon.PageWhereFind[mysqlmodel.PodServicePort](c.metadata, "pod_service_id IN ?", podServiceIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1347,6 +1395,7 @@ func (c *Cache) refreshPodGroups() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN), c.metadata.LogPrefixes)
 	podGroups, err := rcommon.PageWhereFind[mysqlmodel.PodGroup](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1374,6 +1423,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 
 	podGroupPorts, err := rcommon.PageWhereFind[mysqlmodel.PodGroupPort](c.metadata, "pod_service_id IN ?", podServiceIDs)
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1399,6 +1449,7 @@ func (c *Cache) refreshPodReplicaSets() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN), c.metadata.LogPrefixes)
 	podReplicaSets, err := rcommon.PageWhereFind[mysqlmodel.PodReplicaSet](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1428,6 +1479,7 @@ func (c *Cache) refreshPods() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_EN), c.metadata.LogPrefixes)
 	pods, err := rcommon.PageWhereFind[mysqlmodel.Pod](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1453,6 +1505,7 @@ func (c *Cache) refreshConfigMaps() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN), c.metadata.LogPrefixes)
 	configMaps, err := rcommon.PageWhereFind[mysqlmodel.ConfigMap](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1478,6 +1531,7 @@ func (c *Cache) refreshPodGroupConfigMapConnections() {
 	var items []*mysqlmodel.PodGroupConfigMapConnection
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid()).Find(&items).Error
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1505,6 +1559,7 @@ func (c *Cache) refreshProcesses() {
 	var processes []*mysqlmodel.Process
 	processes, err := query.FindInBatches[mysqlmodel.Process](c.metadata.DB.Unscoped().Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid()))
 	if err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1528,6 +1583,7 @@ func (c *Cache) refreshVIP() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VIP_EN), c.metadata.LogPrefixes)
 	var vips []*mysqlmodel.VIP
 	if err := c.metadata.DB.Where("domain = ?", c.metadata.GetDomainLcuuid()).Find(&vips).Error; err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VIP_EN, err), c.metadata.LogPrefixes)
 		return
 	}
@@ -1539,6 +1595,7 @@ func (c *Cache) refreshVIP() {
 func (c *Cache) RefreshVTaps() {
 	var vtaps []*mysqlmodel.VTap
 	if err := c.metadata.DB.Select("id", "name", "launch_server_id", "type").Find(&vtaps).Error; err != nil {
+		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VTAP_EN, err))
 		return
 	}
