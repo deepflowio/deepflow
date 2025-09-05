@@ -31,7 +31,7 @@ func NewVPC() *VPC {
 }
 
 func (v *VPC) RegisterTo(e *gin.Engine) {
-	e.GET("/v2/vpcs/", getVPCs)
+	e.GET("/v2/epcs", getVPCs)
 }
 
 func getVPCs(c *gin.Context) {
