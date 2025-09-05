@@ -115,7 +115,7 @@ use public::{
     debug::QueueDebugger,
     packet::MiniPacket,
     proto::trident::{self, Exception, SocketType, TapMode},
-    queue::{self, DebugSender, Receiver},
+    queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
@@ -1418,7 +1418,7 @@ pub struct AgentComponents {
     pub telegraf_uniform_sender: UniformSenderThread<TelegrafMetric>,
     pub profile_uniform_sender: UniformSenderThread<Profile>,
     pub packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
-    pub packet_sequence_uniform_input: Receiver<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub exception_handler: ExceptionHandler,
     pub proto_log_sender: DebugSender<BoxAppProtoLogsData>,
@@ -2107,6 +2107,15 @@ impl AgentComponents {
                 StatsOption::Tag("index", "0".to_string()),
             ],
         );
+        let packet_sequence_uniform_sender = UniformSenderThread::new(
+            packet_sequence_queue_name,
+            Arc::new(packet_sequence_uniform_input),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            true,
+        );
+
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
             vxlan_flags: yaml_config.vxlan_flags,
@@ -2542,7 +2551,7 @@ impl AgentComponents {
             proc_event_uniform_sender,
             tap_mode: candidate_config.tap_mode,
             packet_sequence_uniform_output, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_uniform_input,  // Enterprise Edition Feature: packet-sequence
+            packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             npb_bps_limit,
             compressed_otel_uniform_sender,
             pcap_batch_uniform_sender,
@@ -2593,6 +2602,9 @@ impl AgentComponents {
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
         self.l4_flow_uniform_sender.start();
+
+        // Enterprise Edition Feature: packet-sequence
+        self.packet_sequence_uniform_sender.start();
 
         // When tap_mode is Analyzer mode and agent is not running in container and agent
         // in the environment where cgroup is not supported, we need to check free memory
@@ -2695,6 +2707,10 @@ impl AgentComponents {
             join_handles.push(h);
         }
         if let Some(h) = self.pcap_batch_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        // Enterprise Edition Feature: packet-sequence
+        if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
 
