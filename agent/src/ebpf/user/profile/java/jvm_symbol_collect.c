@@ -490,6 +490,8 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 	    ((args->task->need_refresh && unload_count > 0)
 	     || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH)) {
 		fclose(args->map_fp);
+		// Prevent repeated fclose() in destroy_task() when the entire thread exits.
+		args->map_fp = NULL;
 		int count;
 		if ((count = delete_method_unload_symbol(args)) < 0) {
 			vec_free(unload_addrs);
