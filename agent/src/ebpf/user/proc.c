@@ -344,8 +344,8 @@ static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
 				       NULL);
 	if (nr < 1) {
 		clib_mem_free(ev_info);
-		ebpf_info("Failed to add process %d to the queue, so it "
-			  "was added to the vector instead.\n", kv->k.pid);
+		ebpf_info("Could not add process %d to proc_event_ring\n",
+			  kv->k.pid);
 		return -1;
 	}
 
