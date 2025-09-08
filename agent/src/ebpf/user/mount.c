@@ -286,6 +286,7 @@ static const fs_map_t fs_map[] = {
 	{"configfs", FS_TYPE_VIRTUAL},
 	{"pstore", FS_TYPE_VIRTUAL},
 	{"overlay", FS_TYPE_VIRTUAL},
+        {"nfsd", FS_TYPE_VIRTUAL},
 
 	// Other network filesystems
 	{"cifs", FS_TYPE_NETWORK},
@@ -566,11 +567,14 @@ void check_root_mount_info(bool output_log)
  * Replace the longest suffix of str1 (that is a prefix of str2) with str1.
  * Result is written to 'out' with a maximum size of 'out_size'.
  * e.g.:
- *    const char *str1 = "/mnt/nfs"; (mount point)
- *    const char *str2 = "/nfs/data/"; (file dir via eBPF)
- * target: "/mnt/nfs/data/"
+ *    const char *str1 = "10.33.49.27:/srv/nfs/data"; (mount source)
+ *    const char *str2 = "/nfs/data/"; (file path via eBPF)
+ *    const char *new_prefix = "/mnt/nfs"; (mount point)
+ * target: "/mnt/nfs/"
  */
-static int replace_suffix_prefix(const char *str1, const char *str2, char *out,
+static int replace_suffix_prefix(const char *str1, const char *str2,
+				 const char *new_prefix
+				 __attribute__ ((unused)), char *out,
 				 size_t out_size)
 {
 	size_t len1 = strlen(str1);
@@ -584,14 +588,14 @@ static int replace_suffix_prefix(const char *str1, const char *str2, char *out,
 		// Check if this suffix matches the prefix of str2
 		if (suffix_len <= len2
 		    && strncmp(suffix, str2, suffix_len) == 0) {
-			// Match found: replace the suffix with str2
-			return fast_strncat_trunc(str1, str2 + suffix_len, out,
+			// Match found: replace the suffix with new_prefix (for nfs4)
+			return fast_strncat_trunc(new_prefix, str2 + suffix_len, out,
 						  out_size);
 		}
 	}
 
-	// No match found: copy str1 + str2
-	return fast_strncat_trunc(str1, str2, out, out_size);
+	// No match found: copy new_prefix + str2 (for nfs3)
+	return fast_strncat_trunc(new_prefix, str2, out, out_size);
 }
 
 u32 copy_file_metrics(int pid, void *dst, void *src, int len,
@@ -651,8 +655,8 @@ copy_event:
 	buffer = u_event->file_dir;
 	if (file_type == FS_TYPE_NETWORK) {
 		temp_index =
-		    replace_suffix_prefix(mount_point, temp, buffer,
-					  sizeof(u_event->file_dir));
+		    replace_suffix_prefix(mount_source, temp, mount_point,
+					  buffer, sizeof(u_event->file_dir));
 	} else {
 		const char *point = mount_point;
 		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
