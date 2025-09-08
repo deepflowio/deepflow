@@ -286,7 +286,7 @@ static const fs_map_t fs_map[] = {
 	{"configfs", FS_TYPE_VIRTUAL},
 	{"pstore", FS_TYPE_VIRTUAL},
 	{"overlay", FS_TYPE_VIRTUAL},
-        {"nfsd", FS_TYPE_VIRTUAL},
+	{"nfsd", FS_TYPE_VIRTUAL},
 
 	// Other network filesystems
 	{"cifs", FS_TYPE_NETWORK},
