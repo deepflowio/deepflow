@@ -32,8 +32,8 @@ use k8s_openapi::{
     api::{
         apps::v1::{DaemonSet, Deployment, ReplicaSet, ReplicaSetSpec, StatefulSet},
         core::v1::{
-            ConfigMap, Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod,
-            PodSpec, PodStatus, ReplicationController, Service, ServiceStatus,
+            ConfigMap, Container, ContainerStatus, Namespace, Node, NodeCondition, NodeSpec,
+            NodeStatus, Pod, PodSpec, PodStatus, ReplicationController, Service, ServiceStatus,
         },
         networking,
     },
@@ -1160,7 +1160,15 @@ impl Trimmable for Node {
         if let Some(node_status) = self.status.take() {
             trim_node.status = Some(NodeStatus {
                 addresses: node_status.addresses,
-                conditions: node_status.conditions,
+                conditions: node_status.conditions.map(|cs| {
+                    cs.into_iter()
+                        .map(|s| NodeCondition {
+                            reason: s.reason,
+                            status: s.status,
+                            ..Default::default()
+                        })
+                        .collect()
+                }),
                 capacity: node_status.capacity,
                 ..Default::default()
             });
@@ -1239,7 +1247,13 @@ impl Trimmable for ConfigMap {
     fn trim(self) -> Self {
         ConfigMap {
             data: self.data,
-            metadata: self.metadata,
+            metadata: ObjectMeta {
+                uid: self.metadata.uid,
+                name: self.metadata.name,
+                namespace: self.metadata.namespace,
+                creation_timestamp: self.metadata.creation_timestamp,
+                ..Default::default()
+            },
             ..Default::default()
         }
     }

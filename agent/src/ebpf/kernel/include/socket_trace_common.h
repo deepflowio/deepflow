@@ -238,7 +238,7 @@ struct __io_event_buffer {
 	__u32 len;
 
 	// strings terminated with \0
-	char filename[IO_FILEPATH_BUFF_SIZE];
+	char filename[FILE_PATH_SZ];
 } __attribute__ ((packed));
 
 struct user_io_event_buffer {
@@ -254,8 +254,12 @@ struct user_io_event_buffer {
 	// The number of bytes of offset within the file content
 	__u64 offset;
 
+	__u32 file_type;
 	// strings terminated with \0
-	char filename[IO_FILEPATH_BUFF_SIZE];
+	char filename[FILE_NAME_SZ];
+	char mount_source[MOUNT_SOURCE_SZ];
+	char mount_point[MOUNT_POINT_SZ];
+	char file_dir[FILE_PATH_SZ];
 } __attribute__ ((packed));
 
 // struct ebpf_proc_info -> offsets[]  arrays index.

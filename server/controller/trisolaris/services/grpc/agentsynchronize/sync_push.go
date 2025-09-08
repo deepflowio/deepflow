@@ -180,6 +180,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	clusterID := in.GetKubernetesClusterId()
 	k8sForceWatch := in.GetKubernetesForceWatch()
 	k8sWatchPoilcy := in.GetKubernetesWatchPolicy()
+	currentBufferSize := in.GetCurrentGrpcBufferSize()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	gAgentInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gAgentInfo == nil {
@@ -229,11 +230,13 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d), "+
 		"(groups version %d -> %d), "+
+		"(current grpc buffer size %d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d AGENT_GROUP_ID:%s",
 		ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(),
 		versionPlatformData, in.GetVersionPlatformData(),
 		versionPolicy, in.GetVersionAcls(),
 		versionGroups, in.GetVersionGroups(),
+		currentBufferSize,
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime(), in.GetAgentGroupIdRequest())
 
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
@@ -352,7 +355,6 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	containers := gAgentInfo.GetAgentContainers(int(vtapCache.GetVTapID()))
 	userConfigData := e.marshalUserConfig(userConfig, vtapCache)
 	selfUpdateURL := gAgentInfo.GetSelfUpdateUrl()
-	currentBufferSize := in.GetCurrentGrpcBufferSize()
 	syncResponse := api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,

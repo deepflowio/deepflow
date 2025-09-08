@@ -117,12 +117,8 @@ func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *mess
 			SubType:  fieldsUpdate.HType.GetNew(),
 		}]
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VM).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VM,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VM,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -222,12 +218,8 @@ func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *me
 			SubType:  fieldsUpdate.HType.GetNew(),
 		}]
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_HOST).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_HOST,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_HOST,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -310,12 +302,8 @@ func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_VROUTER).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_VROUTER,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -397,12 +385,8 @@ func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_DHCP_PORT).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -488,12 +472,8 @@ func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessa
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_NAT_GATEWAY).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -579,12 +559,8 @@ func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *mess
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_LB).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_LB,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_LB,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -668,12 +644,8 @@ func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMess
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_RDS_INSTANCE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -757,12 +729,8 @@ func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMe
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_REDIS_INSTANCE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -856,12 +824,8 @@ func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessa
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_SERVICE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -942,12 +906,8 @@ func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *mes
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -1028,13 +988,9 @@ func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		podGroupType := fieldsUpdate.Type.GetNew()
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType]).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
-			DeviceID: sourceID}, db)
-	}
+	podGroupType := fieldsUpdate.Type.GetNew()
+	c.updateOrSync(db, DeviceKey{DeviceType: common.RESOURCE_POD_GROUP_TYPE_MAP[podGroupType],
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -1122,12 +1078,8 @@ func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 	if fieldsUpdate.IP.IsDifferent() {
 		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -1185,7 +1137,7 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *metadb
 		sourceName += " (deleted)"
 	}
 
-	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
 		DeviceID: source.ID})
 	targets = append(targets, metadbmodel.ChDevice{
 		DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
@@ -1209,12 +1161,8 @@ func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessa
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -1296,12 +1244,8 @@ func (c *ChProcessDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", gid, CH_DEVICE_TYPE_GPROCESS).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
-			DeviceID: gid}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
+		DeviceID: gid}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -1388,12 +1332,8 @@ func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMe
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	if len(updateInfo) > 0 {
-		var chItem metadbmodel.ChDevice
-		db.Where("deviceid = ? and devicetype = ?", sourceID, CH_DEVICE_TYPE_CUSTOM_SERVICE).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
-			DeviceID: sourceID}, db)
-	}
+	c.updateOrSync(db, DeviceKey{DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
+		DeviceID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

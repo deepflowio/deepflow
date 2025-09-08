@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package schema
+package common
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
-
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.1.0.1"
+import (
+	"math"
 )
+
+func CalculateBufferSize(byteCount uint64) uint64 {
+	return uint64(math.Ceil(float64(byteCount+BUFFER_SIZE_EXTRA)/MEGA_BYTE)) * MEGA_BYTE
+}
