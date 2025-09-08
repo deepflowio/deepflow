@@ -1012,13 +1012,13 @@ void check_and_update_proc_info(bool output_log)
 int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     uint8_t * name, int name_size, kern_dev_t s_dev,
 			     char *mount_point, char *mount_source,
-			     int mount_size, bool * is_nfs)
+			     int mount_size, fs_type_t *file_type)
 {
 	memset(cid, 0, cid_size);
 	memset(name, 0, name_size);
 	memset(mount_point, 0, mount_size);
 	memset(mount_source, 0, mount_size);
-	*is_nfs = false;
+	*file_type = FS_TYPE_UNKNOWN;
 	return -1;
 }
 
