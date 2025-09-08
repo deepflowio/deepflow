@@ -519,9 +519,7 @@ func (c *Cache) DeleteVPCs(lcuuids []string) {
 
 func (c *Cache) refreshVPCs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VPC_EN), c.metadata.LogPrefixes)
-	var vpcs []*mysqlmodel.VPC
-
-	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&vpcs).Error
+	vpcs, err := rcommon.PageWhereFind[mysqlmodel.VPC](c.metadata, c.getConditonDomainCreateMethod())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VPC_EN, err), c.metadata.LogPrefixes)
@@ -662,7 +660,7 @@ func (c *Cache) DeleteRoutingTables(lcuuids []string) {
 
 func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN), c.metadata.LogPrefixes)
-	routingTables, err := rcommon.PageWhereFind[mysqlmodel.RoutingTable](c.metadata, "vnet_id IN ?", vrouterIDs)
+	routingTables, err := rcommon.PageWhereFind[mysqlmodel.RoutingTable](c.metadata, c.getConditionDomain())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, err), c.metadata.LogPrefixes)
@@ -693,9 +691,7 @@ func (c *Cache) DeleteDHCPPorts(lcuuids []string) {
 
 func (c *Cache) refreshDHCPPorts() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN), c.metadata.LogPrefixes)
-	var dhcpPorts []*mysqlmodel.DHCPPort
-
-	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&dhcpPorts).Error
+	dhcpPorts, err := rcommon.PageWhereFind[mysqlmodel.DHCPPort](c.metadata, c.getConditionDomain())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, err), c.metadata.LogPrefixes)
@@ -1303,7 +1299,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 		return
 	}
 
-	podIngressRules, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRule](c.metadata, "pod_ingress_id IN ?", podIngressIDs)
+	podIngressRules, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRule](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, err), c.metadata.LogPrefixes)
@@ -1332,7 +1328,7 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 		return
 	}
 
-	podIngressRuleBackends, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRuleBackend](c.metadata, "pod_ingress_id IN ?", podIngressIDs)
+	podIngressRuleBackends, err := rcommon.PageWhereFind[mysqlmodel.PodIngressRuleBackend](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, err), c.metadata.LogPrefixes)
@@ -1401,7 +1397,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 		return
 	}
 
-	podServicePorts, err := rcommon.PageWhereFind[mysqlmodel.PodServicePort](c.metadata, "pod_service_id IN ?", podServiceIDs)
+	podServicePorts, err := rcommon.PageWhereFind[mysqlmodel.PodServicePort](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, err), c.metadata.LogPrefixes)
@@ -1457,7 +1453,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 		return
 	}
 
-	podGroupPorts, err := rcommon.PageWhereFind[mysqlmodel.PodGroupPort](c.metadata, "pod_service_id IN ?", podServiceIDs)
+	podGroupPorts, err := rcommon.PageWhereFind[mysqlmodel.PodGroupPort](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, err), c.metadata.LogPrefixes)
@@ -1569,7 +1565,7 @@ func (c *Cache) DeletePodGroupConfigMapConnections(lcuuids []string) {
 func (c *Cache) refreshPodGroupConfigMapConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN), c.metadata.LogPrefixes)
 	var items []*mysqlmodel.PodGroupConfigMapConnection
-	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid()).Find(&items).Error
+	items, err := rcommon.PageWhereFind[mysqlmodel.PodGroupConfigMapConnection](c.metadata, "domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.GetDomainLcuuid(), c.metadata.GetSubDomainLcuuid())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, err), c.metadata.LogPrefixes)
