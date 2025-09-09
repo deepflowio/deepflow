@@ -517,6 +517,10 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 {
 	FILE *fp = args->map_fp;
+	// Prevent writing data to a null file pointer
+	if (fp == NULL)
+		return -1;
+
 	struct symbol_metadata meta;
 	int n = receive_msg(args, sock_fd, (char *)&meta, sizeof(meta), false);
 	if (n != sizeof(meta))
@@ -559,6 +563,8 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 static int symbol_log_process(receiver_args_t * args, int sock_fd)
 {
 	FILE *fp = args->log_fp;
+	if (fp == NULL)
+		return -1;
 	char rcv_buf[STRING_BUFFER_SIZE];
 	int n = receive_msg(args, sock_fd, rcv_buf, sizeof(rcv_buf), true);
 	if (n == -1)
