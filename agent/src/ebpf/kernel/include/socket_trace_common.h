@@ -26,6 +26,16 @@
 
 #include "../config.h"
 
+#define INVALID_OFFSET 0xFFFF
+
+// Structure used to store kernel mount information for adaptation purposes.
+// Helps to infer kernel structure offsets for different kernel versions.
+struct adapt_kern_data {
+	__u64 id;       // Combined identifier, e.g., {tgid, pid} of the process
+	int mnt_id;     // Mount ID corresponding to the file
+	__u32 mntns_id; // Mount namespace ID corresponding to the file
+};
+
 enum endpoint_role {
 	ROLE_UNKNOWN,
 	ROLE_CLIENT,
@@ -234,6 +244,11 @@ struct __io_event_buffer {
 	// The number of bytes of offset within the file content
 	__u64 offset;
 
+	// Mount ID of the file’s mount
+	int mnt_id;
+	// Mount namespace ID of the file’s mount
+	__u32 mntns_id;
+
 	// filename length
 	__u32 len;
 
@@ -260,6 +275,8 @@ struct user_io_event_buffer {
 	char mount_source[MOUNT_SOURCE_SZ];
 	char mount_point[MOUNT_POINT_SZ];
 	char file_dir[FILE_PATH_SZ];
+	int mnt_id;
+	__u32 mntns_id;
 } __attribute__ ((packed));
 
 // struct ebpf_proc_info -> offsets[]  arrays index.
@@ -344,7 +361,9 @@ struct member_fields_offset {
 	__u8 ready;
 	__u8 kprobe_invalid:1;			// This indicates that the KPROBE feature has been disabled.
 	__u8 enable_unix_socket:1;		// Enable flag for Unix socket tracing
-	__u8 reserved:6;
+	__u8 files_infer_done:1;		// 0: file-related structure offset inference not completed
+						// 1: file-related structure offset inference completed
+	__u8 reserved:5;
 	__u16 struct_dentry_d_parent_offset;    // offsetof(struct dentry, d_parent)
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;
@@ -369,6 +388,17 @@ struct member_fields_offset {
 	__u32 struct_sock_sport_offset;	// offsetof(struct sock_common, skc_num)
 	__u32 struct_sock_skc_state_offset;	// offsetof(struct sock_common, skc_state)
 	__u32 struct_sock_common_ipv6only_offset;	// offsetof(struct sock_common, skc_flags)
+
+	/*
+ 	 * Mount information related offsets
+ 	 */
+	__u16 struct_file_f_path_offset;      // offsetof(struct file, f_path)
+	__u16 struct_path_mnt_offset;         // offsetof(struct path, mnt)
+	__u16 struct_mount_mnt_offset;	      // offsetof(struct mount, mnt)
+	__u16 struct_mount_mnt_ns_offset;     // offsetof(struct mount, mnt_ns)
+	__u16 struct_mnt_namespace_ns_offset; // offsetof(struct mnt_namespace, ns)
+	__u16 struct_ns_common_inum_offset;   // offsetof(struct mnt_common, inum)
+	__u16 struct_mount_mnt_id_offset;     // offsetof(struct mount, mnt_id)
 };
 
 typedef struct member_fields_offset bpf_offset_param_t;
