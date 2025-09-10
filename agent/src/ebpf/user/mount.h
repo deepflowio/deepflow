@@ -56,6 +56,7 @@ typedef struct {
 /**
  * struct mount_entry - Represents a mount point within a mount namespace
  * @list:         Linked list node for chaining multiple mount entries
+ * @mount_id:	  The unique mount point ID assigned by the kernel.
  * @s_dev:        Device ID (from stat.st_dev), typically encoded as major:minor
  * @is_nfs:       True if the mount source is a network file system (e.g., NFS)
  * @mount_point:  Absolute path of the mount point (e.g., "/mnt/data")
@@ -63,6 +64,7 @@ typedef struct {
  */
 struct mount_entry {
 	struct list_head list;
+	int mount_id;
 	kern_dev_t s_dev;
 	fs_type_t file_type;
 	char *mount_point;
@@ -152,16 +154,17 @@ int mount_info_cache_remove(pid_t pid, u64 mntns_id);
  * @brief Find the mount path and source device for a given device ID in a namespace.
  *
  * @param[in]  pid            Process ID
- * @param[in/out]  mntns_id   Mount namespace ID adress
+ * @param[in]  mnt_id	      Mount ID
+ * @param[in]  mntns_id       Mount namespace ID
  * @param[in]  s_dev          Device ID (major:minor encoded)
  * @param[out] mount_path     Output buffer for mount point path
  * @param[out] mount_source   Output buffer for mount source (e.g., device or NFS path)
  * @param[in]  mount_size     Size of output buffers
  * @param[out] file_type      File type
  */
-void get_mount_info(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
-		    char *mount_path, char *mount_source,
-		    int mount_size, fs_type_t *file_type);
+void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
+		    kern_dev_t s_dev, char *mount_path,
+		    char *mount_source, int mount_size, fs_type_t * file_type);
 
 /**
  * @brief Copy and transform event data containing file paths from eBPF trace.
@@ -254,4 +257,20 @@ void collect_mount_info_stats(bool output_log);
  * filesystem type information in a human-readable format.
  */
 const char *fs_type_to_string(fs_type_t type);
+
+/**
+ * Retrieve the mount ID of a given file descriptor from /proc/<pid>/fdinfo/<fd>.
+ *
+ * This function reads the "mnt_id" field from the corresponding fdinfo file
+ * in the /proc filesystem. It provides a simple and direct way to obtain the
+ * mount ID without parsing /proc/<pid>/mountinfo or using name_to_handle_at().
+ *
+ * @param pid  Target process ID.
+ * @param fd   File descriptor within the target process.
+ * @return     On success: non-negative mount ID.
+ *             On failure: -1 is returned, and errno is set accordingly.
+ */
+int get_mount_id(pid_t pid, int fd);
+
+int mount_offset_infer(void);
 #endif /* DF_USER_MOUNT_H */
