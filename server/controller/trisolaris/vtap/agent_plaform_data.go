@@ -18,6 +18,7 @@ package vtap
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -128,9 +129,9 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 	}
 
 	podClusterInternalIP := vtapConfig.getPodClusterInternalIP()
-	domainFilters := vtapConfig.getDomainFilters()
-	log.Debug(v.Logf("%d %s", podClusterInternalIP, domainFilters))
-	if !podClusterInternalIP && SliceEqual[string](domainFilters, ALL_DOMAIMS) {
+	domains := vtapConfig.getDomainFilters()
+	log.Debug(v.Logf("%d %v", podClusterInternalIP, domains))
+	if !podClusterInternalIP && slices.Equal(domains, ALL_DOMAINS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=所有集群
 		// 所有云平台所有数据
 		log.Info(v.Logf("all: %s", p.GetAllSimplePlatformData()))
@@ -147,7 +148,7 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 		}
 		domainToAllPlatformData := p.GetDomainToAllPlatformData()
 		domainAllData := metadata.NewPlatformData("platformDataType1", "", 0, PLATFORM_DATA_TYPE_1)
-		for _, domainLcuuid := range domainFilters {
+		for _, domainLcuuid := range domains {
 			domainData := domainToAllPlatformData[domainLcuuid]
 			if domainData == nil {
 				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -160,7 +161,7 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 		v.platformDataType1.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
 		c.setAgentPlatformData(domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
-	} else if podClusterInternalIP && SliceEqual[string](domainFilters, ALL_DOMAIMS) {
+	} else if podClusterInternalIP && slices.Equal(domains, ALL_DOMAINS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
 		// 所有云平台中devicetype != POD/容器服务的所有接口，采集器所在集群devicetype=POD/容器服务的所有接口
 
@@ -208,7 +209,7 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 			}
 			domainToAllPlatformData := p.GetDomainToAllPlatformData()
 			domainAllData := metadata.NewPlatformData("platformDataBMDedicated", "", 0, PLATFORM_DATA_BM_DEDICATED)
-			for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+			for _, domainLcuuid := range domains {
 				domainData := domainToAllPlatformData[domainLcuuid]
 				if domainData == nil {
 					log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -236,7 +237,7 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 		domainToPlatformDataExceptPod := p.GetDomainToPlatformDataExceptPod()
 		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
 		domainAllData := metadata.NewPlatformData("platformDataType3", "", 0, PLATFORM_DATA_TYPE_3)
-		for _, domainLcuuid := range domainFilters {
+		for _, domainLcuuid := range domains {
 			domainData := domainToPlatformDataExceptPod[domainLcuuid]
 			if domainData == nil {
 				log.Errorf(v.Logf("domain(%s) no platform data", domainLcuuid))
@@ -251,7 +252,7 @@ func (v *AgentPlatformData) setPlatformDataByAgent(p *metadata.PlatformDataOP, c
 				log.Errorf(v.Logf("domain(%s) no platform data", podDomain))
 				continue
 			}
-			if Find[string](domainFilters, podDomain) {
+			if slices.Contains(domains, podDomain) {
 				domainAllData.MergeInterfaces(vtapDomainData)
 			} else {
 				domainAllData.Merge(vtapDomainData)
