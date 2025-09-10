@@ -234,8 +234,9 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				for _, tPort := range targetPorts {
 					targetPortsMap[tPort] = false
 				}
+				portString := strconv.Itoa(portInt)
 				for targetPort := range targetPortsMap {
-					key := strconv.Itoa(portInt) + portProtocol + strconv.Itoa(portNodePort) + strconv.Itoa(targetPort)
+					key := portString + portProtocol + strconv.Itoa(portNodePort) + strconv.Itoa(targetPort)
 					servicePort := model.PodServicePort{
 						Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+key),
 						Name:             portName,
@@ -254,7 +255,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 						continue
 					}
 					for targetPort := range targetPortsMap {
-						key := portProtocol + strconv.Itoa(targetPort)
+						key := portName + portString + portProtocol + strconv.Itoa(targetPort)
 						podGroupPort := model.PodGroupPort{
 							Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+podGroupLcuuid+key),
 							Name:             portName,
