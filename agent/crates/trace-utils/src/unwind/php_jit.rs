@@ -129,7 +129,7 @@ impl PhpJitSupport {
         // Look for pattern: mov w0, #<immediate>; ret
         // On aarch64, constants are loaded differently
 
-        for i in 0..code.len().saturating_sub(8) {
+        for i in 0..code.len().saturating_sub(3) {
             // Pattern: mov w0, #imm16 (can be multiple instructions for larger constants)
             // This is a simplified check - real implementation would need full aarch64 decoding
 
@@ -345,23 +345,5 @@ impl PhpJitSupport {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_jit_support_detection() {
-        let php74 = PhpJitSupport::new(Version::new(7, 4, 33));
-        assert!(!php74.supports_jit());
-
-        let php80 = PhpJitSupport::new(Version::new(8, 0, 30));
-        assert!(php80.supports_jit());
-
-        let php82 = PhpJitSupport::new(Version::new(8, 2, 15));
-        assert!(php82.supports_jit());
-    }
-
-    #[test]
-    fn test_vm_kind_constants() {
-        assert_eq!(ZEND_VM_KIND_HYBRID, 4);
-    }
-}
+#[path = "php_jit/tests.rs"]
+mod tests;
