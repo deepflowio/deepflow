@@ -146,8 +146,8 @@ BPF_HASH(socket_role_map, __u64, __u32, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET
 // Key is struct trace_key_t. value is trace_info_t
 BPF_HASH(trace_map, struct trace_key_t, struct trace_info_t, MAP_MAX_ENTRIES_DEF, FEATURE_FLAG_SOCKET_TRACER)
 
-// Stores the identity used to fit the kernel, key: 0, vlaue:{tgid, pid}
-MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1, FEATURE_FLAG_SOCKET_TRACER)
+// Stores the identity used to fit the kernel, key: 0, vlaue: struct adapt_kern_data
+MAP_ARRAY(adapt_kern_data_map, __u32, struct adapt_kern_data, 1, FEATURE_FLAG_SOCKET_TRACER)
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 /*
@@ -1084,12 +1084,13 @@ static __inline void infer_tcp_seq_offset(void *sk,
 static __inline bool check_pid_validity(void)
 {
 	__u32 k0 = 0;
-	__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
-	if (!adapt_uid)
+	struct adapt_kern_data *adapt_data;
+	adapt_data = adapt_kern_data_map__lookup(&k0);
+	if (!adapt_data)
 		return false;
 
 	// Only a preset uid can be adapted to the kernel
-	if ((*adapt_uid) >> 32 != bpf_get_current_pid_tgid() >> 32)
+	if (adapt_data->id >> 32 != bpf_get_current_pid_tgid() >> 32)
 		return false;
 
 	return true;

@@ -293,10 +293,12 @@ static int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 }
 
 int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
-			     uint8_t * name, int name_size, kern_dev_t s_dev,
+			     uint8_t * name, int name_size, int mnt_id,
+			     uint32_t mntns_id, kern_dev_t s_dev,
 			     char *mount_point, char *mount_source,
 			     int mount_size, fs_type_t *file_type)
 {
+	int ret = -1;
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
@@ -319,14 +321,16 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			memcpy_s_inline((void *)name, name_size, p->comm,
 					sizeof(p->comm));
 		}
-		if (s_dev != DEV_INVALID)
-			get_mount_info(pid, &p->mntns_id, s_dev, mount_point,
-				       mount_source, mount_size, file_type);
 		AO_DEC(&p->use);
-		return 0;
+		ret = 0;
 	}
 
-	return -1;
+	if (s_dev != DEV_INVALID) {
+		get_mount_info(pid, mnt_id, mntns_id, s_dev, mount_point,
+			       mount_source, mount_size, file_type);
+	}
+
+	return ret;
 }
 
 static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
@@ -1017,7 +1021,8 @@ void check_and_update_proc_info(bool output_log)
 }
 
 int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
-			     uint8_t * name, int name_size, kern_dev_t s_dev,
+			     uint8_t * name, int name_size, int mnt_id,
+			     uint32_t mntns_id, kern_dev_t s_dev,
 			     char *mount_point, char *mount_source,
 			     int mount_size, fs_type_t *file_type)
 {
