@@ -85,6 +85,7 @@ func (c *ChPodK8sEnvs) onResourceUpdated(md *message.Metadata, updateMessage *me
 				}},
 				db,
 			)
+			return
 		}
 	}
 	c.updateOrSync(db, targetKey, updateInfo)

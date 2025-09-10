@@ -1,4 +1,5 @@
 # Value , DisplayName   , Description
+0       , Unknown       ,
 1       , Regular File  , A file stored on the local disk
 2       , Virtual File  , A file virtually created by the kernel, such as those in `procfs`, `sysfs`, etc
 3       , Network File  , A file stored on a remote `NAS` or `NFS` system
