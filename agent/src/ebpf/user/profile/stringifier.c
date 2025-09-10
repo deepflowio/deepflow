@@ -436,16 +436,30 @@ static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int 
 {
 	int len = 0;
 	char *ptr = NULL;
-	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 3];
+	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 16]; // Extra space for JIT markers
 	memset(format_str, 0, sizeof(format_str));
 
+	// Check if this is a JIT-compiled frame (high bit set in eBPF)
+	bool is_jit_frame = (address & 0x8000000000000000ULL) != 0;
 	u32 symbol_id = address & 0xFFFFFFFF;
+
 	for (int i = 0; i < n_symbols; i++) {
 		if (symbol_ids[i] == symbol_id) {
 			if (strlen(symbols[i].class_name) > 0) {
-				snprintf(format_str, sizeof(format_str), "%s::%s", symbols[i].class_name, symbols[i].method_name);
+				// Enhanced formatting for JIT frames
+				if (is_jit_frame) {
+					snprintf(format_str, sizeof(format_str), "%s::%s [JIT]",
+						symbols[i].class_name, symbols[i].method_name);
+				} else {
+					snprintf(format_str, sizeof(format_str), "%s::%s",
+						symbols[i].class_name, symbols[i].method_name);
+				}
 			} else {
-				snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
+				if (is_jit_frame) {
+					snprintf(format_str, sizeof(format_str), "%s [JIT]", symbols[i].method_name);
+				} else {
+					snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
+				}
 			}
 			goto finish;
 		}

@@ -159,6 +159,7 @@ typedef struct {
 
 	void *php_execute_data_ptr;
 	__u8 php_offsets_id;
+	__u64 php_jit_return_address; // JIT return address for PHP 8+ mixed stacks
 
 	void *v8_frame_ptr;
 	__u8 v8_offsets_id;
@@ -181,6 +182,7 @@ void reset_unwind_state(unwind_state_t * state)
 	state->py_offsets_id = 0;
 	state->php_execute_data_ptr = NULL;
 	state->php_offsets_id = 0;
+	state->php_jit_return_address = 0;
 	state->v8_frame_ptr = NULL;
 	state->v8_offsets_id = 0;
 	state->v8_current_pc = 0;
@@ -495,7 +497,14 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	}
 
 	if (intp_stack != NULL && intp_stack->len > 0) {
-		key->intpstack = get_stackid(stack_map, intp_stack);
+		// Use custom_stack_map for interpreter stack to enable symbol resolution
+		struct bpf_map_def *intp_stack_map = NULL;
+		if (!((*transfer_count_ptr) & 0x1ULL)) {
+			intp_stack_map = maps->custom_stack_map_a;
+		} else {
+			intp_stack_map = maps->custom_stack_map_b;
+		}
+		key->intpstack = get_stackid(intp_stack_map, intp_stack);
 	}
 #endif
 
@@ -1016,6 +1025,10 @@ int pre_php_unwind(void *ctx, unwind_state_t * state,
 
 	state->php_execute_data_ptr = execute_data_ptr;
 
+	// Store JIT return address for PHP 8+ JIT unwinding
+	// This enables detection and proper handling of mixed interpreter/JIT stacks
+	state->php_jit_return_address = php_unwind_info->jit_return_address;
+
 	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
 	return 0;
 }
@@ -1126,6 +1139,29 @@ __u32 read_php_symbol(php_offsets_t * php_offsets, void *execute_data_ptr,
 	return lineno;
 }
 
+// Helper function to detect if we've encountered JIT code in the call stack
+static inline __attribute__ ((always_inline))
+bool is_php_jit_frame(unwind_state_t *state, void *execute_data_ptr, void *zend_function_ptr) {
+	// If no JIT return address is configured, no JIT support
+	if (state->php_jit_return_address == 0) {
+		return false;
+	}
+
+	// Simple heuristic: if the execute_data pointer is near the JIT return address,
+	// this might be a JIT frame. In a complete implementation, we would:
+	// 1. Check if the current PC is in a JIT memory region
+	// 2. Validate the execute_data structure for JIT vs interpreter frames
+	// 3. Use OPcache JIT buffer mapping for precise detection
+
+	__u64 addr_diff = ((__u64)execute_data_ptr > state->php_jit_return_address) ?
+		(__u64)execute_data_ptr - state->php_jit_return_address :
+		state->php_jit_return_address - (__u64)execute_data_ptr;
+
+	// If within 64KB range of JIT return address, consider it JIT-related
+	// This is a simplified heuristic - production code would use more precise detection
+	return addr_diff < 0x10000;
+}
+
 static inline __attribute__ ((always_inline))
 int php_unwind(void *ctx, unwind_state_t * state,
 		 map_group_t *maps, int jmp_idx) {
@@ -1154,15 +1190,39 @@ int php_unwind(void *ctx, unwind_state_t * state,
 			goto output;
 		}
 
+		// Enhanced JIT detection and handling
+		bool is_jit_frame = is_php_jit_frame(state, state->php_execute_data_ptr, zend_function_ptr);
+
 		__builtin_memset(&symbol, 0, sizeof(symbol));
 		__u64 lineno = read_php_symbol(php_offsets, state->php_execute_data_ptr, zend_function_ptr, &symbol);
 
 		if (lineno == 0) {
-			goto output;
-		}
+			// For JIT frames, we might not get valid symbols from interpreter structures
+			// In this case, we could add a special JIT marker frame
+			if (is_jit_frame && state->php_jit_return_address != 0) {
+				// Add a synthetic JIT frame marker
+				// This helps identify JIT code in the call stack
+				__builtin_memcpy(symbol.class_name, "[JIT]", 6);
+				__builtin_memcpy(symbol.method_name, "compiled_code", 14);
+				lineno = 0; // No line number for JIT code
+				__u64 jit_symbol_id = get_symbol_id(&symbol);
+				add_frame(&state->intp_stack, jit_symbol_id);
+			} else {
+				goto output;
+			}
+		} else {
+			__u64 symbol_id = get_symbol_id(&symbol);
 
-		__u64 symbol_id = get_symbol_id(&symbol);
-		add_frame(&state->intp_stack, (lineno << 32) | symbol_id);
+			// For JIT frames, we can add additional metadata
+			if (is_jit_frame) {
+				// Mark this frame as JIT-compiled by setting a high bit in the frame data
+				// This preserves the symbol information while indicating JIT compilation
+				add_frame(&state->intp_stack, (lineno << 32) | symbol_id | 0x8000000000000000ULL);
+			} else {
+				// Normal interpreter frame
+				add_frame(&state->intp_stack, (lineno << 32) | symbol_id);
+			}
+		}
 
 		// Move to previous execute_data
 		if (bpf_probe_read_user(&state->php_execute_data_ptr, sizeof(void *),
@@ -1364,7 +1424,7 @@ int v8_unwind_one_frame(unwind_state_t *state, v8_offsets_t *v8_offsets,
 	__u64 sp = state->regs.sp;
 	__u64 fp = state->regs.bp;
 	__u64 pc = state->regs.ip;
-	
+
 	// Variables for symbolization
 	__u64 pointer_and_type = 0;
 	__u64 delta_or_marker = 0;
@@ -1470,7 +1530,7 @@ int v8_frame_unwinder(void *ctx, unwind_state_t *state, map_group_t *maps) {
 		symbol_t symbol;
 		__builtin_memset(&symbol, 0, sizeof(symbol));
 		__builtin_memcpy(symbol.method_name, "V8:frame", 9);
-		
+
 		__u64 symbol_id = get_symbol_id(&symbol);
 		add_frame(&state->intp_stack, symbol_id);
 
@@ -1632,7 +1692,7 @@ int v8_frame_analyzer(void *ctx, unwind_state_t *state, map_group_t *maps) {
 		symbol_t symbol;
 		__builtin_memset(&symbol, 0, sizeof(symbol));
 		__builtin_memcpy(symbol.method_name, "V8:analyzed", 12);
-		
+
 		__u64 symbol_id = get_symbol_id(&symbol);
 		add_frame(&state->intp_stack, symbol_id);
 
@@ -1651,13 +1711,13 @@ int v8_frame_analyzer(void *ctx, unwind_state_t *state, map_group_t *maps) {
 		state->regs.ip = new_pc;
 		state->regs.sp = fp + 16;
 	}
-	
+
 	// Continue unwinding if we have more frames and space
 	if (state->regs.bp != 0 && state->regs.ip != 0 &&
 	    state->intp_stack.len < (PERF_MAX_STACK_DEPTH * 3 / 4)) {
 		bpf_tail_call(ctx, maps->progs_jmp, PROG_V8_FRAME_UNWINDER_PE_IDX);
 	}
-	
+
 	return 0;
 }
 

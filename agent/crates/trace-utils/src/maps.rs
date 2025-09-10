@@ -77,6 +77,21 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
                     trace!("found {:?}", la);
                     areas.push(la);
                 }
+
+                // CRITICAL FIX: Filter out dangerous device files to prevent infinite memory consumption
+                // Skip device files like /dev/zero, /dev/null, etc. that can cause OOM when read
+                if path.starts_with("/dev/zero")
+                    || path.starts_with("/dev/null")
+                    || path.starts_with("/dev/random")
+                    || path.starts_with("/dev/urandom")
+                    || path.contains("/dev/zero")
+                    || path.contains("/dev/null")
+                {
+                    trace!("Skipping dangerous device file mapping: {}", path);
+                    last_executable = false;
+                    continue;
+                }
+
                 last_area.replace(MemoryArea {
                     m_start,
                     mx_start: if perms.contains('x') { m_start } else { 0 },
