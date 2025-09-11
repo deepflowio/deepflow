@@ -9,6 +9,8 @@
 #### New Feature
 
 #### Bug Fix
+* fix:  pod group port duplication [#10452](https://github.com/deepflowio/deepflow/pull/10452) by [askyrie](https://github.com/askyrie)
+* fix: agent - Avoid closing repeatedly when java_update exits [#10443](https://github.com/deepflowio/deepflow/pull/10443) by [yinjiping](https://github.com/yinjiping)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
