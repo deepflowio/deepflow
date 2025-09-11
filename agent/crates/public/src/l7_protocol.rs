@@ -58,6 +58,9 @@ pub enum L7Protocol {
     PostgreSQL = 61,
     Oracle = 62,
 
+    // ISO
+    Iso8583 = 70,
+
     // NoSQL
     Redis = 80,
     MongoDB = 81,
@@ -130,6 +133,7 @@ impl From<String> for L7Protocol {
             "rocketmq" => Self::RocketMQ,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
+            "iso8583" | "iso-8583" => Self::Iso8583,
             "tls" => Self::TLS,
             "ping" => Self::Ping,
             "some/ip" | "someip" => Self::SomeIp,

@@ -2385,7 +2385,7 @@ mod tests {
             l7_protocol_log::{EbpfParam, L7PerfCache},
             MetaPacket,
         },
-        config::OracleConfig,
+        config::{config::Iso8583ParseConfig, OracleConfig},
     };
 
     use std::cell::RefCell;
@@ -2666,6 +2666,7 @@ mod tests {
             buf_size: 0,
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
+            iso8583_parse_conf: Iso8583ParseConfig::default(),
             icmp_data: None,
         };
 

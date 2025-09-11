@@ -128,6 +128,7 @@ cfg_if::cfg_if! {
             SomeIpInfo(crate::flow_generator::protocol_logs::SomeIpInfo),
             PingInfo(PingInfo),
             CustomInfo(CustomInfo),
+            Iso8583Info(crate::flow_generator::protocol_logs::Iso8583Info),
             // add new protocol info below
         );
     }
@@ -149,6 +150,13 @@ where
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()>;
 
     fn app_proto_head(&self) -> Option<AppProtoHead>;
+
+    // 是否需要将数据聚合为会话
+    // =============================
+    // needs to be aggregated into sessions
+    fn needs_session_aggregation(&self) -> bool {
+        true
+    }
 
     fn is_tls(&self) -> bool;
 
