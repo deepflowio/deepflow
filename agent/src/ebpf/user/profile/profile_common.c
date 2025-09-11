@@ -442,15 +442,18 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *arg)
 		cpdbg_process(msg);
 
 		tracer_callback_t fun = profiler_tracer->process_fn;
+		int r = 0;
 		/*
 		 * Execute callback function to hand over the data to the
 		 * higher level for processing. The higher level will se-
 		 * nd the data to the server for storage as required.
 		 */
 		if (likely(ctx->profiler_stop == 0))
-			fun(ctx->callback_ctx, 0, msg);
+			r = fun(ctx->callback_ctx, 0, msg);
 
-		clib_mem_free((void *)msg);
+		if (!(r & TRACER_CALLBACK_FLAG_KEEP_DATA))
+			clib_mem_free((void *)msg);
+
 		msg_kv->msg_ptr = 0;
 	}
 
@@ -720,7 +723,7 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 		}
 	}
 
-	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+	msg->time_stamp = v->timestamp + get_sysboot_time_ns();
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
 		msg->count = v->memory.size;
 	} else if (ctx->use_delta_time) {
