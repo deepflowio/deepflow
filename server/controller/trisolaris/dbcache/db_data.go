@@ -591,7 +591,8 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	acls, err := dbmgr.DBMgr[models.ACL](db).GetBatchFromState(ACL_STATE_ENABLE)
+	var acls []*models.ACL
+	err = db.Where("state = ? AND valid = ?", ACL_STATE_ENABLE, ACL_STATE_VALID).Find(&acls).Error
 	if err == nil {
 		d.acls = acls
 	} else {
