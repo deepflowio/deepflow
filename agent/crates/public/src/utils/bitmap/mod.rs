@@ -19,8 +19,16 @@ use crate::bitmap::Bitmap;
 // u16_range example: "1,2,3-55,6,77-888" ...
 // if strict is true, must all parse correct, otherwise return None.
 pub fn parse_u16_range_list_to_bitmap(port_str: impl AsRef<str>, strict: bool) -> Option<Bitmap> {
+    return parse_range_list_to_bitmap(u16::MAX, port_str, strict);
+}
+
+pub fn parse_range_list_to_bitmap(
+    max_pos: u16,
+    port_str: impl AsRef<str>,
+    strict: bool,
+) -> Option<Bitmap> {
     let port_str = port_str.as_ref();
-    let mut bitmap = Bitmap::new(u16::MAX as usize, false);
+    let mut bitmap = Bitmap::new(max_pos as usize, false);
     let mut ports = port_str.split(",");
 
     while let Some(mut p) = ports.next() {
