@@ -1648,6 +1648,7 @@ CREATE TABLE IF NOT EXISTS acl (
     type                   INTEGER DEFAULT 2,
     tap_type               INTEGER DEFAULT 3,
     state                  INTEGER DEFAULT 1,
+    valid                  INTEGER DEFAULT 1,
     applications           VARCHAR(64) NOT NULL,
     epc_id                 INTEGER,
     src_group_ids          TEXT,
@@ -1669,6 +1670,7 @@ COMMENT ON COLUMN acl.src_group_ids IS 'separated by ,';
 COMMENT ON COLUMN acl.dst_group_ids IS 'separated by ,';
 COMMENT ON COLUMN acl.src_ports IS 'separated by ,';
 COMMENT ON COLUMN acl.dst_ports IS 'separated by ,';
+COMMENT ON COLUMN acl.valid IS '0-invalid; 1-valid';
 
 CREATE TABLE IF NOT EXISTS resource_group (
     id                      SERIAL PRIMARY KEY,
