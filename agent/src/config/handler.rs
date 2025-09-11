@@ -50,9 +50,9 @@ use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
-        GRPC_BUFFER_SIZE_MIN,
+        HttpEndpointMatchRule, Iso8583Config, OracleConfig, PcapStream, PortConfig,
+        ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
+        UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -515,6 +515,7 @@ pub struct FlowConfig {
     pub batched_buffer_size_limit: usize,
 
     pub oracle_parse_conf: OracleConfig,
+    pub iso8583_parse_conf: Iso8583Config,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
@@ -676,6 +677,13 @@ impl From<&UserConfig> for FlowConfig {
                 .application_protocol_inference
                 .protocol_special_config
                 .oracle
+                .clone(),
+            iso8583_parse_conf: conf
+                .processors
+                .request_log
+                .application_protocol_inference
+                .protocol_special_config
+                .iso8583
                 .clone(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
                 conf.processors
@@ -4988,7 +4996,7 @@ impl ConfigHandler {
                 "Update processors.request_log.application_protocol_inference.protocol_special_config from {:?} to {:?}.",
                 app.protocol_special_config, new_app.protocol_special_config
             );
-            app.protocol_special_config = new_app.protocol_special_config;
+            app.protocol_special_config = new_app.protocol_special_config.clone();
             restart_agent = !first_run;
         }
         if app.custom_protocols != new_app.custom_protocols {

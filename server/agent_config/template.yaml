@@ -4960,6 +4960,55 @@ processors:
           # upgrade_from: static_config.oracle-parse-config.resp-0x04-extra-byte
           resp_0x04_extra_byte: false
         # type: section
+        # name: ISO8583
+        # description:
+        iso8583:
+          # type: bool
+          # name:
+          #   en: Value Translation
+          #   ch: 数据翻译
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to perform field value translation
+          #   ch: |-
+          #     是否对解析后的数据进行查表翻译后展示
+          translation_enabled: true
+          # type: bool
+          # name:
+          #   en: PAN Obfuscate
+          #   ch: 卡号脱敏
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to obfuscate the Primary Account Number (PAN).
+          #   ch: |-
+          #     是否对卡号脱敏
+          pan_obfuscate: true
+          # type: int
+          # name:
+          #   en: Ignore Fields
+          #   ch: 忽略字段
+          # unit:
+          # range: [0, 128]
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Ignore the data of fields
+          #   ch: |-
+          #     忽略此配置中的字段
+          omit_fields: []
+        # type: section
         # name: MySQL
         # description:
         mysql:
