@@ -303,6 +303,7 @@ const (
 
 const (
 	ACL_STATE_ENABLE = 1
+	ACL_STATE_VALID  = 1
 )
 
 const (
