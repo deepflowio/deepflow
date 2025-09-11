@@ -297,6 +297,7 @@ type ACL struct {
 	Type         int       `gorm:"column:type;type:int;default:2" json:"TYPE"`                     // 1-epc; 2-custom
 	TapType      int       `gorm:"column:tap_type;type:int;default:3" json:"TAP_TYPE"`             // 1-WAN; 3-LAN
 	State        int       `gorm:"column:state;type:int;default:null;default:0" json:"STATE"`      // 0-disable; 1-enable
+	Valid        int       `gorm:"column:valid;type:tinyint(1);default:1" json:"VALID"`            // 0-invalid; 1-valid
 	Applications string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"` // separated by , (1-performance analysis; 2-backpacking; 6-npb)
 	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
 	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
