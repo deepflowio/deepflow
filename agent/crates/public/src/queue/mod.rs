@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+mod buffer;
 mod debug;
 mod overwrite_queue;
 
+pub use buffer::BufferedSender;
 pub use debug::{bounded_with_debug, DebugSender};
 pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
 use thiserror::Error;
