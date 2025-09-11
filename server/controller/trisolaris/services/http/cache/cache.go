@@ -42,6 +42,40 @@ func NewCacheService() *CacheService {
 	return &CacheService{}
 }
 
+func GetCache(c *gin.Context) {
+	var err error
+	orgID := 0
+	orgIDStr, ok := c.GetQuery("org_id")
+	if ok {
+		orgID, err = strconv.Atoi(orgIDStr)
+		if err != nil {
+			common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
+			return
+		}
+	} else {
+		if headerOrgID, ok := c.Get(HEADER_KEY_X_ORG_ID); ok {
+			orgID = headerOrgID.(int)
+		}
+	}
+	if utils.CheckOrgID(orgID) == false {
+		errMessage := fmt.Sprintf("check orgID(%d) failed", orgID)
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, errMessage))
+		return
+	}
+
+	resp := make(map[string]interface{})
+	groupIDToIPsType := "group_id_to_ips"
+	if types, ok := c.GetQueryArray("type"); ok {
+		for _, t := range types {
+			switch t {
+			case groupIDToIPsType:
+				resp[groupIDToIPsType] = trisolaris.GetMetaData(orgID).GetGroupDataOP().GetGroupIDToIPs()
+			}
+		}
+	}
+	common.Response(c, nil, resp)
+}
+
 func PutCache(c *gin.Context) {
 	log.Debug(c.GetQueryArray("type"))
 	var err error
@@ -88,4 +122,5 @@ func PutCache(c *gin.Context) {
 
 func (*CacheService) Register(mux *gin.Engine) {
 	mux.PUT("v1/caches/", PutCache)
+	mux.GET("v1/caches/", GetCache)
 }
