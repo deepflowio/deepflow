@@ -179,6 +179,14 @@ func (g *GroupDataOP) SetStartTime(startTime int64) {
 	g.dropletGroupProto.startTime = startTime
 }
 
+func (g *GroupDataOP) GetGroupIDToIPs() map[int][]string {
+	result := make(map[int][]string)
+	for k, v := range g.groupRawData.groupIDToIPs {
+		result[k] = append(v.cidrs, v.ipRanges...)
+	}
+	return result
+}
+
 func (g *GroupDataOP) GetIDToGroup() map[int]*models.ResourceGroup {
 	return g.groupRawData.idToGroup
 }
