@@ -426,7 +426,9 @@ impl SessionQueue {
         }
         self.counter.receive.fetch_add(1, Ordering::Relaxed);
 
-        if matches!(item.base_info.head.msg_type, LogMessageType::Session) {
+        if !item.l7_info.needs_session_aggregation()
+            || matches!(item.base_info.head.msg_type, LogMessageType::Session)
+        {
             if item.base_info.start_time.is_zero() {
                 item.base_info.start_time = item.base_info.end_time;
             }
@@ -576,6 +578,7 @@ impl SessionQueue {
                 item.l7_info.get_request_resource_length() as u64,
                 Ordering::Relaxed,
             );
+
             self.throttle_sender
                 .send(item.clone(), Some(L7ResponseStatus::Timeout));
             None

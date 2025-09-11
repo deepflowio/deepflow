@@ -1079,6 +1079,47 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 	}
 }
 
+// https://en.wikipedia.org/wiki/ISO_8583
+static __inline enum message_type infer_iso8583_message(const char *buf,
+						     size_t count,
+						     const char *ptr,
+						     __u32 infer_len,
+						     struct conn_info_s
+						     *conn_info)
+{
+#define CUPS_HEADER_SIZE 0x2e
+#define CUPS_HEADER_FLAG_1 0x02
+#define CUPS_HEADER_FLAG_2 0x82
+
+	if (!protocol_port_check_2(PROTO_ISO8583, conn_info))
+		return MSG_UNKNOWN;
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < 58 || infer_len < 53) {
+		return MSG_UNKNOWN;
+	}
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_ISO8583)
+			return MSG_UNKNOWN;
+	}
+
+	char buffer[8];
+	// Check for ISO8583 CUPS header patterns
+	if (buf[0] == CUPS_HEADER_SIZE && (buf[1] == CUPS_HEADER_FLAG_1 || (uint8_t)buf[1] == CUPS_HEADER_FLAG_2)) {
+            bpf_probe_read_user(buffer, 8, ptr + 41);
+	} else if (buf[4] == CUPS_HEADER_SIZE && (buf[5] == CUPS_HEADER_FLAG_1 || (uint8_t)buf[5] == CUPS_HEADER_FLAG_2)) {
+			bpf_probe_read_user(buffer, 8, ptr + 45);
+	} else {
+		return MSG_UNKNOWN;
+	}
+
+	if (buffer[0] != '0' || buffer[1] != '0' || buffer[2] != '0' || buffer[3] != '0' || buffer[4] != '0') {
+		return MSG_UNKNOWN;
+	}
+	if (buffer[7] % 2 == 1) {
+		return MSG_RESPONSE;
+	}
+	return MSG_REQUEST;
+}
+
 #define CSTR_LEN(s) (sizeof(s) / sizeof(char) - 1)
 #define CSTR_MASK(s) ((~0ull) >> (64 - CSTR_LEN(s) * 8))
 // convert const string with length <= 8 for matching
@@ -3812,6 +3853,16 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_ISO8583 && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_iso8583_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ISO8583;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_MEMCACHED && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4137,6 +4188,16 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ORACLE;
+				return inferred_message;
+			}
+			break;
+		case PROTO_ISO8583:
+			if ((inferred_message.type =
+			    infer_iso8583_message(infer_buf, count,
+						syscall_infer_addr,
+						syscall_infer_len,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_ISO8583;
 				return inferred_message;
 			}
 			break;
