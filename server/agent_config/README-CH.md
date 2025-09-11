@@ -4767,7 +4767,99 @@ inputs:
 
 **详细描述**:
 
-采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 80B 内存。
+采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 32B 内存。
+
+##### 排序长度 {#inputs.ebpf.profile.memory.sort_length}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_length`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_length: 8192
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 65536] |
+
+**详细描述**:
+
+为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+该参数是排序数组的长度。
+
+##### 排序间隔 {#inputs.ebpf.profile.memory.sort_interval}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_interval`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_interval: 1s
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1ns', '10s'] |
+
+**详细描述**:
+
+为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+该参数控制排序数组中第一个和最后一个元素之间的时间间隔的最大值。
+
+##### 队列大小 {#inputs.ebpf.profile.memory.queue_size}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.queue_size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        queue_size: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**详细描述**:
+
+内存剖析组件内部的队列大小。
 
 #### 预处理 {#inputs.ebpf.profile.preprocess}
 

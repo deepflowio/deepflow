@@ -4892,6 +4892,98 @@ inputs:
 Agent uses LRU cache to record process allocated addresses to avoid uncontrolled
 memory usage. Each record in this LRU is about 80B.
 
+##### Sort length {#inputs.ebpf.profile.memory.sort_length}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_length`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_length: 8192
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 65536] |
+
+**Description**:
+
+In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+This parameter is the length of the sorted array.
+
+##### Sort interval {#inputs.ebpf.profile.memory.sort_interval}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_interval`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_interval: 1s
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1ns', '10s'] |
+
+**Description**:
+
+In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+This parameter controls the max span of interval between the first and last item in the sorted array.
+
+##### Queue Size {#inputs.ebpf.profile.memory.queue_size}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.queue_size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        queue_size: 16384
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**Description**:
+
+Memory profiler inner queue size.
+
 #### Preprocess {#inputs.ebpf.profile.preprocess}
 
 ##### Stack Compression {#inputs.ebpf.profile.preprocess.stack_compression}
