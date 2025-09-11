@@ -161,6 +161,7 @@ const (
 	L7_PROTOCOL_MYSQL     L7Protocol = 60
 	L7_PROTOCOL_POSTGRE   L7Protocol = 61
 	L7_PROTOCOL_ORACLE    L7Protocol = 62
+	L7_PROTOCOL_ISO8583   L7Protocol = 70
 	L7_PROTOCOL_REDIS     L7Protocol = 80
 	L7_PROTOCOL_MONGODB   L7Protocol = 81
 	L7_PROTOCOL_MEMCACHED L7Protocol = 82
@@ -688,6 +689,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "Oracle"
 		}
+	case L7_PROTOCOL_ISO8583:
+		if isTLS {
+			return "ISO-8583_TLS"
+		} else {
+			return "ISO-8583"
+		}
 	case L7_PROTOCOL_REDIS:
 		if isTLS {
 			return "Redis_TLS"
@@ -780,6 +787,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):    L7_PROTOCOL_MYSQL,
 	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):  L7_PROTOCOL_POSTGRE,
 	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):   L7_PROTOCOL_ORACLE,
+	strings.ToLower(L7_PROTOCOL_ISO8583.String(false)):  L7_PROTOCOL_ISO8583,
 	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):    L7_PROTOCOL_REDIS,
 	strings.ToLower(L7_PROTOCOL_MONGODB.String(false)):  L7_PROTOCOL_MONGODB,
 	strings.ToLower(L7_PROTOCOL_KAFKA.String(false)):    L7_PROTOCOL_KAFKA,
