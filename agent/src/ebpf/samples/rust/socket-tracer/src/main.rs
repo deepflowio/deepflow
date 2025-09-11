@@ -246,6 +246,8 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
             proto_tag.push_str("TLS");
         } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
             proto_tag.push_str("ORACLE");
+        } else if sk_proto_safe(sd) == SOCK_DATA_ISO8583 {
+            proto_tag.push_str("ISO8583");
         } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
             proto_tag.push_str("OPENWIRE");
         } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
@@ -434,6 +436,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
+        enable_ebpf_protocol(SOCK_DATA_ISO8583 as c_int);
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
@@ -628,7 +631,13 @@ fn main() {
             SOCK_DATA_TLS as c_int,
             CString::new("443".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
-
+        set_protocol_ports_bitmap(
+            SOCK_DATA_ISO8583 as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
 	// dpdk enable
 	// set_dpdk_trace_enabled(true);
 	// disable_kprobe_feature();

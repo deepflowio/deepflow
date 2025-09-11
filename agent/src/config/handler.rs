@@ -50,9 +50,9 @@ use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
-        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
-        GRPC_BUFFER_SIZE_MIN,
+        HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
+        ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
+        UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -92,7 +92,7 @@ use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7Protocol;
 use public::proto::agent::{self, AgentType, PacketCaptureType};
-use public::utils::net::MacAddr;
+use public::utils::{bitmap::parse_range_list_to_bitmap, net::MacAddr};
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
@@ -514,6 +514,7 @@ pub struct FlowConfig {
     pub batched_buffer_size_limit: usize,
 
     pub oracle_parse_conf: OracleConfig,
+    pub iso8583_parse_conf: Iso8583ParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
@@ -524,6 +525,7 @@ pub struct FlowConfig {
 
 impl From<&UserConfig> for FlowConfig {
     fn from(conf: &UserConfig) -> Self {
+        const ISO8583_FIELD_MAX_COUNT: u16 = 129;
         FlowConfig {
             agent_id: conf.global.common.agent_id as u16,
             agent_type: conf.global.common.agent_type,
@@ -676,6 +678,34 @@ impl From<&UserConfig> for FlowConfig {
                 .protocol_special_config
                 .oracle
                 .clone(),
+            iso8583_parse_conf: Iso8583ParseConfig {
+                translation_enabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .iso8583
+                    .translation_enabled,
+                pan_obfuscate: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .iso8583
+                    .pan_obfuscate,
+                extract_fields: parse_range_list_to_bitmap(
+                    ISO8583_FIELD_MAX_COUNT,
+                    conf.processors
+                        .request_log
+                        .application_protocol_inference
+                        .protocol_special_config
+                        .iso8583
+                        .extract_fields
+                        .clone(),
+                    false,
+                )
+                .unwrap(),
+            },
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
                 conf.processors
                     .request_log
@@ -4956,7 +4986,7 @@ impl ConfigHandler {
                 "Update processors.request_log.application_protocol_inference.protocol_special_config from {:?} to {:?}.",
                 app.protocol_special_config, new_app.protocol_special_config
             );
-            app.protocol_special_config = new_app.protocol_special_config;
+            app.protocol_special_config = new_app.protocol_special_config.clone();
             restart_agent = !first_run;
         }
         if app.custom_protocols != new_app.custom_protocols {
