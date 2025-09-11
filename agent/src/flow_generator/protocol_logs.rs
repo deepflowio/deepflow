@@ -47,10 +47,12 @@ pub use sql::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
+        pub mod iso8583;
         pub mod tls;
 
-        pub use sql::{OracleInfo, OracleLog};
+        pub use iso8583::{Iso8583Info, Iso8583Log};
         pub use rpc::{SomeIpInfo, SomeIpLog};
+        pub use sql::{OracleInfo, OracleLog};
         pub use tls::{TlsInfo, TlsLog};
     }
 }
