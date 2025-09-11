@@ -63,7 +63,7 @@ use crate::common::l7_protocol_log::{
 use crate::common::meta_packet::{MetaPacket, SegmentFlags};
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::{FlowAclListener, FlowAclListenerId};
-use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
+use crate::config::handler::{CollectorAccess, EbpfAccess, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf;
 use crate::exception::ExceptionHandler;
@@ -509,10 +509,7 @@ impl FlowAclListener for SyncEbpfDispatcher {
 }
 
 #[derive(Default)]
-struct ConfigHandle {
-    #[cfg(feature = "extended_observability")]
-    memory_profile_settings: Option<memory_profile::MemoryContextSettings>,
-}
+struct ConfigHandle;
 
 pub struct EbpfCollector {
     thread_dispatcher: EbpfDispatcher,
@@ -649,7 +646,7 @@ impl EbpfCollector {
 
     extern "C" fn ebpf_profiler_callback(
         #[allow(unused)] ctx: *mut c_void,
-        #[allow(unused)] queue_id: c_int,
+        _queue_id: c_int,
         data: *mut ebpf::stack_profile_data,
     ) {
         #[allow(static_mut_refs)]
@@ -659,23 +656,20 @@ impl EbpfCollector {
             }
             let data = &mut *data;
 
+            let time_diff = TIME_DIFF
+                .as_ref()
+                .map(|t| t.load(Ordering::Relaxed))
+                .unwrap_or(0);
+
             #[cfg(feature = "extended_observability")]
             if data.profiler_type == ebpf::PROFILER_TYPE_MEMORY {
-                let mut ts_nanos = data.timestamp;
-                if let Some(time_diff) = TIME_DIFF.as_ref() {
-                    let diff = time_diff.load(Ordering::Relaxed);
-                    if diff > 0 {
-                        ts_nanos += diff as u64;
-                    } else {
-                        ts_nanos -= (-diff) as u64;
-                    }
-                }
                 let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
                     return;
                 };
-                m_ctx.update(data);
-                m_ctx.report(
-                    Duration::from_nanos(ts_nanos),
+                m_ctx.process(
+                    data,
+                    time_diff,
+                    POLICY_GETTER.as_ref(),
                     EBPF_PROFILE_SENDER.as_mut().unwrap(),
                 );
                 return;
@@ -683,15 +677,11 @@ impl EbpfCollector {
 
             let mut profile = metric::Profile::default();
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
-            profile.timestamp = data.timestamp;
-            if let Some(time_diff) = TIME_DIFF.as_ref() {
-                let diff = time_diff.load(Ordering::Relaxed);
-                if diff > 0 {
-                    profile.timestamp += diff as u64;
-                } else {
-                    profile.timestamp -= (-diff) as u64;
-                }
-            }
+            profile.timestamp = if time_diff > 0 {
+                data.timestamp + time_diff as u64
+            } else {
+                data.timestamp - time_diff.abs() as u64
+            };
             profile.event_type = match data.profiler_type {
                 #[cfg(feature = "extended_observability")]
                 ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
@@ -735,7 +725,7 @@ impl EbpfCollector {
     }
 
     fn ebpf_init(
-        config: &EbpfConfig,
+        config: EbpfAccess,
         sender: DebugSender<Box<MetaPacket<'static>>>,
         dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
@@ -749,7 +739,8 @@ impl EbpfCollector {
         #[allow(static_mut_refs)]
         unsafe {
             let dpdk_sender_count = dpdk_senders.len();
-            let handle = Self::ebpf_core_init(process_listener, config, stats_collector);
+            let handle = Self::ebpf_core_init(process_listener, config.clone(), stats_collector);
+            let config = config.load();
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
@@ -771,9 +762,10 @@ impl EbpfCollector {
     #[allow(unused)]
     unsafe fn ebpf_core_init(
         process_listener: &ProcessListener,
-        config: &EbpfConfig,
+        config: EbpfAccess,
         stats_collector: &stats::Collector,
     ) -> Result<ConfigHandle> {
+        let (config_access, config) = (config.clone(), config.load());
         // ebpf core modules init
         let mut handle = ConfigHandle::default();
         ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
@@ -1059,12 +1051,7 @@ impl EbpfCollector {
             let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
             #[cfg(feature = "extended_observability")]
             {
-                let mp_ctx = memory_profile::MemoryContext::new(
-                    memory.report_interval,
-                    memory.allocated_addresses_lru_len,
-                    ebpf_conf.profile.preprocess.stack_compression,
-                );
-                handle.memory_profile_settings = Some(mp_ctx.settings());
+                let mp_ctx = memory_profile::MemoryContext::new(config_access);
                 stats_collector.register_countable(
                     &stats::NoTagModule("ebpf-memory-profiler"),
                     Countable::Ref(mp_ctx.counters()),
@@ -1296,7 +1283,7 @@ impl EbpfCollector {
         );
 
         let config_handle = Self::ebpf_init(
-            &ebpf_config,
+            config.clone(),
             sender,
             dpdk_senders,
             proc_event_output,
@@ -1352,7 +1339,8 @@ impl EbpfCollector {
         self.need_reload_config.store(true, Ordering::Relaxed);
     }
 
-    pub fn on_config_change(&mut self, config: &EbpfConfig) {
+    pub fn on_config_change(&mut self, config: EbpfAccess) {
+        let (config, access) = (config.load(), config);
         unsafe {
             let ecfg = &config.ebpf.profile;
             let restart_cprofiler = ebpf::dwarf_available()
@@ -1384,7 +1372,7 @@ impl EbpfCollector {
                     ));
                 }
                 if let Ok(handle) =
-                    Self::ebpf_core_init(&self.process_listener, config, &self.stats_collector)
+                    Self::ebpf_core_init(&self.process_listener, access, &self.stats_collector)
                 {
                     self.config_handle = handle;
                 } else {
@@ -1392,11 +1380,6 @@ impl EbpfCollector {
                     self.config_handle = Default::default();
                     return;
                 }
-            }
-            #[cfg(feature = "extended_observability")]
-            if let Some(s) = self.config_handle.memory_profile_settings.as_ref() {
-                s.set_report_interval(ecfg.memory.report_interval);
-                s.set_address_lru_len(ecfg.memory.allocated_addresses_lru_len);
             }
 
             Self::ebpf_on_config_change(config.l7_log_packet_size);

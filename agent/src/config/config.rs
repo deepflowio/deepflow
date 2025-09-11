@@ -1079,6 +1079,9 @@ pub struct EbpfProfileMemory {
     #[serde(with = "humantime_serde")]
     pub report_interval: Duration,
     pub allocated_addresses_lru_len: u32,
+    pub sort_length: u32,
+    #[serde(with = "humantime_serde")]
+    pub sort_interval: Duration,
 }
 
 impl Default for EbpfProfileMemory {
@@ -1087,6 +1090,8 @@ impl Default for EbpfProfileMemory {
             disabled: true,
             report_interval: Duration::from_secs(10),
             allocated_addresses_lru_len: 131072,
+            sort_length: 1024,
+            sort_interval: Duration::from_secs(1),
         }
     }
 }

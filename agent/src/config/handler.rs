@@ -2684,8 +2684,7 @@ impl ConfigHandler {
     #[cfg(target_os = "linux")]
     fn set_ebpf(handler: &ConfigHandler, components: &mut AgentComponents) {
         if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
-            d.ebpf_collector
-                .on_config_change(&handler.candidate_config.ebpf);
+            d.ebpf_collector.on_config_change(handler.ebpf());
         }
     }
 
@@ -3249,28 +3248,12 @@ impl ConfigHandler {
 
         let memory = &mut ebpf.profile.memory;
         let new_memory = &mut new_ebpf.profile.memory;
-        if memory.disabled != new_memory.disabled {
+        if memory != new_memory {
             info!(
-                "Update inputs.ebpf.profile.memory.disabled from {:?} to {:?}.",
-                memory.disabled, new_memory.disabled
+                "Update inputs.ebpf.profile.memory from {:?} to {:?}.",
+                memory, new_memory
             );
-            memory.disabled = new_memory.disabled;
-            restart_agent = !first_run;
-        }
-        if memory.report_interval != new_memory.report_interval {
-            info!(
-                "Update inputs.ebpf.profile.memory.report_interval from {:?} to {:?}.",
-                memory.report_interval, new_memory.report_interval
-            );
-            memory.report_interval = new_memory.report_interval;
-            restart_agent = !first_run;
-        }
-        if memory.allocated_addresses_lru_len != new_memory.allocated_addresses_lru_len {
-            info!(
-                "Update inputs.ebpf.profile.memory.allocated_addresses_lru_len from {:?} to {:?}.",
-                memory.allocated_addresses_lru_len, new_memory.allocated_addresses_lru_len
-            );
-            memory.allocated_addresses_lru_len = new_memory.allocated_addresses_lru_len;
+            *memory = *new_memory;
             restart_agent = !first_run;
         }
 
