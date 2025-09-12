@@ -1,6 +1,8 @@
 # Field              , DisplayName             , Unit , Description
-log_count            , Log Count               ,      ,
+count                , Count                   ,      ,
 bytes                , Bytes                   , Byte ,
 
 duration             , Duration                , us   ,
+max_duration         , Max Duration            , us   ,
+avg_duration         , Avg Duration            , us   ,
 row                  , Row Count               ,      ,

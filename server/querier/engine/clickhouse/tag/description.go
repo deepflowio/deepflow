@@ -936,7 +936,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	}
 
 	// 查询外部字段
-	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG, "_prometheus"}, db) || (db == "flow_log" && table != "l7_flow_log") || (db == ckcommon.DB_NAME_PROFILE && table != ckcommon.TABLE_NAME_IN_PROCESS) {
+	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG, "_prometheus"}, db) || (db == ckcommon.DB_NAME_FLOW_LOG && table != ckcommon.TABLE_NAME_L7_FLOW_LOG) || (db == ckcommon.DB_NAME_PROFILE && table != ckcommon.TABLE_NAME_IN_PROCESS) || (db == ckcommon.DB_NAME_EVENT && !slices.Contains([]string{ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_FILE_EVENT}, table)) {
 		return response, nil
 	}
 	externalChClient := client.Client{

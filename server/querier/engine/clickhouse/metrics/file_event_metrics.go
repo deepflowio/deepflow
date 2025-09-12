@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-package schema
+package metrics
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
+// FILE_EVENT_METRICS_METRICS contains metrics definitions for file event aggregation
+// These metrics are loaded dynamically from db_descriptions files
+// during system initialization
+var FILE_EVENT_METRICS_METRICS = map[string]*Metrics{}
 
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.1.0.4"
-)
+// metrics to clickhouse field mapping, no need to replace
+var FILE_EVENT_METRICS_METRICS_REPLACE = map[string]*Metrics{}
+
+func GetFileEventMetricsMetrics() map[string]*Metrics {
+	return FILE_EVENT_METRICS_METRICS
+}

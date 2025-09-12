@@ -16,8 +16,6 @@
 
 package metrics
 
-import ()
-
 var RESOURCE_FILE_EVENT_METRICS = map[string]*Metrics{}
 
 var RESOURCE_FILE_EVENT_METRICS_REPLACE = map[string]*Metrics{
@@ -25,6 +23,5 @@ var RESOURCE_FILE_EVENT_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetResourceFileEventMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return RESOURCE_FILE_EVENT_METRICS
 }

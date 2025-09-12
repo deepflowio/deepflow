@@ -95,7 +95,8 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"外部指标数据",        // ext_metrics.*
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
-	"事件-IO 事件",      // event.perf_event
+	"事件-IO 事件",      // event.file_event
+	"事件-IO 事件指标",    // event.file_event_metrics
 	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
 	"应用-性能剖析指标",     // profile.in_process_metrics
