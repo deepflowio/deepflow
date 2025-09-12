@@ -113,7 +113,7 @@ impl fmt::Display for FlowMeterWithFlow {
         let peer1 = &self.flow.peers[1];
         write!(
             f,
-            "FlowMeterWithFlow: time: {:?}, flow_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
+            "FlowMeterWithFlow: time: {:?}, flow_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}",
             self.time_in_second, &self.flow_meter, &peer0.nat_real_ip, &peer1.nat_real_ip,  &peer0.nat_real_port, &peer1.nat_real_port,
         )
     }
