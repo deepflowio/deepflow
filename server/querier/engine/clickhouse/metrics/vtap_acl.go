@@ -24,6 +24,5 @@ var VTAP_ACL_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetVtapAclMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return VTAP_ACL_METRICS
 }

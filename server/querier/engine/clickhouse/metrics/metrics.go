@@ -347,6 +347,8 @@ func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 			return GetResourceFileEventMetrics()
 		case "alert_event":
 			return GetAlarmEventMetrics()
+		case ckcommon.TABLE_NAME_FILE_EVENT_METRICS:
+			return GetFileEventMetricsMetrics()
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
@@ -661,6 +663,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "alert_event":
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_FILE_EVENT_METRICS:
+			metrics = FILE_EVENT_METRICS_METRICS
+			replaceMetrics = FILE_EVENT_METRICS_METRICS_REPLACE
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {

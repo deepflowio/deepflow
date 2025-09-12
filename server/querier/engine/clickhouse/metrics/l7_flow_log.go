@@ -53,6 +53,5 @@ var L7_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetL7FlowLogMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return L7_FLOW_LOG_METRICS
 }
