@@ -18,9 +18,7 @@ package metrics
 
 var IN_PROCESS_METRICS = map[string]*Metrics{}
 
-var IN_PROCESS_METRICS_REPLACE = map[string]*Metrics{
-	"profile_value": NewReplaceMetrics("1", ""),
-}
+var IN_PROCESS_METRICS_REPLACE = map[string]*Metrics{}
 
 func GetInProcessMetrics() map[string]*Metrics {
 	return IN_PROCESS_METRICS

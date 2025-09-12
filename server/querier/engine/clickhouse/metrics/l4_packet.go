@@ -21,6 +21,5 @@ var L4_PACKET_METRICS = map[string]*Metrics{}
 var L4_PACKET_METRICS_REPLACE = map[string]*Metrics{}
 
 func GetL4PacketMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return L4_PACKET_METRICS
 }
