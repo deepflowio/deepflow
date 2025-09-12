@@ -54,6 +54,5 @@ var VTAP_FLOW_EDGE_PORT_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetVtapFlowEdgePortMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return VTAP_FLOW_EDGE_PORT_METRICS
 }

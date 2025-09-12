@@ -21,6 +21,5 @@ var L7_PACKET_METRICS = map[string]*Metrics{}
 var L7_PACKET_METRICS_REPLACE = map[string]*Metrics{}
 
 func GetL7PacketMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return L7_PACKET_METRICS
 }

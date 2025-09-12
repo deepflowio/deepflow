@@ -16,10 +16,14 @@
 
 package metrics
 
-var L4_PACKET_METRICS = map[string]*Metrics{}
+// FILE_EVENT_METRICS_METRICS contains metrics definitions for file event aggregation
+// These metrics are loaded dynamically from db_descriptions files
+// during system initialization
+var FILE_EVENT_METRICS_METRICS = map[string]*Metrics{}
 
-var L4_PACKET_METRICS_REPLACE = map[string]*Metrics{}
+// metrics to clickhouse field mapping, no need to replace
+var FILE_EVENT_METRICS_METRICS_REPLACE = map[string]*Metrics{}
 
-func GetL4PacketMetrics() map[string]*Metrics {
-	return L4_PACKET_METRICS
+func GetFileEventMetricsMetrics() map[string]*Metrics {
+	return FILE_EVENT_METRICS_METRICS
 }
