@@ -752,7 +752,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	var pV4cidrs, pV6cidrs []string
 	var pV4cidr, pV6cidr, pV4SLcuuid, pV6SLcuuid string
 	if len(podV4Cidrs) != 0 {
-		pV4cidrs = cloudcommon.AggregateCIDR(podV4Cidrs, 0)
+		pV4cidrs = cloudcommon.AggregateCIDR(podV4Cidrs, k.PodNetIPv4CIDRMaxMask)
 		if len(pV4cidrs) == 1 {
 			pV4cidr = pV4cidrs[0]
 			pV4SLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+pV4cidr)
@@ -766,7 +766,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		}
 	}
 	if len(podV6Cidrs) != 0 {
-		pV6cidrs = cloudcommon.AggregateCIDR(podV6Cidrs, 0)
+		pV6cidrs = cloudcommon.AggregateCIDR(podV6Cidrs, k.PodNetIPv6CIDRMaxMask)
 		if len(pV6cidrs) == 1 {
 			pV6cidr = pV6cidrs[0]
 			pV6SLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+pV6cidr)
