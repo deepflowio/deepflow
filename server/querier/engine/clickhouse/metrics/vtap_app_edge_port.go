@@ -28,6 +28,5 @@ var VTAP_APP_EDGE_PORT_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetVtapAppEdgePortMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return VTAP_APP_EDGE_PORT_METRICS
 }

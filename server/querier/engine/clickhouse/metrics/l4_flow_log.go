@@ -140,6 +140,5 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 }
 
 func GetL4FlowLogMetrics() map[string]*Metrics {
-	// TODO: 特殊指标量修改
 	return L4_FLOW_LOG_METRICS
 }
