@@ -441,6 +441,16 @@ static __inline enum message_type parse_http2_headers_frame(const char
 #define HTTPV2_FRAME_READ_SZ            21
 #define HTTPV2_STATIC_TABLE_IDX_MAX     61
 
+	/*
+	 * If the server reads data in multiple passes, and the previous pass
+	 * has already read the first 9 bytes of the protocol header, and it
+	 * has been determined as HEADER, then the current data is directly
+	 * PUSHed to the upper layer.
+	 */
+	if (conn_info->prev_count == HTTPV2_FRAME_PROTO_SZ) {
+		return MSG_REQUEST;
+	}
+
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
 		return MSG_UNKNOWN;
@@ -588,7 +598,6 @@ static __inline enum message_type parse_http2_headers_frame(const char
 
 static __inline enum message_type infer_http2_message(const char *buf_kern,
 						      size_t syscall_len,
-						      bool is_http2_header_sz,
 						      const char *buf_src,
 						      size_t count,
 						      struct conn_info_s
@@ -620,16 +629,6 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 		is_first = false;
-	}
-
-	/*
-	 * If the server reads data in multiple passes, and the previous pass
-	 * has already read the first 9 bytes of the protocol header, and it
-	 * has been determined as HEADER, then the current data is directly
-	 * PUSHed to the upper layer.
-	 */
-	if (is_http2_header_sz) {
-		return MSG_REQUEST;
 	}
 
 	enum message_type ret =
@@ -3910,10 +3909,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	conn_info->syscall_infer_addr = syscall_infer_addr;
 	conn_info->syscall_infer_len = syscall_infer_len;
 
-	bool is_http2_header_sz = false;
-	if (check_and_fetch_prev_data(conn_info) == HTTPV2_FRAME_PROTO_SZ) {
-		is_http2_header_sz = true;
-	}
+	check_and_fetch_prev_data(conn_info);
 
 	// In the initial stage of data protocol inference, reassembly check.
 	check_and_set_data_reassembly(conn_info);
@@ -4119,7 +4115,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
 			     infer_http2_message(infer_buf, count,
-						 is_http2_header_sz,
 						 syscall_infer_addr,
 						 syscall_infer_len,
 						 conn_info)) != MSG_UNKNOWN) {
@@ -4285,7 +4280,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_http2_message(infer_buf, count,
-					is_http2_header_sz,
 					syscall_infer_addr,
 					syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN) {
