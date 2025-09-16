@@ -46,6 +46,7 @@ const (
 
 var pagesIntControl = map[string]int{
 	"DescribeInstances":                                      0,
+	"DescribeDBInstances":                                    0,
 	"DescribeNatGateways":                                    0,
 	"DescribeLoadBalancers":                                  0,
 	"DescribeNetworkInterfaces":                              0,
@@ -65,6 +66,8 @@ type Tencent struct {
 	credential           *tcommon.Credential
 	natIDs               []string
 	azLcuuidMap          map[string]int
+	azIDToLcuuid         map[int]string
+	zoneToLcuuid         map[string]string
 	publicIPToVinterface map[string]model.VInterface
 	cloudStatsd          statsd.CloudStatsd
 
@@ -131,6 +134,8 @@ func NewTencent(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig
 		// 以下属性为获取资源所用的关联关系
 		natIDs:               []string{},
 		azLcuuidMap:          map[string]int{},
+		azIDToLcuuid:         map[int]string{},
+		zoneToLcuuid:         map[string]string{},
 		publicIPToVinterface: map[string]model.VInterface{},
 		cloudStatsd:          statsd.NewCloudStatsd(),
 		debugger:             cloudcommon.NewDebugger(domain.Name),
@@ -298,6 +303,12 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 		log.Infof("region (%s) collect starting", region, logger.NewORGPrefix(t.orgID))
 
 		t.azLcuuidMap = map[string]int{}
+		t.azIDToLcuuid = map[int]string{}
+		t.zoneToLcuuid = map[string]string{}
+		azs, err := t.getAZs(region)
+		if err != nil {
+			return model.Resource{}, err
+		}
 
 		vpcs, err := t.getVPCs(region)
 		if err != nil {
@@ -340,6 +351,22 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 		}
 		resource.VMs = append(resource.VMs, vms...)
 
+		rdsInstances, rdsVInterfaces, rdsIPs, err := t.getRDSInstances(region)
+		if err != nil {
+			return model.Resource{}, err
+		}
+		resource.RDSInstances = append(resource.RDSInstances, rdsInstances...)
+		resource.VInterfaces = append(resource.VInterfaces, rdsVInterfaces...)
+		resource.IPs = append(resource.IPs, rdsIPs...)
+
+		redisInstances, redisVInterfaces, redisIPs, err := t.getRedisInstances(region)
+		if err != nil {
+			return model.Resource{}, err
+		}
+		resource.RedisInstances = append(resource.RedisInstances, redisInstances...)
+		resource.VInterfaces = append(resource.VInterfaces, redisVInterfaces...)
+		resource.IPs = append(resource.IPs, redisIPs...)
+
 		vinterfaces, ips, vNatRules, err := t.getVInterfacesAndIPs(region)
 		if err != nil {
 			return model.Resource{}, err
@@ -370,12 +397,12 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 		}
 		resource.PeerConnections = append(resource.PeerConnections, peerConnections...)
 
-		azs, err := t.getAZs(region)
-		if err != nil {
-			return model.Resource{}, err
-		}
-		if len(azs) > 0 {
-			resource.AZs = append(resource.AZs, azs...)
+		for _, az := range azs {
+			if _, ok := t.azLcuuidMap[az.Lcuuid]; !ok {
+				log.Infof("az (%s) has no resource", az.Name, logger.NewORGPrefix(t.orgID))
+				continue
+			}
+			resource.AZs = append(resource.AZs, az)
 		}
 
 		log.Infof("region (%s) collect complete", region, logger.NewORGPrefix(t.orgID))
