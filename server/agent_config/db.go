@@ -31,6 +31,21 @@ func (MySQLAgentGroupConfiguration) TableName() string {
 	return "agent_group_configuration"
 }
 
+type MetadbAgentGroupConfigurationChangelog struct {
+	ID                 int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);default:not null" json:"LCUUID"`
+	AgentGroupConfigID int       `gorm:"column:agent_group_configuration_id;type:int;default:not null" json:"AGENT_GROUP_CONFIGURATION_ID"`
+	YamlDiff           string    `gorm:"column:yaml_diff;type:mediumtext;default:not null" json:"YAML_DIFF"`
+	Operator           string    `gorm:"column:operator;type:char(64);default:not null" json:"OPERATOR"`
+	Description        string    `gorm:"column:description;type:text;default:not null" json:"DESCRIPTION"`
+	CreatedAt          time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt          time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+func (MetadbAgentGroupConfigurationLog) TableName() string {
+	return "agent_group_configuration_changelog"
+}
+
 type AgentGroupConfigModel struct {
 	ID                                int      `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	MaxCollectPps                     *int     `gorm:"column:max_collect_pps;type:int;default:null" json:"MAX_COLLECT_PPS"`
