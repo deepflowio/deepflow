@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,21 @@
  * limitations under the License.
  */
 
-package schema
+package model
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
+// 各资源可支持的 query 字段定义
+type QueryConstraint interface {
+	AgentGroupConfigChangelogQuery
 
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.1.0.15"
-)
+	// GetFormat() string
+	// GetIncludedFieldsCondition() IncludedFieldsInfo
+	// GetPageCondition() PageInfo
+	// GetSortCondition() SortInfo
+	// GetDBFilterConditions() map[string]interface{}
+	// GetMemoryFilterConditions() map[string]interface{}
+	// GetFuzzyFilterConditions() map[string]interface{}
+}
+
+type PayloadConstraint interface {
+	AgentGroupConfigChangelogCreate | AgentGroupConfigChangelogUpdate
+}

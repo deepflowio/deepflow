@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package service
+package agent
 
 import (
 	"bytes"
@@ -34,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	querierConfig "github.com/deepflowio/deepflow/server/querier/config"
 )
@@ -46,7 +47,7 @@ var (
 type AgentGroupConfig struct {
 	cfg *config.ControllerConfig
 
-	resourceAccess *ResourceAccess // FIXME 实际没有使用此数据做权限控制，重构 UserInfo 传递方式
+	resourceAccess *service.ResourceAccess // FIXME 实际没有使用此数据做权限控制，重构 UserInfo 传递方式
 
 	dataType int
 }
@@ -54,7 +55,7 @@ type AgentGroupConfig struct {
 func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
 	return &AgentGroupConfig{
 		cfg:            cfg,
-		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
+		resourceAccess: &service.ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
 }
 

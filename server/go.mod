@@ -57,9 +57,9 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240924113131-ec9660ac2e46
+	github.com/deepflowio/deepflow/message v0.0.0-20251106062554-cd61c2b9c965
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-20220727111425-3ab2abb8d80b
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
@@ -83,7 +83,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -92,6 +92,7 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/schema v1.4.1
 	github.com/grafana/pyroscope-go v1.2.0
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jarcoal/httpmock v1.3.1
@@ -124,7 +125,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.11.0
 	github.com/swaggo/files v1.0.1
-	github.com/swaggo/gin-swagger v1.6.0
+	github.com/swaggo/gin-swagger v1.6.1
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.726
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
@@ -139,6 +140,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0
 	go.opentelemetry.io/otel/trace v1.34.0
 	go.opentelemetry.io/proto/otlp v1.1.0
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
@@ -150,7 +152,7 @@ require (
 	gorm.io/driver/mysql v1.3.4
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.30.1
+	gorm.io/gorm v1.31.0
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
@@ -167,6 +169,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/DataDog/zstd v1.4.1 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
@@ -282,7 +285,7 @@ require (
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/swaggo/swag v1.8.12 // indirect
+	github.com/swaggo/swag v1.16.4 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -304,7 +307,6 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/arch v0.20.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
