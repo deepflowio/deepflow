@@ -51,9 +51,9 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240924113131-ec9660ac2e46
+	github.com/deepflowio/deepflow/message v0.0.0-20251106062554-cd61c2b9c965
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-20220727111425-3ab2abb8d80b
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
@@ -127,6 +127,7 @@ require (
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/golang/mock v1.6.0
+	github.com/gorilla/schema v1.4.1
 	github.com/grafana/pyroscope-go v1.2.0
 	github.com/json-iterator/go v1.1.12
 	github.com/klauspost/compress v1.18.0
