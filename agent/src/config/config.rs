@@ -2159,7 +2159,7 @@ pub struct CircuitBreakers {
 #[serde(default)]
 pub struct Tunning {
     pub cpu_affinity: Vec<usize>,
-    pub process_scheduling_priority: usize,
+    pub process_scheduling_priority: isize,
     pub idle_memory_trimming: bool,
     pub swap_disabled: bool,
     pub page_cache_reclaim_percentage: u8,
@@ -2294,14 +2294,12 @@ pub struct Profile {
 pub struct Debug {
     pub enabled: bool,
     pub local_udp_port: u16,
-    pub debug_metrics_enabled: bool,
 }
 
 impl Default for Debug {
     fn default() -> Self {
         Self {
             local_udp_port: 0,
-            debug_metrics_enabled: false,
             enabled: true,
         }
     }

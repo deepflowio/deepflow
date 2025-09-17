@@ -707,7 +707,7 @@ global:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -736,7 +736,7 @@ global:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -828,7 +828,7 @@ cgroup 因为内存不足杀死 agent 进程。为了避免这种情况，agent 
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1319,7 +1319,7 @@ log_level: info,deepflow_agent::rpc::session=debug
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1639,7 +1639,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1667,7 +1667,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1733,7 +1733,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1780,7 +1780,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1809,7 +1809,7 @@ deepflow-agent 执行 `script_command` 脚本命令的用户名。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2187,7 +2187,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8581,7 +8581,7 @@ QuadrupleGenerator、Collector 等。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8614,7 +8614,7 @@ FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存�
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8644,7 +8644,7 @@ FlowMap 内存池的大小。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8678,7 +8678,7 @@ mmap 调用和页错误增加，反而降低性能，所以不推荐将该配置
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
