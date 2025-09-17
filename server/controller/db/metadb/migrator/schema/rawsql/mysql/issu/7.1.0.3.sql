@@ -6,13 +6,13 @@ BEGIN
 
     SELECT COUNT(*) INTO existing_display_name
     FROM data_source
-    WHERE  id = 25;
+    WHERE  display_name = '应用-性能剖析指标';
 
     IF existing_display_name = 0 THEN
         START TRANSACTION;
         set @lcuuid = (select uuid());
-        INSERT INTO data_source (id, display_name, data_table_collection, `interval_time`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-        VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3*24, 'Sum', 'Avg', @lcuuid);
+        INSERT INTO data_source (display_name, data_table_collection, `interval_time`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+        VALUES ('应用-性能剖析指标', 'profile.in_process_metrics', 1, 3*24, 'Sum', 'Avg', @lcuuid);
         COMMIT; 
     END IF;
 

@@ -86,19 +86,6 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *metadbmodel.Net
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChNetwork) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNetwork) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedNetworkFields)
-	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Network)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	if fieldsUpdate.VPCID.IsDifferent() {
-		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
