@@ -84,30 +84,6 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	if fieldsUpdate.VPCID.IsDifferent() {
-		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
-	}
-	if fieldsUpdate.HostID.IsDifferent() {
-		updateInfo["host_id"] = fieldsUpdate.HostID.GetNew()
-	}
-	if fieldsUpdate.Hostname.IsDifferent() {
-		updateInfo["hostname"] = fieldsUpdate.Hostname.GetNew()
-	}
-	if fieldsUpdate.IP.IsDifferent() {
-		updateInfo["ip"] = fieldsUpdate.IP.GetNew()
-	}
-	if fieldsUpdate.NetworkID.IsDifferent() {
-		updateInfo["subnet_id"] = fieldsUpdate.NetworkID.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

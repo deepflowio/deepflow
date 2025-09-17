@@ -66,15 +66,6 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedAZ) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedAZFields)
-	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.AZ)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	a.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
