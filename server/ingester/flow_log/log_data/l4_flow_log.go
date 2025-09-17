@@ -862,7 +862,7 @@ func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageSta
 		return datatype.STATUS_OK
 	} else if t.IsClientError() {
 		return datatype.STATUS_CLIENT_ERROR
-	} else if p == layers.IPProtocolTCP && t.IsServerError() {
+	} else if (p == layers.IPProtocolTCP || p == layers.IPProtocolICMPv4 || p == layers.IPProtocolICMPv6) && t.IsServerError() {
 		return datatype.STATUS_SERVER_ERROR
 	} else {
 		return datatype.STATUS_NOT_EXIST
