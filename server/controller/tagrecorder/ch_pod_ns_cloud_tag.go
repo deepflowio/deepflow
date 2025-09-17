@@ -65,9 +65,6 @@ func (c *ChPodNSCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 	sourceID := newSource.ID
 	new := map[string]string{}
 	old := map[string]string{}
-	updateInfo := make(map[string]interface{})
-	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChPodNSCloudTag, 0)
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChPodNSCloudTag, 0)
 
@@ -103,41 +100,6 @@ func (c *ChPodNSCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 		}
 	}
 
-	for k, v := range new {
-		targetKey := NewIDKeyKey(sourceID, k)
-		oldV, ok := old[k]
-		if !ok {
-			keysToAdd = append(keysToAdd, targetKey)
-			targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
-				ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-				Key:         k,
-				Value:       v,
-				TeamID:      md.GetTeamID(),
-				DomainID:    md.GetDomainID(),
-				SubDomainID: md.GetSubDomainID(),
-			})
-			continue
-		}
-
-		if oldV != v {
-			var chItem mysqlmodel.ChPodNSCloudTag
-			db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-			if chItem.ID == 0 {
-				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodNSCloudTag{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-					Key:         k,
-					Value:       v,
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				})
-				continue
-			}
-			updateInfo["value"] = v
-		}
-		c.updateOrSync(db, targetKey, updateInfo)
-	}
 	for k := range old {
 		if _, ok := new[k]; !ok {
 			keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
@@ -148,9 +110,6 @@ func (c *ChPodNSCloudTag) onResourceUpdated(md *message.Metadata, updateMessage 
 		}
 	}
 
-	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
-	}
 	if len(keysToDelete) > 0 {
 		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}

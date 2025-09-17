@@ -91,20 +91,6 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedProcess) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedProcessFields)
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	if fieldsUpdate.VMID.IsDifferent() {
-		updateInfo["chost_id"] = fieldsUpdate.VMID.GetNew()
-	}
-	if fieldsUpdate.VPCID.IsDifferent() {
-		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: int(fieldsUpdate.GID.GetNew())}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

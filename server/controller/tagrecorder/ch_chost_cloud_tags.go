@@ -62,40 +62,6 @@ func NewChChostCloudTags() *ChChostCloudTags {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.VM)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if !fieldsUpdate.LearnedCloudTags.IsDifferent() && !fieldsUpdate.CustomCloudTags.IsDifferent() {
-		return
-	}
-
-	cloudTagMap := MergeCloudTags(newSource.LearnedCloudTags, newSource.CustomCloudTags)
-	bytes, err := json.Marshal(cloudTagMap)
-	if err != nil {
-		log.Error(err, db.LogPrefixORGID)
-		return
-	}
-	updateInfo["cloud_tags"] = string(bytes)
-	targetKey := IDKey{ID: sourceID}
-	var chItem mysqlmodel.ChChostCloudTags
-	db.Where("id = ?", sourceID).Find(&chItem)
-	if chItem.ID == 0 {
-		c.SubscriberComponent.dbOperator.add(
-			[]IDKey{targetKey},
-			[]mysqlmodel.ChChostCloudTags{{
-				ChIDBase:  mysqlmodel.ChIDBase{ID: sourceID},
-				CloudTags: updateInfo["cloud_tags"].(string),
-				TeamID:    md.GetTeamID(),
-				DomainID:  md.GetDomainID(),
-			}},
-			db,
-		)
-		return
-	}
-	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
