@@ -840,12 +840,6 @@ impl Trident {
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
-            config_handler
-                .candidate_config
-                .user_config
-                .global
-                .tunning
-                .idle_memory_trimming,
             cgroups_disabled,
         ) {
             Ok(g) => g,

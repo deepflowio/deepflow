@@ -707,7 +707,7 @@ global:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -736,7 +736,7 @@ global:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -828,7 +828,7 @@ cgroup 因为内存不足杀死 agent 进程。为了避免这种情况，agent 
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1319,7 +1319,7 @@ log_level: info,deepflow_agent::rpc::session=debug
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1639,7 +1639,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1667,7 +1667,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1733,7 +1733,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1780,7 +1780,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1809,7 +1809,7 @@ deepflow-agent 执行 `script_command` 脚本命令的用户名。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2187,7 +2187,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8589,7 +8589,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8620,7 +8620,7 @@ TCP 状态机的建连状态超时时长。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8651,7 +8651,7 @@ Closing Reset 类型的 TCP 状态机超时。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8682,7 +8682,7 @@ Opening Reset 类型的 TCP 状态机超时。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 

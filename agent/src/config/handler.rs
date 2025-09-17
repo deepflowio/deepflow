@@ -234,6 +234,7 @@ pub struct EnvironmentConfig {
     pub free_disk_circuit_breaker_percentage_threshold: u8,
     pub free_disk_circuit_breaker_absolute_threshold: u64,
     pub free_disk_circuit_breaker_directories: Vec<String>,
+    pub idle_memory_trimming: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -302,8 +303,6 @@ pub struct OsProcScanConfig {
     // whether to sync os socket and proc info
     // only make sense when process_info_enabled() == true
     pub os_proc_sync_enabled: bool,
-    // sync os socket and proc info only when the process has been tagged.
-    pub os_proc_sync_tagged_only: bool,
 }
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1761,6 +1760,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     v.dedup();
                     v
                 },
+                idle_memory_trimming: conf.global.tunning.idle_memory_trimming,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: conf.global.communication.proactive_request_interval,
@@ -1986,19 +1986,6 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     os_app_tag_exec_user: conf.inputs.proc.tag_extraction.exec_username.clone(),
                     os_app_tag_exec: conf.inputs.proc.tag_extraction.script_command.clone(),
                     os_proc_sync_enabled: conf.inputs.proc.enabled,
-                    os_proc_sync_tagged_only: conf
-                        .inputs
-                        .proc
-                        .process_matcher
-                        .iter()
-                        .find(|m| {
-                            m.enabled_features
-                                .iter()
-                                .find(|s| s.as_str() == "proc.gprocess_info")
-                                .is_some()
-                                && m.only_with_tag
-                        })
-                        .is_some(),
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
@@ -2418,7 +2405,7 @@ impl ConfigHandler {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn set_process_scheduling_priority(process_scheduling_priority: usize) {
+    fn set_process_scheduling_priority(process_scheduling_priority: isize) {
         let pid = std::process::id();
         unsafe {
             if libc::setpriority(
@@ -2613,7 +2600,7 @@ impl ConfigHandler {
         }
     }
 
-    fn set_log_retention(
+    fn set_log_retention_and_path(
         logger_handle: &mut Option<LoggerHandle>,
         log_retention: &Duration,
         log_file: &String,
@@ -2789,13 +2776,6 @@ impl ConfigHandler {
         let mut restart_agent = false;
         #[cfg(target_os = "windows")]
         let capture_mode = new_config.user_config.inputs.cbpf.common.capture_mode;
-        let log_file = new_config
-            .user_config
-            .global
-            .self_monitoring
-            .log
-            .log_file
-            .clone();
         let logger_handle = &mut self.logger_handle;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut cpu_set = CpuSet::new();
@@ -3729,7 +3709,6 @@ impl ConfigHandler {
                 proc.min_lifetime, new_proc.min_lifetime
             );
             proc.min_lifetime = new_proc.min_lifetime;
-            restart_agent = !first_run;
         }
         let mut process_matcher_update = false;
         if proc.proc_dir_path != new_proc.proc_dir_path {
@@ -3739,7 +3718,6 @@ impl ConfigHandler {
             );
             proc.proc_dir_path = new_proc.proc_dir_path.clone();
             process_matcher_update = true;
-            restart_agent = !first_run;
         }
         if proc.process_blacklist != new_proc.process_blacklist {
             info!(
@@ -3748,7 +3726,6 @@ impl ConfigHandler {
             );
             proc.process_blacklist = new_proc.process_blacklist.clone();
             process_matcher_update = true;
-            restart_agent = !first_run;
         }
         if proc.process_matcher != new_proc.process_matcher {
             info!(
@@ -3757,7 +3734,6 @@ impl ConfigHandler {
             );
             proc.process_matcher = new_proc.process_matcher.clone();
             process_matcher_update = true;
-            restart_agent = !first_run;
         }
         if proc.symbol_table != new_proc.symbol_table {
             info!(
@@ -3773,7 +3749,6 @@ impl ConfigHandler {
                 proc.socket_info_sync_interval, new_proc.socket_info_sync_interval
             );
             proc.socket_info_sync_interval = new_proc.socket_info_sync_interval;
-            restart_agent = !first_run;
         }
 
         let tag = &mut proc.tag_extraction;
@@ -3785,7 +3760,6 @@ impl ConfigHandler {
             );
             tag.exec_username = new_tag.exec_username.clone();
             process_matcher_update = true;
-            restart_agent = !first_run;
         }
         if tag.script_command != new_tag.script_command {
             info!(
@@ -3794,7 +3768,6 @@ impl ConfigHandler {
             );
             tag.script_command = new_tag.script_command.clone();
             process_matcher_update = true;
-            restart_agent = !first_run;
         }
 
         if process_matcher_update {
@@ -4103,16 +4076,13 @@ impl ConfigHandler {
 
         let limits = &mut config.global.limits;
         let new_limits = &mut new_config.user_config.global.limits;
+        let mut update_log_retention_and_path = false;
         if limits.local_log_retention != new_limits.local_log_retention {
             info!(
                 "Update global.limits.local_log_retention from {:?} to {:?}.",
                 limits.local_log_retention, new_limits.local_log_retention
             );
-            if Self::set_log_retention(logger_handle, &new_limits.local_log_retention, &log_file) {
-                limits.local_log_retention = new_limits.local_log_retention;
-            } else {
-                new_limits.local_log_retention = limits.local_log_retention;
-            }
+            update_log_retention_and_path = true;
         }
         if limits.max_local_log_file_size != new_limits.max_local_log_file_size {
             info!(
@@ -4222,14 +4192,6 @@ impl ConfigHandler {
             );
             debug.enabled = debug.enabled;
         }
-        if debug.debug_metrics_enabled != new_debug.debug_metrics_enabled {
-            info!(
-                "Update global.self_monitoring.debug.debug_metrics_enabled from {:?} to {:?}.",
-                debug.debug_metrics_enabled, new_debug.debug_metrics_enabled
-            );
-            debug.debug_metrics_enabled = debug.debug_metrics_enabled;
-            restart_agent = !first_run;
-        }
         if debug.local_udp_port != new_debug.local_udp_port {
             info!(
                 "Update global.self_monitoring.debug.local_udp_port from {:?} to {:?}.",
@@ -4276,8 +4238,7 @@ impl ConfigHandler {
                 "Update global.self_monitoring.log.log_file from {:?} to {:?}.",
                 log.log_file, new_log.log_file
             );
-            log.log_file = new_log.log_file.clone();
-            restart_agent = !first_run;
+            update_log_retention_and_path = true;
         }
         if log.log_level != new_log.log_level {
             info!(
@@ -4326,7 +4287,6 @@ impl ConfigHandler {
                 tunning.idle_memory_trimming, new_tunning.idle_memory_trimming
             );
             tunning.idle_memory_trimming = new_tunning.idle_memory_trimming;
-            restart_agent = !first_run;
         }
         if tunning.swap_disabled != new_tunning.swap_disabled {
             info!(
@@ -4362,7 +4322,6 @@ impl ConfigHandler {
             tunning.process_scheduling_priority = new_tunning.process_scheduling_priority;
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::set_process_scheduling_priority(tunning.process_scheduling_priority);
-            restart_agent = !first_run;
         }
         if tunning.resource_monitoring_interval != new_tunning.resource_monitoring_interval {
             info!(
@@ -4370,7 +4329,6 @@ impl ConfigHandler {
                 tunning.resource_monitoring_interval, new_tunning.resource_monitoring_interval
             );
             tunning.resource_monitoring_interval = new_tunning.resource_monitoring_interval;
-            restart_agent = !first_run;
         }
         if tunning.page_cache_reclaim_percentage != new_tunning.page_cache_reclaim_percentage {
             info!(
@@ -4380,6 +4338,19 @@ impl ConfigHandler {
             tunning.page_cache_reclaim_percentage = new_tunning.page_cache_reclaim_percentage;
         }
 
+        if update_log_retention_and_path {
+            let new_retention = &new_config.user_config.global.limits.local_log_retention;
+            let new_log_file = &new_config.user_config.global.self_monitoring.log.log_file;
+            if Self::set_log_retention_and_path(logger_handle, new_retention, new_log_file) {
+                config.global.limits.local_log_retention = *new_retention;
+                config.global.self_monitoring.log.log_file = new_log_file.clone();
+            } else {
+                new_config.user_config.global.limits.local_log_retention =
+                    config.global.limits.local_log_retention;
+                new_config.user_config.global.self_monitoring.log.log_file =
+                    config.global.self_monitoring.log.log_file.clone();
+            }
+        }
         // dev
         let dev = &mut config.dev;
         let new_dev = &mut new_config.user_config.dev;
@@ -4850,7 +4821,6 @@ impl ConfigHandler {
                 timeouts.closing_rst, new_timeouts.closing_rst
             );
             timeouts.closing_rst = new_timeouts.closing_rst;
-            restart_agent = !first_run;
         }
         if timeouts.established != new_timeouts.established {
             info!(
@@ -4858,7 +4828,6 @@ impl ConfigHandler {
                 timeouts.established, new_timeouts.established
             );
             timeouts.established = new_timeouts.established;
-            restart_agent = !first_run;
         }
         if timeouts.opening_rst != new_timeouts.opening_rst {
             info!(
@@ -4866,7 +4835,6 @@ impl ConfigHandler {
                 timeouts.opening_rst, new_timeouts.opening_rst
             );
             timeouts.opening_rst = new_timeouts.opening_rst;
-            restart_agent = !first_run;
         }
         if timeouts.others != new_timeouts.others {
             info!(
@@ -4874,7 +4842,6 @@ impl ConfigHandler {
                 timeouts.others, new_timeouts.others
             );
             timeouts.others = new_timeouts.others;
-            restart_agent = !first_run;
         }
 
         let time_window = &mut flow_log.time_window;
