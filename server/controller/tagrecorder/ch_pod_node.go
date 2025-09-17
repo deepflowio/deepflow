@@ -87,16 +87,6 @@ func (c *ChPodNode) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodNode) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodNode) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodNodeFields)
-	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodNode)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
