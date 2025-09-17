@@ -1618,6 +1618,9 @@ VALUES (23, '应用-指标（小时级）', 'flow_metrics.application*', 8, 3600
 INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
 VALUES (24, '应用-指标（天级）', 'flow_metrics.application*', 23, 86400, 30 * 24, 'Sum', 'Avg', gen_random_uuid());
 
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3 * 24, 'Sum', 'Avg', gen_random_uuid());
+
 CREATE TABLE IF NOT EXISTS report (
     id                      SERIAL PRIMARY KEY,
     title                   VARCHAR(200) NOT NULL DEFAULT '',
@@ -1645,6 +1648,7 @@ CREATE TABLE IF NOT EXISTS acl (
     type                   INTEGER DEFAULT 2,
     tap_type               INTEGER DEFAULT 3,
     state                  INTEGER DEFAULT 1,
+    valid                  INTEGER DEFAULT 1,
     applications           VARCHAR(64) NOT NULL,
     epc_id                 INTEGER,
     src_group_ids          TEXT,
@@ -1666,6 +1670,7 @@ COMMENT ON COLUMN acl.src_group_ids IS 'separated by ,';
 COMMENT ON COLUMN acl.dst_group_ids IS 'separated by ,';
 COMMENT ON COLUMN acl.src_ports IS 'separated by ,';
 COMMENT ON COLUMN acl.dst_ports IS 'separated by ,';
+COMMENT ON COLUMN acl.valid IS '0-invalid; 1-valid';
 
 CREATE TABLE IF NOT EXISTS resource_group (
     id                      SERIAL PRIMARY KEY,

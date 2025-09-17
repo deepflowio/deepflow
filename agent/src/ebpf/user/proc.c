@@ -158,13 +158,6 @@ static bool inline enable_proc_info_cache(void)
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
 	int pid = (int)p->pid;
-	if (p->is_java) {
-		/* Delete target ns Java files */
-		if (pid > 0) {
-			clean_local_java_symbols_files(pid);
-		}
-	}
-
 	if (p->syms_cache) {
 		bcc_free_symcache((void *)p->syms_cache, p->pid);
 		free_symcache_count++;
@@ -348,8 +341,8 @@ static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
 				       NULL);
 	if (nr < 1) {
 		clib_mem_free(ev_info);
-		ebpf_info("Failed to add process %d to the queue, so it "
-			  "was added to the vector instead.\n", kv->k.pid);
+		ebpf_info("Could not add process %d to proc_event_ring\n",
+			  kv->k.pid);
 		return -1;
 	}
 

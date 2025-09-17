@@ -1,0 +1,3 @@
+# Field                     , DBField              , Type       , Category       , Permission
+profile_value               , profile_value        , counter    , APP Profile    , 111
+row                         ,                      , other      , Other          , 111 
