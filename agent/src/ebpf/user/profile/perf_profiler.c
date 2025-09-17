@@ -759,6 +759,14 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      cb_ctx[PROFILER_CTX_ONCPU_IDX]);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
+	/* Initialize off-CPU profiler integration */
+	extern int off_cpu_profiler_integration_init(void);
+	if (off_cpu_profiler_integration_init() == 0) {
+		ebpf_info("Off-CPU profiler integration initialized\n");
+	} else {
+		ebpf_warning("Failed to initialize off-CPU profiler integration\n");
+	}
+
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN)
 	    || (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
 		java_syms_update_delay = JAVA_SYMS_UPDATE_DELAY_DEF;
@@ -828,6 +836,14 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 		return (-1);
 
 	tracer->state = TRACER_RUNNING;
+
+	/* Start off-CPU profiler integration */
+	extern int off_cpu_profiler_integration_start(struct bpf_tracer *tracer);
+	if (off_cpu_profiler_integration_start(tracer) == 0) {
+		ebpf_info("Off-CPU profiler integration started\n");
+	} else {
+		ebpf_warning("Failed to start off-CPU profiler integration\n");
+	}
 
 	if (write_profiler_running_pid() != ETR_OK)
 		return (-1);
@@ -984,8 +1000,24 @@ void profiler_match_pid_handle(int feat, int pid, enum match_pids_act act)
 	    || feat == FEATURE_PROFILE_MEMORY) {
 		if (act == MATCH_PID_ADD) {
 			unwind_process_exec(pid);
+			
+			/* Initialize off-CPU profiler for this PID if needed */
+			if (feat == FEATURE_PROFILE_OFFCPU) {
+				extern int off_cpu_profiler_add_process(uint32_t pid);
+				if (off_cpu_profiler_add_process(pid) == 0) {
+					ebpf_info("Added PID %d to off-CPU profiling\n", pid);
+				}
+			}
 		} else if (act == MATCH_PID_DEL) {
 			unwind_process_exit(pid);
+			
+			/* Remove from off-CPU profiler if needed */
+			if (feat == FEATURE_PROFILE_OFFCPU) {
+				extern int off_cpu_profiler_remove_process(uint32_t pid);
+				if (off_cpu_profiler_remove_process(pid) == 0) {
+					ebpf_info("Removed PID %d from off-CPU profiling\n", pid);
+				}
+			}
 		}
 	}
 }
