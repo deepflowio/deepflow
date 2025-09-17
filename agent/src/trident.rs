@@ -129,7 +129,7 @@ use public::{
     debug::QueueDebugger,
     packet::MiniPacket,
     proto::agent::{self, Exception, PacketCaptureType, SocketType},
-    queue::{self, DebugSender},
+    queue::{self, DebugSender, MultiDebugSender},
     utils::net::{get_route_src_ip, IpMacPair, Link, MacAddr},
     LeakyBucket,
 };
@@ -1778,7 +1778,7 @@ pub struct AgentComponents {
     pub tap_typer: Arc<CaptureNetworkTyper>,
     pub cur_tap_types: Vec<agent::CaptureNetworkType>,
     pub dispatcher_components: Vec<DispatcherComponent>,
-    pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
+    pub l4_flow_uniform_senders: Vec<UniformSenderThread<BoxedTaggedFlow>>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
@@ -1806,7 +1806,7 @@ pub struct AgentComponents {
     pub proto_log_sender: DebugSender<BoxAppProtoLogsData>,
     pub pcap_batch_sender: DebugSender<BoxedPcapBatch>,
     pub toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-    pub l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
+    pub l4_flow_aggr_sender: MultiDebugSender<BoxedTaggedFlow>,
     pub metrics_sender: DebugSender<BoxedDocument>,
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
@@ -1870,7 +1870,7 @@ impl AgentComponents {
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Arc<BatchedBox<TaggedFlow>>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-        l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
+        l4_flow_aggr_sender: Option<MultiDebugSender<BoxedTaggedFlow>>,
         metrics_sender: DebugSender<BoxedDocument>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
@@ -2404,37 +2404,44 @@ impl AgentComponents {
             "static analyzer ip: '{}' actual analyzer ip '{}'",
             user_config.global.communication.ingester_ip, candidate_config.sender.dest_ip
         );
-        let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
-        let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-            user_config
-                .processors
-                .flow_log
-                .tunning
-                .flow_generator_queue_size,
-            l4_flow_aggr_queue_name,
-            &queue_debugger,
-        );
-        stats_collector.register_countable(
-            &QueueStats {
-                module: l4_flow_aggr_queue_name,
-                ..Default::default()
-            },
-            Countable::Owned(Box::new(counter)),
-        );
-        let l4_flow_uniform_sender = UniformSenderThread::new(
-            l4_flow_aggr_queue_name,
-            Arc::new(l4_flow_aggr_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            None,
-            if candidate_config.metric_server.l4_flow_log_compressed {
-                SenderEncoder::Zstd
-            } else {
-                SenderEncoder::Raw
-            },
-            sender_leaky_bucket.clone(),
-        );
+        let mut l4_flow_uniform_senders = Vec::new();
+        let mut l4_flow_aggr_senders = Vec::new();
+        for i in 0..user_config.outputs.flow_log.tunning.sender_threads {
+            let name: &'static str = Box::leak(format!("3-flowlog-to-collector-sender-{}", i).into_boxed_str());
+
+            let (s, r, counter) = queue::bounded_with_debug(
+                user_config
+                    .processors
+                    .flow_log
+                    .tunning
+                    .flow_generator_queue_size,
+                name,
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                &QueueStats {
+                    module: name,
+                    ..Default::default()
+                },
+                Countable::Owned(Box::new(counter)),
+            );
+            l4_flow_aggr_senders.push(s);
+            l4_flow_uniform_senders.push(UniformSenderThread::new(
+                name,
+                Arc::new(r),
+                config_handler.sender(),
+                stats_collector.clone(),
+                exception_handler.clone(),
+                None,
+                if candidate_config.metric_server.l4_flow_log_compressed {
+                    SenderEncoder::Zstd
+                } else {
+                    SenderEncoder::Raw
+                },
+                sender_leaky_bucket.clone(),
+            ));
+        }
+        let l4_flow_aggr_sender = MultiDebugSender::new(l4_flow_aggr_senders);
 
         let metrics_queue_name = "3-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
@@ -3157,7 +3164,7 @@ impl AgentComponents {
             rx_leaky_bucket,
             tap_typer,
             cur_tap_types: vec![],
-            l4_flow_uniform_sender,
+            l4_flow_uniform_senders,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
             platform_synchronizer,
@@ -3234,7 +3241,9 @@ impl AgentComponents {
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
-        self.l4_flow_uniform_sender.start();
+        for sender in self.l4_flow_uniform_senders.iter_mut() {
+            sender.start();
+        }
 
         // Enterprise Edition Feature: packet-sequence
         self.packet_sequence_uniform_sender.start();
@@ -3306,8 +3315,10 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         self.kubernetes_poller.stop();
 
-        if let Some(h) = self.l4_flow_uniform_sender.notify_stop() {
-            join_handles.push(h);
+        for sender in self.l4_flow_uniform_senders.iter_mut() {
+            if let Some(h) = sender.notify_stop() {
+                join_handles.push(h);
+            }
         }
         if let Some(h) = self.metrics_uniform_sender.notify_stop() {
             join_handles.push(h);
@@ -3518,7 +3529,7 @@ fn build_dispatchers(
     vm_mac_addrs: Vec<MacAddr>,
     gateway_vmac_addrs: Vec<MacAddr>,
     toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-    l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
+    l4_flow_aggr_sender: MultiDebugSender<BoxedTaggedFlow>,
     metrics_sender: DebugSender<BoxedDocument>,
     #[cfg(target_os = "linux")] netns: netns::NsFile,
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,

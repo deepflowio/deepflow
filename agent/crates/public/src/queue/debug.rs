@@ -17,7 +17,7 @@
 use std::{
     fmt::Debug,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -88,4 +88,40 @@ pub fn bounded_with_debug<T>(
     };
 
     (sender, receiver, handle)
+}
+
+#[derive(Clone)]
+pub struct MultiDebugSender<T> {
+    senders: Arc<Vec<DebugSender<T>>>,
+    index: Arc<AtomicUsize>,
+}
+
+impl<T> MultiDebugSender<T> {
+    pub fn new(senders: Vec<DebugSender<T>>) -> Self {
+        Self {
+            senders: Arc::new(senders),
+            index: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn choose(&self) -> &DebugSender<T> {
+        let i = self
+            .index
+            .fetch_add(1, Ordering::Relaxed)
+            % self.senders.len();
+        &self.senders[i]
+    }
+}
+
+impl<T: Debug> MultiDebugSender<T> {
+    pub fn send(&self, msg: T) -> Result<(), Error<T>> {
+        self.choose().send(msg)
+    }
+
+    pub fn send_all(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
+        for msg in msgs.drain(..) {
+            self.send(msg)?;
+        }
+        Ok(())
+    }
 }
