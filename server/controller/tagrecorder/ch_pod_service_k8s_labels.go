@@ -59,39 +59,6 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceK8sLabels) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodService) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.Label.IsDifferent() {
-		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
-		if labels != "" {
-			updateInfo["labels"] = labels
-		}
-	}
-	targetKey := IDKey{ID: sourceID}
-	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChPodServiceK8sLabels
-		db.Where("id = ?", sourceID).First(&chItem)
-		if chItem.ID == 0 {
-			c.SubscriberComponent.dbOperator.add(
-				[]IDKey{targetKey},
-				[]mysqlmodel.ChPodServiceK8sLabels{{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-					Labels:      updateInfo["labels"].(string),
-					L3EPCID:     newSource.VPCID,
-					PodNsID:     newSource.PodNamespaceID,
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				}},
-				db,
-			)
-			return
-		}
-	}
-	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // sourceToTarget implements SubscriberDataGenerator

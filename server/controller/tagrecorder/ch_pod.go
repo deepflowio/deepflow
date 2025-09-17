@@ -91,31 +91,6 @@ func (c *ChPod) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (ke
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPod) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	if fieldsUpdate.PodClusterID.IsDifferent() {
-		updateInfo["pod_cluster_id"] = fieldsUpdate.PodClusterID.GetNew()
-	}
-	if fieldsUpdate.PodNamespaceID.IsDifferent() {
-		updateInfo["pod_ns_id"] = fieldsUpdate.PodNamespaceID.GetNew()
-	}
-	if fieldsUpdate.PodNodeID.IsDifferent() {
-		updateInfo["pod_node_id"] = fieldsUpdate.PodNodeID.GetNew()
-	}
-	if fieldsUpdate.PodGroupID.IsDifferent() {
-		updateInfo["pod_group_id"] = fieldsUpdate.PodGroupID.GetNew()
-	}
-	if fieldsUpdate.PodServiceID.IsDifferent() {
-		updateInfo["pod_service_id"] = fieldsUpdate.PodServiceID.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
