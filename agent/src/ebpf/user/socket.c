@@ -1977,7 +1977,6 @@ static void display_kern_offsets(bpf_offset_param_t * offset)
 	ebpf_info("member_fields_offset:\n");
 
 	ebpf_info("\tready: 0x%x\n", offset->ready);
-	ebpf_info("\tkprobe_invalid: 0x%x\n", offset->kprobe_invalid);
 	ebpf_info("\tenable_unix_socket: 0x%x\n", offset->enable_unix_socket);
 	ebpf_info("\tfiles_infer_done: 0x%x\n", offset->files_infer_done);
 	ebpf_info("\treserved: 0x%x\n", offset->reserved);
