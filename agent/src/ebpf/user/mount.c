@@ -640,12 +640,20 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 }
 
 u32 copy_file_metrics(int pid, void *dst, void *src, int len,
-		      const char *mount_point, const char *mount_source,
-		      fs_type_t file_type)
+		      u32 mntns_id, const char *mount_point,
+		      const char *mount_source, fs_type_t file_type)
 {
+#define MNTNS_ID_BUF_SZ 12
 	if (len <= 0)
 		return 0;
 
+	char mntns_str[MNTNS_ID_BUF_SZ] = { 0 };
+	if (mntns_id > 0) {
+		int len;
+		len = u32_to_str_safe(mntns_id, mntns_str, sizeof(mntns_str));
+		mntns_str[len] = ':';
+	}
+	
 	struct user_io_event_buffer *u_event;
 	struct __io_event_buffer *event = (struct __io_event_buffer *)src;
 	char *buffer = event->filename;
@@ -708,6 +716,8 @@ copy_event:
 				       sizeof(u_event->file_dir));
 	}
 
+	prepend_prefix_safe(buffer, sizeof(u_event->file_dir), mntns_str);
+
 	u_event->bytes_count = event->bytes_count;
 	u_event->operation = event->operation;
 	u_event->latency = event->latency;
@@ -717,8 +727,8 @@ copy_event:
 	u_event->mntns_id = event->mntns_id;
 	strcpy_s_inline(u_event->mount_source, sizeof(u_event->mount_source),
 			mount_source, strlen(mount_source));
-	strcpy_s_inline(u_event->mount_point, sizeof(u_event->mount_point),
-			mount_point, strlen(mount_point));
+	fast_strncat_trunc(mntns_str, mount_point, u_event->mount_point,
+			   sizeof(u_event->mount_point));
 	strcpy_s_inline(u_event->filename, sizeof(u_event->filename),
 			event->filename, strlen(event->filename));
 	return sizeof(*u_event);
