@@ -83,6 +83,7 @@ impl Iso8583Info {
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
+        self.attributes.append(&mut other.attributes);
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {

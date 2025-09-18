@@ -220,6 +220,7 @@ cfg_if::cfg_if! {
                 Pulsar(PulsarLog),
                 ZMTP(ZmtpLog),
                 RocketMQ(RocketmqLog),
+                WebSphereMQ(crate::flow_generator::protocol_logs::WebSphereMqLog),
                 OpenWire(OpenWireLog),
                 TLS(crate::flow_generator::protocol_logs::TlsLog),
                 SomeIp(crate::flow_generator::protocol_logs::SomeIpLog),
