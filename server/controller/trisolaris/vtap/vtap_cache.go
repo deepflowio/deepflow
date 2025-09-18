@@ -418,7 +418,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	v := c.vTapInfo
 	c.unsetLicenseFunctionEnable()
-	if c.GetOwner() == VTAP_OWNER_DEEPFLOW {
+	if c.GetVTapType() != VTAP_TYPE_DEDICATED && c.GetOwner() == VTAP_OWNER_DEEPFLOW {
 		c.enabledCallMonitoring.Set()
 		c.enabledNetworkMonitoring.Set()
 		c.enabledTrafficDistribution.Set()
