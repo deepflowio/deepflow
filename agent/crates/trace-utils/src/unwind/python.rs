@@ -610,6 +610,11 @@ pub unsafe extern "C" fn merge_python_stacks(
     i_trace: *const c_void,
     u_trace: *const c_void,
 ) -> usize {
+    // Check for null pointers first to avoid SIGSEGV
+    if i_trace.is_null() || u_trace.is_null() || trace_str.is_null() {
+        return 0;
+    }
+
     let Ok(i_trace) = CStr::from_ptr(i_trace as *const libc::c_char).to_str() else {
         return 0;
     };
