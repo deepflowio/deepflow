@@ -313,7 +313,7 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) Heal() {
 	for sourceID, sourceUpdatedAt := range h.sourceDataGen.getIDToUpdatedAt() {
 		// check if the source ID exists in the target data
 		// if it exists, compare the updated_at timestamps, if the source is newer, means target data is stale, need to refresh it by force deleting it and adding.
-		// yf it does not exist, means target data is missing, need to add it.
+		// if it does not exist, means target data is missing, need to add it.
 		if targetUpdatedAt, ok := h.targetDataGen.getIDToUpdatedAt()[sourceID]; ok {
 			if sourceUpdatedAt.After(targetUpdatedAt) {
 				targetIDsToForceDelete = append(targetIDsToForceDelete, sourceID)

@@ -63,8 +63,6 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.Pod)
 	sourceID := newSource.ID
-	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]metadbmodel.ChPodK8sLabel, 0)
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodK8sLabel, 0)
 
@@ -72,41 +70,6 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 		_, new := StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		_, old := StrToJsonAndMap(fieldsUpdate.Label.GetOld())
 
-		for k, v := range new {
-			targetKey := NewIDKeyKey(sourceID, k)
-			oldV, ok := old[k]
-			if !ok {
-				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sLabel{
-					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
-					Key:         k,
-					Value:       v,
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				})
-				continue
-			}
-			updateInfo := make(map[string]interface{})
-			if oldV != v {
-				var chItem metadbmodel.ChPodK8sLabel
-				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-				if chItem.ID == 0 {
-					keysToAdd = append(keysToAdd, targetKey)
-					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodK8sLabel{
-						ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
-						Key:         k,
-						Value:       v,
-						TeamID:      md.GetTeamID(),
-						DomainID:    md.GetDomainID(),
-						SubDomainID: md.GetSubDomainID(),
-					})
-					continue
-				}
-				updateInfo["value"] = v
-			}
-			c.updateOrSync(db, targetKey, updateInfo)
-		}
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
@@ -116,12 +79,9 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 				})
 			}
 		}
-	}
-	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
-	}
-	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
+		if len(keysToDelete) > 0 {
+			c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
+		}
 	}
 }
 
