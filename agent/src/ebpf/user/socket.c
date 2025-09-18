@@ -1192,6 +1192,9 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		submit_data->syscall_len = sd->syscall_len;
 		submit_data->l7_protocal_hint = sd->data_type;
 		submit_data->batch_last_data = false;
+
+		u32 mntns_id = 0;
+		u32 self_mntns_id = 0;
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
@@ -1225,7 +1228,6 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			int ret = 0;
 			kern_dev_t s_dev = DEV_INVALID;
 			int mnt_id = 0;
-			u32 mntns_id = 0;
 			if (sd->source == DATA_SOURCE_IO_EVENT) {
 				struct __io_event_buffer *event =
 					(struct __io_event_buffer *)sd->data;
@@ -1237,8 +1239,9 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 						       sizeof(submit_data->container_id),
 						       submit_data->process_kname,
 						       sizeof(submit_data->process_kname),
-						       mnt_id, mntns_id, s_dev, mount_point,
-						       mount_source, sizeof(mount_point), &file_type);
+						       mnt_id, mntns_id, &self_mntns_id,
+						       s_dev, mount_point, mount_source,
+						       sizeof(mount_point), &file_type);
 
 			// Not found in the process cache, attempting to retrieve from procfs.
 			if (ret) {
@@ -1293,10 +1296,13 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 				offset = sd->extra_data_count;
 			}
 			if (sd->source == DATA_SOURCE_IO_EVENT) {
+				u32 display_mntns_id = 0;
+				if (self_mntns_id > 0 && mntns_id != self_mntns_id)
+					display_mntns_id = mntns_id;
 				len =
 				    copy_file_metrics(sd->tgid, submit_data->cap_data
-						      + offset, sd->data,
-						      len, mount_point,
+						      + offset, sd->data, len,
+						      display_mntns_id, mount_point,
 						      mount_source, file_type);
 			} else {
 				memcpy_fast(submit_data->cap_data + offset,

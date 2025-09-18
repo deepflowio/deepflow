@@ -175,13 +175,14 @@ void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
  * @param[out] dst           Destination buffer
  * @param[in]  src           Source buffer (raw eBPF event)
  * @param[in]  len           Length of destination buffer
+ * @param[in]  mntns_id      The mount namespace ID of the file
  * @param[in]  mount_point   Mount point path
  * @param[in]  mount_source  Mount source path
  * @param[in]  file_type     File type (FS_TYPE_REGULAR, FS_TYPE_VIRTUAL, FS_TYPE_NETWORK)
  * @return Number of bytes written to dst
  */
 uint32_t copy_file_metrics(int pid, void *dst, void *src, int len,
-			   const char *mount_point,
+			   u32 mntns_id, const char *mount_point,
 			   const char *mount_source, fs_type_t file_type);
 /**
  * @brief Check for changes in the host root mount namespace's mount information.
