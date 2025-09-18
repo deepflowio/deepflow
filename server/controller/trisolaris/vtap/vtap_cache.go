@@ -477,7 +477,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	v := c.vTapInfo
 	c.unsetLicenseFunctionEnable()
-	if c.GetVTapType() == common.VTAP_TYPE_DEDICATED || c.GetOwner() == common.VTAP_OWNER_DEEPFLOW {
+	if c.GetVTapType() != common.VTAP_TYPE_DEDICATED && c.GetOwner() == common.VTAP_OWNER_DEEPFLOW {
 		c.enabledNetNpb.Set()
 		c.enabledNetNpmd.Set()
 		c.enabledNetDpdk.Set()
