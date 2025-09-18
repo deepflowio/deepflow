@@ -57,6 +57,8 @@ pub enum Error {
     ZmtpPerfParseFailed,
     #[error("rocketmq log parse failed")]
     RocketmqLogParseFailed,
+    #[error("webspheremq log parse failed")]
+    WebSphereMqLogParseFailed,
     #[error("redis log parse failed")]
     RedisLogParseFailed,
     #[error("redis perf parse failed")]

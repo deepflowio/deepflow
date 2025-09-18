@@ -120,6 +120,7 @@ cfg_if::cfg_if! {
             PulsarInfo(PulsarInfo),
             ZmtpInfo(ZmtpInfo),
             RocketmqInfo(RocketmqInfo),
+            WebSphereMqInfo(crate::flow_generator::protocol_logs::WebSphereMqInfo),
             PostgreInfo(PostgreInfo),
             OpenWireInfo(OpenWireInfo),
             OracleInfo(crate::flow_generator::protocol_logs::OracleInfo),
