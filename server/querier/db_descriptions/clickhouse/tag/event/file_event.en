@@ -55,9 +55,9 @@ vtap                  , DeepFlow Agent               , Deprecated，please use a
 agent                 , DeepFlow Agent               ,
 signal_source         , Signal Source                ,
 
-mount_source          , Mount Source                 ,
-mount_point           , Mount Point                  ,
-file_dir              , File Dir                     ,
+mount_source          , Mount Source                 , Mount source: for example, `/dev/sda1` represents a block device, `proc` (and others such as `sysfs`, `tmpfs`) represent virtual file systems, `10.1.2.3:/path` represents an NFS file system, `/var/lib/docker/...` or `overlay` represents the mount source of a directory inside a container.
+mount_point           , Mount Point                  , Mount point: when a process accesses files in another namespace (`nsid`), it is displayed as `$nsid:/$mount_point`.
+file_dir              , File Dir                     , Directory: when a process accesses files in another namespace (`nsid`), it is displayed as `$nsid:/$file_dir`.
 file_name             , File Name                    ,
 file_type             , File Type                    ,
 offset                , Offset                       ,
