@@ -335,7 +335,12 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 		} else {
 			q = q.Where("domain = ?", s.md.GetDomainLcuuid())
 			if s.filterSubDomain {
-				q = q.Where("sub_domain = ?", s.md.GetSubDomainLcuuid())
+				subDomainLcuuid := s.md.GetSubDomainLcuuid()
+				if subDomainLcuuid != "" {
+					q = q.Where("sub_domain = ?", subDomainLcuuid)
+				} else {
+					q = q.Where("(sub_domain = '' or sub_domain is null)")
+				}
 			}
 		}
 		return q

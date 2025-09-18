@@ -79,9 +79,10 @@ func (c *ChPodK8sLabel) onResourceUpdated(md *message.Metadata, updateMessage *m
 				})
 			}
 		}
-		if len(keysToDelete) > 0 {
-			c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
-		}
+	}
+
+	if len(keysToDelete) > 0 {
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
