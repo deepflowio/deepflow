@@ -8,6 +8,10 @@ build = "build.rs"
 [build-dependencies]
 dunce = "0.1.1"
 
+[profile.release]
+opt-level = 0
+debug = true
+
 [dependencies]
 cfg-if = "1.0"
 libc = "0.2"
