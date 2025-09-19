@@ -262,7 +262,6 @@ pub struct Guard {
     exception_handler: ExceptionHandler,
     cgroup_mount_path: String,
     is_cgroup_v2: bool,
-    memory_trim_disabled: bool,
     system: Arc<Mutex<System>>,
     pid: Pid,
     cgroups_disabled: bool,
@@ -276,7 +275,6 @@ impl Guard {
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
-        memory_trim_enabled: bool,
         cgroups_disabled: bool,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
@@ -293,7 +291,6 @@ impl Guard {
             exception_handler,
             cgroup_mount_path,
             is_cgroup_v2,
-            memory_trim_disabled: !memory_trim_enabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
             cgroups_disabled,
@@ -533,8 +530,6 @@ impl Guard {
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let cgroup_mount_path = self.cgroup_mount_path.clone();
         let is_cgroup_v2 = self.is_cgroup_v2;
-        #[cfg(all(target_os = "linux", target_env = "gnu"))]
-        let memory_trim_disabled = self.memory_trim_disabled;
         let mut check_cgroup_result = true; // It is used to determine whether subsequent checks are required. If the first check fails, the check is stopped
         let system = self.system.clone();
         let pid: Pid = self.pid.clone();
@@ -635,7 +630,7 @@ impl Guard {
                 }
 
                 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-                if !memory_trim_disabled {
+                if config.idle_memory_trimming {
                     feed.add(FeedTitle::MallocTrim);
                     unsafe { let _ = malloc_trim(0); }
                 }

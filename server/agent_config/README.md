@@ -716,7 +716,7 @@ global:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -746,7 +746,7 @@ The smaller the value of process scheduling priority, the higher the priority of
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -841,7 +841,7 @@ Note:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1346,7 +1346,7 @@ will set the log level to INFO for all modules and DEBUG for the rpc::session mo
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1666,7 +1666,7 @@ type in CLI environments.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1694,7 +1694,7 @@ The /proc fs mount path.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1760,7 +1760,7 @@ Socket and Process will not be reported if their uptime is lower than this thres
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1807,7 +1807,7 @@ inputs:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1836,7 +1836,7 @@ The user who should execute the `script_command` command.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2216,7 +2216,7 @@ New name after matched.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8803,7 +8803,7 @@ set this value at this time. Only valid for IDC (not Cloud) traffic.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8834,7 +8834,7 @@ Timeouts for TCP State Machine - Established.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8865,7 +8865,7 @@ Timeouts for TCP State Machine - Closing Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8896,7 +8896,7 @@ Timeouts for TCP State Machine - Opening Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 

@@ -503,7 +503,7 @@ global:
     # unit:
     # range: [-20, 19]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -520,7 +520,7 @@ global:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -588,7 +588,7 @@ global:
     # unit:
     # range: [1s, 3600s]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -939,7 +939,7 @@ global:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1156,7 +1156,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1172,7 +1172,7 @@ inputs:
     # unit:
     # range: [0ns, 1h]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1222,7 +1222,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1274,7 +1274,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1290,7 +1290,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1576,7 +1576,7 @@ inputs:
     #   - ebpf.profile.memory
     #   #- ebpf.profile.cuda
     #   #- ebpf.profile.hbm
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   ch: |-
@@ -6129,7 +6129,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6143,7 +6143,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6157,7 +6157,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6171,7 +6171,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-

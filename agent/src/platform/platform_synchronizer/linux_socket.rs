@@ -500,7 +500,6 @@ mod tests {
             os_app_tag_exec_user: "".to_string(),
             os_app_tag_exec: vec![],
             os_proc_sync_enabled: true,
-            os_proc_sync_tagged_only: false,
         };
         let (_, mut getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false, false);
         let pids = procfs::process::all_processes()
