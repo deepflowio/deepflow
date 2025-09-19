@@ -174,7 +174,7 @@ strcpy_s_inline(void *__restrict__ dest, rsize_t dmax,
 	if (err == 0) {
 		rsize_t no_use_n = dmax - n;
 		if (no_use_n > 0) {
-			memset(dest + n, 0, no_use_n);
+			((char *)dest)[n] = '\0';
 		} else {
 			char *_d = dest;
 			_d[dmax - 1] = '\0';

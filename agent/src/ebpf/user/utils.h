@@ -342,6 +342,32 @@ void format_port_ranges(uint16_t *ports, size_t size, char *ret_str, int str_sz)
  * @return 32-bit hash value computed over the input data.
  */
 uint32_t murmurhash(const void *key, size_t len, uint32_t seed);
+
+/*
+ * Convert uint32_t to decimal string safely
+ *
+ * @param value    The input number to convert
+ * @param buf      Output buffer to store the string
+ * @param bufsize  Size of the output buffer
+ * @return Number of characters written (excluding '\0'), or 0 on failure (e.g., buffer too small)
+ */
+size_t u32_to_str_safe(uint32_t value, char *buf, size_t bufsize);
+
+/*
+ * Safely prepend a prefix to a string buffer
+ *
+ * @param buffer   The string buffer to modify
+ * @param bufsize  Total size of the buffer (including space for '\0')
+ * @param prefix   The prefix to prepend
+ * @return 0 on success, -1 if buffer is too small
+ *
+ * Features:
+ * - Fully safe: checks buffer size
+ * - Uses memmove to handle overlapping memory
+ * - Supports empty prefix or empty buffer
+ * - Always null-terminates on success
+ */
+int prepend_prefix_safe(char *buffer, size_t bufsize, const char *prefix);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */

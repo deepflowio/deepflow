@@ -126,6 +126,7 @@ static uint64_t io_event_minimal_duration = 1000000;
 static uint32_t conf_socket_map_max_reclaim;
 
 struct bpf_tracer *g_tracer;
+bpf_offset_param_t g_kern_offsets;
 
 /*
  * The table for L7 protocol filtering ports.
@@ -140,6 +141,7 @@ extern uint64_t sys_boot_time_ns;
 extern uint64_t prev_sys_boot_time_ns;
 
 extern uint64_t adapt_kern_uid;
+extern int bpf_raw_tracepoint_open(const char *name, int prog_fd);
 
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
@@ -152,7 +154,8 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int conflict_count,
 				 int max_delay,
 				 int total_time, int event_count);
-extern int bpf_raw_tracepoint_open(const char *name, int prog_fd);
+static void save_kern_offsets(struct bpf_tracer *t);
+static void display_kern_offsets(bpf_offset_param_t *offset);
 static bool fentry_try_attach(const char *fn)
 {
 	int prog_fd, attach_fd;
@@ -981,6 +984,30 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	return ETR_OK;
 }
 
+/**
+ * Calculate the extra memory size required when allocating,
+ * due to file I/O events and the need to pass mount-related
+ * information. These details are obtained in user space and
+ * are not stored in the kernel structures, so additional
+ * memory must be reserved to hold them.
+ */
+static inline int get_additional_memory_size(struct __socket_data_buffer *buf)
+{
+	int i, start = 0, extra_size = 0;
+	struct __socket_data *sd;
+	for (i = 0; i < buf->events_num; i++) {
+		sd = (struct __socket_data *)&buf->data[start];
+		if (sd->source == DATA_SOURCE_IO_EVENT) {
+			extra_size += (sizeof(struct user_io_event_buffer) - sd->data_len);
+		}
+		start +=
+		    (offsetof(typeof(struct __socket_data), data) +
+		     sd->data_len);
+	}
+
+	return extra_size;
+}	
+
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
@@ -1124,8 +1151,8 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	struct socket_bpf_data *submit_data;
 	int len;
 	void *data_buf_ptr;
-	char mount_point[MAX_PATH_LENGTH], mount_source[MAX_PATH_LENGTH];
-	bool is_nfs = false;
+	char mount_point[MAX_PATH_LENGTH] = {0}, mount_source[MAX_PATH_LENGTH] = {0};
+	fs_type_t file_type = FS_TYPE_UNKNOWN;
 
 	// 所有载荷的数据总大小（去掉头）
 	int alloc_len = buf->len - offsetof(typeof(struct __socket_data),
@@ -1133,6 +1160,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	alloc_len += sizeof(*submit_data) * buf->events_num;	// 计算长度包含要提交的数据的头
 	alloc_len += sizeof(struct mem_block_head) * buf->events_num;	// 包含内存块head
 	alloc_len += sizeof(sd->extra_data) * buf->events_num;	// 可能包含额外数据
+	alloc_len += get_additional_memory_size(buf);
 	alloc_len = CACHE_LINE_ROUNDUP(alloc_len);	// 保持cache line对齐
 
 	void *socket_data_buff = malloc(alloc_len);
@@ -1164,6 +1192,9 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		submit_data->syscall_len = sd->syscall_len;
 		submit_data->l7_protocal_hint = sd->data_type;
 		submit_data->batch_last_data = false;
+
+		u32 mntns_id = 0;
+		u32 self_mntns_id = 0;
 		if (sd->source != DATA_SOURCE_DPDK) {
 			submit_data->socket_id = sd->socket_id;
 			submit_data->tuple = sd->tuple;
@@ -1196,14 +1227,21 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			    sd->thread_trace_id;
 			int ret = 0;
 			kern_dev_t s_dev = DEV_INVALID;
-			if (sd->source == DATA_SOURCE_IO_EVENT)
+			int mnt_id = 0;
+			if (sd->source == DATA_SOURCE_IO_EVENT) {
+				struct __io_event_buffer *event =
+					(struct __io_event_buffer *)sd->data;
 				s_dev = sd->s_dev;
+				mnt_id = event->mnt_id;
+				mntns_id = event->mntns_id;
+			}
 			ret = get_proc_info_from_cache(sd->tgid, submit_data->container_id,
 						       sizeof(submit_data->container_id),
 						       submit_data->process_kname,
 						       sizeof(submit_data->process_kname),
+						       mnt_id, mntns_id, &self_mntns_id,
 						       s_dev, mount_point, mount_source,
-						       sizeof(mount_point), &is_nfs);
+						       sizeof(mount_point), &file_type);
 
 			// Not found in the process cache, attempting to retrieve from procfs.
 			if (ret) {
@@ -1220,13 +1258,6 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 						      sizeof(submit_data->process_kname),
 						      sd->comm, sizeof(sd->comm));
 				}
-			}
-
-			if (s_dev != DEV_INVALID && mount_point[0] == '\0') {
-				u64 mntns_id = 0;
-                        	find_mount_point_path(sd->tgid, &mntns_id, s_dev,
-						      mount_point, mount_source,
-						      sizeof(mount_point), &is_nfs);
 			}
 
 			submit_data->process_kname[sizeof(submit_data->process_kname) -
@@ -1265,11 +1296,14 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 				offset = sd->extra_data_count;
 			}
 			if (sd->source == DATA_SOURCE_IO_EVENT) {
+				u32 display_mntns_id = 0;
+				if (self_mntns_id > 0 && mntns_id != self_mntns_id)
+					display_mntns_id = mntns_id;
 				len =
-				    copy_regular_file_data(sd->tgid, submit_data->cap_data
-							   + offset, sd->data,
-							   len, mount_point,
-							   mount_source, is_nfs);
+				    copy_file_metrics(sd->tgid, submit_data->cap_data
+						      + offset, sd->data, len,
+						      display_mntns_id, mount_point,
+						      mount_source, file_type);
 			} else {
 				memcpy_fast(submit_data->cap_data + offset,
 					    sd->data, len);
@@ -1474,6 +1508,8 @@ static int check_kern_adapt_and_state_update(void)
 		set_period_event_invalid("check-kern-adapt");
 		set_period_event_invalid("trigger_kern_adapt");
 		t->adapt_success = true;
+		save_kern_offsets(t);
+		display_kern_offsets(&g_kern_offsets);
 	}
 
 	return 0;
@@ -1636,16 +1672,19 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		offset.struct_files_struct_fdt_offset = 0x8;
 		offset.struct_files_private_data_offset = 0xa8;
 		offset.struct_file_f_pos_offset = 0x68;
+		offset.struct_ns_common_inum_offset = 0x4;
 		break;
 	case K_TYPE_KYLIN:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc0;
 		offset.struct_file_f_pos_offset = 0x60;
+		offset.struct_ns_common_inum_offset = 0x10;
 		break;
 	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
 		offset.struct_files_private_data_offset = 0xc8;
 		offset.struct_file_f_pos_offset = 0x68;
+		offset.struct_ns_common_inum_offset = 0x10;
 	};
 
 	/*
@@ -1677,6 +1716,16 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	offset.struct_sock_sport_offset = 0xe;
 	offset.struct_sock_skc_state_offset = 0x12;
 	offset.struct_sock_common_ipv6only_offset = 0x13;
+
+	/*
+	 * Mount information related offsets
+	 */ 
+	offset.struct_file_f_path_offset      = 0x10;
+	offset.struct_path_mnt_offset         = 0x0;
+	offset.struct_mount_mnt_offset        = 0x20;
+	offset.struct_mount_mnt_ns_offset     = 0xe0;
+	offset.struct_mnt_namespace_ns_offset = 0x8; // On Linux 5.11 and later, this value is 0.
+	offset.struct_mount_mnt_id_offset     = 0x11c;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_error("update_offset_map_default failed.\n");
@@ -1778,6 +1827,21 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	int struct_sock_common_ipv6only_offset =
 	    struct_sock_skc_state_offset + 1;
 
+	// Mount information related offsets
+	int struct_file_f_path_offset =
+	    kernel_struct_field_offset(obj, "file", "f_path");
+	int struct_path_mnt_offset =
+	    kernel_struct_field_offset(obj, "path", "mnt");
+	int struct_mount_mnt_offset =
+	    kernel_struct_field_offset(obj, "mount", "mnt");
+	int struct_mount_mnt_ns_offset =
+	    kernel_struct_field_offset(obj, "mount", "mnt_ns");
+        int struct_mnt_namespace_ns_offset =
+	    kernel_struct_field_offset(obj, "mnt_namespace", "ns");
+	int struct_ns_common_inum_offset =
+	    kernel_struct_field_offset(obj, "ns_common", "inum");
+	int struct_mount_mnt_id_offset =
+	    kernel_struct_field_offset(obj, "mount", "mnt_id");
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
 	    struct_files_private_data_offset < 0 ||
@@ -1790,7 +1854,11 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
 	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
 	    struct_sock_common_ipv6only_offset < 0 ||
-	    struct_dentry_d_parent_offset < 0 || struct_file_f_pos_offset < 0) {
+	    struct_dentry_d_parent_offset < 0 || struct_file_f_pos_offset < 0 ||
+	    struct_file_f_path_offset < 0 || struct_path_mnt_offset < 0 ||
+	    struct_mount_mnt_offset < 0 || struct_mount_mnt_ns_offset < 0 ||
+	    struct_mnt_namespace_ns_offset < 0 || struct_ns_common_inum_offset < 0 ||
+	    struct_mount_mnt_id_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -1837,6 +1905,20 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		  struct_sock_skc_state_offset);
 	ebpf_info("    struct_sock_common_ipv6only_offset: 0x%x\n",
 		  struct_sock_common_ipv6only_offset);
+	ebpf_info("    struct_file_f_path_offset: 0x%x\n",
+		  struct_file_f_path_offset);
+	ebpf_info("    struct_path_mnt_offset: 0x%x\n",
+		  struct_path_mnt_offset);
+	ebpf_info("    struct_mount_mnt_offset: 0x%x\n",
+		  struct_mount_mnt_offset);
+	ebpf_info("    struct_mount_mnt_ns_offset: 0x%x\n",
+		  struct_mount_mnt_ns_offset);
+	ebpf_info("    struct_mnt_namespace_ns_offset: 0x%x\n",
+		  struct_mnt_namespace_ns_offset);
+	ebpf_info("    struct_ns_common_inum_offset: 0x%x\n",
+		  struct_ns_common_inum_offset);
+	ebpf_info("    struct_mount_mnt_id_offset: 0x%x\n",
+		  struct_mount_mnt_id_offset);
 
 	bpf_offset_param_t offset;
 	memset(&offset, 0, sizeof(offset));
@@ -1845,6 +1927,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	}
 
 	offset.ready = 1;
+	offset.files_infer_done = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
 	offset.tcp_sock__copied_seq_offset = copied_seq_offs;
@@ -1870,6 +1953,13 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_sock_skc_state_offset = struct_sock_skc_state_offset;
 	offset.struct_sock_common_ipv6only_offset =
 	    struct_sock_common_ipv6only_offset;
+	offset.struct_file_f_path_offset      = struct_file_f_path_offset;
+	offset.struct_path_mnt_offset         = struct_path_mnt_offset;
+	offset.struct_mount_mnt_offset        = struct_mount_mnt_offset;
+	offset.struct_mount_mnt_ns_offset     = struct_mount_mnt_ns_offset;
+	offset.struct_mnt_namespace_ns_offset = struct_mnt_namespace_ns_offset;
+	offset.struct_ns_common_inum_offset   = struct_ns_common_inum_offset;
+	offset.struct_mount_mnt_id_offset     = struct_mount_mnt_id_offset;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_warning("Update offsets map failed.\n");
@@ -1877,6 +1967,112 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	}
 
 	return ETR_OK;
+}
+
+static void display_kern_offsets(bpf_offset_param_t * offset)
+{
+	if (!offset)
+		return;
+
+	ebpf_info("member_fields_offset:\n");
+
+	ebpf_info("\tready: 0x%x\n", offset->ready);
+	ebpf_info("\tenable_unix_socket: 0x%x\n", offset->enable_unix_socket);
+	ebpf_info("\tfiles_infer_done: 0x%x\n", offset->files_infer_done);
+	ebpf_info("\treserved: 0x%x\n", offset->reserved);
+
+	ebpf_info("\tstruct_dentry_d_parent_offset: 0x%x\n",
+		  offset->struct_dentry_d_parent_offset);
+	ebpf_info("\ttask__files_offset: 0x%x\n", offset->task__files_offset);
+	ebpf_info("\tsock__flags_offset: 0x%x\n", offset->sock__flags_offset);
+	ebpf_info("\ttcp_sock__copied_seq_offset: 0x%x\n",
+		  offset->tcp_sock__copied_seq_offset);
+	ebpf_info("\ttcp_sock__write_seq_offset: 0x%x\n",
+		  offset->tcp_sock__write_seq_offset);
+
+	ebpf_info("\tstruct_files_struct_fdt_offset: 0x%x\n",
+		  offset->struct_files_struct_fdt_offset);
+	ebpf_info("\tstruct_file_f_pos_offset: 0x%x\n",
+		  offset->struct_file_f_pos_offset);
+	ebpf_info("\tstruct_files_private_data_offset: 0x%x\n",
+		  offset->struct_files_private_data_offset);
+	ebpf_info("\tstruct_file_f_inode_offset: 0x%x\n",
+		  offset->struct_file_f_inode_offset);
+	ebpf_info("\tstruct_inode_i_mode_offset: 0x%x\n",
+		  offset->struct_inode_i_mode_offset);
+	ebpf_info("\tstruct_inode_i_sb_offset: 0x%x\n",
+		  offset->struct_inode_i_sb_offset);
+	ebpf_info("\tstruct_super_block_s_dev_offset: 0x%x\n",
+		  offset->struct_super_block_s_dev_offset);
+	ebpf_info("\tstruct_file_dentry_offset: 0x%x\n",
+		  offset->struct_file_dentry_offset);
+	ebpf_info("\tstruct_dentry_name_offset: 0x%x\n",
+		  offset->struct_dentry_name_offset);
+	ebpf_info("\tstruct_sock_family_offset: 0x%x\n",
+		  offset->struct_sock_family_offset);
+	ebpf_info("\tstruct_sock_saddr_offset: 0x%x\n",
+		  offset->struct_sock_saddr_offset);
+	ebpf_info("\tstruct_sock_daddr_offset: 0x%x\n",
+		  offset->struct_sock_daddr_offset);
+	ebpf_info("\tstruct_sock_ip6saddr_offset: 0x%x\n",
+		  offset->struct_sock_ip6saddr_offset);
+	ebpf_info("\tstruct_sock_ip6daddr_offset: 0x%x\n",
+		  offset->struct_sock_ip6daddr_offset);
+	ebpf_info("\tstruct_sock_dport_offset: 0x%x\n",
+		  offset->struct_sock_dport_offset);
+	ebpf_info("\tstruct_sock_sport_offset: 0x%x\n",
+		  offset->struct_sock_sport_offset);
+	ebpf_info("\tstruct_sock_skc_state_offset: 0x%x\n",
+		  offset->struct_sock_skc_state_offset);
+	ebpf_info("\tstruct_sock_common_ipv6only_offset: 0x%x\n",
+		  offset->struct_sock_common_ipv6only_offset);
+
+	ebpf_info("\tstruct_file_f_path_offset: 0x%x\n",
+		  offset->struct_file_f_path_offset);
+	ebpf_info("\tstruct_path_mnt_offset: 0x%x\n",
+		  offset->struct_path_mnt_offset);
+	ebpf_info("\tstruct_mount_mnt_offset: 0x%x\n",
+		  offset->struct_mount_mnt_offset);
+	ebpf_info("\tstruct_mount_mnt_ns_offset: 0x%x\n",
+		  offset->struct_mount_mnt_ns_offset);
+	ebpf_info("\tstruct_mnt_namespace_ns_offset: 0x%x\n",
+		  offset->struct_mnt_namespace_ns_offset);
+	ebpf_info("\tstruct_ns_common_inum_offset: 0x%x\n",
+		  offset->struct_ns_common_inum_offset);
+	ebpf_info("\tstruct_mount_mnt_id_offset: 0x%x\n",
+		  offset->struct_mount_mnt_id_offset);
+}
+
+static void save_kern_offsets(struct bpf_tracer *t)
+{
+	int i;
+
+	if (sys_cpus_count > 0) {
+		bpf_offset_param_t *offset;
+		struct bpf_offset_param_array *array =
+		    malloc(sizeof(*array) + sizeof(*offset) * sys_cpus_count);
+		if (array == NULL) {
+			ebpf_warning("malloc() error.\n");
+			return;
+		}
+
+		array->count = sys_cpus_count;
+
+		if (!bpf_offset_map_collect(t, array)) {
+			free(array);
+			return;
+		}
+
+		offset = (bpf_offset_param_t *) (array + 1);
+		for (i = 0; i < sys_cpus_count; i++) {
+			if (!cpu_online[i])
+				continue;
+			g_kern_offsets = offset[i];
+			break;
+		}
+
+		free(array);
+	}
 }
 
 static void update_protocol_filter_array(struct bpf_tracer *tracer)
@@ -1973,13 +2169,14 @@ static void config_proto_ports_bitmap(struct bpf_tracer *tracer)
 	}
 }
 
-static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
+void insert_adapt_kern_data_to_map(struct bpf_tracer *tracer,
+				   int mnt_id, u32 mntns_id)
 {
-	bpf_table_set_value(tracer, MAP_ADAPT_KERN_UID_NAME, 0,
-			    &adapt_kern_uid);
-
-	ebpf_info("Insert adapt kern uid : %d , %d\n",
-		  adapt_kern_uid >> 32, (uint32_t) adapt_kern_uid);
+	struct adapt_kern_data val = { 0 };
+	val.id = adapt_kern_uid;
+	val.mnt_id = mnt_id;
+	val.mntns_id = mntns_id;
+	bpf_table_set_value(tracer, MAP_ADAPT_KERN_DATA_NAME, 0, &val);
 }
 
 static inline int __set_data_limit_max(int limit_size)
@@ -2670,7 +2867,7 @@ retry_load:
 	insert_output_prog_to_map(tracer);
 
 	// Insert the unique identifier of the adaptation kernel into the map
-	insert_adapt_kern_uid_to_map(tracer);
+	insert_adapt_kern_data_to_map(tracer, 0, 0);
 
 	// Update protocol filter array
 	update_protocol_filter_array(tracer);
@@ -2709,6 +2906,11 @@ retry_load:
 
 	if ((ret = register_extra_waiting_op("offset-infer-client",
 					     kernel_offset_infer_client,
+					     EXTRA_TYPE_CLIENT)))
+		return ret;
+
+	if ((ret = register_extra_waiting_op("mount-offset-infer",
+					     mount_offset_infer,
 					     EXTRA_TYPE_CLIENT)))
 		return ret;
 
@@ -3155,16 +3357,25 @@ int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf,
 	if (datadump_enable) {
 		bytes = snprintf(buf, buf_len,
 				 "bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
-				 "latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+				 "latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
+				 "file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
+				 "mountID=[%d]\nmntnsID=[%u]\nmountinfo file %s\n",
 				 event->bytes_count, event->operation,
-				 event->offset, event->latency, event->filename,
-				 path_len, mount_file_tag);
+				 event->offset, event->latency, event->mount_source,
+				 event->mount_point, event->file_dir, event->filename,
+				 path_len, fs_type_to_string(event->file_type),
+				 event->mnt_id, event->mntns_id, mount_file_tag);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
-			"latency=[%llu]\nfilename=[%s](len %d)\nmountinfo file %s\n",
+			"latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
+			"file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
+			"mountID=[%d]\nmntnsID=[%u]\nmountinfo file %s\n",
 			event->bytes_count, event->operation, event->offset,
-			event->latency, event->filename, path_len, mount_file_tag);
+			event->latency, event->mount_source, event->mount_point,
+			event->file_dir, event->filename, path_len,
+			fs_type_to_string(event->file_type),
+			event->mnt_id, event->mntns_id, mount_file_tag);
 
 		fflush(stdout);
 	}

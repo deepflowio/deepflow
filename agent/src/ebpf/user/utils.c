@@ -1771,3 +1771,64 @@ uint32_t murmurhash(const void *key, size_t len, uint32_t seed)
 
 	return h1;
 }
+
+size_t u32_to_str_safe(uint32_t value, char *buf, size_t bufsize)
+{
+	char temp[10]; // Maximum digits for uint32_t: 4294967295 -> 10 digits
+	int i = 0;
+
+	if (bufsize == 0) return 0; // Buffer size must be at least 1
+
+	// Handle zero explicitly
+	if (value == 0) {
+		if (bufsize < 2) return 0; // Need space for '0' + '\0'
+		buf[0] = '0';
+		buf[1] = '\0';
+		return 1;
+	}
+
+	// Convert number to string in reverse order
+	while (value > 0) {
+		temp[i++] = '0' + (value % 10);
+		value /= 10;
+	}
+
+	// Check if buffer is large enough
+	if (bufsize <= (size_t)i) return 0;
+
+	// Reverse copy to output buffer
+	for (int j = 0; j < i; j++) {
+		buf[j] = temp[i - j - 1];
+	}
+
+	buf[i] = '\0';
+	return i;
+}
+
+int prepend_prefix_safe(char *buffer, size_t bufsize, const char *prefix)
+{
+	if (!buffer || !prefix || bufsize == 0) {
+		return -1; // invalid input
+	}
+
+	size_t len_prefix = strlen(prefix);
+	if (len_prefix == 0)
+		return 0; // empty prefix, nothing to do
+
+	size_t len_buffer = strlen(buffer);
+
+	// Check if buffer has enough space
+	if (len_prefix + len_buffer + 1 > bufsize) {
+		return -1; // not enough space
+	}
+
+	if (len_prefix > 0) {
+		// Move existing string to make room for prefix
+		memmove(buffer + len_prefix, buffer, len_buffer + 1); // +1 to move '\0'
+
+		// Copy prefix to the start
+		memcpy(buffer, prefix, len_prefix);
+	}
+
+	return 0;
+}
