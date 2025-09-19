@@ -267,6 +267,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
 	dbItems := m.GetMySQLItems().([]*MT)
+	log.Infof("receive add message, resource type: %s, count: %d", s.subResourceTypeName, len(dbItems), logger.NewORGPrefix(md.GetORGID()))
 	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
