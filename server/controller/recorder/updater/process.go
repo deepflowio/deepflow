@@ -132,6 +132,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 		PID:         cloudItem.PID,
 		ProcessName: cloudItem.ProcessName,
 		CommandLine: cloudItem.CommandLine,
+		StartTime:   cloudItem.StartTime,
 		UserName:    cloudItem.UserName,
 		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
