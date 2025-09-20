@@ -428,8 +428,8 @@ static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int 
 	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 16]; // Extra space for JIT markers
 	memset(format_str, 0, sizeof(format_str));
 
-	// Check if this is a JIT-compiled frame (high bit set in eBPF)
-	bool is_jit_frame = (address & 0x8000000000000000ULL) != 0;
+	// Check if this is a JIT-compiled frame (OpenTelemetry-style JIT bit set in eBPF)
+	bool is_jit_frame = (address & 0x4000000000000000ULL) != 0;
 	u32 symbol_id = address & 0xFFFFFFFF;
 
 	for (int i = 0; i < n_symbols; i++) {
@@ -520,13 +520,24 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 			ebpf_warning("bpf table %s not found", MAP_SYMBOL_TABLE_NAME);
 			return NULL;
 		}
-		symbol_t key = {};
-		while (bpf_get_next_key(map->fd, &key, &symbols[n_symbols]) == 0) {
-			int ret = bpf_lookup_elem(map->fd, &key, &symbol_ids[n_symbols]);
-			key = symbols[n_symbols];
-			if (ret == 0) {
+		symbol_t prev_key = {};
+		bool have_prev_key = false;
+		while (n_symbols < MAX_SYMBOL_NUM) {
+			symbol_t current_key = {};
+			int ret =
+			    bpf_get_next_key(map->fd,
+					    have_prev_key ? &prev_key : NULL,
+					    &current_key);
+			if (ret != 0) {
+				break;
+			}
+			if (bpf_lookup_elem(map->fd, &current_key,
+					 &symbol_ids[n_symbols]) == 0) {
+				symbols[n_symbols] = current_key;
 				n_symbols++;
 			}
+			prev_key = current_key;
+			have_prev_key = true;
 		}
 	}
 

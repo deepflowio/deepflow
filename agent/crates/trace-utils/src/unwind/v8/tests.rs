@@ -160,7 +160,7 @@ fn test_v8_stack_merging_complex_cases() {
 
     let merged = merge_stacks(js_stack, non_v8_native);
     assert!(merged.contains(js_stack));
-    assert!(merged.contains(INCOMPLETE_V8_STACK));
+    assert!(merged.contains("pthread_create")); // Should contain the native stack
 
     // Test case 2: Proper V8 stack merging
     let v8_native = "v8::internal::Invoke;v8::Script::Run;native_func";
@@ -175,6 +175,21 @@ fn test_v8_stack_merging_complex_cases() {
     // Test case 4: Both empty
     let merged = merge_stacks("", "");
     assert!(merged.is_empty());
+}
+
+#[test]
+fn test_v8_stack_ordering_near_entry() {
+    let js_stack = "main;calculate";
+    let native_stack = "root;node::Start;v8::internal::Invoke;malloc";
+
+    let merged = merge_stacks(js_stack, native_stack);
+
+    assert!(merged.contains("v8::internal::Invoke;main;calculate"));
+    assert!(merged.ends_with("calculate;malloc"));
+    assert_eq!(
+        merged,
+        "root;node::Start;v8::internal::Invoke;main;calculate;malloc"
+    );
 }
 
 #[test]

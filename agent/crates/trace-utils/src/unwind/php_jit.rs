@@ -166,13 +166,13 @@ impl PhpJitSupport {
         // First determine VM kind
         let vm_kind = self.determine_vm_kind(binary_data)?;
 
-        // Only proceed if we have HYBRID mode (JIT compatible)
-        if vm_kind != ZEND_VM_KIND_HYBRID {
-            debug!(
-                "VM kind 0x{:x} does not support JIT (need HYBRID mode 0x{:x})",
-                vm_kind, ZEND_VM_KIND_HYBRID
-            );
-            return Ok(0);
+        // Check VM kind - prefer HYBRID mode but allow other modes for JIT
+        if vm_kind == ZEND_VM_KIND_HYBRID {
+            // Optimal for JIT
+        } else if vm_kind != 0 {
+            // Not HYBRID but proceeding with JIT recovery
+        } else {
+            // Could not determine VM kind, proceeding with JIT recovery anyway
         }
 
         let obj = object::File::parse(binary_data)?;

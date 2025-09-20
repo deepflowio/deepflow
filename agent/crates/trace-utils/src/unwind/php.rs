@@ -198,6 +198,31 @@ impl MappedFile {
             .map(|s| s.address() + ba))
     }
 
+    /// Find a symbol's runtime absolute address range (start, end-exclusive)
+    fn find_symbol_range(&mut self, name: &str) -> Result<Option<(u64, u64)>> {
+        self.load()?;
+        let ba = self.base_address()?;
+        let obj = object::File::parse(&*self.contents)?;
+
+        let mut syms: Vec<_> = obj
+            .symbols()
+            .chain(obj.dynamic_symbols())
+            .filter(|s| s.address() != 0 && s.name().map(|n| !n.is_empty()).unwrap_or(false))
+            .collect();
+        syms.sort_by_key(|s| s.address());
+
+        let pos = syms
+            .iter()
+            .position(|s| s.name().map(|n| n == name).unwrap_or(false));
+        let Some(idx) = pos else { return Ok(None) };
+        let start = syms[idx].address() + ba;
+        let end = syms
+            .get(idx + 1)
+            .map(|s| s.address() + ba)
+            .unwrap_or(start + 0x2000); // conservative fallback if size is unknown
+        Ok(Some((start, end)))
+    }
+
     /// Extract PHP version from rodata by looking for "X-Powered-By: PHP/" string
     fn extract_version_from_rodata(&mut self) -> Result<Option<Version>> {
         self.load()?;
@@ -359,11 +384,28 @@ impl Interpreter {
         }
         Err(error_not_supported_version(self.pid, self.version.clone()))
     }
+
+    /// Return the runtime absolute address range of execute_ex if available
+    fn execute_ex_range(&mut self) -> Result<Option<(u64, u64)>> {
+        // Try executable first
+        if let Some((s, e)) = self.exe.find_symbol_range("execute_ex")? {
+            return Ok(Some((s, e)));
+        }
+        // Fallback to libphp if present
+        if let Some(lib) = self.lib.as_mut() {
+            if let Some((s, e)) = lib.find_symbol_range("execute_ex")? {
+                return Ok(Some((s, e)));
+            }
+        }
+        Ok(None)
+    }
 }
 
 pub struct InterpreterInfo {
     pub version: Version,
     pub executor_globals_address: u64,
+    pub execute_ex_start: u64,
+    pub execute_ex_end: u64,
 }
 
 impl InterpreterInfo {
@@ -386,9 +428,12 @@ impl InterpreterInfo {
         );
 
         let mut intp = Interpreter::new(pid, exe_area, lib_area)?;
+        let (execute_ex_start, execute_ex_end) = intp.execute_ex_range()?.unwrap_or((0, 0));
         Ok(Self {
             version: intp.version.clone(),
             executor_globals_address: intp.executor_globals_address()?,
+            execute_ex_start,
+            execute_ex_end,
         })
     }
 
@@ -408,7 +453,11 @@ impl InterpreterInfo {
 pub struct PhpUnwindInfo {
     pub executor_globals_address: u64,
     pub jit_return_address: u64,
+    pub execute_ex_start: u64,
+    pub execute_ex_end: u64,
     pub offsets_id: u8,
+    pub has_jit: u8,
+    pub _reserved: [u8; 6],
 }
 
 #[repr(C)]
@@ -733,7 +782,15 @@ impl PhpUnwindTable {
         let info = PhpUnwindInfo {
             executor_globals_address: info.executor_globals_address,
             jit_return_address,
+            execute_ex_start: info.execute_ex_start,
+            execute_ex_end: info.execute_ex_end,
             offsets_id,
+            has_jit: if info.version >= Version::new(8, 0, 0) {
+                1
+            } else {
+                0
+            },
+            _reserved: [0; 6],
         };
         self.update_unwind_info_map(pid, &info);
     }
@@ -836,7 +893,62 @@ impl PhpUnwindTable {
 }
 
 // const PHP_EVAL_FNAME: &'static str = "eval"; // Currently unused
-const INCOMPLETE_PHP_STACK: &'static str = "[lost] incomplete PHP c stack";
+// const INCOMPLETE_PHP_STACK: &'static str = "[lost] incomplete PHP c stack"; // Currently unused
+
+/// Find PHP entry point in native stack for optimal insertion
+/// Returns the character position where PHP stack should be inserted
+fn find_php_entry_point(u_trace: &str) -> Option<usize> {
+    // Look for key PHP functions that indicate where PHP execution begins
+    let php_markers = [
+        "execute_ex",           // Primary PHP execution function
+        "zend_execute",         // Zend engine execution
+        "php_execute_script",   // Script execution entry point
+        "zend_execute_scripts", // Script execution
+    ];
+
+    for marker in &php_markers {
+        if let Some(pos) = u_trace.find(marker) {
+            // Find the start of this frame (beginning of line or after ';')
+            let frame_start = u_trace[..pos].rfind(';').map(|p| p + 1).unwrap_or(0);
+            return Some(frame_start);
+        }
+    }
+
+    None
+}
+
+/// Split trace string at specified character position
+fn split_at_position(trace: &str, pos: usize) -> (&str, &str) {
+    if pos == 0 {
+        ("", trace)
+    } else if pos >= trace.len() {
+        (trace, "")
+    } else {
+        // Ensure we split at frame boundary (at ';' or start)
+        let actual_pos = if trace.chars().nth(pos) == Some(';') {
+            pos + 1
+        } else {
+            pos
+        };
+        (&trace[..pos], &trace[actual_pos..])
+    }
+}
+
+fn is_php_runtime_helper(frame: &str) -> bool {
+    frame.contains("_emalloc")
+        || frame.contains("_efree")
+        || frame.contains("malloc")
+        || frame.contains("free")
+        || frame.contains("zend_mm_")
+        || frame.contains("rc_dtor_func")
+        || frame.contains("add_function")
+        || frame.contains("sub_function")
+        || frame.contains("mul_function")
+        || frame.contains("div_function")
+        || frame.contains("pow_function")
+        || frame.contains("concat_function")
+        || (frame.contains("zend_") && !frame.contains("zend_execute"))
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn merge_php_stacks(
@@ -859,41 +971,128 @@ pub unsafe extern "C" fn merge_php_stacks(
 
     let mut trace = Vec::with_capacity(len);
 
-    let n_php_frames = i_trace.split(";").count();
-    let n_execute_ex_frames = u_trace
-        .split(";")
-        .filter(|c_func| c_func.contains("execute_ex"))
-        .count();
+    // OpenTelemetry-style stack merging: simple and linear
+    // The goal is to show a natural call flow from main() to PHP functions
 
-    if n_execute_ex_frames == 0 {
-        // native stack not correctly unwinded, just put it on top of PHP frames
-        let _ = write!(
-            &mut trace,
-            "{};{};{}",
-            i_trace, INCOMPLETE_PHP_STACK, u_trace
-        );
-    } else if n_php_frames == n_execute_ex_frames {
-        // no native stack
+    if i_trace.is_empty() && u_trace.is_empty() {
+        // Both empty, nothing to merge
+        return 0;
+    } else if i_trace.is_empty() {
+        // Only native stack available
+        let _ = write!(&mut trace, "{}", u_trace);
+    } else if u_trace.is_empty() {
+        // Only PHP stack available
         let _ = write!(&mut trace, "{}", i_trace);
-    } else if n_php_frames == n_execute_ex_frames - 1 {
-        // PHP calls native, just put everything after the last execute_ex on top of PHP frames
-        if let Some(loc) = u_trace.rfind("execute_ex") {
-            let start_pos = loc + "execute_ex".len();
-            let _ = write!(&mut trace, "{}{}", i_trace, &u_trace[start_pos..]);
-        } else {
-            let _ = write!(&mut trace, "{}", i_trace);
-        }
     } else {
-        let _ = write!(
-            &mut trace,
-            "{};{};{}",
-            i_trace, INCOMPLETE_PHP_STACK, u_trace
-        );
+        // Both stacks available - find the right insertion point
+        // Look for PHP entry points in native stack
+        if let Some(php_entry_pos) = find_php_entry_point(u_trace) {
+            let (before_php, from_php) = split_at_position(u_trace, php_entry_pos);
+            let clean_i_trace = if i_trace.starts_with(';') {
+                &i_trace[1..]
+            } else {
+                i_trace
+            };
+
+            let mut merged_frames: Vec<&str> = Vec::new();
+
+            // Frames before the PHP entry point (main, start_thread, etc.)
+            merged_frames.extend(before_php.split(';').filter(|f| !f.is_empty()));
+
+            // Split native portion at entry: execute_ex should come before PHP frames
+            let mut native_frames = from_php.split(';').filter(|f| !f.is_empty());
+            if let Some(entry_frame) = native_frames.next() {
+                merged_frames.push(entry_frame);
+            }
+
+            // Insert PHP interpreter/userland frames right after execute_ex
+            if !clean_i_trace.is_empty() {
+                merged_frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+            }
+
+            // Any remaining native frames (helpers like _emalloc) must appear after PHP frames
+            merged_frames.extend(native_frames);
+
+            if merged_frames.is_empty() {
+                // Fallback if everything was filtered out
+                merged_frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
+            }
+
+            merged_frames.dedup();
+            let merged_string = merged_frames.join(";");
+            let _ = write!(&mut trace, "{}", merged_string);
+        } else {
+            // No clear PHP entry point found in native stack
+            // But we know there's a calling relationship: native code calls PHP functions
+
+            // Clean up PHP stack (remove leading semicolon if present)
+            let clean_i_trace = if i_trace.starts_with(';') {
+                &i_trace[1..]
+            } else {
+                i_trace
+            };
+
+            if clean_i_trace.is_empty() {
+                let _ = write!(&mut trace, "{}", u_trace);
+            } else {
+                // Check if native stack contains likely interpreter functions
+                if u_trace.contains("execute_ex")
+                    || u_trace.contains("zend_execute")
+                    || u_trace.contains("php_execute_script")
+                {
+                    let mut frames: Vec<&str> = Vec::new();
+                    frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
+                    frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+                    frames.dedup();
+                    let _ = write!(&mut trace, "{}", frames.join(";"));
+                } else {
+                    // No clear interpreter functions, but native stack might contain C helpers
+                    let native_frames: Vec<&str> =
+                        u_trace.split(';').filter(|f| !f.is_empty()).collect();
+                    let has_c_helpers = native_frames
+                        .iter()
+                        .any(|frame| is_php_runtime_helper(frame));
+
+                    let mut frames: Vec<&str> = Vec::new();
+                    if has_c_helpers {
+                        let helper_idx = native_frames
+                            .iter()
+                            .rposition(|frame| is_php_runtime_helper(frame))
+                            .unwrap_or(native_frames.len().saturating_sub(1));
+
+                        frames.extend(native_frames.iter().take(helper_idx));
+                        frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+                        frames.extend(native_frames.iter().skip(helper_idx));
+                    } else {
+                        frames.extend(native_frames.iter());
+                        frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+                    }
+
+                    frames.dedup();
+                    let merged = frames.join(";");
+                    let _ = write!(&mut trace, "{}", merged);
+                }
+            }
+        }
     }
 
+    let final_trace = String::from_utf8_lossy(&trace);
+
+    // Clean up double semicolons and leading/trailing semicolons
+    let cleaned_trace = final_trace
+        .replace(";;", ";")
+        .trim_start_matches(';')
+        .trim_end_matches(';')
+        .to_string();
+
     trace_str.write_bytes(0, len);
-    let written = trace.len();
-    std::ptr::copy_nonoverlapping(trace.as_ptr(), trace_str as *mut u8, written);
+    let cleaned_bytes = cleaned_trace.as_bytes();
+    let written = cleaned_bytes.len().min(len - 1); // Leave space for null terminator
+    std::ptr::copy_nonoverlapping(cleaned_bytes.as_ptr(), trace_str as *mut u8, written);
+    if written < len {
+        (trace_str as *mut u8).add(written).write(0); // Add null terminator
+    }
+
     written
 }
 

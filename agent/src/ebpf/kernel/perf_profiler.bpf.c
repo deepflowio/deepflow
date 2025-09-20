@@ -120,16 +120,16 @@ MAP_HASH(python_unwind_info_map, __u32, python_unwind_info_t, 65536, FEATURE_FLA
 MAP_HASH(python_offsets_map, __u8, python_offsets_t, 1, FEATURE_FLAG_PROFILE)
 
 MAP_HASH(php_unwind_info_map, __u32, php_unwind_info_t, 65536, FEATURE_FLAG_PROFILE)
-MAP_HASH(php_offsets_map, __u8, php_offsets_t, 1, FEATURE_FLAG_PROFILE)
+MAP_HASH(php_offsets_map, __u8, php_offsets_t, 8, FEATURE_FLAG_PROFILE)
 
 MAP_HASH(v8_unwind_info_map, __u32, v8_unwind_info_t, 65536, FEATURE_FLAG_PROFILE)
-MAP_HASH(v8_offsets_map, __u8, v8_offsets_t, 1, FEATURE_FLAG_PROFILE)
+MAP_HASH(v8_offsets_map, __u8, v8_offsets_t, 8, FEATURE_FLAG_PROFILE)
 
 struct bpf_map_def SEC("maps") __symbol_table = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(symbol_t),
     .value_size = sizeof(__u32),
-    .max_entries = 1024,
+    .max_entries = 8192,
     .feat_flags = FEATURE_FLAG_PROFILE,
 };
 MAP_PERARRAY(symbol_index_storage, __u32, __u32, 1, FEATURE_FLAG_PROFILE)
@@ -160,6 +160,11 @@ typedef struct {
 	void *php_execute_data_ptr;
 	__u8 php_offsets_id;
 	__u64 php_jit_return_address; // JIT return address for PHP 8+ mixed stacks
+	__u8 php_has_jit;
+	__u8 _php_reserved_pad[7];
+
+	__u64 php_execute_ex_start;   // execute_ex start (abs addr)
+	__u64 php_execute_ex_end;     // execute_ex end (exclusive)
 
 	void *v8_frame_ptr;
 	__u8 v8_offsets_id;
@@ -183,6 +188,9 @@ void reset_unwind_state(unwind_state_t * state)
 	state->php_execute_data_ptr = NULL;
 	state->php_offsets_id = 0;
 	state->php_jit_return_address = 0;
+	state->php_has_jit = 0;
+	state->php_execute_ex_start = 0;
+	state->php_execute_ex_end = 0;
 	state->v8_frame_ptr = NULL;
 	state->v8_offsets_id = 0;
 	state->v8_current_pc = 0;
@@ -642,6 +650,12 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 	    php_unwind_info_map__lookup(&state->key.tgid);
 	if (php_unwind_info != NULL) {
 		pre_php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
+	} else {
+		php_unwind_info = php_unwind_info_map__lookup(&state->key.pid);
+		if (php_unwind_info != NULL) {
+			pre_php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
+		} else {
+		}
 	}
 
 	v8_unwind_info_t *v8_unwind_info =
@@ -1009,6 +1023,7 @@ int pre_php_unwind(void *ctx, unwind_state_t * state,
         return 0;
 	}
 	state->php_offsets_id = php_unwind_info->offsets_id;
+	state->php_has_jit = php_unwind_info->has_jit;
 
 	php_offsets_t *php_offsets =
 	    php_offsets_map__lookup(&state->php_offsets_id);
@@ -1028,6 +1043,10 @@ int pre_php_unwind(void *ctx, unwind_state_t * state,
 	// Store JIT return address for PHP 8+ JIT unwinding
 	// This enables detection and proper handling of mixed interpreter/JIT stacks
 	state->php_jit_return_address = php_unwind_info->jit_return_address;
+
+	// Record execute_ex range for lightweight JIT detection
+	state->php_execute_ex_start = php_unwind_info->execute_ex_start;
+	state->php_execute_ex_end   = php_unwind_info->execute_ex_end;
 
 	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
 	return 0;
@@ -1109,9 +1128,16 @@ __u32 read_php_symbol(php_offsets_t * php_offsets, void *execute_data_ptr,
 
 	if (function_name_ptr) {
 		// Read the string data from zend_string
-		bpf_probe_read_user_str(&symbol->method_name,
-					sizeof(symbol->method_name),
-					function_name_ptr + php_offsets->string.val);
+		int str_result = bpf_probe_read_user_str(&symbol->method_name,
+		                                        sizeof(symbol->method_name),
+		                                        function_name_ptr + php_offsets->string.val);
+		if (str_result > 0) {
+			//bpf_debug("DEBUG: PHP method name extracted successfully\n");
+		} else {
+			//bpf_debug("DEBUG: Failed to extract PHP method name string\n");
+		}
+	} else {
+		//bpf_debug("DEBUG: function_name_ptr is NULL\n");
 	}
 
 	// Try to read class name from zend_function->common.scope
@@ -1140,26 +1166,33 @@ __u32 read_php_symbol(php_offsets_t * php_offsets, void *execute_data_ptr,
 }
 
 // Helper function to detect if we've encountered JIT code in the call stack
+// Implementation based on multiple PHP JIT characteristics
 static inline __attribute__ ((always_inline))
-bool is_php_jit_frame(unwind_state_t *state, void *execute_data_ptr, void *zend_function_ptr) {
-	// If no JIT return address is configured, no JIT support
+bool is_php_jit_frame(unwind_state_t *state, void *current_pc) {
+	// If no JIT return address is configured, no JIT support available
 	if (state->php_jit_return_address == 0) {
 		return false;
 	}
 
-	// Simple heuristic: if the execute_data pointer is near the JIT return address,
-	// this might be a JIT frame. In a complete implementation, we would:
-	// 1. Check if the current PC is in a JIT memory region
-	// 2. Validate the execute_data structure for JIT vs interpreter frames
-	// 3. Use OPcache JIT buffer mapping for precise detection
+	// Strategy 1: Check if current PC matches known JIT return address
+	if ((__u64)current_pc == state->php_jit_return_address) {
+		return true;
+	}
 
-	__u64 addr_diff = ((__u64)execute_data_ptr > state->php_jit_return_address) ?
-		(__u64)execute_data_ptr - state->php_jit_return_address :
-		state->php_jit_return_address - (__u64)execute_data_ptr;
+	// Strategy 2: More restrictive JIT region detection
+	// Only consider it JIT if we're in a high memory region AND close to JIT return address
+	__u64 pc_addr = (__u64)current_pc;
+	if (pc_addr > 0x7f0000000000ULL && state->php_jit_return_address > 0x7f0000000000ULL) {
+		// Check if PC is within reasonable distance of JIT return address (same memory segment)
+		__u64 distance = (pc_addr > state->php_jit_return_address) ?
+			(pc_addr - state->php_jit_return_address) :
+			(state->php_jit_return_address - pc_addr);
+		if (distance < 0x10000ULL) { // Within 64KB - much more restrictive
+			return true;
+		}
+	}
 
-	// If within 64KB range of JIT return address, consider it JIT-related
-	// This is a simplified heuristic - production code would use more precise detection
-	return addr_diff < 0x10000;
+	return false;
 }
 
 static inline __attribute__ ((always_inline))
@@ -1174,6 +1207,16 @@ int php_unwind(void *ctx, unwind_state_t * state,
 	if (php_offsets == NULL) {
 		goto output;
 	}
+
+	// Lightweight JIT detection based on current PC vs execute_ex range
+	__u64 ip = state->regs.ip;
+	bool pc_in_execute_ex = (state->php_execute_ex_start != 0 &&
+					 state->php_execute_ex_end   != 0 &&
+					 ip >= state->php_execute_ex_start &&
+					 ip <  state->php_execute_ex_end);
+	// Consider samples outside execute_ex() as JIT; gate by has_jit flag
+	bool sample_is_jit = state->php_has_jit &&
+	    (!pc_in_execute_ex || is_php_jit_frame(state, (void *)ip));
 
 	symbol_t symbol;
 
@@ -1190,38 +1233,33 @@ int php_unwind(void *ctx, unwind_state_t * state,
 			goto output;
 		}
 
-		// Enhanced JIT detection and handling
-		bool is_jit_frame = is_php_jit_frame(state, state->php_execute_data_ptr, zend_function_ptr);
+		// Mark only the top PHP frame as JIT when native PC is outside execute_ex
+		bool is_jit_frame = sample_is_jit && (i == 0);
 
 		__builtin_memset(&symbol, 0, sizeof(symbol));
-		__u64 lineno = read_php_symbol(php_offsets, state->php_execute_data_ptr, zend_function_ptr, &symbol);
+		__u64 lineno =
+		    read_php_symbol(php_offsets, state->php_execute_data_ptr,
+				    zend_function_ptr, &symbol);
 
-		if (lineno == 0) {
-			// For JIT frames, we might not get valid symbols from interpreter structures
-			// In this case, we could add a special JIT marker frame
-			if (is_jit_frame && state->php_jit_return_address != 0) {
-				// Add a synthetic JIT frame marker
-				// This helps identify JIT code in the call stack
-				__builtin_memcpy(symbol.class_name, "[JIT]", 6);
-				__builtin_memcpy(symbol.method_name, "compiled_code", 14);
-				lineno = 0; // No line number for JIT code
-				__u64 jit_symbol_id = get_symbol_id(&symbol);
-				add_frame(&state->intp_stack, jit_symbol_id);
-			} else {
-				goto output;
-			}
-		} else {
+		if (lineno == 0 && symbol.method_name[0] == 0 && symbol.class_name[0] == 0) {
+			const char unknown_method[] = "<php-unknown>";
+			__builtin_memcpy(&symbol.method_name, unknown_method,
+					 sizeof(unknown_method));
+		}
+
+		if (symbol.method_name[0] != 0 || symbol.class_name[0] != 0) {
 			__u64 symbol_id = get_symbol_id(&symbol);
+			__u64 frame_value = (lineno << 32) | symbol_id;
 
-			// For JIT frames, we can add additional metadata
+			// Enhanced JIT handling: Mark JIT frames with special bit
+			// This preserves the actual PHP function names while marking JIT compilation
 			if (is_jit_frame) {
-				// Mark this frame as JIT-compiled by setting a high bit in the frame data
-				// This preserves the symbol information while indicating JIT compilation
-				add_frame(&state->intp_stack, (lineno << 32) | symbol_id | 0x8000000000000000ULL);
-			} else {
-				// Normal interpreter frame
-				add_frame(&state->intp_stack, (lineno << 32) | symbol_id);
+				// Mark this frame as JIT-compiled by setting a JIT bit
+				// This allows user-space to display actual function names with [JIT] prefix
+				frame_value |= 0x4000000000000000ULL;
 			}
+
+			add_frame(&state->intp_stack, frame_value);
 		}
 
 		// Move to previous execute_data
@@ -1303,6 +1341,9 @@ PROGPE(php_unwind) (struct bpf_perf_event_data * ctx) {
 	if (state == NULL) {
 		return 0;
 	}
+
+	// Best-effort: fetch user registers so php_unwind() can access current IP
+	get_usermode_regs((struct pt_regs *)&ctx->regs, &state->regs);
 
 	php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
 

@@ -83,7 +83,11 @@ typedef struct {
 typedef struct {
     uint64_t executor_globals_address;
     uint64_t jit_return_address;
-    uint8_t offsets_id;
+    uint64_t execute_ex_start;   // absolute address of execute_ex start
+    uint64_t execute_ex_end;     // absolute address of execute_ex end (exclusive)
+    uint8_t  offsets_id;
+    uint8_t  has_jit;
+    uint8_t  _reserved[6];
 } php_unwind_info_t;
 
 typedef struct {
