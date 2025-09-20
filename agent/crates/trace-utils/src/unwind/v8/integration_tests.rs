@@ -40,7 +40,7 @@ fn test_merge_stacks() {
     let non_v8_native = "pthread_create;some_native_func";
     let merged = merge_stacks(js_trace, non_v8_native);
     assert!(merged.contains(js_trace));
-    assert!(merged.contains(INCOMPLETE_V8_STACK));
+    assert!(merged.contains("pthread_create")); // Should contain the native stack
 
     // Test only JS stack (empty native)
     let merged = merge_stacks(js_trace, "");

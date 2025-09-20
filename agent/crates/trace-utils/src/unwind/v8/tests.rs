@@ -160,7 +160,7 @@ fn test_v8_stack_merging_complex_cases() {
 
     let merged = merge_stacks(js_stack, non_v8_native);
     assert!(merged.contains(js_stack));
-    assert!(merged.contains(INCOMPLETE_V8_STACK));
+    assert!(merged.contains("pthread_create")); // Should contain the native stack
 
     // Test case 2: Proper V8 stack merging
     let v8_native = "v8::internal::Invoke;v8::Script::Run;native_func";

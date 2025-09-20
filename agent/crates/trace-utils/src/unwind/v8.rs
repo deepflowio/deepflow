@@ -29,7 +29,7 @@ use crate::{
 };
 
 // V8 stack merging constants
-const INCOMPLETE_V8_STACK: &'static str = "[lost] incomplete V8 c stack";
+// const INCOMPLETE_V8_STACK: &'static str = "[lost] incomplete V8 c stack"; // Currently unused
 
 // V8 Frame type constants (matching OpenTelemetry implementation)
 const V8_FILE_TYPE_MARKER: u64 = 0x0;
@@ -1029,33 +1029,81 @@ fn detect_v8_process(pid: u32) -> bool {
 
 /// Merge V8 interpreter stack with native stack
 pub fn merge_stacks(interpreter_trace: &str, native_trace: &str) -> String {
-    if interpreter_trace.is_empty() {
+    if interpreter_trace.is_empty() && native_trace.is_empty() {
+        return String::new();
+    } else if interpreter_trace.is_empty() {
         return native_trace.to_string();
-    }
-
-    if native_trace.is_empty() {
+    } else if native_trace.is_empty() {
         return interpreter_trace.to_string();
     }
 
+    // Clean up V8 stack (remove leading semicolon if present)
+    let clean_js_trace = if interpreter_trace.starts_with(';') {
+        &interpreter_trace[1..]
+    } else {
+        interpreter_trace
+    };
+
     // Parse and enhance V8 frames with better symbolization
-    let enhanced_js_trace = enhance_v8_trace(interpreter_trace);
+    let enhanced_js_trace = enhance_v8_trace(clean_js_trace);
 
-    // Check if native stack contains V8 internal functions
-    let has_v8_frames = native_trace.contains("v8::internal::")
-        || native_trace.contains("v8::Script::")
-        || native_trace.contains("v8::Context::");
+    // Look for V8 engine entry points in native stack
+    let v8_entry_patterns = [
+        "v8::internal::",
+        "v8::Script::",
+        "v8::Context::",
+        "v8::Function::",
+        "node::",
+        "node::Execute",
+        "node::Start",
+    ];
 
-    if !has_v8_frames {
-        // Native stack may not be properly unwound, mark it as incomplete
-        return format!(
-            "{};{};{}",
-            enhanced_js_trace, INCOMPLETE_V8_STACK, native_trace
-        );
+    let mut found_v8_entry = false;
+    for pattern in &v8_entry_patterns {
+        if native_trace.contains(pattern) {
+            found_v8_entry = true;
+            break;
+        }
     }
 
-    // For V8, we typically want to show JavaScript frames first, then native frames
-    // JavaScript frames are more relevant for application-level profiling
-    format!("{};{}", enhanced_js_trace, native_trace)
+    if !found_v8_entry {
+        // Check for C helper patterns that might be called FROM JavaScript
+        let has_c_helpers = native_trace.contains("malloc")
+            || native_trace.contains("free")
+            || native_trace.contains("_Z")
+            || native_trace.contains("__libc");
+
+        if has_c_helpers {
+            // Native stack likely contains C helpers called by V8
+            // Put JS functions before C helpers: main -> JS -> C_helpers
+            let result = format!("{};{}", enhanced_js_trace, native_trace);
+            return result
+                .replace(";;", ";")
+                .trim_start_matches(';')
+                .trim_end_matches(';')
+                .to_string();
+        } else {
+            // Default case: assume native stack is main program calling V8
+            let result = format!("{};{}", native_trace, enhanced_js_trace);
+            return result
+                .replace(";;", ";")
+                .trim_start_matches(';')
+                .trim_end_matches(';')
+                .to_string();
+        }
+    }
+
+    // Found V8 entry points - this is the ideal case
+    // For V8, we typically want to show the calling sequence properly
+    // The native stack should contain the V8 engine calls, then JS functions
+    let result = format!("{};{}", native_trace, enhanced_js_trace);
+
+    // Clean up double semicolons and leading/trailing semicolons
+    result
+        .replace(";;", ";")
+        .trim_start_matches(';')
+        .trim_end_matches(';')
+        .to_string()
 }
 
 /// Enhance V8 trace with better symbolization
