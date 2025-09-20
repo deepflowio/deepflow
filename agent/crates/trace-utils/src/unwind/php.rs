@@ -836,7 +836,46 @@ impl PhpUnwindTable {
 }
 
 // const PHP_EVAL_FNAME: &'static str = "eval"; // Currently unused
-const INCOMPLETE_PHP_STACK: &'static str = "[lost] incomplete PHP c stack";
+// const INCOMPLETE_PHP_STACK: &'static str = "[lost] incomplete PHP c stack"; // Currently unused
+
+/// Find PHP entry point in native stack for optimal insertion
+/// Returns the character position where PHP stack should be inserted
+fn find_php_entry_point(u_trace: &str) -> Option<usize> {
+    // Look for key PHP functions that indicate where PHP execution begins
+    let php_markers = [
+        "execute_ex",           // Primary PHP execution function
+        "zend_execute",         // Zend engine execution
+        "php_execute_script",   // Script execution entry point
+        "zend_execute_scripts", // Script execution
+    ];
+
+    for marker in &php_markers {
+        if let Some(pos) = u_trace.find(marker) {
+            // Find the start of this frame (beginning of line or after ';')
+            let frame_start = u_trace[..pos].rfind(';').map(|p| p + 1).unwrap_or(0);
+            return Some(frame_start);
+        }
+    }
+
+    None
+}
+
+/// Split trace string at specified character position
+fn split_at_position(trace: &str, pos: usize) -> (&str, &str) {
+    if pos == 0 {
+        ("", trace)
+    } else if pos >= trace.len() {
+        (trace, "")
+    } else {
+        // Ensure we split at frame boundary (at ';' or start)
+        let actual_pos = if trace.chars().nth(pos) == Some(';') {
+            pos + 1
+        } else {
+            pos
+        };
+        (&trace[..pos], &trace[actual_pos..])
+    }
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn merge_php_stacks(
@@ -859,41 +898,117 @@ pub unsafe extern "C" fn merge_php_stacks(
 
     let mut trace = Vec::with_capacity(len);
 
-    let n_php_frames = i_trace.split(";").count();
-    let n_execute_ex_frames = u_trace
-        .split(";")
-        .filter(|c_func| c_func.contains("execute_ex"))
-        .count();
+    // OpenTelemetry-style stack merging: simple and linear
+    // The goal is to show a natural call flow from main() to PHP functions
 
-    if n_execute_ex_frames == 0 {
-        // native stack not correctly unwinded, just put it on top of PHP frames
-        let _ = write!(
-            &mut trace,
-            "{};{};{}",
-            i_trace, INCOMPLETE_PHP_STACK, u_trace
-        );
-    } else if n_php_frames == n_execute_ex_frames {
-        // no native stack
+    if i_trace.is_empty() && u_trace.is_empty() {
+        // Both empty, nothing to merge
+        return 0;
+    } else if i_trace.is_empty() {
+        // Only native stack available
+        let _ = write!(&mut trace, "{}", u_trace);
+    } else if u_trace.is_empty() {
+        // Only PHP stack available
         let _ = write!(&mut trace, "{}", i_trace);
-    } else if n_php_frames == n_execute_ex_frames - 1 {
-        // PHP calls native, just put everything after the last execute_ex on top of PHP frames
-        if let Some(loc) = u_trace.rfind("execute_ex") {
-            let start_pos = loc + "execute_ex".len();
-            let _ = write!(&mut trace, "{}{}", i_trace, &u_trace[start_pos..]);
-        } else {
-            let _ = write!(&mut trace, "{}", i_trace);
-        }
     } else {
-        let _ = write!(
-            &mut trace,
-            "{};{};{}",
-            i_trace, INCOMPLETE_PHP_STACK, u_trace
-        );
+        // Both stacks available - find the right insertion point
+        // Look for PHP entry points in native stack
+        if let Some(php_entry_pos) = find_php_entry_point(u_trace) {
+            // Split native stack at PHP entry point and insert PHP stack
+            let (before_php, from_php) = split_at_position(u_trace, php_entry_pos);
+            // Clean up PHP stack (remove leading semicolon if present)
+            let clean_i_trace = if i_trace.starts_with(';') {
+                &i_trace[1..]
+            } else {
+                i_trace
+            };
+
+            if !before_php.is_empty() && !from_php.is_empty() {
+                // Correct order: before_entry -> entry_point -> PHP_functions
+                // execute_ex should call PHP functions, not the other way around
+                if clean_i_trace.is_empty() {
+                    let _ = write!(&mut trace, "{};{}", before_php, from_php);
+                } else {
+                    let _ = write!(&mut trace, "{};{};{}", before_php, from_php, clean_i_trace);
+                }
+            } else if !before_php.is_empty() {
+                if clean_i_trace.is_empty() {
+                    let _ = write!(&mut trace, "{}", before_php);
+                } else {
+                    let _ = write!(&mut trace, "{};{}", before_php, clean_i_trace);
+                }
+            } else {
+                // from_php (like execute_ex) should call i_trace (PHP functions)
+                if clean_i_trace.is_empty() {
+                    let _ = write!(&mut trace, "{}", from_php);
+                } else {
+                    let _ = write!(&mut trace, "{};{}", from_php, clean_i_trace);
+                }
+            }
+        } else {
+            // No clear PHP entry point found in native stack
+            // But we know there's a calling relationship: native code calls PHP functions
+
+            // Clean up PHP stack (remove leading semicolon if present)
+            let clean_i_trace = if i_trace.starts_with(';') {
+                &i_trace[1..]
+            } else {
+                i_trace
+            };
+
+            if clean_i_trace.is_empty() {
+                let _ = write!(&mut trace, "{}", u_trace);
+            } else {
+                // Check if native stack contains likely interpreter functions
+                if u_trace.contains("execute_ex")
+                    || u_trace.contains("zend_execute")
+                    || u_trace.contains("php_execute_script")
+                {
+                    // Found interpreter functions - PHP user functions should come after them
+                    // This handles cases where find_php_entry_point missed the entry point
+                    let _ = write!(&mut trace, "{};{}", u_trace, clean_i_trace);
+                } else {
+                    // No clear interpreter functions, but native stack might contain C helpers
+                    // that are called FROM PHP functions (like _emalloc, malloc, etc.)
+                    // In this case, PHP functions should come before C helpers
+                    // Check for common C helper patterns
+                    let has_c_helpers = u_trace.contains("_emalloc")
+                        || u_trace.contains("_efree")
+                        || u_trace.contains("malloc")
+                        || u_trace.contains("free")
+                        || u_trace.contains("zend_mm_")
+                        || u_trace.contains("rc_dtor_func");
+
+                    if has_c_helpers {
+                        // Native stack likely contains C helpers called by PHP
+                        // Put PHP functions before C helpers: main -> PHP -> C_helpers
+                        let _ = write!(&mut trace, "{};{}", clean_i_trace, u_trace);
+                    } else {
+                        // Default case: assume native stack is main program calling PHP
+                        let _ = write!(&mut trace, "{};{}", u_trace, clean_i_trace);
+                    }
+                }
+            }
+        }
     }
 
+    let final_trace = String::from_utf8_lossy(&trace);
+
+    // Clean up double semicolons and leading/trailing semicolons
+    let cleaned_trace = final_trace
+        .replace(";;", ";")
+        .trim_start_matches(';')
+        .trim_end_matches(';')
+        .to_string();
+
     trace_str.write_bytes(0, len);
-    let written = trace.len();
-    std::ptr::copy_nonoverlapping(trace.as_ptr(), trace_str as *mut u8, written);
+    let cleaned_bytes = cleaned_trace.as_bytes();
+    let written = cleaned_bytes.len().min(len - 1); // Leave space for null terminator
+    std::ptr::copy_nonoverlapping(cleaned_bytes.as_ptr(), trace_str as *mut u8, written);
+    if written < len {
+        (trace_str as *mut u8).add(written).write(0); // Add null terminator
+    }
+
     written
 }
 

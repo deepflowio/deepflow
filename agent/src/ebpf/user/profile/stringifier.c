@@ -439,8 +439,8 @@ static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int 
 	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 16]; // Extra space for JIT markers
 	memset(format_str, 0, sizeof(format_str));
 
-	// Check if this is a JIT-compiled frame (high bit set in eBPF)
-	bool is_jit_frame = (address & 0x8000000000000000ULL) != 0;
+	// Check if this is a JIT-compiled frame (OpenTelemetry-style JIT bit set in eBPF)
+	bool is_jit_frame = (address & 0x4000000000000000ULL) != 0;
 	u32 symbol_id = address & 0xFFFFFFFF;
 
 	for (int i = 0; i < n_symbols; i++) {
@@ -533,10 +533,13 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		}
 		symbol_t key = {};
 		while (bpf_get_next_key(map->fd, &key, &symbols[n_symbols]) == 0) {
-			int ret = bpf_lookup_elem(map->fd, &key, &symbol_ids[n_symbols]);
-			key = symbols[n_symbols];
+			int ret = bpf_lookup_elem(map->fd, &symbols[n_symbols], &symbol_ids[n_symbols]);
+			key = symbols[n_symbols];  // Update key for next iteration
 			if (ret == 0) {
 				n_symbols++;
+				if (n_symbols >= MAX_SYMBOL_NUM) {
+					break;
+				}
 			}
 		}
 	}
