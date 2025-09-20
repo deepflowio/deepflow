@@ -7232,6 +7232,99 @@ processors:
 Due to the response with data id 0x04 has different struct in
 different version, it may has one byte before row affect.
 
+##### ISO8583 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583}
+
+###### Value Translation {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          translation_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to perform field value translation
+
+###### PAN Obfuscate {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          pan_obfuscate: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to obfuscate the Primary Account Number (PAN).
+
+###### Ignore Fields {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.omit_fields}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.omit_fields`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          omit_fields: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 128] |
+
+**Description**:
+
+Ignore the data of fields
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}

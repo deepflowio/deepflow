@@ -7065,6 +7065,99 @@ processors:
 在不同的 Oracle 版本中，ID 为 0x04 的响应会有不同的数据结构，如果环境中该响应数据的
 `影响行数`前有 1byte 的额外数据，请开启此开关。
 
+##### ISO8583 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583}
+
+###### 数据翻译 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          translation_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否对解析后的数据进行查表翻译后展示
+
+###### 卡号脱敏 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          pan_obfuscate: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否对卡号脱敏
+
+###### 忽略字段 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.omit_fields}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.omit_fields`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          omit_fields: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 128] |
+
+**详细描述**:
+
+忽略此配置中的字段
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}

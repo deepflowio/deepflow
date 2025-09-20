@@ -1588,6 +1588,24 @@ impl Default for OracleConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Iso8583Config {
+    pub omit_fields: Vec<u8>,
+    pub translation_enabled: bool,
+    pub pan_obfuscate: bool,
+}
+
+impl Default for Iso8583Config {
+    fn default() -> Self {
+        Self {
+            omit_fields: vec![],
+            translation_enabled: true,
+            pan_obfuscate: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct MysqlConfig {
@@ -1616,10 +1634,11 @@ impl Default for GrpcConfig {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
+    pub iso8583: Iso8583Config,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
 }
@@ -1687,6 +1706,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
+                ("ISO8583".to_string(), "1-65535".to_string()),
                 ("Redis".to_string(), "1-65535".to_string()),
                 ("MongoDB".to_string(), "1-65535".to_string()),
                 ("Memcached".to_string(), "11211".to_string()),
@@ -1716,6 +1736,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
                 ("Oracle".to_string(), vec![]),
+                ("ISO8583".to_string(), vec![]),
                 ("Redis".to_string(), vec![]),
                 ("MongoDB".to_string(), vec![]),
                 ("Memcached".to_string(), vec![]),
@@ -3718,6 +3739,14 @@ pub struct OracleParseConfig {
     pub is_be: bool,
     pub int_compress: bool,
     pub resp_0x04_extra_byte: bool,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ISO8583ParseConfig {
+    pub omit_fields: Vec<u8>,
+    pub translation_enabled: bool,
+    pub pan_obfuscate: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

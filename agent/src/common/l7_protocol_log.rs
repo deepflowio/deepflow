@@ -34,6 +34,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::common::meta_packet::{IcmpData, ProtocolData};
+use crate::config::config::Iso8583Config;
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
@@ -210,6 +211,7 @@ cfg_if::cfg_if! {
                 Brpc(BrpcLog),
                 Tars(TarsLog),
                 Oracle(crate::flow_generator::protocol_logs::OracleLog),
+                ISO8583(crate::flow_generator::protocol_logs::Iso8583Log),
                 MQTT(MqttLog),
                 AMQP(AmqpLog),
                 NATS(NatsLog),
@@ -661,6 +663,7 @@ pub struct ParseParam<'a> {
     pub captured_byte: u16,
 
     pub oracle_parse_conf: OracleConfig,
+    pub iso8583_parse_conf: Iso8583Config,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -689,6 +692,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("buf_size", &self.buf_size)
             .field("captured_byte", &self.captured_byte)
             .field("oracle_parse_conf", &self.oracle_parse_conf)
+            .field("iso8583_parse_conf", &self.iso8583_parse_conf)
             .finish()
     }
 }
@@ -746,6 +750,7 @@ impl<'a> ParseParam<'a> {
             captured_byte: 0,
 
             oracle_parse_conf: OracleConfig::default(),
+            iso8583_parse_conf: Iso8583Config::default(),
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -793,6 +798,10 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_oracle_conf(&mut self, conf: OracleConfig) {
         self.oracle_parse_conf = conf;
+    }
+
+    pub fn set_iso8583_conf(&mut self, conf: &Iso8583Config) {
+        self.iso8583_parse_conf = conf.clone();
     }
 }
 
