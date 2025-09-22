@@ -487,6 +487,7 @@ const (
 	RDS_TYPE_PPAS       = 3
 	RDS_TYPE_PSQL       = 4 // PostgreSQL
 	RDS_TYPE_MARIADB    = 5
+	RDS_TYPE_ORACLE     = 6 // oracle
 
 	RDS_STATE_RUNNING   = 1
 	RDS_STATE_RESTORING = 2
@@ -502,7 +503,8 @@ const (
 )
 
 const (
-	REDIS_STATE_RUNNING = 1
+	REDIS_STATE_RUNNING    = 1
+	REDIS_STATE_RECOVERING = 2
 )
 
 const (
