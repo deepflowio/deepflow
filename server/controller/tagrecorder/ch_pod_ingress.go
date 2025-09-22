@@ -82,15 +82,6 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *metadbmodel.
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodIngress) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPodIngress) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodIngressFields)
-	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodIngress)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.Name.IsDifferent() {
-		updateInfo["name"] = fieldsUpdate.Name.GetNew()
-	}
-	c.updateOrSync(db, IDKey{ID: sourceID}, updateInfo)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
