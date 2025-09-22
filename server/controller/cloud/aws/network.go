@@ -84,6 +84,7 @@ func (a *Aws) getNetworks(client *ec2.Client) ([]model.Network, []model.Subnet, 
 			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: networkLcuuid,
 		})
+		a.subnetIDToVPCAZLcuuid[networkSubnetID] = [2]string{vpcLcuuid, azLcuuid}
 
 		routerID, ok := a.vpcOrSubnetToRouter[networkSubnetID]
 		if !ok {
