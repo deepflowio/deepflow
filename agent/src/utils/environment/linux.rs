@@ -283,6 +283,8 @@ impl CoreFileProcessor<'_> {
     }
 
     fn check(&self) {
+        const DEFAILT_CORE_DIR: &str = "/";
+
         match self {
             CoreFileProcessor::Dir(core_path) => {
                 // core_path example:
@@ -320,6 +322,8 @@ impl CoreFileProcessor<'_> {
                                 if let Some((_left, right)) = line.rsplit_once("=") {
                                     info!("Check core-files in dir: {}", right.trim());
                                     self.check_abrt_dir(right.trim());
+                                    info!("Check core-files in dir: {}", DEFAILT_CORE_DIR);
+                                    self.check_core_file_dir(DEFAILT_CORE_DIR);
                                     return;
                                 }
                             }
@@ -332,6 +336,8 @@ impl CoreFileProcessor<'_> {
 
                 info!("Check core-files in dir: {}", CORE_DIR);
                 self.check_abrt_dir(CORE_DIR);
+                info!("Check core-files in dir: {}", DEFAILT_CORE_DIR);
+                self.check_core_file_dir(DEFAILT_CORE_DIR);
             }
             // ubuntu
             CoreFileProcessor::Process("apport") => {
@@ -349,6 +355,8 @@ impl CoreFileProcessor<'_> {
                                 if let Some((_left, right)) = line.rsplit_once("=") {
                                     info!("Check core-files in dir: {}", right.trim());
                                     self.check_core_file_dir(right.trim());
+                                    info!("Check core-files in dir: {}", DEFAILT_CORE_DIR);
+                                    self.check_core_file_dir(DEFAILT_CORE_DIR);
                                     break;
                                 }
                             }
@@ -361,6 +369,8 @@ impl CoreFileProcessor<'_> {
 
                 info!("Check core-files in dir: {}", CORE_DIR);
                 self.check_core_file_dir(CORE_DIR);
+                info!("Check core-files in dir: {}", DEFAILT_CORE_DIR);
+                self.check_core_file_dir(DEFAILT_CORE_DIR);
             }
             CoreFileProcessor::Process(name) => {
                 info!(
