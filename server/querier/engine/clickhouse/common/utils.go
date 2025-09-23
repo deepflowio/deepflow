@@ -110,7 +110,7 @@ func ParseResponse(response *http.Response) (map[string]interface{}, error) {
 func GetDatasources(db string, table string, orgID string) ([]string, error) {
 	var datasources []string
 	switch db {
-	case "flow_metrics":
+	case "flow_metrics", DB_NAME_PROFILE, DB_NAME_EVENT:
 		var tsdbType string
 		if table == "network" || table == "network_map" {
 			tsdbType = "network"
@@ -118,6 +118,12 @@ func GetDatasources(db string, table string, orgID string) ([]string, error) {
 			tsdbType = "application"
 		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
+		} else if table == TABLE_NAME_IN_PROCESS_METRICS {
+			tsdbType = TABLE_NAME_IN_PROCESS_METRICS
+		} else if table == TABLE_NAME_FILE_EVENT_METRICS {
+			tsdbType = TABLE_NAME_FILE_EVENT_METRICS
+		} else {
+			return datasources, nil
 		}
 		client := &http.Client{}
 		url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)

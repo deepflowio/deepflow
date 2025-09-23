@@ -2226,7 +2226,7 @@ set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, display_name, data_table_collection, `interval_time`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (26, '事件-IO 事件指标', 'event.file_event_metrics', 1, 7*24, 'Sum', 'Avg', @lcuuid);
 
 CREATE TABLE IF NOT EXISTS voucher (

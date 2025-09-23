@@ -492,7 +492,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 			formatMetricByLanguage(args.Language, result.Values)
 		}
 		return result, []string{}, true, err
-	case 4: // show tag X values from Y  X, Y not nil
+	case 4: // show tag X values from Y; X, Y not nil
 		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.Language, args.UseQueryCache)
 		e.DB = "flow_tag"
 		return result, sqlList, true, err
@@ -508,7 +508,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 			formatTagByLanguage(args.Language, data.Values)
 		}
 		return data, []string{}, true, err
-	case 6: // show  tables...
+	case 6: // show tables...
 		if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT && len(visibilityFilter) > 0 {
 			where = visibilityWhere
 		}
@@ -517,7 +517,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
 		}
 		return result, []string{}, true, nil
-	case 7: // show  databases...
+	case 7: // show databases...
 		result := GetDatabases()
 		if len(visibilityFilter) > 0 {
 			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
