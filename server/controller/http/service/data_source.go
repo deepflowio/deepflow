@@ -144,6 +144,10 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 				collection = "prometheus.*"
 			case "traffic_policy":
 				collection = "flow_metrics.traffic_policy"
+			case "in_process_metrics":
+				collection = "profile.in_process_metrics"
+			case "file_event_metrics":
+				collection = "event.file_event_metrics"
 			default:
 				collection = t.(string)
 			}

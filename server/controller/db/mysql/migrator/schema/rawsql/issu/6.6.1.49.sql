@@ -11,7 +11,7 @@ BEGIN
     IF existing_display_name = 0 THEN
         START TRANSACTION;
         set @lcuuid = (select uuid());
-        INSERT INTO data_source (display_name, data_table_collection, `interval_time`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
+        INSERT INTO data_source (display_name, data_table_collection, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
         VALUES ('事件-IO 事件指标', 'event.file_event_metrics', 1, 7*24, 'Sum', 'Avg', @lcuuid);
         COMMIT; 
     END IF;
