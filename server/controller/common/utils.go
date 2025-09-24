@@ -18,6 +18,8 @@ package common
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -190,4 +192,24 @@ func getVarSizeInternal(val any, visited map[uintptr]bool) uint64 {
 		log.Debugf("Unsupported kind %v for type %T, size=%d", vl.Kind(), val, uint64(tp.Size()))
 		return uint64(tp.Size())
 	}
+}
+
+func CompareVersion(ver1, ver2 string) int {
+	if ver1 == "" || ver2 == "" {
+		log.Warningf("empty version string: ver1=%s, ver2=%s", ver1, ver2)
+		return 0
+	}
+
+	parts1 := strings.Split(ver1, ".")
+	parts2 := strings.Split(ver2, ".")
+
+	v1, err1 := strconv.Atoi(parts1[0])
+	v2, err2 := strconv.Atoi(parts2[0])
+
+	if err1 != nil || err2 != nil {
+		log.Errorf("invalid version format: ver1=%s, ver2=%s", ver1, ver2)
+		return 0
+	}
+
+	return v1 - v2
 }
