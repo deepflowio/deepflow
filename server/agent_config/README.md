@@ -1729,7 +1729,7 @@ Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 

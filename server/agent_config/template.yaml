@@ -1200,7 +1200,7 @@ inputs:
     # unit:
     # range: [1s, 1h]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
