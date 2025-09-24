@@ -83,6 +83,11 @@ var showPatterns = []string{
 }
 var res []*regexp.Regexp
 
+const (
+	TUPLE_ELEMENT_VALUES_INDEX = 1
+	TUPLE_ELEMENT_COUNTS_INDEX = 2
+)
+
 type TargetLabelFilter struct {
 	OriginFilter string
 	TransFilter  string
@@ -112,6 +117,23 @@ func init() {
 	for _, pattern := range showPatterns {
 		res = append(res, regexp.MustCompile(pattern))
 	}
+}
+
+func createTopKColumn(functionAs, prefix string, elementIndex, argsLength int) (string, string, error) {
+	if functionAs == "" {
+		return "", "", fmt.Errorf("TopK function alias cannot be empty")
+	}
+
+	if elementIndex < 1 || elementIndex > 2 {
+		return "", "", fmt.Errorf("elementIndex must be 1 or 2")
+	}
+	columnValue := fmt.Sprintf("tupleElement(`%s`,%d)", strings.Trim(functionAs, "`"), elementIndex)
+	// if topk has one arg, need to concat array to string
+	if argsLength == 1 {
+		columnValue = fmt.Sprintf("arrayStringConcat(%s,',')", columnValue)
+	}
+	columnAlias := strings.Replace(functionAs, "array_", prefix, 1)
+	return columnValue, columnAlias, nil
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -1597,6 +1619,30 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 			}
 		}
+
+		// topk add counts column
+		if name == view.FUNCTION_TOPK {
+			argsLength := len(args)
+			if strings.HasPrefix(functionAs, "`") {
+				functionAs = strings.TrimPrefix(functionAs, "`")
+				functionAs = "`array_" + functionAs
+			} else {
+				functionAs = "array_" + functionAs
+			}
+			topKStr, topKStrAs, err := createTopKColumn(functionAs, "", TUPLE_ELEMENT_VALUES_INDEX, argsLength-1)
+			if err != nil {
+				return err
+			}
+			topKCounts, topKCountsAs, err := createTopKColumn(functionAs, "counts_", TUPLE_ELEMENT_COUNTS_INDEX, argsLength-1)
+			if err != nil {
+				return err
+			}
+			e.Statements = append(e.Statements, &SelectTag{Value: topKStr, Alias: topKStrAs, Flag: view.NODE_FLAG_METRICS_OUTER})
+			e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(topKStrAs, topKStr, ""))
+			e.Statements = append(e.Statements, &SelectTag{Value: topKCounts, Alias: topKCountsAs, Flag: view.NODE_FLAG_METRICS_OUTER})
+			e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(topKCountsAs, topKCounts, ""))
+		}
+
 		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, derivativeArgs, e)
 		if err != nil {
 			return err
