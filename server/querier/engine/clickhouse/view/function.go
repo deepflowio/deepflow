@@ -57,6 +57,11 @@ const (
 	FUNCTION_COUNTDISTINCT = "countDistinct"
 )
 
+const (
+	TOPK_DEFAULT_LIMIT = "3"
+	TOPK_COUNTS_MODE   = "'counts'"
+)
+
 // 对外提供的算子与数据库实际算子转换
 var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_SUM:         "SUM",
@@ -237,10 +242,6 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		return
 	}
 
-	isSingleTagTok := f.Name == FUNCTION_TOPK && len(f.Args) == 1
-	if isSingleTagTok {
-		buf.WriteString("arrayStringConcat(")
-	}
 	buf.WriteString(dbFuncName)
 
 	if f.IsGroupArray {
@@ -255,6 +256,9 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	args := f.Args
 	if f.Name == FUNCTION_TOPK {
 		args = f.Args[len(f.Args)-1:]
+		if len(f.Args) == 1 {
+			args = append(args, []string{TOPK_DEFAULT_LIMIT, TOPK_COUNTS_MODE}...) // topk add counts
+		}
 	} else if f.Name == FUNCTION_ANY || f.Name == FUNCTION_UNIQ || f.Name == FUNCTION_UNIQ_EXACT {
 		args = nil
 	}
@@ -311,9 +315,6 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	}
 
 	buf.WriteString(")")
-	if isSingleTagTok {
-		buf.WriteString(", ',')")
-	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
