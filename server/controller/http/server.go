@@ -127,6 +127,8 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 
 		// icon
 		router.NewIcon(s.controllerConfig),
+		// ck version
+		router.NewCKVersion(),
 
 		// resource
 		resource.NewDomain(s.controllerConfig),

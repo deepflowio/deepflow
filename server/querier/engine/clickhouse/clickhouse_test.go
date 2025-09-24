@@ -350,7 +350,7 @@ var (
 		name:   "topk_enum",
 		db:     "flow_log",
 		input:  "select TopK(protocol,2) from l4_flow_log limit 2",
-		output: []string{"SELECT arrayStringConcat(topKIf(2)(dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol), dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol) != ''), ',') AS `TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2"},
+		output: []string{"SELECT arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,1),',') AS `TopK_2(protocol)`, arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,2),',') AS `counts_TopK_2(protocol)`, topKIf(2, 3, 'counts')(dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol), dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol) != '') AS `array_TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2"},
 	}, {
 		name:   "select_enum",
 		db:     "flow_log",
@@ -372,11 +372,11 @@ var (
 	}, {
 		name:   "TopK_1",
 		input:  "select TopK(ip_0, 10) from l4_flow_log limit 1",
-		output: []string{"SELECT arrayStringConcat(topKIf(10)(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != ''), ',') AS `TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1"},
+		output: []string{"SELECT arrayStringConcat(tupleElement(`array_TopK_10(ip_0)`,1),',') AS `TopK_10(ip_0)`, arrayStringConcat(tupleElement(`array_TopK_10(ip_0)`,2),',') AS `counts_TopK_10(ip_0)`, topKIf(10, 3, 'counts')(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '') AS `array_TopK_10(ip_0)` FROM flow_log.`l4_flow_log` LIMIT 1"},
 	}, {
 		name:   "TopK_2",
 		input:  "select TopK(ip_0, pod_0, 10) from l4_flow_log limit 1",
-		output: []string{"SELECT topKIf(10)((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id_0)))), (if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '' AND dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id_0))) != '')) AS `TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1"},
+		output: []string{"SELECT tupleElement(`array_TopK_10(ip_0, pod_0)`,1) AS `TopK_10(ip_0, pod_0)`, tupleElement(`array_TopK_10(ip_0, pod_0)`,2) AS `counts_TopK_10(ip_0, pod_0)`, topKIf(10, 3, 'counts')((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id_0)))), (if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) != '' AND dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id_0))) != '')) AS `array_TopK_10(ip_0, pod_0)` FROM flow_log.`l4_flow_log` LIMIT 1"},
 	}, {
 		name:    "TopK_err",
 		input:   "select TopK(ip_0, 111) from l4_flow_log limit 1",
@@ -384,7 +384,7 @@ var (
 	}, {
 		name:       "TopK_3",
 		input:      "SELECT TopK(`region`,3) AS `TopK_3(区域)` FROM `vtap_app_port` WHERE (time>=1705370520 AND time<=1705371300)",
-		output:     []string{"SELECT arrayStringConcat(topKArray(3)(`_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))_dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != ''`), ',') AS `TopK_3(区域)` FROM (SELECT groupArrayIf(dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))), dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != '') AS `_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))_dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != ''` FROM flow_metrics.`application.1m` WHERE (`time` >= 1705370520 AND `time` <= 1705371300)) LIMIT 10000"},
+		output:     []string{"SELECT arrayStringConcat(tupleElement(`array_TopK_3(区域)`,1),',') AS `TopK_3(区域)`, arrayStringConcat(tupleElement(`array_TopK_3(区域)`,2),',') AS `counts_TopK_3(区域)`, topKArray(3, 3, 'counts')(`_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))_dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != ''`) AS `array_TopK_3(区域)` FROM (SELECT groupArrayIf(dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))), dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != '') AS `_grouparray_dictGet(flow_tag.region_map, name, (toUInt64(region_id)))_dictGet('flow_tag.region_map', 'name', (toUInt64(region_id))) != ''` FROM flow_metrics.`application.1m` WHERE (`time` >= 1705370520 AND `time` <= 1705371300)) LIMIT 10000"},
 		db:         "flow_metrics",
 		datasource: "1m",
 	}, {
@@ -700,6 +700,7 @@ func TestGetSql(t *testing.T) {
 func Load() error {
 	ServerCfg := config.DefaultConfig()
 	config.Cfg = &ServerCfg.QuerierConfig
+	config.Cfg.Clickhouse.Version = "24.8"
 	config.ControllerCfg = &ServerCfg.ControllerConfig
 	dir := "../../db_descriptions"
 	dbDescriptions, err := common.LoadDbDescriptions(dir)

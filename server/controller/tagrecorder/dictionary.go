@@ -386,7 +386,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			log.Error(err, logger.NewORGPrefix(orgID))
 			return
 		}
-		if versions[0] > common.CLICK_HOUSE_VERSION {
+		if common.CompareVersion(versions[0], common.CLICK_HOUSE_VERSION) >= 0 {
 			continue
 		}
 		// Get the current view in the database
