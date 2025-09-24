@@ -1729,7 +1729,7 @@ Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8638,7 +8638,7 @@ set this value at this time. Only valid for IDC (not Cloud) traffic.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8669,7 +8669,7 @@ Timeouts for TCP State Machine - Established.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8700,7 +8700,7 @@ Timeouts for TCP State Machine - Closing Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8731,7 +8731,7 @@ Timeouts for TCP State Machine - Opening Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8796,7 +8796,7 @@ Collector, etc.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8829,7 +8829,7 @@ is `Physical Mirror` and concurrent_flow_limit is less than or equal to 65535, i
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8861,7 +8861,7 @@ FlowNode, FlowLog, etc.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8896,7 +8896,7 @@ result in calling mmap and more page faults.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
