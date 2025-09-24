@@ -1702,7 +1702,7 @@ inputs:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8424,7 +8424,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8455,7 +8455,7 @@ TCP 状态机的建连状态超时时长。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8486,7 +8486,7 @@ Closing Reset 类型的 TCP 状态机超时。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8517,7 +8517,7 @@ Opening Reset 类型的 TCP 状态机超时。
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8581,7 +8581,7 @@ QuadrupleGenerator、Collector 等。
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8614,7 +8614,7 @@ FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存�
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8644,7 +8644,7 @@ FlowMap 内存池的大小。
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -8678,7 +8678,7 @@ mmap 调用和页错误增加，反而降低性能，所以不推荐将该配置
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
