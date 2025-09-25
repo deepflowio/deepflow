@@ -1871,7 +1871,7 @@ The list of processe names ignored by process matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1972,7 +1972,7 @@ inputs:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2001,7 +2001,7 @@ The regex of matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2039,7 +2039,7 @@ The type of matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2075,7 +2075,7 @@ Default value `[]` match all languages.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2102,7 +2102,7 @@ Default value `[]` match all usernames.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2129,7 +2129,7 @@ Default value `true` means only match processes in container.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2158,7 +2158,7 @@ Default value `false` means match processes with or without tags.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2187,7 +2187,7 @@ Whether to ignore matched processes.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
