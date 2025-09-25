@@ -3515,6 +3515,11 @@ typedef struct __attribute__ ((packed)) {
 static __inline enum message_type
 infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (!conn_info->socket_info_ptr->is_tls)
+			return MSG_UNKNOWN;
+	}
+
 	/*
 	 * When reading data over TLS, it first reads 5 bytes of content and then
 	 * reads the remaining data. We save the initial 5 bytes and combine them
@@ -3996,8 +4001,18 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				       conn_info)) != MSG_UNKNOWN) {
 			inferred_message.protocol = PROTO_TLS;
 			return inferred_message;
-		} else {
-			goto infer_aborted;
+		}
+
+		/*
+		 * If the connection is a TLS connection and uprobe is not used, the
+		 * encrypted data can be discarded to prevent it from being involved
+		 * in subsequent protocol inference, thereby avoiding performance
+		 * degradation.
+		 */ 
+		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+			if (conn_info->socket_info_ptr->is_tls &&
+			    !skip_http2_kprobe())
+				goto infer_aborted;
 		}
 	}
 
