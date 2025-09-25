@@ -1305,7 +1305,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   ch: |-
@@ -1421,7 +1421,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1439,7 +1439,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1457,7 +1457,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: [java, golang, python, nodejs, dotnet]
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1474,7 +1474,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1491,7 +1491,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1508,7 +1508,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1526,7 +1526,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1544,7 +1544,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
