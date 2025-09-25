@@ -1060,6 +1060,7 @@ CREATE TABLE IF NOT EXISTS acl (
     tap_type               INTEGER DEFAULT 3 COMMENT '1-WAN; 3-LAN',
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
     valid                  TINYINT(1) DEFAULT 1 COMMENT '0-invalid; 1-valid',
+    invalid_description    TEXT,
     applications           CHAR(64) NOT NULL COMMENT 'separated by , (1-performance analysis; 2-backpacking; 6-npb)',
     epc_id                 INTEGER,
     src_group_ids          TEXT COMMENT 'separated by ,',

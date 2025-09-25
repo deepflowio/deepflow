@@ -1649,6 +1649,7 @@ CREATE TABLE IF NOT EXISTS acl (
     tap_type               INTEGER DEFAULT 3,
     state                  INTEGER DEFAULT 1,
     valid                  INTEGER DEFAULT 1,
+    invalid_description    TEXT,
     applications           VARCHAR(64) NOT NULL,
     epc_id                 INTEGER,
     src_group_ids          TEXT,
