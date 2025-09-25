@@ -1748,7 +1748,7 @@ static void period_process_main(__unused void *arg)
 	// Ensure the extra_waiting_process of the server type executes first.
 	sleep(1);
 
-	ebpf_info("cpus_kick begin !!!\n");
+	ebpf_info("trigger_kern_adapt begin !!!\n");
 
 	memset((void *)ready_flag_cpus, 1, sizeof(ready_flag_cpus));
 
