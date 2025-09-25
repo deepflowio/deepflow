@@ -34,8 +34,29 @@ typedef u32 kern_dev_t;
 #define DEV_INVALID ((kern_dev_t)-1)
 
 /**
+ * Filesystem type categories
+ * - FS_TYPE_UNKNOWN = Unknown type
+ * - FS_TYPE_REGULAR = Local disk filesystem (ext4, xfs, btrfs, etc.)
+ * - FS_TYPE_VIRTUAL = Virtual filesystem (proc, sysfs, tmpfs, etc.)
+ * - FS_TYPE_NETWORK = Network filesystem (nfs, cifs, ceph, etc.)
+ */
+typedef enum {
+	FS_TYPE_UNKNOWN = 0,
+	FS_TYPE_REGULAR = 1,
+	FS_TYPE_VIRTUAL = 2,
+	FS_TYPE_NETWORK = 3
+} fs_type_t;
+
+/// Mapping from filesystem name to type
+typedef struct {
+	const char *name;
+	fs_type_t type;
+} fs_map_t;
+
+/**
  * struct mount_entry - Represents a mount point within a mount namespace
  * @list:         Linked list node for chaining multiple mount entries
+ * @mount_id:	  The unique mount point ID assigned by the kernel.
  * @s_dev:        Device ID (from stat.st_dev), typically encoded as major:minor
  * @is_nfs:       True if the mount source is a network file system (e.g., NFS)
  * @mount_point:  Absolute path of the mount point (e.g., "/mnt/data")
@@ -43,8 +64,9 @@ typedef u32 kern_dev_t;
  */
 struct mount_entry {
 	struct list_head list;
+	int mount_id;
 	kern_dev_t s_dev;
-	bool is_nfs;
+	fs_type_t file_type;
 	char *mount_point;
 	char *mount_source;
 };
@@ -132,16 +154,17 @@ int mount_info_cache_remove(pid_t pid, u64 mntns_id);
  * @brief Find the mount path and source device for a given device ID in a namespace.
  *
  * @param[in]  pid            Process ID
- * @param[in/out]  mntns_id   Mount namespace ID adress
+ * @param[in]  mnt_id	      Mount ID
+ * @param[in]  mntns_id       Mount namespace ID
  * @param[in]  s_dev          Device ID (major:minor encoded)
  * @param[out] mount_path     Output buffer for mount point path
  * @param[out] mount_source   Output buffer for mount source (e.g., device or NFS path)
  * @param[in]  mount_size     Size of output buffers
- * @param[out] is_nfs         Set to true if the mount is NFS
+ * @param[out] file_type      File type
  */
-void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
-			   char *mount_path, char *mount_source,
-			   int mount_size, bool * is_nfs);
+void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
+		    kern_dev_t s_dev, char *mount_path,
+		    char *mount_source, int mount_size, fs_type_t * file_type);
 
 /**
  * @brief Copy and transform event data containing file paths from eBPF trace.
@@ -152,14 +175,15 @@ void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
  * @param[out] dst           Destination buffer
  * @param[in]  src           Source buffer (raw eBPF event)
  * @param[in]  len           Length of destination buffer
+ * @param[in]  mntns_id      The mount namespace ID of the file
  * @param[in]  mount_point   Mount point path
  * @param[in]  mount_source  Mount source path
- * @param[in]  is_nfs        True if mount is NFS
+ * @param[in]  file_type     File type (FS_TYPE_REGULAR, FS_TYPE_VIRTUAL, FS_TYPE_NETWORK)
  * @return Number of bytes written to dst
  */
-uint32_t copy_regular_file_data(int pid, void *dst, void *src, int len,
-				const char *mount_point,
-				const char *mount_source, bool is_nfs);
+uint32_t copy_file_metrics(int pid, void *dst, void *src, int len,
+			   u32 mntns_id, const char *mount_point,
+			   const char *mount_source, fs_type_t file_type);
 /**
  * @brief Check for changes in the host root mount namespace's mount information.
  *
@@ -216,4 +240,38 @@ void check_and_cleanup_mount_info(pid_t pid, u64 mntns_id);
  * for future accumulation of mount memory size statistics.
  */
 void collect_mount_info_stats(bool output_log);
+
+/**
+ * fs_type_to_string - Convert a filesystem type enum to a human-readable string.
+ *
+ * @type: The filesystem type, one of FS_TYPE_UNKNOWN, FS_TYPE_REGULAR, 
+ *        FS_TYPE_VIRTUAL, or FS_TYPE_NETWORK.
+ *
+ * Returns:
+ *   A constant string representing the filesystem type:
+ *   - "regular" for FS_TYPE_REGULAR
+ *   - "virtual" for FS_TYPE_VIRTUAL
+ *   - "network" for FS_TYPE_NETWORK
+ *   - "unknown" for FS_TYPE_UNKNOWN or any unrecognized value
+ *
+ * This function is safe to use for logging, debugging, or displaying
+ * filesystem type information in a human-readable format.
+ */
+const char *fs_type_to_string(fs_type_t type);
+
+/**
+ * Retrieve the mount ID of a given file descriptor from /proc/<pid>/fdinfo/<fd>.
+ *
+ * This function reads the "mnt_id" field from the corresponding fdinfo file
+ * in the /proc filesystem. It provides a simple and direct way to obtain the
+ * mount ID without parsing /proc/<pid>/mountinfo or using name_to_handle_at().
+ *
+ * @param pid  Target process ID.
+ * @param fd   File descriptor within the target process.
+ * @return     On success: non-negative mount ID.
+ *             On failure: -1 is returned, and errno is set accordingly.
+ */
+int get_mount_id(pid_t pid, int fd);
+
+int mount_offset_infer(void);
 #endif /* DF_USER_MOUNT_H */

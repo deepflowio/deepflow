@@ -32,40 +32,53 @@ use crate::common::{
 };
 use crate::ebpf::SK_BPF_DATA;
 
-const IO_BYTES_COUNT_OFFSET: usize = 4;
-const IO_OPERATION_OFFSET: usize = 8;
-const IO_LATENCY_OFFSET: usize = 16;
-const IO_OFF_BYTES_OFFSET: usize = 24;
+const IO_OPERATION_OFFSET: usize = 4;
+const IO_LATENCY_OFFSET: usize = 8;
+const IO_OFF_BYTES_OFFSET: usize = 16;
+const IO_FILE_TYPE_OFFSET: usize = 24;
+const IO_FILE_NAME_OFFSET: usize = 28;
+const IO_MOUNT_SOURCE_OFFSET: usize = 284;
+const IO_MOUNT_POINT_OFFSET: usize = 796;
+const IO_FILE_DIR_OFFSET: usize = 1052;
+const IO_EVENT_BUFF_SIZE: usize = 1564;
 struct IoEventData {
     bytes_count: u32, // Number of bytes read and written
     operation: u32,   // 0: write 1: read
     latency: u64,     // Function call delay, in nanoseconds
     off_bytes: u64,   // The number of bytes of offset within the file content
+    file_type: u32,   // File type: 0: unknown, 1: regular, 2: virtual, 3: network
     filename: Vec<u8>,
+    mount_source: Vec<u8>,
+    mount_point: Vec<u8>,
+    file_dir: Vec<u8>,
 }
 
 impl TryFrom<&[u8]> for IoEventData {
     type Error = Error;
 
     fn try_from(raw_data: &[u8]) -> Result<Self, self::Error> {
+        fn parse_cstring_slice(slice: &[u8]) -> Vec<u8> {
+            match slice.iter().position(|&b| b == b'\0') {
+                Some(index) => slice[..index].to_vec(),
+                None => vec![],
+            }
+        }
         let length = raw_data.len();
-        if length < IO_OFF_BYTES_OFFSET {
+        if length < IO_EVENT_BUFF_SIZE {
             return Err(ParseEventData(format!(
                 "parse io event data failed, raw data length: {length} < {IO_OFF_BYTES_OFFSET}"
             )));
         }
         let io_event_data = Self {
             bytes_count: read_u32_le(&raw_data),
-            operation: read_u32_le(&raw_data[IO_BYTES_COUNT_OFFSET..]),
-            latency: read_u64_le(&raw_data[IO_OPERATION_OFFSET..]),
-            off_bytes: read_u64_le(&raw_data[IO_LATENCY_OFFSET..]),
-            filename: {
-                let data = &raw_data[IO_OFF_BYTES_OFFSET..];
-                match data.iter().position(|&b| b == b'\0') {
-                    Some(index) => data[..index].to_vec(),
-                    None => vec![],
-                }
-            },
+            operation: read_u32_le(&raw_data[IO_OPERATION_OFFSET..]),
+            latency: read_u64_le(&raw_data[IO_LATENCY_OFFSET..]),
+            off_bytes: read_u64_le(&raw_data[IO_OFF_BYTES_OFFSET..]),
+            file_type: read_u32_le(&raw_data[IO_FILE_TYPE_OFFSET..]),
+            filename: parse_cstring_slice(&raw_data[IO_FILE_NAME_OFFSET..]),
+            mount_source: parse_cstring_slice(&raw_data[IO_MOUNT_SOURCE_OFFSET..]),
+            mount_point: parse_cstring_slice(&raw_data[IO_MOUNT_POINT_OFFSET..]),
+            file_dir: parse_cstring_slice(&raw_data[IO_FILE_DIR_OFFSET..]),
         };
         Ok(io_event_data)
     }
@@ -79,6 +92,10 @@ impl From<IoEventData> for metric::IoEventData {
             latency: io_event_data.latency,
             off_bytes: io_event_data.off_bytes,
             filename: io_event_data.filename,
+            mount_source: io_event_data.mount_source,
+            mount_point: io_event_data.mount_point,
+            file_dir: io_event_data.file_dir,
+            file_type: io_event_data.file_type as i32,
         }
     }
 }
