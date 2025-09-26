@@ -39,7 +39,7 @@ use super::{
 use crate::{
     common::{
         endpoint::EPC_INTERNET,
-        enums::{EthernetType, IpProtocol, TapType},
+        enums::{EthernetType, IpProtocol},
         flow::{CloseType, L7Protocol, SignalSource},
     },
     config::handler::{CollectorAccess, CollectorConfig},
@@ -54,7 +54,6 @@ use crate::{
     },
 };
 use public::{
-    proto::common::TridentType,
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
 };
@@ -500,65 +499,9 @@ impl Stash {
         directions: &[Direction; 2],
         config: &CollectorConfig,
     ) {
-        for ep in 0..2 {
-            let direction = match config.trident_type {
-                TridentType::TtDedicatedPhysicalMachine
-                    if acc_flow.flow.flow_key.tap_type != TapType::Cloud
-                        && directions[0] != Direction::None
-                        && directions[1] != Direction::None =>
-                {
-                    Direction::None
-                }
-                _ if directions[ep] == Direction::None => continue,
-                _ => directions[ep],
-            };
-            let is_active_host = if ep == 0 {
-                acc_flow.is_active_host0
-            } else {
-                acc_flow.is_active_host1
-            };
-            // single_stats: Do not count the inactive end (Internet/private network IP with no response packet)
-            if config.inactive_ip_enabled || is_active_host {
-                let flow_meter = if ep == FLOW_METRICS_PEER_DST {
-                    acc_flow.flow_meter.to_reversed()
-                } else {
-                    acc_flow.flow_meter
-                };
-                let tagger = get_single_tagger(
-                    self.global_thread_id,
-                    &acc_flow.flow,
-                    ep,
-                    direction,
-                    is_active_host,
-                    config,
-                    None,
-                    0,
-                    0,
-                    L7Protocol::Unknown,
-                    self.context.agent_mode,
-                );
-                self.fill_single_l4_stats(tagger, flow_meter);
-            }
-            let tagger = get_edge_tagger(
-                self.global_thread_id,
-                &acc_flow.flow,
-                direction,
-                acc_flow.is_active_host0,
-                acc_flow.is_active_host1,
-                config,
-                None,
-                0,
-                0,
-                L7Protocol::Unknown,
-                self.context.agent_mode,
-            );
-            // edge_stats: If the direction of a certain end is known, the statistical data
-            // will be recorded with the direction (corresponding tap-side), up to two times
-            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
-        }
-        // edge_stats: If both ends of direction are None, record the
+        // edge_stats: If both ends of direction are None or not None, record the
         // statistical data with direction=0 (corresponding tap-side=rest)
-        if directions[0] == Direction::None && directions[1] == Direction::None {
+        if Direction::from(directions) == Direction::None {
             // if otel data's directions are unknown, set direction =  Direction::App
             let direction = if acc_flow.flow.signal_source == SignalSource::OTel {
                 Direction::App
@@ -578,6 +521,57 @@ impl Stash {
                 L7Protocol::Unknown,
                 self.context.agent_mode,
             );
+            self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
+            return;
+        }
+
+        for ep in 0..2 {
+            // Do not count the data of None direction
+            if directions[ep] == Direction::None {
+                continue;
+            }
+            let is_active_host = if ep == 0 {
+                acc_flow.is_active_host0
+            } else {
+                acc_flow.is_active_host1
+            };
+            // single_stats: Do not count the inactive end (Internet/private network IP with no response packet)
+            if config.inactive_ip_enabled || is_active_host {
+                let flow_meter = if ep == FLOW_METRICS_PEER_DST {
+                    acc_flow.flow_meter.to_reversed()
+                } else {
+                    acc_flow.flow_meter
+                };
+                let tagger = get_single_tagger(
+                    self.global_thread_id,
+                    &acc_flow.flow,
+                    ep,
+                    directions[ep],
+                    is_active_host,
+                    config,
+                    None,
+                    0,
+                    0,
+                    L7Protocol::Unknown,
+                    self.context.agent_mode,
+                );
+                self.fill_single_l4_stats(tagger, flow_meter);
+            }
+            let tagger = get_edge_tagger(
+                self.global_thread_id,
+                &acc_flow.flow,
+                directions[ep],
+                acc_flow.is_active_host0,
+                acc_flow.is_active_host1,
+                config,
+                None,
+                0,
+                0,
+                L7Protocol::Unknown,
+                self.context.agent_mode,
+            );
+            // edge_stats: If the direction of a certain end is known, the statistical data
+            // will be recorded with the direction (corresponding tap-side), up to two times
             self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
         }
     }
@@ -697,6 +691,33 @@ impl Stash {
         config: &CollectorConfig,
     ) {
         let flow = &meter.flow;
+        // edge_stats: If both ends of direction are None or not None, record the
+        // statistical data with direction=0 (corresponding tap-side=rest)
+        if Direction::from(directions) == Direction::None {
+            // if otel data's directions are unknown, set direction =  Direction::App
+            let direction = if flow.signal_source == SignalSource::OTel {
+                Direction::App
+            } else {
+                Direction::None
+            };
+            let mut tagger = get_edge_tagger(
+                self.global_thread_id,
+                &flow,
+                direction,
+                meter.is_active_host0,
+                meter.is_active_host1,
+                config,
+                meter.endpoint.clone(),
+                meter.biz_type,
+                meter.time_span,
+                meter.l7_protocol,
+                self.context.agent_mode,
+            );
+            tagger.code |= Code::L7_PROTOCOL;
+            self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
+            return;
+        }
+
         for ep in 0..2 {
             // Do not count the data of None direction
             if directions[ep] == Direction::None {
@@ -741,31 +762,6 @@ impl Stash {
             tagger.code |= Code::L7_PROTOCOL;
             // edge_stats: If the direction of a certain end is known, the statistical data
             // will be recorded with the direction (corresponding tap-side), up to two times
-            self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
-        }
-        // edge_stats: If both ends of direction are None, record the
-        // statistical data with direction=0 (corresponding tap-side=rest)
-        if directions[0] == Direction::None && directions[1] == Direction::None {
-            // if otel data's directions are unknown, set direction =  Direction::App
-            let direction = if flow.signal_source == SignalSource::OTel {
-                Direction::App
-            } else {
-                Direction::None
-            };
-            let mut tagger = get_edge_tagger(
-                self.global_thread_id,
-                &flow,
-                direction,
-                meter.is_active_host0,
-                meter.is_active_host1,
-                config,
-                meter.endpoint.clone(),
-                meter.biz_type,
-                meter.time_span,
-                meter.l7_protocol,
-                self.context.agent_mode,
-            );
-            tagger.code |= Code::L7_PROTOCOL;
             self.fill_edge_l7_stats(tagger, meter.endpoint_hash, meter.app_meter);
         }
     }
