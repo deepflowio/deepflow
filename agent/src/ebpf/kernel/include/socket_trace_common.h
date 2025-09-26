@@ -155,8 +155,9 @@ struct socket_info_s {
 	};
 	__u8 direction:1;
 	__u8 pre_direction:1;
-	__u8 unused:2;
+	__u8 unused:1;
 	__u8 role:3;		// Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 is_tls:1;		// Identify whether it is a TLS connection
 	__u8 tls_end:1;		// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;	// L7 protocol inference requiring confirmation.
 	union {

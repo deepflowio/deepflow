@@ -1430,6 +1430,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->uid = tracer_ctx->socket_id + 1;
 		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info->l7_proto = conn_info->protocol;
+		if (sk_info->l7_proto == PROTO_TLS)
+			sk_info->is_tls = 1;
 		//Confirm whether data reassembly is required for this socket.
 		if (is_proto_reasm_enabled(conn_info->protocol)) {
 			sk_info->allow_reassembly = true;
