@@ -425,16 +425,30 @@ static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int 
 {
 	int len = 0;
 	char *ptr = NULL;
-	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 3];
+	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 16]; // Extra space for JIT markers
 	memset(format_str, 0, sizeof(format_str));
 
+	// Check if this is a JIT-compiled frame (OpenTelemetry-style JIT bit set in eBPF)
+	bool is_jit_frame = (address & 0x4000000000000000ULL) != 0;
 	u32 symbol_id = address & 0xFFFFFFFF;
+
 	for (int i = 0; i < n_symbols; i++) {
 		if (symbol_ids[i] == symbol_id) {
 			if (strlen(symbols[i].class_name) > 0) {
-				snprintf(format_str, sizeof(format_str), "%s::%s", symbols[i].class_name, symbols[i].method_name);
+				// Enhanced formatting for JIT frames
+				if (is_jit_frame) {
+					snprintf(format_str, sizeof(format_str), "%s::%s [JIT]",
+						symbols[i].class_name, symbols[i].method_name);
+				} else {
+					snprintf(format_str, sizeof(format_str), "%s::%s",
+						symbols[i].class_name, symbols[i].method_name);
+				}
 			} else {
-				snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
+				if (is_jit_frame) {
+					snprintf(format_str, sizeof(format_str), "%s [JIT]", symbols[i].method_name);
+				} else {
+					snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
+				}
 			}
 			goto finish;
 		}
@@ -508,10 +522,13 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		}
 		symbol_t key = {};
 		while (bpf_get_next_key(map->fd, &key, &symbols[n_symbols]) == 0) {
-			int ret = bpf_lookup_elem(map->fd, &key, &symbol_ids[n_symbols]);
-			key = symbols[n_symbols];
+			int ret = bpf_lookup_elem(map->fd, &symbols[n_symbols], &symbol_ids[n_symbols]);
+			key = symbols[n_symbols];  // Update key for next iteration
 			if (ret == 0) {
 				n_symbols++;
+				if (n_symbols >= MAX_SYMBOL_NUM) {
+					break;
+				}
 			}
 		}
 	}
@@ -604,7 +621,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	/*
 	 * Firstly, search the stack-trace hash to see if the
-	 * stack trace string has already been stored. 
+	 * stack trace string has already been stored.
 	 */
 	stack_str_hash_kv kv;
 	kv.key = (u64) stack_id;
@@ -776,7 +793,16 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		// Check if this is PHP process for special handling
+		if (is_php_process(v->tgid)) {
+			offset += merge_php_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		} else if (is_v8_process(v->tgid)) {
+			// V8/Node.js process handling
+			offset += merge_v8_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		} else {
+			// Default Python/other interpreter handling
+			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		}
 	} else if (i_trace_str) {
 		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
 	} else if (u_trace_str) {
@@ -794,7 +820,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	if (offset == 0) {
-		/* 
+		/*
 		 * The kernel can indicate the invalidity of a stack ID in two
 		 * different ways:
 		 *
