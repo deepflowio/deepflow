@@ -463,7 +463,7 @@ pub struct stack_profile_data {
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
      * In microseconds as the unit of time.
-     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated byte count value, or 0 for frees
+     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated byte count value, or negative for frees
      */
     pub count: u64,
     /*
