@@ -547,7 +547,7 @@ impl Guard {
         let feed = Arc::new(Feed::default());
 
         self.running_watchdog.store(true, Relaxed);
-        self.start_watchdog(feed.clone());
+        //self.start_watchdog(feed.clone());
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
