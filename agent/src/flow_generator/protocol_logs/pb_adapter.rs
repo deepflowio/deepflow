@@ -79,6 +79,7 @@ pub struct ExtendedInfo {
  */
 #[derive(Default, Debug)]
 pub struct L7ProtocolSendLog {
+    pub override_msg_type: Option<u32>,
     pub req_len: Option<u32>,
     pub resp_len: Option<u32>,
     pub row_effect: u32,
@@ -96,6 +97,13 @@ impl L7ProtocolSendLog {
     pub const SECONDS_PER_DAY: f32 = 60.0 * 60.0 * 24.0;
 
     pub fn fill_app_proto_log(self, log: &mut flow_log::AppProtoLogsData) {
+        if let Some(override_msg_type) = self.override_msg_type {
+            if let Some(base) = log.base.as_mut() {
+                if let Some(head) = base.head.as_mut() {
+                    head.msg_type = override_msg_type;
+                }
+            }
+        }
         let req_len = if let Some(len) = self.req_len {
             len as i32
         } else {

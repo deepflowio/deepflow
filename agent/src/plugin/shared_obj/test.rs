@@ -33,7 +33,7 @@ use crate::{
         l7_protocol_log::L7ProtocolParserInterface,
         l7_protocol_log::{EbpfParam, L7PerfCache, ParseParam},
     },
-    config::OracleConfig,
+    config::{config::Iso8583ParseConfig, OracleConfig},
     flow_generator::protocol_logs::{
         pb_adapter::KeyVal,
         plugin::shared_obj::{get_so_parser, SoLog},
@@ -85,6 +85,7 @@ fn get_req_param<'a>(
         buf_size: 0,
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
+        iso8583_parse_conf: Iso8583ParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -123,6 +124,7 @@ fn get_resp_param<'a>(
         buf_size: 0,
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
+        iso8583_parse_conf: Iso8583ParseConfig::default(),
         icmp_data: None,
     }
 }

@@ -1588,6 +1588,24 @@ impl Default for OracleConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Iso8583Config {
+    pub extract_fields: String,
+    pub translation_enabled: bool,
+    pub pan_obfuscate: bool,
+}
+
+impl Default for Iso8583Config {
+    fn default() -> Self {
+        Self {
+            extract_fields: "2, 7, 11, 32, 33".to_string(),
+            translation_enabled: true,
+            pan_obfuscate: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct MysqlConfig {
@@ -1616,10 +1634,11 @@ impl Default for GrpcConfig {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
+    pub iso8583: Iso8583Config,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
 }
@@ -1687,6 +1706,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
+                ("ISO8583".to_string(), "1-65535".to_string()),
                 ("Redis".to_string(), "1-65535".to_string()),
                 ("MongoDB".to_string(), "1-65535".to_string()),
                 ("Memcached".to_string(), "11211".to_string()),
@@ -1716,6 +1736,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
                 ("Oracle".to_string(), vec![]),
+                ("ISO8583".to_string(), vec![]),
                 ("Redis".to_string(), vec![]),
                 ("MongoDB".to_string(), vec![]),
                 ("Memcached".to_string(), vec![]),
@@ -3716,6 +3737,23 @@ pub struct OracleParseConfig {
     pub is_be: bool,
     pub int_compress: bool,
     pub resp_0x04_extra_byte: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Iso8583ParseConfig {
+    pub extract_fields: Bitmap,
+    pub translation_enabled: bool,
+    pub pan_obfuscate: bool,
+}
+
+impl Default for Iso8583ParseConfig {
+    fn default() -> Self {
+        Iso8583ParseConfig {
+            extract_fields: Bitmap::new(0, false),
+            translation_enabled: true,
+            pan_obfuscate: true,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
