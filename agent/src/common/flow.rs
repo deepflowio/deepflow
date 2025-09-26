@@ -1179,14 +1179,7 @@ impl Flow {
         }
         // 链路追踪统计位置
         self.directions = get_direction(&*self, agent_type, cloud_gateway_traffic);
-
-        if self.directions[0] != Direction::None && self.directions[1] == Direction::None {
-            self.tap_side = self.directions[0].into();
-        } else if self.directions[0] == Direction::None && self.directions[1] != Direction::None {
-            self.tap_side = self.directions[1].into();
-        } else {
-            self.tap_side = TapSide::Rest;
-        }
+        self.tap_side = Direction::from(&self.directions).into();
     }
 
     // Currently acl_gids only saves the policy ID of pcap, but does not save the policy ID of NPB
