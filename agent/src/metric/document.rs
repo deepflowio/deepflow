@@ -192,6 +192,18 @@ impl Default for Direction {
     }
 }
 
+impl From<&[Direction; 2]> for Direction {
+    fn from(value: &[Direction; 2]) -> Self {
+        if value[0] != Direction::None && value[1] == Direction::None {
+            value[0]
+        } else if value[0] == Direction::None && value[1] != Direction::None {
+            value[1]
+        } else {
+            Direction::None
+        }
+    }
+}
+
 const SIDE_NODE: u8 = 1 << 3;
 const SIDE_HYPERVISOR: u8 = 2 << 3;
 const SIDE_GATEWAY_HYPERVISOR: u8 = 3 << 3;
