@@ -855,6 +855,9 @@ extern "C" {
                * @return 0 on success, -1 on failure.
                */
                pub fn set_socket_fanout_ebpf(socket: c_int, group_id: c_int) -> c_int;
+               // Enable Istio envoy mTLS traffic decryption
+               pub fn set_envoy_mtls_enabled(enabled: bool) -> c_void;
+               pub fn envoy_trace_start() -> c_int;
         }
     }
 }

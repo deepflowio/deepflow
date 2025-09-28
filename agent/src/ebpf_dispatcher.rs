@@ -806,6 +806,8 @@ impl EbpfCollector {
         }
 
         ebpf::set_uprobe_openssl_enabled(config.ebpf.socket.uprobe.tls.enabled);
+        #[cfg(feature = "extended_observability")]
+        ebpf::set_envoy_mtls_enabled(config.ebpf.socket.uprobe.tls.envoy_mtls_enabled);
         if config.ebpf.socket.uprobe.tls.enabled {
             let feature = "ebpf.socket.uprobe.tls";
             process_listener.register(feature, set_feature_uprobe_tls);
@@ -1189,6 +1191,12 @@ impl EbpfCollector {
             }
 
             ebpf::dpdk_trace_start();
+        }
+
+        // Istio envoy mtls
+        #[cfg(feature = "extended_observability")]
+        if config.ebpf.socket.uprobe.tls.envoy_mtls_enabled {
+            ebpf::envoy_trace_start();
         }
 
         ebpf::bpf_tracer_finish();

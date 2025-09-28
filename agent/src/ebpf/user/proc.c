@@ -1295,8 +1295,14 @@ int add_probe_sym_to_tracer_probes(int pid, const char *path,
 		 * address to a physical address.
 		 * For shared library binary files (ET_DYN), no conversion is needed.
 		 * ref: https://refspecs.linuxbase.org/elf/gabi4+/ch5.pheader.html
+		 *
+		 * ET_DYN indicates a position-independent loadable file.
+		 * It can be either a shared library (.so) or a PIE (Position Independent Executable).
+		 * - PIE executables use random load addresses (ASLR) for better security (modern default).
+		 * - Shared libraries are also ET_DYN but usually lack the executable bit.
+		 *   To distinguish between them, check if the file has executable permissions.
 		 */
-		if (bcc_elf_get_type(probe_sym->binary_path) == ET_EXEC) {
+		if (bcc_elf_is_exe(probe_sym->binary_path)) {
 			struct load_addr_t addr = {
 				.target_addr = probe_sym->entry,
 				.binary_addr = 0x0,
@@ -1309,6 +1315,7 @@ int add_probe_sym_to_tracer_probes(int pid, const char *path,
 			if (!addr.binary_addr) {
 				goto invalid;
 			}
+
 			probe_sym->entry = addr.binary_addr;
 		}
 
