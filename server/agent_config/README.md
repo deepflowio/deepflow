@@ -1904,6 +1904,20 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
+      match_regex: \bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $5
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: \b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $4
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
       match_regex: ^deepflow-
       only_in_container: false
     - enabled_features:
@@ -1921,6 +1935,12 @@ inputs:
 List of advanced features enabled for specific processes.
 
 Will traverse over the entire array, so the previous ones will be matched first.
+The default matchers cover common scripting runtimes:
+- Python: matches CLI invocations like `python app.py` and rewrites the process name to the script filename (`$4`).
+- PHP: mirrors the Python pattern, capturing CLI commands such as `php80 script.php` (or `php-fpm -c ... script.php`) and rewriting to the target script (`$5`).
+- Node.js: follows the same idea for `node`/`nodejs` commands, keeping the executed `.js` file as the process name (`$4`).
+- `^deepflow-`: ensures DeepFlow internal binaries keep profiling enabled.
+- `.*`: final catch-all that leaves `proc.gprocess_info` enabled for any remaining processes.
 when match_type is parent_process_name, will recursive to match parent proc name,
 and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
 and windows style environment variable, for example: `$1-py-script-%HOSTNAME%` will
@@ -10849,4 +10869,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

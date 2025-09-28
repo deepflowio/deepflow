@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{cell::OnceCell, collections::HashMap, fs, path::PathBuf};
+use std::{borrow::Cow, cell::OnceCell, collections::HashMap, fs, path::PathBuf};
 
 use libc::c_void;
 use log::{debug, trace, warn};
@@ -1096,9 +1096,36 @@ pub fn merge_stacks(interpreter_trace: &str, native_trace: &str) -> String {
     // Found V8 entry points - this is the ideal case
     // For V8, we typically want to show the calling sequence properly
     // The native stack should contain the V8 engine calls, then JS functions
-    let result = format!("{};{}", native_trace, enhanced_js_trace);
+    let native_frames: Vec<&str> = native_trace.split(';').filter(|f| !f.is_empty()).collect();
+    if let Some(entry_idx) = native_frames.iter().rposition(|frame| {
+        v8_entry_patterns
+            .iter()
+            .any(|pattern| frame.contains(pattern))
+    }) {
+        let mut merged_frames: Vec<Cow<'_, str>> = Vec::new();
+        for frame in native_frames.iter().take(entry_idx + 1) {
+            merged_frames.push(Cow::Borrowed(*frame));
+        }
+        for frame in enhanced_js_trace.split(';').filter(|f| !f.is_empty()) {
+            merged_frames.push(Cow::Owned(frame.to_string()));
+        }
+        for frame in native_frames.iter().skip(entry_idx + 1) {
+            merged_frames.push(Cow::Borrowed(*frame));
+        }
 
-    // Clean up double semicolons and leading/trailing semicolons
+        let mut merged = String::new();
+        for (idx, frame) in merged_frames.iter().enumerate() {
+            if idx > 0 {
+                merged.push(';');
+            }
+            merged.push_str(frame.as_ref());
+        }
+
+        return merged;
+    }
+
+    // Fallback: entry pattern detected in string but not aligned with frame split
+    let result = format!("{};{}", native_trace, enhanced_js_trace);
     result
         .replace(";;", ";")
         .trim_start_matches(';')

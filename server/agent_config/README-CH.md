@@ -1876,6 +1876,20 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
+      match_regex: \bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $5
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
+      match_regex: \b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $4
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
       match_regex: ^deepflow-
       only_in_container: false
     - enabled_features:
@@ -1896,6 +1910,13 @@ inputs:
 当 match_type 为 parent_process_name 时，匹配器将会递归地查找父进程名且忽略 rewrite_name 选项。
 rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的环境变量。
 例如：`$1-py-script-%HOSTNAME%` 中的 $1 将会替换正则表达式捕获到的第一组内容，并替换 HOSTNAME 环境变量。
+
+默认规则覆盖了常见脚本运行时：
+- Python：匹配 `python app.py` 等命令行，使用 `$4` 将进程名重写为脚本文件名。
+- PHP：沿用与 Python 相同的思路，匹配 `php80 script.php` 或 `php-fpm ... script.php` 等命令行，并用 `$5` 指向的脚本名重写进程名。
+- Node.js：匹配 `node server.js`/`nodejs app.js` 等命令行，使用 `$4` 重写为目标 `.js` 文件。
+- `^deepflow-`：确保 DeepFlow 自身的组件保持启用相关特性。
+- `.*`：兜底规则，仍然为剩余进程保留 `proc.gprocess_info` 功能。
 
 配置键：
 - match_regex: 用于匹配进程的表达式，缺省值为 `""`。
@@ -10605,4 +10626,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

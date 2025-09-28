@@ -178,6 +178,21 @@ fn test_v8_stack_merging_complex_cases() {
 }
 
 #[test]
+fn test_v8_stack_ordering_near_entry() {
+    let js_stack = "main;calculate";
+    let native_stack = "root;node::Start;v8::internal::Invoke;malloc";
+
+    let merged = merge_stacks(js_stack, native_stack);
+
+    assert!(merged.contains("v8::internal::Invoke;main;calculate"));
+    assert!(merged.ends_with("calculate;malloc"));
+    assert_eq!(
+        merged,
+        "root;node::Start;v8::internal::Invoke;main;calculate;malloc"
+    );
+}
+
+#[test]
 fn test_v8_process_detection() {
     let current_pid = std::process::id();
 

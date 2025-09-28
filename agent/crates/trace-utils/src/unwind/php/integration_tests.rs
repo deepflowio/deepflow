@@ -163,3 +163,53 @@ fn test_php_stack_merging_edge_cases() {
         assert!(result_str.contains("MyClass::method1"));
     }
 }
+
+#[test]
+fn test_php_stack_merging_native_helper_order() {
+    let php_stack = "memory_intensive_task";
+    let native_stack = "root;[p] php;execute_ex;zend_long_to_str;_emalloc";
+
+    let mut buffer = vec![0u8; 512];
+    let php_cstring = std::ffi::CString::new(php_stack).unwrap();
+    let native_cstring = std::ffi::CString::new(native_stack).unwrap();
+    let result_len = unsafe {
+        merge_php_stacks(
+            buffer.as_mut_ptr() as *mut std::ffi::c_void,
+            buffer.len(),
+            php_cstring.as_ptr() as *const std::ffi::c_void,
+            native_cstring.as_ptr() as *const std::ffi::c_void,
+        )
+    };
+
+    assert!(result_len > 0, "Merged stack should contain frames");
+    let result_str = String::from_utf8_lossy(&buffer[..result_len]);
+    assert_eq!(
+        result_str,
+        "root;[p] php;execute_ex;memory_intensive_task;zend_long_to_str;_emalloc"
+    );
+}
+
+#[test]
+fn test_php_stack_merging_math_helpers() {
+    let php_stack = "matrix_multiply";
+    let native_stack = "root;[p] php80;/usr/bin/php;add_function";
+
+    let mut buffer = vec![0u8; 512];
+    let php_cstring = std::ffi::CString::new(php_stack).unwrap();
+    let native_cstring = std::ffi::CString::new(native_stack).unwrap();
+    let result_len = unsafe {
+        merge_php_stacks(
+            buffer.as_mut_ptr() as *mut std::ffi::c_void,
+            buffer.len(),
+            php_cstring.as_ptr() as *const std::ffi::c_void,
+            native_cstring.as_ptr() as *const std::ffi::c_void,
+        )
+    };
+
+    assert!(result_len > 0, "Merged stack should contain frames");
+    let result_str = String::from_utf8_lossy(&buffer[..result_len]);
+    assert_eq!(
+        result_str,
+        "root;[p] php80;/usr/bin/php;matrix_multiply;add_function"
+    );
+}

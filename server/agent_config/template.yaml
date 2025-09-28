@@ -1634,6 +1634,16 @@ inputs:
         only_in_container: false
         rewrite_name: $4
         enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $5
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $4
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
       - match_regex: ^deepflow-
         only_in_container: false
         enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
