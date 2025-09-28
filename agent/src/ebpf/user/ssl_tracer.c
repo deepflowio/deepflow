@@ -36,25 +36,25 @@ static struct symbol symbols[] = {
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_write",
-		.probe_func = UPROBE_FUNC_NAME(openssl_write_enter),
+		.probe_func = UPROBE_FUNC_NAME(boringssl_write_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_write",
-		.probe_func = UPROBE_FUNC_NAME(openssl_write_exit),
+		.probe_func = UPROBE_FUNC_NAME(boringssl_write_exit),
 		.is_probe_ret = true,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_read",
-		.probe_func = UPROBE_FUNC_NAME(openssl_read_enter),
+		.probe_func = UPROBE_FUNC_NAME(boringssl_read_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_read",
-		.probe_func = UPROBE_FUNC_NAME(openssl_read_exit),
+		.probe_func = UPROBE_FUNC_NAME(boringssl_read_exit),
 		.is_probe_ret = true,
 	},
 };
@@ -70,13 +70,15 @@ static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	if (!is_user_process(pid))
 		goto out;
 
-	path = get_so_path_by_pid_and_name(pid, "ssl");
+	path = get_elf_path_by_pid(pid);
+	//path = get_so_path_by_pid_and_name(pid, "ssl");
 	if (!path)
 		goto out;
 
 	ebpf_info("openssl uprobe, pid:%d, path:%s\n", pid, path);
-	add_probe_sym_to_tracer_probes(pid, path, conf, symbols,
-				       NELEMS(symbols));
+	add_probe_sym_to_tracer_probes(pid, path, conf, symbols, NELEMS(symbols));	
+	//add_probe_sym_to_tracer_probes(pid, path, conf, symbols,
+	//			       NELEMS(symbols));
 
 out:
 	free(path);
@@ -211,6 +213,7 @@ void ssl_events_handle(void)
 
 		tracer = event->tracer;
 		if (tracer) {
+			printf("+++++++++++++++++++ ssl_events_handle pid %d\n", event->pid);
 			pthread_mutex_lock(&tracer->mutex_probes_lock);
 			openssl_parse_and_register(event->pid, tracer->tps);
 			tracer_uprobes_update(tracer);
