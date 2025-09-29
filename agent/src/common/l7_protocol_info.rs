@@ -41,7 +41,7 @@ use crate::{
 use super::l7_protocol_log::ParseParam;
 
 macro_rules! all_protocol_info {
-    ($($name:ident($info_struct:ident)),+$(,)?) => {
+    ($($name:ident($info_struct:ty)),+$(,)?) => {
 
         #[derive(Serialize, Debug, Clone)]
         #[enum_dispatch]
