@@ -7035,6 +7035,180 @@ processors:
 在不同的 Oracle 版本中，ID 为 0x04 的响应会有不同的数据结构，如果环境中该响应数据的
 `影响行数`前有 1byte 的额外数据，请开启此开关。
 
+##### ISO8583 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583}
+
+###### 数据翻译 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          translation_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否对解析后的数据进行查表翻译后展示。
+
+  - 支持翻译的字段列表:
+
+|  支持翻译的字段       | 示例（翻译前）|示例（翻译后）          | 备注         |
+|-----------------------|-------------- |----------------------- |--------------|
+| 0-报文类型标识符      | 0100          | 0100-授权类请求        |              |
+| 3-交易处理码          | 300000        | 300000-余额查询        |              |
+| 32-受理机构标识码     | 6100****      | 6100-中国邮政储蓄银行  | 翻译前4位    |
+| 39-应答码             | 00            | 00-承兑或交易成功      |              |
+| 49-交易货币代码       | 156           | 156-人民币元           |              |
+
+###### 卡号脱敏 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          pan_obfuscate: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否对卡号脱敏。
+
+###### 提取字段 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.extract_fields}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.extract_fields`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          extract_fields: 2,7,11,32,33
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+提取字段展示在`数据原生标签`
+  - 配置样例: `extract_fields: 0,2-33`
+
+字段对照表:
+
+| 字段号 | 说明 |
+|--------|----------|
+| 0  | 报文类型标识符 |
+| 1  | 位图 |
+| 2  | 主账号 |
+| 3  | 交易处理码 |
+| 4  | 交易金额 |
+| 5  | 清算金额 |
+| 6  | 持卡人扣账金额 |
+| 7  | 交易传输时间 |
+| 9  | 清算汇率 |
+| 10 | 持卡人扣账汇率 |
+| 11 | 系统跟踪号 |
+| 12 | 受卡方所在地时间 |
+| 13 | 受卡方所在地日期 |
+| 14 | 卡有效期 |
+| 15 | 清算日期 |
+| 16 | 兑换日期 |
+| 18 | 商户类型 |
+| 19 | 商户国家代码 |
+| 22 | 服务点输入方式码 |
+| 23 | 卡序列号 |
+| 25 | 服务点条件码 |
+| 26 | 服务点 PIN 获取码 |
+| 28 | 交易费 |
+| 32 | 受理机构标识码 |
+| 33 | 发送机构标识码 |
+| 35 | 第二磁道数据 |
+| 36 | 第三磁道数据 |
+| 37 | 检索参考号 |
+| 38 | 授权标识应答码 |
+| 39 | 应答码 |
+| 41 | 受卡机终端标识码 |
+| 42 | 受卡方标识码 |
+| 43 | 受卡方名称地址 |
+| 44 | 附加响应数据 |
+| 45 | 第一磁道数据 |
+| 48 | 附加数据－私有 |
+| 49 | 交易货币代码 |
+| 50 | 清算货币代码 |
+| 51 | 持卡人账户货币代码 |
+| 52 | 个人标识码数据 |
+| 53 | 安全控制信息 |
+| 54 | 实际余额 |
+| 55 | IC 卡数据域 |
+| 56 | 附加信息 |
+| 57 | 附加交易信息 |
+| 59 | 明细查询数据 |
+| 60 | 自定义域 |
+| 61 | 持卡人身份认证信息 |
+| 62 | 交换中心数据 |
+| 63 | 金融网络数据 |
+| 70 | 网络管理信息码 |
+| 90 | 原始数据元 |
+| 96 | 报文安全码 |
+| 100 | 接收机构标识码 |
+| 102 | 账户标识 1 |
+| 103 | 账户标识 2 |
+| 104 | 附加信息 |
+| 113 | 附加信息 |
+| 116 | 附加信息 |
+| 117 | 附加信息 |
+| 121 | CUPS 保留 |
+| 122 | 受理方保留 |
+| 123 | 发卡方保留 |
+| 125 | 附加信息 |
+| 126 | 附加信息 |
+| 128 | 报文鉴别码 |
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
