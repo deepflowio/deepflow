@@ -105,3 +105,6 @@ pub const BODY_PARAM_SERVICE_NAME: u8 = 2;
 pub const BODY_PARAM_SERVICE_VERSION: u8 = 3;
 pub const BODY_PARAM_METHOD_NAME: u8 = 4;
 pub const BODY_PARAM_MAX: u8 = 5;
+
+pub const APM_TRACE_ID_ATTR: &str = "apm_trace_id";
+pub const APM_SPAN_ID_ATTR: &str = "apm_span_id";
