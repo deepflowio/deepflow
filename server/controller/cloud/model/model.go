@@ -75,6 +75,7 @@ type VPC struct {
 	Lcuuid       string `json:"lcuuid" binding:"required"`
 	Name         string `json:"name" binding:"required"`
 	Label        string `json:"label"`
+	Owner        string `json:"owner"`
 	TunnelID     int    `json:"tunnel_id"`
 	CIDR         string `json:"cidr"`
 	RegionLcuuid string `json:"region_lcuuid" binding:"required"`

@@ -86,6 +86,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, 
 	dbItem := &metadbmodel.VPC{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
+		Owner:        cloudItem.Owner,
 		UID:          cloudItem.Label,
 		CreateMethod: ctrlrcommon.CREATE_METHOD_LEARN,
 		Domain:       v.metadata.GetDomainLcuuid(),
@@ -120,6 +121,10 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
+	}
+	if diffBase.Owner != cloudItem.Owner {
+		mapInfo["owner"] = cloudItem.Owner
+		structInfo.Owner.Set(diffBase.Owner, cloudItem.Owner)
 	}
 	if diffBase.CIDR != cloudItem.CIDR {
 		mapInfo["cidr"] = cloudItem.CIDR
