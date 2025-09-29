@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS epc (
     name                VARCHAR(256) DEFAULT '',
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '',
+    `owner`             VARCHAR(64) DEFAULT '',
     alias               VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
     region              VARCHAR(64) DEFAULT '',

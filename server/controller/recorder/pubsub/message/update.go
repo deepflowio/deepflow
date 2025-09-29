@@ -245,6 +245,7 @@ type UpdatedVPCFields struct {
 	Key
 	Name         fieldDetail[string]
 	Label        fieldDetail[string]
+	Owner        fieldDetail[string]
 	CIDR         fieldDetail[string]
 	TunnelID     fieldDetail[int]
 	RegionLcuuid fieldDetail[string]
