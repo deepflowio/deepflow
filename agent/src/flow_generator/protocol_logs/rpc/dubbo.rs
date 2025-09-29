@@ -17,6 +17,8 @@
 mod consts;
 mod hessian2;
 
+use std::mem::replace;
+
 use serde::Serialize;
 
 use crate::{
@@ -31,6 +33,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
+            consts::*,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
                 TraceInfo,
@@ -234,11 +237,29 @@ impl DubboInfo {
 
         //trace info rewrite
         if let Some(trace_id) = custom.trace.trace_id {
-            self.trace_id = PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id);
+            let prev = replace(
+                &mut self.trace_id,
+                PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id),
+            );
+            if !prev.is_default() {
+                self.attributes.push(KeyVal {
+                    key: APM_TRACE_ID_ATTR.to_string(),
+                    val: prev.into_inner(),
+                });
+            }
         }
 
         if let Some(span_id) = custom.trace.span_id {
-            self.span_id = PrioField::new(PLUGIN_FIELD_PRIORITY, span_id);
+            let prev = replace(
+                &mut self.span_id,
+                PrioField::new(PLUGIN_FIELD_PRIORITY, span_id),
+            );
+            if !prev.is_default() {
+                self.attributes.push(KeyVal {
+                    key: APM_SPAN_ID_ATTR.to_string(),
+                    val: prev.into_inner(),
+                });
+            }
         }
 
         // extend attribute
@@ -294,12 +315,30 @@ impl DubboInfo {
         // trace info
         if CUSTOM_FIELD_POLICY_PRIORITY < self.trace_id.prio {
             if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
-                self.trace_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
+                let prev = replace(
+                    &mut self.trace_id,
+                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id),
+                );
+                if !prev.is_default() {
+                    self.attributes.push(KeyVal {
+                        key: APM_TRACE_ID_ATTR.to_string(),
+                        val: prev.into_inner(),
+                    });
+                }
             }
         }
         if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
             if let Some(span_id) = tags.remove(ExtraField::SPAN_ID) {
-                self.span_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id);
+                let prev = replace(
+                    &mut self.span_id,
+                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id),
+                );
+                if !prev.is_default() {
+                    self.attributes.push(KeyVal {
+                        key: APM_SPAN_ID_ATTR.to_string(),
+                        val: prev.into_inner(),
+                    });
+                }
             }
         }
         self.client_ip = tags.remove(ExtraField::HTTP_PROXY_CLIENT);
