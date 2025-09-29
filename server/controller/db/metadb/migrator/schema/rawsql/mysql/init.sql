@@ -502,6 +502,7 @@ CREATE TABLE IF NOT EXISTS epc (
     name                VARCHAR(256) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     label               VARCHAR(64) DEFAULT '',
+    `owner`             VARCHAR(64) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
