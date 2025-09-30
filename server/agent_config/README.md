@@ -4893,6 +4893,106 @@ inputs:
 Agent uses LRU cache to record process allocated addresses to avoid uncontrolled
 memory usage. Each record in this LRU is about 80B.
 
+##### Sort length {#inputs.ebpf.profile.memory.sort_length}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_length`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_length: 16384
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 65536] |
+
+**Description**:
+
+In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+This parameter is the length of the sorted array.
+When configuring this option, first adjust the `sort_interval` parameter according to the instructions,
+and then refer to the agent performance statistics in `deepflow_agent_ebpf_memory_profiler`
+`dequeued_by_length` and `dequeued_by_interval` metrics, appropriately reduce this parameter
+while ensuring that the former is several times smaller than the latter.
+
+##### Sort interval {#inputs.ebpf.profile.memory.sort_interval}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_interval`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_interval: 1500ms
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1ns', '10s'] |
+
+**Description**:
+
+In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+This parameter controls the max span of interval between the first and last item in the sorted array.
+Refer to agent performance statistics in `deepflow_agent_ebpf_memory_profiler`,
+making `time_backtracked` to 0. Configurion `sort_length` may also need to be increased.
+
+##### Queue Size {#inputs.ebpf.profile.memory.queue_size}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.queue_size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        queue_size: 32768
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**Description**:
+
+Memory profiler inner queue size.
+Refer to agent performance statistics in `deepflow_agent_ebpf_memory_profiler`,
+making `overwritten` to 0 and `pending` not exceeding this configuration.
+
 #### Preprocess {#inputs.ebpf.profile.preprocess}
 
 ##### Stack Compression {#inputs.ebpf.profile.preprocess.stack_compression}
