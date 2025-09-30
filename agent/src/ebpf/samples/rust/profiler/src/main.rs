@@ -119,9 +119,9 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, _sd: *mut SK_BPF_DATA) {}
+extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, _sd: *mut SK_BPF_DATA) -> c_int { 0 }
 
-extern "C" fn continuous_profiler_callback(_: *mut c_void, queue_id: c_int, cp: *mut stack_profile_data) {
+extern "C" fn continuous_profiler_callback(_: *mut c_void, queue_id: c_int, cp: *mut stack_profile_data) -> c_int {
     unsafe {
         process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count as u32, 1);
@@ -143,6 +143,8 @@ extern "C" fn continuous_profiler_callback(_: *mut c_void, queue_id: c_int, cp: 
         //         (*cp).stack_data_len, data);
         //println!("+ --------------------------------- +");
     }
+
+    0
 }
 
 #[allow(dead_code)]
