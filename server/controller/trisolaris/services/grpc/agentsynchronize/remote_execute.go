@@ -115,6 +115,16 @@ func (e *RemoteExecute) receiveAndHandle(
 			}
 
 			e.resetTimer(ctx, agentInactivityTimer)
+
+			if resp == nil {
+				log.Infof("agent received null response: %s", resp.String())
+				return
+			}
+			if resp.AgentId == nil {
+				log.Warningf("agent received null agent id: %s", resp.String())
+				return
+			}
+
 			e.initCtx(ctx, resp)
 
 			if !ctx.cmdMng.IsValid() {
@@ -140,18 +150,7 @@ func (e *RemoteExecute) receiveAndHandle(
 }
 
 func (e *RemoteExecute) initCtx(ctx *remoteExecContext, resp *api.RemoteExecResponse) {
-	if resp == nil {
-		log.Infof("agent received null response: %s", resp.String())
-		return
-	}
-
 	log.Debugf("agent command response: %s", resp.String())
-
-	if resp.AgentId == nil {
-		log.Warningf("agent received null agent id: %s", resp.String())
-		return
-	}
-
 	ctx.key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 
 	if !ctx.isFirstRecv {
