@@ -177,6 +177,26 @@ static char *kern_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 #define RUST_SYM_SUFFIX "::h0123456789abcdef"
 #define RUST_SYM_MAX_LEN 512
 
+static bool maybe_rust_symbol(const char *name) {
+	// According to https://github.com/rust-lang/rustc-demangle/blob/f053741061bd1686873a467a7d9ef22d2f1fb876/src/lib.rs#L93,
+	// rust symbols may contain a ".llvm." suffix, handle this first
+	if (strstr(name, ".llvm.") != NULL) {
+		return true;
+	}
+
+	// check memory related symbols
+	if (strstr(name, "__rust_alloc") != NULL || strstr(name, "__rust_dealloc") != NULL || strstr(name, "__rust_realloc") != NULL) {
+		return true;
+	}
+
+	// rust symbols ends with "::h0123456789abcdef", which is "::h" followed by 16 hex digits
+	// for example:
+	//     std::sys_common::backtrace::__rust_begin_short_backtrace::h4385d813972dd7eb
+	// try rustc_demangle if we see this pattern
+	int offset = strlen(name) - strlen(RUST_SYM_SUFFIX);
+	return offset > 0 && strncmp(name + offset, "::h", 3) == 0;
+}
+
 static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 {
 	ASSERT(pid >= 0);
@@ -184,16 +204,7 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	int len = 0;
 	char *ptr = (char *)sym->demangle_name;
 
-	// According to https://github.com/rust-lang/rustc-demangle/blob/f053741061bd1686873a467a7d9ef22d2f1fb876/src/lib.rs#L93,
-	// rust symbols may contain a ".llvm." suffix, handle this first
-	bool maybe_rust_symbol = strstr(sym->demangle_name, ".llvm.") != NULL;
-	// rust symbols ends with "::h0123456789abcdef", which is "::h" followed by 16 hex digits
-	// for example:
-	//     std::sys_common::backtrace::__rust_begin_short_backtrace::h4385d813972dd7eb
-	// try rustc_demangle if we see this pattern
-	int offset = strlen(sym->demangle_name) - strlen(RUST_SYM_SUFFIX);
-	maybe_rust_symbol |= offset > 0 && strncmp(sym->demangle_name + offset, "::h", 3) == 0;
-	if (maybe_rust_symbol) {
+	if (maybe_rust_symbol(sym->demangle_name)) {
 		// likely a rust name
 		char rust_name[RUST_SYM_MAX_LEN];
 		memset(rust_name, 0, sizeof(rust_name));

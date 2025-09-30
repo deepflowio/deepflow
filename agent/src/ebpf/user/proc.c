@@ -715,10 +715,13 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				 * for each java process's delay.
 				 * The same applies to non-Java processes, which also perform
 				 * random symbol table loading within one minute.
+				 * Do not add delay for agent itself.
 				 */
-				p->update_syms_table_time +=
-				    generate_random_integer
-				    (PROFILER_DEFER_RANDOM_MAX);
+				if (pid != getpid()) {
+					p->update_syms_table_time +=
+						generate_random_integer
+						(PROFILER_DEFER_RANDOM_MAX);
+				}
 			}
 
 			if (p->update_syms_table_time > 0
@@ -1097,7 +1100,10 @@ void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
 	event->pid = pid;
 	event->stime = get_process_starttime(pid);
 	event->path = path;
-	event->expire_time = get_sys_uptime() + PROC_EVENT_HANDLE_DELAY;
+	event->expire_time = get_sys_uptime();
+	if (pid != getpid()) {
+	    event->expire_time += PROC_EVENT_HANDLE_DELAY;
+	}
 
 	pthread_mutex_lock(&list->m);
 	list_add_tail(&event->list, &list->head);

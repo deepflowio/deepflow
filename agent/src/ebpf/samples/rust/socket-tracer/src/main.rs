@@ -201,7 +201,7 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) {
+extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) -> c_int {
     unsafe {
         let mut proto_tag = String::from("");
         if sk_proto_safe(sd) == SOCK_DATA_OTHER {
@@ -333,6 +333,8 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
 
         println!("+ --------------------------------- +\n");
     }
+
+    0
 }
 
 #[allow(dead_code)]

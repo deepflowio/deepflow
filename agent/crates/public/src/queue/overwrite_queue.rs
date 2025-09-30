@@ -36,6 +36,7 @@ pub struct Counter {
     pub input: AtomicU64,
     pub output: AtomicU64,
     pub overwritten: AtomicU64,
+    pub pending: AtomicU64,
 }
 
 // fixed size MPSC overwrite queue implemented with ring buffer
@@ -107,6 +108,9 @@ impl<T> OverwriteQueue<T> {
             raw_end
         };
         assert!(end - start <= self.size);
+        self.counter
+            .pending
+            .fetch_max(self.size.min(end - start + count) as u64, Ordering::Relaxed);
         // queue full
         if end - start + count > self.size {
             let _lock = self.reader_lock.lock().unwrap();
@@ -487,11 +491,6 @@ impl<T> Drop for StatsHandle<T> {
 impl<T: Send> stats::OwnedCountable for StatsHandle<T> {
     fn get_counters(&self) -> Vec<stats::Counter> {
         let queue = &self.counter().queue;
-        let start = queue.start.load(Ordering::Relaxed);
-        let mut end = queue.end.load(Ordering::Relaxed);
-        if end < start {
-            end += 2 * queue.size;
-        }
         vec![
             (
                 "in",
@@ -511,7 +510,7 @@ impl<T: Send> stats::OwnedCountable for StatsHandle<T> {
             (
                 "pending",
                 stats::CounterType::Gauged,
-                stats::CounterValue::Unsigned((end - start) as u64),
+                stats::CounterValue::Unsigned(queue.counter.pending.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
