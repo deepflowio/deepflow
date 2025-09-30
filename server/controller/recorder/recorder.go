@@ -20,7 +20,7 @@ import (
 	"context"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -43,7 +43,7 @@ func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *que
 		log.Errorf("domain lcuuid: %s, failed to create metadata object: %s", domainLcuuid, err.Error(), logger.NewORGPrefix(orgID))
 		return nil
 	}
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	if err := md.DB.Where("lcuuid = ?", domainLcuuid).First(&domain).Error; err != nil {
 		log.Errorf("domain lcuuid: %s, failed to get domain from db: %s", domainLcuuid, err.Error(), md.LogPrefixes)
 		return nil

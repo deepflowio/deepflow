@@ -32,8 +32,8 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	service "github.com/deepflowio/deepflow/server/controller/http/service/vtap"
@@ -91,7 +91,7 @@ func (a *AgentCMD) RegisterTo(e *gin.Engine) {
 func forwardToServerConnectedByAgent() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
@@ -105,7 +105,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		var agent *mysqlmodel.VTap
+		var agent *metadbmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
@@ -188,7 +188,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			response.JSON(c, response.SetError(err))
 			return
@@ -198,7 +198,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
-		var agent *mysqlmodel.VTap
+		var agent *metadbmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			response.JSON(c, response.SetError(err))
 			return
@@ -241,14 +241,14 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 	}
 }
 
-func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
+func getAgentID(c *gin.Context, db *metadb.DB) (int, error) {
 	agentIDentStr := c.Param("id-or-name")
 	if agentIDentStr == "" {
 		return 0, errors.New("ident can not be empty")
 	}
 	agentID, err := strconv.Atoi(agentIDentStr)
 	if err != nil {
-		var agent mysqlmodel.VTap
+		var agent metadbmodel.VTap
 		if err := db.Where("name = ?", agentIDentStr).First(&agent).Error; err != nil {
 			return 0, fmt.Errorf("failed to get agent by name(%s), error: %s", err.Error())
 		}
@@ -284,7 +284,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 		}
 
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			response.JSON(c, response.SetError(err))
 			return

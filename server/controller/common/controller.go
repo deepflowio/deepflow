@@ -23,13 +23,13 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func GetSelfController() (*mysqlmodel.Controller, error) {
-	var controller *mysqlmodel.Controller
-	err := mysql.DefaultDB.Where("ip = ?", GetNodeIP()).Find(&controller).Error
+func GetSelfController() (*metadbmodel.Controller, error) {
+	var controller *metadbmodel.Controller
+	err := metadb.DefaultDB.Where("ip = ?", GetNodeIP()).Find(&controller).Error
 	return controller, err
 }
 
@@ -50,8 +50,8 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 			return
 		}
 	} else {
-		var controllers []*mysqlmodel.Controller
-		err = mysql.DefaultDB.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controllers).Error
+		var controllers []*metadbmodel.Controller
+		err = metadb.DefaultDB.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controllers).Error
 		if err != nil {
 			return
 		}

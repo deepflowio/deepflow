@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type Process struct {
-	OperatorBase[*mysqlmodel.Process, mysqlmodel.Process]
+	OperatorBase[*metadbmodel.Process, metadbmodel.Process]
 }
 
 func NewProcess() *Process {
 	operator := &Process{
-		newOperatorBase[*mysqlmodel.Process](
+		newOperatorBase[*metadbmodel.Process](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			true,
 			true,

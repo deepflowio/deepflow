@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBRoutingTable() *mysqlmodel.RoutingTable {
-	return &mysqlmodel.RoutingTable{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Nexthop: uuid.New().String()}
+func newDBRoutingTable() *metadbmodel.RoutingTable {
+	return &metadbmodel.RoutingTable{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Nexthop: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddRoutingTableBatchSuccess() {
 	operator := NewRoutingTable()
 	itemToAdd := newDBRoutingTable()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.RoutingTable{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.RoutingTable{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.RoutingTable
+	var addedItem *metadbmodel.RoutingTable
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Nexthop, itemToAdd.Nexthop)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.RoutingTable{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.RoutingTable{})
 }
 
 func (t *SuiteTest) TestUpdateRoutingTableSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateRoutingTableSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.RoutingTable
+	var updatedItem *metadbmodel.RoutingTable
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Nexthop, updateInfo["nexthop"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.RoutingTable{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.RoutingTable{})
 }
 
 func (t *SuiteTest) TestDeleteRoutingTableBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeleteRoutingTableBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.RoutingTable
+	var deletedItem *metadbmodel.RoutingTable
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

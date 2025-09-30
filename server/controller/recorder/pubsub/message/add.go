@@ -17,221 +17,221 @@
 package message
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type AddedRegions struct {
-	MySQLItems[mysqlmodel.Region]
+	MetadbItems[metadbmodel.Region]
 	addition[AddNoneAddition]
 }
 
 type AddedAZs struct {
-	MySQLItems[mysqlmodel.AZ]
+	MetadbItems[metadbmodel.AZ]
 	addition[AddNoneAddition]
 }
 
 type AddedSubDomains struct {
-	MySQLItems[mysqlmodel.SubDomain]
+	MetadbItems[metadbmodel.SubDomain]
 	addition[AddNoneAddition]
 }
 
 type AddedHosts struct {
-	MySQLItems[mysqlmodel.Host]
+	MetadbItems[metadbmodel.Host]
 	addition[AddNoneAddition]
 }
 
 type AddedVMs struct {
-	MySQLItems[mysqlmodel.VM]
+	MetadbItems[metadbmodel.VM]
 	addition[AddNoneAddition]
 }
 
 type AddedVMPodNodeConnections struct {
-	MySQLItems[mysqlmodel.VMPodNodeConnection]
+	MetadbItems[metadbmodel.VMPodNodeConnection]
 	addition[AddNoneAddition]
 }
 
 type AddedVPCs struct {
-	MySQLItems[mysqlmodel.VPC]
+	MetadbItems[metadbmodel.VPC]
 	addition[AddNoneAddition]
 }
 
 type AddedNetworks struct {
-	MySQLItems[mysqlmodel.Network]
+	MetadbItems[metadbmodel.Network]
 	addition[AddNoneAddition]
 }
 
 type AddedSubnets struct {
-	MySQLItems[mysqlmodel.Subnet]
+	MetadbItems[metadbmodel.Subnet]
 	addition[AddNoneAddition]
 }
 
 type AddedVRouters struct {
-	MySQLItems[mysqlmodel.VRouter]
+	MetadbItems[metadbmodel.VRouter]
 	addition[AddNoneAddition]
 }
 
 type AddedRoutingTables struct {
-	MySQLItems[mysqlmodel.RoutingTable]
+	MetadbItems[metadbmodel.RoutingTable]
 	addition[AddNoneAddition]
 }
 
 type AddedDHCPPorts struct {
-	MySQLItems[mysqlmodel.DHCPPort]
+	MetadbItems[metadbmodel.DHCPPort]
 	addition[AddNoneAddition]
 }
 
 type AddedVInterfaces struct {
-	MySQLItems[mysqlmodel.VInterface]
+	MetadbItems[metadbmodel.VInterface]
 	addition[AddNoneAddition]
 }
 
 type AddedFloatingIPs struct {
-	MySQLItems[mysqlmodel.FloatingIP]
+	MetadbItems[metadbmodel.FloatingIP]
 	addition[AddNoneAddition]
 }
 
 type AddedLANIPs struct {
-	MySQLItems[mysqlmodel.LANIP]
+	MetadbItems[metadbmodel.LANIP]
 	addition[AddNoneAddition]
 }
 
 type AddedWANIPs struct {
-	MySQLItems[mysqlmodel.WANIP]
+	MetadbItems[metadbmodel.WANIP]
 	addition[AddNoneAddition]
 }
 
 type AddedVIPs struct {
-	MySQLItems[mysqlmodel.VIP]
+	MetadbItems[metadbmodel.VIP]
 	addition[AddNoneAddition]
 }
 
 type AddedNATGateways struct {
-	MySQLItems[mysqlmodel.NATGateway]
+	MetadbItems[metadbmodel.NATGateway]
 	addition[AddNoneAddition]
 }
 
 type AddedNATRules struct {
-	MySQLItems[mysqlmodel.NATRule]
+	MetadbItems[metadbmodel.NATRule]
 	addition[AddNoneAddition]
 }
 
 type AddedNATVMConnections struct {
-	MySQLItems[mysqlmodel.NATVMConnection]
+	MetadbItems[metadbmodel.NATVMConnection]
 	addition[AddNoneAddition]
 }
 
 type AddedLBs struct {
-	MySQLItems[mysqlmodel.LB]
+	MetadbItems[metadbmodel.LB]
 	addition[AddNoneAddition]
 }
 
 type AddedLBListeners struct {
-	MySQLItems[mysqlmodel.LBListener]
+	MetadbItems[metadbmodel.LBListener]
 	addition[AddNoneAddition]
 }
 
 type AddedLBTargetServers struct {
-	MySQLItems[mysqlmodel.LBTargetServer]
+	MetadbItems[metadbmodel.LBTargetServer]
 	addition[AddNoneAddition]
 }
 
 type AddedLBVMConnections struct {
-	MySQLItems[mysqlmodel.LBVMConnection]
+	MetadbItems[metadbmodel.LBVMConnection]
 	addition[AddNoneAddition]
 }
 
 type AddedPeerConnections struct {
-	MySQLItems[mysqlmodel.PeerConnection]
+	MetadbItems[metadbmodel.PeerConnection]
 	addition[AddNoneAddition]
 }
 
 type AddedCENs struct {
-	MySQLItems[mysqlmodel.CEN]
+	MetadbItems[metadbmodel.CEN]
 	addition[AddNoneAddition]
 }
 
 type AddedRDSInstances struct {
-	MySQLItems[mysqlmodel.RDSInstance]
+	MetadbItems[metadbmodel.RDSInstance]
 	addition[AddNoneAddition]
 }
 
 type AddedRedisInstances struct {
-	MySQLItems[mysqlmodel.RedisInstance]
+	MetadbItems[metadbmodel.RedisInstance]
 	addition[AddNoneAddition]
 }
 
 type AddedPodClusters struct {
-	MySQLItems[mysqlmodel.PodCluster]
+	MetadbItems[metadbmodel.PodCluster]
 	addition[AddNoneAddition]
 }
 
 type AddedPodNamespaces struct {
-	MySQLItems[mysqlmodel.PodNamespace]
+	MetadbItems[metadbmodel.PodNamespace]
 	addition[AddNoneAddition]
 }
 
 type AddedPodNodes struct {
-	MySQLItems[mysqlmodel.PodNode]
+	MetadbItems[metadbmodel.PodNode]
 	addition[AddNoneAddition]
 }
 
 type AddedPodIngresses struct {
-	MySQLItems[mysqlmodel.PodIngress]
+	MetadbItems[metadbmodel.PodIngress]
 	addition[AddNoneAddition]
 }
 
 type AddedPodIngressRules struct {
-	MySQLItems[mysqlmodel.PodIngressRule]
+	MetadbItems[metadbmodel.PodIngressRule]
 	addition[AddNoneAddition]
 }
 
 type AddedPodIngressRuleBackends struct {
-	MySQLItems[mysqlmodel.PodIngressRuleBackend]
+	MetadbItems[metadbmodel.PodIngressRuleBackend]
 	addition[AddNoneAddition]
 }
 
 type AddedPodServices struct {
-	MySQLItems[mysqlmodel.PodService]
+	MetadbItems[metadbmodel.PodService]
 	addition[AddNoneAddition]
 }
 
 type AddedPodServicePorts struct {
-	MySQLItems[mysqlmodel.PodServicePort]
+	MetadbItems[metadbmodel.PodServicePort]
 	addition[AddNoneAddition]
 }
 
 type AddedPodGroups struct {
-	MySQLItems[mysqlmodel.PodGroup]
+	MetadbItems[metadbmodel.PodGroup]
 	addition[AddNoneAddition]
 }
 
 type AddedConfigMaps struct {
-	MySQLItems[mysqlmodel.ConfigMap]
+	MetadbItems[metadbmodel.ConfigMap]
 	addition[AddNoneAddition]
 }
 
 type AddedPodGroupConfigMapConnections struct {
-	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
+	MetadbItems[metadbmodel.PodGroupConfigMapConnection]
 	addition[AddNoneAddition]
 }
 
 type AddedPodGroupPorts struct {
-	MySQLItems[mysqlmodel.PodGroupPort]
+	MetadbItems[metadbmodel.PodGroupPort]
 	addition[AddNoneAddition]
 }
 
 type AddedPodReplicaSets struct {
-	MySQLItems[mysqlmodel.PodReplicaSet]
+	MetadbItems[metadbmodel.PodReplicaSet]
 	addition[AddNoneAddition]
 }
 
 type AddedPods struct {
-	MySQLItems[mysqlmodel.Pod]
+	MetadbItems[metadbmodel.Pod]
 	addition[AddNoneAddition]
 }
 
 type AddedProcesses struct {
-	MySQLItems[mysqlmodel.Process]
+	MetadbItems[metadbmodel.Process]
 	addition[AddedProcessesAddition]
 }
 
@@ -240,6 +240,6 @@ type AddedProcessesAddition struct {
 }
 
 type AddedCustomServices struct {
-	MySQLItems[mysqlmodel.CustomService]
+	MetadbItems[metadbmodel.CustomService]
 	addition[AddNoneAddition]
 }

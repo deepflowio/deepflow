@@ -25,8 +25,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 )
 
@@ -69,7 +69,7 @@ func (m *IDManagers) Start(ctx context.Context) error {
 	m.inUse = true
 	m.ctx, m.cancel = context.WithCancel(ctx)
 
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}
@@ -112,7 +112,7 @@ func (m *IDManagers) timedRefresh() {
 }
 
 func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Error("failed to get db: %v", err)
 		return nil, err
@@ -120,7 +120,7 @@ func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
 
 	if orgID != common.DEFAULT_ORG_ID {
 		// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
-		var domain *mysqlmodel.Domain
+		var domain *metadbmodel.Domain
 		result := db.Limit(1).Find(&domain)
 		if result.Error != nil {
 			log.Errorf("failed to get domain: %v", err, db.LogPrefixORGID)
@@ -163,7 +163,7 @@ func (m *IDManagers) refresh() error {
 }
 
 func (m *IDManagers) checkORGs() error {
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}

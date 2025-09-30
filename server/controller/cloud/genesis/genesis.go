@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -53,7 +53,7 @@ type Genesis struct {
 	cloudStatsd     statsd.CloudStatsd
 }
 
-func NewGenesis(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig) (*Genesis, error) {
+func NewGenesis(orgID int, domain metadbmodel.Domain, cfg config.CloudConfig) (*Genesis, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewVM(c *cache.Cache, eq *queue.OverwriteQueue) *VM {
 	return listener
 }
 
-func (vm *VM) OnUpdaterAdded(addedDBItems []*mysqlmodel.VM) {
+func (vm *VM) OnUpdaterAdded(addedDBItems []*metadbmodel.VM) {
 	vm.eventProducer.ProduceByAdd(addedDBItems)
 	vm.cache.AddVMs(addedDBItems)
 }
@@ -49,7 +49,7 @@ func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *diffbase.VM) 
 	vm.cache.UpdateVM(cloudItem)
 }
 
-func (vm *VM) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.VM) {
+func (vm *VM) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.VM) {
 	vm.eventProducer.ProduceByDelete(lcuuids)
 	vm.cache.DeleteVMs(lcuuids)
 }

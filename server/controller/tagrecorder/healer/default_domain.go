@@ -19,14 +19,14 @@ package healer
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func NewDefaultDomainHealers(db *mysql.DB) *Healers {
+func NewDefaultDomainHealers(db *metadb.DB) *Healers {
 	platformMetadata, _ := metadata.NewPlatform(
 		db.GetORGID(),
 		metadata.MetadataDomain(
-			mysqlmodel.Domain{Base: mysqlmodel.Base{Lcuuid: ctrlrcommon.DEFAULT_DOMAIN}, TeamID: ctrlrcommon.DEFAULT_TEAM_ID}))
+			metadbmodel.Domain{Base: metadbmodel.Base{Lcuuid: ctrlrcommon.DEFAULT_DOMAIN}, TeamID: ctrlrcommon.DEFAULT_TEAM_ID}))
 	return NewHealers(platformMetadata)
 }

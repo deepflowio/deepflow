@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
@@ -73,7 +73,7 @@ func (c *VTapCounter) SetNull(orgID int, vtapName string) {
 	counter.Weight = 0
 }
 
-func (c *VTapCounter) SetCounter(db *mysql.DB, teamID int, vtapName string, weight float64, isChanged uint64) {
+func (c *VTapCounter) SetCounter(db *metadb.DB, teamID int, vtapName string, weight float64, isChanged uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

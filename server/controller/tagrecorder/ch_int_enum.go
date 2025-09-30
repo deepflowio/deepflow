@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
 
 type ChIntEnum struct {
-	UpdaterComponent[mysqlmodel.ChIntEnum, IntEnumTagKey]
+	UpdaterComponent[metadbmodel.ChIntEnum, IntEnumTagKey]
 }
 
 func NewChIntEnum() *ChIntEnum {
 	updater := &ChIntEnum{
-		newUpdaterComponent[mysqlmodel.ChIntEnum, IntEnumTagKey](
+		newUpdaterComponent[metadbmodel.ChIntEnum, IntEnumTagKey](
 			RESOURCE_TYPE_CH_INT_ENUM,
 		),
 	}
@@ -36,11 +36,11 @@ func NewChIntEnum() *ChIntEnum {
 	return updater
 }
 
-func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysqlmodel.ChIntEnum, bool) {
+func (e *ChIntEnum) generateNewData(dbClient *metadb.DB) (map[IntEnumTagKey]metadbmodel.ChIntEnum, bool) {
 	sql := "show tag all_int_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"
-	keyToItem := make(map[IntEnumTagKey]mysqlmodel.ChIntEnum)
+	keyToItem := make(map[IntEnumTagKey]metadbmodel.ChIntEnum)
 	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
 		log.Errorf("read failed: %v", err, dbClient.LogPrefixORGID)
@@ -59,7 +59,7 @@ func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysql
 					TagName:  name,
 					TagValue: tagValueInt,
 				}
-				keyToItem[key] = mysqlmodel.ChIntEnum{
+				keyToItem[key] = metadbmodel.ChIntEnum{
 					TagName:       name,
 					Value:         tagValueInt,
 					NameZH:        tagDisplayNameZH.(string),
@@ -73,11 +73,11 @@ func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysql
 	return keyToItem, true
 }
 
-func (e *ChIntEnum) generateKey(dbItem mysqlmodel.ChIntEnum) IntEnumTagKey {
+func (e *ChIntEnum) generateKey(dbItem metadbmodel.ChIntEnum) IntEnumTagKey {
 	return IntEnumTagKey{TagName: dbItem.TagName, TagValue: dbItem.Value}
 }
 
-func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIntEnum) (map[string]interface{}, bool) {
+func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem metadbmodel.ChIntEnum) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.TagName != newItem.TagName {
 		updateInfo["tag_name"] = newItem.TagName

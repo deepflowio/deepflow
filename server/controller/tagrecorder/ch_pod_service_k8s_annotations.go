@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChPodServiceK8sAnnotations struct {
 		message.UpdatedPodService,
 		*message.DeletedPodServices,
 		message.DeletedPodServices,
-		mysqlmodel.PodService,
-		mysqlmodel.ChPodServiceK8sAnnotations,
+		metadbmodel.PodService,
+		metadbmodel.ChPodServiceK8sAnnotations,
 		IDKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 			message.UpdatedPodService,
 			*message.DeletedPodServices,
 			message.DeletedPodServices,
-			mysqlmodel.PodService,
-			mysqlmodel.ChPodServiceK8sAnnotations,
+			metadbmodel.PodService,
+			metadbmodel.ChPodServiceK8sAnnotations,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS,
@@ -62,13 +62,13 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(md *message.Metadata, upd
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodService) (keys []IDKey, targets []mysqlmodel.ChPodServiceK8sAnnotations) {
+func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []IDKey, targets []metadbmodel.ChPodServiceK8sAnnotations) {
 	if source.Annotation == "" {
 		return
 	}
 	annotations, _ := common.StrToJsonAndMap(source.Annotation)
-	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodServiceK8sAnnotations{{
-		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodServiceK8sAnnotations{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Annotations: annotations,
 		L3EPCID:     source.VPCID,
 		PodNsID:     source.PodNamespaceID,
@@ -79,6 +79,6 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, source
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodServiceK8sAnnotations, db *mysql.DB) {
+func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []metadbmodel.ChPodServiceK8sAnnotations, db *metadb.DB) {
 
 }

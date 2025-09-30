@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -34,8 +34,8 @@ type ChPodNSCloudTags struct {
 		message.UpdatedPodNamespace,
 		*message.DeletedPodNamespaces,
 		message.DeletedPodNamespaces,
-		mysqlmodel.PodNamespace,
-		mysqlmodel.ChPodNSCloudTags,
+		metadbmodel.PodNamespace,
+		metadbmodel.ChPodNSCloudTags,
 		IDKey,
 	]
 }
@@ -49,8 +49,8 @@ func NewChPodNSCloudTags() *ChPodNSCloudTags {
 			message.UpdatedPodNamespace,
 			*message.DeletedPodNamespaces,
 			message.DeletedPodNamespaces,
-			mysqlmodel.PodNamespace,
-			mysqlmodel.ChPodNSCloudTags,
+			metadbmodel.PodNamespace,
+			metadbmodel.ChPodNSCloudTags,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
@@ -65,7 +65,7 @@ func (c *ChPodNSCloudTags) onResourceUpdated(md *message.Metadata, updateMessage
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodNamespace) (keys []IDKey, targets []mysqlmodel.ChPodNSCloudTags) {
+func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *metadbmodel.PodNamespace) (keys []IDKey, targets []metadbmodel.ChPodNSCloudTags) {
 	cloudTagMap := MergeCloudTags(source.LearnedCloudTags, source.CustomCloudTags)
 	if len(cloudTagMap) == 0 {
 		return
@@ -75,8 +75,8 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmod
 		log.Error(err, logger.NewORGPrefix(md.GetORGID()))
 		return
 	}
-	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodNSCloudTags{{
-		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodNSCloudTags{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		CloudTags:   string(bytes),
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
@@ -85,6 +85,6 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, source *mysqlmod
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodNSCloudTags, db *mysql.DB) {
+func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []metadbmodel.ChPodNSCloudTags, db *metadb.DB) {
 
 }

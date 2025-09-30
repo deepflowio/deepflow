@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBWANIP() *mysqlmodel.WANIP {
-	return &mysqlmodel.WANIP{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, IP: randomIP(), Region: uuid.New().String()}
+func newDBWANIP() *metadbmodel.WANIP {
+	return &metadbmodel.WANIP{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, IP: randomIP(), Region: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddWANIPBatchSuccess() {
 	operator := NewWANIP()
 	itemToAdd := newDBWANIP()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.WANIP{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.WANIP{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.WANIP
+	var addedItem *metadbmodel.WANIP
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.IP, itemToAdd.IP)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.WANIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.WANIP{})
 }
 
 func (t *SuiteTest) TestUpdateWANIPSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateWANIPSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.WANIP
+	var updatedItem *metadbmodel.WANIP
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Region, updateInfo["region"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.WANIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.WANIP{})
 }
 
 func (t *SuiteTest) TestDeleteWANIPBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeleteWANIPBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.WANIP
+	var deletedItem *metadbmodel.WANIP
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,13 +34,13 @@ func NewNATRule(c *cache.Cache) *NATRule {
 	return listener
 }
 
-func (r *NATRule) OnUpdaterAdded(addedDBItems []*mysqlmodel.NATRule) {
+func (r *NATRule) OnUpdaterAdded(addedDBItems []*metadbmodel.NATRule) {
 	r.cache.AddNATRules(addedDBItems)
 }
 
 func (r *NATRule) OnUpdaterUpdated(cloudItem *cloudmodel.NATRule, diffBase *diffbase.NATRule) {
 }
 
-func (r *NATRule) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.NATRule) {
+func (r *NATRule) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.NATRule) {
 	r.cache.DeleteNATRules(lcuuids)
 }

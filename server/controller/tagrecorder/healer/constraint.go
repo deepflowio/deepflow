@@ -19,29 +19,29 @@ package healer
 import (
 	"time"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type dataGeneratorModel interface {
-	mysqlmodel.AZ | mysqlmodel.Host | mysqlmodel.VM | mysqlmodel.VPC | mysqlmodel.Network | mysqlmodel.VRouter |
-		mysqlmodel.DHCPPort | mysqlmodel.NATGateway | mysqlmodel.LB | mysqlmodel.RDSInstance | mysqlmodel.RedisInstance |
-		mysqlmodel.PodCluster | mysqlmodel.PodNode | mysqlmodel.PodNamespace | mysqlmodel.PodIngress | mysqlmodel.PodService |
-		mysqlmodel.PodGroup | mysqlmodel.PodReplicaSet | mysqlmodel.Pod | healerProcess | mysqlmodel.CustomService |
+	metadbmodel.AZ | metadbmodel.Host | metadbmodel.VM | metadbmodel.VPC | metadbmodel.Network | metadbmodel.VRouter |
+		metadbmodel.DHCPPort | metadbmodel.NATGateway | metadbmodel.LB | metadbmodel.RDSInstance | metadbmodel.RedisInstance |
+		metadbmodel.PodCluster | metadbmodel.PodNode | metadbmodel.PodNamespace | metadbmodel.PodIngress | metadbmodel.PodService |
+		metadbmodel.PodGroup | metadbmodel.PodReplicaSet | metadbmodel.Pod | healerProcess | metadbmodel.CustomService |
 
-		healerChDevice | mysqlmodel.ChAZ | mysqlmodel.ChChost | mysqlmodel.ChVPC | mysqlmodel.ChNetwork | mysqlmodel.ChLBListener |
-		mysqlmodel.ChPodCluster | mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChPodIngress | mysqlmodel.ChPodService |
-		mysqlmodel.ChPodGroup | mysqlmodel.ChPod | mysqlmodel.ChGProcess |
-		mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
-		mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag |
-		mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations | mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodK8sLabel |
-		mysqlmodel.ChPodK8sLabels
+		healerChDevice | metadbmodel.ChAZ | metadbmodel.ChChost | metadbmodel.ChVPC | metadbmodel.ChNetwork | metadbmodel.ChLBListener |
+		metadbmodel.ChPodCluster | metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChPodIngress | metadbmodel.ChPodService |
+		metadbmodel.ChPodGroup | metadbmodel.ChPod | metadbmodel.ChGProcess |
+		metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
+		metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag |
+		metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations | metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodK8sLabel |
+		metadbmodel.ChPodK8sLabels
 
 	GetID() int
 	GetUpdatedAt() time.Time
 }
 
 type healerChDevice struct {
-	mysqlmodel.ChDevice
+	metadbmodel.ChDevice
 }
 
 func (h healerChDevice) GetID() int {
@@ -57,7 +57,7 @@ func (h healerChDevice) TableName() string {
 }
 
 type healerProcess struct {
-	mysqlmodel.Process
+	metadbmodel.Process
 }
 
 func (h healerProcess) GetID() int {

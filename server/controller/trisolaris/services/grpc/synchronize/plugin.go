@@ -24,8 +24,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -51,11 +51,11 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginDat
 		return nil, fmt.Errorf("the plugin request data type(%d) or name(%s) is empty",
 			r.GetPluginType(), r.GetPluginName())
 	}
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, fmt.Errorf("get db failed")
 	}
-	pluginDbMgr := dbmgr.DBMgr[mysqlmodel.Plugin](db.DB)
+	pluginDbMgr := dbmgr.DBMgr[metadbmodel.Plugin](db.DB)
 	plugin, err := pluginDbMgr.GetByOption(
 		pluginDbMgr.WithName(r.GetPluginName()),
 		pluginDbMgr.WithType(int(r.GetPluginType())),

@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
@@ -31,7 +31,7 @@ import (
 
 const hookerDeletePage = 0
 
-type deletePageHooker[MT mysqlmodel.AssetResourceConstraint, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
+type deletePageHooker[MT metadbmodel.AssetResourceConstraint, MDT msgconstraint.Delete, MDPT msgconstraint.DeletePtr[MDT]] interface {
 	beforeDeletePage([]*MT, MDPT) []*MT
 }
 
@@ -173,13 +173,13 @@ type SubscriberDataGenerator[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT mysqlmodel.AssetResourceConstraint,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] interface {
 	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
 	onResourceUpdated(*message.Metadata, MUPT)
-	softDeletedTargetsUpdated([]CT, *mysql.DB)
+	softDeletedTargetsUpdated([]CT, *metadb.DB)
 }
 
 type SubscriberComponent[
@@ -189,7 +189,7 @@ type SubscriberComponent[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT mysqlmodel.AssetResourceConstraint,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ] struct {
@@ -210,7 +210,7 @@ func newSubscriberComponent[
 	MUT msgconstraint.Update,
 	MDPT msgconstraint.DeletePtr[MDT],
 	MDT msgconstraint.Delete,
-	MT mysqlmodel.AssetResourceConstraint,
+	MT metadbmodel.AssetResourceConstraint,
 	CT SubscriberMetaDBChModel,
 	KT SubscriberChModelKey,
 ](
@@ -266,9 +266,9 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
-	dbItems := m.GetMySQLItems().([]*MT)
+	dbItems := m.GetMetadbItems().([]*MT)
 	log.Infof("receive add message, resource type: %s, count: %d", s.subResourceTypeName, len(dbItems), logger.NewORGPrefix(md.GetORGID()))
-	db, err := mysql.GetDB(md.GetORGID())
+	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
@@ -279,7 +279,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMessage := msg.(MUPT)
-	dbItem := updateMessage.GetNewMySQL().(*MT)
+	dbItem := updateMessage.GetNewMetadbItem().(*MT)
 	dbItems := []*MT{dbItem}
 	db := md.GetDB()
 	// use add to complete addition and update of resource in ch table
@@ -294,7 +294,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	m := msg.(MDPT)
-	items := m.GetMySQLItems().([]*MT)
+	items := m.GetMetadbItems().([]*MT)
 	newItems := items
 	if hasHooker, ok := s.hookers[hookerDeletePage]; ok {
 		if hooker, ok := hasHooker.(deletePageHooker[MT, MDT, MDPT]); ok {
@@ -304,7 +304,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 		}
 	}
 
-	db, err := mysql.GetDB(md.GetORGID()) // TODO use md.GetDB() instead
+	db, err := metadb.GetDB(md.GetORGID()) // TODO use md.GetDB() instead
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
@@ -323,7 +323,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // Delete resource by domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.GetORGID())
+	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
@@ -335,7 +335,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnDom
 // Delete resource by sub domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.GetORGID())
+	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}
@@ -347,7 +347,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSub
 // Update team_id of resource by sub domain
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
 	var chModel CT
-	db, err := mysql.GetDB(md.GetORGID())
+	db, err := metadb.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
 	}

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewLANIP(c *cache.Cache, eq *queue.OverwriteQueue) *LANIP {
 	return listener
 }
 
-func (i *LANIP) OnUpdaterAdded(addedDBItems []*mysqlmodel.LANIP) {
+func (i *LANIP) OnUpdaterAdded(addedDBItems []*metadbmodel.LANIP) {
 	i.eventProducer.ProduceByAdd(addedDBItems)
 	i.cache.AddLANIPs(addedDBItems)
 }
@@ -48,7 +48,7 @@ func (i *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.LA
 	diffBase.Update(cloudItem)
 }
 
-func (i *LANIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.LANIP) {
+func (i *LANIP) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.LANIP) {
 	i.eventProducer.ProduceByDelete(lcuuids)
 	i.cache.DeleteLANIPs(lcuuids)
 }

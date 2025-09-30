@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBFloatingIP() *mysqlmodel.FloatingIP {
-	return &mysqlmodel.FloatingIP{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, IP: uuid.New().String(), Region: uuid.New().String()}
+func newDBFloatingIP() *metadbmodel.FloatingIP {
+	return &metadbmodel.FloatingIP{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, IP: uuid.New().String(), Region: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddFloatingIPBatchSuccess() {
 	operator := NewFloatingIP()
 	itemToAdd := newDBFloatingIP()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.FloatingIP{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.FloatingIP{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.FloatingIP
+	var addedItem *metadbmodel.FloatingIP
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.IP, itemToAdd.IP)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.FloatingIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.FloatingIP{})
 }
 
 func (t *SuiteTest) TestUpdateFloatingIPSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateFloatingIPSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.FloatingIP
+	var updatedItem *metadbmodel.FloatingIP
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Region, updateInfo["region"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.FloatingIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.FloatingIP{})
 }
 
 func (t *SuiteTest) TestDeleteFloatingIPBatchSuccess() {
@@ -66,27 +66,27 @@ func (t *SuiteTest) TestDeleteFloatingIPBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.FloatingIP
+	var deletedItem *metadbmodel.FloatingIP
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestFloatingIPCreateAndFind() {
 	lcuuid := uuid.New().String()
-	floatingIP := &mysqlmodel.FloatingIP{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	floatingIP := &metadbmodel.FloatingIP{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(floatingIP)
-	var resultFloatingIP *mysqlmodel.FloatingIP
+	var resultFloatingIP *metadbmodel.FloatingIP
 	err := t.db.Where("lcuuid = ? and ip='' and region='' and domain=''", lcuuid).First(&resultFloatingIP).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
 
-	resultFloatingIP = new(mysqlmodel.FloatingIP)
+	resultFloatingIP = new(metadbmodel.FloatingIP)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultFloatingIP)
 	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
 
-	resultFloatingIP = new(mysqlmodel.FloatingIP)
+	resultFloatingIP = new(metadbmodel.FloatingIP)
 	result := t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultFloatingIP)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

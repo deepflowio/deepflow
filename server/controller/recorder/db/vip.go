@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type VIP struct {
-	OperatorBase[*mysqlmodel.VIP, mysqlmodel.VIP]
+	OperatorBase[*metadbmodel.VIP, metadbmodel.VIP]
 }
 
 func NewVIP() *VIP {
 	operator := &VIP{
-		newOperatorBase[*mysqlmodel.VIP](
+		newOperatorBase[*metadbmodel.VIP](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			false,
 			false,

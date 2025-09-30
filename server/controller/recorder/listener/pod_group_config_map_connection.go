@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewPodGroupConfigMapConnection(c *cache.Cache, eq *queue.OverwriteQueue) *P
 	return listener
 }
 
-func (h *PodGroupConfigMapConnection) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroupConfigMapConnection) {
+func (h *PodGroupConfigMapConnection) OnUpdaterAdded(addedDBItems []*metadbmodel.PodGroupConfigMapConnection) {
 	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddPodGroupConfigMapConnections(addedDBItems)
 }
@@ -46,6 +46,6 @@ func (h *PodGroupConfigMapConnection) OnUpdaterAdded(addedDBItems []*mysqlmodel.
 func (h *PodGroupConfigMapConnection) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroupConfigMapConnection, diffBase *diffbase.PodGroupConfigMapConnection) {
 }
 
-func (h *PodGroupConfigMapConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroupConfigMapConnection) {
+func (h *PodGroupConfigMapConnection) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodGroupConfigMapConnection) {
 	h.cache.DeletePodGroupConfigMapConnections(lcuuids)
 }
