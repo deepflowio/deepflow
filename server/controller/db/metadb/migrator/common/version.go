@@ -34,10 +34,6 @@ func CheckCEDBVersionTableExists(dc *DBConfig) (bool, error) {
 	return CheckTableExists(dc, schema.DB_VERSION_TABLE)
 }
 
-func CreateCEDBVersionTable(dc *DBConfig) error {
-	return InitDBVersionTable(dc, dc.SqlFmt.GetRawSqlDirectory(schema.RAW_SQL_ROOT_DIR))
-}
-
 func CheckDBVersion(dc *DBConfig, tableName string, expectedVersion string) error {
 	version, err := GetDBVersion(dc, tableName)
 	if err != nil {
