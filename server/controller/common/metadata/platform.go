@@ -19,13 +19,13 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func NewPlatform(orgID int, options ...func(*Platform)) (Platform, error) {
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	md := &Platform{
 		orgID:       orgID,
 		DB:          db,
@@ -42,7 +42,7 @@ func NewPlatform(orgID int, options ...func(*Platform)) (Platform, error) {
 // Platform is the metadata of the platform resource.
 // It contains organization ID, team ID, db connection, domain and sub domain information.
 type Platform struct {
-	DB          *mysql.DB
+	DB          *metadb.DB
 	orgID       int
 	teamID      int
 	domain      DomainInfo
@@ -65,7 +65,7 @@ func (m Platform) IsSubDomainValid() bool {
 	return m.subDomain.ID != 0
 }
 
-func (m Platform) GetDB() *mysql.DB {
+func (m Platform) GetDB() *metadb.DB {
 	return m.DB
 }
 
@@ -106,7 +106,7 @@ func (m *Platform) SetORGID(orgID int) {
 	m.LogPrefixes = append(m.LogPrefixes, logger.NewORGPrefix(orgID))
 }
 
-func (m *Platform) SetDB(db *mysql.DB) {
+func (m *Platform) SetDB(db *metadb.DB) {
 	m.DB = db
 	m.SetORGID(db.GetORGID())
 }

@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -47,7 +47,7 @@ func (t *SuiteTest) getCENMock(mockDB bool) (*cache.Cache, cloudmodel.CEN) {
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.CEN{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.CEN{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.CENs[cloudItem.Lcuuid] = &diffbase.CEN{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -68,13 +68,13 @@ func (t *SuiteTest) TestHandleAddCENSucess() {
 	updater := NewCEN(cache_, []cloudmodel.CEN{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.CEN
+	var addedItem *metadbmodel.CEN
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.CENs), 1)
 	assert.Equal(t.T(), addedItem.VPCIDs, strconv.Itoa(vpcID))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.CEN{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.CEN{})
 }
 
 func (t *SuiteTest) TestHandleUpdateCENSucess() {
@@ -84,13 +84,13 @@ func (t *SuiteTest) TestHandleUpdateCENSucess() {
 	updater := NewCEN(cache, []cloudmodel.CEN{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.CEN
+	var addedItem *metadbmodel.CEN
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.CENs), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.CEN{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.CEN{})
 }
 
 func (t *SuiteTest) TestHandleDeleteCENSucess() {
@@ -99,7 +99,7 @@ func (t *SuiteTest) TestHandleDeleteCENSucess() {
 	updater := NewCEN(cache, []cloudmodel.CEN{})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.CEN
+	var addedItem *metadbmodel.CEN
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.CENs), 0)

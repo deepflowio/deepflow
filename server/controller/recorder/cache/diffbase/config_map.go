@@ -21,11 +21,11 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddConfigMap(dbItem *mysqlmodel.ConfigMap, seq int) {
+func (b *DataSet) AddConfigMap(dbItem *metadbmodel.ConfigMap, seq int) {
 	b.ConfigMaps[dbItem.Lcuuid] = &ConfigMap{
 		DiffBase: DiffBase{
 			Sequence: seq,

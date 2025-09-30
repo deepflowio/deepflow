@@ -21,11 +21,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBRegion() *mysqlmodel.Region {
-	dbItem := new(mysqlmodel.Region)
+func newDBRegion() *metadbmodel.Region {
+	dbItem := new(metadbmodel.Region)
 	dbItem.Lcuuid = uuid.New().String()
 	dbItem.Name = uuid.New().String()
 	return dbItem
@@ -35,14 +35,14 @@ func (t *SuiteTest) TestAddRegionBatchSuccess() {
 	operator := NewRegion()
 	itemToAdd := newDBRegion()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.Region{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.Region{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.Region
+	var addedItem *metadbmodel.Region
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Region{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Region{})
 }
 
 func (t *SuiteTest) TestUpdateRegionSuccess() {
@@ -55,11 +55,11 @@ func (t *SuiteTest) TestUpdateRegionSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.Region
+	var updatedItem *metadbmodel.Region
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Region{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Region{})
 }
 
 func (t *SuiteTest) TestDeleteRegionSuccess() {
@@ -69,27 +69,27 @@ func (t *SuiteTest) TestDeleteRegionSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.Region
+	var deletedItem *metadbmodel.Region
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestRegionCreateAndFind() {
 	lcuuid := uuid.New().String()
-	region := &mysqlmodel.Region{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	region := &metadbmodel.Region{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(region)
-	var resultRegion *mysqlmodel.Region
+	var resultRegion *metadbmodel.Region
 	err := t.db.Where("lcuuid = ? and name='' and label=''", lcuuid).First(&resultRegion).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
 
-	resultRegion = new(mysqlmodel.Region)
+	resultRegion = new(metadbmodel.Region)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultRegion)
 	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
 
-	resultRegion = new(mysqlmodel.Region)
+	resultRegion = new(metadbmodel.Region)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultRegion)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

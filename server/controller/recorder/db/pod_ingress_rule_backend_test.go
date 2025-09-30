@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPodIngressRuleBackend() *mysqlmodel.PodIngressRuleBackend {
-	return &mysqlmodel.PodIngressRuleBackend{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}}
+func newDBPodIngressRuleBackend() *metadbmodel.PodIngressRuleBackend {
+	return &metadbmodel.PodIngressRuleBackend{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}}
 }
 
 func (t *SuiteTest) TestAddPodIngressRuleBackendBatchSuccess() {
 	operator := NewPodIngressRuleBackend()
 	itemToAdd := newDBPodIngressRuleBackend()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PodIngressRuleBackend{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PodIngressRuleBackend{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PodIngressRuleBackend
+	var addedItem *metadbmodel.PodIngressRuleBackend
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodIngressRuleBackend{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodIngressRuleBackend{})
 }
 
 func (t *SuiteTest) TestDeletePodIngressRuleBackendBatchSuccess() {
@@ -49,7 +49,7 @@ func (t *SuiteTest) TestDeletePodIngressRuleBackendBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PodIngressRuleBackend
+	var deletedItem *metadbmodel.PodIngressRuleBackend
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

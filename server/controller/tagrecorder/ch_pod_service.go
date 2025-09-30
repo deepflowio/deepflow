@@ -20,8 +20,8 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -33,8 +33,8 @@ type ChPodService struct {
 		message.UpdatedPodService,
 		*message.DeletedPodServices,
 		message.DeletedPodServices,
-		mysqlmodel.PodService,
-		mysqlmodel.ChPodService,
+		metadbmodel.PodService,
+		metadbmodel.ChPodService,
 		IDKey,
 	]
 }
@@ -48,8 +48,8 @@ func NewChPodService() *ChPodService {
 			message.UpdatedPodService,
 			*message.DeletedPodServices,
 			message.DeletedPodServices,
-			mysqlmodel.PodService,
-			mysqlmodel.ChPodService,
+			metadbmodel.PodService,
+			metadbmodel.ChPodService,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_SERVICE_EN, RESOURCE_TYPE_CH_POD_SERVICE,
@@ -61,15 +61,15 @@ func NewChPodService() *ChPodService {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodService) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodService) (keys []IDKey, targets []mysqlmodel.ChPodService) {
+func (c *ChPodService) sourceToTarget(md *message.Metadata, source *metadbmodel.PodService) (keys []IDKey, targets []metadbmodel.ChPodService) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysqlmodel.ChPodService{
-		ChIDBase:     mysqlmodel.ChIDBase{ID: source.ID},
+	targets = append(targets, metadbmodel.ChPodService{
+		ChIDBase:     metadbmodel.ChIDBase{ID: source.ID},
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
@@ -85,7 +85,7 @@ func (c *ChPodService) onResourceUpdated(md *message.Metadata, updateMessage *me
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodService) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodService, db *mysql.DB) {
+func (c *ChPodService) softDeletedTargetsUpdated(targets []metadbmodel.ChPodService, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

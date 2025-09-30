@@ -30,8 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -84,7 +84,7 @@ type networkLcuuidCIDRs struct {
 	cidrs         []string
 }
 
-func NewKubernetesGather(db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mysqlmodel.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
+func NewKubernetesGather(db *metadb.DB, domain *metadbmodel.Domain, subDomain *metadbmodel.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
 	var teamID int
 	var name string
 	var displayName string

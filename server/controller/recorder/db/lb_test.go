@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBLB() *mysqlmodel.LB {
-	return &mysqlmodel.LB{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBLB() *metadbmodel.LB {
+	return &metadbmodel.LB{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddLBBatchSuccess() {
 	operator := NewLB()
 	itemToAdd := newDBLB()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.LB{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.LB{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.LB
+	var addedItem *metadbmodel.LB
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LB{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LB{})
 }
 
 func (t *SuiteTest) TestUpdateLBSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateLBSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.LB
+	var updatedItem *metadbmodel.LB
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LB{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.LB{})
 }
 
 func (t *SuiteTest) TestDeleteLBBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeleteLBBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.LB
+	var deletedItem *metadbmodel.LB
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestLBCreateAndFind() {
 	lcuuid := uuid.New().String()
-	lb := &mysqlmodel.LB{
-		Base: mysqlmodel.Base{Lcuuid: lcuuid},
+	lb := &metadbmodel.LB{
+		Base: metadbmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(lb)
-	var resultLB *mysqlmodel.LB
+	var resultLB *metadbmodel.LB
 	err := t.db.Where("lcuuid = ? and name='' and label='' and vip='' and az='' and "+
 		"region='' and uid='' and domain=''", lcuuid).First(&resultLB).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), lb.Base.Lcuuid, resultLB.Base.Lcuuid)
 
-	resultLB = new(mysqlmodel.LB)
+	resultLB = new(metadbmodel.LB)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultLB)
 	assert.Equal(t.T(), lb.Base.Lcuuid, resultLB.Base.Lcuuid)
 
-	resultLB = new(mysqlmodel.LB)
+	resultLB = new(metadbmodel.LB)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultLB)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

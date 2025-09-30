@@ -42,9 +42,9 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	controllermodel "github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -232,12 +232,12 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
+		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
 		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
 	}
-	vtaps := []mysqlmodel.VTap{}
+	vtaps := []metadbmodel.VTap{}
 	db.Select("launch_server", "ctrl_ip").Find(&vtaps)
 
 	vtapLaunchServerToCtrlIP := make(map[string]string)
@@ -564,14 +564,14 @@ func InetNToA(ip uint32) string {
 }
 
 func GetVPCLcuuidFromUUIDGenerate(orgID int, uuidGenerate string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		uuidGenerate += strconv.Itoa(orgID)
 	}
 	return common.GetUUID(uuidGenerate+K8S_VPC_NAME, uuid.Nil)
 }
 
 func GetAZLcuuidFromUUIDGenerate(orgID int, uuidGenerate string) string {
-	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+	if orgID != metadbcommon.DEFAULT_ORG_ID {
 		uuidGenerate += strconv.Itoa(orgID)
 	}
 	lcuuid := common.GetUUID(uuidGenerate, uuid.Nil)
@@ -607,7 +607,7 @@ func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool, db *gorm.DB) (map[
 	podNodeLcuuidToHostName := map[string]string{}
 	var domain string
 	if isSubDomain {
-		var subDomain mysqlmodel.SubDomain
+		var subDomain metadbmodel.SubDomain
 		err := db.Where("lcuuid = ?", lcuuid).Find(&subDomain).Error
 		if err != nil {
 			return map[string]string{}, err
@@ -617,7 +617,7 @@ func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool, db *gorm.DB) (map[
 		domain = lcuuid
 	}
 
-	var azs []mysqlmodel.AZ
+	var azs []metadbmodel.AZ
 	err := db.Where("domain = ?", domain).Find(&azs).Error
 	if err != nil {
 		return map[string]string{}, err
@@ -626,12 +626,12 @@ func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool, db *gorm.DB) (map[
 	for _, az := range azs {
 		azLcuuids = append(azLcuuids, az.Lcuuid)
 	}
-	var vtaps []mysqlmodel.VTap
+	var vtaps []metadbmodel.VTap
 	err = db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
 	if err != nil {
 		return map[string]string{}, err
 	}
-	var podNodes []mysqlmodel.PodNode
+	var podNodes []metadbmodel.PodNode
 	if isSubDomain {
 		err = db.Where("domain = ? AND sub_domain = ?", domain, lcuuid).Find(&podNodes).Error
 		if err != nil {
@@ -665,7 +665,7 @@ func GetHostAndVmHostNameByDomain(domain string, db *gorm.DB) (map[string]string
 	hostIPToHostName := map[string]string{}
 	vmLcuuidToHostName := map[string]string{}
 
-	var azs []mysqlmodel.AZ
+	var azs []metadbmodel.AZ
 	err := db.Where("domain = ?", domain).Find(&azs).Error
 	if err != nil {
 		return map[string]string{}, map[string]string{}, err
@@ -674,12 +674,12 @@ func GetHostAndVmHostNameByDomain(domain string, db *gorm.DB) (map[string]string
 	for _, az := range azs {
 		azLcuuids = append(azLcuuids, az.Lcuuid)
 	}
-	var vtaps []mysqlmodel.VTap
+	var vtaps []metadbmodel.VTap
 	err = db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
 	if err != nil {
 		return map[string]string{}, map[string]string{}, err
 	}
-	var podNodes []mysqlmodel.PodNode
+	var podNodes []metadbmodel.PodNode
 	err = db.Where("domain = ?", domain).Find(&podNodes).Error
 	if err != nil {
 		return map[string]string{}, map[string]string{}, err
@@ -703,7 +703,7 @@ func GetHostAndVmHostNameByDomain(domain string, db *gorm.DB) (map[string]string
 func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string, error) {
 	vtapIDToSubDomain := make(map[int]string)
 
-	var azs []mysqlmodel.AZ
+	var azs []metadbmodel.AZ
 	err := db.Where("domain = ?", domain).Find(&azs).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
@@ -713,7 +713,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 		azLcuuids = append(azLcuuids, az.Lcuuid)
 	}
 
-	var podNodes []mysqlmodel.PodNode
+	var podNodes []metadbmodel.PodNode
 	err = db.Where("domain = ?", domain).Find(&podNodes).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
@@ -723,7 +723,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 		podNodeIDToSubDomain[podNode.ID] = podNode.SubDomain
 	}
 
-	var pods []mysqlmodel.Pod
+	var pods []metadbmodel.Pod
 	err = db.Where("domain = ?", domain).Find(&pods).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
@@ -733,7 +733,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 		podIDToSubDomain[pod.ID] = pod.SubDomain
 	}
 
-	var vtaps []mysqlmodel.VTap
+	var vtaps []metadbmodel.VTap
 	err = db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
 	if err != nil {
 		return vtapIDToSubDomain, err

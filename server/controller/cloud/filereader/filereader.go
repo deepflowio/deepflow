@@ -26,7 +26,7 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -50,7 +50,7 @@ type FileReader struct {
 	subnetNameToLcuuid        map[string]string
 }
 
-func NewFileReader(orgID int, domain mysqlmodel.Domain) (*FileReader, error) {
+func NewFileReader(orgID int, domain metadbmodel.Domain) (*FileReader, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

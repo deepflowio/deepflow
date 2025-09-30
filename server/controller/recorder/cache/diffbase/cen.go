@@ -19,12 +19,12 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
-func (b *DataSet) AddCEN(dbItem *mysqlmodel.CEN, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddCEN(dbItem *metadbmodel.CEN, seq int, toolDataSet *tool.DataSet) {
 	vpcLcuuids := []string{}
 	for _, vpcID := range rcommon.StringToIntSlice(dbItem.VPCIDs) {
 		vpcLcuuid, exists := toolDataSet.GetVPCLcuuidByID(vpcID)

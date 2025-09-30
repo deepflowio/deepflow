@@ -22,7 +22,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -150,8 +150,8 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (mt *metricTarget) load() ([]*mysqlmodel.PrometheusMetricTarget, error) {
-	var metricTargets []*mysqlmodel.PrometheusMetricTarget
+func (mt *metricTarget) load() ([]*metadbmodel.PrometheusMetricTarget, error) {
+	var metricTargets []*metadbmodel.PrometheusMetricTarget
 	err := mt.org.DB.Find(&metricTargets).Error
 	return metricTargets, err
 }

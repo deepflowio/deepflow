@@ -17,7 +17,7 @@
 package message
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type Lcuuids struct {
@@ -32,274 +32,273 @@ func (d *Lcuuids) SetLcuuids(lcuuids []string) {
 	d.data = lcuuids
 }
 
-// TODO rename to mysql
-type MySQLItems[T mysqlmodel.AssetResourceConstraint] struct {
+type MetadbItems[T metadbmodel.AssetResourceConstraint] struct {
 	data []*T
 }
 
-func (m *MySQLItems[T]) GetMySQLItems() interface{} {
+func (m *MetadbItems[T]) GetMetadbItems() interface{} {
 	return m.data
 }
 
-func (m *MySQLItems[T]) SetMySQLItems(items interface{}) {
+func (m *MetadbItems[T]) SetMetadbItems(items interface{}) {
 	m.data = items.([]*T)
 }
 
 type DeletedRegions struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Region]
+	MetadbItems[metadbmodel.Region]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedAZs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.AZ]
+	MetadbItems[metadbmodel.AZ]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedSubDomains struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.SubDomain]
+	MetadbItems[metadbmodel.SubDomain]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedHosts struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Host]
+	MetadbItems[metadbmodel.Host]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVMs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VM]
+	MetadbItems[metadbmodel.VM]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVMPodNodeConnections struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VMPodNodeConnection]
+	MetadbItems[metadbmodel.VMPodNodeConnection]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVPCs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VPC]
+	MetadbItems[metadbmodel.VPC]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedNetworks struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Network]
+	MetadbItems[metadbmodel.Network]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedSubnets struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Subnet]
+	MetadbItems[metadbmodel.Subnet]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVRouters struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VRouter]
+	MetadbItems[metadbmodel.VRouter]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedRoutingTables struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.RoutingTable]
+	MetadbItems[metadbmodel.RoutingTable]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedDHCPPorts struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.DHCPPort]
+	MetadbItems[metadbmodel.DHCPPort]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVInterfaces struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VInterface]
+	MetadbItems[metadbmodel.VInterface]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedFloatingIPs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.FloatingIP]
+	MetadbItems[metadbmodel.FloatingIP]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedLANIPs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.LANIP]
+	MetadbItems[metadbmodel.LANIP]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedWANIPs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.WANIP]
+	MetadbItems[metadbmodel.WANIP]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedVIPs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.VIP]
+	MetadbItems[metadbmodel.VIP]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedNATGateways struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.NATGateway]
+	MetadbItems[metadbmodel.NATGateway]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedNATRules struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.NATRule]
+	MetadbItems[metadbmodel.NATRule]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedNATVMConnections struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.NATVMConnection]
+	MetadbItems[metadbmodel.NATVMConnection]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedLBs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.LB]
+	MetadbItems[metadbmodel.LB]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedLBListeners struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.LBListener]
+	MetadbItems[metadbmodel.LBListener]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedLBTargetServers struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.LBTargetServer]
+	MetadbItems[metadbmodel.LBTargetServer]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedLBVMConnections struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.LBVMConnection]
+	MetadbItems[metadbmodel.LBVMConnection]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPeerConnections struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PeerConnection]
+	MetadbItems[metadbmodel.PeerConnection]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedCENs struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.CEN]
+	MetadbItems[metadbmodel.CEN]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedRDSInstances struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.RDSInstance]
+	MetadbItems[metadbmodel.RDSInstance]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedRedisInstances struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.RedisInstance]
+	MetadbItems[metadbmodel.RedisInstance]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodClusters struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodCluster]
+	MetadbItems[metadbmodel.PodCluster]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodNamespaces struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodNamespace]
+	MetadbItems[metadbmodel.PodNamespace]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodNodes struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodNode]
+	MetadbItems[metadbmodel.PodNode]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodIngresses struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodIngress]
+	MetadbItems[metadbmodel.PodIngress]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodIngressRules struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodIngressRule]
+	MetadbItems[metadbmodel.PodIngressRule]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodIngressRuleBackends struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodIngressRuleBackend]
+	MetadbItems[metadbmodel.PodIngressRuleBackend]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodServices struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodService]
+	MetadbItems[metadbmodel.PodService]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodServicePorts struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodServicePort]
+	MetadbItems[metadbmodel.PodServicePort]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodGroups struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodGroup]
+	MetadbItems[metadbmodel.PodGroup]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedConfigMaps struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.ConfigMap]
+	MetadbItems[metadbmodel.ConfigMap]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodGroupConfigMapConnections struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodGroupConfigMapConnection]
+	MetadbItems[metadbmodel.PodGroupConfigMapConnection]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodGroupPorts struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodGroupPort]
+	MetadbItems[metadbmodel.PodGroupPort]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPodReplicaSets struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.PodReplicaSet]
+	MetadbItems[metadbmodel.PodReplicaSet]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedPods struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Pod]
+	MetadbItems[metadbmodel.Pod]
 	addition[DeleteNoneAddition]
 }
 
 type DeletedProcesses struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.Process]
+	MetadbItems[metadbmodel.Process]
 	addition[DeletedProcessesAddition]
 }
 
@@ -309,6 +308,6 @@ type DeletedProcessesAddition struct {
 
 type DeletedCustomServices struct {
 	Lcuuids
-	MySQLItems[mysqlmodel.CustomService]
+	MetadbItems[metadbmodel.CustomService]
 	addition[DeleteNoneAddition]
 }

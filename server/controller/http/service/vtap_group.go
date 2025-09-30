@@ -29,8 +29,8 @@ import (
 	agentconf "github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
@@ -57,15 +57,15 @@ func NewAgentGroup(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) 
 
 func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
 	var response []model.VtapGroup
-	var allVTaps []mysqlmodel.VTap
-	var allVTapGroups []*mysqlmodel.VTapGroup
+	var allVTaps []metadbmodel.VTap
+	var allVTapGroups []*metadbmodel.VTapGroup
 	var vtapGroupLcuuids []string
 	var groupToVtapLcuuids map[string][]string
 	var groupToPendingVtapLcuuids map[string][]string
 	var groupToDisableVtapLcuuids map[string][]string
 
 	userInfo := a.resourceAccess.UserInfo
-	dbInfo, err := mysql.GetDB(userInfo.ORGID)
+	dbInfo, err := metadb.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,13 +156,13 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	cfg := a.cfg
 	var vtapGroupCount int64
 	userInfo := a.resourceAccess.UserInfo
-	dbInfo, err := mysql.GetDB(userInfo.ORGID)
+	dbInfo, err := metadb.GetDB(userInfo.ORGID)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
 	db := dbInfo.DB
 
-	db.Model(&mysqlmodel.VTapGroup{}).Count(&vtapGroupCount)
+	db.Model(&metadbmodel.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {
 		return model.VtapGroup{}, response.ServiceError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
@@ -177,7 +177,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 		)
 	}
 
-	var allVTaps []mysqlmodel.VTap
+	var allVTaps []metadbmodel.VTap
 	if err = db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&allVTaps).Error; err != nil {
 		return model.VtapGroup{}, err
 	}
@@ -201,7 +201,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 		shortUUID = groupID
 	}
 
-	vtapGroup := mysqlmodel.VTapGroup{}
+	vtapGroup := metadbmodel.VTapGroup{}
 	vtapGroup.Lcuuid = lcuuid
 	vtapGroup.ShortUUID = shortUUID
 	vtapGroup.Name = vtapGroupCreate.Name
@@ -214,7 +214,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 			return err
 		}
 		for _, vtap := range vtaps {
-			if err := tx.Model(&mysqlmodel.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid,
+			if err := tx.Model(&metadbmodel.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid,
 				"team_id": vtapGroupCreate.TeamID}).Error; err != nil {
 				return err
 			}
@@ -250,7 +250,7 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 	}
 
 	var vtapGroupCount int64
-	db.Model(&mysqlmodel.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
+	db.Model(&metadbmodel.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
 		return response.ServiceError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
 	}
@@ -287,26 +287,26 @@ func (a *AgentGroup) Update(lcuuid string, body map[string]interface{}, cfg *con
 // updateRelatedData encapsulates all data required for the update operation
 type updateRelatedData struct {
 	requestBody map[string]interface{}
-	db          *mysql.DB
+	db          *metadb.DB
 
-	agentGroup               *mysqlmodel.VTapGroup
+	agentGroup               *metadbmodel.VTapGroup
 	agentGroupValuesToUpdate map[string]interface{} // values to update in agent group table
 	oldAgentGroupTeamID      int
 	newAgentGroupTeamID      int
 	agentListChanged         bool
 
 	agentGroupConfigs     []agentconf.AgentGroupConfigModel
-	userAccessedOldAgents []mysqlmodel.VTap
-	userAccessedNewAgents []mysqlmodel.VTap
+	userAccessedOldAgents []metadbmodel.VTap
+	userAccessedNewAgents []metadbmodel.VTap
 
-	agentsToRemove    []mysqlmodel.VTap
-	agentsToAdd       []mysqlmodel.VTap
-	defaultAgentGroup *mysqlmodel.VTapGroup
+	agentsToRemove    []metadbmodel.VTap
+	agentsToAdd       []metadbmodel.VTap
+	defaultAgentGroup *metadbmodel.VTapGroup
 }
 
 // prepareUpdateData prepares all data required for the update
 func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]interface{}, cfg *config.ControllerConfig) (*updateRelatedData, error) {
-	db, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
+	db, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]int
 		data.agentGroupValuesToUpdate["user_id"] = userIDValue
 	}
 
-	var allOldAgents []mysqlmodel.VTap
+	var allOldAgents []metadbmodel.VTap
 	if err := db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&allOldAgents).Error; err != nil {
 		return nil, fmt.Errorf("failed to get vtap_group agents: %s", err.Error())
 	}
@@ -368,7 +368,7 @@ func (a *AgentGroup) prepareUpdateData(lcuuid string, requestBody map[string]int
 			)
 		}
 
-		var allNewAgents []mysqlmodel.VTap
+		var allNewAgents []metadbmodel.VTap
 		if err := db.Where("lcuuid IN (?)", agentLcuuids).Find(&allNewAgents).Error; err != nil {
 			return nil, fmt.Errorf("failed to get new vtap_group agents: %s", err.Error())
 		}
@@ -467,14 +467,14 @@ func (a *AgentGroup) validateUpdatePermissions(data *updateRelatedData) error {
 func (a *AgentGroup) executeUpdateInTransaction(tx *gorm.DB, data *updateRelatedData) error {
 	// Handle state update
 	if stateValue, ok := data.requestBody["STATE"]; ok {
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("state", stateValue).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("state", stateValue).Error; err != nil {
 			return err
 		}
 	}
 
 	// Handle enable state update
 	if enableValue, ok := data.requestBody["ENABLE"]; ok {
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("enable", enableValue).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", data.agentGroup.Lcuuid).Update("enable", enableValue).Error; err != nil {
 			return err
 		}
 	}
@@ -507,7 +507,7 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 				agent.Name, agent.VtapGroupLcuuid, data.defaultAgentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
 			ids[i] = agent.ID
 		}
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
 			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.defaultAgentGroup, data.agentsToRemove); err != nil {
@@ -524,7 +524,7 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 				agent.Name, agent.VtapGroupLcuuid, data.agentGroup.Lcuuid, data.db.LogPrefixORGID, data.db.LogPrefixName)
 			ids[i] = agent.ID
 		}
-		if err := tx.Model(&mysqlmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
+		if err := tx.Model(&metadbmodel.VTap{}).Where("id IN (?)", ids).Updates(valuesToUpdate).Error; err != nil {
 			return err
 		}
 		if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, data.agentGroup, data.agentsToAdd); err != nil {
@@ -537,25 +537,25 @@ func (a *AgentGroup) updateAgentAssignments(tx *gorm.DB, data *updateRelatedData
 
 func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	orgID := a.resourceAccess.UserInfo.ORGID
-	dbInfo, err := mysql.GetDB(orgID)
+	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
 
-	var vtapGroup mysqlmodel.VTapGroup
+	var vtapGroup metadbmodel.VTapGroup
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT_GROUP, vtapGroup.Lcuuid); err != nil {
 		return nil, err
 	}
-	var agents []mysqlmodel.VTap
+	var agents []metadbmodel.VTap
 	if err = db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&agents).Error; err != nil {
 		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
-	var defaultVtapGroup mysqlmodel.VTapGroup
+	var defaultVtapGroup metadbmodel.VTapGroup
 	if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
 		return map[string]string{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 	}
@@ -567,7 +567,7 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 				return err
 			}
 		}
-		if err = tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Updates(map[string]interface{}{
+		if err = tx.Model(&metadbmodel.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Updates(map[string]interface{}{
 			"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID}).Error; err != nil {
 			return err
 		}
