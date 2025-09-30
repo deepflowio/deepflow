@@ -3190,29 +3190,15 @@ impl ConfigHandler {
 
         let memory = &mut ebpf.profile.memory;
         let new_memory = &mut new_ebpf.profile.memory;
-        if memory.disabled != new_memory.disabled {
+        if memory != new_memory {
             info!(
-                "Update inputs.ebpf.profile.memory.disabled from {:?} to {:?}.",
-                memory.disabled, new_memory.disabled
+                "Update inputs.ebpf.profile.memory from {:?} to {:?}.",
+                memory, new_memory
             );
-            memory.disabled = new_memory.disabled;
-            restart_agent = !first_run;
-        }
-        if memory.report_interval != new_memory.report_interval {
-            info!(
-                "Update inputs.ebpf.profile.memory.report_interval from {:?} to {:?}.",
-                memory.report_interval, new_memory.report_interval
-            );
-            memory.report_interval = new_memory.report_interval;
-            restart_agent = !first_run;
-        }
-        if memory.allocated_addresses_lru_len != new_memory.allocated_addresses_lru_len {
-            info!(
-                "Update inputs.ebpf.profile.memory.allocated_addresses_lru_len from {:?} to {:?}.",
-                memory.allocated_addresses_lru_len, new_memory.allocated_addresses_lru_len
-            );
-            memory.allocated_addresses_lru_len = new_memory.allocated_addresses_lru_len;
-            restart_agent = !first_run;
+            restart_agent = (memory.disabled != new_memory.disabled
+                || memory.queue_size != new_memory.queue_size)
+                && !first_run;
+            *memory = *new_memory;
         }
 
         let off_cpu = &mut ebpf.profile.off_cpu;

@@ -278,7 +278,11 @@ struct mem_block_head {
 	void (*fn) (void *);
 } __attribute__ ((packed));
 
-typedef void (*tracer_callback_t) (void *ctx, int queue_id, void *cp_data);
+typedef int (*tracer_callback_t) (void *ctx, int queue_id, void *cp_data);
+
+enum {
+    TRACER_CALLBACK_FLAG_KEEP_DATA = 0x1,
+};
 
 struct tracer_probes_conf {
 	char *bin_file;		// only use uprobe;
