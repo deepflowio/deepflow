@@ -1038,3 +1038,11 @@ func GetVTapPortsCount() (int, error) {
 
 	return vtapVifCount, nil
 }
+
+func GetVTapCPUNum() (int, error) {
+	cpuNum := 0
+	if err := metadb.DefaultDB.Table("vtap").Select("Sum(cpu_num)").Scan(&cpuNum).Error; err != nil {
+		return 0, err
+	}
+	return cpuNum, nil
+}
