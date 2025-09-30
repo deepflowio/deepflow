@@ -66,7 +66,8 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 
 	e.POST("/v1/vtaps-csv/", v.getVtapCSV())
 
-	e.GET("/v1/vtap-ports/", getVTapPorts) // only in default organization
+	e.GET("/v1/vtap-ports/", getVTapPorts)    // only in default organization
+	e.GET("/v1/vtap-cpu-num/", getVTapCPUNum) // only in default organization
 }
 
 func (v *Vtap) getVtap() gin.HandlerFunc {
@@ -391,6 +392,18 @@ func getVTapPorts(c *gin.Context) {
 	}
 	resp := map[string]int{
 		"COUNT": count,
+	}
+	response.JSON(c, response.SetData(resp))
+}
+
+func getVTapCPUNum(c *gin.Context) {
+	count, err := service.GetVTapCPUNum()
+	if err != nil {
+		response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
+		return
+	}
+	resp := map[string]int{
+		"CPU_NUM": count,
 	}
 	response.JSON(c, response.SetData(resp))
 }
