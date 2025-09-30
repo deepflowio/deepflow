@@ -213,6 +213,9 @@ cfg_if::cfg_if! {
 pub const PROFILER_CTX_MEMORY_IDX: usize = 2;
 pub const PROFILER_CTX_NUM: usize = 3;
 
+// set this flag to notify caller not to free the data
+pub const TRACER_CALLBACK_FLAG_KEEP_DATA: u8 = 0x1;
+
 //Process exec/exit events
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -465,7 +468,7 @@ pub struct stack_profile_data {
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
      * In microseconds as the unit of time.
-     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated byte count value, or 0 for frees
+     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated byte count value, or negative for frees
      */
     pub count: u64,
     /*
@@ -581,7 +584,7 @@ extern "C" {
     pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
 
     // 参数说明：
-    // callback: 回调接口 rust -> C
+    // callback: 回调接口 rust -> C，返回值参考 TRACER_CALLBACK_FLAG_* 的定义
     // thread_nr: 工作线程数，是指用户态有多少线程参与数据处理。
     // perf_pages_cnt: 和内核共享内存占用的页框数量, 值为2的次幂。
     // ring_size: 环形缓存队列大小，值为2的次幂。
@@ -590,7 +593,7 @@ extern "C" {
     // socket_map_max_reclaim: socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作。
     // 返回值：成功返回0，否则返回非0
     pub fn running_socket_tracer(
-        callback: extern "C" fn(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA),
+        callback: extern "C" fn(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) -> c_int,
         thread_nr: c_int,
         perf_pages_cnt: c_uint,
         ring_size: c_uint,
@@ -617,7 +620,7 @@ extern "C" {
      *   more symbol information, we delay symbol retrieval when encountering unknown
      *   symbols. The unit of measurement used is seconds.
      *   The recommended range for values is [5, 3600], default valuse is 60.
-     * @callback Profile data processing callback interface
+     * @callback Profile data processing callback interface, refer to definition of TRACER_CALLBACK_FLAG_* for return value
      * @callback_ctx Contexts to pass into callback function from different profiler readers.
      *               Accesses to each context is single threaded.
      * @returns 0 on success, < 0 on error
@@ -625,7 +628,11 @@ extern "C" {
     pub fn start_continuous_profiler(
         freq: c_int,
         java_syms_update_delay: c_int,
-        callback: extern "C" fn(ctx: *mut c_void, queue_id: c_int, _data: *mut stack_profile_data),
+        callback: extern "C" fn(
+            ctx: *mut c_void,
+            queue_id: c_int,
+            _data: *mut stack_profile_data,
+        ) -> c_int,
         callback_ctx: *const [*mut c_void; PROFILER_CTX_NUM],
     ) -> c_int;
 
@@ -659,6 +666,11 @@ extern "C" {
      *   value (CPU_INVALID:0xfff) used to indicate that it is an invalid value.
      */
     pub fn set_profiler_cpu_aggregation(flag: c_int) -> c_int;
+
+    /*
+     * profile data release
+     */
+    pub fn clib_mem_free(ptr: *mut c_void);
 
     /*
      * test flame graph

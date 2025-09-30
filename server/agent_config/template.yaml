@@ -3537,9 +3537,75 @@ inputs:
         #     Agent uses LRU cache to record process allocated addresses to avoid uncontrolled
         #     memory usage. Each record in this LRU is about 80B.
         #   ch: |-
-        #     采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 80B 内存。
+        #     采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 32B 内存。
         # upgrade_from:
         allocated_addresses_lru_len: 131072
+        # type: int
+        # name:
+        #   en: Sort length
+        #   ch: 排序长度
+        # unit:
+        # range: [0, 65536]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+        #     This parameter is the length of the sorted array.
+        #     When configuring this option, first adjust the `sort_interval` parameter according to the instructions,
+        #     and then refer to the agent performance statistics in `deepflow_agent_ebpf_memory_profiler`
+        #     `dequeued_by_length` and `dequeued_by_interval` metrics, appropriately reduce this parameter
+        #     while ensuring that the former is several times smaller than the latter.
+        #   ch: |-
+        #     为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+        #     该参数是排序数组的长度。
+        #     配置该选项时先按说明调整 `sort_interval` 参数，在参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+        #     `dequeued_by_length` 和 `dequeued_by_interval` 指标，在保证前者小于后者几倍的前提下适当调小该参数。
+        # upgrade_from:
+        sort_length: 16384
+        # type: duration
+        # name:
+        #   en: Sort interval
+        #   ch: 排序间隔
+        # unit:
+        # range: [1ns, 10s]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     In order to match mallocs and frees, memory profiler will sort data by timestamp before processing.
+        #     This parameter controls the max span of interval between the first and last item in the sorted array.
+        #     Refer to agent performance statistics in `deepflow_agent_ebpf_memory_profiler`,
+        #     making `time_backtracked` to 0. Configurion `sort_length` may also need to be increased.
+        #   ch: |-
+        #     为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+        #     该参数控制排序数组中第一个和最后一个元素之间的时间间隔的最大值。
+        #     配置该选项可以参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+        #     `time_backtracked` 指标，增大该参数使之为 0 即可。注意可能需要相应增大 `sort_length` 参数。
+        # upgrade_from:
+        sort_interval: 1500ms
+        # type: int
+        # name:
+        #   en: Queue Size
+        #   ch: 队列大小
+        # unit:
+        # range: [4096, 64000000]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Memory profiler inner queue size.
+        #     Refer to agent performance statistics in `deepflow_agent_ebpf_memory_profiler`,
+        #     making `overwritten` to 0 and `pending` not exceeding this configuration.
+        #   ch: |-
+        #     内存剖析组件内部的队列大小。
+        #     配置该选项可以参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+        #     `overwritten` 和 `pending` 指标，增大该配置使得前者为 0，后者不高于该配置即可。
+        # upgrade_from:
+        queue_size: 32768
       # type: section
       # name:
       #   en: Preprocess

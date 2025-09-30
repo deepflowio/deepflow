@@ -4767,7 +4767,105 @@ inputs:
 
 **详细描述**:
 
-采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 80B 内存。
+采集器使用 LRU 缓存记录进程分配的地址，以避免内存使用失控。每个 LRU 条目大约占 32B 内存。
+
+##### 排序长度 {#inputs.ebpf.profile.memory.sort_length}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_length`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_length: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 65536] |
+
+**详细描述**:
+
+为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+该参数是排序数组的长度。
+配置该选项时先按说明调整 `sort_interval` 参数，在参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+`dequeued_by_length` 和 `dequeued_by_interval` 指标，在保证前者小于后者几倍的前提下适当调小该参数。
+
+##### 排序间隔 {#inputs.ebpf.profile.memory.sort_interval}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.sort_interval`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        sort_interval: 1500ms
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1ns', '10s'] |
+
+**详细描述**:
+
+为了匹配 mallocs 和 frees，内存剖析会在处理前对数据按时间戳排序。
+该参数控制排序数组中第一个和最后一个元素之间的时间间隔的最大值。
+配置该选项可以参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+`time_backtracked` 指标，增大该参数使之为 0 即可。注意可能需要相应增大 `sort_length` 参数。
+
+##### 队列大小 {#inputs.ebpf.profile.memory.queue_size}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.queue_size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        queue_size: 32768
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**详细描述**:
+
+内存剖析组件内部的队列大小。
+配置该选项可以参考采集器性能统计 `deepflow_agent_ebpf_memory_profiler` 中
+`overwritten` 和 `pending` 指标，增大该配置使得前者为 0，后者不高于该配置即可。
 
 #### 预处理 {#inputs.ebpf.profile.preprocess}
 
