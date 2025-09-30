@@ -113,4 +113,3 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
 set @lcuuid = (select uuid());
 INSERT INTO data_source (display_name, data_table_collection, interval_time, retention_time, lcuuid)
                  VALUES ('管理侧监控数据', 'deepflow_admin.*', 0, 7*24, @lcuuid);
-                 
