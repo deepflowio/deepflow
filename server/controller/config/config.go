@@ -87,6 +87,7 @@ type ControllerConfig struct {
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
 	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
+	DaMengCfg     metadb.DaMengConfig         `yaml:"dameng"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
@@ -149,6 +150,7 @@ func (c *Config) Load(path string) {
 
 	c.ControllerConfig.MetadbCfg.InitFromMySQL(c.ControllerConfig.MySqlCfg)
 	c.ControllerConfig.MetadbCfg.InitFromPostgreSQL(c.ControllerConfig.PostgreSQLCfg)
+	c.ControllerConfig.MetadbCfg.InitFromDaMeng(c.ControllerConfig.DaMengCfg)
 }
 
 func DefaultConfig() *Config {
