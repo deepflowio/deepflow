@@ -250,6 +250,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "ZMTP";
 	case PROTO_ROCKETMQ:
 		return "RocketMQ";
+	case PROTO_WEBSPHEREMQ:
+		return "WebSphereMQ";
 	case PROTO_NATS:
 		return "NATS";
 	case PROTO_PULSAR:
