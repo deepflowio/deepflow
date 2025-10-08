@@ -61,6 +61,7 @@
 #include <bcc/bcc_syms.h>
 #include "../proc.h"
 #include "trace_utils.h"
+#include "lua_decoder.h"
 
 // static const char *k_err_tag = "[kernel stack trace error]";
 // static const char *u_err_tag = "[user stack trace error]";
@@ -483,13 +484,13 @@ static int get_stack_ips(struct bpf_tracer *t,
 }
 
 static char *build_stack_trace_string(struct bpf_tracer *t,
-				      const char *stack_map_name,
-				      pid_t pid,
-				      int stack_id,
-				      stack_str_hash_t * h,
-				      bool new_cache,
-				      int *ret_val, void *info_p, u64 ts,
-				      bool ignore_libs, bool use_symbol_table)
+		      const char *stack_map_name,
+		      pid_t pid,
+		      int stack_id,
+		      stack_str_hash_t * h,
+		      bool new_cache,
+		      int *ret_val, void *info_p, u64 ts,
+		      bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -601,6 +602,189 @@ failed:
 	vec_free(symbol_array);
 
 	return NULL;
+}
+
+static struct lua_ofs cached_lua_ofs;
+static bool cached_have_lua_ofs;
+static struct lj_ofs cached_lj_ofs;
+static bool cached_have_lj_ofs;
+static __u32 cached_lang_flags;
+static pid_t cached_pid = -1;
+
+static void refresh_lua_offsets(pid_t pid)
+{
+	if (cached_pid == pid)
+		return;
+
+	cached_pid = pid;
+	cached_have_lua_ofs = false;
+	cached_have_lj_ofs = false;
+	cached_lang_flags = 0;
+
+	int fd;
+	fd = get_lua_lang_flags_map_fd();
+	if (fd >= 0) {
+		__u32 key = pid;
+		__u32 val = 0;
+		if (bpf_lookup_elem(fd, &key, &val) == 0)
+			cached_lang_flags = val;
+	}
+
+	__u32 offsets_id = 0;
+	fd = get_lua_unwind_info_map_fd();
+	if (fd >= 0) {
+		struct lua_unwind_info_t info = {};
+		__u32 key = pid;
+		if (bpf_lookup_elem(fd, &key, &info) == 0)
+			offsets_id = info.offsets_id;
+	}
+
+	if (cached_lang_flags & LANG_LUA) {
+		fd = get_lua_offsets_map_fd();
+		if (fd >= 0) {
+			__u32 key = offsets_id;
+			struct lua_ofs ofs = {};
+			if (bpf_lookup_elem(fd, &key, &ofs) == 0) {
+				cached_lua_ofs = ofs;
+				cached_have_lua_ofs = true;
+			}
+		}
+	}
+
+	if (cached_lang_flags & LANG_LUAJIT) {
+		fd = get_luajit_offsets_map_fd();
+		if (fd >= 0) {
+			__u32 key = offsets_id;
+			struct lj_ofs ofs = {};
+			if (bpf_lookup_elem(fd, &key, &ofs) == 0) {
+				cached_lj_ofs = ofs;
+				cached_have_lj_ofs = true;
+			}
+		}
+	}
+}
+
+static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
+					  int stack_id,
+					  pid_t pid,
+					  stack_str_hash_t *h,
+					  bool new_cache)
+{
+	if (stack_id < 0)
+		return NULL;
+
+	stack_str_hash_kv kv;
+	kv.key = ((u64)pid << 32) | (u32)stack_id;
+	kv.value = 0;
+	if (stack_str_hash_search(h, &kv, &kv) == 0) {
+		__sync_fetch_and_add(&h->hit_hash_count, 1);
+		return (char *)kv.value;
+	}
+
+	refresh_lua_offsets(pid);
+	if (!(cached_lang_flags & (LANG_LUA | LANG_LUAJIT)))
+		return NULL;
+
+	int fd = get_lua_intp_stack_map_fd();
+	if (fd < 0)
+		return NULL;
+
+	struct lua_stack_t stack = {};
+	__u32 key = stack_id;
+	if (bpf_lookup_elem(fd, &key, &stack) != 0 || stack.len == 0)
+		return NULL;
+
+	int ret = VEC_OK;
+	uword *frames = NULL;
+	vec_validate_init_empty(frames, stack.len, 0, ret);
+	if (ret != VEC_OK)
+		return NULL;
+
+	int total = 0;
+	for (u32 i = 0; i < stack.len; i++) {
+		const struct lua_frame_t *frame = &stack.frames[i];
+		__u64 tag = frame->tag & TAG_MASK;
+		char buf[256] = {0};
+		char *out = NULL;
+
+		if (tag == TAG_LUA) {
+			char chunk[128] = {0};
+			bool have_chunk = lua_decode_chunkname(pid, frame->addr,
+					      cached_lang_flags,
+					      cached_have_lua_ofs ? &cached_lua_ofs : NULL,
+					      cached_have_lj_ofs ? &cached_lj_ofs : NULL,
+					      chunk, sizeof(chunk));
+			__u32 line = lua_decode_firstline(pid, frame->addr,
+					       cached_lang_flags,
+					       cached_have_lua_ofs ? &cached_lua_ofs : NULL,
+					       cached_have_lj_ofs ? &cached_lj_ofs : NULL);
+			if (have_chunk && line)
+				snprintf(buf, sizeof(buf), "L:%s:%u", chunk, line);
+			else if (have_chunk)
+				snprintf(buf, sizeof(buf), "L:%s:?", chunk);
+			else if (line)
+				snprintf(buf, sizeof(buf), "L:line=%u", line);
+			else
+				snprintf(buf, sizeof(buf), "L:line=?");
+			out = create_symbol_str(strlen(buf), buf, "");
+		} else if (tag == TAG_CFUNC) {
+			unsigned long addr = (unsigned long)(frame->tag & ~TAG_MASK);
+			if (!addr)
+				addr = (unsigned long)frame->addr;
+			out = resolve_addr(t, pid, false, addr, new_cache, NULL);
+			if (!out) {
+				snprintf(buf, sizeof(buf), "C:0x%016lx", addr);
+				out = create_symbol_str(strlen(buf), buf, "");
+			}
+		} else if (tag == TAG_FFUNC) {
+			unsigned long ffid = frame->tag & ~TAG_MASK;
+			snprintf(buf, sizeof(buf), "builtin#%lu", ffid);
+			out = create_symbol_str(strlen(buf), buf, "");
+		} else {
+			snprintf(buf, sizeof(buf), "%s", i_err_tag);
+			out = create_symbol_str(strlen(buf), buf, "");
+		}
+
+		if (out) {
+			frames[i] = pointer_to_uword(out);
+			total += strlen(out);
+		}
+	}
+
+	if (total == 0) {
+		vec_free(frames);
+		return NULL;
+	}
+
+	total += stack.len; /* room for separators */
+	char *result = clib_mem_alloc_aligned("lua_folded_str", total + 1, 0, NULL);
+	if (!result) {
+		for (u32 i = 0; i < stack.len; i++)
+			if (frames[i])
+				clib_mem_free((void *)frames[i]);
+		vec_free(frames);
+		return NULL;
+	}
+
+	int len = 0;
+	for (u32 i = 0; i < stack.len; i++) {
+		if (!frames[i])
+			continue;
+		char *s = (char *)frames[i];
+		len += snprintf(result + len, total - len + 1, "%s;", s);
+		clib_mem_free(s);
+	}
+	if (len > 0)
+		result[len - 1] = '\0';
+	vec_free(frames);
+
+	kv.value = pointer_to_uword(result);
+	if (stack_str_hash_add_del(h, &kv, 1)) {
+		clib_mem_free(result);
+		result = NULL;
+	}
+
+	return result;
 }
 
 static char *folded_stack_trace_string(struct bpf_tracer *t,
@@ -769,12 +953,27 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	bool has_intpstack = v->intpstack > 0;
+	bool lua_intp = false;
 	if (has_intpstack) {
-		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid, custom_stack_map_name, h, new_cache, info_p, v->timestamp, ignore_libs, true);
+		i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
+							    v->tgid, h,
+							    new_cache);
 		if (i_trace_str != NULL) {
-			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
+			lua_intp = true;
+			len += strlen(i_trace_str) + 1;
 		} else {
-			len += strlen(i_err_tag);
+			i_trace_str = folded_stack_trace_string(t, v->intpstack,
+								v->tgid,
+								custom_stack_map_name,
+								h, new_cache,
+								info_p,
+								v->timestamp,
+								ignore_libs, true);
+			if (i_trace_str != NULL) {
+				len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
+			} else {
+				len += strlen(i_err_tag);
+			}
 		}
 	}
 
@@ -787,7 +986,11 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		if (lua_intp) {
+			offset += snprintf(trace_str + offset, len - offset, "%s;%s", i_trace_str, u_trace_str);
+		} else {
+			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		}
 	} else if (i_trace_str) {
 		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
 	} else if (u_trace_str) {

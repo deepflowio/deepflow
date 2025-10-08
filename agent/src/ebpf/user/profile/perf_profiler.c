@@ -50,9 +50,11 @@
 #include "../proc.h"
 #include "../unwind_tracer.h"
 #include "trace_utils.h"
+#include "../probe.h"
 
 #include "../perf_profiler_bpf_common.c"
 #include "../perf_profiler_bpf_5_2_plus.c"
+#include "../lua_profile_bpf.c"
 
 #define CP_PERF_PG_NUM 16
 #define ONCPU_PROFILER_NAME "oncpu"
@@ -79,6 +81,25 @@ static FILE *folded_file;
 #define FOLDED_FILE_PATH "./profiler.folded"
 char *flame_graph_start_time;
 static char *flame_graph_end_time;
+
+#define LUA_PERF_SAMPLE_FREQ 99
+#define LUA_EVENTS_MAP_NAME "__events"
+
+struct lua_profiler_state {
+	struct ebpf_object *obj;
+	int lua_fds[MAX_CPU_NR];
+	int luajit_fds[MAX_CPU_NR];
+	bool lua_attached;
+	bool luajit_attached;
+	struct bpf_perf_reader *reader;
+	int intp_stack_fd;
+	int lang_flags_fd;
+	int unwind_info_fd;
+	int lua_offsets_fd;
+	int luajit_offsets_fd;
+};
+
+static struct lua_profiler_state lua_state;
 
 /* Continuous Profiler debug related settings. */
 static pthread_mutex_t cpdbg_mutex;
@@ -131,15 +152,156 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&tracer->recv, 1);
 }
 
+
+static void lua_profiler_reset(void)
+{
+	memset(&lua_state, 0, sizeof(lua_state));
+	lua_state.intp_stack_fd = -1;
+	lua_state.lang_flags_fd = -1;
+	lua_state.unwind_info_fd = -1;
+	lua_state.lua_offsets_fd = -1;
+	lua_state.luajit_offsets_fd = -1;
+}
+
+static int lua_profiler_attach(const char *prog_name, int *fds)
+{
+	struct ebpf_prog *prog;
+
+	if (!lua_state.obj)
+		return -EINVAL;
+
+	prog = ebpf_obj__get_prog_by_name(lua_state.obj, prog_name);
+	if (!prog)
+		return -ENOENT;
+
+	memset(fds, 0, sizeof(int) * MAX_CPU_NR);
+
+	return program__attach_perf_event(prog->prog_fd,
+						 PERF_TYPE_SOFTWARE,
+						 PERF_COUNT_SW_CPU_CLOCK,
+						 0,
+						 LUA_PERF_SAMPLE_FREQ,
+						 -1,
+						 -1,
+						 -1,
+						 fds,
+						 MAX_CPU_NR);
+}
+
+static void lua_profiler_detach(int *fds)
+{
+	program__detach_perf_event(fds, MAX_CPU_NR);
+}
+
+static int lua_profiler_load(struct bpf_tracer *tracer)
+{
+	struct ebpf_object *orig_obj;
+	int ret;
+
+	if (lua_state.obj)
+		return 0;
+
+	lua_state.obj = create_ebpf_object(lua_profile_ebpf_data,
+					      sizeof(lua_profile_ebpf_data),
+					      "lua_profile");
+	if (IS_NULL(lua_state.obj))
+		return ETR_INVAL;
+
+	ret = load_ebpf_object(lua_state.obj);
+	if (ret) {
+		release_object(lua_state.obj);
+		lua_state.obj = NULL;
+		return ret;
+	}
+
+	struct ebpf_map *map;
+	map = ebpf_obj__get_map_by_name(lua_state.obj, MAP_LUA_INTP_STACK_NAME);
+	lua_state.intp_stack_fd = map ? map->fd : -1;
+
+	map = ebpf_obj__get_map_by_name(lua_state.obj, MAP_LUA_LANG_FLAGS_NAME);
+	lua_state.lang_flags_fd = map ? map->fd : -1;
+
+	map = ebpf_obj__get_map_by_name(lua_state.obj, MAP_LUA_UNWIND_INFO_NAME);
+	lua_state.unwind_info_fd = map ? map->fd : -1;
+
+	map = ebpf_obj__get_map_by_name(lua_state.obj, MAP_LUA_OFFSETS_NAME);
+	lua_state.lua_offsets_fd = map ? map->fd : -1;
+
+	map = ebpf_obj__get_map_by_name(lua_state.obj, MAP_LUAJIT_OFFSETS_NAME);
+	lua_state.luajit_offsets_fd = map ? map->fd : -1;
+
+	if (!lua_profiler_attach("do_perf_event_lua", lua_state.lua_fds))
+		lua_state.lua_attached = true;
+	else {
+		ebpf_warning("Lua profiler: failed to attach do_perf_event_lua; interpreter stacks may be incomplete.\n");
+		lua_profiler_detach(lua_state.lua_fds);
+	}
+
+	if (!lua_profiler_attach("do_perf_event_luajit", lua_state.luajit_fds))
+		lua_state.luajit_attached = true;
+	else {
+		ebpf_warning("Lua profiler: failed to attach do_perf_event_luajit; interpreter stacks may be incomplete.\n");
+		lua_profiler_detach(lua_state.luajit_fds);
+	}
+
+	orig_obj = tracer->obj;
+	tracer->obj = lua_state.obj;
+	lua_state.reader = create_perf_buffer_reader(tracer,
+						       LUA_EVENTS_MAP_NAME,
+						       reader_raw_cb,
+						       reader_lost_cb_a,
+						       PROFILE_PG_CNT_DEF,
+						       1,
+						       PROFILER_READER_EPOLL_TIMEOUT);
+	tracer->obj = orig_obj;
+	if (!lua_state.reader) {
+		lua_profiler_detach(lua_state.lua_fds);
+		lua_profiler_detach(lua_state.luajit_fds);
+		release_object(lua_state.obj);
+		lua_profiler_reset();
+		return ETR_NORESOURCE;
+	}
+
+	return 0;
+}
+
+static void lua_profiler_stop(void)
+{
+	if (!lua_state.obj)
+		return;
+
+	if (lua_state.lua_attached) {
+		lua_profiler_detach(lua_state.lua_fds);
+		lua_state.lua_attached = false;
+	}
+
+	if (lua_state.luajit_attached) {
+		lua_profiler_detach(lua_state.luajit_fds);
+		lua_state.luajit_attached = false;
+	}
+}
+
+static void lua_profiler_destroy(void)
+{
+	if (!lua_state.obj)
+		return;
+
+	release_object(lua_state.obj);
+	lua_profiler_reset();
+}
+
+
 static int release_profiler(struct bpf_tracer *tracer)
 {
 	tracer_reader_lock(tracer);
 
 	/* detach perf event */
 	tracer_hooks_detach(tracer);
+	lua_profiler_stop();
 
 	/* free all readers */
 	free_all_readers(tracer);
+	lua_profiler_destroy();
 
 	print_cp_tracer_status();
 
@@ -368,6 +530,10 @@ static int create_profiler(struct bpf_tracer *tracer)
 	}
 
 	if (g_enable_oncpu) {
+		ret = lua_profiler_load(tracer);
+		if (ret)
+			goto error;
+
 		ebpf_info(LOG_CP_TAG "=== oncpu profiler enabled ===\n");
 		tracer->enable_sample = true;
 		set_bpf_run_enabled(tracer, &oncpu_ctx, 0);
@@ -758,6 +924,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      NANOSEC_PER_SEC / freq,
 			      cb_ctx[PROFILER_CTX_ONCPU_IDX]);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
+	lua_profiler_reset();
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN)
 	    || (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -921,6 +1088,32 @@ struct bpf_tracer *get_profiler_tracer(void)
 {
 	return profiler_tracer;
 }
+
+int get_lua_lang_flags_map_fd(void)
+{
+	return lua_state.lang_flags_fd;
+}
+
+int get_lua_unwind_info_map_fd(void)
+{
+	return lua_state.unwind_info_fd;
+}
+
+int get_lua_offsets_map_fd(void)
+{
+	return lua_state.lua_offsets_fd;
+}
+
+int get_luajit_offsets_map_fd(void)
+{
+	return lua_state.luajit_offsets_fd;
+}
+
+int get_lua_intp_stack_map_fd(void)
+{
+	return lua_state.intp_stack_fd;
+}
+
 
 /*
  * Configure and enable the debugging functionality for Continuous Profiling.
