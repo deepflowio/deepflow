@@ -31,3 +31,10 @@ pub use openwire::{OpenWireInfo, OpenWireLog};
 pub use pulsar::{PulsarInfo, PulsarLog};
 pub use rocketmq::{RocketmqInfo, RocketmqLog};
 pub use zmtp::{ZmtpInfo, ZmtpLog};
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+        mod webspheremq;
+        pub use webspheremq::{WebSphereMqInfo, WebSphereMqLog};
+    }
+}

@@ -148,34 +148,35 @@ const (
 type L7Protocol uint8
 
 const (
-	L7_PROTOCOL_UNKNOWN   L7Protocol = 0
-	L7_PROTOCOL_HTTP_1    L7Protocol = 20
-	L7_PROTOCOL_HTTP_2    L7Protocol = 21
-	L7_PROTOCOL_DUBBO     L7Protocol = 40
-	L7_PROTOCOL_GRPC      L7Protocol = 41
-	L7_PROTOCOL_SOFARPC   L7Protocol = 43
-	L7_PROTOCOL_FASTCGI   L7Protocol = 44
-	L7_PROTOCOL_BRPC      L7Protocol = 45
-	L7_PROTOCOL_TARS      L7Protocol = 46
-	L7_PROTOCOL_SOME_IP   L7Protocol = 47
-	L7_PROTOCOL_MYSQL     L7Protocol = 60
-	L7_PROTOCOL_POSTGRE   L7Protocol = 61
-	L7_PROTOCOL_ORACLE    L7Protocol = 62
-	L7_PROTOCOL_ISO8583   L7Protocol = 70
-	L7_PROTOCOL_REDIS     L7Protocol = 80
-	L7_PROTOCOL_MONGODB   L7Protocol = 81
-	L7_PROTOCOL_MEMCACHED L7Protocol = 82
-	L7_PROTOCOL_KAFKA     L7Protocol = 100
-	L7_PROTOCOL_MQTT      L7Protocol = 101
-	L7_PROTOCOL_AMQP      L7Protocol = 102
-	L7_PROTOCOL_OPENWIRE  L7Protocol = 103
-	L7_PROTOCOL_NATS      L7Protocol = 104
-	L7_PROTOCOL_PULSAR    L7Protocol = 105
-	L7_PROTOCOL_ZMTP      L7Protocol = 106
-	L7_PROTOCOL_ROCKETMQ  L7Protocol = 107
-	L7_PROTOCOL_DNS       L7Protocol = 120
-	L7_PROTOCOL_TLS       L7Protocol = 121
-	L7_PROTOCOL_CUSTOM    L7Protocol = 127
+	L7_PROTOCOL_UNKNOWN     L7Protocol = 0
+	L7_PROTOCOL_HTTP_1      L7Protocol = 20
+	L7_PROTOCOL_HTTP_2      L7Protocol = 21
+	L7_PROTOCOL_DUBBO       L7Protocol = 40
+	L7_PROTOCOL_GRPC        L7Protocol = 41
+	L7_PROTOCOL_SOFARPC     L7Protocol = 43
+	L7_PROTOCOL_FASTCGI     L7Protocol = 44
+	L7_PROTOCOL_BRPC        L7Protocol = 45
+	L7_PROTOCOL_TARS        L7Protocol = 46
+	L7_PROTOCOL_SOME_IP     L7Protocol = 47
+	L7_PROTOCOL_MYSQL       L7Protocol = 60
+	L7_PROTOCOL_POSTGRE     L7Protocol = 61
+	L7_PROTOCOL_ORACLE      L7Protocol = 62
+	L7_PROTOCOL_ISO8583     L7Protocol = 70
+	L7_PROTOCOL_REDIS       L7Protocol = 80
+	L7_PROTOCOL_MONGODB     L7Protocol = 81
+	L7_PROTOCOL_MEMCACHED   L7Protocol = 82
+	L7_PROTOCOL_KAFKA       L7Protocol = 100
+	L7_PROTOCOL_MQTT        L7Protocol = 101
+	L7_PROTOCOL_AMQP        L7Protocol = 102
+	L7_PROTOCOL_OPENWIRE    L7Protocol = 103
+	L7_PROTOCOL_NATS        L7Protocol = 104
+	L7_PROTOCOL_PULSAR      L7Protocol = 105
+	L7_PROTOCOL_ZMTP        L7Protocol = 106
+	L7_PROTOCOL_ROCKETMQ    L7Protocol = 107
+	L7_PROTOCOL_WEBSPHEREMQ L7Protocol = 108
+	L7_PROTOCOL_DNS         L7Protocol = 120
+	L7_PROTOCOL_TLS         L7Protocol = 121
+	L7_PROTOCOL_CUSTOM      L7Protocol = 127
 )
 
 // size = 9 * 4B = 36B
@@ -762,6 +763,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "RocketMQ"
 		}
+	case L7_PROTOCOL_WEBSPHEREMQ:
+		if isTLS {
+			return "WebSphereMQ_TLS"
+		} else {
+			return "WebSphereMQ"
+		}
 	case L7_PROTOCOL_DNS:
 		if isTLS {
 			return "DNS_TLS"
@@ -782,33 +789,34 @@ func (p L7Protocol) String(isTLS bool) string {
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	strings.ToLower(L7_PROTOCOL_HTTP_1.String(false)):   L7_PROTOCOL_HTTP_1,
-	strings.ToLower(L7_PROTOCOL_HTTP_2.String(false)):   L7_PROTOCOL_HTTP_2,
-	strings.ToLower(L7_PROTOCOL_DUBBO.String(false)):    L7_PROTOCOL_DUBBO,
-	strings.ToLower(L7_PROTOCOL_GRPC.String(false)):     L7_PROTOCOL_GRPC,
-	strings.ToLower(L7_PROTOCOL_SOFARPC.String(false)):  L7_PROTOCOL_SOFARPC,
-	strings.ToLower(L7_PROTOCOL_FASTCGI.String(false)):  L7_PROTOCOL_FASTCGI,
-	strings.ToLower(L7_PROTOCOL_BRPC.String(false)):     L7_PROTOCOL_BRPC,
-	strings.ToLower(L7_PROTOCOL_TARS.String(false)):     L7_PROTOCOL_TARS,
-	strings.ToLower(L7_PROTOCOL_SOME_IP.String(false)):  L7_PROTOCOL_SOME_IP,
-	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):    L7_PROTOCOL_MYSQL,
-	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):  L7_PROTOCOL_POSTGRE,
-	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):   L7_PROTOCOL_ORACLE,
-	strings.ToLower(L7_PROTOCOL_ISO8583.String(false)):  L7_PROTOCOL_ISO8583,
-	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):    L7_PROTOCOL_REDIS,
-	strings.ToLower(L7_PROTOCOL_MONGODB.String(false)):  L7_PROTOCOL_MONGODB,
-	strings.ToLower(L7_PROTOCOL_KAFKA.String(false)):    L7_PROTOCOL_KAFKA,
-	strings.ToLower(L7_PROTOCOL_MQTT.String(false)):     L7_PROTOCOL_MQTT,
-	strings.ToLower(L7_PROTOCOL_AMQP.String(false)):     L7_PROTOCOL_AMQP,
-	strings.ToLower(L7_PROTOCOL_OPENWIRE.String(false)): L7_PROTOCOL_OPENWIRE,
-	strings.ToLower(L7_PROTOCOL_NATS.String(false)):     L7_PROTOCOL_NATS,
-	strings.ToLower(L7_PROTOCOL_PULSAR.String(false)):   L7_PROTOCOL_PULSAR,
-	strings.ToLower(L7_PROTOCOL_ZMTP.String(false)):     L7_PROTOCOL_ZMTP,
-	strings.ToLower(L7_PROTOCOL_ROCKETMQ.String(false)): L7_PROTOCOL_ROCKETMQ,
-	strings.ToLower(L7_PROTOCOL_DNS.String(false)):      L7_PROTOCOL_DNS,
-	strings.ToLower(L7_PROTOCOL_TLS.String(false)):      L7_PROTOCOL_TLS,
-	strings.ToLower(L7_PROTOCOL_CUSTOM.String(false)):   L7_PROTOCOL_CUSTOM,
-	strings.ToLower(L7_PROTOCOL_UNKNOWN.String(false)):  L7_PROTOCOL_UNKNOWN,
+	strings.ToLower(L7_PROTOCOL_HTTP_1.String(false)):      L7_PROTOCOL_HTTP_1,
+	strings.ToLower(L7_PROTOCOL_HTTP_2.String(false)):      L7_PROTOCOL_HTTP_2,
+	strings.ToLower(L7_PROTOCOL_DUBBO.String(false)):       L7_PROTOCOL_DUBBO,
+	strings.ToLower(L7_PROTOCOL_GRPC.String(false)):        L7_PROTOCOL_GRPC,
+	strings.ToLower(L7_PROTOCOL_SOFARPC.String(false)):     L7_PROTOCOL_SOFARPC,
+	strings.ToLower(L7_PROTOCOL_FASTCGI.String(false)):     L7_PROTOCOL_FASTCGI,
+	strings.ToLower(L7_PROTOCOL_BRPC.String(false)):        L7_PROTOCOL_BRPC,
+	strings.ToLower(L7_PROTOCOL_TARS.String(false)):        L7_PROTOCOL_TARS,
+	strings.ToLower(L7_PROTOCOL_SOME_IP.String(false)):     L7_PROTOCOL_SOME_IP,
+	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):       L7_PROTOCOL_MYSQL,
+	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):     L7_PROTOCOL_POSTGRE,
+	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):      L7_PROTOCOL_ORACLE,
+	strings.ToLower(L7_PROTOCOL_ISO8583.String(false)):     L7_PROTOCOL_ISO8583,
+	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):       L7_PROTOCOL_REDIS,
+	strings.ToLower(L7_PROTOCOL_MONGODB.String(false)):     L7_PROTOCOL_MONGODB,
+	strings.ToLower(L7_PROTOCOL_KAFKA.String(false)):       L7_PROTOCOL_KAFKA,
+	strings.ToLower(L7_PROTOCOL_MQTT.String(false)):        L7_PROTOCOL_MQTT,
+	strings.ToLower(L7_PROTOCOL_AMQP.String(false)):        L7_PROTOCOL_AMQP,
+	strings.ToLower(L7_PROTOCOL_OPENWIRE.String(false)):    L7_PROTOCOL_OPENWIRE,
+	strings.ToLower(L7_PROTOCOL_NATS.String(false)):        L7_PROTOCOL_NATS,
+	strings.ToLower(L7_PROTOCOL_PULSAR.String(false)):      L7_PROTOCOL_PULSAR,
+	strings.ToLower(L7_PROTOCOL_ZMTP.String(false)):        L7_PROTOCOL_ZMTP,
+	strings.ToLower(L7_PROTOCOL_ROCKETMQ.String(false)):    L7_PROTOCOL_ROCKETMQ,
+	strings.ToLower(L7_PROTOCOL_WEBSPHEREMQ.String(false)): L7_PROTOCOL_WEBSPHEREMQ,
+	strings.ToLower(L7_PROTOCOL_DNS.String(false)):         L7_PROTOCOL_DNS,
+	strings.ToLower(L7_PROTOCOL_TLS.String(false)):         L7_PROTOCOL_TLS,
+	strings.ToLower(L7_PROTOCOL_CUSTOM.String(false)):      L7_PROTOCOL_CUSTOM,
+	strings.ToLower(L7_PROTOCOL_UNKNOWN.String(false)):     L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {
