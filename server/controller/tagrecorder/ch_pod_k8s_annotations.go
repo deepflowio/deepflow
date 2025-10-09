@@ -59,36 +59,6 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sAnnotations) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
-		updateInfo["annotations"] = annotations
-	}
-	targetKey := IDKey{ID: sourceID}
-	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChPodK8sAnnotations
-		db.Where("id = ?", sourceID).First(&chItem)
-		if chItem.ID == 0 {
-			c.SubscriberComponent.dbOperator.add(
-				[]IDKey{targetKey},
-				[]mysqlmodel.ChPodK8sAnnotations{{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-					Annotations: updateInfo["annotations"].(string),
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				}},
-				db,
-			)
-			return
-		}
-	}
-	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator

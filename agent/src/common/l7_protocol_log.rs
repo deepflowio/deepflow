@@ -34,6 +34,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::common::meta_packet::{IcmpData, ProtocolData};
+use crate::config::config::Iso8583ParseConfig;
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
@@ -114,6 +115,8 @@ macro_rules! impl_protocol_parser {
                     "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
                     "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
                     "Custom"=>Ok(Self::Custom(Default::default())),
+                    #[cfg(feature = "enterprise")]
+                    "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
                     )*
@@ -163,10 +166,12 @@ macro_rules! impl_protocol_parser {
 // enum name will be used to parse strings so case matters
 // large structs (>128B) should be boxed to reduce memory consumption
 //
-impl_protocol_parser! {
-    pub enum L7ProtocolParser {
-        // http have two version but one parser, can not place in macro param.
-        // custom must in first so can not place in macro
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "enterprise"))] {
+        impl_protocol_parser! {
+            pub enum L7ProtocolParser {
+                // http have two version but one parser, can not place in macro param.
+                // custom must in first so can not place in macro
         DNS(DnsLog),
         SofaRPC(SofaRpcLog),
         MySQL(MysqlLog),
@@ -189,7 +194,40 @@ impl_protocol_parser! {
         TLS(TlsLog),
         SomeIp(SomeIpLog),
         Ping(PingLog),
-        // add protocol below
+                // add protocol below
+            }
+        }
+    } else {
+        impl_protocol_parser! {
+            pub enum L7ProtocolParser {
+                // http have two version but one parser, can not place in macro param.
+                // custom must in first so can not place in macro
+        DNS(DnsLog),
+        SofaRPC(SofaRpcLog),
+        MySQL(MysqlLog),
+        Kafka(KafkaLog),
+        Redis(RedisLog),
+        MongoDB(MongoDBLog),
+        Memcached(MemcachedLog),
+        PostgreSQL(PostgresqlLog),
+        Dubbo(DubboLog),
+        FastCGI(FastCGILog),
+        Brpc(BrpcLog),
+        Tars(TarsLog),
+        Oracle(OracleLog),
+        MQTT(MqttLog),
+        AMQP(AmqpLog),
+        NATS(NatsLog),
+        Pulsar(PulsarLog),
+        ZMTP(ZmtpLog),
+        OpenWire(OpenWireLog),
+        TLS(TlsLog),
+        SomeIp(SomeIpLog),
+        Ping(PingLog),
+                Iso8583(crate::flow_generator::protocol_logs::Iso8583Log),
+                // add protocol below
+            }
+        }
     }
 }
 
@@ -628,6 +666,7 @@ pub struct ParseParam<'a> {
     pub captured_byte: u16,
 
     pub oracle_parse_conf: OracleConfig,
+    pub iso8583_parse_conf: Iso8583ParseConfig,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -656,6 +695,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("buf_size", &self.buf_size)
             .field("captured_byte", &self.captured_byte)
             .field("oracle_parse_conf", &self.oracle_parse_conf)
+            .field("iso8583_parse_conf", &self.iso8583_parse_conf)
             .finish()
     }
 }
@@ -713,6 +753,7 @@ impl<'a> ParseParam<'a> {
             captured_byte: 0,
 
             oracle_parse_conf: OracleConfig::default(),
+            iso8583_parse_conf: Iso8583ParseConfig::default(),
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -760,6 +801,10 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_oracle_conf(&mut self, conf: OracleConfig) {
         self.oracle_parse_conf = conf;
+    }
+
+    pub fn set_iso8583_conf(&mut self, conf: &Iso8583ParseConfig) {
+        self.iso8583_parse_conf = conf.clone();
     }
 }
 

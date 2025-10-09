@@ -59,36 +59,6 @@ func NewChPodK8sEnvs() *ChPodK8sEnvs {
 
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sEnvs) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedPod) {
-	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodFields)
-	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.Pod)
-	sourceID := newSource.ID
-	updateInfo := make(map[string]interface{})
-
-	if fieldsUpdate.ENV.IsDifferent() {
-		envs, _ := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
-		updateInfo["envs"] = envs
-	}
-	targetKey := IDKey{ID: sourceID}
-	if len(updateInfo) > 0 {
-		var chItem mysqlmodel.ChPodK8sEnvs
-		db.Where("id = ?", sourceID).First(&chItem)
-		if chItem.ID == 0 {
-			c.SubscriberComponent.dbOperator.add(
-				[]IDKey{targetKey},
-				[]mysqlmodel.ChPodK8sEnvs{{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-					Envs:        updateInfo["envs"].(string),
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				}},
-				db,
-			)
-			return
-		}
-	}
-	c.updateOrSync(db, targetKey, updateInfo)
 }
 
 // onResourceUpdated implements SubscriberDataGenerator

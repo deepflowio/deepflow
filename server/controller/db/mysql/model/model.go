@@ -291,23 +291,25 @@ type KubernetesCluster struct {
 }
 
 type ACL struct {
-	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	BusinessID   int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
-	Name         string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	Type         int       `gorm:"column:type;type:int;default:2" json:"TYPE"`                     // 1-epc; 2-custom
-	TapType      int       `gorm:"column:tap_type;type:int;default:3" json:"TAP_TYPE"`             // 1-WAN; 3-LAN
-	State        int       `gorm:"column:state;type:int;default:null;default:0" json:"STATE"`      // 0-disable; 1-enable
-	Applications string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"` // separated by , (1-performance analysis; 2-backpacking; 6-npb)
-	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
-	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
-	DstGroupIDs  string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
-	Protocol     *int      `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
-	SrcPorts     string    `gorm:"column:src_ports;type:text;default:null" json:"SRC_PORTS"` // separated by ,
-	DstPorts     string    `gorm:"column:dst_ports;type:text;default:null" json:"DST_PORTS"` // separated by ,
-	Vlan         int       `gorm:"column:vlan;type:int;default:null" json:"VLAN"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
-	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	ID                 int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	BusinessID         int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
+	Name               string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Type               int       `gorm:"column:type;type:int;default:2" json:"TYPE"`                // 1-epc; 2-custom
+	TapType            int       `gorm:"column:tap_type;type:int;default:3" json:"TAP_TYPE"`        // 1-WAN; 3-LAN
+	State              int       `gorm:"column:state;type:int;default:null;default:0" json:"STATE"` // 0-disable; 1-enable
+	Valid              int       `gorm:"column:valid;type:tinyint(1);default:1" json:"VALID"`       // 0-invalid; 1-valid
+	InvalidDescription string    `gorm:"column:invalid_description;type:text;default:null" json:"INVALID_DESCRIPTION"`
+	Applications       string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"` // separated by , (1-performance analysis; 2-backpacking; 6-npb)
+	EpcID              int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
+	SrcGroupIDs        string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
+	DstGroupIDs        string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
+	Protocol           *int      `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
+	SrcPorts           string    `gorm:"column:src_ports;type:text;default:null" json:"SRC_PORTS"` // separated by ,
+	DstPorts           string    `gorm:"column:dst_ports;type:text;default:null" json:"DST_PORTS"` // separated by ,
+	Vlan               int       `gorm:"column:vlan;type:int;default:null" json:"VLAN"`
+	CreatedAt          time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt          time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 }
 
 func (ACL) TableName() string {

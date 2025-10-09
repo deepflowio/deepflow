@@ -63,56 +63,12 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMes
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
 	newSource := updateMessage.GetNewMySQL().(*mysqlmodel.PodService)
 	sourceID := newSource.ID
-	vpcID := newSource.VPCID
-	podNsID := newSource.PodNamespaceID
-	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]mysqlmodel.ChPodServiceK8sLabel, 0)
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]mysqlmodel.ChPodServiceK8sLabel, 0)
 
 	if fieldsUpdate.Label.IsDifferent() {
 		_, oldMap := common.StrToJsonAndMap(fieldsUpdate.Label.GetOld())
 		_, newMap := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
-
-		for k, v := range newMap {
-			targetKey := NewIDKeyKey(sourceID, k)
-			oldV, ok := oldMap[k]
-			if !ok {
-				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodServiceK8sLabel{
-					ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-					Key:         k,
-					Value:       v,
-					L3EPCID:     vpcID,
-					PodNsID:     podNsID,
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				})
-				continue
-			}
-			updateInfo := make(map[string]interface{})
-			if oldV != v {
-				var chItem mysqlmodel.ChPodServiceK8sLabel
-				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-				if chItem.ID == 0 {
-					keysToAdd = append(keysToAdd, targetKey)
-					targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodServiceK8sLabel{
-						ChIDBase:    mysqlmodel.ChIDBase{ID: sourceID},
-						Key:         k,
-						Value:       v,
-						L3EPCID:     vpcID,
-						PodNsID:     podNsID,
-						TeamID:      md.GetTeamID(),
-						DomainID:    md.GetDomainID(),
-						SubDomainID: md.GetSubDomainID(),
-					})
-					continue
-				}
-				updateInfo["value"] = v
-			}
-			c.updateOrSync(db, targetKey, updateInfo)
-		}
 
 		for k := range oldMap {
 			if _, ok := newMap[k]; !ok {
@@ -124,9 +80,7 @@ func (c *ChPodServiceK8sLabel) onResourceUpdated(md *message.Metadata, updateMes
 			}
 		}
 	}
-	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
-	}
+
 	if len(keysToDelete) > 0 {
 		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}

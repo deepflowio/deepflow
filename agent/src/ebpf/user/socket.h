@@ -262,6 +262,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "PgSQL";
 	case PROTO_ORACLE:
 		return "Oracle";
+	case PROTO_ISO8583:
+		return "ISO-8583";
 	case PROTO_FASTCGI:
 		return "FastCGI";
 	case PROTO_BRPC:

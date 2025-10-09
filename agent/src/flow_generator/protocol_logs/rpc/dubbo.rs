@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::mem::replace;
+
 use serde::Serialize;
 
 use crate::{
@@ -256,11 +258,24 @@ impl DubboInfo {
         }
 
         //trace info rewrite
-        if custom.trace.trace_id.is_some() {
-            self.trace_id = custom.trace.trace_id.unwrap();
+        if let Some(trace_id) = custom.trace.trace_id {
+            let prev = replace(&mut self.trace_id, trace_id);
+            if !prev.is_empty() {
+                self.attributes.push(KeyVal {
+                    key: APM_TRACE_ID_ATTR.to_string(),
+                    val: prev,
+                });
+            }
         }
-        if custom.trace.span_id.is_some() {
-            self.span_id = custom.trace.span_id.unwrap();
+
+        if let Some(span_id) = custom.trace.span_id {
+            let prev = replace(&mut self.span_id, span_id);
+            if !prev.is_empty() {
+                self.attributes.push(KeyVal {
+                    key: APM_SPAN_ID_ATTR.to_string(),
+                    val: prev,
+                });
+            }
         }
 
         // extend attribute

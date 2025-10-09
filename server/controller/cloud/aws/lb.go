@@ -113,7 +113,7 @@ func (a *Aws) getLoadBalances(region string) ([]model.LB, []model.LBListener, []
 					LBListenerLcuuid: listenerLcuuid,
 					Type:             common.LB_SERVER_TYPE_VM,
 					VMLcuuid:         common.GetUUIDByOrgID(a.orgID, serverInstanceID),
-					Port:             int(listener.Listener.InstancePort),
+					Port:             int(a.getInt32PointerValue(listener.Listener.InstancePort)),
 					VPCLcuuid:        vpcLcuuid,
 					IP:               ip,
 					Protocol:         a.getStringPointerValue(listener.Listener.InstanceProtocol),

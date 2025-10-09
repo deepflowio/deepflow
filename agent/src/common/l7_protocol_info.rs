@@ -41,7 +41,7 @@ use crate::{
 use super::l7_protocol_log::ParseParam;
 
 macro_rules! all_protocol_info {
-    ($($name:ident($info_struct:ident)),+$(,)?) => {
+    ($($name:ident($info_struct:ty)),+$(,)?) => {
 
         #[derive(Serialize, Debug, Clone)]
         #[enum_dispatch]
@@ -74,7 +74,9 @@ macro_rules! all_protocol_info {
     };
 }
 
-all_protocol_info!(
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "enterprise"))] {
+        all_protocol_info!(
     DnsInfo(DnsInfo),
     HttpInfo(HttpInfo),
     MysqlInfo(MysqlInfo),
@@ -99,8 +101,39 @@ all_protocol_info!(
     SomeIpInfo(SomeIpInfo),
     PingInfo(PingInfo),
     CustomInfo(CustomInfo),
-    // add new protocol info below
-);
+            // add new protocol info below
+        );
+    } else {
+        all_protocol_info!(
+    DnsInfo(DnsInfo),
+    HttpInfo(HttpInfo),
+    MysqlInfo(MysqlInfo),
+    RedisInfo(RedisInfo),
+    MongoDBInfo(MongoDBInfo),
+    MemcachedInfo(MemcachedInfo),
+    DubboInfo(DubboInfo),
+    FastCGIInfo(FastCGIInfo),
+    BrpcInfo(BrpcInfo),
+    TarsInfo(TarsInfo),
+    KafkaInfo(KafkaInfo),
+    MqttInfo(MqttInfo),
+    AmqpInfo(AmqpInfo),
+    NatsInfo(NatsInfo),
+    PulsarInfo(PulsarInfo),
+    ZmtpInfo(ZmtpInfo),
+    PostgreInfo(PostgreInfo),
+    OpenWireInfo(OpenWireInfo),
+    OracleInfo(OracleInfo),
+    SofaRpcInfo(SofaRpcInfo),
+    TlsInfo(TlsInfo),
+    SomeIpInfo(SomeIpInfo),
+    PingInfo(PingInfo),
+    CustomInfo(CustomInfo),
+            Iso8583Info(crate::flow_generator::protocol_logs::Iso8583Info),
+            // add new protocol info below
+        );
+    }
+}
 
 #[enum_dispatch(L7ProtocolInfo)]
 pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog>
@@ -118,6 +151,13 @@ where
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()>;
 
     fn app_proto_head(&self) -> Option<AppProtoHead>;
+
+    // 是否需要将数据聚合为会话
+    // =============================
+    // needs to be aggregated into sessions
+    fn needs_session_aggregation(&self) -> bool {
+        true
+    }
 
     fn is_tls(&self) -> bool;
 

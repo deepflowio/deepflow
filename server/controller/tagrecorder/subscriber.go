@@ -17,12 +17,8 @@
 package tagrecorder
 
 import (
-	"fmt"
 	"slices"
 	"sync"
-	"time"
-
-	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -271,6 +267,7 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subsc
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	m := msg.(MAPT)
 	dbItems := m.GetMySQLItems().([]*MT)
+	log.Infof("receive add message, resource type: %s, count: %d", s.subResourceTypeName, len(dbItems), logger.NewORGPrefix(md.GetORGID()))
 	db, err := mysql.GetDB(md.GetORGID())
 	if err != nil {
 		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.GetORGID()))
@@ -282,32 +279,16 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnRes
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateMessage := msg.(MUPT)
+	dbItem := updateMessage.GetNewMySQL().(*MT)
+	dbItems := []*MT{dbItem}
+	db := md.GetDB()
+	// use add to complete addition and update of resource in ch table
+	keys, chItems := s.generateKeyTargets(md, dbItems)
+	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
+	// delete resource from ch table
+	// such as ch_chost_cloud_tag, ch_pod_ns_cloud_tag, ch_pod_k8s_label,
+	// ch_pod_k8s_annotation, ch_pod_k8s_env, ch_pod_service_k8s_label, ch_pod_service_k8s_annotation
 	s.subscriberDG.onResourceUpdated(md, updateMessage)
-}
-
-func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) updateOrSync(db *mysql.DB, key KT, updateInfo map[string]interface{}) {
-	condMap := key.Map()
-	if len(condMap) == 0 {
-		log.Errorf("%s key: %#v is empty", s.resourceTypeName, key, db.LogPrefixORGID)
-		return
-	}
-	query := db.GetGORMDB()
-	for k, v := range condMap {
-		query = query.Where(fmt.Sprintf("%s = ?", k), v)
-	}
-	var chItem CT
-	if err := query.First(&chItem).Error; err != nil {
-		if err != gorm.ErrRecordNotFound {
-			log.Errorf("failed to get %s by key %#v: %v", s.resourceTypeName, key, err, db.LogPrefixORGID)
-		}
-		return
-	}
-	if len(updateInfo) == 0 {
-		updateInfo = map[string]interface{}{
-			"updated_at": time.Now(), // use update_at as synchronize time
-		}
-	}
-	s.dbOperator.update(chItem, updateInfo, key, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go

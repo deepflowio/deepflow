@@ -16,6 +16,7 @@
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
+use std::mem::replace;
 use std::str;
 use std::sync::Arc;
 
@@ -350,10 +351,28 @@ impl HttpInfo {
 
         //trace info rewrite
         if let Some(trace_id) = custom.trace.trace_id {
-            self.trace_id = PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id);
+            let prev = replace(
+                &mut self.trace_id,
+                PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id),
+            );
+            if !prev.is_default() {
+                self.attributes.push(KeyVal {
+                    key: APM_TRACE_ID_ATTR.to_string(),
+                    val: prev.into_inner(),
+                });
+            }
         }
         if let Some(span_id) = custom.trace.span_id {
-            self.span_id = PrioField::new(PLUGIN_FIELD_PRIORITY, span_id);
+            let prev = replace(
+                &mut self.span_id,
+                PrioField::new(PLUGIN_FIELD_PRIORITY, span_id),
+            );
+            if !prev.is_default() {
+                self.attributes.push(KeyVal {
+                    key: APM_SPAN_ID_ATTR.to_string(),
+                    val: prev.into_inner(),
+                });
+            }
         }
         if let Some(x_request_id_0) = custom.trace.x_request_id_0 {
             self.x_request_id_0 = PrioField::new(PLUGIN_FIELD_PRIORITY, x_request_id_0);
@@ -1870,7 +1889,7 @@ mod tests {
             l7_protocol_log::{EbpfParam, L7PerfCache},
             MetaPacket,
         },
-        config::OracleConfig,
+        config::{config::Iso8583ParseConfig, OracleConfig},
     };
 
     use std::cell::RefCell;
@@ -2140,6 +2159,7 @@ mod tests {
             buf_size: 0,
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
+            iso8583_parse_conf: Iso8583ParseConfig::default(),
             icmp_data: None,
         };
 
