@@ -30,25 +30,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
-          # 动态获取正确的 ref
+          fetch-depth: 0
           ref: >-
             ${{
-              github.event.pull_request.head.ref ||
-              (github.event.issue.pull_request &&
-               github.event.issue.pull_request.head &&
-               github.event.issue.pull_request.head.ref) ||
+              github.event.issue.number && 
+              format('refs/pull/{0}/head', github.event.issue.number) ||
+              github.event.pull_request.number &&
+              format('refs/pull/{0}/head', github.event.pull_request.number) ||
               github.ref
-            }}
-          # 处理 fork PR 的仓库
-          repository: >-
-            ${{
-              github.event.pull_request.head.repo.full_name ||
-              (github.event.issue.pull_request &&
-               github.event.issue.pull_request.head &&
-               github.event.issue.pull_request.head.repo &&
-               github.event.issue.pull_request.head.repo.full_name) ||
-              github.repository
             }}
       - name: Run Claude Code
         id: claude
