@@ -83,3 +83,6 @@ pub const SERVICE_NOT_FOUND: u8 = 60;
 pub const SERVICE_ERROR: u8 = 70;
 pub const SERVER_ERROR: u8 = 80;
 pub const SERVER_THREADPOOL_EXHAUSTED_ERROR: u8 = 100;
+
+pub const APM_TRACE_ID_ATTR: &str = "apm_trace_id";
+pub const APM_SPAN_ID_ATTR: &str = "apm_span_id";

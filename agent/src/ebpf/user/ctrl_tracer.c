@@ -131,6 +131,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    60:  PROTO_MYSQL\n");
 	fprintf(stderr, "    61:  PROTO_POSTGRESQL\n");
 	fprintf(stderr, "    62:  PROTO_ORACLE\n");
+	fprintf(stderr, "    70:  PROTO_ISO8583\n");
 	fprintf(stderr, "    80:  PROTO_REDIS\n");
 	fprintf(stderr, "    81:  PROTO_MONGO\n");
 	fprintf(stderr, "    82:  PROTO_MEMCACHED\n");

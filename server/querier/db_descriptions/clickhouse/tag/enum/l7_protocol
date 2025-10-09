@@ -12,6 +12,7 @@
 60      , MySQL           ,
 61      , PostgreSQL      ,
 62      , Oracle          ,
+70      , ISO-8583        ,
 80      , Redis           ,
 81      , MongoDB         ,
 82      , Memcached       ,

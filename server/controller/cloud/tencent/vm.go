@@ -65,8 +65,12 @@ func (t *Tencent) getVMs(region string) ([]model.VM, error) {
 			log.Warningf("vm (%s) created time format error: %s", vmName, err.Error(), logger.NewORGPrefix(t.orgID))
 		}
 
-		azID := vData.Get("Placement").Get("Zone").MustString()
-		azLcuuid := common.GetUUIDByOrgID(t.orgID, t.uuidGenerate+"_"+azID)
+		zone := vData.Get("Placement").Get("Zone").MustString()
+		azLcuuid, ok := t.zoneToLcuuid[zone]
+		if !ok {
+			log.Infof("vm (%s) az (id:%s) not in available zones", vmName, zone, logger.NewORGPrefix(t.orgID))
+			continue
+		}
 		vms = append(vms, model.VM{
 			Lcuuid:       vmLcuuid,
 			Name:         vmName,

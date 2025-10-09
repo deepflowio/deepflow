@@ -503,7 +503,7 @@ global:
     # unit:
     # range: [-20, 19]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -520,7 +520,7 @@ global:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -588,7 +588,7 @@ global:
     # unit:
     # range: [1s, 3600s]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -939,7 +939,7 @@ global:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1156,7 +1156,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1172,7 +1172,7 @@ inputs:
     # unit:
     # range: [0ns, 1h]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1200,7 +1200,7 @@ inputs:
     # unit:
     # range: [1s, 1h]
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1222,7 +1222,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1274,7 +1274,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -1290,7 +1290,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1305,7 +1305,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   ch: |-
@@ -1421,7 +1421,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1439,7 +1439,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: [process_name, cmdline, cmdline_with_args, parent_process_name, tag]
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1457,7 +1457,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: [java, golang, python, nodejs, dotnet]
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1474,7 +1474,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1491,7 +1491,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1508,7 +1508,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1526,7 +1526,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1544,7 +1544,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   en: |-
@@ -1576,7 +1576,7 @@ inputs:
     #   - ebpf.profile.memory
     #   #- ebpf.profile.cuda
     #   #- ebpf.profile.hbm
-    # modification: agent_restart
+    # modification: hot_update
     # ee_feature: false
     # description:
     #   ch: |-
@@ -4960,6 +4960,208 @@ processors:
           # upgrade_from: static_config.oracle-parse-config.resp-0x04-extra-byte
           resp_0x04_extra_byte: false
         # type: section
+        # name: ISO8583
+        # description:
+        iso8583:
+          # type: bool
+          # name:
+          #   en: Value Translation
+          #   ch: 数据翻译
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to perform field value translation.
+          #   ch: |-
+          #     是否对解析后的数据进行查表翻译后展示。
+          #
+          #       - 支持翻译的字段列表:
+          #
+          #     |  支持翻译的字段       | 示例（翻译前）|示例（翻译后）          | 备注         |
+          #     |-----------------------|-------------- |----------------------- |--------------|
+          #     | 0-报文类型标识符      | 0100          | 0100-授权类请求        |              |
+          #     | 3-交易处理码          | 300000        | 300000-余额查询        |              |
+          #     | 32-受理机构标识码     | 6100****      | 6100-中国邮政储蓄银行  | 翻译前4位    |
+          #     | 39-应答码             | 00            | 00-承兑或交易成功      |              |
+          #     | 49-交易货币代码       | 156           | 156-人民币元           |              |
+          translation_enabled: true
+          # type: bool
+          # name:
+          #   en: PAN Obfuscate
+          #   ch: 卡号脱敏
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to obfuscate the Primary Account Number (PAN).
+          #   ch: |-
+          #     是否对卡号脱敏。
+          pan_obfuscate: true
+          # type: string
+          # name:
+          #   en: Extract Fields
+          #   ch: 提取字段
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #    Extracted fields are displayed in `data native tags`.
+          #      - Example: `extract_fields: 0,2-33`
+          #    Field Reference:
+          #
+          #    | Field No. | Description |
+          #    |-----------|-------------|
+          #    | 0   | Message Type Identifier (MTI) |
+          #    | 1   | Bitmap |
+          #    | 2   | Primary Account Number (PAN) |
+          #    | 3   | Processing Code |
+          #    | 4   | Amount, Transaction |
+          #    | 5   | Amount, Settlement |
+          #    | 6   | Amount, Cardholder Billing |
+          #    | 7   | Transmission Date & Time |
+          #    | 9   | Conversion Rate, Settlement |
+          #    | 10  | Conversion Rate, Cardholder Billing |
+          #    | 11  | System Trace Audit Number (STAN) |
+          #    | 12  | Local Transaction Time |
+          #    | 13  | Local Transaction Date |
+          #    | 14  | Expiration Date |
+          #    | 15  | Settlement Date |
+          #    | 16  | Conversion Date |
+          #    | 18  | Merchant Type |
+          #    | 19  | Acquiring Institution Country Code |
+          #    | 22  | POS Entry Mode Code |
+          #    | 23  | Card Sequence Number |
+          #    | 25  | POS Condition Code |
+          #    | 26  | POS PIN Capture Code |
+          #    | 28  | Transaction Fee |
+          #    | 32  | Acquiring Institution Identification Code |
+          #    | 33  | Forwarding Institution Identification Code |
+          #    | 35  | Track 2 Data |
+          #    | 36  | Track 3 Data |
+          #    | 37  | Retrieval Reference Number (RRN) |
+          #    | 38  | Authorization Identification Response |
+          #    | 39  | Response Code |
+          #    | 41  | Card Acceptor Terminal ID |
+          #    | 42  | Card Acceptor ID Code |
+          #    | 43  | Card Acceptor Name/Location |
+          #    | 44  | Additional Response Data |
+          #    | 45  | Track 1 Data |
+          #    | 48  | Additional Data – Private |
+          #    | 49  | Currency Code, Transaction |
+          #    | 50  | Currency Code, Settlement |
+          #    | 51  | Currency Code, Cardholder Billing |
+          #    | 52  | PIN Data |
+          #    | 53  | Security Related Control Information |
+          #    | 54  | Additional Amounts (Balance) |
+          #    | 55  | ICC Data (EMV Data) |
+          #    | 56  | Additional Data |
+          #    | 57  | Additional Transaction Data |
+          #    | 59  | Detail Data / Reserved for National Use |
+          #    | 60  | Reserved for Private Use |
+          #    | 61  | Cardholder Authentication Information |
+          #    | 62  | Switch Data |
+          #    | 63  | Network Data |
+          #    | 70  | Network Management Information Code |
+          #    | 90  | Original Data Elements |
+          #    | 96  | Message Security Code |
+          #    | 100 | Receiving Institution Identification Code |
+          #    | 102 | Account Identification 1 |
+          #    | 103 | Account Identification 2 |
+          #    | 104 | Additional Data |
+          #    | 113 | Additional Data |
+          #    | 116 | Additional Data |
+          #    | 117 | Additional Data |
+          #    | 121 | Reserved by China UnionPay (CUPS) |
+          #    | 122 | Reserved for Acquirer |
+          #    | 123 | Reserved for Issuer |
+          #    | 125 | Additional Data |
+          #    | 126 | Additional Data |
+          #    | 128 | Message Authentication Code (MAC) |
+          #   ch: |-
+          #    提取字段展示在`数据原生标签`
+          #      - 配置样例: `extract_fields: 0,2-33`
+          #
+          #    字段对照表:
+          #
+          #    | 字段号 | 说明 |
+          #    |--------|----------|
+          #    | 0  | 报文类型标识符 |
+          #    | 1  | 位图 |
+          #    | 2  | 主账号 |
+          #    | 3  | 交易处理码 |
+          #    | 4  | 交易金额 |
+          #    | 5  | 清算金额 |
+          #    | 6  | 持卡人扣账金额 |
+          #    | 7  | 交易传输时间 |
+          #    | 9  | 清算汇率 |
+          #    | 10 | 持卡人扣账汇率 |
+          #    | 11 | 系统跟踪号 |
+          #    | 12 | 受卡方所在地时间 |
+          #    | 13 | 受卡方所在地日期 |
+          #    | 14 | 卡有效期 |
+          #    | 15 | 清算日期 |
+          #    | 16 | 兑换日期 |
+          #    | 18 | 商户类型 |
+          #    | 19 | 商户国家代码 |
+          #    | 22 | 服务点输入方式码 |
+          #    | 23 | 卡序列号 |
+          #    | 25 | 服务点条件码 |
+          #    | 26 | 服务点 PIN 获取码 |
+          #    | 28 | 交易费 |
+          #    | 32 | 受理机构标识码 |
+          #    | 33 | 发送机构标识码 |
+          #    | 35 | 第二磁道数据 |
+          #    | 36 | 第三磁道数据 |
+          #    | 37 | 检索参考号 |
+          #    | 38 | 授权标识应答码 |
+          #    | 39 | 应答码 |
+          #    | 41 | 受卡机终端标识码 |
+          #    | 42 | 受卡方标识码 |
+          #    | 43 | 受卡方名称地址 |
+          #    | 44 | 附加响应数据 |
+          #    | 45 | 第一磁道数据 |
+          #    | 48 | 附加数据－私有 |
+          #    | 49 | 交易货币代码 |
+          #    | 50 | 清算货币代码 |
+          #    | 51 | 持卡人账户货币代码 |
+          #    | 52 | 个人标识码数据 |
+          #    | 53 | 安全控制信息 |
+          #    | 54 | 实际余额 |
+          #    | 55 | IC 卡数据域 |
+          #    | 56 | 附加信息 |
+          #    | 57 | 附加交易信息 |
+          #    | 59 | 明细查询数据 |
+          #    | 60 | 自定义域 |
+          #    | 61 | 持卡人身份认证信息 |
+          #    | 62 | 交换中心数据 |
+          #    | 63 | 金融网络数据 |
+          #    | 70 | 网络管理信息码 |
+          #    | 90 | 原始数据元 |
+          #    | 96 | 报文安全码 |
+          #    | 100 | 接收机构标识码 |
+          #    | 102 | 账户标识 1 |
+          #    | 103 | 账户标识 2 |
+          #    | 104 | 附加信息 |
+          #    | 113 | 附加信息 |
+          #    | 116 | 附加信息 |
+          #    | 117 | 附加信息 |
+          #    | 121 | CUPS 保留 |
+          #    | 122 | 受理方保留 |
+          #    | 123 | 发卡方保留 |
+          #    | 125 | 附加信息 |
+          #    | 126 | 附加信息 |
+          #    | 128 | 报文鉴别码 |
+          extract_fields: "2,7,11,32,33"
+        # type: section
         # name: MySQL
         # description:
         mysql:
@@ -6129,7 +6331,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6143,7 +6345,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6157,7 +6359,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-
@@ -6171,7 +6373,7 @@ processors:
         # unit:
         # range: [1s, 1d]
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: false
         # description:
         #   en: |-

@@ -63,10 +63,6 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, upda
 	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedPodServiceFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.PodService)
 	sourceID := newSource.ID
-	vpcID := newSource.VPCID
-	podNsID := newSource.PodNamespaceID
-	keysToAdd := make([]IDKeyKey, 0)
-	targetsToAdd := make([]metadbmodel.ChPodServiceK8sAnnotation, 0)
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodServiceK8sAnnotation, 0)
 
@@ -74,45 +70,6 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, upda
 		_, oldMap := StrToJsonAndMap(fieldsUpdate.Annotation.GetOld())
 		_, newMap := StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 
-		for k, v := range newMap {
-			targetKey := NewIDKeyKey(sourceID, k)
-			oldV, ok := oldMap[k]
-			if !ok {
-				keysToAdd = append(keysToAdd, targetKey)
-				targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sAnnotation{
-					ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
-					Key:         k,
-					Value:       v,
-					L3EPCID:     vpcID,
-					PodNsID:     podNsID,
-					TeamID:      md.GetTeamID(),
-					DomainID:    md.GetDomainID(),
-					SubDomainID: md.GetSubDomainID(),
-				})
-				continue
-			}
-			updateInfo := make(map[string]interface{})
-			if oldV != v {
-				var chItem metadbmodel.ChPodServiceK8sAnnotation
-				db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
-				if chItem.ID == 0 {
-					keysToAdd = append(keysToAdd, targetKey)
-					targetsToAdd = append(targetsToAdd, metadbmodel.ChPodServiceK8sAnnotation{
-						ChIDBase:    metadbmodel.ChIDBase{ID: sourceID},
-						Key:         k,
-						Value:       v,
-						L3EPCID:     vpcID,
-						PodNsID:     podNsID,
-						TeamID:      md.GetTeamID(),
-						DomainID:    md.GetDomainID(),
-						SubDomainID: md.GetSubDomainID(),
-					})
-					continue
-				}
-				updateInfo["value"] = v
-			}
-			c.updateOrSync(db, targetKey, updateInfo)
-		}
 		for k := range oldMap {
 			if _, ok := newMap[k]; !ok {
 				keysToDelete = append(keysToDelete, NewIDKeyKey(sourceID, k))
@@ -123,9 +80,7 @@ func (c *ChPodServiceK8sAnnotation) onResourceUpdated(md *message.Metadata, upda
 			}
 		}
 	}
-	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
-	}
+
 	if len(keysToDelete) > 0 {
 		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}

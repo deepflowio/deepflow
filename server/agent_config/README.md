@@ -716,7 +716,7 @@ global:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -746,7 +746,7 @@ The smaller the value of process scheduling priority, the higher the priority of
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -841,7 +841,7 @@ Note:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1346,7 +1346,7 @@ will set the log level to INFO for all modules and DEBUG for the rpc::session mo
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1666,7 +1666,7 @@ type in CLI environments.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1694,7 +1694,7 @@ The /proc fs mount path.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1729,7 +1729,7 @@ Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1760,7 +1760,7 @@ Socket and Process will not be reported if their uptime is lower than this thres
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1807,7 +1807,7 @@ inputs:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1836,7 +1836,7 @@ The user who should execute the `script_command` command.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1871,7 +1871,7 @@ The list of processe names ignored by process matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -1972,7 +1972,7 @@ inputs:
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2001,7 +2001,7 @@ The regex of matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2039,7 +2039,7 @@ The type of matcher.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2075,7 +2075,7 @@ Default value `[]` match all languages.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2102,7 +2102,7 @@ Default value `[]` match all usernames.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2129,7 +2129,7 @@ Default value `true` means only match processes in container.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2158,7 +2158,7 @@ Default value `false` means match processes with or without tags.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2187,7 +2187,7 @@ Whether to ignore matched processes.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -2216,7 +2216,7 @@ New name after matched.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -7232,6 +7232,169 @@ processors:
 Due to the response with data id 0x04 has different struct in
 different version, it may has one byte before row affect.
 
+##### ISO8583 {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583}
+
+###### Value Translation {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.translation_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          translation_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to perform field value translation.
+
+###### PAN Obfuscate {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.pan_obfuscate`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          pan_obfuscate: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to obfuscate the Primary Account Number (PAN).
+
+###### Extract Fields {#processors.request_log.application_protocol_inference.protocol_special_config.iso8583.extract_fields}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.iso8583.extract_fields`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        iso8583:
+          extract_fields: 2,7,11,32,33
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Extracted fields are displayed in `data native tags`.
+  - Example: `extract_fields: 0,2-33`
+Field Reference:
+
+| Field No. | Description |
+|-----------|-------------|
+| 0   | Message Type Identifier (MTI) |
+| 1   | Bitmap |
+| 2   | Primary Account Number (PAN) |
+| 3   | Processing Code |
+| 4   | Amount, Transaction |
+| 5   | Amount, Settlement |
+| 6   | Amount, Cardholder Billing |
+| 7   | Transmission Date & Time |
+| 9   | Conversion Rate, Settlement |
+| 10  | Conversion Rate, Cardholder Billing |
+| 11  | System Trace Audit Number (STAN) |
+| 12  | Local Transaction Time |
+| 13  | Local Transaction Date |
+| 14  | Expiration Date |
+| 15  | Settlement Date |
+| 16  | Conversion Date |
+| 18  | Merchant Type |
+| 19  | Acquiring Institution Country Code |
+| 22  | POS Entry Mode Code |
+| 23  | Card Sequence Number |
+| 25  | POS Condition Code |
+| 26  | POS PIN Capture Code |
+| 28  | Transaction Fee |
+| 32  | Acquiring Institution Identification Code |
+| 33  | Forwarding Institution Identification Code |
+| 35  | Track 2 Data |
+| 36  | Track 3 Data |
+| 37  | Retrieval Reference Number (RRN) |
+| 38  | Authorization Identification Response |
+| 39  | Response Code |
+| 41  | Card Acceptor Terminal ID |
+| 42  | Card Acceptor ID Code |
+| 43  | Card Acceptor Name/Location |
+| 44  | Additional Response Data |
+| 45  | Track 1 Data |
+| 48  | Additional Data – Private |
+| 49  | Currency Code, Transaction |
+| 50  | Currency Code, Settlement |
+| 51  | Currency Code, Cardholder Billing |
+| 52  | PIN Data |
+| 53  | Security Related Control Information |
+| 54  | Additional Amounts (Balance) |
+| 55  | ICC Data (EMV Data) |
+| 56  | Additional Data |
+| 57  | Additional Transaction Data |
+| 59  | Detail Data / Reserved for National Use |
+| 60  | Reserved for Private Use |
+| 61  | Cardholder Authentication Information |
+| 62  | Switch Data |
+| 63  | Network Data |
+| 70  | Network Management Information Code |
+| 90  | Original Data Elements |
+| 96  | Message Security Code |
+| 100 | Receiving Institution Identification Code |
+| 102 | Account Identification 1 |
+| 103 | Account Identification 2 |
+| 104 | Additional Data |
+| 113 | Additional Data |
+| 116 | Additional Data |
+| 117 | Additional Data |
+| 121 | Reserved by China UnionPay (CUPS) |
+| 122 | Reserved for Acquirer |
+| 123 | Reserved for Issuer |
+| 125 | Additional Data |
+| 126 | Additional Data |
+| 128 | Message Authentication Code (MAC) |
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
@@ -8803,7 +8966,7 @@ set this value at this time. Only valid for IDC (not Cloud) traffic.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8834,7 +8997,7 @@ Timeouts for TCP State Machine - Established.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8865,7 +9028,7 @@ Timeouts for TCP State Machine - Closing Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8896,7 +9059,7 @@ Timeouts for TCP State Machine - Opening Reset.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
