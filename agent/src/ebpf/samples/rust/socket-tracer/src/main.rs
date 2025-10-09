@@ -254,6 +254,8 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
             proto_tag.push_str("ZMTP");
         } else if sk_proto_safe(sd) == SOCK_DATA_ROCKETMQ {
             proto_tag.push_str("ROCKETMQ");
+        } else if sk_proto_safe(sd) == SOCK_DATA_WEBSPHEREMQ {
+            proto_tag.push_str("WEBSPHEREMQ");
         } else {
             proto_tag.push_str("UNSPEC");
         }
@@ -431,6 +433,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
         enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
         enable_ebpf_protocol(SOCK_DATA_ROCKETMQ as c_int);
+        enable_ebpf_protocol(SOCK_DATA_WEBSPHEREMQ as c_int);
         enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
         enable_ebpf_protocol(SOCK_DATA_PULSAR as c_int);
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
@@ -622,6 +625,13 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_ROCKETMQ as c_int,
+            CString::new("1-65535".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+        set_protocol_ports_bitmap(
+            SOCK_DATA_WEBSPHEREMQ as c_int,
             CString::new("1-65535".as_bytes())
                 .unwrap()
                 .as_c_str()
