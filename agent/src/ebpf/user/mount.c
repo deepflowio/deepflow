@@ -34,6 +34,10 @@
 #define MOUNT_INFO_NULL      ((struct mount_info *)0)
 #define MOUNT_INFO_INVAL     ((struct mount_info *)(intptr_t)-1)
 #define IS_MOUNT_INFO_ERR(ptr) (ptr == MOUNT_INFO_NULL || ptr == MOUNT_INFO_INVAL)
+
+extern uint64_t adapt_kern_uid;
+extern bpf_offset_param_t g_kern_offsets;
+
 mount_info_hash_t mount_info_hash;
 // Stores the mount namespace ID of the host root
 static u64 host_root_mntns_id = 0;
@@ -104,7 +108,37 @@ int get_mount_ns_id(pid_t pid, u64 * mntns_id)
 	return 0;
 }
 
-static bool has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
+int get_mount_id(pid_t pid, int fd)
+{
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/%d/fdinfo/%d", pid, fd);
+
+	FILE *fp = fopen(path, "r");
+	if (!fp) {
+		ebpf_debug("fopen %s failed, errno=%d (%s)",
+			   path, errno, strerror(errno));
+		return -1;
+	}
+
+	char line[256];
+	int mount_id = -1;
+	while (fgets(line, sizeof(line), fp)) {
+		if (sscanf(line, "mnt_id:%d", &mount_id) == 1) {
+			break;
+		}
+	}
+	fclose(fp);
+
+	if (mount_id == -1) {
+		ebpf_warning("no mnt_id found in %s, errno=%d (%s)",
+			     path, errno, strerror(errno));
+		errno = ENOENT;
+	}
+
+	return mount_id;
+}
+
+static bool __unused has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
 {
 	struct list_head *p, *n;
 	struct mount_entry *e;
@@ -119,22 +153,24 @@ static bool has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
 	return false;
 }
 
-void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
-			   char *mount_path, char *mount_source,
-			   int mount_size, bool * is_nfs)
+static void inline set_mount_info(struct mount_entry *e, char *mount_path,
+				  char *mount_source, int mount_size,
+				  fs_type_t * file_type)
+{
+	fast_strncat_trunc(e->mount_point, "", mount_path, mount_size);
+	fast_strncat_trunc(e->mount_source, "", mount_source, mount_size);
+	*file_type = e->file_type;
+}
+
+void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
+		    kern_dev_t s_dev, char *mount_path,
+		    char *mount_source, int mount_size, fs_type_t * file_type)
 {
 	struct list_head *p, *n;
 	struct mount_entry *e;
-	struct mount_info *m = mount_info_cache_lookup(pid, *mntns_id);
-	if (m == MOUNT_INFO_INVAL)
+	struct mount_info *m = mount_info_cache_lookup(pid, (u64) mntns_id);
+	if (m == MOUNT_INFO_INVAL || m == MOUNT_INFO_NULL) {
 		return;
-
-	if (m == MOUNT_INFO_NULL) {
-		get_mount_ns_id(pid, mntns_id);
-		m = create_proc_mount_info(pid, *mntns_id);
-		if (m == NULL)
-			return;
-		AO_INC(&m->refcount);
 	}
 
 	if (!m->mount_head.next) {
@@ -144,10 +180,16 @@ void find_mount_point_path(pid_t pid, u64 * mntns_id, kern_dev_t s_dev,
 
 	list_for_each_safe(p, n, &m->mount_head) {
 		e = container_of(p, struct mount_entry, list);
-		if (e && e->s_dev == s_dev) {
-			fast_strncat_trunc(e->mount_point, "", mount_path, mount_size);
-			fast_strncat_trunc(e->mount_source, "", mount_source, mount_size);
-			*is_nfs = e->is_nfs;
+		if (e && mnt_id > -1) {
+			if (e->mount_id == mnt_id) {
+				set_mount_info(e, mount_path, mount_source,
+					       mount_size, file_type);
+				break;
+			}
+
+		} else if (e && e->s_dev == s_dev) {
+			set_mount_info(e, mount_path, mount_source, mount_size,
+				       file_type);
 			break;
 		}
 	}
@@ -255,6 +297,83 @@ static int add_mount_info_to_cache(pid_t pid, struct mount_info *m)
 	return 0;
 }
 
+/// Static mapping table, common filesystems placed first for faster matching
+static const fs_map_t fs_map[] = {
+	// Most common filesystems first
+	{"ext4", FS_TYPE_REGULAR},
+	{"xfs", FS_TYPE_REGULAR},
+	{"proc", FS_TYPE_VIRTUAL},
+	{"sysfs", FS_TYPE_VIRTUAL},
+	{"nfs", FS_TYPE_NETWORK},
+	{"nfs4", FS_TYPE_NETWORK},
+	{"overlay", FS_TYPE_REGULAR},
+
+	// Other local filesystems
+	{"ext2", FS_TYPE_REGULAR},
+	{"ext3", FS_TYPE_REGULAR},
+	{"btrfs", FS_TYPE_REGULAR},
+	{"f2fs", FS_TYPE_REGULAR},
+	{"zfs", FS_TYPE_REGULAR},
+
+	// Other virtual filesystems
+	{"devtmpfs", FS_TYPE_VIRTUAL},
+	{"tmpfs", FS_TYPE_VIRTUAL},
+	{"cgroup", FS_TYPE_VIRTUAL},
+	{"cgroup2", FS_TYPE_VIRTUAL},
+	{"mqueue", FS_TYPE_VIRTUAL},
+	{"debugfs", FS_TYPE_VIRTUAL},
+	{"tracefs", FS_TYPE_VIRTUAL},
+	{"securityfs", FS_TYPE_VIRTUAL},
+	{"configfs", FS_TYPE_VIRTUAL},
+	{"pstore", FS_TYPE_VIRTUAL},
+	{"nfsd", FS_TYPE_VIRTUAL},
+
+	// Other network filesystems
+	{"cifs", FS_TYPE_NETWORK},
+	{"smb3", FS_TYPE_NETWORK},
+	{"ceph", FS_TYPE_NETWORK},
+	{"glusterfs", FS_TYPE_NETWORK},
+	{"9p", FS_TYPE_NETWORK},
+
+	{NULL, FS_TYPE_UNKNOWN}	// Sentinel
+};
+
+const char *fs_type_to_string(fs_type_t type)
+{
+	switch (type) {
+	case FS_TYPE_REGULAR:
+		return "regular";
+	case FS_TYPE_VIRTUAL:
+		return "virtual";
+	case FS_TYPE_NETWORK:
+		return "network";
+	case FS_TYPE_UNKNOWN:
+	default:
+		return "unknown";
+	}
+}
+
+/**
+ * Determine filesystem category from fstype (string from /proc/<pid>/mountinfo)
+ * @param fstype - filesystem type string
+ * @return fs_type_t - enum category (LOCAL / VIRTUAL / NETWORK / UNKNOWN)
+ */
+static fs_type_t get_fs_type(const char *fstype)
+{
+	if (!fstype)
+		return FS_TYPE_UNKNOWN;
+
+	if (strncmp(fstype, "fuse", 4) == 0)
+		return FS_TYPE_VIRTUAL;
+
+	for (int i = 0; fs_map[i].name != NULL; i++) {
+		if (strcmp(fstype, fs_map[i].name) == 0) {
+			return fs_map[i].type;
+		}
+	}
+	return FS_TYPE_UNKNOWN;
+}
+
 static int build_mount_info(pid_t pid, struct list_head *mount_head,
 			    u32 * bytes_count)
 {
@@ -285,21 +404,7 @@ static int build_mount_info(pid_t pid, struct list_head *mount_head,
 		if (matched != 8)
 			continue;
 
-		bool is_nfs = strncmp("nfs", fs_type, 3) == 0;
-		/*
-		 * Filter out bind mounts, because for bind mounts, the data obtained via eBPF starts from
-		 * `[fs_root]`, which is already a path on the host. There's no need to translate it into
-		 * the mount point path inside the container.
-		 * For example, a path like `/var/lib/mysql/xxxx.data` is already a host path and does not
-		 * need to be translated into `/bitnami/mysql/xxxx.data` (which is the container path).
-		 * e.g.: 1729 1710 253:0 /var/lib/mysql /bitnami/mysql rw,relatime - xfs /dev/mapper/centos-root rw,attr2,inode64,noquota
-		 */
-		if (!(root[0] == '/' && root[1] == '\0') && !is_nfs)
-			continue;
-
 		kern_dev_t s_dev = ((major & 0xfff) << 20) | (minor & 0xfffff);
-		if (has_mount_entry(mount_head, s_dev))
-			continue;
 		struct mount_entry *entry =
 		    calloc(1, sizeof(struct mount_entry));
 		if (entry == NULL) {
@@ -308,8 +413,9 @@ static int build_mount_info(pid_t pid, struct list_head *mount_head,
 			goto exit;
 		}
 
+		entry->mount_id = id;
 		entry->s_dev = s_dev;
-		entry->is_nfs = is_nfs;
+		entry->file_type = get_fs_type(fs_type);
 		entry->mount_point = strdup(mount_point);
 		if (entry->mount_point == NULL) {
 			free(entry);
@@ -460,9 +566,10 @@ void check_and_cleanup_mount_info(pid_t pid, u64 mntns_id)
 	}
 
 	if (new_hash != m->file_hash) {
-		if (delete_mount_info_from_cache(pid, m) == 0)
+		if (delete_mount_info_from_cache(pid, m) == 0) {
 			free_mount_info(m);
-		else
+			create_proc_mount_info(pid, mntns_id);
+		} else
 			AO_DEC(&m->refcount);
 
 		return;
@@ -483,9 +590,10 @@ void check_root_mount_info(bool output_log)
 		if (!IS_MOUNT_INFO_ERR(m)) {
 			// Ensure that the root mount point can be cleaned up.
 			host_root_mntns_id = 0;
-			if (delete_mount_info_from_cache(1, m) == 0)
+			if (delete_mount_info_from_cache(1, m) == 0) {
 				free_mount_info(m);
-			else
+				create_proc_mount_info(1, tmp_mntns_id);
+			} else
 				AO_DEC(&m->refcount);
 			host_root_mntns_id = tmp_mntns_id;
 		}
@@ -501,9 +609,9 @@ void check_root_mount_info(bool output_log)
  * Result is written to 'out' with a maximum size of 'out_size'.
  * e.g.:
  *    const char *str1 = "10.33.49.27:/srv/nfs/data"; (mount source)
- *    const char *str2 = "/nfs/data/ddd"; (file path via eBPF)
+ *    const char *str2 = "/nfs/data/"; (file path via eBPF)
  *    const char *new_prefix = "/mnt/nfs"; (mount point)
- * target: "10.33.49.27:/srv/nfs/data/ddd"
+ * target: "/mnt/nfs/"
  */
 static int replace_suffix_prefix(const char *str1, const char *str2,
 				 const char *new_prefix
@@ -521,23 +629,31 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 		// Check if this suffix matches the prefix of str2
 		if (suffix_len <= len2
 		    && strncmp(suffix, str2, suffix_len) == 0) {
-			// Match found: replace the suffix with new_prefix
-			return fast_strncat_trunc(str1, str2 + suffix_len, out,
-						  out_size);
+			// Match found: replace the suffix with new_prefix (for nfs4)
+			return fast_strncat_trunc(new_prefix, str2 + suffix_len,
+						  out, out_size);
 		}
 	}
 
-	// No match found: copy str1 + str2
-	return fast_strncat_trunc(str1, str2, out, out_size);
+	// No match found: copy new_prefix + str2 (for nfs3)
+	return fast_strncat_trunc(new_prefix, str2, out, out_size);
 }
 
-u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
-			   const char *mount_point, const char *mount_source,
-			   bool is_nfs)
+u32 copy_file_metrics(int pid, void *dst, void *src, int len,
+		      u32 mntns_id, const char *mount_point,
+		      const char *mount_source, fs_type_t file_type)
 {
+#define MNTNS_ID_BUF_SZ 12
 	if (len <= 0)
 		return 0;
 
+	char mntns_str[MNTNS_ID_BUF_SZ] = { 0 };
+	if (mntns_id > 0) {
+		int len;
+		len = u32_to_str_safe(mntns_id, mntns_str, sizeof(mntns_str));
+		mntns_str[len] = ':';
+	}
+	
 	struct user_io_event_buffer *u_event;
 	struct __io_event_buffer *event = (struct __io_event_buffer *)src;
 	char *buffer = event->filename;
@@ -553,7 +669,6 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 		buffer_len = len - buf_offset;
 	}
 
-	int event_len;
 	int i, temp_index = 0;
 	char temp[buffer_len + 1];
 	temp[0] = '\0';
@@ -572,14 +687,10 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 
 	char *p;
 	int copy_len;
-	for (i = buffer_len - 2; i >= 0; i--) {
-		if (i == 0) {
-			p = &buffer[0];
-		} else {
-			if (buffer[i] != '\0')
-				continue;
-			p = &buffer[i + 1];
-		}
+	for (i = buffer_len - 2; i > 0; i--) {
+		if (buffer[i] != '\0')
+			continue;
+		p = &buffer[i + 1];
 
 		copy_len =
 		    fast_strncat_trunc(p, (temp_index > 0 && i != 0) ? "/" : "",
@@ -590,11 +701,11 @@ u32 copy_regular_file_data(int pid, void *dst, void *src, int len,
 
 copy_event:
 	u_event = (struct user_io_event_buffer *)dst;
-	buffer = u_event->filename;
-	if (is_nfs) {
+	buffer = u_event->file_dir;
+	if (file_type == FS_TYPE_NETWORK) {
 		temp_index =
 		    replace_suffix_prefix(mount_source, temp, mount_point,
-					  buffer, sizeof(event->filename));
+					  buffer, sizeof(u_event->file_dir));
 	} else {
 		const char *point = mount_point;
 		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
@@ -602,15 +713,88 @@ copy_event:
 			point = "";
 		temp_index =
 		    fast_strncat_trunc(point, temp, buffer,
-				       sizeof(event->filename));
+				       sizeof(u_event->file_dir));
 	}
 
-	buffer_len = temp_index + 1;
+	prepend_prefix_safe(buffer, sizeof(u_event->file_dir), mntns_str);
+
 	u_event->bytes_count = event->bytes_count;
 	u_event->operation = event->operation;
 	u_event->latency = event->latency;
 	u_event->offset = event->offset;
-	event_len = offsetof(typeof(struct user_io_event_buffer),
-			     filename) + buffer_len;
-	return event_len;
+	u_event->file_type = file_type;
+	u_event->mnt_id = event->mnt_id;
+	u_event->mntns_id = event->mntns_id;
+	strcpy_s_inline(u_event->mount_source, sizeof(u_event->mount_source),
+			mount_source, strlen(mount_source));
+	fast_strncat_trunc(mntns_str, mount_point, u_event->mount_point,
+			   sizeof(u_event->mount_point));
+	strcpy_s_inline(u_event->filename, sizeof(u_event->filename),
+			event->filename, strlen(event->filename));
+	return sizeof(*u_event);
+}
+
+/*
+ * We need to create an event that triggers the pread64() system call
+ * so that eBPF can capture it. Using this event, the eBPF program can
+ * deduce mount-related structure offsets of files, allowing adaptation
+ * to different kernel versions.
+ */
+static bool print_info = true;
+int mount_offset_infer(void)
+{
+	const char *filename = "/proc/self/mountinfo";
+	char buffer[512];
+	int fd, mnt_id = -1;
+	ssize_t bytes_read;
+	pid_t pid = getpid();
+	u64 mntns_id = 0;
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		ebpf_warning("failed to find bpf_tracer with name '%s'\n",
+			     SK_TRACER_NAME);
+	}
+
+	if (get_mount_ns_id(pid, &mntns_id)) {
+		ebpf_warning("get_mount_ns_id() error\n");
+		return -1;
+	}
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		ebpf_warning("open() failed, errno=%d: %s\n", errno,
+			     strerror(errno));
+		return -1;
+	}
+
+	mnt_id = get_mount_id(pid, fd);
+
+	/*
+	 * Before invoking pread64(), it is mandatory to update the adapt_kern_data.
+	 * This ensures that the BPF map contains the prepared and correct data
+	 * required for proper kernel adaptation.
+	 */
+	if (print_info)
+		ebpf_info
+		    ("Insert adapt kern data id (%d,%d) mntID %d nsID %u\n",
+		     adapt_kern_uid >> 32, (uint32_t) adapt_kern_uid, mnt_id,
+		     mntns_id);
+	insert_adapt_kern_data_to_map(tracer, mnt_id, mntns_id);
+
+	bytes_read = pread64(fd, buffer, sizeof(buffer), 0);
+	if (bytes_read < 0) {
+		ebpf_warning("pread64() failed, errno=%d: %s\n", errno,
+			     strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	if (print_info)
+		ebpf_info("mount_offset_infer: The pread64() system call was"
+			  "triggered, reading %zd bytes.\n", bytes_read);
+
+	print_info = false;
+	return 0;
 }
