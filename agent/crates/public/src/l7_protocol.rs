@@ -75,6 +75,7 @@ pub enum L7Protocol {
     Pulsar = 105,
     ZMTP = 106,
     RocketMQ = 107,
+    WebSphereMq = 108,
 
     // INFRA
     DNS = 120,
@@ -131,6 +132,7 @@ impl From<String> for L7Protocol {
             "pulsar" => Self::Pulsar,
             "zmtp" => Self::ZMTP,
             "rocketmq" => Self::RocketMQ,
+            "webspheremq" => Self::WebSphereMq,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "iso8583" | "iso-8583" => Self::Iso8583,
