@@ -117,6 +117,8 @@ macro_rules! impl_protocol_parser {
                     "Custom"=>Ok(Self::Custom(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
+                    #[cfg(feature = "enterprise")]
+                    "WebSphereMQ"=>Ok(Self::WebSphereMq(Default::default())),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
                     )*
@@ -220,6 +222,7 @@ cfg_if::cfg_if! {
         NATS(NatsLog),
         Pulsar(PulsarLog),
         ZMTP(ZmtpLog),
+        WebSphereMq(crate::flow_generator::protocol_logs::WebSphereMqLog),
         OpenWire(OpenWireLog),
         TLS(TlsLog),
         SomeIp(SomeIpLog),

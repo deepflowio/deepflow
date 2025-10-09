@@ -248,6 +248,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "OpenWire";
 	case PROTO_ZMTP:
 		return "ZMTP";
+	case PROTO_WEBSPHEREMQ:
+		return "WebSphereMQ";
 	case PROTO_NATS:
 		return "NATS";
 	case PROTO_PULSAR:
