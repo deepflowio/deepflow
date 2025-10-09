@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix: the wrong direction in L7 metrics [#10538](https://github.com/deepflowio/deepflow/pull/10538) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
@@ -46,6 +47,10 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support parse WebSphere protocol [#10541](https://github.com/deepflowio/deepflow/pull/10541) by [lzf575](https://github.com/lzf575)
+* feat: perf_event is changed to file_event [#10533](https://github.com/deepflowio/deepflow/pull/10533) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: add file_event_metrics.1s table [#10532](https://github.com/deepflowio/deepflow/pull/10532) by [lzf575](https://github.com/lzf575)
+* feat: agent - eBPF File IO Metric Adjustment [#10474](https://github.com/deepflowio/deepflow/pull/10474) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
@@ -77,3 +82,11 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### Chore
+* chore: added desc for the mount_source/point and file_dir columns [#10536](https://github.com/deepflowio/deepflow/pull/10536) by [lzf575](https://github.com/lzf575)
+
+
+#### OTHER
+* V66 file event [#10530](https://github.com/deepflowio/deepflow/pull/10530) by [lzf575](https://github.com/lzf575)
