@@ -3636,6 +3636,37 @@ check:
 		return MSG_RESPONSE;
 }
 
+// ref: https://www.ibm.com/docs/en/ibm-mq/
+static __inline enum message_type infer_webspheremq_message(const char *buf,
+							 size_t count,
+							 struct conn_info_s *conn_info)
+{
+	// Transmission Segment Header length 36
+	if (count < 36) {
+		return MSG_UNKNOWN;
+	}
+
+	if (!protocol_port_check_2(PROTO_WEBSPHEREMQ, conn_info)) {
+		return MSG_UNKNOWN;
+	}
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_WEBSPHEREMQ) {
+			return MSG_UNKNOWN;
+		}
+	}
+
+	if (buf[0] != 'T' || buf[1] != 'S' || buf[2] != 'H' || buf[3] != 'M') {
+		return MSG_UNKNOWN;
+	}
+
+	// SegmType: 0x9x response
+	if ((buf[17] & 0x90) == 0x90) {
+		return MSG_RESPONSE;
+	}
+	return MSG_REQUEST;
+}
+
 static __inline bool drop_msg_by_comm(void)
 {
 	char comm[TASK_COMM_LEN];
@@ -3735,7 +3766,15 @@ infer_protocol_3(const char *infer_buf, size_t count,
 		    infer_mongo_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MONGO;
-	}
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_WEBSPHEREMQ && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_webspheremq_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_WEBSPHEREMQ;
+}
 
 	if (conn_info->enable_reasm) {
 		if (inferred_message.type == MSG_UNKNOWN) {
@@ -4249,6 +4288,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						syscall_infer_len,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ZMTP;
+				return inferred_message;
+			}
+			break;
+		case PROTO_WEBSPHEREMQ:
+			if ((inferred_message.type =
+			     infer_webspheremq_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_WEBSPHEREMQ;
 				return inferred_message;
 			}
 			break;

@@ -150,6 +150,28 @@ pub mod l7 {
             }
         }
     }
+    pub mod mq {
+        pub mod web_sphere_mq {
+
+            #[derive(Default)]
+            pub struct WebSphereMqParser {
+                pub request_type: Option<String>,
+                pub end_to_end_id: Option<String>,
+                pub ret_code: Option<String>,
+                pub exception: Option<String>,
+            }
+
+            impl WebSphereMqParser {
+                pub fn check_payload(&mut self, _: &[u8], _: bool) -> bool {
+                    unimplemented!()
+                }
+
+                pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+                    unimplemented!()
+                }
+            }
+        }
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]

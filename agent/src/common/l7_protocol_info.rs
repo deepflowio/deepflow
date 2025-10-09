@@ -121,6 +121,7 @@ cfg_if::cfg_if! {
     NatsInfo(NatsInfo),
     PulsarInfo(PulsarInfo),
     ZmtpInfo(ZmtpInfo),
+    WebSphereMqInfo(crate::flow_generator::protocol_logs::WebSphereMqInfo),
     PostgreInfo(PostgreInfo),
     OpenWireInfo(OpenWireInfo),
     OracleInfo(OracleInfo),
