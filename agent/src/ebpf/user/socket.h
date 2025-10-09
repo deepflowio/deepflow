@@ -434,5 +434,25 @@ void disable_kprobe_feature(void);
  * for monitoring and tracing specific points in the kernel.
  */
 void enable_kprobe_feature(void);
+
+/**
+ * Insert adapt_kern_data entry into the BPF map.
+ *
+ * This function initializes a struct adapt_kern_data with the provided
+ * mount ID and mount namespace ID, along with the global adapt_kern_uid.
+ * The data is then stored into the BPF map identified by
+ * MAP_ADAPT_KERN_DATA_NAME with a fixed key of 0.
+ *
+ * @param tracer     Pointer to the bpf_tracer context used for accessing maps.
+ * @param mnt_id     Mount ID of the target file system.
+ * @param mntns_id   Mount namespace ID associated with the process.
+ *
+ * Behavior:
+ * - Creates a new adapt_kern_data value.
+ * - Fills in the id, mnt_id, and mntns_id fields.
+ * - Updates the BPF map with this value using key = 0.
+ */
+void insert_adapt_kern_data_to_map(struct bpf_tracer *tracer,
+				   int mnt_id, u32 mntns_id);
 bool is_pure_kprobe_ebpf(void);
 #endif /* DF_USER_SOCKET_H */

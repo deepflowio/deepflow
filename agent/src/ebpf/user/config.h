@@ -18,10 +18,21 @@
 #define DF_EBPF_CONFIG_H
 
 #define EV_NAME_SIZE			1024
-#define MAX_EVENTS_BURST           	32 // The number of events in batch processing
+#define MAX_EVENTS_BURST           	32	// The number of events in batch processing
 #define BOOT_TIME_UPDATE_PERIOD		60	// 系统启动时间更新周期, 单位：秒
-#define IO_FILEPATH_BUFF_SIZE		1024 // Default value for file path length
-#define DENTRY_NAME_SIZE		256  // Maximum length of a directory entry name
+#define DENTRY_NAME_SIZE		256  	// Maximum length of a directory entry name
+
+/*
+ *  Note: The following settings are related to the offset
+ *  calculations in Rust, in the file 
+ *  `agent/src/common/proc_event/linux.rs`.
+ *  If the values of the four macros below are modified, the
+ *  Rust file must be updated accordingly.
+ */
+#define FILE_NAME_SZ			256
+#define MOUNT_SOURCE_SZ			512
+#define MOUNT_POINT_SZ			256
+#define FILE_PATH_SZ			512
 
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME         "__members_offset"
@@ -32,7 +43,7 @@
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
 #define MAP_PROTO_FILTER_NAME		"__protocol_filter"
 #define MAP_KPROBE_PORT_BITMAP_NAME	"__kprobe_port_bitmap"
-#define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
+#define MAP_ADAPT_KERN_DATA_NAME	"__adapt_kern_data_map"
 #define MAP_PROTO_PORTS_BITMAPS_NAME	"__proto_ports_bitmap"
 #define MAP_ALLOW_REASM_PROTOS_NAME     "__allow_reasm_protos_map"
 #define MAP_PKTS_STATES_NAME		"__pkts_stats_map"
