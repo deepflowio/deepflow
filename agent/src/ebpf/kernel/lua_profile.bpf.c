@@ -51,7 +51,6 @@
 #define LUA_EVENTS_MAX_CPUS      256
 
 
-const volatile bool disable_lua_user_trace = false;
 const volatile bool include_idle = false;
 const volatile pid_t targ_pid = -1;
 const volatile pid_t targ_tid = -1;
@@ -59,43 +58,30 @@ const volatile __u64 targ_ns_dev = 0;
 const volatile __u64 targ_ns_ino = 0;
 const volatile __u64 stack_depth_limit = 16;
 const volatile bool is_lua = false;
-const volatile struct lj_ofs lj = {0};
-const volatile struct lua_ofs lua = {0};
+
 
 
 #include "lua_unwind_helper.h"
 /* ------------------ maps for stack emit ------------------ */
 
-// ===== Required maps (no A/B) =====
-
-// (1) Kernel + user stacks captured via bpf_get_stackid()
 MAP_STACK_TRACE(stack_map, LUA_STACK_MAP_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
-// (2) Interpreter (Lua/LuaJIT) software stacks → stack IDs
 MAP_HASH(intp_stack_map, __u32, struct lua_stack_t, LUA_INTP_STACK_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
-// (3) TID -> lua_State* (captured by uprobe on lua_resume)
 MAP_HASH(lua_tstate_map, __u32, __u64, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
 MAP_PERARRAY(intp_stack_scratch, __u32, struct lua_stack_t, 1, FEATURE_FLAG_PROFILE_ONCPU)
 
-// (4) Userspace output
 MAP_PERF_EVENT(events, int, __u32, LUA_EVENTS_MAX_CPUS, FEATURE_FLAG_PROFILE_ONCPU)
 
-// ===== Helpful/optional maps =====
-
-// Per-CPU scratch (keeps large structs off stack; you can store just stack_trace_key_t or a bigger state)
 MAP_PERARRAY(heap, __u32, struct stack_trace_key_t, 1, FEATURE_FLAG_PROFILE_ONCPU)
 
-// Userspace-controlled language flags (TGID -> LANG_* bits)
 MAP_HASH(lang_flags_map, __u32, __u32, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
 MAP_HASH(lua_unwind_info_map, __u32, struct lua_unwind_info_t, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 
-// Offsets profiles array (populate from userspace, select by offsets_id)
 MAP_HASH(lua_offsets_map, __u32, struct lua_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
 
-// For LuaJIT, either another array with struct lj_ofs or reuse if shape matches:
 MAP_HASH(luajit_offsets_map, __u32, struct lj_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
 
 #define SYMBOL_TABLE_MAX_ENTRIES 1024
@@ -166,14 +152,12 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx, __u32 tid
         if (o->features & LUA_FEAT_CI_LINKED)
             (void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev), (char*)ci + o->off_CI_prev);
 
-        /* debug removed */
         int tt = -1;
         if (bpf_probe_read_user(&tt, sizeof(tt), (char *)ci_func + o->off_TValue_tt)) {
             goto next_frame;
         }
-        /* debug removed */
 
-        int variant = tt & 0x30;         // 0<<4, 1<<4, 2<<4
+        int variant = tt & 0x30;
         bool is_collectable = (tt & LUA_TCOLLECTABLE) != 0;
 
         void *valp = NULL;
@@ -231,12 +215,10 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx, __u32 tid
 
     next_frame:
         if (o->features & LUA_FEAT_CI_LINKED) {
-            // after emitting:
             if (!ci_prev) break;
             ci = ci_prev;
             continue;
         } else {
-            // Previous frame in the CallInfo array
             ci = (void *)((char *)ci - o->sizeof_CallInfo);
         }
     }
@@ -263,7 +245,6 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame,
 	{
 		void *pt = NULL;
 		if (gcfunc_get_proto(fn, &pt, o)) {
-			/* debug removed */
 			return -1;
 		}
         
@@ -285,7 +266,6 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame,
                 add_frame(intp_stack, 0, enc);
 	}
 	else {
-        // Push a placeholder so the unwinder keeps depth in sync.
         add_frame(intp_stack, 0, TAG_MASK);
         return -1;
     }
@@ -311,15 +291,14 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid, void *L, __
     if(L_get_base(L, &base_ptr, o)) return -1;
     
     // TODO: remove hardcoded TValue size, add lj.tv_size
-	void *bot = (void *)((char *)stack_ptr + (o->fr2 ? 16 : 0)); // 2 * sizeof(TValue)
+	void *bot = (void *)((char *)stack_ptr + (o->fr2 ? 16 : 0));
 
 	void *frame, *nextframe;
-	frame = nextframe = (void *)((char *)base_ptr - 8); // sizeof(TValue)
+	frame = nextframe = (void *)((char *)base_ptr - 8);
 
 
 	// Main frame walker loop
     int i = 0;
-	/* debug removed */
     for (; i < stack_depth_limit && frame > bot; i++) {
         if (frame_gc_equals_L(frame, L, o) > 0) {
             level++;
