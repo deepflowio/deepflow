@@ -20,30 +20,30 @@ package tagrecorder
 import (
 	"time"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 // 资源的MySQL orm对象
 type MySQLChModel interface {
-	mysqlmodel.ChUser | mysqlmodel.ChAlarmPolicy | mysqlmodel.ChPrometheusTargetLabelLayout | mysqlmodel.ChTargetLabel | mysqlmodel.ChAPPLabel | mysqlmodel.ChPrometheusMetricName | mysqlmodel.ChPrometheusLabelName |
-		mysqlmodel.ChPrometheusMetricAPPLabelLayout | mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChOSAppTags |
-		mysqlmodel.ChOSAppTag | mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag | mysqlmodel.ChIntEnum |
-		mysqlmodel.ChStringEnum | mysqlmodel.ChPodIngress | mysqlmodel.ChVTapPort | mysqlmodel.ChAZ | mysqlmodel.ChIPResource | mysqlmodel.ChPodK8sLabel |
-		mysqlmodel.ChLBListener | mysqlmodel.ChRegion | mysqlmodel.ChVPC |
-		mysqlmodel.ChDevice | mysqlmodel.ChIPRelation | mysqlmodel.ChPodGroup | mysqlmodel.ChNetwork | mysqlmodel.ChPod | mysqlmodel.ChPodCluster |
-		mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChTapType | mysqlmodel.ChVTap | mysqlmodel.ChPodK8sLabels | mysqlmodel.ChNodeType | mysqlmodel.ChGProcess | mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations |
-		mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
-		mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodService | mysqlmodel.ChChost | mysqlmodel.ChPolicy | mysqlmodel.ChNpbTunnel
+	metadbmodel.ChUser | metadbmodel.ChAlarmPolicy | metadbmodel.ChPrometheusTargetLabelLayout | metadbmodel.ChTargetLabel | metadbmodel.ChAPPLabel | metadbmodel.ChPrometheusMetricName | metadbmodel.ChPrometheusLabelName |
+		metadbmodel.ChPrometheusMetricAPPLabelLayout | metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChOSAppTags |
+		metadbmodel.ChOSAppTag | metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag | metadbmodel.ChIntEnum |
+		metadbmodel.ChStringEnum | metadbmodel.ChPodIngress | metadbmodel.ChVTapPort | metadbmodel.ChAZ | metadbmodel.ChIPResource | metadbmodel.ChPodK8sLabel |
+		metadbmodel.ChLBListener | metadbmodel.ChRegion | metadbmodel.ChVPC |
+		metadbmodel.ChDevice | metadbmodel.ChIPRelation | metadbmodel.ChPodGroup | metadbmodel.ChNetwork | metadbmodel.ChPod | metadbmodel.ChPodCluster |
+		metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChTapType | metadbmodel.ChVTap | metadbmodel.ChPodK8sLabels | metadbmodel.ChNodeType | metadbmodel.ChGProcess | metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations |
+		metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
+		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel
 }
 
 type SubscriberMetaDBChModel interface {
-	mysqlmodel.ChDevice | mysqlmodel.ChAZ | mysqlmodel.ChChost | mysqlmodel.ChVPC | mysqlmodel.ChNetwork | mysqlmodel.ChLBListener |
-		mysqlmodel.ChPodCluster | mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChPodIngress | mysqlmodel.ChPodService |
-		mysqlmodel.ChPodGroup | mysqlmodel.ChPod | mysqlmodel.ChGProcess |
-		mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
-		mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag |
-		mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations | mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodK8sLabel |
-		mysqlmodel.ChPodK8sLabels
+	metadbmodel.ChDevice | metadbmodel.ChAZ | metadbmodel.ChChost | metadbmodel.ChVPC | metadbmodel.ChNetwork | metadbmodel.ChLBListener |
+		metadbmodel.ChPodCluster | metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChPodIngress | metadbmodel.ChPodService |
+		metadbmodel.ChPodGroup | metadbmodel.ChPod | metadbmodel.ChGProcess |
+		metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
+		metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag |
+		metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations | metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodK8sLabel |
+		metadbmodel.ChPodK8sLabels
 
 	GetID() int
 	GetUpdatedAt() time.Time

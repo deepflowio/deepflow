@@ -18,8 +18,8 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -31,8 +31,8 @@ type ChPodK8sLabels struct {
 		message.UpdatedPod,
 		*message.DeletedPods,
 		message.DeletedPods,
-		mysqlmodel.Pod,
-		mysqlmodel.ChPodK8sLabels,
+		metadbmodel.Pod,
+		metadbmodel.ChPodK8sLabels,
 		IDKey,
 	]
 }
@@ -46,8 +46,8 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 			message.UpdatedPod,
 			*message.DeletedPods,
 			message.DeletedPods,
-			mysqlmodel.Pod,
-			mysqlmodel.ChPodK8sLabels,
+			metadbmodel.Pod,
+			metadbmodel.ChPodK8sLabels,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_POD_K8S_LABELS,
@@ -62,13 +62,13 @@ func (c *ChPodK8sLabels) onResourceUpdated(md *message.Metadata, updateMessage *
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []IDKey, targets []mysqlmodel.ChPodK8sLabels) {
+func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, source *metadbmodel.Pod) (keys []IDKey, targets []metadbmodel.ChPodK8sLabels) {
 	if source.Label == "" {
 		return
 	}
 	labels, _ := common.StrToJsonAndMap(source.Label)
-	return []IDKey{{ID: source.ID}}, []mysqlmodel.ChPodK8sLabels{{
-		ChIDBase:    mysqlmodel.ChIDBase{ID: source.ID},
+	return []IDKey{{ID: source.ID}}, []metadbmodel.ChPodK8sLabels{{
+		ChIDBase:    metadbmodel.ChIDBase{ID: source.ID},
 		Labels:      labels,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
@@ -77,6 +77,6 @@ func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, source *mysqlmodel
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sLabels, db *mysql.DB) {
+func (c *ChPodK8sLabels) softDeletedTargetsUpdated(targets []metadbmodel.ChPodK8sLabels, db *metadb.DB) {
 
 }

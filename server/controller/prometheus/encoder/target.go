@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	prometheuscommon "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -70,7 +70,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	defer ln.lock.Unlock()
 
 	resp := make([]*controller.PrometheusTarget, 0)
-	var dbToAdd []*mysqlmodel.PrometheusTarget
+	var dbToAdd []*metadbmodel.PrometheusTarget
 	podClusterIDToDomainInfo, err := ln.getPodClusterIDToDomainInfo()
 	for i := range ts {
 		t := ts[i]
@@ -89,8 +89,8 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 			continue
 		}
 		di := podClusterIDToDomainInfo[podClusterID]
-		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusTarget{
-			Base:         mysqlmodel.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d-%d", vpcID, podClusterID) + "prometheus")},
+		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusTarget{
+			Base:         metadbmodel.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d-%d", vpcID, podClusterID) + "prometheus")},
 			CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS,
 			Instance:     ins,
 			Job:          job,
@@ -131,8 +131,8 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 }
 
 func (ln *target) load() (ids mapset.Set[int], err error) {
-	var items []*mysqlmodel.PrometheusTarget
-	err = ln.org.DB.Unscoped().Where(&mysqlmodel.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
+	var items []*metadbmodel.PrometheusTarget
+	err = ln.org.DB.Unscoped().Where(&metadbmodel.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return nil, err
@@ -147,7 +147,7 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 }
 
 func (ln *target) check(ids []int) (inUseIDs []int, err error) {
-	var dbItems []*mysqlmodel.PrometheusTarget
+	var dbItems []*metadbmodel.PrometheusTarget
 	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
@@ -168,7 +168,7 @@ type domainInfo struct {
 }
 
 func (ln *target) getPodClusterIDToDomainInfo() (podClusterIDToDomainInfo map[int]domainInfo, err error) {
-	var podClusters []*mysqlmodel.PodCluster
+	var podClusters []*metadbmodel.PodCluster
 	err = ln.org.DB.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf("db query pod cluster failed: %v", err, ln.org.LogPrefix)

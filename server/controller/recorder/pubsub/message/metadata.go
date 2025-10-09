@@ -18,8 +18,8 @@ package message
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
@@ -45,19 +45,19 @@ func MetadataPlatform(base metadata.Platform) func(*Metadata) {
 	}
 }
 
-func MetadataDB(db *mysql.DB) func(*Metadata) {
+func MetadataDB(db *metadb.DB) func(*Metadata) {
 	return func(m *Metadata) {
 		m.SetDB(db)
 	}
 }
 
-func MetadataDomain(domain mysqlModel.Domain) func(*Metadata) {
+func MetadataDomain(domain metadbModel.Domain) func(*Metadata) {
 	return func(m *Metadata) {
 		m.SetDomain(domain)
 	}
 }
 
-func MetadataSubDomain(subDomain mysqlModel.SubDomain) func(*Metadata) {
+func MetadataSubDomain(subDomain metadbModel.SubDomain) func(*Metadata) {
 	return func(m *Metadata) {
 		m.SetSubDomain(subDomain)
 	}

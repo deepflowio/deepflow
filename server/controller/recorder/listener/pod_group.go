@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewPodGroup(c *cache.Cache, eq *queue.OverwriteQueue) *PodGroup {
 	return listener
 }
 
-func (p *PodGroup) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroup) {
+func (p *PodGroup) OnUpdaterAdded(addedDBItems []*metadbmodel.PodGroup) {
 	p.cache.AddPodGroups(addedDBItems)
 }
 
@@ -47,6 +47,6 @@ func (p *PodGroup) OnUpdaterUpdated(cloudItem *cloudmodel.PodGroup, diffBase *di
 	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
-func (p *PodGroup) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodGroup) {
+func (p *PodGroup) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodGroup) {
 	p.cache.DeletePodGroups(lcuuids)
 }

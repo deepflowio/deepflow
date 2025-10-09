@@ -22,7 +22,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -54,7 +54,7 @@ func NewVM(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *VM {
 	return mng
 }
 
-func (v *VM) ProduceByAdd(items []*mysqlmodel.VM) {
+func (v *VM) ProduceByAdd(items []*metadbmodel.VM) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
 		info, err := v.ToolDataSet.GetVMInfoByID(item.ID)

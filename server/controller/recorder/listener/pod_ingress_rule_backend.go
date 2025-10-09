@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,13 +34,13 @@ func NewPodIngressRuleBackend(c *cache.Cache) *PodIngressRuleBackend {
 	return listener
 }
 
-func (b *PodIngressRuleBackend) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodIngressRuleBackend) {
+func (b *PodIngressRuleBackend) OnUpdaterAdded(addedDBItems []*metadbmodel.PodIngressRuleBackend) {
 	b.cache.AddPodIngressRuleBackends(addedDBItems)
 }
 
 func (b *PodIngressRuleBackend) OnUpdaterUpdated(cloudItem *cloudmodel.PodIngressRuleBackend, diffBase *diffbase.PodIngressRuleBackend) {
 }
 
-func (b *PodIngressRuleBackend) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.PodIngressRuleBackend) {
+func (b *PodIngressRuleBackend) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.PodIngressRuleBackend) {
 	b.cache.DeletePodIngressRuleBackends(lcuuids)
 }

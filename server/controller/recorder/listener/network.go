@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewNetwork(c *cache.Cache) *Network {
 	return listener
 }
 
-func (n *Network) OnUpdaterAdded(addedDBItems []*mysqlmodel.Network) {
+func (n *Network) OnUpdaterAdded(addedDBItems []*metadbmodel.Network) {
 	n.cache.AddNetworks(addedDBItems)
 }
 
@@ -43,6 +43,6 @@ func (n *Network) OnUpdaterUpdated(cloudItem *cloudmodel.Network, diffBase *diff
 	n.cache.UpdateNetwork(cloudItem)
 }
 
-func (n *Network) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*mysqlmodel.Network) {
+func (n *Network) OnUpdaterDeleted(lcuuids []string, deletedDBItems []*metadbmodel.Network) {
 	n.cache.DeleteNetworks(lcuuids)
 }

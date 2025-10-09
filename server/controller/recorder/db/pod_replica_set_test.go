@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func newDBPodReplicaSet() *mysqlmodel.PodReplicaSet {
-	return &mysqlmodel.PodReplicaSet{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPodReplicaSet() *metadbmodel.PodReplicaSet {
+	return &metadbmodel.PodReplicaSet{Base: metadbmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodReplicaSetBatchSuccess() {
 	operator := NewPodReplicaSet()
 	itemToAdd := newDBPodReplicaSet()
 
-	_, ok := operator.AddBatch([]*mysqlmodel.PodReplicaSet{itemToAdd})
+	_, ok := operator.AddBatch([]*metadbmodel.PodReplicaSet{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysqlmodel.PodReplicaSet
+	var addedItem *metadbmodel.PodReplicaSet
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodReplicaSet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodReplicaSet{})
 }
 
 func (t *SuiteTest) TestUpdatePodReplicaSetSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodReplicaSetSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysqlmodel.PodReplicaSet
+	var updatedItem *metadbmodel.PodReplicaSet
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodReplicaSet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.PodReplicaSet{})
 }
 
 func (t *SuiteTest) TestDeletePodReplicaSetBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeletePodReplicaSetBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysqlmodel.PodReplicaSet
+	var deletedItem *metadbmodel.PodReplicaSet
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

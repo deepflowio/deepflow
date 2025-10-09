@@ -22,8 +22,8 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -35,8 +35,8 @@ type ChGProcess struct {
 		message.UpdatedProcess,
 		*message.DeletedProcesses,
 		message.DeletedProcesses,
-		mysqlmodel.Process,
-		mysqlmodel.ChGProcess,
+		metadbmodel.Process,
+		metadbmodel.ChGProcess,
 		IDKey,
 	]
 	resourceTypeToIconID map[IconKey]int
@@ -51,8 +51,8 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 			message.UpdatedProcess,
 			*message.DeletedProcesses,
 			message.DeletedProcesses,
-			mysqlmodel.Process,
-			mysqlmodel.ChGProcess,
+			metadbmodel.Process,
+			metadbmodel.ChGProcess,
 			IDKey,
 		](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_GPROCESS,
@@ -66,7 +66,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Process) (keys []IDKey, targets []mysqlmodel.ChGProcess) {
+func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Process) (keys []IDKey, targets []metadbmodel.ChGProcess) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_GPROCESS,
 	}]
@@ -76,8 +76,8 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pro
 	}
 	gid := int(source.GID)
 	keys = append(keys, IDKey{ID: gid})
-	targets = append(targets, mysqlmodel.ChGProcess{
-		ChIDBase:    mysqlmodel.ChIDBase{ID: gid},
+	targets = append(targets, metadbmodel.ChGProcess{
+		ChIDBase:    metadbmodel.ChIDBase{ID: gid},
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
@@ -94,16 +94,16 @@ func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *mess
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysqlmodel.ChGProcess, db *mysql.DB) {
+func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess, db *metadb.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
 }
 
-func (c *ChGProcess) beforeDeletePage(dbData []*mysqlmodel.Process, msg *message.DeletedProcesses) []*mysqlmodel.Process {
+func (c *ChGProcess) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.DeletedProcesses) []*metadbmodel.Process {
 	gids := msg.GetAddition().(*message.DeletedProcessesAddition).DeletedGIDs
-	newDatas := []*mysqlmodel.Process{}
+	newDatas := []*metadbmodel.Process{}
 	for _, item := range dbData {
 		if slices.Contains(gids, item.GID) {
 			newDatas = append(newDatas, item)

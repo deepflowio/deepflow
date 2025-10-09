@@ -25,8 +25,8 @@ import (
 	"gorm.io/gorm/clause"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -79,9 +79,9 @@ func (s *SyncStorage) Renew(orgID int, vtapID uint32, key string, refresh, wrEna
 	if !refresh {
 		return
 	}
-	db, err := mysql.GetDB(orgID)
+	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get mysql session failed: %s", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", logger.NewORGPrefix(orgID))
 		return
 	}
 	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
@@ -141,9 +141,9 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, key string, data common.G
 		// push immediately after update
 		s.fetch()
 
-		db, err := mysql.GetDB(orgID)
+		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get mysql session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+			log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 			return
 		}
 		db.Clauses(clause.OnConflict{
@@ -231,18 +231,18 @@ func (s *SyncStorage) refreshDatabase() {
 
 	for range ticker.C {
 		// clean genesis storage invalid data
-		orgIDs, err := mysql.GetORGIDs()
+		orgIDs, err := metadb.GetORGIDs()
 		if err != nil {
 			log.Errorf("get org ids failed: %s", err.Error())
 			return
 		}
 		for _, orgID := range orgIDs {
-			db, err := mysql.GetDB(orgID)
+			db, err := metadb.GetDB(orgID)
 			if err != nil {
-				log.Errorf("get mysql session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+				log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 				continue
 			}
-			vTaps := []mysqlmodel.VTap{}
+			vTaps := []metadbmodel.VTap{}
 			vTapIDs := map[int]bool{}
 			storages := []model.GenesisStorage{}
 			invalidStorages := []model.GenesisStorage{}

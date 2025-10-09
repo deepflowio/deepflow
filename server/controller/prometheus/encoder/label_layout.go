@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
@@ -70,14 +70,14 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 	defer ia.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricAPPLabelLayout, 0)
-	var dbToAdd []*mysqlmodel.PrometheusMetricAPPLabelLayout
+	var dbToAdd []*metadbmodel.PrometheusMetricAPPLabelLayout
 	for i := range strs {
 		str := strs[i]
 		if idx, ok := ia.strToIdx[str]; ok {
 			resp = append(resp, &controller.PrometheusMetricAPPLabelLayout{MetricName: &ia.metricName, AppLabelName: &str, AppLabelColumnIndex: proto.Uint32(uint32(idx))})
 			continue
 		}
-		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusMetricAPPLabelLayout{MetricName: ia.metricName, APPLabelName: str})
+		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusMetricAPPLabelLayout{MetricName: ia.metricName, APPLabelName: str})
 	}
 	if len(dbToAdd) == 0 {
 		return resp, nil
@@ -104,7 +104,7 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 }
 
 func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
-	var dbItems []*mysqlmodel.PrometheusMetricAPPLabelLayout
+	var dbItems []*metadbmodel.PrometheusMetricAPPLabelLayout
 	err = ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ia.resourceType, err, ia.org.LogPrefix)
@@ -138,7 +138,7 @@ func newLabelLayout(org *common.ORG, cfg prometheuscfg.Config) *labelLayout {
 }
 
 func (ll *labelLayout) refresh(args ...interface{}) error {
-	var items []*mysqlmodel.PrometheusMetricAPPLabelLayout
+	var items []*metadbmodel.PrometheusMetricAPPLabelLayout
 	err := ll.org.DB.Find(&items).Error
 	if err != nil {
 		return err

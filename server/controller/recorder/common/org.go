@@ -19,18 +19,18 @@ package common
 import (
 	// "fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type ORG struct {
-	ID        int       // org id
-	DB        *mysql.DB // org database connection
+	ID        int        // org id
+	DB        *metadb.DB // org database connection
 	LogPrefix logger.Prefix
 }
 
 func NewORG(id int) (*ORG, error) {
-	db, err := mysql.GetDB(id)
+	db, err := metadb.GetDB(id)
 	return &ORG{
 		ID:        id,
 		DB:        db,

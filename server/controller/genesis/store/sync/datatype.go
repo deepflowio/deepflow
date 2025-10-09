@@ -23,8 +23,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -161,7 +161,7 @@ func (g *GenesisSyncTypeOperation[T]) Load(nodeIP string) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	for _, db := range mysql.GetDBs().All() {
+	for _, db := range metadb.GetDBs().All() {
 		storages := []model.GenesisStorage{}
 		err := db.Where("node_ip = ?", nodeIP).Find(&storages).Error
 		if err != nil {
@@ -197,7 +197,7 @@ func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	for _, db := range mysql.GetDBs().All() {
+	for _, db := range metadb.GetDBs().All() {
 		// get effective vtap ids in current controller
 		var storages []model.GenesisStorage
 		err := db.Where("node_ip = ?", nodeIP).Find(&storages).Error

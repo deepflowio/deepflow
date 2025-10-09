@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type PodGroupConfigMapConnection struct {
-	OperatorBase[*mysqlmodel.PodGroupConfigMapConnection, mysqlmodel.PodGroupConfigMapConnection]
+	OperatorBase[*metadbmodel.PodGroupConfigMapConnection, metadbmodel.PodGroupConfigMapConnection]
 }
 
 func NewPodGroupConfigMapConnection() *PodGroupConfigMapConnection {
 	operater := &PodGroupConfigMapConnection{
-		newOperatorBase[*mysqlmodel.PodGroupConfigMapConnection](
+		newOperatorBase[*metadbmodel.PodGroupConfigMapConnection](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
 			false,
 			false,
