@@ -1657,7 +1657,7 @@ pub struct ApplicationProtocolInference {
 impl Default for ApplicationProtocolInference {
     fn default() -> Self {
         Self {
-            inference_max_retries: 5,
+            inference_max_retries: 128,
             inference_result_ttl: Duration::from_secs(60),
             enabled_protocols: vec![
                 "HTTP".to_string(),
