@@ -23,22 +23,28 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
     steps:
+      - name: Get PR Info
+        id: pr_info
+        run: |
+          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,headRepository,author)
+          HEAD_REF_NAME=$(echo "$PR_DATA" | jq -r .headRefName)
+          REPO_NAME=$(echo "$PR_DATA" | jq -r .headRepository.name)
+          AUTHOR_LOGIN=$(echo "$PR_DATA" | jq -r .author.login)
+          HEAD_REPOSITORY="$AUTHOR_LOGIN/$REPO_NAME"
+          echo "repo_full_name=$HEAD_REPOSITORY" >> $GITHUB_OUTPUT
+          echo "branch_name=$HEAD_REF_NAME" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          repository: ${{ steps.pr_info.outputs.repo_full_name }}
+          ref: ${{ steps.pr_info.outputs.branch_name }}
           fetch-depth: 0
-          ref: >-
-            ${{
-              github.event.issue.number && 
-              format('refs/pull/{0}/head', github.event.issue.number) ||
-              github.event.pull_request.number &&
-              format('refs/pull/{0}/head', github.event.pull_request.number) ||
-              github.ref
-            }}
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@beta
