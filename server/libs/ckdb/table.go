@@ -513,9 +513,8 @@ func (t *Table) MakeAggrTableCreateSQL(orgID uint16, aggrInterval AggregationInt
 			case AggrLastAndSum, AggrLastAndSumProfileValue:
 				columns = append(columns, fmt.Sprintf("%s_last %s %s", c.Name, c.Type.String(), codec))
 				columns = append(columns, fmt.Sprintf("%s_sum__agg AggregateFunction(sum, %s)", c.Name, c.Type.String()))
-			case AggrMaxAndAvgDurationValue:
+			case AggrMaxAndSumDurationValue:
 				columns = append(columns, fmt.Sprintf("%s_max__agg AggregateFunction(max, %s)", c.Name, c.Type.String()))
-				columns = append(columns, fmt.Sprintf("%s_avg__agg AggregateFunction(avg, %s)", c.Name, c.Type.String()))
 				columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(sum, %s)", c.Name, c.Type.String()))
 			case AggrMax, AggrSum, AggrAvg:
 				columns = append(columns, fmt.Sprintf("%s__agg AggregateFunction(%s, %s)", c.Name, c.Aggr, c.Type.String()))
@@ -587,9 +586,8 @@ func (t *Table) MakeAggrMVTableCreateSQL(orgID uint16, aggrInterval AggregationI
 					columns = append(columns, fmt.Sprintf("sumState(%s) AS %s_sum__agg", c.Name, c.Name))
 				case AggrSum, AggrMax, AggrAvg:
 					columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", c.Aggr, c.Name, c.Name))
-				case AggrMaxAndAvgDurationValue:
+				case AggrMaxAndSumDurationValue:
 					columns = append(columns, fmt.Sprintf("maxState(%s) AS %s_max__agg", c.Name, c.Name))
-					columns = append(columns, fmt.Sprintf("avgState(%s) AS %s_avg__agg", c.Name, c.Name))
 					columns = append(columns, fmt.Sprintf("sumState(%s) AS %s__agg", c.Name, c.Name))
 				default:
 					columns = append(columns, fmt.Sprintf("%sState(%s) AS %s__agg", getAggr(c), c.Name, c.Name))
@@ -640,9 +638,8 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 				// The profile 'mem-inuse' data is collected every 10 seconds. If you want to aggregate it by 1 second,
 				// you need to use the sum aggregation instead of the last aggregation.
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_sum__agg) AS %s", c.Name, c.Name))
-			case AggrMaxAndAvgDurationValue:
+			case AggrMaxAndSumDurationValue:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_max__agg) AS max_%s", c.Name, c.Name))
-				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s_avg__agg) AS avg_%s", c.Name, c.Name))
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))
 			default:
 				columns = append(columns, fmt.Sprintf("finalizeAggregation(%s__agg) AS %s", c.Name, c.Name))

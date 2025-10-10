@@ -303,7 +303,7 @@ const (
 	AggrLast
 	AggrLastAndSum
 	AggrLastAndSumProfileValue
-	AggrMaxAndAvgDurationValue
+	AggrMaxAndSumDurationValue
 	AggrMax
 )
 
@@ -314,7 +314,7 @@ var aggrTypeString = []string{
 	AggrLast:                   "last",
 	AggrLastAndSum:             "last and sum",
 	AggrLastAndSumProfileValue: "last and sum profile value",
-	AggrMaxAndAvgDurationValue: "max and avg duration value",
+	AggrMaxAndSumDurationValue: "max and sum duration value",
 	AggrMax:                    "max",
 }
 
@@ -382,8 +382,8 @@ func (c *Column) SetAggrLastAndSumProfileValue() *Column {
 	return c
 }
 
-func (c *Column) SetAggrMaxAndAvgDurationValue() *Column {
-	c.Aggr = AggrMaxAndAvgDurationValue
+func (c *Column) SetAggrMaxAndSumDurationValue() *Column {
+	c.Aggr = AggrMaxAndSumDurationValue
 	return c
 }
 
