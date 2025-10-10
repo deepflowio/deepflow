@@ -2,5 +2,5 @@
 log_count            , Log Count               ,      ,
 bytes                , Bytes                   , Byte ,
 
-duration             , Duration                , us   ,
+duration             , Total Duration          , us   ,
 row                  , Row Count               ,      ,
