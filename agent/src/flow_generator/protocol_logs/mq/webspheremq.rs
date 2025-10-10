@@ -243,6 +243,9 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         if !self.parser.parse_payload(payload, has_wasm) {
             return Err(Error::L7ProtocolUnknown);
         }
+        if self.perf_stats.is_none() && param.parse_perf {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
 
         let mut info = WebSphereMqInfo::default();
         if let Some(request_type) = &self.parser.request_type {
@@ -260,6 +263,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             info.msg_type = LogMessageType::Response;
             if !code.ends_with(RESPONSE_CODE_OK_SUFFIX) {
                 info.status = L7ResponseStatus::ClientError;
+                self.perf_stats.as_mut().map(|p| p.inc_req_err());
             }
         }
 
@@ -272,8 +276,10 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         set_captured_byte!(info, param);
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {
-                info.rrt = stats.rrt_sum;
                 perf_stats.sequential_merge(&stats);
+                perf_stats.rrt_max = 0;
+                perf_stats.rrt_sum = 0;
+                perf_stats.rrt_count = 0;
             }
         }
 
