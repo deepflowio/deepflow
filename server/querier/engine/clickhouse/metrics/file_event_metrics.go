@@ -22,7 +22,9 @@ package metrics
 var FILE_EVENT_METRICS_METRICS = map[string]*Metrics{}
 
 // metrics to clickhouse field mapping, no need to replace
-var FILE_EVENT_METRICS_METRICS_REPLACE = map[string]*Metrics{}
+var FILE_EVENT_METRICS_METRICS_REPLACE = map[string]*Metrics{
+	"avg_duration": NewReplaceMetrics("duration/count", "count>0"),
+}
 
 func GetFileEventMetricsMetrics() map[string]*Metrics {
 	return FILE_EVENT_METRICS_METRICS

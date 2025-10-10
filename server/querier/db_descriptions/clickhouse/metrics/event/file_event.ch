@@ -2,5 +2,5 @@
 log_count            , 日志总量                , 个   ,
 bytes                , 字节                    , 字节 ,
 
-duration             , 持续时间                , 微秒 ,
+duration             , 总持续时间               , 微秒 ,
 row                  , 行数                    , 个   ,     

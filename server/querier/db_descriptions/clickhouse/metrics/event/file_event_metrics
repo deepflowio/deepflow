@@ -4,5 +4,5 @@ bytes                , bytes                , counter    , Throughput , 111
 
 duration             , duration             , delay      , Delay      , 111
 max_duration         , max_duration         , delay      , Delay      , 111
-avg_duration         , avg_duration         , delay      , Delay      , 111
+avg_duration         ,                      , delay      , Delay      , 111
 row                  ,                      , other      , Other      , 111    
