@@ -138,7 +138,8 @@ int get_mount_id(pid_t pid, int fd)
 	return mount_id;
 }
 
-static bool __unused has_mount_entry(struct list_head *mount_head, kern_dev_t s_dev)
+static bool __unused has_mount_entry(struct list_head *mount_head,
+				     kern_dev_t s_dev)
 {
 	struct list_head *p, *n;
 	struct mount_entry *e;
@@ -154,17 +155,19 @@ static bool __unused has_mount_entry(struct list_head *mount_head, kern_dev_t s_
 }
 
 static void inline set_mount_info(struct mount_entry *e, char *mount_path,
-				  char *mount_source, int mount_size,
-				  fs_type_t * file_type)
+				  char *mount_source, char *root,
+				  int mount_size, fs_type_t * file_type)
 {
 	fast_strncat_trunc(e->mount_point, "", mount_path, mount_size);
 	fast_strncat_trunc(e->mount_source, "", mount_source, mount_size);
+	fast_strncat_trunc(e->root, "", root, mount_size);
 	*file_type = e->file_type;
 }
 
 void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
 		    kern_dev_t s_dev, char *mount_path,
-		    char *mount_source, int mount_size, fs_type_t * file_type)
+		    char *mount_source, char *root,
+		    int mount_size, fs_type_t * file_type)
 {
 	struct list_head *p, *n;
 	struct mount_entry *e;
@@ -183,13 +186,13 @@ void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
 		if (e && mnt_id > -1) {
 			if (e->mount_id == mnt_id) {
 				set_mount_info(e, mount_path, mount_source,
-					       mount_size, file_type);
+					       root, mount_size, file_type);
 				break;
 			}
 
 		} else if (e && e->s_dev == s_dev) {
-			set_mount_info(e, mount_path, mount_source, mount_size,
-				       file_type);
+			set_mount_info(e, mount_path, mount_source, root,
+				       mount_size, file_type);
 			break;
 		}
 	}
@@ -250,6 +253,7 @@ static void free_mount_info(struct mount_info *m)
 			list_head_del(&e->list);
 			free(e->mount_point);
 			free(e->mount_source);
+			free(e->root);
 			free(e);
 		}
 	}
@@ -423,15 +427,22 @@ static int build_mount_info(pid_t pid, struct list_head *mount_head,
 		}
 		entry->mount_source = strdup(mount_source);
 		if (entry->mount_source == NULL) {
-			free(entry);
 			free(entry->mount_point);
+			free(entry);
 			goto exit;
 		}
+		entry->root = strdup(root);
+		if (entry->root == NULL) {
+			free(entry->mount_point);
+			free(entry->mount_source);
+			free(entry);
+			goto exit;
 
+		}
 		count++;
 		*bytes_count +=
 		    (strlen(entry->mount_point) + strlen(entry->mount_source) +
-		     2);
+		     strlen(entry->root) + 3);
 		list_add_tail(&entry->list, mount_head);
 	}
 
@@ -605,13 +616,15 @@ void check_root_mount_info(bool output_log)
 }
 
 /*
- * Replace the longest suffix of str1 (that is a prefix of str2) with str1.
- * Result is written to 'out' with a maximum size of 'out_size'.
- * e.g.:
- *    const char *str1 = "10.33.49.27:/srv/nfs/data"; (mount source)
- *    const char *str2 = "/nfs/data/"; (file path via eBPF)
- *    const char *new_prefix = "/mnt/nfs"; (mount point)
- * target: "/mnt/nfs/"
+ * Replace the longest suffix of 'str1' that matches the beginning of 'str2'
+ * with 'new_prefix', and append the remaining part of 'str2'.
+ * The result is written to 'out' with a maximum size of 'out_size'.
+ *
+ * Example:
+ *    str1       = "10.33.49.27:/srv/nfs/data"      (mount source)
+ *    str2       = "/nfs/data/logs/"                (file path via eBPF)
+ *    new_prefix = "/mnt/nfs"                       (mount point)
+ *    Result     = "/mnt/nfs/logs"
  */
 static int replace_suffix_prefix(const char *str1, const char *str2,
 				 const char *new_prefix
@@ -641,7 +654,8 @@ static int replace_suffix_prefix(const char *str1, const char *str2,
 
 u32 copy_file_metrics(int pid, void *dst, void *src, int len,
 		      u32 mntns_id, const char *mount_point,
-		      const char *mount_source, fs_type_t file_type)
+		      const char *mount_source, const char *root,
+		      fs_type_t file_type)
 {
 #define MNTNS_ID_BUF_SZ 12
 	if (len <= 0)
@@ -653,7 +667,7 @@ u32 copy_file_metrics(int pid, void *dst, void *src, int len,
 		len = u32_to_str_safe(mntns_id, mntns_str, sizeof(mntns_str));
 		mntns_str[len] = ':';
 	}
-	
+
 	struct user_io_event_buffer *u_event;
 	struct __io_event_buffer *event = (struct __io_event_buffer *)src;
 	char *buffer = event->filename;
@@ -708,12 +722,58 @@ copy_event:
 					  buffer, sizeof(u_event->file_dir));
 	} else {
 		const char *point = mount_point;
+		int root_len = strlen(root);
+		int dir_len = strlen(temp);
+		int file_len = strlen(event->filename);
 		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
-		if (mount_point[0] == '/' && mount_point[1] == '\0')
+		if (mount_point[0] == '/' && mount_point[1] == '\0') {
 			point = "";
-		temp_index =
-		    fast_strncat_trunc(point, temp, buffer,
-				       sizeof(u_event->file_dir));
+		} else {
+			/*
+			 * If <root> == <mount_point> and <root> != "/", directly
+			 * use the path obtained from eBPF.
+			 */
+			if (strcmp(root, mount_point) == 0)
+				point = "";
+
+			/*
+			 * Handle file-only mount
+			 * root : /var/lib/kubelet/pods/31247686-d43f-4993-a5c0-76dadaf089e6/etc-hosts
+			 * point: /etc/hosts
+			 */
+			if ((root_len == dir_len + file_len)
+			    && (memcmp(temp, root, temp_index) == 0)) {
+				const char *p = strrchr(root, '/');
+				p = p ? p + 1 : root;
+
+				if ((strlen(p) == file_len)
+				    && (memcmp(p, event->filename, file_len) ==
+					0)) {
+					point = "";
+				}
+			}
+
+		}
+
+		/*
+		 * The prefix is the mount root.
+		 *
+		 * Example:
+		 *    mount root         = "/mnt/clickhouse"
+		 *    mount point        = "/var/lib/clickhouse_storage"  
+		 *    file path via eBPF = "/mnt/clickhouse/store/151/"
+		 *    Result             = "/var/lib/clickhouse_storage/store/151/"
+		 */
+		if (point[0] != '\0' && memcmp(root, temp, root_len) == 0
+			   && temp[root_len] == '/') {
+			temp_index =
+			    fast_strncat_trunc(point, temp + root_len, buffer,
+					       sizeof(u_event->file_dir));
+		} else {
+			temp_index =
+			    fast_strncat_trunc(point, temp, buffer,
+					       sizeof(u_event->file_dir));
+		}
 	}
 
 	prepend_prefix_safe(buffer, sizeof(u_event->file_dir), mntns_str);
