@@ -157,12 +157,13 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			newHost = agent.ControllerIP
 			c.Request.Header.Set(ForwardControllerTimes, fmt.Sprintf("%d", forwardTimes+1))
 		} else {
-			if manager := service.GetAgentCMDManager(key); manager != nil {
-				log.Infof("agent(key: %s) cmd manager not found in server(ip: %s), lookup next", key, common.PodIP)
+			manager := service.GetAgentCMDManager(key)
+			if manager != nil && manager.IsValid() {
 				c.Next()
-				//return
+				return
 			}
 
+			log.Infof("agent(key: %s) cmd manager not found in server(ip: %s), lookup next", key, common.NodeIP)
 			if newHost == agent.CurControllerIP {
 				newHost = agent.ControllerIP
 			} else {
