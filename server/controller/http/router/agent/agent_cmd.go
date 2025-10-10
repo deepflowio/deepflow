@@ -160,7 +160,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			if manager := service.GetAgentCMDManager(key); manager != nil {
 				log.Infof("agent(key: %s) cmd manager not found in server(ip: %s), lookup next", key, common.PodIP)
 				c.Next()
-				return
+				//return
 			}
 
 			if newHost == agent.CurControllerIP {
