@@ -1024,6 +1024,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     PRIMARY KEY (lcuuid, vtap_id, node_ip)
 );
 TRUNCATE TABLE genesis_vinterface;
+CREATE INDEX vinterface_node_ip_index ON genesis_vinterface (node_ip);
 
 CREATE TABLE IF NOT EXISTS genesis_ip (
     lcuuid              VARCHAR(64),
@@ -1102,6 +1103,7 @@ CREATE TABLE IF NOT EXISTS genesis_process (
 );
 COMMENT ON COLUMN genesis_process.os_app_tags IS 'separated by ,';
 TRUNCATE TABLE genesis_process;
+CREATE INDEX process_node_ip_index ON genesis_process (node_ip);
 
 CREATE TABLE IF NOT EXISTS genesis_storage (
     vtap_id     INTEGER NOT NULL PRIMARY KEY,
