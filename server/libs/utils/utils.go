@@ -113,6 +113,14 @@ func GetIpHash(ip net.IP) uint32 {
 	return ipHash
 }
 
+func IsLocalIP(isIPv6 bool, ip4 uint32, ip6 net.IP) bool {
+	ip := ip6
+	if !isIPv6 {
+		ip = IpFromUint32(ip4)
+	}
+	return !ip.IsGlobalUnicast()
+}
+
 func Bool2Int(b bool) int {
 	if b {
 		return 1
