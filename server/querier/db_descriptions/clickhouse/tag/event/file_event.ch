@@ -55,9 +55,9 @@ vtap                       , 采集器                     , 已废弃，请使�
 agent                      , 采集器                     ,
 signal_source              , 信号源                     ,
 
-mount_source               , 挂载源                     , 目录挂载源，例如：`/dev/sda1` 表示块设备，`proc` 等（其他如 `sysfs`，`tmpfs`）表示虚拟文件系统，`10.1.2.3:/path` 表示 NFS 文件系统，`/var/lib/docker/...` 或 `overlay` 表示容器内目录的挂载源。
-mount_point                , 挂载点                     , 目录挂载点，当进程访问其他命名空间（`nsid`）下的文件时，显示为 `$nsid:/$mount_point`。
-file_dir                   , 文件夹                     , 目录，当进程访问其他命名空间（`nsid`）下的文件时，显示为 `$nsid:/$file_dir`。
+mount_source               , 挂载源                     , 目录挂载源。例如：`/dev/sda1` 表示块设备，`proc` 等（其他如 `sysfs`，`tmpfs`）表示虚拟文件系统，`10.1.2.3:/path` 表示 NFS 文件系统，`/var/lib/docker/...` 或 `overlay` 表示容器内目录的挂载源。
+mount_point                , 挂载点                     , 目录挂载点。注意，当进程访问其他命名空间（`nsid`）下的文件时，显示为 `$nsid:/$mount_point`。
+file_dir                   , 文件夹                     , 目录。注意，当进程访问其他命名空间（`nsid`）下的文件时，显示为 `$nsid:/$file_dir`；另外，对于 Pod 访问宿主机目录的场景，此处展示的是宿主机上的文件夹。
 file_name                  , 文件名                     ,
 file_type                  , 文件类型                   ,
 offset                     , 偏移量                     ,
