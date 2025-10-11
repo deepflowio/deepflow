@@ -289,8 +289,8 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     uint8_t * name, int name_size, int mnt_id,
 			     uint32_t mntns_id, uint32_t *self_mntns_id,
 			     kern_dev_t s_dev, char *mount_point,
-			     char *mount_source, int mount_size,
-			     fs_type_t *file_type)
+			     char *mount_source, char *root,
+			     int mount_size, fs_type_t *file_type)
 {
 	int ret = -1;
 	symbol_caches_hash_t *h = &syms_cache_hash;
@@ -323,7 +323,7 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 
 	if (s_dev != DEV_INVALID) {
 		get_mount_info(pid, mnt_id, mntns_id, s_dev, mount_point,
-			       mount_source, mount_size, file_type);
+			       mount_source, root, mount_size, file_type);
 	}
 
 	return ret;
