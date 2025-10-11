@@ -61,16 +61,26 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 			if t.MAC != 0 {
 				t.TagSource |= uint8(flow_metrics.Mac)
 				info = platformData.QueryMacInfo(t.OrgId, t.MAC|uint64(t.L3EpcID)<<48)
-				if info == nil {
+			}
+
+			if info == nil {
+				lookupByAgent := false
+				if t.TAPSide == flow_metrics.Local || t.TAPSide == flow_metrics.ClientProcess || t.TAPSide == flow_metrics.ServerProcess {
+					// for local non-unicast IPs, can lookup by agent
+					if utils.IsLocalIP(t.IsIPv4 == 0, t.IP, t.IP6) {
+						lookupByAgent = true
+					}
+				}
+
+				if lookupByAgent {
+					t.TagSource |= uint8(flow_metrics.Agent)
+					if agentInfo := platformData.QueryVtapInfo(t.OrgId, t.VTAPID); agentInfo != nil {
+						info = common.RegetInfoFromIP(t.OrgId, !agentInfo.IsIPv4, agentInfo.IP6, agentInfo.IP4, agentInfo.EpcId, platformData)
+					}
+				} else {
 					t.TagSource |= uint8(flow_metrics.EpcIP)
 					info = common.RegetInfoFromIP(t.OrgId, t.IsIPv4 == 0, t.IP6, t.IP, t.L3EpcID, platformData)
 				}
-			} else if t.IsIPv4 == 0 {
-				t.TagSource |= uint8(flow_metrics.EpcIP)
-				info = platformData.QueryIPV6Infos(t.OrgId, t.L3EpcID, t.IP6)
-			} else {
-				t.TagSource |= uint8(flow_metrics.EpcIP)
-				info = platformData.QueryIPV4Infos(t.OrgId, t.L3EpcID, t.IP)
 			}
 		}
 	}
@@ -82,7 +92,6 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 				t.PodID1 = podId
 				t.TagSource1 |= uint8(flow_metrics.GpId)
 			}
-
 		}
 
 		if t.PodID1 != 0 {
@@ -94,16 +103,26 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 			if t.MAC1 != 0 {
 				t.TagSource1 |= uint8(flow_metrics.Mac)
 				info1 = platformData.QueryMacInfo(t.OrgId, t.MAC1|uint64(t.L3EpcID1)<<48)
-				if info1 == nil {
+			}
+
+			if info1 == nil {
+				lookupByAgent := false
+				if t.TAPSide == flow_metrics.Local || t.TAPSide == flow_metrics.ClientProcess || t.TAPSide == flow_metrics.ServerProcess {
+					// for local non-unicast IPs, can lookup by agent
+					if utils.IsLocalIP(t.IsIPv4 == 0, t.IP1, t.IP61) {
+						lookupByAgent = true
+					}
+				}
+
+				if lookupByAgent {
+					t.TagSource1 |= uint8(flow_metrics.Agent)
+					if agentInfo := platformData.QueryVtapInfo(t.OrgId, t.VTAPID); agentInfo != nil {
+						info1 = common.RegetInfoFromIP(t.OrgId, !agentInfo.IsIPv4, agentInfo.IP6, agentInfo.IP4, agentInfo.EpcId, platformData)
+					}
+				} else {
 					t.TagSource1 |= uint8(flow_metrics.EpcIP)
 					info1 = common.RegetInfoFromIP(t.OrgId, t.IsIPv4 == 0, t.IP61, t.IP1, t.L3EpcID1, platformData)
 				}
-			} else if t.IsIPv4 == 0 {
-				t.TagSource1 |= uint8(flow_metrics.EpcIP)
-				info1 = platformData.QueryIPV6Infos(t.OrgId, t.L3EpcID1, t.IP61)
-			} else {
-				t.TagSource1 |= uint8(flow_metrics.EpcIP)
-				info1 = platformData.QueryIPV4Infos(t.OrgId, t.L3EpcID1, t.IP1)
 			}
 		}
 	}
