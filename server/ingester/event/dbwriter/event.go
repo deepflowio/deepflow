@@ -283,7 +283,7 @@ func EventColumns(isFileEvent bool) []*ckdb.Column {
 	if isFileEvent {
 		columns = append(columns,
 			ckdb.NewColumn("bytes", ckdb.UInt32).SetAggrSum().SetAggrSum(),
-			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒").SetAggrMaxAndAvgDurationValue(),
+			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒").SetAggrMaxAndSumDurationValue(),
 			ckdb.NewColumn("file_name", ckdb.String).SetComment("文件名").SetIgnoredInAggrTable(),
 			ckdb.NewColumn("file_type", ckdb.UInt8).SetComment("文件类型").SetGroupBy(),
 			ckdb.NewColumn("offset", ckdb.UInt64).SetComment("读写偏移").SetIgnoredInAggrTable(),

@@ -249,6 +249,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
                     info.response_status = L7ResponseStatus::ClientError;
                     info.response_exception =
                         field.translated.clone().unwrap_or(field.value.clone());
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
                 }
             };
             set_captured_byte!(info, param);
@@ -286,10 +287,13 @@ impl L7ProtocolParserInterface for Iso8583Log {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
+
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {
-                info.rrt = stats.rrt_sum;
                 perf_stats.sequential_merge(&stats);
+                perf_stats.rrt_max = 0;
+                perf_stats.rrt_sum = 0;
+                perf_stats.rrt_count = 0;
             }
         }
 
