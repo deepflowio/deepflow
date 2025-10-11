@@ -1018,7 +1018,7 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     uint8_t * name, int name_size, int mnt_id,
 			     uint32_t mntns_id, uint32_t *self_mntns_id,
 			     kern_dev_t s_dev, char *mount_point,
-			     char *mount_source, int mount_size,
+			     char *mount_source, char *root, int mount_size,
 			     fs_type_t *file_type)
 {
 	*self_mntns_id = 0;
@@ -1026,6 +1026,7 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 	memset(name, 0, name_size);
 	memset(mount_point, 0, mount_size);
 	memset(mount_source, 0, mount_size);
+	memset(root, 0, mount_size);
 	*file_type = FS_TYPE_UNKNOWN;
 	return -1;
 }
