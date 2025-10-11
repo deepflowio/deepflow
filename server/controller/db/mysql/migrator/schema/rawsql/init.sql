@@ -1748,7 +1748,8 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
     team_id               INTEGER DEFAULT 1,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`),
+    INDEX node_ip_index(node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;
 
@@ -1765,7 +1766,8 @@ CREATE TABLE IF NOT EXISTS genesis_process (
     os_app_tags         TEXT COMMENT 'separated by ,',
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
+    PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`),
+    INDEX node_ip_index(node_ip)
 ) ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE genesis_process;
 
