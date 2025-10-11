@@ -212,6 +212,7 @@ int create_and_init_proc_info_caches(void);
  * @param s_dev         Device number to be resolved into a mount point path.
  * @param mount_point   Output buffer to store the mount point path matching `s_dev`.
  * @param mount_source  Output buffer to store the mount source path.
+ * @param root  	Output buffer to store the mount root path.
  * @param mount_size    Size of the `mount_point` buffer in bytes.
  * @param file_type     File type
  *
@@ -228,8 +229,8 @@ int get_proc_info_from_cache(pid_t pid, uint8_t *cid, int cid_size,
 			     uint8_t *name, int name_size, int mnt_id,
 			     uint32_t mntns_id, uint32_t *self_mntns_id,
 			     kern_dev_t s_dev, char *mount_point,
-			     char *mount_source, int mount_size,
-			     fs_type_t *file_type);
+			     char *mount_source, char *root,
+			     int mount_size, fs_type_t *file_type);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
 
 // Lower version kernels do not support hooking so files in containers
