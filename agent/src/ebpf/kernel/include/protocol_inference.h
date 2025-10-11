@@ -3515,11 +3515,6 @@ typedef struct __attribute__ ((packed)) {
 static __inline enum message_type
 infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		if (!conn_info->socket_info_ptr->is_tls)
-			return MSG_UNKNOWN;
-	}
-
 	/*
 	 * When reading data over TLS, it first reads 5 bytes of content and then
 	 * reads the remaining data. We save the initial 5 bytes and combine them
