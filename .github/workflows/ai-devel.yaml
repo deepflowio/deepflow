@@ -30,11 +30,20 @@ jobs:
       - name: Get PR Info
         id: pr_info
         run: |
-          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,headRepository,author)
+          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,headRepository,author,isCrossRepository)
           HEAD_REF_NAME=$(echo "$PR_DATA" | jq -r .headRefName)
-          REPO_NAME=$(echo "$PR_DATA" | jq -r .headRepository.name)
-          AUTHOR_LOGIN=$(echo "$PR_DATA" | jq -r .author.login)
-          HEAD_REPOSITORY="$AUTHOR_LOGIN/$REPO_NAME"
+          IS_FORK=$(echo "$PR_DATA" | jq -r .isCrossRepository)
+          if [ "$IS_FORK" = "true" ]; then
+            echo "This is a FORKED PR. Manually constructing repository name."
+            REPO_NAME=$(echo "$PR_DATA" | jq -r .headRepository.name)
+            AUTHOR_LOGIN=$(echo "$PR_DATA" | jq -r .author.login)
+            HEAD_REPOSITORY="$AUTHOR_LOGIN/$REPO_NAME"
+          else
+            echo "This is an INTERNAL PR. Using the current repository name."
+            HEAD_REPOSITORY="${{ github.repository }}"
+          fi
+          echo "Final Repository Name: $HEAD_REPOSITORY"
+          echo "Final Branch Name: $HEAD_REF_NAME"
           echo "repo_full_name=$HEAD_REPOSITORY" >> $GITHUB_OUTPUT
           echo "branch_name=$HEAD_REF_NAME" >> $GITHUB_OUTPUT
         env:
