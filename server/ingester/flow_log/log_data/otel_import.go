@@ -151,6 +151,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	metricsNames, metricsValues := []string{}, []float64{}
 	isHttp := false
 	httpURL := ""
+	hasPeerAddress := false
 	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
 		value := attr.GetValue()
@@ -210,11 +211,19 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 					h.Protocol = uint8(layers.IPProtocolUDP)
 				}
 			// https://github.com/open-telemetry/opentelemetry-go/blob/db7fd1bb51ce6ed1171cac15eeecb6871dbbb80a/semconv/internal/http.go#L79
-			case "net.peer.ip":
+			case "net.peer.ip", "network.peer.address":
+				if hasPeerAddress {
+					continue
+				}
 				ip := net.ParseIP(value.GetStringValue())
 				if ip == nil {
 					continue
 				}
+
+				if key == "network.peer.address" {
+					hasPeerAddress = true
+				}
+
 				if ip4 := ip.To4(); ip4 != nil {
 					if h.TapSide == "c-app" {
 						h.IP41 = utils.IpToUint32(ip4)
