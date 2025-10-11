@@ -1153,6 +1153,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	int len;
 	void *data_buf_ptr;
 	char mount_point[MAX_PATH_LENGTH] = {0}, mount_source[MAX_PATH_LENGTH] = {0};
+	char root[MAX_PATH_LENGTH] = {0};
 	fs_type_t file_type = FS_TYPE_UNKNOWN;
 
 	// 所有载荷的数据总大小（去掉头）
@@ -1242,7 +1243,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 						       sizeof(submit_data->process_kname),
 						       mnt_id, mntns_id, &self_mntns_id,
 						       s_dev, mount_point, mount_source,
-						       sizeof(mount_point), &file_type);
+						       root, sizeof(mount_point), &file_type);
 
 			// Not found in the process cache, attempting to retrieve from procfs.
 			if (ret) {
@@ -1304,7 +1305,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 				    copy_file_metrics(sd->tgid, submit_data->cap_data
 						      + offset, sd->data, len,
 						      display_mntns_id, mount_point,
-						      mount_source, file_type);
+						      mount_source, root, file_type);
 			} else {
 				memcpy_fast(submit_data->cap_data + offset,
 					    sd->data, len);
