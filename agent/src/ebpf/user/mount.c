@@ -730,19 +730,23 @@ copy_event:
 			point = "";
 		} else {
 			/*
-			 * If <root> == <mount_point> and <root> != "/", directly
-			 * use the path obtained from eBPF.
-			 */
-			if (strcmp(root, mount_point) == 0)
-				point = "";
-
-			/*
-			 * Handle file-only mount
+			 * Handle bind mount
+			 *
+			 * Directory mount:
+			 * mount root         = "/mnt/clickhouse"
+			 * mount point        = "/var/lib/clickhouse_storage"
+			 * file path via eBPF = "/mnt/clickhouse/store/151/"
+			 *
+			 * File mount:
 			 * root : /var/lib/kubelet/pods/31247686-d43f-4993-a5c0-76dadaf089e6/etc-hosts
 			 * point: /etc/hosts
 			 */
-			if ((root_len == dir_len + file_len)
-			    && (memcmp(temp, root, temp_index) == 0)) {
+			if (dir_len > root_len
+			    && memcmp(root, temp, root_len) == 0
+			    && temp[root_len] == '/') {
+				point = "";
+			} else if ((root_len == dir_len + file_len)
+				   && (memcmp(temp, root, dir_len) == 0)) {
 				const char *p = strrchr(root, '/');
 				p = p ? p + 1 : root;
 
@@ -752,28 +756,11 @@ copy_event:
 					point = "";
 				}
 			}
-
 		}
 
-		/*
-		 * The prefix is the mount root.
-		 *
-		 * Example:
-		 *    mount root         = "/mnt/clickhouse"
-		 *    mount point        = "/var/lib/clickhouse_storage"  
-		 *    file path via eBPF = "/mnt/clickhouse/store/151/"
-		 *    Result             = "/var/lib/clickhouse_storage/store/151/"
-		 */
-		if (point[0] != '\0' && memcmp(root, temp, root_len) == 0
-			   && temp[root_len] == '/') {
-			temp_index =
-			    fast_strncat_trunc(point, temp + root_len, buffer,
-					       sizeof(u_event->file_dir));
-		} else {
-			temp_index =
-			    fast_strncat_trunc(point, temp, buffer,
-					       sizeof(u_event->file_dir));
-		}
+		temp_index =
+		    fast_strncat_trunc(point, temp, buffer,
+				       sizeof(u_event->file_dir));
 	}
 
 	prepend_prefix_safe(buffer, sizeof(u_event->file_dir), mntns_str);
