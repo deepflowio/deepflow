@@ -69,6 +69,7 @@ struct mount_entry {
 	fs_type_t file_type;
 	char *mount_point;
 	char *mount_source;
+	char *root;
 };
 
 /**
@@ -159,12 +160,14 @@ int mount_info_cache_remove(pid_t pid, u64 mntns_id);
  * @param[in]  s_dev          Device ID (major:minor encoded)
  * @param[out] mount_path     Output buffer for mount point path
  * @param[out] mount_source   Output buffer for mount source (e.g., device or NFS path)
+ * @param[out] root	      Output buffer for mount root
  * @param[in]  mount_size     Size of output buffers
  * @param[out] file_type      File type
  */
 void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
 		    kern_dev_t s_dev, char *mount_path,
-		    char *mount_source, int mount_size, fs_type_t * file_type);
+		    char *mount_source, char *root,
+		    int mount_size, fs_type_t * file_type);
 
 /**
  * @brief Copy and transform event data containing file paths from eBPF trace.
@@ -178,12 +181,14 @@ void get_mount_info(pid_t pid, int mnt_id, u32 mntns_id,
  * @param[in]  mntns_id      The mount namespace ID of the file
  * @param[in]  mount_point   Mount point path
  * @param[in]  mount_source  Mount source path
+ * @param[in]  root	     Mount root path
  * @param[in]  file_type     File type (FS_TYPE_REGULAR, FS_TYPE_VIRTUAL, FS_TYPE_NETWORK)
  * @return Number of bytes written to dst
  */
 uint32_t copy_file_metrics(int pid, void *dst, void *src, int len,
 			   u32 mntns_id, const char *mount_point,
-			   const char *mount_source, fs_type_t file_type);
+			   const char *mount_source, const char *root,
+			   fs_type_t file_type);
 /**
  * @brief Check for changes in the host root mount namespace's mount information.
  *
