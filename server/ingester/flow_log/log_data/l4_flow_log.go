@@ -523,14 +523,6 @@ func (i *Internet) Fill(f *pb.Flow) {
 	i.Province1 = geo.QueryProvince(f.FlowKey.IpDst)
 }
 
-func isLocalIP(isIPv6 bool, ip4 uint32, ip6 net.IP) bool {
-	ip := ip6
-	if !isIPv6 {
-		ip = utils.IpFromUint32(ip4)
-	}
-	return !ip.IsGlobalUnicast()
-}
-
 func (k *KnowledgeGraph) fill(
 	platformData *grpc.PlatformInfoTable,
 	isIPv6, isVipInterface0, isVipInterface1 bool,
@@ -552,14 +544,14 @@ func (k *KnowledgeGraph) fill(
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(flow_metrics.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
-		if isLocalIP(isIPv6, ip40, ip60) {
+		if utils.IsLocalIP(isIPv6, ip40, ip60) {
 			if mac0 != 0 {
 				lookupByMac0 = true
 			} else {
 				lookupByAgent0 = true
 			}
 		}
-		if isLocalIP(isIPv6, ip41, ip61) {
+		if utils.IsLocalIP(isIPv6, ip41, ip61) {
 			if mac1 != 0 {
 				lookupByMac1 = true
 			} else {
@@ -570,12 +562,12 @@ func (k *KnowledgeGraph) fill(
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
 			lookupByMac0 = true
-		} else if isLocalIP(isIPv6, ip40, ip60) {
+		} else if utils.IsLocalIP(isIPv6, ip40, ip60) {
 			lookupByAgent0 = true
 		}
 		if mac1 != 0 {
 			lookupByMac1 = true
-		} else if isLocalIP(isIPv6, ip41, ip61) {
+		} else if utils.IsLocalIP(isIPv6, ip41, ip61) {
 			lookupByAgent1 = true
 		}
 	}
