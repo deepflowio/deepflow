@@ -1593,7 +1593,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, interval_time,
 VALUES (15, '事件-资源变更事件', 'event.event', 0, 30 * 24, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
-VALUES (16, '事件-IO 事件', 'event.file_event', 0, 7 * 24, gen_random_uuid());
+VALUES (16, '事件-文件读写事件', 'event.file_event', 0, 7 * 24, gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
 VALUES (17, '事件-告警事件', 'event.alert_event', 0, 30 * 24, gen_random_uuid());
@@ -1623,7 +1623,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, interval_time,
 VALUES (25, '应用-性能剖析指标', 'profile.in_process_metrics', 1, 3 * 24, 'Sum', 'Avg', gen_random_uuid());
 
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
-VALUES (26, '事件-IO 事件指标', 'event.file_event_metrics', 1, 7 * 24, 'Sum', 'Avg', gen_random_uuid());
+VALUES (26, '事件-文件读写指标', 'event.file_event_metrics', 1, 7 * 24, 'Sum', 'Avg', gen_random_uuid());
 
 CREATE TABLE IF NOT EXISTS report (
     id                      SERIAL PRIMARY KEY,
