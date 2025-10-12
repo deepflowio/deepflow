@@ -85,9 +85,10 @@
 // lua related maps
 #define MAP_LUA_LANG_FLAGS_NAME         "__lang_flags_map"
 #define MAP_LUA_UNWIND_INFO_NAME        "__lua_unwind_info_map"
-#define MAP_LUA_INTP_STACK_NAME         "__intp_stack_map"
 #define MAP_LUA_OFFSETS_NAME            "__lua_offsets_map"
 #define MAP_LUAJIT_OFFSETS_NAME         "__luajit_offsets_map"
+#define MAP_LUA_TSTATE_NAME             "__lua_tstate_map"
+
 
 #define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
 #define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"

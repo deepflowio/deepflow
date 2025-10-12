@@ -665,10 +665,11 @@ static void refresh_lua_offsets(pid_t pid)
 }
 
 static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
-					  int stack_id,
-					  pid_t pid,
-					  stack_str_hash_t *h,
-					  bool new_cache)
+				  int stack_id,
+				  pid_t pid,
+				  const char *stack_map_name,
+				  stack_str_hash_t *h,
+				  bool new_cache)
 {
 	if (stack_id < 0)
 		return NULL;
@@ -685,39 +686,53 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	if (!(cached_lang_flags & (LANG_LUA | LANG_LUAJIT)))
 		return NULL;
 
-	int fd = get_lua_intp_stack_map_fd();
+	if (!stack_map_name)
+		return NULL;
+
+	int fd = bpf_table_get_fd(t, stack_map_name);
 	if (fd < 0)
 		return NULL;
 
-	struct lua_stack_t stack = {};
+	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = {0};
 	__u32 key = stack_id;
-	if (bpf_lookup_elem(fd, &key, &stack) != 0 || stack.len == 0)
+	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0)
 		return NULL;
 
 	int ret = VEC_OK;
 	uword *frames = NULL;
-	vec_validate_init_empty(frames, stack.len, 0, ret);
+	u32 frame_count = 0;
+	for (; frame_count < PERF_MAX_STACK_DEPTH; frame_count++) {
+		if (raw_frames[frame_count] == 0)
+			break;
+	}
+	if (frame_count == 0)
+		return NULL;
+
+	vec_validate_init_empty(frames, frame_count, 0, ret);
 	if (ret != VEC_OK)
 		return NULL;
 
 	int total = 0;
-	for (u32 i = 0; i < stack.len; i++) {
-		const struct lua_frame_t *frame = &stack.frames[i];
-		__u64 tag = frame->tag & TAG_MASK;
+	for (u32 i = 0; i < frame_count; i++) {
+		__u64 encoded = raw_frames[i];
+		if (!encoded)
+			continue;
+		__u64 tag = encoded & TAG_MASK;
 		char buf[256] = {0};
 		char *out = NULL;
 
 		if (tag == TAG_LUA) {
 			char chunk[128] = {0};
-			bool have_chunk = lua_decode_chunkname(pid, frame->addr,
-					      cached_lang_flags,
-					      cached_have_lua_ofs ? &cached_lua_ofs : NULL,
-					      cached_have_lj_ofs ? &cached_lj_ofs : NULL,
-					      chunk, sizeof(chunk));
-			__u32 line = lua_decode_firstline(pid, frame->addr,
-					       cached_lang_flags,
-					       cached_have_lua_ofs ? &cached_lua_ofs : NULL,
-					       cached_have_lj_ofs ? &cached_lj_ofs : NULL);
+			uintptr_t proto = (uintptr_t)(encoded & ~TAG_MASK);
+			bool have_chunk = lua_decode_chunkname(pid, proto,
+				      cached_lang_flags,
+				      cached_have_lua_ofs ? &cached_lua_ofs : NULL,
+				      cached_have_lj_ofs ? &cached_lj_ofs : NULL,
+				      chunk, sizeof(chunk));
+			__u32 line = lua_decode_firstline(pid, proto,
+				       cached_lang_flags,
+				       cached_have_lua_ofs ? &cached_lua_ofs : NULL,
+				       cached_have_lj_ofs ? &cached_lj_ofs : NULL);
 			if (have_chunk && line)
 				snprintf(buf, sizeof(buf), "L:%s:%u", chunk, line);
 			else if (have_chunk)
@@ -728,16 +743,14 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 				snprintf(buf, sizeof(buf), "L:line=?");
 			out = create_symbol_str(strlen(buf), buf, "");
 		} else if (tag == TAG_CFUNC) {
-			unsigned long addr = (unsigned long)(frame->tag & ~TAG_MASK);
-			if (!addr)
-				addr = (unsigned long)frame->addr;
+			unsigned long addr = (unsigned long)(encoded & ~TAG_MASK);
 			out = resolve_addr(t, pid, false, addr, new_cache, NULL);
 			if (!out) {
 				snprintf(buf, sizeof(buf), "C:0x%016lx", addr);
 				out = create_symbol_str(strlen(buf), buf, "");
 			}
 		} else if (tag == TAG_FFUNC) {
-			unsigned long ffid = frame->tag & ~TAG_MASK;
+			unsigned long ffid = encoded & ~TAG_MASK;
 			snprintf(buf, sizeof(buf), "builtin#%lu", ffid);
 			out = create_symbol_str(strlen(buf), buf, "");
 		} else {
@@ -756,26 +769,36 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 	}
 
-	total += stack.len; /* room for separators */
-	char *result = clib_mem_alloc_aligned("lua_folded_str", total + 1, 0, NULL);
+	size_t alloc_len = total + frame_count + 1;
+	char *result = clib_mem_alloc_aligned("lua_folded_str", alloc_len, 0, NULL);
 	if (!result) {
-		for (u32 i = 0; i < stack.len; i++)
+		for (u32 i = 0; i < frame_count; i++)
 			if (frames[i])
 				clib_mem_free((void *)frames[i]);
 		vec_free(frames);
 		return NULL;
 	}
 
-	int len = 0;
-	for (u32 i = 0; i < stack.len; i++) {
-		if (!frames[i])
-			continue;
+	char *ptr = result;
+	bool first = true;
+	for (u32 i = 0; i < frame_count; i++) {
 		char *s = (char *)frames[i];
-		len += snprintf(result + len, total - len + 1, "%s;", s);
+		if (!s)
+			continue;
+		if (!first)
+			*ptr++ = ';';
+		size_t l = strlen(s);
+		memcpy(ptr, s, l);
+		ptr += l;
+		first = false;
 		clib_mem_free(s);
 	}
-	if (len > 0)
-		result[len - 1] = '\0';
+	if (first) {
+		clib_mem_free(result);
+		vec_free(frames);
+		return NULL;
+	}
+	*ptr = '\0';
 	vec_free(frames);
 
 	kv.value = pointer_to_uword(result);
@@ -956,8 +979,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	bool lua_intp = false;
 	if (has_intpstack) {
 		i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
-							    v->tgid, h,
-							    new_cache);
+					    v->tgid, custom_stack_map_name,
+					    h, new_cache);
 		if (i_trace_str != NULL) {
 			lua_intp = true;
 			len += strlen(i_trace_str) + 1;

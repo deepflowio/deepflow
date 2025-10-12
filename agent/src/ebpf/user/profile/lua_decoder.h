@@ -27,6 +27,9 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
+
+#include "../log.h"
 
 #ifndef HAVE_PROCESS_VM_READV_DECL
 ssize_t process_vm_readv(pid_t pid,
@@ -129,10 +132,18 @@ static inline int lua_read_target_mem(pid_t pid, uintptr_t addr, void *buf,
 	};
 
 	ssize_t got = process_vm_readv(pid, &local, 1, &remote, 1, 0);
-	if (got < 0)
-		return -errno;
-	if ((size_t)got != len)
+	if (got < 0) {
+		int err = errno;
+		ebpf_warning("lua_read_target_mem: process_vm_readv(pid=%d, remote=0x%llx, len=%zu) failed: %s (%d)",
+			     pid, (unsigned long long)addr, len,
+			     strerror(err), err);
+		return -err;
+	}
+	if ((size_t)got != len) {
+		ebpf_warning("lua_read_target_mem: short read pid=%d remote=0x%llx expected=%zu got=%zd",
+			     pid, (unsigned long long)addr, len, got);
 		return -EIO;
+	}
 	return 0;
 }
 
