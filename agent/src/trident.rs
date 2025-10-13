@@ -984,20 +984,79 @@ fn component_on_config_change(
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            for d in components.dispatcher_components.iter_mut() {
-                let interfaces = get_listener_links(
+            components.dispatcher_components.retain_mut(|d| {
+                let links = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
                     d.dispatcher_listener.netns(),
                 );
+                if links.is_empty() {
+                    info!("No interfaces found, stopping dispatcher {}", d.id);
+                    d.stop();
+                    return false;
+                }
                 d.dispatcher_listener.on_tap_interface_change(
-                    &interfaces,
+                    &links,
                     if_mac_source,
                     conf.trident_type,
                     &blacklist,
                 );
                 d.dispatcher_listener
                     .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+                true
+            });
+
+            if components.dispatcher_components.is_empty() {
+                let links = get_listener_links(
+                    conf,
+                    #[cfg(target_os = "linux")]
+                    &netns::NsFile::Root,
+                );
+                if links.is_empty() {
+                    return;
+                }
+                match build_dispatchers(
+                    components.last_dispatcher_component_id + 1,
+                    links,
+                    components.stats_collector.clone(),
+                    config_handler,
+                    components.debugger.clone_queue(),
+                    components.is_ce_version,
+                    synchronizer,
+                    components.npb_bps_limit.clone(),
+                    components.npb_arp_table.clone(),
+                    components.rx_leaky_bucket.clone(),
+                    components.policy_getter,
+                    components.exception_handler.clone(),
+                    components.bpf_options.clone(),
+                    components.packet_sequence_uniform_output.clone(),
+                    components.proto_log_sender.clone(),
+                    components.pcap_batch_sender.clone(),
+                    components.tap_typer.clone(),
+                    vm_mac_addrs.clone(),
+                    gateway_vmac_addrs.clone(),
+                    components.toa_info_sender.clone(),
+                    components.l4_flow_aggr_sender.clone(),
+                    components.metrics_sender.clone(),
+                    #[cfg(target_os = "linux")]
+                    netns::NsFile::Root,
+                    #[cfg(target_os = "linux")]
+                    components.kubernetes_poller.clone(),
+                    #[cfg(target_os = "linux")]
+                    libvirt_xml_extractor.clone(),
+                    #[cfg(target_os = "linux")]
+                    false,
+                ) {
+                    Ok(mut d) => {
+                        d.start();
+                        components.dispatcher_components.push(d);
+                        components.last_dispatcher_component_id += 1;
+                    }
+                    Err(e) => {
+                        warn!("build dispatcher_component failed: {}", e);
+                        crate::utils::notify_exit(1);
+                    }
+                }
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
