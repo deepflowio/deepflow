@@ -2703,6 +2703,21 @@ inputs:
           #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.tls`。
           # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
           enabled: false
+          # type: bool
+          # name:
+          #   en: Enable Istio envoy mTLS traffic decryption
+          #   ch: 启用 Istio envoy mTLS 流量解密
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Enable Istio envoy mTLS traffic decryption without impacting business.
+          #   ch: |-
+          #     启用 Istio envoy mTLS 流量解密，不影响业务。
+          envoy_mtls_enabled: false
         # type: section
         # name: DPDK
         # description:
