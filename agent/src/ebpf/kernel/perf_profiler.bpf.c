@@ -82,7 +82,7 @@ typedef struct {
 	struct bpf_map_def *custom_stack_map_b;
 	struct bpf_map_def *profiler_output_a;
 	struct bpf_map_def *profiler_output_b;
-	struct bpf_map_def *progs_jmp;
+struct bpf_map_def *progs_jmp;
 } map_group_t;
 
 #ifdef LINUX_VER_5_2_PLUS
@@ -128,6 +128,7 @@ struct bpf_map_def SEC("maps") __symbol_table = {
     .feat_flags = FEATURE_FLAG_PROFILE,
 };
 MAP_PERARRAY(symbol_index_storage, __u32, __u32, 1, FEATURE_FLAG_PROFILE)
+#endif
 
 typedef struct {
 	__u64 ip;
@@ -179,12 +180,6 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
 static inline __attribute__ ((always_inline))
 int pre_lua_unwind(void *ctx, unwind_state_t *state,
 		 map_group_t *maps, int jmp_idx);
-
-#else
-
-typedef void stack_t;		// placeholder
-
-#endif
 
 /* ------------------ maps for lua------------------ */
 #ifdef LINUX_VER_5_2_PLUS
@@ -1105,7 +1100,6 @@ PROGPE(oncpu_output) (struct bpf_perf_event_data * ctx) {
 					     &oncpu_maps, false);
 }
 
-#ifdef LINUX_VER_5_2_PLUS
 static inline __attribute__ ((always_inline))
 int pre_lua_unwind(void *ctx, unwind_state_t *state,
 		   map_group_t *maps, int jmp_idx)
@@ -1154,12 +1148,9 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx, __u32 tid
         }
     }
 
-    int max_depth = INTP_MAX_STACK_DEPTH;
+    for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
 
-    for (int i = 0; i < INTP_MAX_STACK_DEPTH; i++) {
-        if (i >= max_depth)
-            break;
-        if (intp_stack->len >= INTP_MAX_STACK_DEPTH)
+        if (intp_stack->len >= STACK_FRAMES_PER_RUN)
             break;
 
         if (o->features & LUA_FEAT_CI_ARRAY) {
@@ -1320,19 +1311,17 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid, void *L, st
 	frame = nextframe = (void *)((char *)base_ptr - 8);
 
 
-    int max_depth = INTP_MAX_STACK_DEPTH;
 
     // Main frame walker loop
     int i = 0;
-    for (; i < INTP_MAX_STACK_DEPTH; i++) {
-        if (i >= max_depth) break;
+    for (; i < STACK_FRAMES_PER_RUN; i++) {
         if (frame <= bot) break;
         if (frame_gc_equals_L(frame, L, o) > 0) {
             level++;
         }
         if (level-- == 0) {
             level++;
-            if (intp_stack->len >= INTP_MAX_STACK_DEPTH) {
+            if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
                 break;
             }
             if (lua_get_funcdata(ctx, frame, intp_stack, o) != 0) {
@@ -1389,7 +1378,6 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 		      PROG_ONCPU_OUTPUT_PE_IDX);
 	return 0;
 }
-#endif /* LINUX_VER_5_2_PLUS */
 
 static __always_inline int probe_entry_lua(struct pt_regs *ctx)
 {
@@ -1410,8 +1398,8 @@ static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
     return 0;
 }
 
-UPROG(lua_handle_entry)  (struct pt_regs *ctx) { return probe_entry_lua(ctx); }
-UPROG(lua_handle_cancel) (struct pt_regs *ctx) { return probe_entry_lua_cancel(ctx); }
+UPROG(handle_entry_lua)  (struct pt_regs *ctx) { return probe_entry_lua(ctx); }
+URETPROG(handle_entry_lua_cancel) (struct pt_regs *ctx) { return probe_entry_lua_cancel(ctx); }
 
 
 #endif
