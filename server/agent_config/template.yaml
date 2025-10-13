@@ -2705,8 +2705,8 @@ inputs:
           enabled: false
           # type: bool
           # name:
-          #   en: Enable Istio envoy mTLS traffic decryption
-          #   ch: 启用 Istio envoy mTLS 流量解密
+          #   en: Envoy mTLS
+          #   ch: Envoy mTLS
           # unit:
           # range: []
           # enum_options: []
@@ -2714,9 +2714,9 @@ inputs:
           # ee_feature: true
           # description:
           #   en: |-
-          #     Enable Istio envoy mTLS traffic decryption without impacting business.
+          #     Enable envoy mTLS traffic decryption without impacting business.
           #   ch: |-
-          #     启用 Istio envoy mTLS 流量解密，不影响业务。
+          #     启用 envoy mTLS 流量解密，不影响业务。
           envoy_mtls_enabled: false
         # type: section
         # name: DPDK
