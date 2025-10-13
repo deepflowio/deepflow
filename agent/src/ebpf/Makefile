@@ -54,6 +54,7 @@ define compile_perf_profiler_elf
 	@./tools/bintobuffer kernel/perf_profiler.bpf.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
 endef
 
+
 define check_gcc_version
         @GCC_VER=`gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.`; \
 	VER_GTE112=`echo $${GCC_VER} \>= 11.2 | sed -e 's/\./*100+/g' | bc`; \
@@ -153,8 +154,6 @@ SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
 	user/perf_profiler_bpf_5_2_plus.c
 
-ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(AF_PACKET_FANOUT_ELFS)
-
 tools/bintobuffer:
 	$(call msg,TOOLS,tools/bintobuffer)
 	@$(CC) tools/bintobuffer.c -o tools/bintobuffer
@@ -203,6 +202,7 @@ user/perf_profiler_bpf_5_2_plus.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 	$(call check_clang)
 	$(call compile_perf_profiler_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
 
+
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@/user/profile/java
@@ -212,9 +212,6 @@ $(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OB
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(STATIC_OBJDIR)/user/profile/perf_profiler.o: user/profile/perf_profiler.c $(PERF_PROFILER_ELFS) | $(STATIC_OBJDIR)
-	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)

@@ -43,9 +43,18 @@ enum RegType {
 };
 typedef uint8_t RegType;
 
+typedef struct LuaUnwindTable LuaUnwindTable;
+
 typedef struct python_unwind_table_t python_unwind_table_t;
 
 typedef struct unwind_table_t unwind_table_t;
+
+typedef struct {
+    uint32_t kind;
+    uint8_t version[32];
+    uint8_t detection_method[256];
+    uint8_t path[512];
+} LuaRuntimeInfo;
 
 typedef struct {
     uint32_t id;
@@ -152,11 +161,26 @@ typedef struct {
 
 bool frame_pointer_heuristic_check(uint32_t pid);
 
-bool is_lua_process(uint32_t pid);
+int32_t is_lua_process(pid_t pid);
 
 bool is_python_process(uint32_t pid);
 
+int32_t lua_detect(pid_t pid, LuaRuntimeInfo *out);
+
+LuaUnwindTable *lua_unwind_table_create(int32_t lang_flags_fd,
+                                        int32_t unwind_info_fd,
+                                        int32_t lua_offsets_fd,
+                                        int32_t luajit_offsets_fd);
+
+void lua_unwind_table_destroy(LuaUnwindTable *table);
+
+void lua_unwind_table_load(LuaUnwindTable *table, uint32_t pid);
+
+void lua_unwind_table_unload(LuaUnwindTable *table, uint32_t pid);
+
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+int32_t protect_cpu_affinity_c(void);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
                                                   int32_t offsets_map_fd);
@@ -182,5 +206,4 @@ void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);
 
-int protect_cpu_affinity_c(void);
 #endif /* TRACE_UTILS_H */
