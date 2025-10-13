@@ -79,6 +79,7 @@
 #define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
+#define PROG_LUA_UNWIND_FOR_PE      "df_PE_lua_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
 
 // 增加 lua 相关的程序名
@@ -118,6 +119,7 @@ enum {
 enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
+	PROG_LUA_UNWIND_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };
