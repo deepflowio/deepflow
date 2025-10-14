@@ -218,6 +218,7 @@ type L7FlowLogBlock struct {
 	ColXRequestId0          proto.ColStr
 	ColXRequestId1          proto.ColStr
 	ColTraceId              proto.ColStr
+	ColTraceId2             proto.ColStr
 	ColTraceIdIndex         proto.ColUInt64
 	ColSpanId               proto.ColStr
 	ColParentSpanId         proto.ColStr
@@ -260,6 +261,7 @@ func (b *L7FlowLogBlock) Reset() {
 	b.ColXRequestId0.Reset()
 	b.ColXRequestId1.Reset()
 	b.ColTraceId.Reset()
+	b.ColTraceId2.Reset()
 	b.ColTraceIdIndex.Reset()
 	b.ColSpanId.Reset()
 	b.ColParentSpanId.Reset()
@@ -305,6 +307,7 @@ func (b *L7FlowLogBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_X_REQUEST_ID_0, Data: &b.ColXRequestId0},
 		proto.InputColumn{Name: ckdb.COLUMN_X_REQUEST_ID_1, Data: &b.ColXRequestId1},
 		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID, Data: &b.ColTraceId},
+		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID_2, Data: &b.ColTraceId2},
 		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID_INDEX, Data: &b.ColTraceIdIndex},
 		proto.InputColumn{Name: ckdb.COLUMN_SPAN_ID, Data: &b.ColSpanId},
 		proto.InputColumn{Name: ckdb.COLUMN_PARENT_SPAN_ID, Data: &b.ColParentSpanId},
@@ -374,6 +377,7 @@ func (n *L7FlowLog) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColXRequestId0.Append(n.XRequestId0)
 	block.ColXRequestId1.Append(n.XRequestId1)
 	block.ColTraceId.Append(n.TraceId)
+	block.ColTraceId2.Append(n.TraceId2)
 	block.ColTraceIdIndex.Append(n.TraceIdIndex)
 	block.ColSpanId.Append(n.SpanId)
 	block.ColParentSpanId.Append(n.ParentSpanId)

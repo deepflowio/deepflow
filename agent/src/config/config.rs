@@ -1333,6 +1333,10 @@ impl Default for Kubernetes {
                     name: "ingresses".to_string(),
                     ..Default::default()
                 },
+                ApiResources {
+                    name: "configmaps".to_string(),
+                    ..Default::default()
+                },
             ],
             api_list_page_size: 1000,
             api_list_max_interval: Duration::from_secs(600),
@@ -1608,7 +1612,7 @@ pub struct Iso8583Config {
 impl Default for Iso8583Config {
     fn default() -> Self {
         Self {
-            extract_fields: "2, 7, 11, 32, 33".to_string(),
+            extract_fields: "2,7,11,32,33".to_string(),
             translation_enabled: true,
             pan_obfuscate: true,
         }
@@ -1832,6 +1836,7 @@ impl Timeouts {
 pub struct TracingTag {
     pub http_real_client: Vec<String>,
     pub x_request_id: Vec<String>,
+    pub multiple_trace_id_collection: bool,
     pub apm_trace_id: Vec<String>,
     pub apm_span_id: Vec<String>,
 }
@@ -1841,6 +1846,7 @@ impl Default for TracingTag {
         Self {
             http_real_client: vec!["X_Forwarded_For".to_string()],
             x_request_id: vec!["X_Request_ID".to_string()],
+            multiple_trace_id_collection: true,
             apm_trace_id: vec!["traceparent".to_string(), "sw8".to_string()],
             apm_span_id: vec!["traceparent".to_string(), "sw8".to_string()],
         }
@@ -2683,7 +2689,7 @@ pub struct Log {
 impl Default for Log {
     fn default() -> Self {
         Self {
-            log_level: "info".to_string(),
+            log_level: "INFO".to_string(),
             log_file: "/var/log/deepflow-agent/deepflow-agent.log".to_string(),
             log_backhaul_enabled: true,
         }

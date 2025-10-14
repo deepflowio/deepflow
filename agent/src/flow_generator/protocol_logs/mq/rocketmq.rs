@@ -30,7 +30,7 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType,
+            L7ResponseStatus, LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes,
@@ -45,7 +45,7 @@ pub struct RocketmqInfo {
     #[serde(rename = "x_request_id", skip_serializing_if = "value_is_default")]
     pub msg_key: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_ids: PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
 
@@ -99,9 +99,9 @@ pub struct RocketmqInfo {
 
 fn parse_trace_info_from_properties(
     properties: &str,
-) -> (Option<String>, Option<String>, Option<String>) {
+) -> (Option<String>, PrioFields, Option<String>) {
     let mut msg_key = None;
-    let mut trace_id = None;
+    let mut trace_ids = PrioFields::new();
     let mut span_id = None;
 
     // use the STX control character (U+0002) as a delimiter
@@ -121,18 +121,18 @@ fn parse_trace_info_from_properties(
                 }
                 "traceparent" => {
                     // OpenTelemetry W3C trace context format: 00-TRACEID-SPANID-01
-                    trace_id = TraceType::TraceParent
+                    TraceType::TraceParent
                         .decode_trace_id(value)
-                        .map(|cow| cow.into_owned());
+                        .map(|cow| trace_ids.merge_field(BASE_FIELD_PRIORITY, cow.into_owned()));
                     span_id = TraceType::TraceParent
                         .decode_span_id(value)
                         .map(|cow| cow.into_owned());
                 }
                 "sw8" => {
                     // SkyWalking format: 1-TRACEID-SEGMENTID-3-...
-                    trace_id = TraceType::Sw8
-                        .decode_trace_id(value)
-                        .map(|cow| cow.into_owned());
+                    TraceType::Sw8.decode_trace_id(value).map(|cow| {
+                        trace_ids.merge_field(BASE_FIELD_PRIORITY + 1, cow.into_owned())
+                    });
                     span_id = TraceType::Sw8
                         .decode_span_id(value)
                         .map(|cow| cow.into_owned());
@@ -142,7 +142,7 @@ fn parse_trace_info_from_properties(
         }
     }
 
-    (msg_key, trace_id, span_id)
+    (msg_key, trace_ids, span_id)
 }
 
 impl L7ProtocolInfoInterface for RocketmqInfo {
@@ -251,7 +251,7 @@ impl From<RocketmqInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
+                trace_ids: f.trace_ids.into_strings_top3(),
                 span_id: Some(f.span_id),
                 ..Default::default()
             }),
@@ -430,13 +430,12 @@ impl RocketmqLog {
             if let Some(ext_fields) = &header.header_data.ext_fields {
                 // extract trace info from the properties field within ExtFields
                 if let Some(properties) = &ext_fields.properties {
-                    let (msg_key, trace_id, span_id) = parse_trace_info_from_properties(properties);
+                    let (msg_key, trace_ids, span_id) =
+                        parse_trace_info_from_properties(properties);
                     if let Some(xid) = msg_key {
                         info.msg_key = xid;
                     }
-                    if let Some(tid) = trace_id {
-                        info.trace_id = tid;
-                    }
+                    info.trace_ids.merge(trace_ids);
                     if let Some(sid) = span_id {
                         info.span_id = sid;
                     }
@@ -447,13 +446,11 @@ impl RocketmqLog {
         // try to extract trace info from the properties field within bodyData
         // regardless of the message type, so as to cover the messages received by the consumer
         if let Some(properties) = &body.body_data.properties {
-            let (msg_key, trace_id, span_id) = parse_trace_info_from_properties(properties);
+            let (msg_key, trace_ids, span_id) = parse_trace_info_from_properties(properties);
             if info.msg_key.is_empty() && msg_key.is_some() {
                 info.msg_key = msg_key.unwrap();
             }
-            if info.trace_id.is_empty() && trace_id.is_some() {
-                info.trace_id = trace_id.unwrap();
-            }
+            info.trace_ids.merge(trace_ids);
             if info.span_id.is_empty() && span_id.is_some() {
                 info.span_id = span_id.unwrap();
             }

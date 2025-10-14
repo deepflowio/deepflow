@@ -35,7 +35,7 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, swap_if, L7ResponseStatus,
+            set_captured_byte, swap_if, L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
@@ -178,7 +178,7 @@ pub struct SofaRpcInfo {
     target_serv: String,
     method: String,
     cmd_code: u16,
-    trace_id: String,
+    trace_ids: PrioFields,
     span_id: String,
     parent_span_id: String,
 
@@ -208,7 +208,8 @@ impl SofaRpcInfo {
     fn fill_with_trace_ctx(&mut self, ctx: String) {
         let ctx = decode_new_rpc_trace_context(ctx.as_bytes());
         if !ctx.trace_id.is_empty() {
-            self.trace_id = ctx.trace_id;
+            self.trace_ids
+                .merge_field(BASE_FIELD_PRIORITY, ctx.trace_id);
         }
         if !ctx.span_id.is_empty() {
             self.span_id = ctx.span_id;
@@ -295,7 +296,7 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(s.trace_id),
+                trace_ids: s.trace_ids.into_strings_top3(),
                 span_id: Some(s.span_id),
                 parent_span_id: Some(s.parent_span_id),
                 ..Default::default()
@@ -453,6 +454,11 @@ impl SofaRpcLog {
         }
 
         payload = &payload[hdr.class_len as usize..];
+        let multiple_trace_id_collection = if let Some(config) = param.parse_config {
+            config.l7_log_dynamic.multiple_trace_id_collection
+        } else {
+            true
+        };
 
         if hdr.hdr_len != 0 {
             let hdr_len = hdr.hdr_len as usize;
@@ -471,7 +477,8 @@ impl SofaRpcLog {
             let sofa_hdr = SofaHdr::from(hdr_payload);
             info.target_serv = sofa_hdr.service;
             info.method = sofa_hdr.method;
-            info.trace_id = sofa_hdr.trace_id;
+            info.trace_ids
+                .merge_field(BASE_FIELD_PRIORITY, sofa_hdr.trace_id);
 
             if !sofa_hdr.new_rpc_trace_context.is_empty() {
                 info.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
@@ -480,6 +487,7 @@ impl SofaRpcLog {
         // parse req hessian2 obj
         if hdr.code_c == CODE_C_HESSIAN && payload.len() != 0 && hdr.typ == TYPE_REQ {
             if let Some(h) = HessianObjIterator::new(payload) {
+                let mut got_trace_id = false;
                 for (k, v) in h {
                     let FieldEnum::String(val) = v else {
                         continue;
@@ -489,9 +497,15 @@ impl SofaRpcLog {
                         SERVICE_KEY if info.target_serv.is_empty() => {
                             info.target_serv = val.to_string()
                         }
-                        TRACE_ID_KEY if info.trace_id.is_empty() => info.trace_id = val.to_string(),
+                        TRACE_ID_KEY => {
+                            got_trace_id = true;
+                            if multiple_trace_id_collection || info.trace_ids.is_empty() {
+                                info.trace_ids
+                                    .merge_field(BASE_FIELD_PRIORITY + 1, val.to_string());
+                            }
+                        }
                         _ => {
-                            if !info.trace_id.is_empty()
+                            if got_trace_id
                                 && !info.target_serv.is_empty()
                                 && !info.method.is_empty()
                             {
@@ -723,7 +737,7 @@ mod test {
             assert_eq!(k.cmd_code, CMD_CODE_REQ);
             assert_eq!(k.method, "testSuccess");
             assert_eq!(k.req_id, 2);
-            assert_eq!(k.trace_id, "0a2200ce167089845152310016143");
+            assert_eq!(k.trace_ids.highest(), "0a2200ce167089845152310016143");
             assert_eq!(k.span_id, "");
             assert_eq!(k.parent_span_id, "");
             assert_eq!(k.proto, PROTO_BOLT_V1);
@@ -815,7 +829,7 @@ mod test {
             assert_eq!(k.cmd_code, CMD_CODE_REQ);
             assert_eq!(k.method, "testSuccess");
             assert_eq!(k.req_id, 2);
-            assert_eq!(k.trace_id, "0a2200ce1670900283956100813525");
+            assert_eq!(k.trace_ids.highest(), "0a2200ce1670900283956100813525");
             assert_eq!(k.span_id, "0");
             assert_eq!(k.parent_span_id, "");
             assert_eq!(k.proto, PROTO_BOLT_V1);

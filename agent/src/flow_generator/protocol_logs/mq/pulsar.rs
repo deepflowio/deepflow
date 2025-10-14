@@ -22,7 +22,8 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::read_u32_be,
@@ -111,8 +112,8 @@ pub struct PulsarInfo {
     // ledgerId:entryId:partitionIndex:batchIndex
     #[serde(skip_serializing_if = "Option::is_none")]
     x_request_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    trace_id: Option<String>,
+    #[serde(skip_serializing_if = "value_is_default")]
+    trace_ids: PrioFields,
     #[serde(skip_serializing_if = "Option::is_none")]
     span_id: Option<String>,
 
@@ -297,23 +298,32 @@ impl PulsarInfo {
         }
     }
 
-    fn parse_trace_span(&self, param: &ParseParam) -> (Option<String>, Option<String>) {
+    fn parse_trace_span(&self, param: &ParseParam) -> (PrioFields, Option<String>) {
         let Some(config) = param.parse_config.map(|x| &x.l7_log_dynamic) else {
-            return (None, None);
+            return (PrioFields::new(), None);
         };
         let Some(metadata) = self.message_metadata.as_ref() else {
-            return (None, None);
+            return (PrioFields::new(), None);
         };
 
-        let mut trace_id = None;
+        let multiple_trace_id_collection = if let Some(config) = param.parse_config {
+            config.l7_log_dynamic.multiple_trace_id_collection
+        } else {
+            true
+        };
+        let mut trace_ids = PrioFields::new();
         let mut span_id = None;
         for kv in metadata.properties.iter() {
             let k = kv.key.as_str();
             let v = kv.value.as_str();
             for tt in config.trace_types.iter() {
                 if tt.check(k) {
-                    trace_id = tt.decode_trace_id(v).map(|x| x.to_string());
-                    break;
+                    if let Some(trace_id) = tt.decode_trace_id(v) {
+                        trace_ids.merge_field(BASE_FIELD_PRIORITY, trace_id.to_string());
+                    }
+                    if !multiple_trace_id_collection && !trace_ids.is_empty() {
+                        break;
+                    }
                 }
             }
             for st in config.span_types.iter() {
@@ -324,7 +334,7 @@ impl PulsarInfo {
             }
         }
 
-        (trace_id, span_id)
+        (trace_ids, span_id)
     }
 
     fn parse_sequence_id(&self) -> Option<u32> {
@@ -715,7 +725,7 @@ impl PulsarInfo {
             info.message_metadata = Box::new(Some(MessageMetadata::decode(buf).ok()?));
             let _payload = extra.get(10 + metadata_size..)?;
         }
-        (info.trace_id, info.span_id) = info.parse_trace_span(param);
+        (info.trace_ids, info.span_id) = info.parse_trace_span(param);
         info.x_request_id = info.parse_x_request_id();
         info.request_id = info.get_request_id().map(|x| x as u32);
         info.domain = info.parse_domain();
@@ -778,7 +788,7 @@ impl From<PulsarInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: info.trace_id,
+                trace_ids: info.trace_ids.into_strings_top3(),
                 span_id: info.span_id,
                 ..Default::default()
             }),
@@ -988,6 +998,7 @@ mod tests {
             let config = L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),

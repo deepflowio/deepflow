@@ -621,9 +621,9 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
 }
 
 // 注意 dubbo trace id 解析是区分大小写的
-fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
+fn decode_trace_ids(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
     if let Some(trace_id) = lookup_str(payload, trace_type) {
-        info.set_trace_id(trace_id, trace_type);
+        info.trace_ids_add(trace_id, trace_type);
     }
 }
 
@@ -708,8 +708,8 @@ pub fn get_req_body_info(
             continue;
         }
 
-        decode_trace_id(&payload[para_index..], &trace_type, info);
-        if info.trace_id.field.len() != 0 {
+        decode_trace_ids(&payload[para_index..], &trace_type, info);
+        if !config.multiple_trace_id_collection && !info.trace_ids.is_empty() {
             break;
         }
     }

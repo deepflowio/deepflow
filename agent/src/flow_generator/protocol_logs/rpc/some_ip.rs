@@ -346,6 +346,7 @@ mod tests {
             let config = L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),

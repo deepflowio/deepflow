@@ -17,7 +17,8 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, LogMessageType, PrioFields,
+            BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::read_u32_be,
@@ -46,7 +47,7 @@ pub struct BrpcInfo {
     resp_exception: Option<String>,
     resp_len: Option<u32>,
 
-    trace_id: Option<String>,
+    trace_ids: PrioFields,
     span_id: Option<String>,
 
     captured_request_byte: u32,
@@ -111,27 +112,28 @@ impl BrpcInfo {
             return None;
         }
 
-        (info.trace_id, info.span_id) = {
-            let mut trace_id = None;
-            let mut span_id = None;
-            if let Some(config) = param.parse_config.map(|x| &x.l7_log_dynamic) {
-                for (k, v) in meta.user_fields.iter() {
-                    for tt in config.trace_types.iter() {
-                        if tt.check(k) {
-                            trace_id = tt.decode_trace_id(v).map(|x| x.to_string());
-                            break;
-                        }
-                    }
-                    for st in config.span_types.iter() {
-                        if st.check(k) {
-                            span_id = st.decode_span_id(v).map(|x| x.to_string());
-                            break;
+        if let Some(config) = param.parse_config.map(|x| &x.l7_log_dynamic) {
+            for (k, v) in meta.user_fields.iter() {
+                for (index, tt) in config.trace_types.iter().enumerate() {
+                    let prio = index as u8 + BASE_FIELD_PRIORITY;
+                    if tt.check(k) {
+                        if info.trace_ids.highest_priority() <= prio
+                            || !config.multiple_trace_id_collection
+                        {
+                            if let Some(trace_id) = tt.decode_trace_id(v) {
+                                info.trace_ids.merge_field(prio, trace_id.to_string())
+                            }
                         }
                     }
                 }
+                for st in config.span_types.iter() {
+                    if st.check(k) {
+                        info.span_id = st.decode_span_id(v).map(|x| x.to_string());
+                        break;
+                    }
+                }
             }
-            (trace_id, span_id)
-        };
+        }
 
         Some((payload, info))
     }
@@ -198,7 +200,7 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: info.trace_id,
+                trace_ids: info.trace_ids.into_strings_top3(),
                 span_id: info.span_id,
                 ..Default::default()
             }),
@@ -405,6 +407,7 @@ mod tests {
             let config = L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),

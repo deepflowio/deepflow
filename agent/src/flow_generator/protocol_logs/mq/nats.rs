@@ -34,7 +34,8 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
+            LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
@@ -207,8 +208,8 @@ pub struct NatsInfo {
     req_len: Option<u32>,
     resp_len: Option<u32>,
 
-    #[serde(rename = "trace_id", skip_serializing_if = "Option::is_none")]
-    trace_id: Option<String>,
+    #[serde(rename = "trace_ids", skip_serializing_if = "value_is_default")]
+    trace_ids: PrioFields,
     #[serde(rename = "span_id", skip_serializing_if = "Option::is_none")]
     span_id: Option<String>,
 
@@ -630,7 +631,7 @@ impl NatsInfo {
             _ => return None,
         };
         if let Some(config) = config {
-            (info.trace_id, info.span_id) = info.parse_trace_span(&config.l7_log_dynamic);
+            (info.trace_ids, info.span_id) = info.parse_trace_span(&config.l7_log_dynamic);
         }
         match info.msg_type {
             LogMessageType::Request => info.req_len = Some((length_begin - payload.len()) as u32),
@@ -674,19 +675,23 @@ impl NatsInfo {
         }
     }
 
-    fn parse_trace_span(&self, config: &L7LogDynamicConfig) -> (Option<String>, Option<String>) {
+    fn parse_trace_span(&self, config: &L7LogDynamicConfig) -> (PrioFields, Option<String>) {
         let headers = match &self.message {
             NatsMessage::Hpub(x) => &x.headers,
             NatsMessage::Hmsg(x) => &x.headers,
-            _ => return (None, None),
+            _ => return (PrioFields::new(), None),
         };
-        let mut trace_id = None;
+        let mut trace_ids = PrioFields::new();
         let mut span_id = None;
         for (k, v) in headers.iter() {
             for tt in config.trace_types.iter() {
                 if tt.check(k) {
-                    trace_id = tt.decode_trace_id(v).map(|x| x.to_string());
-                    break;
+                    if let Some(trace_id) = tt.decode_trace_id(v) {
+                        trace_ids.merge_field(BASE_FIELD_PRIORITY, trace_id.to_string());
+                    }
+                    if !config.multiple_trace_id_collection && !trace_ids.is_empty() {
+                        break;
+                    }
                 }
             }
             for st in config.span_types.iter() {
@@ -696,7 +701,7 @@ impl NatsInfo {
                 }
             }
         }
-        (trace_id, span_id)
+        (trace_ids, span_id)
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -753,7 +758,7 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: info.trace_id,
+                trace_ids: info.trace_ids.into_strings_top3(),
                 span_id: info.span_id,
                 ..Default::default()
             }),
@@ -1024,6 +1029,7 @@ mod tests {
             let config = L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),

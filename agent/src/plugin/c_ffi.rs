@@ -307,7 +307,11 @@ impl TryFrom<ParseInfo> for CustomInfo {
             req,
             resp,
             trace: CustomInfoTrace {
-                trace_id: c_str_to_string(&v.trace.trace_id),
+                trace_ids: if let Some(trace_id) = c_str_to_string(&v.trace.trace_id) {
+                    vec![trace_id]
+                } else {
+                    Vec::new()
+                },
                 span_id: c_str_to_string(&v.trace.span_id),
                 parent_span_id: c_str_to_string(&v.trace.parent_span_id),
                 ..Default::default()

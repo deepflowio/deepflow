@@ -39,7 +39,8 @@ use crate::{
                 TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType, PrioField,
+            L7ResponseStatus, LogMessageType, PrioField, PrioFields, BASE_FIELD_PRIORITY,
+            CUSTOM_FIELD_POLICY_PRIORITY, PLUGIN_FIELD_PRIORITY,
         },
     },
     plugin::{wasm::WasmData, CustomInfo},
@@ -70,11 +71,6 @@ const FASTJSON2_SERIALIZATION_ID: u8 = 23;
 const KRYO_SERIALIZATION2_ID: u8 = 25;
 const CUSTOM_MESSAGE_PACK_ID: u8 = 31;
 
-// priority: base field < custom policy < plugin
-const PLUGIN_FIELD_PRIORITY: u8 = 0;
-const CUSTOM_FIELD_POLICY_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
-const BASE_FIELD_PRIORITY: u8 = CUSTOM_FIELD_POLICY_PRIORITY + 1;
-
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
     #[serde(skip)]
@@ -104,7 +100,7 @@ pub struct DubboInfo {
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub method_name: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: PrioField<String>,
+    pub trace_ids: PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: PrioField<String>,
     #[serde(rename = "x_request_id_0", skip_serializing_if = "Option::is_none")]
@@ -174,7 +170,8 @@ impl DubboInfo {
         swap_if!(self, status_code, is_none, other);
         swap_if!(self, custom_result, is_none, other);
         swap_if!(self, custom_exception, is_none, other);
-        swap_if!(self, trace_id, is_default, other);
+        let other_trace_ids = std::mem::take(&mut other.trace_ids);
+        self.trace_ids.merge(other_trace_ids);
         swap_if!(self, span_id, is_default, other);
         self.attributes.append(&mut other.attributes);
         if other.captured_request_byte > 0 {
@@ -188,13 +185,10 @@ impl DubboInfo {
         }
     }
 
-    fn set_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
-        if self.trace_id.prio <= BASE_FIELD_PRIORITY {
-            return;
-        }
-        self.trace_id = match trace_type.decode_trace_id(&trace_id) {
-            Some(id) => PrioField::new(BASE_FIELD_PRIORITY, id.to_string()),
-            None => PrioField::new(BASE_FIELD_PRIORITY, trace_id),
+    fn trace_ids_add(&mut self, trace_id: String, trace_type: &TraceType) {
+        if let Some(id) = trace_type.decode_trace_id(&trace_id) {
+            self.trace_ids
+                .merge_field(BASE_FIELD_PRIORITY, id.to_string());
         }
     }
 
@@ -235,19 +229,9 @@ impl DubboInfo {
             self.custom_exception = Some(custom.resp.exception);
         }
 
-        //trace info rewrite
-        if let Some(trace_id) = custom.trace.trace_id {
-            let prev = replace(
-                &mut self.trace_id,
-                PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id),
-            );
-            if !prev.is_default() {
-                self.attributes.push(KeyVal {
-                    key: APM_TRACE_ID_ATTR.to_string(),
-                    val: prev.into_inner(),
-                });
-            }
-        }
+        //trace info add
+        self.trace_ids
+            .merge_same_priority(CUSTOM_FIELD_POLICY_PRIORITY, custom.trace.trace_ids);
 
         if let Some(span_id) = custom.trace.span_id {
             let prev = replace(
@@ -313,20 +297,11 @@ impl DubboInfo {
         self.custom_result = tags.remove(ExtraField::RESPONSE_RESULT);
 
         // trace info
-        if CUSTOM_FIELD_POLICY_PRIORITY < self.trace_id.prio {
-            if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
-                let prev = replace(
-                    &mut self.trace_id,
-                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id),
-                );
-                if !prev.is_default() {
-                    self.attributes.push(KeyVal {
-                        key: APM_TRACE_ID_ATTR.to_string(),
-                        val: prev.into_inner(),
-                    });
-                }
-            }
+        if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
+            self.trace_ids
+                .merge_field(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
         }
+
         if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
             if let Some(span_id) = tags.remove(ExtraField::SPAN_ID) {
                 let prev = replace(
@@ -458,7 +433,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id.into_inner()),
+                trace_ids: f.trace_ids.into_strings_top3(),
                 span_id: Some(f.span_id.into_inner()),
                 ..Default::default()
             }),
@@ -625,7 +600,7 @@ mod kryo {
 
     fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(trace_id) = lookup_str(payload, trace_type) {
-            info.set_trace_id(trace_id, trace_type);
+            info.trace_ids_add(trace_id, trace_type);
         }
     }
 
@@ -671,7 +646,7 @@ mod kryo {
             }
 
             decode_trace_id(&payload[offset..], &trace_type, info);
-            if info.trace_id.field.len() != 0 {
+            if !config.multiple_trace_id_collection && !info.trace_ids.is_empty() {
                 break;
             }
         }
@@ -828,7 +803,7 @@ mod fastjson2 {
 
     fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(trace_id) = lookup_str(payload, trace_type) {
-            info.set_trace_id(trace_id, trace_type);
+            info.trace_ids_add(trace_id, trace_type);
         }
     }
 
@@ -874,7 +849,7 @@ mod fastjson2 {
             }
 
             decode_trace_id(&payload[offset..], &trace_type, info);
-            if info.trace_id.field.len() != 0 {
+            if !config.multiple_trace_id_collection && !info.trace_ids.0.is_empty() {
                 break;
             }
         }
@@ -1126,6 +1101,7 @@ mod tests {
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     vec![],
                     vec![],
+                    true,
                     vec![
                         TraceType::Customize("EagleEye-TraceID".to_string()),
                         TraceType::Sw8,
@@ -1235,6 +1211,7 @@ mod tests {
             l7_log_dynamic: L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8],
                 vec![TraceType::Sw8],
                 ExtraLogFields::default(),
@@ -1275,7 +1252,7 @@ mod tests {
 
         assert_eq!(is_dubbo, true);
         assert_eq!(
-            info.trace_id.field,
+            info.trace_ids.highest(),
             "189d38354fc240ea804c15395b2d5baf.175.17394983574777353"
         );
     }
@@ -1342,6 +1319,7 @@ mod tests {
             l7_log_dynamic: L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::CloudWise],
                 vec![],
                 ExtraLogFields::default(),
@@ -1382,7 +1360,7 @@ mod tests {
 
         assert_eq!(is_dubbo, true);
         // EE: assert_eq!(info.trace_id, "00000000-332d-351f-ffff-ffff84afb1ba");
-        assert_eq!(info.trace_id.field, "JAVA:0:6904424666057469:6865509588089802:3363838533311866:00000000-332d-351f-ffff-ffff84afb1ba:7502612320163056:00000000-39d7-c9b2-ffff-ffff93cf32e0:ffffffff-df3a-bfff-0000-000001c43ef4:dilinkapp_dilinkapp-vehicle-provide-test:-1:-1");
+        assert_eq!(info.trace_ids.highest(), "JAVA:0:6904424666057469:6865509588089802:3363838533311866:00000000-332d-351f-ffff-ffff84afb1ba:7502612320163056:00000000-39d7-c9b2-ffff-ffff93cf32e0:ffffffff-df3a-bfff-0000-000001c43ef4:dilinkapp_dilinkapp-vehicle-provide-test:-1:-1");
     }
 
     #[test]
@@ -1445,6 +1423,7 @@ mod tests {
             l7_log_dynamic: L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![
                     TraceType::Customize("EagleEye-TraceID".to_string()),
                     TraceType::Sw8,
@@ -1517,6 +1496,7 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec![],
             vec!["x-request-id".into()],
+            true,
             vec!["trace_id".into()],
             vec!["span_id".into()],
             ExtraLogFields::default(),
@@ -1647,6 +1627,7 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec![],
             vec!["x-request-id".into()],
+            true,
             vec!["trace_id".into()],
             vec!["span_id".into()],
             ExtraLogFields::default(),
