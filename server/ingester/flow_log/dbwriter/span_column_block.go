@@ -25,6 +25,7 @@ import (
 type SpanWithTraceIDBlock struct {
 	ColTime        proto.ColDateTime
 	ColTraceId     proto.ColStr
+	ColTraceId2    proto.ColStr
 	ColSearchIndex proto.ColUInt64
 	ColEncodedSpan proto.ColStr
 }
@@ -36,6 +37,7 @@ func (n *SpanWithTraceID) NativeTagVersion() uint32 {
 func (b *SpanWithTraceIDBlock) Reset() {
 	b.ColTime.Reset()
 	b.ColTraceId.Reset()
+	b.ColTraceId2.Reset()
 	b.ColSearchIndex.Reset()
 	b.ColEncodedSpan.Reset()
 }
@@ -44,6 +46,7 @@ func (b *SpanWithTraceIDBlock) ToInput(input proto.Input) proto.Input {
 	return append(input,
 		proto.InputColumn{Name: ckdb.COLUMN_TIME, Data: &b.ColTime},
 		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID, Data: &b.ColTraceId},
+		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID_2, Data: &b.ColTraceId2},
 		proto.InputColumn{Name: ckdb.COLUMN_SEARCH_INDEX, Data: &b.ColSearchIndex},
 		proto.InputColumn{Name: ckdb.COLUMN_ENCODED_SPAN, Data: &b.ColEncodedSpan},
 	)
@@ -57,6 +60,7 @@ func (n *SpanWithTraceID) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block := b.(*SpanWithTraceIDBlock)
 	ckdb.AppendColDateTime(&block.ColTime, n.Time)
 	block.ColTraceId.Append(n.TraceId)
+	block.ColTraceId2.Append(n.TraceId2)
 	block.ColSearchIndex.Append(n.TraceIdIndex)
 	n.Encode()
 	block.ColEncodedSpan.AppendBytes(n.EncodedSpan)

@@ -156,8 +156,8 @@ fn test_wasm_http_req() {
             i.trace_info
                 .as_ref()
                 .unwrap()
-                .trace_id
-                .as_ref()
+                .trace_ids
+                .first()
                 .unwrap()
                 .as_str(),
             "aaa"
@@ -214,8 +214,8 @@ fn test_wasm_http_resp() {
             i.trace_info
                 .as_ref()
                 .unwrap()
-                .trace_id
-                .as_ref()
+                .trace_ids
+                .first()
                 .unwrap()
                 .as_str(),
             ""
@@ -297,7 +297,7 @@ fn test_wasm_parse_payload_req() {
         assert_eq!(ci.req.resource.as_str(), "resource");
         assert_eq!(ci.req.endpoint.as_str(), "endpoint");
 
-        assert_eq!(ci.trace.trace_id.unwrap(), "11111");
+        assert_eq!(ci.trace.trace_ids.first().unwrap(), "11111");
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
@@ -330,7 +330,7 @@ fn test_wasm_parse_payload_req() {
         assert_eq!(ci.req.resource.as_str(), "resource");
         assert_eq!(ci.req.endpoint.as_str(), "endpoint");
 
-        assert_eq!(ci.trace.trace_id.unwrap(), "11111");
+        assert_eq!(ci.trace.trace_ids.first().unwrap(), "11111");
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
@@ -372,7 +372,7 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.resp.result, "result");
         assert_eq!(ci.resp.exception, "exception");
 
-        assert_eq!(ci.trace.trace_id.unwrap(), "11111");
+        assert_eq!(ci.trace.trace_ids.first().unwrap(), "11111");
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
@@ -401,7 +401,7 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.resp.result, "result");
         assert_eq!(ci.resp.exception, "exception");
 
-        assert_eq!(ci.trace.trace_id.unwrap(), "11111");
+        assert_eq!(ci.trace.trace_ids.first().unwrap(), "11111");
         assert_eq!(ci.trace.span_id.unwrap(), "22222");
         assert_eq!(ci.trace.parent_span_id.unwrap(), "33333");
 
