@@ -3390,14 +3390,6 @@ impl ConfigHandler {
             uprobe.tls.enabled = new_uprobe.tls.enabled;
             restart_agent = !first_run;
         }
-        if uprobe.tls.envoy_mtls_enabled != new_uprobe.tls.envoy_mtls_enabled {
-            info!(
-                "Update inputs.ebpf.socket.uprobe.tls.envoy_mtls_enabled from {:?} to {:?}.",
-                uprobe.tls.envoy_mtls_enabled, new_uprobe.tls.envoy_mtls_enabled
-            );
-            uprobe.tls.envoy_mtls_enabled = new_uprobe.tls.envoy_mtls_enabled;
-            restart_agent = !first_run;
-        }
         let golang_uprobe = &mut uprobe.golang;
         let new_golang_uprobe = &mut new_uprobe.golang;
         if golang_uprobe.enabled != new_golang_uprobe.enabled {

@@ -2684,7 +2684,8 @@ inputs:
           #     [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
           #     ```
           #
-          #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+          #     Note: When this feature is enabled, Envoy mTLS traffic can be automatically traced.
+          #     For non-Envoy traffic, the specific process list must also be specified in `inputs.proc.process_matcher`,
           #     i.e., `ebpf.socket.uprobe.tls` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
           #   ch: |-
           #     是否启用使用 openssl 库的进程以支持 HTTPS 协议数据采集。
@@ -2699,25 +2700,11 @@ inputs:
           #     [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
           #     ```
           #
-          #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+          #     注意：开启此功能后，Envoy mTLS 流量可自动完成追踪；
+          #     若为非 Envoy 流量，则需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
           #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.tls`。
           # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
           enabled: false
-          # type: bool
-          # name:
-          #   en: Envoy mTLS
-          #   ch: Envoy mTLS
-          # unit:
-          # range: []
-          # enum_options: []
-          # modification: agent_restart
-          # ee_feature: true
-          # description:
-          #   en: |-
-          #     Enable envoy mTLS traffic decryption without impacting business.
-          #   ch: |-
-          #     启用 envoy mTLS 流量解密，不影响业务。
-          envoy_mtls_enabled: false
         # type: section
         # name: DPDK
         # description:

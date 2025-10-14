@@ -930,15 +930,11 @@ pub struct Cbpf {
 #[serde(default)]
 pub struct EbpfSocketUprobeTls {
     pub enabled: bool,
-    pub envoy_mtls_enabled: bool,
 }
 
 impl Default for EbpfSocketUprobeTls {
     fn default() -> Self {
-        Self {
-            enabled: false,
-            envoy_mtls_enabled: false,
-        }
+        Self { enabled: false }
     }
 }
 
