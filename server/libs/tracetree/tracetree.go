@@ -39,8 +39,8 @@ type TraceTree struct {
 	SearchIndex uint64
 	OrgId       uint16
 
-	TraceId   string
-	TreeNodes []TreeNode
+	TraceId, TraceId2 string
+	TreeNodes         []TreeNode
 
 	encodedTreeNodes []byte
 }
@@ -103,6 +103,7 @@ func (t *TraceTree) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		t.SearchIndex,
 		t.TraceId,
+		t.TraceId2,
 		string(t.encodedTreeNodes),
 	)
 }
@@ -111,7 +112,8 @@ func TraceTreeColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("search_index", ckdb.UInt64),
-		ckdb.NewColumn("trace_id", ckdb.String),
+		ckdb.NewColumn("trace_id", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
+		ckdb.NewColumn("_trace_id_2", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 		ckdb.NewColumn("encoded_span_list", ckdb.String),
 	}
 }

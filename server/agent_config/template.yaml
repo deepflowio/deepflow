@@ -5347,11 +5347,13 @@ processors:
         Redis: 1-65535
         MongoDB: 1-65535
         Memcached: 11211
+        ISO8583: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
         AMQP: 1-65535
         OpenWire: 1-65535
         NATS: 1-65535
+        WebSphereMQ: 1-65535
         Pulsar: 1-65535
         ZMTP: 1-65535
         DNS: 53,5353
@@ -5507,11 +5509,13 @@ processors:
         Redis: []
         MongoDB: []
         Memcached: []
+        ISO8583: []
         Kafka: []
         MQTT: []
         AMQP: []
         OpenWire: []
         NATS: []
+        WebSphereMQ: []
         Pulsar: []
         ZMTP: []
         DNS: []
@@ -5745,6 +5749,23 @@ processors:
         #     如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
         # upgrade_from: http_log_x_request_id
         x_request_id: [X_Request_ID]
+        # type: bool
+        # name:
+        #   en: Multiple TraceID Collection
+        #   ch: 多 TraceID 采集
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     When configured as `false`, only one TraceID is collected.
+        #     When configured as `true`, multiple TraceIDs will be collected.
+        #   ch: |-
+        #     - 配置为 `false` 时，根据配置 `APM TraceID` 采集到第一个匹配的 TraceID 就不继续采集。
+        #     - 配置为 `true` 时，采集所有匹配到的 TraceID。
+        multiple_trace_id_collection: true
         # type: string
         # name: APM TraceID
         # unit:

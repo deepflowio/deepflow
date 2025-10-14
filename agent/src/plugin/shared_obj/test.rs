@@ -178,7 +178,7 @@ fn test_parse() {
         assert_eq!(info.req.domain.as_str(), "baidu.com.");
 
         assert_eq!(
-            info.trace.trace_id.as_ref().unwrap().as_str(),
+            info.trace.trace_ids.first().unwrap().as_str(),
             "this is trace id"
         );
         assert_eq!(
@@ -211,7 +211,7 @@ fn test_parse() {
         assert_eq!(info.resp.status, L7ResponseStatus::Ok);
 
         assert_eq!(
-            info.trace.trace_id.as_ref().unwrap().as_str(),
+            info.trace.trace_ids.first().unwrap().as_str(),
             "this is trace id"
         );
         assert_eq!(
