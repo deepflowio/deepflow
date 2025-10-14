@@ -32,7 +32,7 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, swap_if, L7ResponseStatus,
+            set_captured_byte, swap_if, L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
         },
         AppProtoHead, Error, Result,
     },
@@ -51,7 +51,7 @@ pub struct Iso8583Info {
     f32: String,
     f33: String,
     // it is formed by connecting f7,f11,f32,f33 with -
-    pub trace_id: String,
+    pub trace_ids: PrioFields,
 
     #[serde(skip_serializing_if = "value_is_default")]
     pub response_status: L7ResponseStatus,
@@ -151,7 +151,7 @@ impl From<Iso8583Info> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
+                trace_ids: f.trace_ids.into_strings_top3(),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
@@ -281,7 +281,10 @@ impl L7ProtocolParserInterface for Iso8583Log {
             && !info.f32.is_empty()
             && !info.f33.is_empty()
         {
-            info.trace_id = format!("{}-{}-{}-{}", info.f7, info.f11, info.f32, info.f33);
+            info.trace_ids.merge_field(
+                BASE_FIELD_PRIORITY,
+                format!("{}-{}-{}-{}", info.f7, info.f11, info.f32, info.f33),
+            );
         }
 
         if let Some(config) = param.parse_config {

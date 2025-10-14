@@ -26,6 +26,8 @@ pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 pub(crate) mod tls;
+use std::collections::HashSet;
+
 pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
 
@@ -524,6 +526,10 @@ macro_rules! set_captured_byte {
 pub(crate) use set_captured_byte;
 pub(crate) use swap_if;
 
+const BASE_FIELD_PRIORITY: u8 = 128;
+const CUSTOM_FIELD_POLICY_PRIORITY: u8 = 64;
+const PLUGIN_FIELD_PRIORITY: u8 = 32;
+
 pub struct PrioField<T> {
     pub prio: u8,
     pub field: T,
@@ -587,6 +593,112 @@ impl<T: Serialize> Serialize for PrioField<T> {
         S: serde::Serializer,
     {
         self.field.serialize(serializer)
+    }
+}
+
+// Wrapper around Option<Vec<PrioField<String>>> for easier manipulation
+#[derive(Serialize, Debug, Default, Clone, Eq, PartialEq)]
+pub struct PrioFields(pub Vec<PrioField<String>>);
+
+impl PrioFields {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    // insertion is kept in ascending order by prio; if prio is the same, insert it at the end (stable sort)
+    #[inline]
+    fn insert_sorted(&mut self, field: PrioField<String>) {
+        // find the first position greater than it (>), skip those that are equal
+        let pos = match self.0.binary_search_by(|x| x.prio.cmp(&field.prio)) {
+            Ok(mut i) => {
+                while i < self.0.len() && self.0[i].prio == field.prio {
+                    i += 1;
+                }
+                i
+            }
+            // no larger one found, insert it at position i
+            Err(i) => i,
+        };
+        self.0.insert(pos, field);
+    }
+
+    // merge another PrioFields (without deduplication)
+    #[inline]
+    pub fn merge(&mut self, mut other: PrioFields) {
+        if other.0.is_empty() {
+            return;
+        }
+
+        // take ownership and move elements directly
+        for o in other.0.drain(..) {
+            self.insert_sorted(o);
+        }
+    }
+
+    // merge a list of same-prio strings, consuming the input (without deduplication)
+    pub fn merge_same_priority(&mut self, prio: u8, mut others: Vec<String>) {
+        if others.is_empty() {
+            return;
+        }
+
+        // move each string out of the vector without cloning
+        for field in others.drain(..) {
+            self.insert_sorted(PrioField::new(prio, field));
+        }
+    }
+
+    // merge a single field (without deduplication)
+    pub fn merge_field(&mut self, prio: u8, field: String) {
+        self.insert_sorted(PrioField::new(prio, field));
+    }
+
+    // convert to Vec<String> (already sorted)
+    #[inline]
+    pub fn to_strings(&self) -> Vec<String> {
+        let mut seen = HashSet::new();
+        let mut result = Vec::with_capacity(self.0.len());
+        for pf in &self.0 {
+            if seen.insert(&pf.field) {
+                result.push(pf.field.clone());
+            }
+        }
+        result
+    }
+
+    #[inline]
+    pub fn into_strings_top3(self) -> Vec<String> {
+        let mut result = Vec::with_capacity(3);
+
+        for pf in self.0 {
+            let field = pf.field;
+
+            if result.iter().any(|f| f == &field) {
+                continue;
+            }
+
+            result.push(field);
+            if result.len() == 3 {
+                break;
+            }
+        }
+        result
+    }
+
+    // get first element's priority, or return max
+    #[inline]
+    pub fn highest_priority(&self) -> u8 {
+        self.0.first().map(|pf| pf.prio).unwrap_or(u8::MAX)
+    }
+
+    #[inline]
+    pub fn highest(&self) -> &str {
+        self.0.first().map(|pf| pf.field.as_str()).unwrap_or("")
     }
 }
 

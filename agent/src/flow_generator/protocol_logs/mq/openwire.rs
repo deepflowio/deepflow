@@ -17,7 +17,7 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
 };
@@ -432,17 +432,18 @@ fn parse_command_type(payload: &[u8]) -> Result<(&[u8], OpenWireCommand)> {
 fn parse_trace_and_span(
     payload: &[u8],
     config: &L7LogDynamicConfig,
-) -> Result<(Option<String>, Option<String>)> {
+) -> Result<(PrioFields, Option<String>)> {
     // header pattern: "<TraceType>\x09<length in short type><values>"
     // now only skywalking supports activemq
     let trace_type = TraceType::Sw8;
     let trace_parsable = config.trace_types.contains(&trace_type);
     let span_parsable = config.span_types.contains(&trace_type);
     if !span_parsable && !trace_parsable {
-        return Ok((None, None));
+        return Ok((PrioFields::new(), None));
     }
     let header_pattern = b"sw8\x09";
     let mut next_payload = payload;
+    let mut trace_ids = PrioFields::new();
     while next_payload.len() > header_pattern.len() {
         let payload = next_payload;
         // match header_pattern
@@ -467,17 +468,17 @@ fn parse_trace_and_span(
             Ok(values) => values,
             Err(_) => continue,
         };
-        let trace_id = if trace_parsable {
-            trace_type.decode_trace_id(values).map(|s| s.to_string())
-        } else {
-            None
-        };
+        if trace_parsable {
+            if let Some(trace_id) = trace_type.decode_trace_id(values) {
+                trace_ids.merge_field(BASE_FIELD_PRIORITY, trace_id.to_string());
+            }
+        }
         let span_id = if span_parsable {
             trace_type.decode_span_id(values).map(|s| s.to_string())
         } else {
             None
         };
-        return Ok((trace_id, span_id));
+        return Ok((trace_ids, span_id));
     }
     Err(Error::OpenWireLogParseFailed)
 }
@@ -1649,8 +1650,8 @@ pub struct OpenWireInfo {
     pub status: L7ResponseStatus,
     pub err_msg: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub trace_id: Option<String>,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub trace_ids: PrioFields,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub span_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1686,7 +1687,7 @@ impl Default for OpenWireInfo {
             res_msg_size: None,
             status: L7ResponseStatus::Ok,
             err_msg: None,
-            trace_id: None,
+            trace_ids: PrioFields::new(),
             span_id: None,
             correlation_id: None,
             rtt: 0,
@@ -1804,7 +1805,7 @@ impl From<OpenWireInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: f.trace_id,
+                trace_ids: f.trace_ids.into_strings_top3(),
                 span_id: f.span_id,
                 ..Default::default()
             }),
@@ -2051,7 +2052,7 @@ impl OpenWireLog {
                 info.req_msg_size = Some(msg_size as u32);
                 // parse sw8 trace_id and span_id
                 if let Some(config) = param.parse_config {
-                    (info.trace_id, info.span_id) =
+                    (info.trace_ids, info.span_id) =
                         parse_trace_and_span(payload, &config.l7_log_dynamic).unwrap_or_default();
                 }
             }
@@ -2307,6 +2308,7 @@ mod tests {
             let config = L7LogDynamicConfig::new(
                 vec![],
                 vec![],
+                true,
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 ExtraLogFields::default(),
@@ -2387,13 +2389,14 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec![],
             vec![],
+            true,
             vec![TraceType::Sw8, TraceType::TraceParent],
             vec![TraceType::Sw8, TraceType::TraceParent],
             ExtraLogFields::default(),
             false,
         );
-        let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
-        assert_eq!(trace_id, Some("TRACEID".to_string()));
+        let (trace_ids, span_id) = parse_trace_and_span(payload, &config).unwrap();
+        assert_eq!(trace_ids.highest(), "TRACEID".to_string());
         assert_eq!(span_id, Some("SEGMENTID-3".to_string()));
     }
 }

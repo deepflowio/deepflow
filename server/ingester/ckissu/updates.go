@@ -21,7 +21,7 @@ import (
 )
 
 var AllColumnAdds = [][]*ColumnAdds{ColumnAdd65, ColumnAdd66}
-var AllIndexAdds = [][]*IndexAdd{getIndexAdds(IndexAdd65)}
+var AllIndexAdds = [][]*IndexAdd{getIndexAdds(IndexAdd65), getIndexAdds(IndexAdd66)}
 var AllColumnMods = [][]*ColumnMod{}
 var AllColumnRenames = [][]*ColumnRename{getColumnRenames(ColumnRename65)}
 var AllColumnDrops = [][]*ColumnDrop{getColumnDrops(nil)}
@@ -380,5 +380,20 @@ var ColumnAdd66 = []*ColumnAdds{
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
 		ColumnNames: []string{"aggregated_flow_ids"},
 		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local", "trace_tree", "trace_tree_local", "span_with_trace_id", "span_with_trace_id_local"},
+		ColumnNames: []string{"_trace_id_2"},
+		ColumnType:  ckdb.String,
+	},
+}
+
+var IndexAdd66 = []*IndexAdds{
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local", "trace_tree_local", "span_with_trace_id_local"},
+		ColumnNames: []string{"_trace_id_2"},
+		IndexType:   ckdb.IndexBloomfilter,
 	},
 }

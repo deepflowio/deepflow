@@ -222,6 +222,7 @@ type L7FlowLog struct {
 	XRequestId0     string `json:"x_request_id_0" category:"$tag" sub:"tracing_info"`
 	XRequestId1     string `json:"x_request_id_1" category:"$tag" sub:"tracing_info"`
 	TraceId         string `json:"trace_id" category:"$tag" sub:"tracing_info"`
+	TraceId2        string `json:"trace_id_2" category:"$tag" sub:"tracing_info"`
 	TraceIdIndex    uint64
 	SpanId          string `json:"span_id" category:"$tag" sub:"tracing_info"`
 	ParentSpanId    string `json:"parent_span_id" category:"$tag" sub:"tracing_info"`
@@ -278,6 +279,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("x_request_id_0", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID0"),
 		ckdb.NewColumn("x_request_id_1", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("XRequestID1"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("TraceID"),
+		ckdb.NewColumn("_trace_id_2", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("TraceID2"),
 		ckdb.NewColumn("trace_id_index", ckdb.UInt64).SetIndex(ckdb.IndexMinmax).SetComment("TraceIDIndex"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
@@ -328,6 +330,7 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.XRequestId0,
 		h.XRequestId1,
 		h.TraceId,
+		h.TraceId2,
 		h.TraceIdIndex,
 		h.SpanId,
 		h.ParentSpanId,
@@ -403,6 +406,24 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	h.fillL7FlowLog(l, cfg)
 }
 
+func (h *L7FlowLog) fillTraceIds(t *pb.TraceInfo) {
+	if t == nil {
+		return
+	}
+	// get trace id from TraceIds field first
+	for i, traceId := range t.TraceIds {
+		if i == 0 {
+			h.TraceId = traceId
+		}
+		if i == 1 {
+			h.TraceId2 = traceId
+		}
+	}
+	if h.TraceId == "" {
+		h.TraceId = t.TraceId
+	}
+}
+
 // requestLength,responseLength 等于 -1 会认为是没有值. responseCode=-32768 会认为没有值
 func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config) {
 	h.Version = l.Version
@@ -474,7 +495,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 	}
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId
-		h.TraceId = l.TraceInfo.TraceId
+		h.fillTraceIds(l.TraceInfo)
 		h.ParentSpanId = l.TraceInfo.ParentSpanId
 	}
 	h.TraceIdIndex = ParseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)

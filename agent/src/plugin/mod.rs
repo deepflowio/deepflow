@@ -62,7 +62,7 @@ pub struct CustomInfoResp {
 
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct CustomInfoTrace {
-    pub trace_id: Option<String>,
+    pub trace_ids: Vec<String>,
     pub span_id: Option<String>,
     pub parent_span_id: Option<String>,
     pub x_request_id_0: Option<String>,
@@ -154,7 +154,7 @@ impl CustomInfo {
 
         if has trace:
 
-            trace_id, span_id, parent_span_id
+            trace_ids, span_id, parent_span_id
             (
 
                 key len: 2 bytes
@@ -337,7 +337,7 @@ impl CustomInfo {
             1 => {
                 if read_wasm_str(buf, &mut off)
                     .and_then(|s| {
-                        info.trace.trace_id = Some(s);
+                        merge_trace_ids(&mut info.trace.trace_ids, &vec![s]);
                         read_wasm_str(buf, &mut off)
                     })
                     .and_then(|s| {
@@ -468,12 +468,18 @@ impl CustomInfo {
         }
         if let Some(t) = pb_info.trace {
             info.trace = CustomInfoTrace {
-                trace_id: t.trace_id,
+                trace_ids: t.trace_ids,
                 span_id: t.span_id,
                 parent_span_id: t.parent_span_id,
                 http_proxy_client: t.http_proxy_client,
                 ..Default::default()
             };
+            // add trace_id to trace_ids
+            if let Some(trace_id) = t.trace_id {
+                if !info.trace.trace_ids.contains(&trace_id) {
+                    info.trace.trace_ids.push(trace_id.to_string());
+                }
+            }
             match dir {
                 PacketDirection::ClientToServer => {
                     info.trace.x_request_id_0 = t.x_request_id;
@@ -502,6 +508,14 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
             Self::from_protobuf(&buf[2..], dir)
         } else {
             Self::from_legacy_protocol(buf, dir)
+        }
+    }
+}
+
+fn merge_trace_ids(a: &mut Vec<String>, b: &Vec<String>) {
+    for item in b {
+        if !a.contains(item) {
+            a.push(item.clone());
         }
     }
 }
@@ -551,12 +565,13 @@ impl L7ProtocolInfoInterface for CustomInfo {
             self.captured_response_byte += w.captured_response_byte;
 
             // trace merge
-            swap_if!(self.trace, trace_id, is_none, w.trace);
+            merge_trace_ids(&mut self.trace.trace_ids, &w.trace.trace_ids);
             swap_if!(self.trace, span_id, is_none, w.trace);
             swap_if!(self.trace, parent_span_id, is_none, w.trace);
             swap_if!(self.trace, x_request_id_0, is_none, w.trace);
             swap_if!(self.trace, x_request_id_1, is_none, w.trace);
             swap_if!(self.trace, http_proxy_client, is_none, w.trace);
+
             self.attributes.append(&mut w.attributes);
         }
         Ok(())
@@ -611,12 +626,12 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 exception: w.resp.exception,
                 result: w.resp.result,
             },
-            trace_info: if w.trace.trace_id.is_some()
+            trace_info: if !w.trace.trace_ids.is_empty()
                 || w.trace.span_id.is_some()
                 || w.trace.parent_span_id.is_some()
             {
                 Some(TraceInfo {
-                    trace_id: w.trace.trace_id,
+                    trace_ids: w.trace.trace_ids,
                     span_id: w.trace.span_id,
                     parent_span_id: w.trace.parent_span_id,
                 })

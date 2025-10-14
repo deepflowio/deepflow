@@ -46,6 +46,7 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes,
@@ -146,7 +147,7 @@ pub struct MysqlInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
-    trace_id: Option<String>,
+    trace_ids: PrioFields,
     span_id: Option<String>,
 
     #[serde(skip)]
@@ -309,10 +310,17 @@ impl MysqlInfo {
             trace!("comment={comment}");
             for (key, value) in KvExtractor::new(comment) {
                 trace!("key={key} value={value}");
-                for tt in config.trace_types.iter() {
+                for (index, tt) in config.trace_types.iter().enumerate() {
                     if tt.check(key) {
-                        self.trace_id = tt.decode_trace_id(value).map(|s| s.to_string());
-                        break;
+                        if let Some(trace_id) = tt.decode_trace_id(value) {
+                            self.trace_ids.merge_field(
+                                index as u8 + BASE_FIELD_PRIORITY,
+                                trace_id.to_string(),
+                            )
+                        }
+                        if !config.multiple_trace_id_collection {
+                            break;
+                        }
                     }
                 }
                 for st in config.span_types.iter() {
@@ -321,17 +329,19 @@ impl MysqlInfo {
                         break;
                     }
                 }
-                if self.trace_id.is_some() && config.span_types.is_empty()
+                if !self.trace_ids.is_empty() && config.span_types.is_empty()
                     || self.span_id.is_some() && config.trace_types.is_empty()
-                    || self.trace_id.is_some() && self.span_id.is_some()
+                    || !self.trace_ids.is_empty() && self.span_id.is_some()
                 {
-                    break 'outer;
+                    if !config.multiple_trace_id_collection {
+                        break 'outer;
+                    }
                 }
             }
         }
         debug!(
             "extracted trace_id={:?} span_id={:?}",
-            self.trace_id, self.span_id
+            self.trace_ids, self.span_id
         );
     }
 
@@ -393,9 +403,9 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 request_id: f.statement_id.into(),
                 ..Default::default()
             }),
-            trace_info: if f.trace_id.is_some() || f.span_id.is_some() {
+            trace_info: if !f.trace_ids.is_empty() || f.span_id.is_some() {
                 Some(TraceInfo {
-                    trace_id: f.trace_id,
+                    trace_ids: f.trace_ids.into_strings_top3(),
                     span_id: f.span_id,
                     ..Default::default()
                 })
@@ -1364,7 +1374,7 @@ mod tests {
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
         config::{handler::TraceType, ExtraLogFields},
-        flow_generator::L7_RRT_CACHE_CAPACITY,
+        flow_generator::{protocol_logs::PrioFields, L7_RRT_CACHE_CAPACITY},
         utils::test::Capture,
     };
 
@@ -1656,6 +1666,7 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec![],
             vec![],
+            true,
             vec![
                 TraceType::TraceParent,
                 TraceType::Customize("TraceID".to_owned()),
@@ -1666,10 +1677,10 @@ mod tests {
             false,
         );
         for (input, tid, sid) in testcases {
-            info.trace_id = None;
+            info.trace_ids = PrioFields::new();
             info.span_id = None;
             info.extract_trace_and_span_id(&config, input);
-            assert_eq!(info.trace_id.as_ref().map(|s| s.as_str()), tid);
+            assert_eq!(info.trace_ids.highest(), tid.unwrap());
             assert_eq!(info.span_id.as_ref().map(|s| s.as_str()), sid);
         }
     }

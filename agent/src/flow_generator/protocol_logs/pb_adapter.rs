@@ -36,7 +36,7 @@ pub struct L7Response {
 
 #[derive(Default, Debug)]
 pub struct TraceInfo {
-    pub trace_id: Option<String>,
+    pub trace_ids: Vec<String>,
     pub span_id: Option<String>,
     pub parent_span_id: Option<String>,
 }
@@ -139,9 +139,7 @@ impl L7ProtocolSendLog {
             if let Some(s) = trace_info.parent_span_id {
                 t.parent_span_id = s.into();
             }
-            if let Some(s) = trace_info.trace_id {
-                t.trace_id = s.into();
-            }
+            t.trace_ids = trace_info.trace_ids;
 
             log.trace_info = Some(t);
         }
