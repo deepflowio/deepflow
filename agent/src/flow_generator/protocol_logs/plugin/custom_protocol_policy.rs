@@ -171,6 +171,10 @@ pub fn get_policy_parser(s: String) -> CustomPolicyLog {
 impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
     fn from(p: (&CustomPolicyInfo, PacketDirection)) -> CustomInfo {
         let (info, direction) = p;
+        let mut trace_ids: Vec<String> = Vec::new();
+        if let Some(trace_id) = &info.trace_id {
+            trace_ids.push(trace_id.to_string());
+        }
         CustomInfo {
             req: CustomInfoRequest {
                 version: info.version.clone(),
@@ -186,7 +190,7 @@ impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
                 result: info.response_result.clone(),
             },
             trace: CustomInfoTrace {
-                trace_id: info.trace_id.clone(),
+                trace_ids,
                 span_id: info.span_id.clone(),
                 http_proxy_client: info.http_proxy_client.clone(),
                 x_request_id_0: if direction == PacketDirection::ClientToServer {

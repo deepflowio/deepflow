@@ -189,6 +189,7 @@ message TraceInfo {
     string trace_id = 1;
     string span_id = 2;
     string parent_span_id = 3;
+    repeated string trace_ids = 4;
 }
 
 message ExtendedInfo {
