@@ -28,75 +28,81 @@
 struct tracer_probes_conf;
 
 enum uprobe_type {
-    GO_UPROBE = 0,
-    OPENSSL_UPROBE,
-    MEMPROF_UPROBE,
-    PYTHON_UPROBE,
-    OTHER_UPROBE
+	GO_UPROBE = 0,
+	OPENSSL_UPROBE,
+	MEMPROF_UPROBE,
+	PYTHON_UPROBE,
+	ENVOY_UPROBE,
+	OTHER_UPROBE
 };
 
 enum proc_act_type {
-    PROC_EXEC = 0,
-    PROC_EXIT
+	PROC_EXEC = 0,
+	PROC_EXIT
 };
 
 struct symbol {
-    enum uprobe_type type;
-    const char *symbol;
-    const char *symbol_prefix;
-    const char *probe_func;
-    bool is_probe_ret;
+	enum uprobe_type type;
+	const char *symbol;
+	const char *symbol_prefix;
+	const char *probe_func;
+	bool is_probe_ret;
 };
 
 struct version_info {
-    int major;
-    int minor;
-    int revision;
+	int major;
+	int minor;
+	int revision;
 };
 
 struct load_addr_t {
-    uint64_t target_addr;
-    uint64_t binary_addr;
+	uint64_t target_addr;
+	uint64_t binary_addr;
 };
 
 struct symbol_uprobe {
-    struct list_head list;
-    enum uprobe_type type;
-    int pid;
-    unsigned long long starttime; // process start time.
-    const char *name; // symbol名字
-    const char *binary_path; // so或目标可执行文件全路径
-    const char *probe_func;
-    size_t entry;  //入口地址
-    uint64_t size; //函数块大小
-    struct version_info ver;
-    size_t rets[FUNC_RET_MAX];
-    int rets_count; // 返回数量 可用来判断是否attch rets
-    bool isret;
-    bool in_probe; // already in probe, if or not ?
+	struct list_head list;
+	enum uprobe_type type;
+	int pid;
+	unsigned long long starttime;	// process start time.
+	const char *name;	// symbol名字
+	const char *binary_path;	// so或目标可执行文件全路径
+	const char *probe_func;
+	size_t entry;		//入口地址
+	uint64_t size;		//函数块大小
+	struct version_info ver;
+	size_t rets[FUNC_RET_MAX];
+	int rets_count;		// 返回数量 可用来判断是否attch rets
+	bool isret;
+	bool in_probe;		// already in probe, if or not ?
 };
 
 struct symbol_kprobe {
-    bool isret;   // only use kprobe
-    char *symbol; // only use uprobe
-    char *func;
+	bool isret;		// only use kprobe
+	char *symbol;		// only use uprobe
+	char *func;
 };
 
 struct symbol_tracepoint {
-    char *name;
+	char *name;
 };
 
 struct symbol_kfunc {
-    char *name;
+	char *name;
 };
 
-void free_uprobe_symbol(struct symbol_uprobe *u_sym, struct tracer_probes_conf *conf);
-void add_uprobe_symbol(int pid, struct symbol_uprobe *u_sym, struct tracer_probes_conf *conf);
+void free_uprobe_symbol(struct symbol_uprobe *u_sym,
+			struct tracer_probes_conf *conf);
+void add_uprobe_symbol(int pid, struct symbol_uprobe *u_sym,
+		       struct tracer_probes_conf *conf);
 int copy_uprobe_symbol(struct symbol_uprobe *src, struct symbol_uprobe *dst);
 char *get_elf_path_by_pid(int pid);
-struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file, struct symbol *sym, const uint64_t addr,
-                                                    int pid);
-uint64_t get_symbol_addr_from_binary(int pid, const char *bin, const char *symname);
+struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
+						    struct symbol *sym,
+						    const uint64_t addr,
+						    int pid);
+uint64_t get_symbol_addr_from_binary(int pid, const char *bin,
+				     const char *symname);
 int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
 	      void *payload);
 #endif /* _USER_SYMBOL_H_ */
