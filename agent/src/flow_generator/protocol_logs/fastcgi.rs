@@ -26,7 +26,9 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::EbpfFlags;
 use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
-use crate::flow_generator::protocol_logs::{set_captured_byte, value_is_default};
+use crate::flow_generator::protocol_logs::{
+    set_captured_byte, value_is_default, BASE_FIELD_PRIORITY,
+};
 use crate::flow_generator::{Error, Result};
 
 use super::consts::{
@@ -38,8 +40,6 @@ use super::{
     pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
     AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
 };
-
-const BASE_FIELD_PRIORITY: u8 = 0;
 
 const FCGI_RECORD_FIX_LEN: usize = 8;
 
@@ -83,7 +83,7 @@ pub struct FastCGIInfo {
     pub resp_content_length: Option<u32>,
 
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: PrioField<String>,
+    pub trace_ids: super::PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: PrioField<String>,
 
@@ -118,7 +118,8 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
             self.status = info.status;
             self.status_code = info.status_code;
             self.captured_response_byte = info.captured_response_byte;
-            super::swap_if!(self, trace_id, is_default, info);
+            let other_trace_ids = std::mem::take(&mut info.trace_ids);
+            self.trace_ids.merge(other_trace_ids);
             super::swap_if!(self, span_id, is_default, info);
             if info.is_on_blacklist {
                 self.is_on_blacklist = info.is_on_blacklist;
@@ -235,15 +236,17 @@ impl FastCGIInfo {
                 if config.is_trace_id(key) {
                     for (i, trace) in config.trace_types.iter().enumerate() {
                         let prio = i as u8 + BASE_FIELD_PRIORITY;
-                        if self.trace_id.prio <= prio {
+                        if self.trace_ids.highest_priority() <= prio
+                            && !config.multiple_trace_id_collection
+                        {
                             break;
                         }
                         if !trace.check(key) {
                             continue;
                         }
-                        trace
-                            .decode_trace_id(val)
-                            .map(|id| self.trace_id = PrioField::new(prio, id.to_string()));
+                        if let Some(trace_id) = trace.decode_trace_id(val) {
+                            self.trace_ids.merge_field(prio, trace_id.to_string());
+                        }
                     }
                 }
 
@@ -319,16 +322,12 @@ impl From<FastCGIInfo> for L7ProtocolSendLog {
             },
             version: Some(f.version.to_string()),
             trace_info: Some(TraceInfo {
-                trace_id: if f.trace_id.is_default() {
-                    None
-                } else {
-                    Some(f.trace_id.into_inner())
-                },
                 span_id: if f.span_id.is_default() {
                     None
                 } else {
                     Some(f.span_id.into_inner())
                 },
+                trace_ids: f.trace_ids.into_strings_top3(),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
