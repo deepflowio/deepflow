@@ -669,6 +669,7 @@ u32 copy_file_metrics(int pid, void *dst, void *src, int len,
 	}
 
 	struct user_io_event_buffer *u_event;
+	bool file_name_finish = false;
 	struct __io_event_buffer *event = (struct __io_event_buffer *)src;
 	char *buffer = event->filename;
 	u32 buffer_len = event->len;
@@ -717,50 +718,69 @@ copy_event:
 	u_event = (struct user_io_event_buffer *)dst;
 	buffer = u_event->file_dir;
 	if (file_type == FS_TYPE_NETWORK) {
-		temp_index =
-		    replace_suffix_prefix(mount_source, temp, mount_point,
-					  buffer, sizeof(u_event->file_dir));
+		replace_suffix_prefix(mount_source, temp, mount_point,
+				      buffer, sizeof(u_event->file_dir));
 	} else {
 		const char *point = mount_point;
 		int root_len = strlen(root);
 		int dir_len = strlen(temp);
 		int file_len = strlen(event->filename);
 		// Ensure no duplicate slashes appear in the path (e.g., //tmp/filename)
-		if (mount_point[0] == '/' && mount_point[1] == '\0') {
+		if (mount_point[0] == '/' && mount_point[1] == '\0')
 			point = "";
-		} else {
+		/*
+		 * Handle bind mount
+		 *
+		 * Directory mount:
+		 * mount root         = "/mnt/clickhouse"
+		 * mount point        = "/var/lib/clickhouse_storage"
+		 * file path via eBPF = "/mnt/clickhouse/store/151/"
+		 * Use the mount point instead of the mountroot prefix:
+		 * result: "/var/lib/clickhouse_storage/store/151/"
+		 */
+		if (dir_len > root_len
+		    && memcmp(root, temp, root_len) == 0
+		    && temp[root_len] == '/') {
+			fast_strncat_trunc(point, temp + root_len, buffer,
+					   sizeof(u_event->file_dir));
+		} else if ((root_len == dir_len + file_len)
+			   && (memcmp(temp, root, dir_len) == 0)) {
 			/*
-			 * Handle bind mount
-			 *
-			 * Directory mount:
-			 * mount root         = "/mnt/clickhouse"
-			 * mount point        = "/var/lib/clickhouse_storage"
-			 * file path via eBPF = "/mnt/clickhouse/store/151/"
-			 *
 			 * File mount:
 			 * root : /var/lib/kubelet/pods/31247686-d43f-4993-a5c0-76dadaf089e6/etc-hosts
 			 * point: /etc/hosts
+			 * Use the mount point.
 			 */
-			if (dir_len > root_len
-			    && memcmp(root, temp, root_len) == 0
-			    && temp[root_len] == '/') {
-				point = "";
-			} else if ((root_len == dir_len + file_len)
-				   && (memcmp(temp, root, dir_len) == 0)) {
-				const char *p = strrchr(root, '/');
-				p = p ? p + 1 : root;
+			const char *p = strrchr(root, '/');
+			p = p ? p + 1 : root;
 
-				if ((strlen(p) == file_len)
-				    && (memcmp(p, event->filename, file_len) ==
-					0)) {
-					point = "";
+			if ((strlen(p) == file_len)
+			    && (memcmp(p, event->filename, file_len) == 0)) {
+				char *name = strrchr(point, '/');
+				if (name) {
+					name++;
+					char tmp = *name;
+					*name = '\0';
+					strcpy_s_inline(u_event->file_dir,
+							sizeof(u_event->
+							       file_dir), point,
+							strlen(point));
+					*name = tmp;
+					strcpy_s_inline(u_event->filename,
+							sizeof(u_event->
+							       filename), name,
+							strlen(name));
+					file_name_finish = true;
 				}
 			}
-		}
 
-		temp_index =
-		    fast_strncat_trunc(point, temp, buffer,
-				       sizeof(u_event->file_dir));
+			if (!file_name_finish)
+				fast_strncat_trunc(point, temp, buffer,
+						   sizeof(u_event->file_dir));
+		} else {
+			fast_strncat_trunc(point, temp, buffer,
+					   sizeof(u_event->file_dir));
+		}
 	}
 
 	prepend_prefix_safe(buffer, sizeof(u_event->file_dir), mntns_str);
@@ -776,8 +796,9 @@ copy_event:
 			mount_source, strlen(mount_source));
 	fast_strncat_trunc(mntns_str, mount_point, u_event->mount_point,
 			   sizeof(u_event->mount_point));
-	strcpy_s_inline(u_event->filename, sizeof(u_event->filename),
-			event->filename, strlen(event->filename));
+	if (likely(!file_name_finish))
+		strcpy_s_inline(u_event->filename, sizeof(u_event->filename),
+				event->filename, strlen(event->filename));
 	return sizeof(*u_event);
 }
 
