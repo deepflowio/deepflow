@@ -115,6 +115,20 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 		// Only vtap_acl translate policy_id
 		if strings.Trim(name, "`") == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
 			stmts = append(stmts, &SelectTag{Value: selectTag})
+		} else if strings.Trim(name, "`") == chCommon.TRACE_ID_TAG {
+			stmt := &SelectTag{}
+			// trace_id as trace_ids
+			if table == chCommon.TABLE_NAME_L7_FLOW_LOG {
+				stmt = &SelectTag{Value: tagItem.TagTranslator}
+				if alias == "" {
+					stmt.Alias = chCommon.TRACE_IDS_TAG
+				} else {
+					stmt.Alias = alias
+				}
+			} else {
+				stmt = &SelectTag{Value: name, Alias: alias}
+			}
+			stmts = append(stmts, stmt)
 		} else if name == "metrics" {
 			tagTranslator := ""
 			if db == "flow_log" || db == chCommon.DB_NAME_APPLICATION_LOG {
@@ -259,6 +273,8 @@ func (t *SelectTag) Format(m *view.Model) {
 		if t.Value == "packet_batch" {
 			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 		}
+		if t.Alias == chCommon.TRACE_IDS_TAG {
+			m.AddCallback(t.Alias, TraceIDsToTraceID([]interface{}{}))
+		}
 	}
-
 }

@@ -868,12 +868,11 @@ func (f *TagFunction) Check() error {
 			}
 		}
 	case TAG_FUNCTION_FAST_FILTER:
-		if strings.Trim(f.Args[0], "`") != "trace_id" {
+		if strings.Trim(f.Args[0], "`") != chCommon.TRACE_ID_TAG {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
 	}
 	return nil
-
 }
 
 func (f *TagFunction) Trans(m *view.Model) view.Node {
@@ -1014,7 +1013,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		if !ok {
 			// tag未定义function则走default
 			tagDes, ok = tag.GetTag(field, f.DB, f.Table, "default")
-			if ok {
+			if ok && field != chCommon.TRACE_ID_TAG {
 				tagField = tagDes.TagTranslator
 			}
 		} else {
