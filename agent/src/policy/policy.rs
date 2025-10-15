@@ -408,6 +408,7 @@ impl Policy {
             key.dst_ip,
             l3_epc_id_0,
             l3_epc_id_1,
+            key.l2_end_0,
         ) {
             let entry = self.lookup_gpid_entry(key, &endpoints);
             self.send_ebpf(
