@@ -254,7 +254,7 @@ fn bench_policy(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                first.ebpf_fast_get(key.src_ip, key.dst_ip, 2, 0);
+                first.ebpf_fast_get(key.src_ip, key.dst_ip, 2, 0, true);
             }
             start.elapsed()
         })
