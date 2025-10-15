@@ -45,6 +45,9 @@ const TAG_SERVER_EN_PREFIX = "Server"
 const TAG_CLIENT_EN_PREFIX = "Client"
 const LANGUAGE_EN = "en"
 const SUCCESS_RATIO_METRICS_NAME = "success_ratio"
+const TRACE_ID_TAG = "trace_id"
+const TRACE_IDS_TAG = "trace_ids"
+const TRACE_ID_2_TAG = "_trace_id_2"
 
 const (
 	NATIVE_FIELD_TYPE_TAG            = 1
