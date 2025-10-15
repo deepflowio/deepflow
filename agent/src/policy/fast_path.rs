@@ -531,8 +531,13 @@ impl FastPath {
         l3_epc_id_dst: i32,
         endpoints: EndpointData,
     ) -> Arc<EndpointData> {
-        let (key_0, key_1) =
-            self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst);
+        let (key_0, key_1) = self.generate_endpoints_map_key(
+            ip_src,
+            ip_dst,
+            l3_epc_id_src,
+            l3_epc_id_dst,
+            endpoints.src_info.l2_end,
+        );
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let endpoints = Arc::new(endpoints);
         let table = self.get_endpoint_table(table_type);
@@ -552,13 +557,14 @@ impl FastPath {
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
+        l2_end_0: bool,
     ) -> Option<Arc<EndpointData>> {
         if self.flush_endpoint_table(table_type) {
             return None;
         }
 
         let (key_0, key_1) =
-            self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst);
+            self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0);
         let key = (key_0 as u128) << 64 | key_1 as u128;
 
         self.get_endpoint_table(table_type)
@@ -572,15 +578,17 @@ impl FastPath {
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
+        l2_end_0: bool,
     ) -> (u64, u64) {
         let netmask_table = self.netmask_table.read().unwrap();
         let (src_masked_ip, dst_masked_ip) = generate_mask_ip(&netmask_table, ip_src, ip_dst);
         let l3_epc_id_src = l3_epc_id_src as u64;
         let l3_epc_id_dst = l3_epc_id_dst as u64;
+        let (src_flags, dst_flags) = if l2_end_0 { (0xffff, 0) } else { (0, 0xffff) };
 
         (
-            (src_masked_ip as u64) | 0xffff << 32 | l3_epc_id_src << 48,
-            (dst_masked_ip as u64) | 0xffff << 32 | l3_epc_id_dst << 48,
+            (src_masked_ip as u64) | src_flags << 32 | l3_epc_id_src << 48,
+            (dst_masked_ip as u64) | dst_flags << 32 | l3_epc_id_dst << 48,
         )
     }
 
@@ -638,7 +646,7 @@ impl FastPath {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Arc;
 
@@ -895,6 +903,7 @@ mod test {
         let ip_src = IpAddr::from("192.169.1.100".parse::<Ipv4Addr>().unwrap());
         let ip_dst = IpAddr::from("172.29.2.200".parse::<Ipv4Addr>().unwrap());
         let mut endpoints: EndpointData = Default::default();
+        endpoints.src_info.l2_end = true;
         endpoints.src_info.l3_epc_id = 10;
         endpoints.dst_info.l3_epc_id = 20;
 
@@ -902,20 +911,42 @@ mod test {
         assert_eq!(10, e.src_info.l3_epc_id);
         assert_eq!(20, e.dst_info.l3_epc_id);
         let e = table
-            .get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 0)
+            .get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 0, true)
             .unwrap();
         assert_eq!(10, e.src_info.l3_epc_id);
         assert_eq!(20, e.dst_info.l3_epc_id);
         let e = table
-            .get_endpoints(EndpointTableType::Ebpf, ip_dst, ip_src, 0, 10)
+            .get_endpoints(EndpointTableType::Ebpf, ip_dst, ip_src, 0, 10, false)
             .unwrap();
         assert_eq!(20, e.src_info.l3_epc_id);
         assert_eq!(10, e.dst_info.l3_epc_id);
-        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 0);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 0, true);
         assert!(e.is_none());
-        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 10);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 0, 10, false);
         assert!(e.is_none());
-        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 20);
+        let e = table.get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 20, true);
         assert!(e.is_none());
+
+        let ip_src = IpAddr::from("192.168.1.100".parse::<Ipv4Addr>().unwrap());
+        let ip_dst = IpAddr::from("192.168.1.200".parse::<Ipv4Addr>().unwrap());
+        let mut endpoints: EndpointData = Default::default();
+        endpoints.src_info.l2_end = true;
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l3_epc_id = 10;
+        let e = table.add_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 10, endpoints);
+        assert_eq!(true, e.src_info.l2_end);
+        assert_eq!(false, e.dst_info.l2_end);
+
+        let e = table
+            .get_endpoints(EndpointTableType::Ebpf, ip_src, ip_dst, 10, 10, true)
+            .unwrap();
+        assert_eq!(true, e.src_info.l2_end);
+        assert_eq!(false, e.dst_info.l2_end);
+
+        let e = table
+            .get_endpoints(EndpointTableType::Ebpf, ip_dst, ip_src, 10, 10, false)
+            .unwrap();
+        assert_eq!(false, e.src_info.l2_end);
+        assert_eq!(true, e.dst_info.l2_end);
     }
 }
