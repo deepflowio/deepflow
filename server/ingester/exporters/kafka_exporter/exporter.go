@@ -188,6 +188,7 @@ func (e *KafkaExporter) queueProcess(queueID int) {
 					Timestamp: time.UnixMicro(exportItem.TimestampUs()),
 				},
 			)
+			log.Infof("kafka: %s \n %+v", jsonStr, item)
 			if len(batch) >= e.config.BatchSize {
 				log.Debugf("kafka: %s \n %+v", jsonStr, item)
 				e.exportBatch(queueID, batch)
