@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 var TagResoureMap = GenerateTagResoureMap()
@@ -1357,6 +1358,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"icon_id": NewTag(iconIdTrans, "", "", "", "")}
 			}
 		}
+	}
+	// Trace_ID
+	// only for l7_flow_log
+	tagResourceMap["trace_id"] = map[string]*Tag{
+		"default": NewTag(
+			// 改进字段显示逻辑
+			"concat(trace_id, if(empty(trace_id) OR empty("+chCommon.TRACE_ID_2_TAG+"), '', ', '), "+chCommon.TRACE_ID_2_TAG+")",
+			"",
+			"trace_id %s %s OR "+chCommon.TRACE_ID_2_TAG+" %s %s",
+			"",
+			"",
+		),
 	}
 	// X_Request_ID
 	tagResourceMap["x_request_id"] = map[string]*Tag{
