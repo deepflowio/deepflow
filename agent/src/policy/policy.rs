@@ -404,10 +404,13 @@ impl Policy {
             (0, local_epc_id)
         };
 
-        if let Some(endpoints) =
-            self.table
-                .ebpf_fast_get(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1)
-        {
+        if let Some(endpoints) = self.table.ebpf_fast_get(
+            key.src_ip,
+            key.dst_ip,
+            l3_epc_id_0,
+            l3_epc_id_1,
+            key.l2_end_0,
+        ) {
             let entry = self.lookup_gpid_entry(key, &endpoints);
             self.send_ebpf(
                 key.src_ip,

@@ -714,13 +714,14 @@ impl FirstPath {
         ip_dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
+        l2_end_0: bool,
     ) -> Option<Arc<EndpointData>> {
         if self.fast_disable {
             return None;
         }
 
         self.fast
-            .ebpf_get_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst)
+            .ebpf_get_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0)
     }
 
     pub fn ebpf_fast_add(
