@@ -275,6 +275,31 @@ func TransIngressFilter(translator, regexpTranslator, op, value string) (filter 
 	return
 }
 
+// trace_id
+func TransTraceIDFilter(op, value string) (filter string) {
+	opLower := strings.ToLower(op)
+	if value == "''" {
+		switch opLower {
+		case "match", "not match":
+			filter = fmt.Sprintf("%s(trace_id,%s)", op, value)
+		default:
+			filter = fmt.Sprintf("trace_id %s %s", op, value)
+		}
+		return
+	}
+	switch opLower {
+	case "!=", "not in", "not like":
+		filter = fmt.Sprintf("trace_id %s %s AND (%s %s %s OR %s = '')", op, value, chCommon.TRACE_ID_2_TAG, op, value, chCommon.TRACE_ID_2_TAG)
+	case "match":
+		filter = fmt.Sprintf("match(trace_id,%s) OR match(%s,%s)", value, chCommon.TRACE_ID_2_TAG, value)
+	case "not match":
+		filter = fmt.Sprintf("not match(trace_id,%s) AND (not match(%s,%s) OR %s = '')", value, chCommon.TRACE_ID_2_TAG, value, chCommon.TRACE_ID_2_TAG)
+	default:
+		filter = fmt.Sprintf("trace_id %s %s OR %s %s %s", op, value, chCommon.TRACE_ID_2_TAG, op, value)
+	}
+	return
+}
+
 // The tag is not in the tagResourceMap default
 func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter string, isRemoteRead bool, e *CHEngine) (filter string, err error) {
 	tagItem := &tag.Tag{}
@@ -753,8 +778,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		noSuffixTag := strings.TrimSuffix(tagName, "_0")
 		noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 		noIDTag := noSuffixTag
-		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
-			noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
+		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id", "trace_id"}, noSuffixTag) {
+			noIDTag = strings.TrimSuffix(noIDTag, "_id")
 		}
 		if ok {
 			switch noIDTag {
@@ -890,8 +915,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			noSuffixTag := strings.TrimSuffix(whereTag, "_0")
 			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 			noIDTag := noSuffixTag
-			if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
-				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
+			if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id", "trace_id"}, noSuffixTag) {
+				noIDTag = strings.TrimSuffix(noIDTag, "_id")
 			}
 			switch noIDTag {
 			case "ip_version":
@@ -1094,6 +1119,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				}
 			case "acl_gids":
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, t.Value)
+			case "trace_id":
+				whereFilter = TransTraceIDFilter(op, t.Value)
 			default:
 				if strings.Contains(op, "match") {
 					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
@@ -1503,11 +1530,12 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 		traceConfig := config.TraceConfig
 		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
 		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
+		filter := ""
 		if traceConfig.Disabled {
-			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+			filter = TransTraceIDFilter(opName, f.Value)
 			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}
-		switch strings.ToLower(opName) {
+		switch opLower := strings.ToLower(opName); opLower {
 		case "=", "!=":
 			traceID := strings.TrimSpace(f.Value)
 			traceID = strings.Trim(traceID, "'")
@@ -1516,10 +1544,14 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 			if err != nil || traceIDIndex == 0 {
 				errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
 				log.Error(errMessage)
-				filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+				filter = TransTraceIDFilter(opName, f.Value)
 				return &view.Expr{Value: "(" + filter + ")"}, nil
 			}
-			filter := fmt.Sprintf("trace_id_index %s %d", opName, traceIDIndex)
+			filter = fmt.Sprintf("trace_id_index = %d OR %s = %s", traceIDIndex, chCommon.TRACE_ID_2_TAG, f.Value)
+			if opLower == "!=" {
+				filter = fmt.Sprintf("trace_id_index != %d AND (%s != %s OR %s = '')", traceIDIndex, chCommon.TRACE_ID_2_TAG, f.Value, chCommon.TRACE_ID_2_TAG)
+				return &view.Expr{Value: filter}, nil
+			}
 			return &view.Expr{Value: "(" + filter + ")"}, nil
 		case "in", "not in":
 			traceIDIndexSlice := []string{}
@@ -1532,13 +1564,17 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 				if err != nil || traceIDIndex == 0 {
 					errMessage := fmt.Sprintf("%s or trace_id_index =0", err.Error())
 					log.Error(errMessage)
-					filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
+					filter = TransTraceIDFilter(opName, f.Value)
 					return &view.Expr{Value: "(" + filter + ")"}, nil
 				}
 				traceIDIndexSlice = append(traceIDIndexSlice, strconv.FormatUint(traceIDIndex, 10))
 			}
 			traceIDIndexs := fmt.Sprintf("(%s)", strings.Join(traceIDIndexSlice, ","))
-			filter := fmt.Sprintf("trace_id_index %s %s", opName, traceIDIndexs)
+			filter = fmt.Sprintf("trace_id_index IN %s OR %s IN %s", traceIDIndexs, chCommon.TRACE_ID_2_TAG, f.Value)
+			if opLower == "not in" {
+				filter = fmt.Sprintf("trace_id_index NOT IN %s AND (%s NOT IN %s OR %s = '')", traceIDIndexs, chCommon.TRACE_ID_2_TAG, f.Value, chCommon.TRACE_ID_2_TAG)
+				return &view.Expr{Value: filter}, nil
+			}
 			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}
 	} else {

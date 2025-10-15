@@ -44,6 +44,7 @@ const TagClientChPrefix = "客户端"
 const TagServerEnPrefix = "Server"
 const TagClientEnPrefix = "Client"
 const LanguageEN = "en"
+const TRACE_ID_2_TAG = "_trace_id_2"
 
 const (
 	NATIVE_FIELD_TYPE_TAG            = 1
