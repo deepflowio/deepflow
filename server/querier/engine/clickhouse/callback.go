@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -257,6 +258,20 @@ func ColumnNameSwap(args []interface{}) func(result *common.Result) error {
 		for i, columnName := range result.Columns {
 			if strings.HasPrefix(columnName.(string), tagName) {
 				columnName = strings.TrimPrefix(columnName.(string), tagName+"_")
+			}
+			newColumnNames[i] = columnName
+		}
+		result.Columns = newColumnNames
+		return nil
+	}
+}
+
+func TraceIDsToTraceID(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newColumnNames := make([]interface{}, len(result.Columns))
+		for i, columnName := range result.Columns {
+			if columnName.(string) == chCommon.TRACE_IDS_TAG {
+				columnName = chCommon.TRACE_ID_TAG
 			}
 			newColumnNames[i] = columnName
 		}
