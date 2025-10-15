@@ -188,7 +188,10 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			// callback
 			stmts = append(stmts, &SelectTag{Value: name})
 		} else if tagItem.TagTranslator != "" {
-			if name != "packet_batch" || table != "l4_packet" {
+			// trace_id as trace_ids
+			if strings.Trim(name, "`") == chCommon.TRACE_ID_TAG {
+				stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: chCommon.TRACE_IDS_TAG})
+			} else if name != "packet_batch" || table != "l4_packet" {
 				stmts = append(stmts, &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag})
 				stmts = GetMultiTag(stmts, name)
 			}
@@ -302,6 +305,8 @@ func (t *SelectTag) Format(m *view.Model) {
 		if t.Value == "packet_batch" {
 			m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 		}
+		if t.Alias == chCommon.TRACE_IDS_TAG {
+			m.AddCallback(t.Alias, TraceIDsToTraceID([]interface{}{}))
+		}
 	}
-
 }
