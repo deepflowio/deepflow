@@ -262,7 +262,14 @@ fn bench_policy(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                first.endpoint_fast_get(EndpointTableType::Ebpf, key.src_ip, key.dst_ip, 2, 0);
+                first.endpoint_fast_get(
+                    EndpointTableType::Ebpf,
+                    key.src_ip,
+                    key.dst_ip,
+                    2,
+                    0,
+                    true,
+                );
             }
             start.elapsed()
         })
