@@ -30,6 +30,7 @@ func (b *DataSet) AddVPC(dbItem *mysqlmodel.VPC, seq int) {
 		},
 		Name:         dbItem.Name,
 		Label:        dbItem.Label,
+		Owner:        dbItem.Owner,
 		TunnelID:     dbItem.TunnelID,
 		CIDR:         dbItem.CIDR,
 		RegionLcuuid: dbItem.Region,
@@ -46,6 +47,7 @@ type VPC struct {
 	DiffBase
 	Name         string `json:"name"`
 	Label        string `json:"label"`
+	Owner        string `json:"owner"`
 	TunnelID     int    `json:"tunnel_id"`
 	CIDR         string `json:"cidr"`
 	RegionLcuuid string `json:"region_lcuuid"`
@@ -54,6 +56,7 @@ type VPC struct {
 func (v *VPC) Update(cloudItem *cloudmodel.VPC) {
 	v.Name = cloudItem.Name
 	v.Label = cloudItem.Label
+	v.Owner = cloudItem.Owner
 	v.TunnelID = cloudItem.TunnelID
 	v.CIDR = cloudItem.CIDR
 	v.RegionLcuuid = cloudItem.RegionLcuuid
