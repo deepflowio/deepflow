@@ -162,6 +162,14 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	}
 	db := dbInfo.DB
 
+	var count int64
+	db.Model(&mysqlmodel.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&count)
+	if count > 0 {
+		return model.VtapGroup{}, response.ServiceError(
+			httpcommon.RESOURCE_ALREADY_EXIST,
+			fmt.Sprintf("vtap_group name (%s) already exist", vtapGroupCreate.Name))
+	}
+
 	db.Model(&mysqlmodel.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {
 		return model.VtapGroup{}, response.ServiceError(
