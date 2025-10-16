@@ -3786,7 +3786,8 @@ to the following:
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
 ```
 
-Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
+Note: When this feature is enabled, Envoy mTLS traffic can be automatically traced.
+For non-Envoy traffic, the specific process list must also be specified in `inputs.proc.process_matcher`,
 i.e., `ebpf.socket.uprobe.tls` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
@@ -6944,6 +6945,36 @@ processors:
 
 The length of the following queues:
 - 1-mini-meta-packet-to-pcap
+
+#### Sender Queue Size {#processors.packet.pcap_stream.sender_queue_size}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.packet.pcap_stream.sender_queue_size`
+
+**Default value**:
+```yaml
+processors:
+  packet:
+    pcap_stream:
+      sender_queue_size: 8192
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**Description**:
+
+The length of the following queues:
+- 2-pcap-batch-to-sender
 
 #### Buffer Size Per Flow {#processors.packet.pcap_stream.buffer_size_per_flow}
 

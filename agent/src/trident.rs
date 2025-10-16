@@ -2522,11 +2522,7 @@ impl AgentComponents {
         let pcap_batch_queue = "2-pcap-batch-to-sender";
         let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
             queue::bounded_with_debug(
-                user_config
-                    .processors
-                    .packet
-                    .pcap_stream
-                    .receiver_queue_size,
+                user_config.processors.packet.pcap_stream.sender_queue_size,
                 pcap_batch_queue,
                 &queue_debugger,
             );
