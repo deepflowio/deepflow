@@ -3715,7 +3715,8 @@ inputs:
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
 ```
 
-注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
+注意：开启此功能后，Envoy mTLS 流量可自动完成追踪；
+若为非 Envoy 流量，则需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
 即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `ebpf.socket.uprobe.tls`。
 
 ##### DPDK {#inputs.ebpf.socket.uprobe.dpdk}
@@ -6689,6 +6690,35 @@ processors:
 **详细描述**:
 
 设置 deepflow-agent 的 1-mini-meta-packet-to-pcap 队列大小。
+
+#### Sender 队列大小 {#processors.packet.pcap_stream.sender_queue_size}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.packet.pcap_stream.sender_queue_size`
+
+**默认值**:
+```yaml
+processors:
+  packet:
+    pcap_stream:
+      sender_queue_size: 8192
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [4096, 64000000] |
+
+**详细描述**:
+
+设置 deepflow-agent 的 2-pcap-batch-to-sender 队列大小。
 
 #### 每个 Flow 的缓冲区大小 {#processors.packet.pcap_stream.buffer_size_per_flow}
 
