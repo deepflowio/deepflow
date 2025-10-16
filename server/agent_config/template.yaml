@@ -4689,6 +4689,23 @@ processors:
       receiver_queue_size: 65536
       # type: int
       # name:
+      #   en: Sender Queue Size
+      #   ch: Sender 队列大小
+      # unit:
+      # range: [4096, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 2-pcap-batch-to-sender
+      #   ch: |-
+      #     设置 deepflow-agent 的 2-pcap-batch-to-sender 队列大小。
+      # upgrade_from:
+      sender_queue_size: 8192
+      # type: int
+      # name:
       #   en: Buffer Size Per Flow
       #   ch: 每个 Flow 的缓冲区大小
       # unit:
