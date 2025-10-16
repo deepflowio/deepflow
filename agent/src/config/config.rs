@@ -1511,6 +1511,7 @@ impl Default for TcpHeader {
 #[serde(default)]
 pub struct PcapStream {
     pub receiver_queue_size: usize,
+    pub sender_queue_size: usize,
     pub buffer_size_per_flow: u32,
     pub total_buffer_size: u64,
     #[serde(with = "humantime_serde")]
@@ -1521,6 +1522,7 @@ impl Default for PcapStream {
     fn default() -> Self {
         Self {
             receiver_queue_size: 65536,
+            sender_queue_size: 8192,
             buffer_size_per_flow: 65536,
             total_buffer_size: 88304,
             flush_interval: Duration::from_secs(60),
