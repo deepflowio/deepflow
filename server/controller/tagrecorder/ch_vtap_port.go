@@ -160,6 +160,12 @@ func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel
 				vTapPort.DeviceType = data.DeviceType
 				vTapPort.DeviceName = data.DeviceName
 				vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
+				vTapPort.HostID = data.DeviceHostID
+				vTapPort.HostName = data.DeviceHostName
+				vTapPort.CHostID = data.DeviceCHostID
+				vTapPort.CHostName = data.DeviceCHostName
+				vTapPort.PodNodeID = data.DevicePodNodeID
+				vTapPort.PodNodeName = data.DevicePodNodeName
 				log.Debugf("device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName, db.LogPrefixORGID)
 			} else {
 				log.Debugf("pass device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName, db.LogPrefixORGID)
@@ -218,6 +224,12 @@ func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel
 					vTapPort.DeviceType = data.DeviceType
 					vTapPort.DeviceName = data.DeviceName
 					vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
+					vTapPort.HostID = data.DeviceHostID
+					vTapPort.HostName = data.DeviceHostName
+					vTapPort.CHostID = data.DeviceCHostID
+					vTapPort.CHostName = data.DeviceCHostName
+					vTapPort.PodNodeID = data.DevicePodNodeID
+					vTapPort.PodNodeName = data.DevicePodNodeName
 					log.Debugf("device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName, db.LogPrefixORGID)
 				} else {
 					log.Debugf("pass device id: %d, device type: %d, device name: %s", data.DeviceID, data.DeviceType, data.DeviceName, db.LogPrefixORGID)
