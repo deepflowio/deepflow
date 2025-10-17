@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-use std::{
-    collections::HashMap,
-    ffi::CStr,
-    fs::File,
-    io::{BufRead, BufReader},
-    mem,
-    slice,
-};
+use std::{collections::HashMap, ffi::CStr, mem, slice};
 
 use libc::{c_char, c_void, pid_t};
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 
+use crate::maps::get_memory_mappings;
 use crate::utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY};
 
 const LANG_LUA: u32 = 1 << 0;
@@ -34,8 +28,8 @@ const LANG_LUAJIT: u32 = 1 << 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct LuaRuntimeInfo {
-    pub kind: u32,                // 0 = none, 1 = Lua, 2 = LuaJIT
-    pub version: [u8; 32],        // e.g. "5.4", "5.3", "2.1"
+    pub kind: u32,         // 0 = none, 1 = Lua, 2 = LuaJIT
+    pub version: [u8; 32], // e.g. "5.4", "5.3", "2.1"
     pub detection_method: [u8; 256],
     pub path: [u8; 512],
 }
@@ -68,7 +62,9 @@ pub extern "C" fn lua_detect(pid: pid_t, out: *mut LuaRuntimeInfo) -> i32 {
 
     match detect_runtime(pid as u32) {
         Some(info) => {
-            unsafe { *out = info; }
+            unsafe {
+                *out = info;
+            }
             0
         }
         None => -1,
@@ -226,27 +222,110 @@ const fn lj_ofs(
 
 const LUA_51_AARCH64: LuaOfs = lua_ofs(
     LUA_FEAT_CI_ARRAY | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_CLOSURE_ISC,
-    40, 80, 72, 8, 0, 24, 0, 0, 0, 10, 32, 32, 64, 96, 24, 80, 0, 0, 0, 16, 40, 24,
+    40,
+    80,
+    72,
+    8,
+    0,
+    24,
+    0,
+    0,
+    0,
+    10,
+    32,
+    32,
+    64,
+    96,
+    24,
+    80,
+    0,
+    0,
+    0,
+    16,
+    40,
+    24,
 );
 
 const LUA_52_AARCH64: LuaOfs = lua_ofs(
     LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32, 0, 0, 0, 0, 56, 16, 8, 0, 0, 24, 24, 72, 104, 24, 88, 40, 0, 0, 24, 80, 0,
+    32,
+    0,
+    0,
+    0,
+    0,
+    56,
+    16,
+    8,
+    0,
+    0,
+    24,
+    24,
+    72,
+    104,
+    24,
+    88,
+    40,
+    0,
+    0,
+    24,
+    80,
+    0,
 );
 
 const LUA_53_AARCH64: LuaOfs = lua_ofs(
     LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32, 0, 0, 0, 8, 40, 16, 8, 0, 0, 24, 24, 104, 40, 56, 24, 72, 0, 0, 24, 72, 16,
+    32,
+    0,
+    0,
+    0,
+    8,
+    40,
+    16,
+    8,
+    0,
+    0,
+    24,
+    24,
+    104,
+    40,
+    56,
+    24,
+    72,
+    0,
+    0,
+    24,
+    72,
+    16,
 );
 
 const LUA_54_AARCH64: LuaOfs = lua_ofs(
     LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32, 0, 0, 0, 8, 32, 16, 8, 0, 0, 24, 24, 112, 44, 63, 24, 88, 0, 0, 32, 64, 16,
+    32,
+    0,
+    0,
+    0,
+    8,
+    32,
+    16,
+    8,
+    0,
+    0,
+    24,
+    24,
+    112,
+    44,
+    63,
+    24,
+    88,
+    0,
+    0,
+    32,
+    64,
+    16,
 );
 
-const LJ_AARCH64_21_FR2_GC64: LjOfs = lj_ofs(
-    1, 1, 32, 56, 72, 64, 24, 40, 10, 32, 104, 20, 16, 146,
-);
+const LJ_AARCH64_21_FR2_GC64: LjOfs =
+    lj_ofs(1, 1, 32, 56, 72, 64, 24, 40, 10, 32, 104, 20, 16, 146);
 
 const LUA_FEAT_CI_ARRAY: u32 = 1 << 0;
 const LUA_FEAT_CI_LINKED: u32 = 1 << 1;
@@ -301,13 +380,31 @@ impl LuaUnwindTable {
         trace!("load lua unwind info for process#{pid}");
         let info = match detect_runtime(pid) {
             Some(info) => info,
-            None => return,
+            None => {
+                debug!("no Lua runtime detected for process#{pid}");
+                return;
+            }
         };
 
         let version = runtime_version_bytes(&info)
             .to_str()
             .unwrap_or_default()
             .trim();
+        let path = nul_terminated(&info.path)
+            .to_str()
+            .unwrap_or_default()
+            .trim();
+        let label = nul_terminated(&info.detection_method)
+            .to_str()
+            .unwrap_or_default()
+            .trim();
+        info!(
+            "detected Lua runtime for process#{pid}: kind={}, version=\"{}\", path=\"{}\", method=\"{}\"",
+            info.kind,
+            version,
+            path,
+            label
+        );
 
         match info.kind {
             2 => self.handle_luajit(pid, version),
@@ -319,11 +416,7 @@ impl LuaUnwindTable {
     pub unsafe fn unload(&mut self, pid: u32) {
         trace!("unload lua unwind info for process#{pid}");
         let key = pid;
-        if bpf_delete_elem(
-            self.unwind_info_fd,
-            &key as *const u32 as *const c_void,
-        ) != 0
-        {
+        if bpf_delete_elem(self.unwind_info_fd, &key as *const u32 as *const c_void) != 0 {
             let errno = get_errno();
             if errno != libc::ENOENT {
                 warn!(
@@ -332,11 +425,7 @@ impl LuaUnwindTable {
             }
         }
 
-        if bpf_delete_elem(
-            self.lang_flags_fd,
-            &key as *const u32 as *const c_void,
-        ) != 0
-        {
+        if bpf_delete_elem(self.lang_flags_fd, &key as *const u32 as *const c_void) != 0 {
             let errno = get_errno();
             if errno != libc::ENOENT {
                 warn!(
@@ -389,8 +478,11 @@ impl LuaUnwindTable {
             Some(id) => *id,
             None => {
                 let id = self.luajit_id_gen.acquire() as u8;
-                if self.update_luajit_offsets_map(self.luajit_offsets_fd, id, &LJ_AARCH64_21_FR2_GC64)
-                    != 0
+                if self.update_luajit_offsets_map(
+                    self.luajit_offsets_fd,
+                    id,
+                    &LJ_AARCH64_21_FR2_GC64,
+                ) != 0
                 {
                     self.luajit_id_gen.release(id as u32);
                     return;
@@ -406,17 +498,19 @@ impl LuaUnwindTable {
 
     unsafe fn update_lang_flags(&self, pid: u32, mask: u32) {
         let key = pid;
-        if bpf_update_elem(
+        let ret = bpf_update_elem(
             self.lang_flags_fd,
             &key as *const u32 as *const c_void,
             &mask as *const u32 as *const c_void,
             BPF_ANY,
-        ) != 0
-        {
+        );
+        if ret != 0 {
             let errno = get_errno();
             warn!(
                 "update lua lang flags for process#{pid} failed: bpf_update_elem() returned {errno}"
             );
+        } else {
+            info!("lua lang flags updated for process#{pid}: mask=0x{mask:08x}");
         }
     }
 
@@ -433,16 +527,20 @@ impl LuaUnwindTable {
             mem::size_of::<LuaUnwindInfo>(),
         );
 
-        if bpf_update_elem(
+        let ret = bpf_update_elem(
             self.unwind_info_fd,
             &key as *const u32 as *const c_void,
             value.as_ptr() as *const c_void,
             BPF_ANY,
-        ) != 0
-        {
+        );
+        if ret != 0 {
             let errno = get_errno();
             warn!(
                 "update lua unwind info for process#{pid} failed: bpf_update_elem() returned {errno}"
+            );
+        } else {
+            info!(
+                "lua unwind info updated for process#{pid}: offsets_id={offsets_id}, state=0x{state_addr:016x}"
             );
         }
     }
@@ -533,28 +631,17 @@ pub unsafe extern "C" fn lua_unwind_table_unload(table: *mut LuaUnwindTable, pid
 // --------- Runtime detection ---------
 
 fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
-    let maps = File::open(format!("/proc/{pid}/maps")).ok()?;
-    let rdr = BufReader::new(maps);
+    let areas = get_memory_mappings(pid).ok()?;
 
     let mut best_prio: u8 = 0;
     let mut best_path = String::new();
 
-    for line in rdr.lines() {
-        let line = line.ok()?;
-        let mut it = line.split_whitespace();
-        let _addr = it.next()?;
-        let perms = it.next().unwrap_or("");
-        if !perms.contains('x') {
-            continue;
-        }
-        it.next();
-        it.next();
-        it.next();
-        let path = it.collect::<Vec<_>>().join(" ");
+    for area in &areas {
+        let path = area.path.as_str();
         if path.is_empty() || path.starts_with('[') {
             continue;
         }
-        let fname = path.rsplit('/').next().unwrap_or(&path);
+        let fname = path.rsplit('/').next().unwrap_or(path);
         let prio = if fname.starts_with("libluajit") {
             4
         } else if fname.starts_with("liblua") {
@@ -568,7 +655,7 @@ fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
         };
         if prio > best_prio {
             best_prio = prio;
-            best_path = path;
+            best_path = path.to_owned();
             if prio == 4 {
                 break;
             }
@@ -579,7 +666,8 @@ fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
         return None;
     }
 
-    let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit") {
+    let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit")
+    {
         (2u32, "2.1", "LuaJIT 2.1")
     } else if best_path.contains("liblua5.4") || best_path.ends_with("/lua5.4") {
         (1u32, "5.4", "Pure Lua 5.4")
@@ -587,7 +675,10 @@ fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
         (1u32, "5.3", "Pure Lua 5.3")
     } else if best_path.contains("liblua5.2") || best_path.ends_with("/lua5.2") {
         (1u32, "5.2", "Pure Lua 5.2")
-    } else if best_path.contains("liblua5.1") || best_path.ends_with("/lua5.1") || best_path.ends_with("/lua") {
+    } else if best_path.contains("liblua5.1")
+        || best_path.ends_with("/lua5.1")
+        || best_path.ends_with("/lua")
+    {
         (1u32, "5.1", "Pure Lua 5.1")
     } else {
         (1u32, "", "Pure Lua (unknown)")
@@ -600,10 +691,17 @@ fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
         path: [0; 512],
     };
 
-    let method = format!("Library analysis: {} ({})", best_path, label);
+    let best_path_str = best_path.as_str();
+    let full_path = if best_path_str.starts_with('/') {
+        format!("/proc/{pid}/root{best_path_str}")
+    } else {
+        format!("/proc/{pid}/root/{best_path_str}")
+    };
+
+    let method = format!("Library analysis: {} ({})", full_path, label);
     copy_into(&mut info.version, ver.as_bytes());
     copy_into(&mut info.detection_method, method.as_bytes());
-    copy_into(&mut info.path, best_path.as_bytes());
+    copy_into(&mut info.path, full_path.as_bytes());
 
     Some(info)
 }

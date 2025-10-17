@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Yunshan Networks
+ * Copyright (c) 2025 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,40 +38,26 @@ ssize_t process_vm_readv(pid_t pid,
 			 unsigned long flags);
 #endif
 
-#define LUA_CHUNK_READ_MAX 4096U
+#define LUA_CHUNK_READ_MAX 4096U  // Clamp chunk reads to avoid oversized allocations.
 
 #define TAG_BITS     2
 #define TAG_SHIFT    (64 - TAG_BITS)
 #define TAG_MASK     (0x3ULL << TAG_SHIFT)
-#define TAG_LUA      (0x0ULL << TAG_SHIFT)
-#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)
-#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)
+#define TAG_LUA      (0x0ULL << TAG_SHIFT)  // Lua proto pointer.
+#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)  // Native C function.
+#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)  // LuaJIT fast function id.
 
-#define LANG_NONE    0u
 #define LANG_LUA     (1u << 0)
 #define LANG_LUAJIT  (1u << 1)
 
-#ifndef INTP_MAX_STACK_DEPTH
-#define INTP_MAX_STACK_DEPTH 30
-#endif
-
-struct lua_frame_t {
-	__u64 addr;
-	__u64 tag;
-};
-
-struct lua_stack_t {
-	__u32 len;
-	__u32 _pad;
-	struct lua_frame_t frames[INTP_MAX_STACK_DEPTH];
-};
-
+/* Metadata placed in lua_unwind_info_map by user space. */
 struct lua_unwind_info_t {
 	__u8 offsets_id;
 	__u8 _reserved[7];
 	__u64 state_address;
 };
 
+/* Layout hints for LuaJIT GC objects used during symbolization. */
 struct lj_ofs {
 	__u8  fr2;
 	__u8  gc64;
@@ -90,6 +76,7 @@ struct lj_ofs {
 	__u32 off_global_State_dispatchmode;
 };
 
+/* Layout hints for vanilla Lua 5.x structures (lua_State, Proto, etc.). */
 struct lua_ofs {
 	__u32 features;
 	__u32 off_L_ci;

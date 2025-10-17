@@ -1,10 +1,6 @@
 #pragma once
 
 
-#ifndef DEBUG_LJ
-#define DEBUG_LJ 1
-#endif
-
 #define TASK_COMM_LEN 16
 #define MAX_CPU_NR 128
 #define MAX_ENTRIES 10240
@@ -38,9 +34,6 @@
 #define PERF_MAX_STACK_DEPTH 127
 #endif
 
-#ifndef INTP_MAX_STACK_DEPTH
-#define INTP_MAX_STACK_DEPTH 30
-#endif
 
 struct lua_unwind_info_t {
 	__u8  offsets_id;    

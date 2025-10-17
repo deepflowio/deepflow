@@ -82,7 +82,7 @@ typedef struct {
 	struct bpf_map_def *custom_stack_map_b;
 	struct bpf_map_def *profiler_output_a;
 	struct bpf_map_def *profiler_output_b;
-struct bpf_map_def *progs_jmp;
+	struct bpf_map_def *progs_jmp;
 } map_group_t;
 
 #ifdef LINUX_VER_5_2_PLUS
@@ -128,7 +128,6 @@ struct bpf_map_def SEC("maps") __symbol_table = {
     .feat_flags = FEATURE_FLAG_PROFILE,
 };
 MAP_PERARRAY(symbol_index_storage, __u32, __u32, 1, FEATURE_FLAG_PROFILE)
-#endif
 
 typedef struct {
 	__u64 ip;
@@ -180,6 +179,8 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
 static inline __attribute__ ((always_inline))
 int pre_lua_unwind(void *ctx, unwind_state_t *state,
 		 map_group_t *maps, int jmp_idx);
+
+#endif
 
 /* ------------------ maps for lua------------------ */
 #ifdef LINUX_VER_5_2_PLUS
@@ -1398,6 +1399,17 @@ static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
     return 0;
 }
 
+/*
+ * Lua interpreter entry/exit uprobes:
+ *   - handle_entry_lua stores the lua_State * for the current thread so user
+ *     space can unwind Lua stacks.
+ *   - handle_entry_lua_cancel removes that cached state when the interpreter
+ *     yields or returns.
+ *
+ * Toggling  (`inputs.ebpf.profile.on_cpu.disabled = true`) will keeps the agent 
+ * from attaching the Lua uprobes.
+ *
+ */
 UPROG(handle_entry_lua)  (struct pt_regs *ctx) { return probe_entry_lua(ctx); }
 URETPROG(handle_entry_lua_cancel) (struct pt_regs *ctx) { return probe_entry_lua_cancel(ctx); }
 
