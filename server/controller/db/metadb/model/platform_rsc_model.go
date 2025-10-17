@@ -275,7 +275,7 @@ type VPC struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	Owner          string `gorm:"column:label;type:varchar(64);default:''" json:"OWNER" mapstructure:"OWNER"`
+	Owner          string `gorm:"column:owner;type:varchar(64);default:''" json:"OWNER" mapstructure:"OWNER"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
