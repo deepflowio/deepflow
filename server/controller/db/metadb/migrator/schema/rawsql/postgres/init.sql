@@ -1755,8 +1755,8 @@ TRUNCATE TABLE tap_type;
 COMMENT ON COLUMN tap_type.type IS '1:packet, 2:sFlow, 3:NetFlow V5 4:NetStream v5';
 COMMENT ON COLUMN tap_type.interface_index IS '1 ~ 2^32-1';
 COMMENT ON COLUMN tap_type.sampling_rate IS '1 ~ 2^32-1';
-INSERT INTO tap_type(name, value, vlan, description, lcuuid) 
-VALUES ('云网络', 3, 768, '', gen_random_uuid());
+INSERT INTO tap_type(name, value, vlan, lcuuid) 
+VALUES ('云网络', 3, 768, gen_random_uuid());
 
 CREATE TABLE IF NOT EXISTS npb_policy (
     id                     SERIAL PRIMARY KEY,
