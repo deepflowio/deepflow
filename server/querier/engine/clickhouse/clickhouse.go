@@ -83,6 +83,13 @@ var showPatterns = []string{
 }
 var res []*regexp.Regexp
 
+const (
+	TUPLE_ELEMENT_VALUES_INDEX = 1
+	TUPLE_ELEMENT_COUNTS_INDEX = 2
+	TOPK_PREFIX_ARRAY          = "array_"
+	TOPK_PREFIX_COUNTS         = "counts_"
+)
+
 type TargetLabelFilter struct {
 	OriginFilter string
 	TransFilter  string
@@ -112,6 +119,31 @@ func init() {
 	for _, pattern := range showPatterns {
 		res = append(res, regexp.MustCompile(pattern))
 	}
+}
+
+// createTopKColumn creates a column definition for TopK results
+// functionAs: the function alias (e.g., "array_TopK_10(ip_0)")
+// prefix: column prefix ("" for values, "counts_" for counts)
+// elementIndex: tuple element index (1 for values, 2 for counts)
+// argsLength: number of TopK function arguments
+func createTopKColumn(functionAs, prefix string, elementIndex, argsLength int) (string, string, error) {
+	if strings.TrimSpace(functionAs) == "" {
+		return "", "", fmt.Errorf("TopK function alias cannot be empty")
+	}
+	if elementIndex < 1 || elementIndex > 2 {
+		return "", "", fmt.Errorf("invalid tuple element index: %d, must be 1 or 2", elementIndex)
+	}
+	columnValue := "`" + strings.Trim(functionAs, "`") + "`"
+	if ctlcommon.CompareVersion(config.Cfg.Clickhouse.Version, ctlcommon.CLICK_HOUSE_VERSION) >= 0 {
+		columnValue = fmt.Sprintf("tupleElement(`%s`,%d)", strings.Trim(functionAs, "`"), elementIndex)
+	}
+
+	// if topk has one arg, need to concat array to string
+	if argsLength == 1 {
+		columnValue = fmt.Sprintf("arrayStringConcat(%s,',')", columnValue)
+	}
+	columnAlias := strings.Replace(functionAs, TOPK_PREFIX_ARRAY, prefix, 1)
+	return columnValue, columnAlias, nil
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -1597,6 +1629,37 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 			}
 		}
+
+		// topk add counts column
+		if name == view.FUNCTION_TOPK {
+			argsLength := len(args)
+			if strings.HasPrefix(functionAs, "`") {
+				functionAs = strings.TrimPrefix(functionAs, "`")
+				functionAs = "`" + TOPK_PREFIX_ARRAY + functionAs
+			} else {
+				functionAs = TOPK_PREFIX_ARRAY + functionAs
+			}
+			e.ColumnSchemas[len(e.ColumnSchemas)-1].Name = strings.Trim(functionAs, "`")
+			// create topk string and counts column
+			topKStr, topKStrAs, err := createTopKColumn(functionAs, "", TUPLE_ELEMENT_VALUES_INDEX, argsLength-1)
+			if err != nil {
+				return err
+			}
+			topKCounts, topKCountsAs, err := createTopKColumn(functionAs, TOPK_PREFIX_COUNTS, TUPLE_ELEMENT_COUNTS_INDEX, argsLength-1)
+			if err != nil {
+				return err
+			}
+			// make sure topk string and counts is the first two select item
+			topkStrSchema := common.NewColumnSchema(topKStrAs, topKStr, "")
+			topkStrSchema.Type = common.COLUMN_SCHEMA_TYPE_METRICS
+			topkCountsSchema := common.NewColumnSchema(topKCountsAs, topKCounts, "")
+			topkCountsSchema.Type = common.COLUMN_SCHEMA_TYPE_METRICS
+			e.Statements = append([]Statement{&SelectTag{Value: topKCounts, Alias: topKCountsAs, Flag: view.NODE_FLAG_METRICS_OUTER}}, e.Statements...)
+			e.ColumnSchemas = append([]*common.ColumnSchema{topkCountsSchema}, e.ColumnSchemas...)
+			e.Statements = append([]Statement{&SelectTag{Value: topKStr, Alias: topKStrAs, Flag: view.NODE_FLAG_METRICS_OUTER}}, e.Statements...)
+			e.ColumnSchemas = append([]*common.ColumnSchema{topkStrSchema}, e.ColumnSchemas...)
+		}
+
 		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, derivativeArgs, e)
 		if err != nil {
 			return err

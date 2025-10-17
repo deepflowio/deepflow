@@ -36,6 +36,7 @@ import (
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
 	"github.com/deepflowio/deepflow/server/querier/router"
@@ -56,12 +57,26 @@ func Start(configPath, serverLogFile string, shared *servercommon.ControllerInge
 	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
 	log.Infof("querier config:\n%s", string(bytes))
 
+	// get ck version
+	ckClient := client.Client{
+		Host:     cfg.Clickhouse.Host,
+		Port:     cfg.Clickhouse.Port,
+		UserName: cfg.Clickhouse.User,
+		Password: cfg.Clickhouse.Password,
+	}
+	err := ckClient.Init("")
+	if err != nil {
+		log.Error(err)
+		os.Exit(0)
+	}
+	config.Cfg.Clickhouse.Version = ckClient.Version
+
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
 	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
 
 	// engine加载数据库tag/metric等信息
-	err := Load()
+	err = Load()
 	if err != nil {
 		log.Error(err)
 		os.Exit(0)

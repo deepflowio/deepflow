@@ -90,6 +90,7 @@ type Clickhouse struct {
 	MaxConnection  int    `default:"20" yaml:"max-connection"`
 	UseQueryCache  bool   `default:"true" yaml:"use-query-cache"`
 	QueryCacheTTL  string `default:"600" yaml:"query-cache-ttl"`
+	Version        string `default:"" yaml:"-"`
 }
 
 type AutoCustomTags struct {
