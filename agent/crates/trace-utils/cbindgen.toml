@@ -51,7 +51,15 @@ sort_by = "Name"
 usize_is_size_t = true
 
 [export]
-include = ["ProcessShardList", "UnwindEntryShard", "PythonUnwindInfo", "PythonOffsets"]
+include = [
+  "ProcessShardList",
+  "UnwindEntryShard",
+  "PythonUnwindInfo",
+  "PythonOffsets",
+  "unwind::lua::LuaRuntimeInfo",
+  "unwind::lua::LuaUnwindInfo",
+  "unwind::lua::LuaUnwindTable"
+]
 exclude = ["bpf_update_elem", "bpf_delete_elem", "BPF_ANY"]
 item_types = []
 renaming_overrides_prefixing = false

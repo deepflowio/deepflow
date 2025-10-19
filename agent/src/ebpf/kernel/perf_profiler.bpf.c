@@ -1149,6 +1149,7 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx, __u32 tid
         }
     }
 
+#pragma unroll
     for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
 
         if (intp_stack->len >= STACK_FRAMES_PER_RUN)
@@ -1311,11 +1312,9 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid, void *L, st
 	void *frame, *nextframe;
 	frame = nextframe = (void *)((char *)base_ptr - 8);
 
-
-
     // Main frame walker loop
-    int i = 0;
-    for (; i < STACK_FRAMES_PER_RUN; i++) {
+#pragma unroll
+    for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
         if (frame <= bot) break;
         if (frame_gc_equals_L(frame, L, o) > 0) {
             level++;

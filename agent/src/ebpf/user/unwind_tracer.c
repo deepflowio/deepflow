@@ -56,7 +56,7 @@ static pthread_mutex_t g_python_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static python_unwind_table_t *g_python_unwind_table = NULL;
 
 static pthread_mutex_t g_lua_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
-static LuaUnwindTable *g_lua_unwind_table = NULL;
+static lua_unwind_table_t *g_lua_unwind_table = NULL;
 
 /* *INDENT-OFF* */
 static struct symbol lua_symbols[] = {
@@ -270,7 +270,7 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
         return -1;
     }
 
-    LuaUnwindTable *lua_table = lua_unwind_table_create(lua_lang_fd,
+    lua_unwind_table_t *lua_table = lua_unwind_table_create(lua_lang_fd,
                                                         lua_unwind_info_fd,
                                                         lua_offsets_fd,
                                                         luajit_offsets_fd);
@@ -333,7 +333,7 @@ out:
 
 static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf)
 {
-    LuaRuntimeInfo info = {0};
+    lua_runtime_info_t info = {0};
     char path[sizeof(info.path)] = {0};
     int n = 0;
 

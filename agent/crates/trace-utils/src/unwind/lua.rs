@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, ffi::CStr, mem, slice};
+use std::{collections::HashMap, mem, slice, str};
 
-use libc::{c_char, c_void, pid_t};
+use libc::{c_void};
 use log::{debug, info, trace, warn};
 
 use crate::maps::get_memory_mappings;
@@ -34,35 +34,53 @@ pub struct LuaRuntimeInfo {
     pub path: [u8; 512],
 }
 
-fn nul_terminated(bytes: &[u8]) -> &CStr {
-    // Safety: cbindgen guarantees buffers are NUL-terminated when filled.
-    unsafe { CStr::from_ptr(bytes.as_ptr() as *const c_char) }
+fn trim_nul(bytes: &[u8]) -> &[u8] {
+    match bytes.iter().position(|&b| b == 0) {
+        Some(idx) => &bytes[..idx],
+        None => bytes,
+    }
 }
 
-#[inline]
-fn runtime_version_bytes(info: &LuaRuntimeInfo) -> &CStr {
-    nul_terminated(&info.version)
+fn bytes_to_str(bytes: &[u8]) -> &str {
+    match str::from_utf8(trim_nul(bytes)) {
+        Ok(s) => s,
+        Err(_) => "",
+    }
+}
+
+impl LuaRuntimeInfo {
+    fn version_str(&self) -> &str {
+        bytes_to_str(&self.version)
+    }
+
+    fn detection_method_str(&self) -> &str {
+        bytes_to_str(&self.detection_method)
+    }
+
+    fn path_str(&self) -> &str {
+        bytes_to_str(&self.path)
+    }
 }
 
 // --------- C FFI surface ---------
 
 #[no_mangle]
-pub extern "C" fn is_lua_process(pid: pid_t) -> i32 {
+pub extern "C" fn is_lua_process(pid: u32) -> i32 {
     if pid <= 0 {
         return 0;
     }
-    detect_runtime(pid as u32).map(|_| 1).unwrap_or(0)
+    detect_runtime(pid as u32).is_some() as i32
 }
 
 #[no_mangle]
-pub extern "C" fn lua_detect(pid: pid_t, out: *mut LuaRuntimeInfo) -> i32 {
+pub unsafe extern "C" fn lua_detect(pid: u32, out: *mut LuaRuntimeInfo) -> i32 {
     if pid <= 0 || out.is_null() {
         return -1;
     }
 
     match detect_runtime(pid as u32) {
         Some(info) => {
-            unsafe {
+            {
                 *out = info;
             }
             0
@@ -131,201 +149,127 @@ struct LjOfs {
     off_global_State_dispatchmode: u32,
 }
 
-#[allow(non_snake_case)]
-const fn lua_ofs(
-    features: u32,
-    off_L_ci: u32,
-    off_L_base_ci: u32,
-    off_L_end_ci: u32,
-    off_CI_func: u32,
-    off_CI_top: u32,
-    off_CI_savedpc: u32,
-    off_CI_prev: u32,
-    off_TValue_tt: u32,
-    off_TValue_val: u32,
-    off_Closure_isC: u32,
-    off_LClosure_p: u32,
-    off_CClosure_f: u32,
-    off_Proto_source: u32,
-    off_Proto_linedefined: u32,
-    off_Proto_code: u32,
-    off_Proto_sizecode: u32,
-    off_Proto_lineinfo: u32,
-    off_Proto_abslineinfo: u32,
-    off_TString_len: u32,
-    sizeof_TString: u32,
-    sizeof_CallInfo: u32,
-    sizeof_TValue: u32,
-) -> LuaOfs {
-    LuaOfs {
-        features,
-        off_L_ci,
-        off_L_base_ci,
-        off_L_end_ci,
-        off_CI_func,
-        off_CI_top,
-        off_CI_savedpc,
-        off_CI_prev,
-        off_TValue_tt,
-        off_TValue_val,
-        off_Closure_isC,
-        off_LClosure_p,
-        off_CClosure_f,
-        off_Proto_source,
-        off_Proto_linedefined,
-        off_Proto_code,
-        off_Proto_sizecode,
-        off_Proto_lineinfo,
-        off_Proto_abslineinfo,
-        off_TString_len,
-        sizeof_TString,
-        sizeof_CallInfo,
-        sizeof_TValue,
-    }
-}
+const LUA_51_AARCH64: LuaOfs = LuaOfs {
+    features: LUA_FEAT_CI_ARRAY | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_CLOSURE_ISC,
+    off_L_ci: 40,
+    off_L_base_ci: 80,
+    off_L_end_ci: 72,
+    off_CI_func: 8,
+    off_CI_top: 0,
+    off_CI_savedpc: 24,
+    off_CI_prev: 0,
+    off_TValue_tt: 0,
+    off_TValue_val: 0,
+    off_Closure_isC: 10,
+    off_LClosure_p: 32,
+    off_CClosure_f: 32,
+    off_Proto_source: 64,
+    off_Proto_linedefined: 96,
+    off_Proto_code: 24,
+    off_Proto_sizecode: 80,
+    off_Proto_lineinfo: 0,
+    off_Proto_abslineinfo: 0,
+    off_TString_len: 0,
+    sizeof_TString: 16,
+    sizeof_CallInfo: 40,
+    sizeof_TValue: 24,
+};
 
-#[allow(non_snake_case)]
-const fn lj_ofs(
-    fr2: u8,
-    gc64: u8,
-    off_L_base: u32,
-    off_L_stack: u32,
-    off_GCproto_firstline: u32,
-    off_GCproto_chunkname: u32,
-    off_GCstr_data: u32,
-    off_GCfunc_cfunc: u32,
-    off_GCfunc_ffid: u32,
-    off_GCfunc_pc: u32,
-    off_GCproto_bc: u32,
-    off_GCstr_len: u32,
-    off_L_glref: u32,
-    off_global_State_dispatchmode: u32,
-) -> LjOfs {
-    LjOfs {
-        fr2,
-        gc64,
-        _pad: 0,
-        off_L_base,
-        off_L_stack,
-        off_GCproto_firstline,
-        off_GCproto_chunkname,
-        off_GCstr_data,
-        off_GCfunc_cfunc,
-        off_GCfunc_ffid,
-        off_GCfunc_pc,
-        off_GCproto_bc,
-        off_GCstr_len,
-        off_L_glref,
-        off_global_State_dispatchmode,
-    }
-}
+const LUA_52_AARCH64: LuaOfs = LuaOfs {
+    features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
+    off_L_ci: 32,
+    off_L_base_ci: 0,
+    off_L_end_ci: 0,
+    off_CI_func: 0,
+    off_CI_top: 0,
+    off_CI_savedpc: 56,
+    off_CI_prev: 16,
+    off_TValue_tt: 8,
+    off_TValue_val: 0,
+    off_Closure_isC: 0,
+    off_LClosure_p: 24,
+    off_CClosure_f: 24,
+    off_Proto_source: 72,
+    off_Proto_linedefined: 104,
+    off_Proto_code: 24,
+    off_Proto_sizecode: 88,
+    off_Proto_lineinfo: 40,
+    off_Proto_abslineinfo: 0,
+    off_TString_len: 0,
+    sizeof_TString: 24,
+    sizeof_CallInfo: 80,
+    sizeof_TValue: 16,
+};
 
-const LUA_51_AARCH64: LuaOfs = lua_ofs(
-    LUA_FEAT_CI_ARRAY | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_CLOSURE_ISC,
-    40,
-    80,
-    72,
-    8,
-    0,
-    24,
-    0,
-    0,
-    0,
-    10,
-    32,
-    32,
-    64,
-    96,
-    24,
-    80,
-    0,
-    0,
-    0,
-    16,
-    40,
-    24,
-);
+const LUA_53_AARCH64: LuaOfs = LuaOfs {
+    features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
+    off_L_ci: 32,
+    off_L_base_ci: 0,
+    off_L_end_ci: 0,
+    off_CI_func: 0,
+    off_CI_top: 8,
+    off_CI_savedpc: 40,
+    off_CI_prev: 16,
+    off_TValue_tt: 8,
+    off_TValue_val: 0,
+    off_Closure_isC: 0,
+    off_LClosure_p: 24,
+    off_CClosure_f: 24,
+    off_Proto_source: 104,
+    off_Proto_linedefined: 40,
+    off_Proto_code: 56,
+    off_Proto_sizecode: 24,
+    off_Proto_lineinfo: 72,
+    off_Proto_abslineinfo: 0,
+    off_TString_len: 0,
+    sizeof_TString: 24,
+    sizeof_CallInfo: 72,
+    sizeof_TValue: 16,
+};
 
-const LUA_52_AARCH64: LuaOfs = lua_ofs(
-    LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32,
-    0,
-    0,
-    0,
-    0,
-    56,
-    16,
-    8,
-    0,
-    0,
-    24,
-    24,
-    72,
-    104,
-    24,
-    88,
-    40,
-    0,
-    0,
-    24,
-    80,
-    0,
-);
+const LUA_54_AARCH64: LuaOfs = LuaOfs {
+    features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
+    off_L_ci: 32,
+    off_L_base_ci: 0,
+    off_L_end_ci: 0,
+    off_CI_func: 0,
+    off_CI_top: 8,
+    off_CI_savedpc: 32,
+    off_CI_prev: 16,
+    off_TValue_tt: 8,
+    off_TValue_val: 0,
+    off_Closure_isC: 0,
+    off_LClosure_p: 24,
+    off_CClosure_f: 24,
+    off_Proto_source: 112,
+    off_Proto_linedefined: 44,
+    off_Proto_code: 63,
+    off_Proto_sizecode: 24,
+    off_Proto_lineinfo: 88,
+    off_Proto_abslineinfo: 0,
+    off_TString_len: 0,
+    sizeof_TString: 32,
+    sizeof_CallInfo: 64,
+    sizeof_TValue: 16,
+};
 
-const LUA_53_AARCH64: LuaOfs = lua_ofs(
-    LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32,
-    0,
-    0,
-    0,
-    8,
-    40,
-    16,
-    8,
-    0,
-    0,
-    24,
-    24,
-    104,
-    40,
-    56,
-    24,
-    72,
-    0,
-    0,
-    24,
-    72,
-    16,
-);
-
-const LUA_54_AARCH64: LuaOfs = lua_ofs(
-    LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    32,
-    0,
-    0,
-    0,
-    8,
-    32,
-    16,
-    8,
-    0,
-    0,
-    24,
-    24,
-    112,
-    44,
-    63,
-    24,
-    88,
-    0,
-    0,
-    32,
-    64,
-    16,
-);
-
-const LJ_AARCH64_21_FR2_GC64: LjOfs =
-    lj_ofs(1, 1, 32, 56, 72, 64, 24, 40, 10, 32, 104, 20, 16, 146);
+const LJ_AARCH64_21_FR2_GC64: LjOfs = LjOfs {
+    fr2: 1,
+    gc64: 1,
+    _pad: 0,
+    off_L_base: 32,
+    off_L_stack: 56,
+    off_GCproto_firstline: 72,
+    off_GCproto_chunkname: 64,
+    off_GCstr_data: 24,
+    off_GCfunc_cfunc: 40,
+    off_GCfunc_ffid: 10,
+    off_GCfunc_pc: 32,
+    off_GCproto_bc: 104,
+    off_GCstr_len: 20,
+    off_L_glref: 16,
+    off_global_State_dispatchmode: 146,
+};
 
 const LUA_FEAT_CI_ARRAY: u32 = 1 << 0;
 const LUA_FEAT_CI_LINKED: u32 = 1 << 1;
@@ -386,18 +330,9 @@ impl LuaUnwindTable {
             }
         };
 
-        let version = runtime_version_bytes(&info)
-            .to_str()
-            .unwrap_or_default()
-            .trim();
-        let path = nul_terminated(&info.path)
-            .to_str()
-            .unwrap_or_default()
-            .trim();
-        let label = nul_terminated(&info.detection_method)
-            .to_str()
-            .unwrap_or_default()
-            .trim();
+        let version = info.version_str().trim();
+        let path = info.path_str().trim();
+        let label = info.detection_method_str().trim();
         info!(
             "detected Lua runtime for process#{pid}: kind={}, version=\"{}\", path=\"{}\", method=\"{}\"",
             info.kind,
