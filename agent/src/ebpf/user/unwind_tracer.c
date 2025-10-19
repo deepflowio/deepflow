@@ -76,9 +76,23 @@ static struct symbol lua_symbols[] = {
     },
     {
         .type = LUA_UPROBE,
+        .symbol = "lua_pcallk",
+        .symbol_prefix = NULL,
+        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
         .symbol = "lua_yield",
         .symbol_prefix = NULL,
-        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua_cancel),
+        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_yieldk",
+        .symbol_prefix = NULL,
+        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
         .is_probe_ret = false,
     },
 };

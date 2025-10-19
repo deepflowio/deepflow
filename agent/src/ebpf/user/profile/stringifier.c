@@ -669,7 +669,8 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 				  pid_t pid,
 				  const char *stack_map_name,
 				  stack_str_hash_t *h,
-				  bool new_cache)
+				  bool new_cache,
+				  void *info_p)
 {
 	if (stack_id < 0)
 		return NULL;
@@ -744,9 +745,13 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 			out = create_symbol_str(strlen(buf), buf, "");
 		} else if (tag == TAG_CFUNC) {
 			unsigned long addr = (unsigned long)(encoded & ~TAG_MASK);
-			out = resolve_addr(t, pid, false, addr, new_cache, NULL);
+			out = resolve_addr(t, pid, false, addr, new_cache, info_p);
 			if (!out) {
 				snprintf(buf, sizeof(buf), "C:0x%016lx", addr);
+				out = create_symbol_str(strlen(buf), buf, "");
+			} else if (strncmp(out, "[unknown", 8) == 0) {
+				clib_mem_free(out);
+				snprintf(buf, sizeof(buf), "[unkown] C:0x%016lx", addr);
 				out = create_symbol_str(strlen(buf), buf, "");
 			}
 		} else if (tag == TAG_FFUNC) {
@@ -980,7 +985,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (has_intpstack) {
 		i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
 					    v->tgid, custom_stack_map_name,
-					    h, new_cache);
+					    h, new_cache, info_p);
 		if (i_trace_str != NULL) {
 			lua_intp = true;
 			len += strlen(i_trace_str) + 1;
