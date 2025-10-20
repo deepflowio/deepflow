@@ -361,10 +361,10 @@ where
             );
 
             if prev_info.time > cur_info.time {
-                if cur_info.msg_type == LogMessageType::Request {
+                if !cur_info.on_blacklist && cur_info.msg_type == LogMessageType::Request {
                     timeout_counter.timeout += 1;
                 }
-                if prev_info.msg_type == LogMessageType::Request {
+                if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Request {
                     timeout_counter.in_cache += 1;
                 }
                 if !cur_info.on_blacklist {
@@ -373,10 +373,10 @@ where
                     None
                 }
             } else {
-                if prev_info.msg_type == LogMessageType::Request {
+                if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Request {
                     timeout_counter.timeout += 1;
                 }
-                if cur_info.msg_type == LogMessageType::Request {
+                if !cur_info.on_blacklist && cur_info.msg_type == LogMessageType::Request {
                     timeout_counter.in_cache += 1;
                 }
                 let prev_info = rtt_cache.put(key, cur_info).unwrap();
@@ -387,7 +387,8 @@ where
                 }
             }
         } else {
-            if prev_info.msg_type != cur_info.msg_type
+            if !prev_info.on_blacklist
+                && prev_info.msg_type != cur_info.msg_type
                 && !prev_info.multi_merge_info.as_ref().unwrap().merged
             {
                 timeout_counter.timeout += 1;
