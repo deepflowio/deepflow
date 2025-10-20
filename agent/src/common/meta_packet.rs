@@ -865,33 +865,35 @@ impl<'a> MetaPacket<'a> {
                 }
             }
             IpProtocol::ICMPV6 => {
-                let mut icmp_data = IcmpData::default();
-                if size_checker > 0 {
-                    let icmpv6_type_index = ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size as usize;
-                    icmp_data.icmp_type = packet[icmpv6_type_index];
-
-                    match Icmpv6Type::new(packet[icmpv6_type_index]) {
-                        Icmpv6Types::NeighborAdvert => {
-                            self.nd_reply_or_arp_request = true;
-                        }
-                        Icmpv6Types::EchoRequest => {
-                            icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
-                        }
-                        Icmpv6Types::EchoReply => {
-                            icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
-                            self.lookup_key.direction = PacketDirection::ServerToClient;
-                        }
-                        _ => {}
-                    }
-                    // 忽略link-local address并只考虑ND reply, i.e. neighbour advertisement
-                    if let IpAddr::V6(ip) = self.lookup_key.src_ip {
-                        self.nd_reply_or_arp_request =
-                            self.nd_reply_or_arp_request && !is_unicast_link_local(&ip);
-                    }
+                size_checker -= HeaderType::Ipv6Icmp.min_header_size() as isize;
+                if size_checker < 0 {
+                    return Ok(());
                 }
-                self.protocol_data = ProtocolData::IcmpData(icmp_data);
+                let mut icmp_data = IcmpData::default();
+                let icmpv6_type_index = ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size as usize;
+                icmp_data.icmp_type = packet[icmpv6_type_index];
+                match Icmpv6Type::new(packet[icmpv6_type_index]) {
+                    Icmpv6Types::NeighborAdvert => {
+                        self.nd_reply_or_arp_request = true;
+                    }
+                    Icmpv6Types::EchoRequest => {
+                        icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
+                    }
+                    Icmpv6Types::EchoReply => {
+                        icmp_data.echo_id_seq = read_u32_be(&packet[icmpv6_type_index + 4..]);
+                        self.lookup_key.direction = PacketDirection::ServerToClient;
+                    }
+                    _ => {}
+                }
+                // 忽略link-local address并只考虑ND reply, i.e. neighbour advertisement
+                if let IpAddr::V6(ip) = self.lookup_key.src_ip {
+                    self.nd_reply_or_arp_request =
+                        self.nd_reply_or_arp_request && !is_unicast_link_local(&ip);
+                }
                 self.payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
+                self.protocol_data = ProtocolData::IcmpData(icmp_data);
+                self.header_type = HeaderType::Ipv6Icmp;
                 return Ok(());
             }
             _ => {
