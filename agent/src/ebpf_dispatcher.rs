@@ -1192,6 +1192,12 @@ impl EbpfCollector {
             ebpf::dpdk_trace_start();
         }
 
+        // Istio envoy mtls
+        #[cfg(feature = "extended_observability")]
+        if config.ebpf.socket.uprobe.tls.enabled {
+            ebpf::envoy_trace_start();
+        }
+
         ebpf::bpf_tracer_finish();
 
         Ok(handle)
