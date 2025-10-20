@@ -180,6 +180,8 @@ void lua_unwind_table_unload(lua_unwind_table_t *table, uint32_t pid);
 
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
+size_t merge_lua_stacks(void *trace_str, size_t len, const void *u_trace, const void *i_trace);
+
 int32_t protect_cpu_affinity_c(void);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,

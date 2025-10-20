@@ -1011,11 +1011,12 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		goto error;
 	}
 
-	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
+	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
 		if (lua_intp) {
-			offset += snprintf(trace_str + offset, len - offset, "%s;%s", i_trace_str, u_trace_str);
+			offset += merge_lua_stacks(trace_str + offset, len - offset,
+						   u_trace_str, i_trace_str);
 		} else {
 			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		}

@@ -9,9 +9,9 @@
 #define TAG_BITS     2
 #define TAG_SHIFT    (64 - TAG_BITS)
 #define TAG_MASK     (0x3ULL << TAG_SHIFT)
-#define TAG_LUA      (0x0ULL << TAG_SHIFT)   // 00
-#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)   // 01
-#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)   // 10
+#define TAG_LUA      (0x0ULL << TAG_SHIFT)   /* 00 */
+#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)   /* 01 */
+#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)   /* 10 */
 
 #define FF_LUA 0
 #define FF_C   1
@@ -36,8 +36,9 @@
 
 
 struct lua_unwind_info_t {
-	__u8  offsets_id;    
-	__u64 state_address; 
+	__u8  offsets_id;                 /* entry in offsets map */
+	__u8  reserved[7];                /* spare for alignment */
+	__u64 state_address;              /* lua_State* in target */
 };
 
 
@@ -57,64 +58,64 @@ enum func_type {
 
 #define LUA_TCOLLECTABLE 0x40
 
-// more fields than actually needed, for future use
+/* more fields than actually needed, for future use */
 struct lj_ofs {
-    __u8  fr2;
-    __u8  gc64;
-    __u16 _pad;
-    __u32 off_L_base;
-    __u32 off_L_stack;
-    __u32 off_GCproto_firstline;
-    __u32 off_GCproto_chunkname;
-    __u32 off_GCstr_data;
-    __u32 off_GCfunc_cfunc;
-    __u32 off_GCfunc_ffid;
-    __u32 off_GCfunc_pc;
-    __u32 off_GCproto_bc;
-    __u32 off_GCstr_len;
-    __u32 off_L_glref;
-    __u32 off_global_State_dispatchmode;
+    __u8  fr2;                     /* frame uses dual slots */
+    __u8  gc64;                    /* GC references are 64-bit */
+    __u16 pad;                     /* alignment padding */
+    __u32 off_l_base;              /* lua_State->base */
+    __u32 off_l_stack;             /* lua_State->stack */
+    __u32 off_gcproto_firstline;   /* GCproto->firstline */
+    __u32 off_gcproto_chunkname;   /* GCproto->chunkname */
+    __u32 off_gcstr_data;          /* GCstr->data */
+    __u32 off_gcfunc_cfunc;        /* GCfunc->c.cfunc */
+    __u32 off_gcfunc_ffid;         /* GCfunc->c.ffid */
+    __u32 off_gcfunc_pc;           /* GCfunc->l.pc */
+    __u32 off_gcproto_bc;          /* GCproto->bc */
+    __u32 off_gcstr_len;           /* GCstr->len */
+    __u32 off_l_glref;             /* lua_State->glref */
+    __u32 off_global_state_dispatchmode; /* global_State->dispatchmode */
 };
 
 
 struct lua_ofs {
-    __u32 features;
+    __u32 features;                /* feature flags (LUA_FEAT_*) */
 
     /* lua_State */
-    __u32 off_L_ci;
-    __u32 off_L_base_ci;
-    __u32 off_L_end_ci; 
+    __u32 off_l_ci;                /* lua_State->ci */
+    __u32 off_l_base_ci;           /* lua_State->base_ci */
+    __u32 off_l_end_ci;            /* lua_State->end_ci */
 
-    /* CallInfo*/
-    __u32 off_CI_func;
-    __u32 off_CI_top;
-    __u32 off_CI_savedpc;
-    __u32 off_CI_prev;
+    /* CallInfo */
+    __u32 off_ci_func;             /* CallInfo->func */
+    __u32 off_ci_top;              /* CallInfo->top */
+    __u32 off_ci_savedpc;          /* CallInfo->savedpc */
+    __u32 off_ci_prev;             /* CallInfo->previous */
 
     /* TValue */
-    __u32 off_TValue_tt; 
-    __u32 off_TValue_val; 
+    __u32 off_tvalue_tt;           /* TValue->tt */
+    __u32 off_tvalue_val;          /* TValue->value */
 
     /* Closure selector / union payloads */
-    __u32 off_Closure_isC;
-    __u32 off_LClosure_p;
-    __u32 off_CClosure_f;
+    __u32 off_closure_isc;         /* Closure->c.isC */
+    __u32 off_lclosure_p;          /* LClosure->p */
+    __u32 off_cclosure_f;          /* CClosure->f */
 
     /* Proto */
-    __u32 off_Proto_source;
-    __u32 off_Proto_linedefined;
-    __u32 off_Proto_code;
-    __u32 off_Proto_sizecode;
-    __u32 off_Proto_lineinfo;
-    __u32 off_Proto_abslineinfo;
+    __u32 off_proto_source;        /* Proto->source */
+    __u32 off_proto_linedefined;   /* Proto->linedefined */
+    __u32 off_proto_code;          /* Proto->code */
+    __u32 off_proto_sizecode;      /* Proto->sizecode */
+    __u32 off_proto_lineinfo;      /* Proto->lineinfo */
+    __u32 off_proto_abslineinfo;   /* Proto->abslineinfo */
 
     /* TString */
-    __u32 off_TString_len;
-    __u32 sizeof_TString;
+    __u32 off_tstring_len;         /* TString->len */
+    __u32 sizeof_tstring;          /* sizeof(TString) */
 
     /* Sizes */
-    __u32 sizeof_CallInfo;
-    __u32 sizeof_TValue;
+    __u32 sizeof_callinfo;         /* sizeof(CallInfo) */
+    __u32 sizeof_tvalue;           /* sizeof(TValue) */
 };
 
 /* ----- helper functions ----- */
@@ -145,7 +146,7 @@ static __always_inline void *decode_gcref_raw(__u64 raw, struct lj_ofs *lj)
 static __always_inline int uread_gcref(void **dst, const void *pt, struct lj_ofs *lj)
 {
     __u64 raw;
-    int r = uread(&raw, uadd(pt, lj->off_GCproto_chunkname), sizeof(raw));
+    int r = uread(&raw, uadd(pt, lj->off_gcproto_chunkname), sizeof(raw));
     if (r)
         return r;
     *dst = decode_gcref_raw(raw, lj);
@@ -155,29 +156,29 @@ static __always_inline int uread_gcref(void **dst, const void *pt, struct lj_ofs
 static __always_inline int gcfunc_get_proto(void *fn, void **ppt, struct lj_ofs *lj)
 {
     void *pc = NULL;
-    void *pc_addr = uadd(fn, lj->off_GCfunc_pc);
+    void *pc_addr = uadd(fn, lj->off_gcfunc_pc);
     int r = uread_mref(&pc, pc_addr);
     if (r) {
         return -1;
     }
-    void *pt = (void *)((char *)pc - lj->off_GCproto_bc);
+    void *pt = (void *)((char *)pc - lj->off_gcproto_bc);
     *ppt = pt;
     return 0;
 }
 
 static __always_inline int L_get_base(void *L, void **base, struct lj_ofs *lj)
 {
-    return uread((void **)base, uadd(L, lj->off_L_base), sizeof(void *));
+    return uread((void **)base, uadd(L, lj->off_l_base), sizeof(void *));
 }
 
 static __always_inline int L_get_stack(void *L, void **stack, struct lj_ofs *lj)
 {
-    return uread_mref((void **)stack, uadd(L, lj->off_L_stack));
+    return uread_mref((void **)stack, uadd(L, lj->off_l_stack));
 }
 
 static __always_inline int proto_get_firstline(void *pt, int *pline, struct lj_ofs *lj)
 {
-    return uread(pline, uadd(pt, lj->off_GCproto_firstline), sizeof(*pline));
+    return uread(pline, uadd(pt, lj->off_gcproto_firstline), sizeof(*pline));
 }
 
 static __always_inline __u32 clamp_len(__u32 len, __u32 max_copy)
@@ -206,14 +207,14 @@ static __always_inline int proto_get_chunkname(void *pt,
     }
 
     __u32 len = 0;
-    r = uread(&len, uadd(gcs_ptr, lj->off_GCstr_len), sizeof(len));
+    r = uread(&len, uadd(gcs_ptr, lj->off_gcstr_len), sizeof(len));
     if (r) {
         return -1;
     }
 
     __u32 n = clamp_len(len, dst_sz - 1);
     if (n) {
-        r = uread(dst, uadd(gcs_ptr, lj->off_GCstr_data), n);
+        r = uread(dst, uadd(gcs_ptr, lj->off_gcstr_data), n);
         if (r) {
             return -1;
         }
@@ -225,12 +226,12 @@ static __always_inline int proto_get_chunkname(void *pt,
 
 static __always_inline int gcfunc_get_cfunc(void *fn, void **cfuncp, struct lj_ofs *lj)
 {
-    return uread(cfuncp, uadd(fn, lj->off_GCfunc_cfunc), sizeof(*cfuncp));
+    return uread(cfuncp, uadd(fn, lj->off_gcfunc_cfunc), sizeof(*cfuncp));
 }
 
 static __always_inline int gcfunc_get_ffid(void *fn, __u8 *pffid, struct lj_ofs *lj)
 {
-    return uread(pffid, uadd(fn, lj->off_GCfunc_ffid), sizeof(*pffid));
+    return uread(pffid, uadd(fn, lj->off_gcfunc_ffid), sizeof(*pffid));
 }
 
 static __always_inline int is_luafunc(void *fn, struct lj_ofs *lj)

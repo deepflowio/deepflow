@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, mem, slice, str};
+use std::{collections::HashMap, ffi::CStr, mem, ptr, slice, str};
 
-use libc::{c_void};
+use libc::{c_char, c_void};
 use log::{debug, info, trace, warn};
 
 use crate::maps::get_memory_mappings;
@@ -89,186 +89,258 @@ pub unsafe extern "C" fn lua_detect(pid: u32, out: *mut LuaRuntimeInfo) -> i32 {
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn merge_lua_stacks(
+    trace_str: *mut c_void,
+    len: usize,
+    u_trace: *const c_void,
+    i_trace: *const c_void,
+) -> usize {
+    if trace_str.is_null() || len == 0 {
+        return 0;
+    }
+
+    let user = if u_trace.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(u_trace as *const c_char).to_str() {
+            Ok(s) => s,
+            Err(_) => "",
+        }
+    };
+
+    let lua = if i_trace.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(i_trace as *const c_char).to_str() {
+            Ok(s) => s,
+            Err(_) => "",
+        }
+    };
+
+    if user.is_empty() {
+        return write_combined_output(trace_str, len, lua.as_bytes());
+    }
+    if lua.is_empty() {
+        return write_combined_output(trace_str, len, user.as_bytes());
+    }
+
+    let lua_frames: Vec<&str> = lua.split(';').filter(|s| !s.is_empty()).collect();
+    let mut lua_idx = 0usize;
+
+    let mut merged: Vec<u8> = Vec::with_capacity(len);
+    let mut first = true;
+
+    for frame in user.split(';').filter(|s| !s.is_empty()) {
+        let should_replace =
+            frame.starts_with("[unknown") || frame.starts_with("[unkown");
+        if should_replace && lua_idx < lua_frames.len() {
+            if !first {
+                merged.push(b';');
+            }
+            merged.extend_from_slice(lua_frames[lua_idx].as_bytes());
+            lua_idx += 1;
+            first = false;
+            continue;
+        }
+
+        if !first {
+            merged.push(b';');
+        }
+        merged.extend_from_slice(frame.as_bytes());
+        first = false;
+    }
+
+    while lua_idx < lua_frames.len() {
+        if !first {
+            merged.push(b';');
+        }
+        merged.extend_from_slice(lua_frames[lua_idx].as_bytes());
+        lua_idx += 1;
+        first = false;
+    }
+
+    write_combined_output(trace_str, len, &merged)
+}
+
 // --------- Lua unwind table plumbing ---------
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct LuaUnwindInfo {
     pub offsets_id: u8,
-    pub _reserved: [u8; 7],
+    pub reserved: [u8; 7],
     pub state_address: u64,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-#[allow(non_snake_case)]
 struct LuaOfs {
     features: u32,
-    off_L_ci: u32,
-    off_L_base_ci: u32,
-    off_L_end_ci: u32,
-    off_CI_func: u32,
-    off_CI_top: u32,
-    off_CI_savedpc: u32,
-    off_CI_prev: u32,
-    off_TValue_tt: u32,
-    off_TValue_val: u32,
-    off_Closure_isC: u32,
-    off_LClosure_p: u32,
-    off_CClosure_f: u32,
-    off_Proto_source: u32,
-    off_Proto_linedefined: u32,
-    off_Proto_code: u32,
-    off_Proto_sizecode: u32,
-    off_Proto_lineinfo: u32,
-    off_Proto_abslineinfo: u32,
-    off_TString_len: u32,
-    sizeof_TString: u32,
-    sizeof_CallInfo: u32,
-    sizeof_TValue: u32,
+    off_l_ci: u32,
+    off_l_base_ci: u32,
+    off_l_end_ci: u32,
+    off_ci_func: u32,
+    off_ci_top: u32,
+    off_ci_savedpc: u32,
+    off_ci_prev: u32,
+    off_tvalue_tt: u32,
+    off_tvalue_val: u32,
+    off_closure_isc: u32,
+    off_lclosure_p: u32,
+    off_cclosure_f: u32,
+    off_proto_source: u32,
+    off_proto_linedefined: u32,
+    off_proto_code: u32,
+    off_proto_sizecode: u32,
+    off_proto_lineinfo: u32,
+    off_proto_abslineinfo: u32,
+    off_tstring_len: u32,
+    sizeof_tstring: u32,
+    sizeof_callinfo: u32,
+    sizeof_tvalue: u32,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-#[allow(non_snake_case)]
 struct LjOfs {
     fr2: u8,
     gc64: u8,
-    _pad: u16,
-    off_L_base: u32,
-    off_L_stack: u32,
-    off_GCproto_firstline: u32,
-    off_GCproto_chunkname: u32,
-    off_GCstr_data: u32,
-    off_GCfunc_cfunc: u32,
-    off_GCfunc_ffid: u32,
-    off_GCfunc_pc: u32,
-    off_GCproto_bc: u32,
-    off_GCstr_len: u32,
-    off_L_glref: u32,
-    off_global_State_dispatchmode: u32,
+    pad: u16,
+    off_l_base: u32,
+    off_l_stack: u32,
+    off_gcproto_firstline: u32,
+    off_gcproto_chunkname: u32,
+    off_gcstr_data: u32,
+    off_gcfunc_cfunc: u32,
+    off_gcfunc_ffid: u32,
+    off_gcfunc_pc: u32,
+    off_gcproto_bc: u32,
+    off_gcstr_len: u32,
+    off_l_glref: u32,
+    off_global_state_dispatchmode: u32,
 }
 
 const LUA_51_AARCH64: LuaOfs = LuaOfs {
     features: LUA_FEAT_CI_ARRAY | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_CLOSURE_ISC,
-    off_L_ci: 40,
-    off_L_base_ci: 80,
-    off_L_end_ci: 72,
-    off_CI_func: 8,
-    off_CI_top: 0,
-    off_CI_savedpc: 24,
-    off_CI_prev: 0,
-    off_TValue_tt: 0,
-    off_TValue_val: 0,
-    off_Closure_isC: 10,
-    off_LClosure_p: 32,
-    off_CClosure_f: 32,
-    off_Proto_source: 64,
-    off_Proto_linedefined: 96,
-    off_Proto_code: 24,
-    off_Proto_sizecode: 80,
-    off_Proto_lineinfo: 0,
-    off_Proto_abslineinfo: 0,
-    off_TString_len: 0,
-    sizeof_TString: 16,
-    sizeof_CallInfo: 40,
-    sizeof_TValue: 24,
+    off_l_ci: 40,
+    off_l_base_ci: 80,
+    off_l_end_ci: 72,
+    off_ci_func: 8,
+    off_ci_top: 0,
+    off_ci_savedpc: 24,
+    off_ci_prev: 0,
+    off_tvalue_tt: 0,
+    off_tvalue_val: 0,
+    off_closure_isc: 10,
+    off_lclosure_p: 32,
+    off_cclosure_f: 32,
+    off_proto_source: 64,
+    off_proto_linedefined: 96,
+    off_proto_code: 24,
+    off_proto_sizecode: 80,
+    off_proto_lineinfo: 0,
+    off_proto_abslineinfo: 0,
+    off_tstring_len: 0,
+    sizeof_tstring: 16,
+    sizeof_callinfo: 40,
+    sizeof_tvalue: 24,
 };
 
 const LUA_52_AARCH64: LuaOfs = LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    off_L_ci: 32,
-    off_L_base_ci: 0,
-    off_L_end_ci: 0,
-    off_CI_func: 0,
-    off_CI_top: 0,
-    off_CI_savedpc: 56,
-    off_CI_prev: 16,
-    off_TValue_tt: 8,
-    off_TValue_val: 0,
-    off_Closure_isC: 0,
-    off_LClosure_p: 24,
-    off_CClosure_f: 24,
-    off_Proto_source: 72,
-    off_Proto_linedefined: 104,
-    off_Proto_code: 24,
-    off_Proto_sizecode: 88,
-    off_Proto_lineinfo: 40,
-    off_Proto_abslineinfo: 0,
-    off_TString_len: 0,
-    sizeof_TString: 24,
-    sizeof_CallInfo: 80,
-    sizeof_TValue: 16,
+    off_l_ci: 32,
+    off_l_base_ci: 0,
+    off_l_end_ci: 0,
+    off_ci_func: 0,
+    off_ci_top: 0,
+    off_ci_savedpc: 56,
+    off_ci_prev: 16,
+    off_tvalue_tt: 8,
+    off_tvalue_val: 0,
+    off_closure_isc: 0,
+    off_lclosure_p: 24,
+    off_cclosure_f: 24,
+    off_proto_source: 72,
+    off_proto_linedefined: 104,
+    off_proto_code: 24,
+    off_proto_sizecode: 88,
+    off_proto_lineinfo: 40,
+    off_proto_abslineinfo: 0,
+    off_tstring_len: 0,
+    sizeof_tstring: 24,
+    sizeof_callinfo: 80,
+    sizeof_tvalue: 16,
 };
 
 const LUA_53_AARCH64: LuaOfs = LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    off_L_ci: 32,
-    off_L_base_ci: 0,
-    off_L_end_ci: 0,
-    off_CI_func: 0,
-    off_CI_top: 8,
-    off_CI_savedpc: 40,
-    off_CI_prev: 16,
-    off_TValue_tt: 8,
-    off_TValue_val: 0,
-    off_Closure_isC: 0,
-    off_LClosure_p: 24,
-    off_CClosure_f: 24,
-    off_Proto_source: 104,
-    off_Proto_linedefined: 40,
-    off_Proto_code: 56,
-    off_Proto_sizecode: 24,
-    off_Proto_lineinfo: 72,
-    off_Proto_abslineinfo: 0,
-    off_TString_len: 0,
-    sizeof_TString: 24,
-    sizeof_CallInfo: 72,
-    sizeof_TValue: 16,
+    off_l_ci: 32,
+    off_l_base_ci: 0,
+    off_l_end_ci: 0,
+    off_ci_func: 0,
+    off_ci_top: 8,
+    off_ci_savedpc: 40,
+    off_ci_prev: 16,
+    off_tvalue_tt: 8,
+    off_tvalue_val: 0,
+    off_closure_isc: 0,
+    off_lclosure_p: 24,
+    off_cclosure_f: 24,
+    off_proto_source: 104,
+    off_proto_linedefined: 40,
+    off_proto_code: 56,
+    off_proto_sizecode: 24,
+    off_proto_lineinfo: 72,
+    off_proto_abslineinfo: 0,
+    off_tstring_len: 0,
+    sizeof_tstring: 24,
+    sizeof_callinfo: 72,
+    sizeof_tvalue: 16,
 };
 
 const LUA_54_AARCH64: LuaOfs = LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
-    off_L_ci: 32,
-    off_L_base_ci: 0,
-    off_L_end_ci: 0,
-    off_CI_func: 0,
-    off_CI_top: 8,
-    off_CI_savedpc: 32,
-    off_CI_prev: 16,
-    off_TValue_tt: 8,
-    off_TValue_val: 0,
-    off_Closure_isC: 0,
-    off_LClosure_p: 24,
-    off_CClosure_f: 24,
-    off_Proto_source: 112,
-    off_Proto_linedefined: 44,
-    off_Proto_code: 63,
-    off_Proto_sizecode: 24,
-    off_Proto_lineinfo: 88,
-    off_Proto_abslineinfo: 0,
-    off_TString_len: 0,
-    sizeof_TString: 32,
-    sizeof_CallInfo: 64,
-    sizeof_TValue: 16,
+    off_l_ci: 32,
+    off_l_base_ci: 0,
+    off_l_end_ci: 0,
+    off_ci_func: 0,
+    off_ci_top: 8,
+    off_ci_savedpc: 32,
+    off_ci_prev: 16,
+    off_tvalue_tt: 8,
+    off_tvalue_val: 0,
+    off_closure_isc: 0,
+    off_lclosure_p: 24,
+    off_cclosure_f: 24,
+    off_proto_source: 112,
+    off_proto_linedefined: 44,
+    off_proto_code: 63,
+    off_proto_sizecode: 24,
+    off_proto_lineinfo: 88,
+    off_proto_abslineinfo: 0,
+    off_tstring_len: 0,
+    sizeof_tstring: 32,
+    sizeof_callinfo: 64,
+    sizeof_tvalue: 16,
 };
 
 const LJ_AARCH64_21_FR2_GC64: LjOfs = LjOfs {
     fr2: 1,
     gc64: 1,
-    _pad: 0,
-    off_L_base: 32,
-    off_L_stack: 56,
-    off_GCproto_firstline: 72,
-    off_GCproto_chunkname: 64,
-    off_GCstr_data: 24,
-    off_GCfunc_cfunc: 40,
-    off_GCfunc_ffid: 10,
-    off_GCfunc_pc: 32,
-    off_GCproto_bc: 104,
-    off_GCstr_len: 20,
-    off_L_glref: 16,
-    off_global_State_dispatchmode: 146,
+    pad: 0,
+    off_l_base: 32,
+    off_l_stack: 56,
+    off_gcproto_firstline: 72,
+    off_gcproto_chunkname: 64,
+    off_gcstr_data: 24,
+    off_gcfunc_cfunc: 40,
+    off_gcfunc_ffid: 10,
+    off_gcfunc_pc: 32,
+    off_gcproto_bc: 104,
+    off_gcstr_len: 20,
+    off_l_glref: 16,
+    off_global_state_dispatchmode: 146,
 };
 
 const LUA_FEAT_CI_ARRAY: u32 = 1 << 0;
@@ -453,7 +525,7 @@ impl LuaUnwindTable {
         let key = pid;
         let info = LuaUnwindInfo {
             offsets_id,
-            _reserved: [0; 7],
+            reserved: [0; 7],
             state_address: state_addr,
         };
 
@@ -656,5 +728,19 @@ fn copy_into<const N: usize>(dst: &mut [u8; N], src: &[u8]) {
     }
     if n < N {
         dst[n] = 0;
+    }
+}
+
+fn write_combined_output(dest: *mut c_void, len: usize, bytes: &[u8]) -> usize {
+    if dest.is_null() || len == 0 {
+        return 0;
+    }
+
+    unsafe {
+        let ptr = dest as *mut u8;
+        ptr.write_bytes(0, len);
+        let copy_len = bytes.len().min(len);
+        ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, copy_len);
+        copy_len
     }
 }
