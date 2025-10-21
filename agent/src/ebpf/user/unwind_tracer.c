@@ -426,6 +426,7 @@ void unwind_events_handle(void) {
     int count = 0;
     pthread_mutex_lock(&g_unwind_table_lock);
     pthread_mutex_lock(&g_python_unwind_table_lock);
+    pthread_mutex_lock(&g_lua_unwind_table_lock);
     do {
         event = get_first_event(&proc_events);
         if (!event)
@@ -446,11 +447,9 @@ void unwind_events_handle(void) {
         }
 
         if (tracer && is_lua_process(event->pid)) {
-            pthread_mutex_lock(&g_lua_unwind_table_lock);
             if (g_lua_unwind_table) {
                 lua_unwind_table_load(g_lua_unwind_table, event->pid);
             }
-            pthread_mutex_unlock(&g_lua_unwind_table_lock);
             pthread_mutex_lock(&tracer->mutex_probes_lock);
             lua_parse_and_register(event->pid, tracer->tps);
             tracer_uprobes_update(tracer);
@@ -466,6 +465,7 @@ void unwind_events_handle(void) {
         process_event_free(event);
 
     } while (true);
+    pthread_mutex_unlock(&g_lua_unwind_table_lock);
     pthread_mutex_unlock(&g_python_unwind_table_lock);
     pthread_mutex_unlock(&g_unwind_table_lock);
 }
