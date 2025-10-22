@@ -183,15 +183,15 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 					clientDisplayName   = displayName
 					serverDisplayNameZH = displayName
 					clientDisplayNameZH = displayName
-					serverDisplayNameEN = ckcommon.TagServerEnPrefix + " " + displayName
-					clientDisplayNameEN = ckcommon.TagClientEnPrefix + " " + displayName
+					serverDisplayNameEN = ckcommon.TAG_SERVER_EN_PREFIX + " " + displayName
+					clientDisplayNameEN = ckcommon.TAG_CLIENT_EN_PREFIX + " " + displayName
 				)
 				if letterRegexp.MatchString(serverName) {
-					serverDisplayNameZH = ckcommon.TagServerChPrefix + " " + displayName
-					clientDisplayNameZH = ckcommon.TagClientChPrefix + " " + displayName
+					serverDisplayNameZH = ckcommon.TAG_SERVER_CH_PREFIX + " " + displayName
+					clientDisplayNameZH = ckcommon.TAG_CLIENT_CH_PREFIX + " " + displayName
 				} else {
-					serverDisplayNameZH = ckcommon.TagServerChPrefix + displayName
-					clientDisplayNameZH = ckcommon.TagClientChPrefix + displayName
+					serverDisplayNameZH = ckcommon.TAG_SERVER_CH_PREFIX + displayName
+					clientDisplayNameZH = ckcommon.TAG_CLIENT_CH_PREFIX + displayName
 				}
 				if config.Cfg.Language == "en" {
 					serverDisplayName = serverDisplayNameEN

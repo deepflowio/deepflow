@@ -900,13 +900,15 @@ func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
 
 type DelayAvgFunction struct {
 	DefaultFunction
-	divFunction *DivFunction
+	divFunction   *DivFunction
+	minusFunction *DefaultFunction
 }
 
 func (f *DelayAvgFunction) Init() {
 	// Sum(Numerator)/Sum(Denominator)
 	if strings.Contains(f.Fields[0].ToString(), "/") {
-		fieldsSlice := strings.Split(f.Fields[0].ToString(), "/")
+		dbField := f.Fields[0].ToString()
+		fieldsSlice := strings.Split(strings.TrimPrefix(dbField, "1 - "), "/")
 		if len(fieldsSlice) > 1 {
 			dividendSumFunc := DefaultFunction{
 				Name:   FUNCTION_SUM,
@@ -924,8 +926,19 @@ func (f *DelayAvgFunction) Init() {
 				DefaultFunction: DefaultFunction{
 					Name:   FUNCTION_DIV,
 					Fields: []Node{&dividendSumFunc, &divisorSumFunc},
-					Math:   f.Math,
 				},
+			}
+
+			// 1 - Sum(Numerator)/Sum(Denominator)
+			if strings.HasPrefix(dbField, "1 - ") {
+				f.divFunction.Nest = true
+				f.minusFunction = &DefaultFunction{
+					Name:   FUNCTION_MINUS,
+					Fields: []Node{&Field{Value: "1"}, f.divFunction},
+					Math:   f.Math,
+				}
+			} else {
+				f.divFunction.Math = f.Math
 			}
 		}
 	}
@@ -935,7 +948,11 @@ func (f *DelayAvgFunction) WriteTo(buf *bytes.Buffer) {
 	if !strings.Contains(f.Fields[0].ToString(), "/") {
 		f.DefaultFunction.WriteTo(buf)
 	} else {
-		f.divFunction.WriteTo(buf)
+		if f.minusFunction != nil {
+			f.minusFunction.WriteTo(buf)
+		} else {
+			f.divFunction.WriteTo(buf)
+		}
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
 			buf.WriteString("`")

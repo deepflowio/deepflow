@@ -1,6 +1,8 @@
 # Field                     , DBField              , Type       , Category     , Permission
 request                     , request              , counter    , Throughput   , 111
 response                    , response             , counter    , Throughput   , 111
+response_ratio              ,                      , percentage , Throughput   , 111
+success_ratio               ,                      , percentage , Throughput   , 111
 
 rrt                         ,                      , delay      , Delay        , 111
 rrt_max                     , rrt_max              , delay      , Delay        , 111

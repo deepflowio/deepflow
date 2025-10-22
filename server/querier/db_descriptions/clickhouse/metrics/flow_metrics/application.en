@@ -1,6 +1,8 @@
 # Field                     , DisplayName          , Unit , Description
 request                     , Request              ,      ,
 response                    , Response             ,      ,
+response_ratio              , Response %           , %    ,
+success_ratio               , Success %            , %    ,
 
 rrt                         , Avg Delay            , us   ,
 rrt_max                     , Max Delay            , us   ,
