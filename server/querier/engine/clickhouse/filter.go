@@ -1502,8 +1502,8 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 		}
 	} else if function == "FastFilter(trace_id)" {
 		traceConfig := config.TraceConfig
-		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
-		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
+		TypeIsIncrementalId := traceConfig.Type == chCommon.INDEX_TYPE_INCREMETAL_ID
+		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FORMAT_HEX
 		if traceConfig.Disabled {
 			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
 			return &view.Expr{Value: "(" + filter + ")"}, nil

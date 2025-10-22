@@ -49,6 +49,8 @@ var L7_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"error_ratio":        NewReplaceMetrics(DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_RESPONSE+">0"),
 	"client_error_ratio": NewReplaceMetrics(DB_FIELD_CLIENT_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_RESPONSE+">0"),
 	"server_error_ratio": NewReplaceMetrics(DB_FIELD_SERVER_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_RESPONSE+">0"),
+	"response_ratio":     NewReplaceMetrics(DB_FIELD_RESPONSE+"/"+DB_FIELD_REQUEST, DB_FIELD_REQUEST+">0"),
+	"success_ratio":      NewReplaceMetrics("1 - "+DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE, DB_FIELD_RESPONSE+">0"),
 	"session_length":     NewReplaceMetrics(DB_FIELD_SESSION_LENGTH, "").SetIsAgg(false),
 }
 

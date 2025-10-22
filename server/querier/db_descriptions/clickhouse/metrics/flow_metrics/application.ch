@@ -1,6 +1,8 @@
 # Field                     , DisplayName          , Unit , Description
 request                     , 请求                 , 个   , 请求总数
 response                    , 响应                 , 个   , 响应总数
+response_ratio              , 响应比例             , %    , `响应 / 请求`
+success_ratio               , 正常比例             , %    , `1 - 异常 / 响应`
 
 rrt                         , 平均时延             , 微秒 , 采集周期内所有应用时延的平均值，单次应用时延等于响应与请求的时间差
 rrt_max                     , 最大时延             , 微秒 , 采集周期内所有应用时延的最大值，单次应用时延等于响应与请求的时间差
