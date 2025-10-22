@@ -1495,6 +1495,11 @@ pub struct L7LogDynamicConfig {
 
     #[cfg(feature = "enterprise")]
     pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+
+    pub error_request_header: usize,
+    pub error_request_payload: usize,
+    pub error_response_header: usize,
+    pub error_response_payload: usize,
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1519,6 +1524,10 @@ impl fmt::Debug for L7LogDynamicConfig {
                 "grpc_streaming_data_enabled",
                 &self.grpc_streaming_data_enabled,
             )
+            .field("error_request_header", &self.error_request_header)
+            .field("error_response_header", &self.error_response_header)
+            .field("error_request_payload", &self.error_request_payload)
+            .field("error_response_payload", &self.error_response_payload)
             .finish()
     }
 }
@@ -1531,6 +1540,10 @@ impl PartialEq for L7LogDynamicConfig {
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
             && self.extra_log_fields == other.extra_log_fields
+            && self.error_request_header == other.error_request_header
+            && self.error_response_header == other.error_response_header
+            && self.error_request_payload == other.error_request_payload
+            && self.error_response_payload == other.error_response_payload
             && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled;
         #[cfg(feature = "enterprise")]
         {
@@ -1554,6 +1567,10 @@ impl L7LogDynamicConfig {
             L7ProtocolEnum,
             ExtraCustomFieldPolicyMap,
         >,
+        error_request_header: usize,
+        error_request_payload: usize,
+        error_response_header: usize,
+        error_response_payload: usize,
     ) -> Self {
         let mut expected_headers_set = get_expected_headers();
         let mut dup_checker = HashSet::new();
@@ -1641,6 +1658,10 @@ impl L7LogDynamicConfig {
             grpc_streaming_data_enabled,
             #[cfg(feature = "enterprise")]
             extra_field_policies,
+            error_request_header,
+            error_request_payload,
+            error_response_header,
+            error_response_payload,
         }
     }
 
@@ -2099,6 +2120,26 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .streaming_data_enabled,
                     #[cfg(feature = "enterprise")]
                     conf.get_extra_field_policies(),
+                    conf.processors
+                        .request_log
+                        .tag_extraction
+                        .raw
+                        .error_request_header,
+                    conf.processors
+                        .request_log
+                        .tag_extraction
+                        .raw
+                        .error_request_payload,
+                    conf.processors
+                        .request_log
+                        .tag_extraction
+                        .raw
+                        .error_response_header,
+                    conf.processors
+                        .request_log
+                        .tag_extraction
+                        .raw
+                        .error_response_payload,
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
@@ -5085,6 +5126,32 @@ impl ConfigHandler {
             );
             tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
             restart_agent = !first_run;
+        }
+        let raw = &mut tag_extraction.raw;
+        let new_raw = &mut new_tag_extraction.raw;
+        if raw.error_request_header != new_raw.error_request_header {
+            info!("Update processors.request_log.tag_extraction.raw.error_request_header from {:?} to {:?}.",
+                raw.error_request_header, new_raw.error_request_header
+            );
+            raw.error_request_header = new_raw.error_request_header;
+        }
+        if raw.error_response_header != new_raw.error_response_header {
+            info!("Update processors.request_log.tag_extraction.raw.error_response_header from {:?} to {:?}.",
+                raw.error_response_header, new_raw.error_response_header
+            );
+            raw.error_response_header = new_raw.error_response_header;
+        }
+        if raw.error_request_payload != new_raw.error_request_payload {
+            info!("Update processors.request_log.tag_extraction.raw.error_request_payload from {:?} to {:?}.",
+                raw.error_request_payload, new_raw.error_request_payload
+            );
+            raw.error_request_payload = new_raw.error_request_payload;
+        }
+        if raw.error_response_payload != new_raw.error_response_payload {
+            info!("Update processors.request_log.tag_extraction.raw.error_response_payload from {:?} to {:?}.",
+                raw.error_response_payload, new_raw.error_response_payload
+            );
+            raw.error_response_payload = new_raw.error_response_payload;
         }
 
         let tunning = &mut request_log.tunning;
