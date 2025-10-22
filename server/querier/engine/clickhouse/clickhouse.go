@@ -290,21 +290,21 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 				var (
 					serverDisplayName   = displayName
 					clientDisplayName   = displayName
-					serverDisplayNameZH = chCommon.TagServerChPrefix + " " + displayName
-					serverDisplayNameEN = chCommon.TagServerEnPrefix + " " + displayName
-					clientDisplayNameZH = chCommon.TagClientChPrefix + " " + displayName
-					clientDisplayNameEN = chCommon.TagClientEnPrefix + " " + displayName
+					serverDisplayNameZH = chCommon.TAG_SERVER_CH_PREFIX + " " + displayName
+					serverDisplayNameEN = chCommon.TAG_SERVER_EN_PREFIX + " " + displayName
+					clientDisplayNameZH = chCommon.TAG_CLIENT_CH_PREFIX + " " + displayName
+					clientDisplayNameEN = chCommon.TAG_CLIENT_EN_PREFIX + " " + displayName
 				)
 				if config.Cfg.Language == "en" {
-					serverDisplayName = chCommon.TagServerEnPrefix + " " + displayName
-					clientDisplayName = chCommon.TagClientEnPrefix + " " + displayName
+					serverDisplayName = chCommon.TAG_SERVER_EN_PREFIX + " " + displayName
+					clientDisplayName = chCommon.TAG_CLIENT_EN_PREFIX + " " + displayName
 				} else if config.Cfg.Language == "ch" {
 					if letterRegexp.MatchString(serverName) {
-						serverDisplayName = chCommon.TagServerChPrefix + " " + displayName
-						clientDisplayName = chCommon.TagClientChPrefix + " " + displayName
+						serverDisplayName = chCommon.TAG_SERVER_CH_PREFIX + " " + displayName
+						clientDisplayName = chCommon.TAG_CLIENT_CH_PREFIX + " " + displayName
 					} else {
-						serverDisplayName = chCommon.TagServerChPrefix + displayName
-						clientDisplayName = chCommon.TagClientChPrefix + displayName
+						serverDisplayName = chCommon.TAG_SERVER_CH_PREFIX + displayName
+						clientDisplayName = chCommon.TAG_CLIENT_CH_PREFIX + displayName
 					}
 				}
 				serverNameMetric := []interface{}{
@@ -372,7 +372,7 @@ func formatTagByLanguage(language string, values []interface{}) {
 		displaynameEN := value.([]interface{})[5].(string)
 		descriptionZH := value.([]interface{})[11].(string)
 		descriptionEN := value.([]interface{})[12].(string)
-		if language == chCommon.LanguageEN {
+		if language == chCommon.LANGUAGE_EN {
 			value.([]interface{})[3] = displaynameEN
 			value.([]interface{})[10] = descriptionEN
 		} else {
@@ -390,7 +390,7 @@ func formatMetricByLanguage(language string, values []interface{}) {
 		unitEN := value.([]interface{})[7].(string)
 		descriptionZH := value.([]interface{})[14].(string)
 		descriptionEN := value.([]interface{})[15].(string)
-		if language == chCommon.LanguageEN {
+		if language == chCommon.LANGUAGE_EN {
 			value.([]interface{})[2] = displaynameEN
 			value.([]interface{})[5] = unitEN
 			value.([]interface{})[13] = descriptionEN
@@ -408,7 +408,7 @@ func formatEnumTagByLanguage(language string, values []interface{}) {
 		displaynameEN := value.([]interface{})[5].(string)
 		descriptionZH := value.([]interface{})[11].(string)
 		descriptionEN := value.([]interface{})[12].(string)
-		if language == chCommon.LanguageEN {
+		if language == chCommon.LANGUAGE_EN {
 			value.([]interface{})[3] = displaynameEN
 			value.([]interface{})[10] = descriptionEN
 		} else {
