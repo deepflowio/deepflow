@@ -18,7 +18,6 @@
  *
  * SPDX-License-Identifier: GPL-2.0
  */
-
 #include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "bpf_base.h"
@@ -619,17 +618,17 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 
 	__u32 *flags = lang_flags_map__lookup(&key->tgid);
     if (flags && (*flags & (LANG_LUA | LANG_LUAJIT))) {
-        state->lua_is_jit = (*flags & LANG_LUAJIT) ? 1 : 0;
+		state->lua_is_jit = (*flags & LANG_LUAJIT) ? 1 : 0;
 
-        __u64 *Lptr = lua_tstate_map__lookup(&key->pid);  // pid==tid in key
-        if (Lptr && *Lptr) state->lua_L_ptr = (void *)(*Lptr);
+		__u64 *Lptr = lua_tstate_map__lookup(&key->pid);  // pid==tid in key
+		if (Lptr && *Lptr) state->lua_L_ptr = (void *)(*Lptr);
 
-        struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
-        if (uw) state->lua_offsets_id = uw->offsets_id;
+		struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
+		if (uw) state->lua_offsets_id = uw->offsets_id;
     }
 
     if (state->lua_L_ptr != NULL) {
-        pre_lua_unwind(ctx, state, &oncpu_maps, PROG_LUA_UNWIND_PE_IDX);
+		pre_lua_unwind(ctx, state, &oncpu_maps, PROG_LUA_UNWIND_PE_IDX);
     }
 
 	process_shard_list_t *shard_list =
@@ -829,7 +828,7 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 				rbp_addr += (ue->rbp_offset) << 3;
 			}
 			if (bpf_probe_read_user
-			    (&regs->bp, sizeof(__u64), (void *)rbp_addr) != 0) {
+				(&regs->bp, sizeof(__u64), (void *)rbp_addr) != 0) {
 				__sync_fetch_and_add(error_count_ptr, 1);
 				goto finish;
 			}
@@ -943,36 +942,36 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
 	python_unwind_info_t *py_unwind_info =
 	    python_unwind_info_map__lookup(&state->key.tgid);
 	if (py_unwind_info == NULL) {
-        return 0;
+  		return 0;
 	}
 	state->py_offsets_id = py_unwind_info->offsets_id;
 
 	python_offsets_t *py_offsets =
 	    python_offsets_map__lookup(&state->py_offsets_id);
 	if (py_offsets == NULL) {
-        return 0;
+  		return 0;
 	}
 
 	void *thread_state;
 	if (bpf_probe_read_user
-	    (&thread_state, sizeof(thread_state),
-	     (void *)py_unwind_info->thread_state_address) != 0) {
-        return 0;
+				(&thread_state, sizeof(thread_state),
+				(void *)py_unwind_info->thread_state_address) != 0) {
+  		return 0;
 	}
 
 	if (thread_state == NULL) {
-        __u64 *addr = python_tstate_addr_map__lookup(&state->key.tgid);
-        if (addr && *addr != 0) {
-            thread_state = (void *)*addr;
-        } else {
-            return 0;
+  		__u64 *addr = python_tstate_addr_map__lookup(&state->key.tgid);
+		if (addr && *addr != 0) {
+			thread_state = (void *)*addr;
+		} else {
+			return 0;
 		}
 	}
 
 	if (bpf_probe_read_user
 	    (&state->py_frame_ptr, sizeof(state->py_frame_ptr),
 	     thread_state + py_offsets->thread_state.frame) != 0) {
-        return 0;
+  return 0;
 	}
 
 	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
@@ -1123,128 +1122,152 @@ int pre_lua_unwind(void *ctx, unwind_state_t * state,
 	return 0;
 }
 
-static __always_inline int lua_unwind(struct bpf_perf_event_data * ctx, __u32 tid,
-				      void *lua_state, struct lua_ofs * o,
-				      stack_t * intp_stack)
+static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
+				      __u32 tid, void *lua_state,
+				      struct lua_ofs *o, stack_t * intp_stack)
 {
-    (void)tid;
-    if (!o || !intp_stack) {
-        return 0;
-    }
+	(void)tid;
+	if (!o || !intp_stack) {
+		return 0;
+	}
 
-    void *ci = NULL, *base_ci = NULL, *end_ci = NULL;
-    if (bpf_probe_read_user(&ci, sizeof(ci), (char *)lua_state + o->off_l_ci)) {
-        return 0;
-    }
-    
-    // base_ci end_ci for Lua 5.1
-    if (o->features & LUA_FEAT_CI_ARRAY) {
-        if (bpf_probe_read_user(&base_ci, sizeof(base_ci), (char *)lua_state + o->off_l_base_ci)) {
-            return 0;
-        }
-        if (bpf_probe_read_user(&end_ci,  sizeof(end_ci),  (char *)lua_state + o->off_l_end_ci))  {
-            return 0;
-        }
-        if (!ci || !base_ci || !end_ci) {
-            return 0;
-        }
-    }
-
+	void *ci = NULL, *base_ci = NULL, *end_ci = NULL;
+	if (bpf_probe_read_user
+	    (&ci, sizeof(ci), (char *)lua_state + o->off_l_ci)) {
+		return 0;
+	}
+	// base_ci end_ci for Lua 5.1
+	if (o->features & LUA_FEAT_CI_ARRAY) {
+		if (bpf_probe_read_user
+		    (&base_ci, sizeof(base_ci),
+		    (char *)lua_state + o->off_l_base_ci)) {
+			return 0;
+		}
+		if (bpf_probe_read_user
+			(&end_ci, sizeof(end_ci),
+		    (char *)lua_state + o->off_l_end_ci)) {
+			return 0;
+		}
+		if (!ci || !base_ci || !end_ci) {
+			return 0;
+		}
+	}
 #pragma unroll
-    for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
+	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
 
-        if (intp_stack->len >= STACK_FRAMES_PER_RUN)
-            break;
+		if (intp_stack->len >= STACK_FRAMES_PER_RUN)
+			break;
 
-        if (o->features & LUA_FEAT_CI_ARRAY) {
-            if ((char *)ci < (char *)base_ci || (char *)ci >= (char *)end_ci)
-                break;
-        }
+		if (o->features & LUA_FEAT_CI_ARRAY) {
+			if ((char *)ci < (char *)base_ci
+			    || (char *)ci >= (char *)end_ci)
+				break;
+		}
 
+		// Load fields from this CallInfo
+		void *ci_func = NULL, *ci_prev = NULL;
+		if (bpf_probe_read_user
+			(&ci_func, sizeof(ci_func),
+			(char *)ci + o->off_ci_func)) {
+			goto next_frame;
+		}
+		// ci_prev available in Lua 5.2+
+		if (o->features & LUA_FEAT_CI_LINKED)
+			(void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev),
+						(char *)ci + o->off_ci_prev);
 
-        // Load fields from this CallInfo
-        void *ci_func = NULL, *ci_prev = NULL;
-        if (bpf_probe_read_user(&ci_func, sizeof(ci_func), (char *)ci + o->off_ci_func)) {
-            goto next_frame;
-        }
-        // ci_prev available in Lua 5.2+
-        if (o->features & LUA_FEAT_CI_LINKED)
-            (void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev), (char*)ci + o->off_ci_prev);
+		int tt = -1;
+		if (bpf_probe_read_user
+		    (&tt, sizeof(tt), (char *)ci_func + o->off_tvalue_tt)) {
+			goto next_frame;
+		}
 
-        int tt = -1;
-        if (bpf_probe_read_user(&tt, sizeof(tt), (char *)ci_func + o->off_tvalue_tt)) {
-            goto next_frame;
-        }
+		bool is_collectable = (tt & LUA_TCOLLECTABLE) != 0;
 
-        int variant = tt & 0x30;
-        bool is_collectable = (tt & LUA_TCOLLECTABLE) != 0;
+		void *valp = NULL;
+		(void)bpf_probe_read_user(&valp, sizeof(valp),
+					  (char *)ci_func +
+					  (o->off_tvalue_val ? o->
+					   off_tvalue_val : 0));
 
-        void *valp = NULL;
-        (void)bpf_probe_read_user(&valp, sizeof(valp),
-                                  (char*)ci_func + (o->off_tvalue_val ? o->off_tvalue_val : 0));
+		void *cl = valp;
 
-        void *cl = valp;
+		if (o->features & LUA_FEAT_LCF) {
+			if (variant == LUA_CLOSURE && is_collectable) {
+				void *proto = NULL;
+				if (!cl || bpf_probe_read_user(&proto,
+					sizeof(proto), (char *)cl +
+					o->off_lclosure_p) || !proto) {
+					goto next_frame;
+				}
+				__u64 frame =
+				    TAG_LUA | (((__u64) proto) & ~TAG_MASK);
+				add_frame(intp_stack, frame);
+			} else if (variant == LUA_C_CLOSURE && is_collectable) {
+				void *f = NULL;
+				if (cl
+				    && !bpf_probe_read_user(&f, sizeof(f), (char *)cl +
+							    o->off_cclosure_f) && f) {
+					__u64 frame =
+					    TAG_CFUNC | (((__u64) f) &
+							 ~TAG_MASK);
+					add_frame(intp_stack, frame);
+				}
+			} else if (variant == LUA_LIGHT_C_FUNC
+				   && !is_collectable) {
+				if (valp) {
+					__u64 frame =
+					    TAG_CFUNC | (((__u64) valp) & ~TAG_MASK);
+					add_frame(intp_stack, frame);
+				}
+			} else {
+				goto next_frame;
+			}
 
-        if (o->features & LUA_FEAT_LCF) {
-            if (variant == (0<<4) && is_collectable) {
-                void *proto = NULL;
-                if (!cl || bpf_probe_read_user(&proto, sizeof(proto), (char*)cl + o->off_lclosure_p) || !proto) {
-                    goto next_frame;
-                }
-				__u64 frame = TAG_LUA | (((__u64)proto) & ~TAG_MASK);
-                add_frame(intp_stack, frame);
-            } else if (variant == (2<<4) && is_collectable) {
-                void *f = NULL;
-                if (cl && !bpf_probe_read_user(&f, sizeof(f), (char*)cl + o->off_cclosure_f) && f) {
-                    __u64 frame = TAG_CFUNC | (((__u64)f) & ~TAG_MASK);
-                    add_frame(intp_stack, frame);
-                }
-            } else if (variant == (1<<4) && !is_collectable) {
-                if (valp) {
-                    __u64 frame = TAG_CFUNC | (((__u64)valp) & ~TAG_MASK);
-                    add_frame(intp_stack, frame);
-                }
-            } else {
-                goto next_frame;
-            }
+		} else {
+			__u8 is_c = 0;
+			if (bpf_probe_read_user
+			    (&is_c, sizeof(is_c),
+			    (char *)cl + o->off_closure_isc)) {
+				goto next_frame;
+			}
+			if (!is_c) {
+				void *proto = NULL;
+				if (bpf_probe_read_user(&proto, sizeof(proto),
+					(char *)cl + o->off_lclosure_p)) {
+					goto next_frame;
+				}
+				__u64 frame =
+				    TAG_LUA | (((__u64) proto) & ~TAG_MASK);
+				add_frame(intp_stack, frame);
+			} else {
+				void *cf = NULL;
+				if (bpf_probe_read_user(&cf, sizeof(cf),
+					(char *)cl + o->off_cclosure_f)) {
+					goto next_frame;
+				}
+				__u64 frame =
+				    TAG_CFUNC | (((__u64) cf) & ~TAG_MASK);
+				add_frame(intp_stack, frame);
+			}
+		}
 
-        } else {
-            __u8 is_c = 0;
-            if (bpf_probe_read_user(&is_c, sizeof(is_c), (char*)cl + o->off_closure_isc)) {
-                goto next_frame;
-            }
-            if (!is_c) {
-                void *proto = NULL;
-                if (bpf_probe_read_user(&proto, sizeof(proto), (char*)cl + o->off_lclosure_p)) {
-                    goto next_frame;
-                }
-                __u64 frame = TAG_LUA | (((__u64)proto) & ~TAG_MASK);
-                add_frame(intp_stack, frame);
-            } else {
-                void *cf = NULL;
-                if (bpf_probe_read_user(&cf, sizeof(cf), (char*)cl + o->off_cclosure_f)) {
-                    goto next_frame;
-                }
-                __u64 frame = TAG_CFUNC | (((__u64)cf) & ~TAG_MASK);
-                add_frame(intp_stack, frame);
-            }
-        }
+	      next_frame:
+		if (o->features & LUA_FEAT_CI_LINKED) {
+			if (!ci_prev)
+				break;
+			ci = ci_prev;
+			continue;
+		} else {
+			ci = (void *)((char *)ci - o->sizeof_callinfo);
+		}
+	}
 
-    next_frame:
-        if (o->features & LUA_FEAT_CI_LINKED) {
-            if (!ci_prev) break;
-            ci = ci_prev;
-            continue;
-        } else {
-            ci = (void *)((char *)ci - o->sizeof_callinfo);
-        }
-    }
-
-    return 0;
+	return 0;
 }
 
-static inline int lua_get_funcdata(struct bpf_perf_event_data * ctx, void *frame,
-				   stack_t * intp_stack, struct lj_ofs * o)
+static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame,
+				   stack_t * intp_stack, struct lj_ofs *o)
 {
 	(void)ctx;
 	if (!frame) {
@@ -1262,79 +1285,84 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data * ctx, void *frame
 			return -1;
 		}
 
-        __u64 frame = TAG_LUA | (((__u64)pt) & ~TAG_MASK);
-        add_frame(intp_stack, frame);
-	}
-	else if (is_cfunc(fn, o)) {
+		__u64 frame = TAG_LUA | (((__u64) pt) & ~TAG_MASK);
+		add_frame(intp_stack, frame);
+	} else if (is_cfunc(fn, o)) {
 		void *cf = NULL;
-		if (gcfunc_get_cfunc(fn, &cf, o)) return -1;
-		__u64 frame = TAG_CFUNC | (((__u64)cf) & ~TAG_MASK);
+		if (gcfunc_get_cfunc(fn, &cf, o))
+			return -1;
+		__u64 frame = TAG_CFUNC | (((__u64) cf) & ~TAG_MASK);
 		add_frame(intp_stack, frame);
-	}
-	else if (is_ffunc(fn, o)) {
+	} else if (is_ffunc(fn, o)) {
 		__u8 ffid = 0;
-		if (gcfunc_get_ffid(fn, &ffid, o)) return -1;
-		__u64 frame = TAG_FFUNC | (__u64)ffid;
+		if (gcfunc_get_ffid(fn, &ffid, o))
+			return -1;
+		__u64 frame = TAG_FFUNC | (__u64) ffid;
 		add_frame(intp_stack, frame);
+	} else {
+		add_frame(intp_stack, TAG_MASK);
+		return -1;
 	}
-	else {
-        add_frame(intp_stack, TAG_MASK);
-        return -1;
-    }
 	return 0;
 }
 
-static int luajit_unwind(struct bpf_perf_event_data * ctx, __u32 tid,
-			 void *lua_state, struct lj_ofs * o,
+static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid,
+			 void *lua_state, struct lj_ofs *o,
 			 stack_t * intp_stack)
 {
-    (void)tid;
+	(void)tid;
 
-    if (!o) return 0;
-    
-    if (o->fr2) return 0;
+	if (!o)
+		return 0;
 
-    if (!intp_stack) return -1;
+	if (o->fr2)
+		return 0;
 
-    int level = 1;
+	if (!intp_stack)
+		return -1;
 
-    void *stack_ptr, *base_ptr;
-    if(L_get_stack(lua_state, &stack_ptr, o)) return -1;
-    if(L_get_base(lua_state, &base_ptr, o)) return -1;
-    
-    // TODO: remove hardcoded TValue size, add lj.tv_size
+	int level = 1;
+
+	void *stack_ptr, *base_ptr;
+	if (L_get_stack(lua_state, &stack_ptr, o))
+		return -1;
+	if (L_get_base(lua_state, &base_ptr, o))
+		return -1;
+
+	// TODO: remove hardcoded TValue size, add lj.tv_size
 	void *bot = (void *)((char *)stack_ptr + (o->fr2 ? 16 : 0));
 
 	void *frame, *nextframe;
 	frame = nextframe = (void *)((char *)base_ptr - 8);
 
-    // Main frame walker loop
+	// Main frame walker loop
 #pragma unroll
-    for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
-        if (frame <= bot) break;
-        if (frame_gc_equals_L(frame, lua_state, o) > 0) {
-            level++;
-        }
-        if (level-- == 0) {
-            level++;
-            if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
-                break;
-            }
-            if (lua_get_funcdata(ctx, frame, intp_stack, o) != 0) {
-                continue;
-            }
-        }
-        nextframe = frame;
+	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
+		if (frame <= bot)
+			break;
+		if (frame_gc_equals_L(frame, lua_state, o) > 0) {
+			level++;
+		}
+		if (level-- == 0) {
+			level++;
+			if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
+				break;
+			}
+			if (lua_get_funcdata(ctx, frame, intp_stack, o) != 0) {
+				continue;
+			}
+		}
+		nextframe = frame;
 
-        if (frame_islua_wr(frame, o)) {
-            frame = frame_prevl_wr(frame, o);
-        } else {
-            if (frame_isvarg_wr(frame, o))
-                level++;
-            frame = frame_prevd_wr(frame, o);
-        }
-    }
-    return 0;
+		if (frame_islua_wr(frame, o)) {
+			frame = frame_prevl_wr(frame, o);
+		} else {
+			if (frame_isvarg_wr(frame, o))
+				level++;
+			frame = frame_prevd_wr(frame, o);
+		}
+	}
+	return 0;
 }
 
 PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
@@ -1358,14 +1386,20 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 
 	if (state->lua_L_ptr != NULL) {
 		if (state->lua_is_jit) {
-			struct lj_ofs *o = luajit_offsets_map__lookup(&state->lua_offsets_id);
+			struct lj_ofs *o =
+			    luajit_offsets_map__lookup(&state->lua_offsets_id);
 			if (o) {
-				luajit_unwind(ctx, state->key.tgid, state->lua_L_ptr, o, &state->intp_stack);
+				luajit_unwind(ctx, state->key.tgid,
+					      state->lua_L_ptr, o,
+					      &state->intp_stack);
 			}
 		} else {
-			struct lua_ofs *o = lua_offsets_map__lookup(&state->lua_offsets_id);
+			struct lua_ofs *o =
+			    lua_offsets_map__lookup(&state->lua_offsets_id);
 			if (o) {
-				lua_unwind(ctx, state->key.tgid, state->lua_L_ptr, o, &state->intp_stack);
+				lua_unwind(ctx, state->key.tgid,
+					   state->lua_L_ptr, o,
+					   &state->intp_stack);
 			}
 		}
 	}
@@ -1377,21 +1411,22 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 
 static __always_inline int probe_entry_lua(struct pt_regs *ctx)
 {
-    void *param1 = (void *)PT_REGS_PARM1(ctx); 
-    if (!param1) return 0;
+	void *param1 = (void *)PT_REGS_PARM1(ctx);
+	if (!param1)
+		return 0;
 
-    __u32 tid  = bpf_get_current_pid_tgid();
+	__u32 tid = bpf_get_current_pid_tgid();
 
-    __u64 lua_state = (__u64)param1;
-    lua_tstate_map__update(&tid, &lua_state);
-    return 0;
+	__u64 lua_state = (__u64) param1;
+	lua_tstate_map__update(&tid, &lua_state);
+	return 0;
 }
 
 static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
 {
-    __u32 tid  = bpf_get_current_pid_tgid();
-    lua_tstate_map__delete(&tid);
-    return 0;
+	__u32 tid = bpf_get_current_pid_tgid();
+	lua_tstate_map__delete(&tid);
+	return 0;
 }
 
 /*
@@ -1405,8 +1440,12 @@ static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
  * from attaching the Lua uprobes.
  *
  */
-UPROG(handle_entry_lua)  (struct pt_regs *ctx) { return probe_entry_lua(ctx); }
-URETPROG(handle_entry_lua_cancel) (struct pt_regs *ctx) { return probe_entry_lua_cancel(ctx); }
+UPROG(handle_entry_lua) (struct pt_regs * ctx) {
+	return probe_entry_lua(ctx);
+}
 
+URETPROG(handle_entry_lua_cancel) (struct pt_regs * ctx) {
+	return probe_entry_lua_cancel(ctx);
+}
 
 #endif

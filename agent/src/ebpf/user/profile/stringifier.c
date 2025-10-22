@@ -39,7 +39,7 @@
  * Due to the reuse of stack trace identifiers and destructive reads, the Stringifier
  * caches the result of its stringification. In each iteration of a continuous perf profiler.
  */
-
+/* *INDENT-OFF* */
 #ifndef AARCH64_MUSL
 #include "../config.h"
 #include "../utils.h"
@@ -603,7 +603,7 @@ failed:
 
 	return NULL;
 }
-
+/* *INDENT-ON* */
 static struct lua_ofs cached_lua_ofs;
 static bool cached_have_lua_ofs;
 static struct lj_ofs cached_lj_ofs;
@@ -665,18 +665,17 @@ static void refresh_lua_offsets(pid_t pid)
 }
 
 static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
-				  int stack_id,
-				  pid_t pid,
-				  const char *stack_map_name,
-				  stack_str_hash_t *h,
-				  bool new_cache,
-				  void *info_p)
+					   int stack_id,
+					   pid_t pid,
+					   const char *stack_map_name,
+					   stack_str_hash_t * h,
+					   bool new_cache, void *info_p)
 {
 	if (stack_id < 0)
 		return NULL;
 
 	stack_str_hash_kv kv;
-	kv.key = ((u64)pid << 32) | (u32)stack_id;
+	kv.key = ((u64) pid << 32) | (u32) stack_id;
 	kv.value = 0;
 	if (stack_str_hash_search(h, &kv, &kv) == 0) {
 		__sync_fetch_and_add(&h->hit_hash_count, 1);
@@ -694,7 +693,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	if (fd < 0)
 		return NULL;
 
-	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = {0};
+	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = { 0 };
 	__u32 key = stack_id;
 	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0)
 		return NULL;
@@ -719,23 +718,33 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		if (!encoded)
 			continue;
 		__u64 tag = encoded & TAG_MASK;
-		char buf[256] = {0};
+		char buf[256] = { 0 };
 		char *out = NULL;
 
 		if (tag == TAG_LUA) {
-			char chunk[128] = {0};
-			uintptr_t proto = (uintptr_t)(encoded & ~TAG_MASK);
+			char chunk[128] = { 0 };
+			uintptr_t proto = (uintptr_t) (encoded & ~TAG_MASK);
 			bool have_chunk = lua_decode_chunkname(pid, proto,
-				      cached_lang_flags,
-				      cached_have_lua_ofs ? &cached_lua_ofs : NULL,
-				      cached_have_lj_ofs ? &cached_lj_ofs : NULL,
-				      chunk, sizeof(chunk));
+							       cached_lang_flags,
+							       cached_have_lua_ofs
+							       ? &cached_lua_ofs
+							       : NULL,
+							       cached_have_lj_ofs
+							       ? &cached_lj_ofs
+							       : NULL,
+							       chunk,
+							       sizeof(chunk));
 			__u32 line = lua_decode_firstline(pid, proto,
-				       cached_lang_flags,
-				       cached_have_lua_ofs ? &cached_lua_ofs : NULL,
-				       cached_have_lj_ofs ? &cached_lj_ofs : NULL);
+							  cached_lang_flags,
+							  cached_have_lua_ofs ?
+							  &cached_lua_ofs :
+							  NULL,
+							  cached_have_lj_ofs ?
+							  &cached_lj_ofs :
+							  NULL);
 			if (have_chunk && line)
-				snprintf(buf, sizeof(buf), "L:%s:%u", chunk, line);
+				snprintf(buf, sizeof(buf), "L:%s:%u", chunk,
+					line);
 			else if (have_chunk)
 				snprintf(buf, sizeof(buf), "L:%s:?", chunk);
 			else if (line)
@@ -744,14 +753,18 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 				snprintf(buf, sizeof(buf), "L:line=?");
 			out = create_symbol_str(strlen(buf), buf, "");
 		} else if (tag == TAG_CFUNC) {
-			unsigned long addr = (unsigned long)(encoded & ~TAG_MASK);
-			out = resolve_addr(t, pid, false, addr, new_cache, info_p);
+			unsigned long addr =
+			    (unsigned long)(encoded & ~TAG_MASK);
+			out =
+			    resolve_addr(t, pid, false, addr, new_cache,
+					info_p);
 			if (!out) {
 				snprintf(buf, sizeof(buf), "C:0x%016lx", addr);
 				out = create_symbol_str(strlen(buf), buf, "");
 			} else if (strncmp(out, "[unknown", 8) == 0) {
 				clib_mem_free(out);
-				snprintf(buf, sizeof(buf), "[unkown] C:0x%016lx", addr);
+				snprintf(buf, sizeof(buf),
+					 "[unkown] C:0x%016lx", addr);
 				out = create_symbol_str(strlen(buf), buf, "");
 			}
 		} else if (tag == TAG_FFUNC) {
@@ -775,7 +788,8 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	}
 
 	size_t alloc_len = total + frame_count + 1;
-	char *result = clib_mem_alloc_aligned("lua_folded_str", alloc_len, 0, NULL);
+	char *result =
+	    clib_mem_alloc_aligned("lua_folded_str", alloc_len, 0, NULL);
 	if (!result) {
 		for (u32 i = 0; i < frame_count; i++)
 			if (frames[i])
@@ -814,7 +828,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 
 	return result;
 }
-
+/* *INDENT-OFF* */
 static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       int stack_id,
 				       pid_t pid,

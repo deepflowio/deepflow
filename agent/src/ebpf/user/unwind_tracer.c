@@ -58,7 +58,6 @@ static python_unwind_table_t *g_python_unwind_table = NULL;
 static pthread_mutex_t g_lua_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static lua_unwind_table_t *g_lua_unwind_table = NULL;
 
-/* *INDENT-OFF* */
 static struct symbol lua_symbols[] = {
     {
         .type = LUA_UPROBE,
@@ -96,7 +95,6 @@ static struct symbol lua_symbols[] = {
         .is_probe_ret = false,
     },
 };
-/* *INDENT-ON* */
 
 static struct {
     bool dwarf_enabled;
@@ -272,7 +270,6 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_python_unwind_table = python_table;
     pthread_mutex_unlock(&g_python_unwind_table_lock);
 
-    // 创建 lua 剖析使用的 bpf table 并设置大小
     int lua_lang_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
     int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
     int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
@@ -300,12 +297,10 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     return 0;
 }
 
-/* *INDENT-OFF* */
 static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
                                             .symbol = "PyEval_SaveThread",
                                             .probe_func = URETPROBE_FUNC_NAME(python_save_tstate_addr),
                                             .is_probe_ret = true, }, };
-/* *INDENT-ON* */
 
 static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     char *path = NULL;

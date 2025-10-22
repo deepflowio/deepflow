@@ -118,6 +118,10 @@ pub unsafe extern "C" fn merge_lua_stacks(
         }
     };
 
+    if !should_merge_lua_into_stack(user, lua) {
+        return write_combined_output(trace_str, len, user.as_bytes());
+    }
+
     if user.is_empty() {
         return write_combined_output(trace_str, len, lua.as_bytes());
     }
@@ -161,6 +165,63 @@ pub unsafe extern "C" fn merge_lua_stacks(
     }
 
     write_combined_output(trace_str, len, &merged)
+}
+
+fn should_merge_lua_into_stack(user: &str, lua: &str) -> bool {
+    if lua.is_empty() {
+        return false;
+    }
+
+    // must contain a known Lua interpreter symbol
+    const LUA_INTERP_HINTS: &[&str] = &[
+        "lua_resume",
+        "luaV_",
+        "luaD_",
+        "luaB_",
+        "lua_yield",
+        "luaF_",
+        "liblua",
+    ];
+    if !LUA_INTERP_HINTS.iter().any(|hint| user.contains(hint)) {
+        return false;
+    }
+
+    // reject when top frame looks like idle/wait/sleep functions
+    const REJECT_KEYWORDS: &[&str] = &[
+        "sleep",
+        "nanosleep",
+        "poll",
+        "epoll",
+        "select",
+        "usleep",
+        "clock_nanosleep",
+        "futex",
+        "pthread",
+        "ld-linux",
+        "libc.so",
+        "libpthread.so",
+    ];
+
+    // extract top user-space frame (before first kernel frame)
+    let mut top_user_frame: Option<&str> = None;
+    for frame in user.split(';') {
+        if frame.is_empty() {
+            continue;
+        }
+        if frame.starts_with("[k]") {
+            break;
+        }
+        top_user_frame = Some(frame);
+    }
+
+    if let Some(frame) = top_user_frame {
+        let frame_lower = frame.to_ascii_lowercase();
+        if REJECT_KEYWORDS.iter().any(|kw| frame_lower.contains(kw)) {
+            return false;
+        }
+    }
+
+    true
 }
 
 // --------- Lua unwind table plumbing ---------

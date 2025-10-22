@@ -38,69 +38,69 @@ ssize_t process_vm_readv(pid_t pid,
 			 unsigned long flags);
 #endif
 
-#define LUA_CHUNK_READ_MAX 4096U  /* Clamp chunk reads to avoid oversized allocations. */
+#define LUA_CHUNK_READ_MAX 4096U	/* Clamp chunk reads to avoid oversized allocations. */
 
 #define TAG_BITS     2
 #define TAG_SHIFT    (64 - TAG_BITS)
 #define TAG_MASK     (0x3ULL << TAG_SHIFT)
-#define TAG_LUA      (0x0ULL << TAG_SHIFT)  /* Lua proto pointer. */
-#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)  /* Native C function. */
-#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)  /* LuaJIT fast function id. */
+#define TAG_LUA      (0x0ULL << TAG_SHIFT)	/* Lua proto pointer. */
+#define TAG_CFUNC    (0x1ULL << TAG_SHIFT)	/* Native C function. */
+#define TAG_FFUNC    (0x2ULL << TAG_SHIFT)	/* LuaJIT fast function id. */
 
 #define LANG_LUA     (1u << 0)
 #define LANG_LUAJIT  (1u << 1)
 
 /* Metadata placed in lua_unwind_info_map by user space. */
 struct lua_unwind_info_t {
-	__u8 offsets_id;                 /* entry in offsets map */
-	__u8 reserved[7];                /* spare for alignment */
-	__u64 state_address;             /* lua_State* in target */
+	__u8 offsets_id;	/* entry in offsets map */
+	__u8 reserved[7];	/* spare for alignment */
+	__u64 state_address;	/* lua_State* in target */
 };
 
 /* Layout hints for LuaJIT GC objects used during symbolization. */
 struct lj_ofs {
-	__u8  fr2;                     /* frames use two stack slots */
-	__u8  gc64;                    /* 64-bit GC reference flag */
-	__u16 pad;                     /* alignment padding */
-	__u32 off_l_base;              /* lua_State->base */
-	__u32 off_l_stack;             /* lua_State->stack */
-	__u32 off_gcproto_firstline;   /* GCproto->firstline */
-	__u32 off_gcproto_chunkname;   /* GCproto->chunkname */
-	__u32 off_gcstr_data;          /* GCstr->data */
-	__u32 off_gcfunc_cfunc;        /* GCfunc->c.pc->cfunc */
-	__u32 off_gcfunc_ffid;         /* GCfunc->c.ffid */
-	__u32 off_gcfunc_pc;           /* GCfunc->l.pc */
-	__u32 off_gcproto_bc;          /* GCproto->bc */
-	__u32 off_gcstr_len;           /* GCstr->len */
-	__u32 off_l_glref;             /* lua_State->glref */
-	__u32 off_global_state_dispatchmode; /* global_State->dispatchmode */
+	__u8 fr2;		/* frames use two stack slots */
+	__u8 gc64;		/* 64-bit GC reference flag */
+	__u16 pad;		/* alignment padding */
+	__u32 off_l_base;	/* lua_State->base */
+	__u32 off_l_stack;	/* lua_State->stack */
+	__u32 off_gcproto_firstline;	/* GCproto->firstline */
+	__u32 off_gcproto_chunkname;	/* GCproto->chunkname */
+	__u32 off_gcstr_data;	/* GCstr->data */
+	__u32 off_gcfunc_cfunc;	/* GCfunc->c.pc->cfunc */
+	__u32 off_gcfunc_ffid;	/* GCfunc->c.ffid */
+	__u32 off_gcfunc_pc;	/* GCfunc->l.pc */
+	__u32 off_gcproto_bc;	/* GCproto->bc */
+	__u32 off_gcstr_len;	/* GCstr->len */
+	__u32 off_l_glref;	/* lua_State->glref */
+	__u32 off_global_state_dispatchmode;	/* global_State->dispatchmode */
 };
 
 /* Layout hints for vanilla Lua 5.x structures (lua_State, Proto, etc.). */
 struct lua_ofs {
-	__u32 features;                /* feature flags (LUA_FEAT_*) */
-	__u32 off_l_ci;                /* lua_State->ci */
-	__u32 off_l_base_ci;           /* lua_State->base_ci */
-	__u32 off_l_end_ci;            /* lua_State->end_ci */
-	__u32 off_ci_func;             /* CallInfo->func */
-	__u32 off_ci_top;              /* CallInfo->top */
-	__u32 off_ci_savedpc;          /* CallInfo->savedpc */
-	__u32 off_ci_prev;             /* CallInfo->previous */
-	__u32 off_tvalue_tt;           /* TValue->tt */
-	__u32 off_tvalue_val;          /* TValue->value */
-	__u32 off_closure_isc;         /* Closure->c.isC */
-	__u32 off_lclosure_p;          /* LClosure->p */
-	__u32 off_cclosure_f;          /* CClosure->f */
-	__u32 off_proto_source;        /* Proto->source */
-	__u32 off_proto_linedefined;   /* Proto->linedefined */
-	__u32 off_proto_code;          /* Proto->code */
-	__u32 off_proto_sizecode;      /* Proto->sizecode */
-	__u32 off_proto_lineinfo;      /* Proto->lineinfo */
-	__u32 off_proto_abslineinfo;   /* Proto->abslineinfo */
-	__u32 off_tstring_len;         /* TString->len */
-	__u32 sizeof_tstring;          /* sizeof(TString) */
-	__u32 sizeof_callinfo;         /* sizeof(CallInfo) */
-	__u32 sizeof_tvalue;           /* sizeof(TValue) */
+	__u32 features;		/* feature flags (LUA_FEAT_*) */
+	__u32 off_l_ci;		/* lua_State->ci */
+	__u32 off_l_base_ci;	/* lua_State->base_ci */
+	__u32 off_l_end_ci;	/* lua_State->end_ci */
+	__u32 off_ci_func;	/* CallInfo->func */
+	__u32 off_ci_top;	/* CallInfo->top */
+	__u32 off_ci_savedpc;	/* CallInfo->savedpc */
+	__u32 off_ci_prev;	/* CallInfo->previous */
+	__u32 off_tvalue_tt;	/* TValue->tt */
+	__u32 off_tvalue_val;	/* TValue->value */
+	__u32 off_closure_isc;	/* Closure->c.isC */
+	__u32 off_lclosure_p;	/* LClosure->p */
+	__u32 off_cclosure_f;	/* CClosure->f */
+	__u32 off_proto_source;	/* Proto->source */
+	__u32 off_proto_linedefined;	/* Proto->linedefined */
+	__u32 off_proto_code;	/* Proto->code */
+	__u32 off_proto_sizecode;	/* Proto->sizecode */
+	__u32 off_proto_lineinfo;	/* Proto->lineinfo */
+	__u32 off_proto_abslineinfo;	/* Proto->abslineinfo */
+	__u32 off_tstring_len;	/* TString->len */
+	__u32 sizeof_tstring;	/* sizeof(TString) */
+	__u32 sizeof_callinfo;	/* sizeof(CallInfo) */
+	__u32 sizeof_tvalue;	/* sizeof(TValue) */
 };
 
 static inline int lua_read_target_mem(pid_t pid, uintptr_t addr, void *buf,
@@ -121,14 +121,15 @@ static inline int lua_read_target_mem(pid_t pid, uintptr_t addr, void *buf,
 	ssize_t got = process_vm_readv(pid, &local, 1, &remote, 1, 0);
 	if (got < 0) {
 		int err = errno;
-		ebpf_warning("lua_read_target_mem: process_vm_readv(pid=%d, remote=0x%llx, len=%zu) failed: %s (%d)",
-			     pid, (unsigned long long)addr, len,
-			     strerror(err), err);
+		ebpf_warning
+		    ("lua_read_target_mem: process_vm_readv(pid=%d, remote=0x%llx, len=%zu) failed: %s (%d)",
+		     pid, (unsigned long long)addr, len, strerror(err), err);
 		return -err;
 	}
-	if ((size_t)got != len) {
-		ebpf_warning("lua_read_target_mem: short read pid=%d remote=0x%llx expected=%zu got=%zd",
-			     pid, (unsigned long long)addr, len, got);
+	if ((size_t) got != len) {
+		ebpf_warning
+		    ("lua_read_target_mem: short read pid=%d remote=0x%llx expected=%zu got=%zd",
+		     pid, (unsigned long long)addr, len, got);
 		return -EIO;
 	}
 	return 0;
@@ -192,9 +193,9 @@ static inline bool lua_decode_luajit_chunkname(const struct lj_ofs *lj_ofs,
 
 	uintptr_t gcs_ptr = 0;
 	if (lj_ofs->gc64)
-		gcs_ptr = (uintptr_t)(raw_ref & ((1ULL << 47) - 1));
+		gcs_ptr = (uintptr_t) (raw_ref & ((1ULL << 47) - 1));
 	else
-		gcs_ptr = (uintptr_t)(uint32_t)raw_ref;
+		gcs_ptr = (uintptr_t) (uint32_t) raw_ref;
 
 	if (gcs_ptr == 0)
 		return false;
@@ -250,21 +251,22 @@ static inline __u32 lua_decode_firstline(pid_t pid, uintptr_t proto_addr,
 	if ((lang_flags & LANG_LUA) && lua_ofs) {
 		int line = 0;
 		if (lua_read_target_mem(pid,
-					proto_addr + lua_ofs->off_proto_linedefined,
-					&line, sizeof(line)) == 0 && line > 0)
-			return (__u32)line;
+					proto_addr +
+					lua_ofs->off_proto_linedefined, &line,
+					sizeof(line)) == 0 && line > 0)
+			return (__u32) line;
 	}
 
 	if ((lang_flags & LANG_LUAJIT) && lj_ofs) {
 		int line = 0;
 		if (lua_read_target_mem(pid,
-					proto_addr + lj_ofs->off_gcproto_firstline,
-					&line, sizeof(line)) == 0 && line > 0)
-			return (__u32)line;
+					proto_addr +
+					lj_ofs->off_gcproto_firstline, &line,
+					sizeof(line)) == 0 && line > 0)
+			return (__u32) line;
 	}
 
 	return 0;
 }
-
 
 #endif /* DF_USER_PROFILE_LUA_DECODER_H */
