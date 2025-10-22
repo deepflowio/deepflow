@@ -281,10 +281,8 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
         return -1;
     }
 
-    lua_unwind_table_t *lua_table = lua_unwind_table_create(lua_lang_fd,
-                                                        lua_unwind_info_fd,
-                                                        lua_offsets_fd,
-                                                        luajit_offsets_fd);
+    lua_unwind_table_t *lua_table =
+        lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
     if (lua_table == NULL) {
         ebpf_warning("Failed to create lua unwind table\n");
         return -1;
@@ -340,8 +338,7 @@ out:
     return;
 }
 
-static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf)
-{
+static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     lua_runtime_info_t info = {0};
     char path[sizeof(info.path)] = {0};
     int n = 0;

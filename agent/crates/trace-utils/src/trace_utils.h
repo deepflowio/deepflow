@@ -178,9 +178,9 @@ void lua_unwind_table_load(lua_unwind_table_t *table, uint32_t pid);
 
 void lua_unwind_table_unload(lua_unwind_table_t *table, uint32_t pid);
 
-size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
-
 size_t merge_lua_stacks(void *trace_str, size_t len, const void *u_trace, const void *i_trace);
+
+size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
 int32_t protect_cpu_affinity_c(void);
 
