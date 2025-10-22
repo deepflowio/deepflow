@@ -1138,6 +1138,10 @@ mod tests {
                     false,
                     #[cfg(feature = "enterprise")]
                     HashMap::new(),
+                    0,
+                    0,
+                    0,
+                    256,
                 ),
                 ..Default::default()
             };
@@ -1237,6 +1241,10 @@ mod tests {
                 false,
                 #[cfg(feature = "enterprise")]
                 HashMap::new(),
+                0,
+                0,
+                0,
+                256,
             ),
             ..Default::default()
         };
@@ -1340,6 +1348,10 @@ mod tests {
                 false,
                 #[cfg(feature = "enterprise")]
                 HashMap::new(),
+                0,
+                0,
+                0,
+                256,
             ),
             ..Default::default()
         };
@@ -1445,6 +1457,10 @@ mod tests {
                 false,
                 #[cfg(feature = "enterprise")]
                 HashMap::new(),
+                0,
+                0,
+                0,
+                256,
             ),
             ..Default::default()
         };
@@ -1524,6 +1540,10 @@ mod tests {
                     indices: segment_map_builder.merge_segments(),
                 },
             )]),
+            0,
+            0,
+            0,
+            256,
         );
 
         for packet in packets.iter_mut() {
@@ -1648,6 +1668,10 @@ mod tests {
                     indices: segment_map_builder.merge_segments(),
                 },
             )]),
+            0,
+            0,
+            0,
+            256,
         );
 
         let mut info = DubboInfo::default();

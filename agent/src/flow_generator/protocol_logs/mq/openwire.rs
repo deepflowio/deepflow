@@ -2313,6 +2313,10 @@ mod tests {
                 false,
                 #[cfg(feature = "enterprise")]
                 std::collections::HashMap::new(),
+                0,
+                0,
+                0,
+                256,
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),
@@ -2395,6 +2399,10 @@ mod tests {
             false,
             #[cfg(feature = "enterprise")]
             std::collections::HashMap::new(),
+            0,
+            0,
+            0,
+            256,
         );
         let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
         assert_eq!(trace_id, Some("TRACEID".to_string()));

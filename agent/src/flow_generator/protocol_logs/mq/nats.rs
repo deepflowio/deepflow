@@ -1030,6 +1030,10 @@ mod tests {
                 false,
                 #[cfg(feature = "enterprise")]
                 std::collections::HashMap::new(),
+                0,
+                0,
+                0,
+                256,
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),

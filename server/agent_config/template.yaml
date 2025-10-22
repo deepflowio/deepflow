@@ -6140,6 +6140,96 @@ processors:
       #     - 各类语句中的 value 信息
       # upgrade_from: static_config.l7-protocol-advanced-features.obfuscate-enabled-protocols
       obfuscate_protocols: [Redis]
+      # type: section
+      # name:
+      #   en: Raw Data
+      #   ch: 原始数据
+      # description:
+      #   en: 控制提取 L7 日志对应的原始数据
+      #   ch: Control the extraction of raw data corresponding to the L7 logs
+      raw:
+        # type: int
+        # name:
+        #   en: Length of extracted request header
+        #   ch: 提取的请求头长度
+        # unit:
+        # range: [0, 16384]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to a value greater than 0, for call logs with abnormal states, the request Header is automatically collected
+        #     (truncated to $error_request_header bytes) into attribute.request_header. Recommended for temporary use only for the
+        #     following reasons:
+        #     - On one hand, directly storing the header carries a certain risk of exposing sensitive information, which may
+        #       lead to compliance issues.
+        #     - On the other hand, it can also cause all request header (currently only for the HTTP protocol) to be cached
+        #       until the response status is parsed to determine whether to send them, consuming collector resources.
+        #   ch: |-
+        #     当设置为大于 0 的值时，对于状态异常的调用日志，自动采集请求 Header（截断到 $error_request_header 字节）到 attribute.request_header，
+        #     因如下原因此功能仅建议临时使用：
+        #     - 一方面直接存储 Header 有一定的敏感信息暴露风险，可能导致合规问题
+        #     - 另一方面也会导致（目前仅 HTTP 协议）所有 Request Header 被缓存，直到等到解析到 Response 状态才能判断是否发送，消耗采集器资源
+        error_request_header: 0
+        # type: int
+        # name:
+        #   en: Length of extracted request header
+        #   ch: 提取的请求头长度
+        # unit:
+        # range: [0, 16384]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to a value greater than 0, for call logs with abnormal states, the response Header is automatically collected
+        #     (truncated to $error_response_header bytes) into attribute.response_header.
+        #   ch: |-
+        #     当设置为大于 0 的值时，对于状态异常的调用日志，自动采集响应 Header（截断到 $error_response_header 字节）到 attribute.response_header。
+        error_response_header: 0
+        # type: int
+        # name:
+        #   en: Length of extracted response header
+        #   ch: 提取的响应头长度
+        # unit:
+        # range: [0, 16384]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to a value greater than 0, for call logs with abnormal status, the request payload is automatically
+        #     collected (truncated to $error_request_payload) into attribute.request_payload. Recommended for temporary use
+        #     only for the following reasons:
+        #     - On one hand, directly storing the payload carries a certain risk of exposing sensitive information, which may
+        #       lead to compliance issues.
+        #     - On the other hand, it can also cause all request payloads (currently only for the HTTP protocol) to be cached
+        #       until the response status is parsed to determine whether to send them, consuming collector resources.
+        #   ch: |-
+        #     当设置为大于 0 的值时，对于状态异常的调用日志，自动采集请求 Payload（截断到 $error_request_payload）到
+        #     attribute.request_payload，因以下原因此功能仅建议临时使用：
+        #     - 一方面直接存储 Payload 有一定的敏感信息暴露风险，可能导致合规问题
+        #     - 另一方面也会导致（目前仅 HTTP 协议）所有 Request Payload 被缓存，直到等到解析到 Response 状态才能判断是否发送，
+        #       消耗采集器资源
+        error_request_payload: 0
+        # type: int
+        # name:
+        #   en: Length of extracted request header
+        #   ch: 提取的请求头长度
+        # unit:
+        # range: [0, 16384]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The default value is 256, which means collecting the first 256 bytes of an abnormal response payload and placing
+        #     them into attribute.response_payload. When set to 0, it means that abnormal response payloads are not collected.
+        #   ch: |-
+        #     默认值为 256，表示采集异常响应 Payload 的前 256 字节，放到 attribute.response_payload 当设置为 0 时，表示不采集
+        #     异常响应 Payload
+        error_response_payload: 256
     # type: section
     # name:
     #   en: Tunning

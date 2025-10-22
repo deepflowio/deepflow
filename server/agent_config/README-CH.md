@@ -8526,6 +8526,134 @@ processors:
 - 授权信息
 - 各类语句中的 value 信息
 
+#### 原始数据 {#processors.request_log.tag_extraction.raw}
+
+Control the extraction of raw data corresponding to the L7 logs
+
+##### 提取的请求头长度 {#processors.request_log.tag_extraction.raw.error_request_header}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_request_header`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_request_header: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**详细描述**:
+
+当设置为大于 0 的值时，对于状态异常的调用日志，自动采集请求 Header（截断到 $error_request_header 字节）到 attribute.request_header，
+因如下原因此功能仅建议临时使用：
+- 一方面直接存储 Header 有一定的敏感信息暴露风险，可能导致合规问题
+- 另一方面也会导致（目前仅 HTTP 协议）所有 Request Header 被缓存，直到等到解析到 Response 状态才能判断是否发送，消耗采集器资源
+
+##### 提取的请求头长度 {#processors.request_log.tag_extraction.raw.error_response_header}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_response_header`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_response_header: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**详细描述**:
+
+当设置为大于 0 的值时，对于状态异常的调用日志，自动采集响应 Header（截断到 $error_response_header 字节）到 attribute.response_header。
+
+##### 提取的响应头长度 {#processors.request_log.tag_extraction.raw.error_request_payload}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_request_payload`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_request_payload: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**详细描述**:
+
+当设置为大于 0 的值时，对于状态异常的调用日志，自动采集请求 Payload（截断到 $error_request_payload）到
+attribute.request_payload，因以下原因此功能仅建议临时使用：
+- 一方面直接存储 Payload 有一定的敏感信息暴露风险，可能导致合规问题
+- 另一方面也会导致（目前仅 HTTP 协议）所有 Request Payload 被缓存，直到等到解析到 Response 状态才能判断是否发送，
+  消耗采集器资源
+
+##### 提取的请求头长度 {#processors.request_log.tag_extraction.raw.error_response_payload}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_response_payload`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_response_payload: 256
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**详细描述**:
+
+默认值为 256，表示采集异常响应 Payload 的前 256 字节，放到 attribute.response_payload 当设置为 0 时，表示不采集
+异常响应 Payload
+
 ### 调优 {#processors.request_log.tunning}
 
 #### Payload 截取 {#processors.request_log.tunning.payload_truncation}

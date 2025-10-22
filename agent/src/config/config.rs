@@ -2215,12 +2215,33 @@ pub struct CustomFields {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct RequestLogTagExtractionRaw {
+    pub error_request_header: usize,
+    pub error_response_header: usize,
+    pub error_request_payload: usize,
+    pub error_response_payload: usize,
+}
+
+impl Default for RequestLogTagExtractionRaw {
+    fn default() -> Self {
+        Self {
+            error_request_header: 0,
+            error_response_header: 0,
+            error_request_payload: 0,
+            error_response_payload: 256,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct RequestLogTagExtraction {
     pub tracing_tag: TracingTag,
     pub http_endpoint: HttpEndpoint,
     pub obfuscate_protocols: Vec<String>,
     pub custom_fields: HashMap<String, Vec<CustomFields>>,
     pub custom_field_policies: Vec<CustomFieldPolicy>,
+    pub raw: RequestLogTagExtractionRaw,
 }
 
 impl Default for RequestLogTagExtraction {
@@ -2234,6 +2255,7 @@ impl Default for RequestLogTagExtraction {
             ]),
             obfuscate_protocols: vec!["Redis".to_string()],
             custom_field_policies: vec![],
+            raw: RequestLogTagExtractionRaw::default(),
         }
     }
 }

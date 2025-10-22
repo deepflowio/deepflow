@@ -8712,6 +8712,140 @@ Obfuscated fields mainly include:
 - Authorization information
 - Value information in various statements
 
+#### Raw Data {#processors.request_log.tag_extraction.raw}
+
+控制提取 L7 日志对应的原始数据
+
+##### Length of extracted request header {#processors.request_log.tag_extraction.raw.error_request_header}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_request_header`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_request_header: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**Description**:
+
+When set to a value greater than 0, for call logs with abnormal states, the request Header is automatically collected
+(truncated to $error_request_header bytes) into attribute.request_header. Recommended for temporary use only for the
+following reasons:
+- On one hand, directly storing the header carries a certain risk of exposing sensitive information, which may
+  lead to compliance issues.
+- On the other hand, it can also cause all request header (currently only for the HTTP protocol) to be cached
+  until the response status is parsed to determine whether to send them, consuming collector resources.
+
+##### Length of extracted request header {#processors.request_log.tag_extraction.raw.error_response_header}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_response_header`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_response_header: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**Description**:
+
+When set to a value greater than 0, for call logs with abnormal states, the response Header is automatically collected
+(truncated to $error_response_header bytes) into attribute.response_header.
+
+##### Length of extracted response header {#processors.request_log.tag_extraction.raw.error_request_payload}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_request_payload`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_request_payload: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**Description**:
+
+When set to a value greater than 0, for call logs with abnormal status, the request payload is automatically
+collected (truncated to $error_request_payload) into attribute.request_payload. Recommended for temporary use
+only for the following reasons:
+- On one hand, directly storing the payload carries a certain risk of exposing sensitive information, which may
+  lead to compliance issues.
+- On the other hand, it can also cause all request payloads (currently only for the HTTP protocol) to be cached
+  until the response status is parsed to determine whether to send them, consuming collector resources.
+
+##### Length of extracted request header {#processors.request_log.tag_extraction.raw.error_response_payload}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.raw.error_response_payload`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      raw:
+        error_response_payload: 256
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 16384] |
+
+**Description**:
+
+The default value is 256, which means collecting the first 256 bytes of an abnormal response payload and placing
+them into attribute.response_payload. When set to 0, it means that abnormal response payloads are not collected.
+
 ### Tunning {#processors.request_log.tunning}
 
 #### Payload Truncation {#processors.request_log.tunning.payload_truncation}
