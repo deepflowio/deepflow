@@ -33,3 +33,21 @@ func PageWhereFind[MT any](md *Metadata, query interface{}, args ...interface{})
 	}
 	return items, nil
 }
+
+func PageSelectWhereFind[MT any](md *Metadata, selectFields []string, query interface{}, args ...interface{}) ([]*MT, error) {
+	pageSize := md.Config.MySQLBatchSize
+	var items []*MT
+	for pageNum := 1; ; pageNum++ {
+		var pageItems []*MT
+		err := md.DB.Select(selectFields).Where(query, args...).Limit(pageSize).Offset((pageNum - 1) * pageSize).Find(&pageItems).Error
+		if err != nil {
+			log.Errorf("failed to find data: %s", err.Error(), md.LogPrefixes)
+			return nil, err
+		}
+		items = append(items, pageItems...)
+		if len(pageItems) < pageSize {
+			break
+		}
+	}
+	return items, nil
+}
