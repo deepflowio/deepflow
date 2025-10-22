@@ -2606,7 +2606,8 @@ static int check_dependencies(void)
 }
 
 static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
-			     int *bin_buf_size, bool skip_kfunc)
+			     int *bin_buf_size, bool skip_kfunc,
+			     bool skip_k_5_2)
 {
 	void *bpf_bin_buffer;
 	int buffer_sz;
@@ -2638,7 +2639,7 @@ static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kylin");
 		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
 		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
-	} else if (major > 5 || (major == 5 && minor >= 2)) {
+	} else if (!skip_k_5_2 && (major > 5 || (major == 5 && minor >= 2))) {
 		g_k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(load_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2_plus");
@@ -2742,7 +2743,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	}
 
 	select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer, &buffer_sz,
-			  !use_kfunc_bin);
+			  !use_kfunc_bin, false);
 
 	/*
 	 * Initialize datadump
@@ -2799,16 +2800,38 @@ int running_socket_tracer(tracer_callback_t handle,
 	conf_max_trace_entries = max_trace_entries;
 
 	bool has_attempted = false;
-retry_load:
-	if (tracer_bpf_load(tracer)) {
-		if (!has_attempted && g_k_type == K_TYPE_KFUNC) {
-			has_attempted = true;
-			select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer,
-					  &buffer_sz, true);
-			reconfig_load_resources(tracer, bpf_load_buffer_name,
-						bpf_bin_buffer, buffer_sz, tps);
-			goto retry_load;
+	while (true) {
+		if (tracer_bpf_load(tracer) == 0) {
+			// Loading succeeded, exit the loop
+			break;
 		}
+
+		if (!has_attempted) {
+			if (g_k_type == K_TYPE_KFUNC) {
+				has_attempted = true;
+				select_bpf_binary(bpf_load_buffer_name,
+						  &bpf_bin_buffer, &buffer_sz,
+						  true, false);
+				reconfig_load_resources(tracer,
+							bpf_load_buffer_name,
+							bpf_bin_buffer,
+							buffer_sz, tps);
+				continue;	/* Retry the load */
+			}
+
+			if (g_k_type == K_TYPE_VER_5_2_PLUS) {
+				has_attempted = true;
+				select_bpf_binary(bpf_load_buffer_name,
+						  &bpf_bin_buffer, &buffer_sz,
+						  true, true);
+				reconfig_load_resources(tracer,
+							bpf_load_buffer_name,
+							bpf_bin_buffer,
+							buffer_sz, tps);
+				continue;	/* Retry the load */
+			}
+		}
+
 		return -EINVAL;
 	}
 
