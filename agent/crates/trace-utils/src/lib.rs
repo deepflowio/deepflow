@@ -17,6 +17,7 @@
 pub mod btf;
 pub mod error;
 pub mod maps;
+pub mod remotememory;
 pub mod unwind;
 pub mod utils;
 

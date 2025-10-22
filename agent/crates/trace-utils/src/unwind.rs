@@ -21,6 +21,7 @@ pub mod php_jit;
 pub mod php_opcache;
 pub mod python;
 pub mod v8;
+pub mod v8_symbolizer;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::collections::{hash_map::Entry, HashMap, HashSet};

@@ -70,6 +70,22 @@ static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
 
+// Stack trace structure definition (user-space copy of eBPF structure)
+// Must match the definition in perf_profiler.bpf.c
+#ifndef PERF_MAX_STACK_DEPTH
+#define PERF_MAX_STACK_DEPTH 127
+#endif
+
+typedef struct {
+	u8 len;                                    // Number of frames in the stack
+	u64 addrs[PERF_MAX_STACK_DEPTH];          // Frame addresses (or pointer_and_type for V8)
+	u8 frame_types[PERF_MAX_STACK_DEPTH];     // Frame type markers (FRAME_TYPE_*)
+	// Extra data for interpreter frames (2 u64s per frame)
+	// For V8: extra_data_a[i] = delta_or_marker, extra_data_b[i] = return_address
+	u64 extra_data_a[PERF_MAX_STACK_DEPTH];
+	u64 extra_data_b[PERF_MAX_STACK_DEPTH];
+} stack_t;
+
 /*
  * To track the scenario where stack data is missing in the eBPF
  * 'stack_map_*' table. This typically occurs due to the design of
@@ -433,6 +449,7 @@ finish:
 }
 
 static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int n_symbols, bool is_start_idx, u64 address)
+
 {
 	int len = 0;
 	char *ptr = NULL;
@@ -445,7 +462,27 @@ static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int 
 
 	for (int i = 0; i < n_symbols; i++) {
 		if (symbol_ids[i] == symbol_id) {
-			if (strlen(symbols[i].class_name) > 0) {
+			// Check if this is a V8 frame (starts with "V8@")
+			if (strlen(symbols[i].method_name) >= 3 &&
+			    symbols[i].method_name[0] == 'V' &&
+			    symbols[i].method_name[1] == '8' &&
+			    symbols[i].method_name[2] == '@') {
+				// Parse the hex FP address from "V8@00007ffc1234"
+				u64 fp_addr = 0;
+				const char *hex_str = symbols[i].method_name + 3;
+				for (int j = 0; j < 16 && hex_str[j] != '\0'; j++) {
+					char c = hex_str[j];
+					int nibble = (c >= '0' && c <= '9') ? (c - '0') :
+					            (c >= 'a' && c <= 'f') ? (c - 'a' + 10) :
+					            (c >= 'A' && c <= 'F') ? (c - 'A' + 10) : 0;
+					fp_addr = (fp_addr << 4) | nibble;
+				}
+
+				// TODO: Call V8 symbolizer with FP address
+				// For now, just return the placeholder
+				snprintf(format_str, sizeof(format_str), "V8:frame@%llx",
+				        (unsigned long long)fp_addr);
+			} else if (strlen(symbols[i].class_name) > 0) {
 				// Enhanced formatting for JIT frames
 				if (is_jit_frame) {
 					snprintf(format_str, sizeof(format_str), "%s::%s [JIT]",
@@ -485,12 +522,27 @@ finish:
 
 static int get_stack_ips(struct bpf_tracer *t,
 			 const char *stack_map_name, int stack_id, u64 * ips,
-			 u64 ts)
+			 stack_t *full_stack, u64 ts)
 {
 	ASSERT(stack_id >= 0);
 
+	// Try to read full stack_t structure first (for interpreter stacks with V8/Python/PHP)
+	if (full_stack && bpf_table_get_value(t, stack_map_name, stack_id, (void *)full_stack)) {
+		// Successfully read full stack_t structure, copy addrs to ips for compatibility
+		memcpy(ips, full_stack->addrs, sizeof(full_stack->addrs));
+		return ETR_OK;
+	}
+
+	// Fallback: read only addresses (for regular stack traces)
 	if (!bpf_table_get_value(t, stack_map_name, stack_id, (void *)ips)) {
 		return ETR_NOTEXIST;
+	}
+
+	// Clear full_stack if provided but couldn't read it
+	if (full_stack) {
+		memset(full_stack, 0, sizeof(*full_stack));
+		// Copy ips to full_stack->addrs for consistency
+		memcpy(full_stack->addrs, ips, PERF_MAX_STACK_DEPTH * sizeof(u64));
 	}
 
 	return ETR_OK;
@@ -516,8 +568,9 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	u64 sentinel_addr = 0xcccccccccccccccc;
 	int i;
 
-	u64 ips[PERF_MAX_STACK_DEPTH];
-	memset(ips, 0, sizeof(ips));
+	// Use full stack_t structure to access frame_types and extra_data
+	stack_t stack;
+	memset(&stack, 0, sizeof(stack));
 
 	symbol_t symbols[MAX_SYMBOL_NUM];
 	memset(symbols, 0, sizeof(symbols));
@@ -553,11 +606,14 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	}
 
 	int ret;
-	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
+	if ((ret = get_stack_ips(t, stack_map_name, stack_id, stack.addrs, &stack, ts))) {
 		stack_table_data_miss++;
 		*ret_val = ret;
 		return NULL;
 	}
+
+	// For debugging: stack.len is the number of frames
+	u64 *ips = stack.addrs;
 
 	char *str = NULL;
 	ret = VEC_OK;
@@ -567,6 +623,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 
 	int start_idx = -1, folded_size = 0;
+
 	for (i = PERF_MAX_STACK_DEPTH - 1; i >= 0; i--) {
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
@@ -574,7 +631,35 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (start_idx == -1)
 			start_idx = i;
 
-		if (use_symbol_table) {
+		// Check if this is a V8 frame using frame_types array
+		if (stack.frame_types[i] == FRAME_TYPE_V8) {
+			// Extract pointer_and_type from addrs, delta_or_marker from extra_data_a,
+			// and sfi_fallback from extra_data_b
+			u64 pointer_and_type = ips[i];
+			u64 delta_or_marker = stack.extra_data_a[i];
+			u64 sfi_fallback = stack.extra_data_b[i];
+
+			// Call Rust V8 symbolizer with OpenTelemetry-style parameters plus SFI fallback
+			str = resolve_v8_frame((u32)pid, pointer_and_type, delta_or_marker, sfi_fallback);
+
+			// If symbolization failed, use placeholder
+			if (str == NULL || strlen(str) == 0) {
+				if (str != NULL) {
+					free(str);
+				}
+				char v8_symbol[256];
+				u8 frame_type = pointer_and_type & V8_FILE_TYPE_MASK;
+				snprintf(v8_symbol, sizeof(v8_symbol), "V8:type%d@%llx+%llx",
+				        frame_type, (unsigned long long)(pointer_and_type & ~V8_FILE_TYPE_MASK),
+				        (unsigned long long)delta_or_marker);
+				int len = strlen(v8_symbol);
+				str = clib_mem_alloc_aligned("v8_symbol", len + 1, 0, NULL);
+				if (str) {
+					strcpy(str, v8_symbol);
+				}
+			}
+		} else if (use_symbol_table) {
+			// Use unified symbol table mechanism for interpreted languages (Python/PHP)
 			str = resolve_custom_symbol_addr(symbols, symbol_ids, n_symbols, (i == start_idx), ips[i]);
 		} else {
 			str = resolve_addr(t, pid, (i == start_idx), ips[i], new_cache, info_p);
@@ -812,14 +897,11 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		// Check if this is PHP process for special handling
 		if (is_php_process(v->tgid)) {
 			offset += merge_php_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		} else if (is_v8_process(v->tgid)) {
-			// V8/Node.js process handling
 			offset += merge_v8_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		} else {
-			// Default Python/other interpreter handling
 			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		}
 	} else if (i_trace_str) {

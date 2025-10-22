@@ -343,7 +343,7 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(150));
+        thread::sleep(Duration::from_secs(300));
         stop_continuous_profiler(&mut contexts as *mut [*mut c_void; PROFILER_CTX_NUM]);
         print!(
             "====== capture count {}, sum {}\n",

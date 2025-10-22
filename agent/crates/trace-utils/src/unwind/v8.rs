@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-use std::{borrow::Cow, cell::OnceCell, collections::HashMap, fs, path::PathBuf};
+use std::{
+    cell::OnceCell,
+    collections::HashMap,
+    fs,
+    path::PathBuf,
+    sync::{Mutex, OnceLock},
+};
 
 use libc::c_void;
-use log::{debug, trace, warn};
-use object::{Object, ObjectSymbol};
+use log::{trace, warn};
+use object::{Object, ObjectSection, ObjectSymbol};
 use regex::Regex;
 use semver::{Version, VersionReq};
 
@@ -28,18 +34,37 @@ use crate::{
     utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
 
+use super::v8_symbolizer::{V8FrameMetadata, V8Symbolizer};
+
 // V8 stack merging constants
 // const INCOMPLETE_V8_STACK: &'static str = "[lost] incomplete V8 c stack"; // Currently unused
 
 // V8 Frame type constants (matching OpenTelemetry implementation)
-const V8_FILE_TYPE_MARKER: u64 = 0x0;
-const V8_FILE_TYPE_BYTECODE: u64 = 0x1;
-const V8_FILE_TYPE_NATIVE_SFI: u64 = 0x2;
-const V8_FILE_TYPE_NATIVE_CODE: u64 = 0x3;
-const V8_FILE_TYPE_NATIVE_JSFUNC: u64 = 0x4;
+// Public constants for reuse in v8_symbolizer module
+pub const V8_FILE_TYPE_MASK: u64 = 0x7;
+pub const V8_FILE_TYPE_MARKER: u64 = 0x0;
+pub const V8_FILE_TYPE_BYTECODE: u64 = 0x1;
+pub const V8_FILE_TYPE_NATIVE_SFI: u64 = 0x2;
+pub const V8_FILE_TYPE_NATIVE_CODE: u64 = 0x3;
+pub const V8_FILE_TYPE_NATIVE_JSFUNC: u64 = 0x4;
 
-// V8 frame type mask and shifts
-const V8_FILE_TYPE_MASK: u64 = 0x7;
+/// Global version registry for fast PID lookup in FFI
+static PROCESS_VERSIONS: OnceLock<Mutex<HashMap<u32, Version>>> = OnceLock::new();
+
+fn get_version_registry() -> &'static Mutex<HashMap<u32, Version>> {
+    PROCESS_VERSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Get V8 offsets for a process (used by FFI)
+pub fn get_offsets_for_pid(pid: u32) -> &'static V8Offsets {
+    if let Ok(registry) = get_version_registry().lock() {
+        if let Some(version) = registry.get(&pid) {
+            return get_offsets_for_v8_version(version);
+        }
+    }
+    // Default to latest if not found
+    V8_11_OFFSETS
+}
 
 fn error_not_v8(pid: u32) -> Error {
     Error::BadInterpreterType(pid, "v8")
@@ -109,7 +134,7 @@ impl MappedFile {
         }) {
             match Self::parse_node_version(c) {
                 Some(v) => return Some(v),
-                None => debug!("Cannot find node version from file {}", self.path.display()),
+                None => {}
             }
         }
         None
@@ -136,6 +161,93 @@ impl MappedFile {
         self.has_any_symbols(&v8_symbols)
     }
 
+    /// Read V8 version directly from ELF symbols (accurate method).
+    /// This reads v8::internal::Version::{major,minor,build}_ symbols.
+    /// Symbol names are C++ mangled: _ZN2v88internal7Version6{major|minor|build}_E
+    fn read_v8_version_from_symbols(&mut self) -> Result<Option<Version>> {
+        self.load()?;
+        let obj = object::File::parse(&*self.contents)?;
+
+        // V8 version symbol names (C++ mangled)
+        let major_sym = "_ZN2v88internal7Version6major_E";
+        let minor_sym = "_ZN2v88internal7Version6minor_E";
+        let build_sym = "_ZN2v88internal7Version6build_E";
+
+        // Find all three version symbols
+        let mut major: Option<u32> = None;
+        let mut minor: Option<u32> = None;
+        let mut build: Option<u32> = None;
+
+        for symbol in obj.symbols().chain(obj.dynamic_symbols()) {
+            if let Ok(name) = symbol.name() {
+                let addr = symbol.address();
+
+                // Read 4-byte value from symbol data
+                if name == major_sym {
+                    if let Ok(section) = obj
+                        .section_by_index(symbol.section_index().unwrap_or(object::SectionIndex(0)))
+                    {
+                        if let Ok(data) = section.data() {
+                            let offset = (addr - section.address()) as usize;
+                            if offset + 4 <= data.len() {
+                                major = Some(u32::from_le_bytes([
+                                    data[offset],
+                                    data[offset + 1],
+                                    data[offset + 2],
+                                    data[offset + 3],
+                                ]));
+                            }
+                        }
+                    }
+                } else if name == minor_sym {
+                    if let Ok(section) = obj
+                        .section_by_index(symbol.section_index().unwrap_or(object::SectionIndex(0)))
+                    {
+                        if let Ok(data) = section.data() {
+                            let offset = (addr - section.address()) as usize;
+                            if offset + 4 <= data.len() {
+                                minor = Some(u32::from_le_bytes([
+                                    data[offset],
+                                    data[offset + 1],
+                                    data[offset + 2],
+                                    data[offset + 3],
+                                ]));
+                            }
+                        }
+                    }
+                } else if name == build_sym {
+                    if let Ok(section) = obj
+                        .section_by_index(symbol.section_index().unwrap_or(object::SectionIndex(0)))
+                    {
+                        if let Ok(data) = section.data() {
+                            let offset = (addr - section.address()) as usize;
+                            if offset + 4 <= data.len() {
+                                build = Some(u32::from_le_bytes([
+                                    data[offset],
+                                    data[offset + 1],
+                                    data[offset + 2],
+                                    data[offset + 3],
+                                ]));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we found both major and minor, construct Version
+        // Note: build version is less critical and often 0 in some V8 builds
+        if let (Some(maj), Some(min)) = (major, minor) {
+            // Build might be available, default to 0 if not found
+            let bld = build.unwrap_or(0);
+            return Ok(Some(Version::new(maj as u64, min as u64, bld as u64)));
+        }
+
+        Ok(None)
+    }
+
+    /// Fallback: Map Node.js version to approximate V8 version.
+    /// Note: This is less accurate than reading from ELF symbols.
     fn node_to_v8_version(&self, node_version: &Version) -> Option<Version> {
         match (node_version.major, node_version.minor) {
             (22, _) => Some(Version::new(12, 4, 254)),
@@ -149,7 +261,6 @@ impl MappedFile {
 }
 
 struct Interpreter {
-    pid: u32,
     exe: MappedFile,
     node_version: Version,
     v8_version: Version,
@@ -157,29 +268,74 @@ struct Interpreter {
 
 impl Interpreter {
     fn new(pid: u32, exe_area: &MemoryArea) -> Result<Self> {
-        let mut exe = MappedFile::new(&exe_area.path, exe_area.m_start);
+        // Build namespace-aware path using /proc/PID/root to access files
+        // from the target process's mount namespace
+        let real_path = Self::build_namespaced_path(pid, &exe_area.path);
+
+        let mut exe = MappedFile::new(&real_path, exe_area.m_start);
 
         if !exe.has_v8_symbols()? {
-            return Err(error_not_v8(pid));
+            // Try fallback to direct path if namespaced path failed
+            exe = MappedFile::new(&exe_area.path, exe_area.m_start);
+
+            if !exe.has_v8_symbols()? {
+                return Err(error_not_v8(pid));
+            }
         }
 
+        // Still try to get Node.js version for informational purposes
         let node_version = exe.version().unwrap_or_else(|| Version::new(20, 0, 0));
-        let v8_version = exe
-            .node_to_v8_version(&node_version)
-            .unwrap_or_else(|| Version::new(11, 3, 244));
+
+        // Try to read V8 version directly from ELF symbols (most accurate)
+        let v8_version = match exe.read_v8_version_from_symbols() {
+            Ok(Some(version)) => {
+                trace!(
+                    "Process#{pid} V8 version from ELF symbols: {} (Node: {})",
+                    version,
+                    node_version
+                );
+                version
+            }
+            Ok(None) => {
+                trace!(
+                    "Process#{pid} V8 ELF symbols not found, using Node mapping: Node {}",
+                    node_version
+                );
+                // Fallback: Try Node.js version from path + mapping
+                exe.node_to_v8_version(&node_version)
+                    .unwrap_or_else(|| Version::new(11, 3, 244))
+            }
+            Err(e) => {
+                warn!(
+                    "Process#{pid} Failed to read V8 ELF symbols: {:?}, using Node mapping",
+                    e
+                );
+                // Fallback: Try Node.js version from path + mapping
+                exe.node_to_v8_version(&node_version)
+                    .unwrap_or_else(|| Version::new(11, 3, 244))
+            }
+        };
 
         Ok(Self {
-            pid,
             exe,
             node_version,
             v8_version,
         })
     }
 
+    /// Build a namespace-aware path using /proc/PID/root prefix.
+    /// This allows accessing files from the target process's mount namespace.
+    fn build_namespaced_path(pid: u32, path: &str) -> String {
+        if path.starts_with('/') {
+            format!("/proc/{}/root{}", pid, path)
+        } else {
+            path.to_string()
+        }
+    }
+
     fn isolate_address(&mut self) -> Result<u64> {
         // 在实际实现中需要从进程内存中动态获取isolate地址
         // 这里简化为返回一个固定值
-        debug!("Getting isolate address for V8 process {}", self.pid);
         self.exe
             .find_symbol_address("v8::internal::Isolate::Current")
             .map(|addr| addr.unwrap_or(0))
@@ -209,12 +365,10 @@ impl InterpreterInfo {
             return Err(error_not_v8(pid));
         };
 
-        debug!("process#{pid} exe: {}", exe_area.path);
-
         let mut intp = Interpreter::new(pid, exe_area)?;
 
         // Check if the Node.js version is supported
-        let req = VersionReq::parse(">=16.0.0, <22.0.0").unwrap();
+        let req = VersionReq::parse(">=16.0.0, <=23.0.0").unwrap();
         if !req.matches(&intp.node_version) {
             return Err(error_not_supported_version(pid, intp.node_version.clone()));
         }
@@ -234,6 +388,108 @@ pub struct V8UnwindInfo {
     pub version: u32,
 }
 
+// V8ProcInfo: Matches the C v8_proc_info_t structure in perf_profiler.h
+// This is what eBPF expects in the v8_unwind_info_map
+// IMPORTANT: Field order and padding must exactly match C structure
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct V8ProcInfo {
+    // Heap Object Offsets
+    pub off_heap_object_map: u16,
+
+    // JSFunction Offsets
+    pub off_jsfunction_shared: u16,
+    pub off_jsfunction_code: u16,
+
+    // Code Object Offsets
+    pub off_code_instruction_start: u16,
+    pub off_code_instruction_size: u16,
+    pub off_code_flags: u16,
+
+    // Type IDs (for validation)
+    pub type_jsfunction_first: u16,
+    pub type_jsfunction_last: u16,
+    pub type_shared_function_info: u16,
+    pub type_code: u16,
+
+    // Frame Pointer Offsets (relative to FP)
+    pub fp_marker: i16,
+    pub fp_function: i16,
+    pub fp_bytecode_offset: i16,
+
+    // Explicit padding for u32 alignment (C compiler adds this automatically)
+    _padding: u16,
+
+    // Version & Metadata
+    pub v8_version: u32,
+    pub codekind_mask: u32,
+    pub codekind_shift: u8,
+    pub codekind_baseline: u8,
+    pub reserved: u16,
+
+    // Debug counters
+    pub unwinding_attempted: u64,
+    pub unwinding_success: u64,
+    pub unwinding_failed: u64,
+}
+
+// Compile-time size check: Ensure V8ProcInfo matches C v8_proc_info_t size
+// Expected: 10*u16 + 3*i16 + 1*u16(padding) + 2*u32 + 2*u8 + 1*u16 + 3*u64
+//         = 20 + 6 + 2 + 8 + 2 + 2 + 24 = 64 bytes
+const _: () = assert!(
+    std::mem::size_of::<V8ProcInfo>() == 64,
+    "V8ProcInfo size must be 64 bytes to match C v8_proc_info_t"
+);
+
+impl V8ProcInfo {
+    pub fn from_offsets(offsets: &V8Offsets, version: u32) -> Self {
+        let proc_info = V8ProcInfo {
+            // Heap Object Offsets - these would come from vmstructs if we had them
+            // For now, use common values that work across V8 versions
+            off_heap_object_map: 0, // First field in HeapObject
+
+            // JSFunction Offsets
+            off_jsfunction_shared: offsets.js_function.shared,
+            off_jsfunction_code: offsets.js_function.code,
+
+            // Code Object Offsets
+            off_code_instruction_start: offsets.code.instruction_start as u16,
+            off_code_instruction_size: offsets.code.instruction_size as u16,
+            off_code_flags: offsets.code.flags as u16,
+
+            // Type IDs - read from V8Offsets structure (version-specific)
+            type_jsfunction_first: offsets.v8_type.js_function_first,
+            type_jsfunction_last: offsets.v8_type.js_function_last,
+            type_shared_function_info: offsets.v8_type.shared_function_info,
+            type_code: offsets.v8_type.code, // V8 Code object type ID (version-specific)
+
+            // Frame Pointer Offsets
+            fp_marker: offsets.frame_pointers.marker,
+            fp_function: offsets.frame_pointers.function,
+            fp_bytecode_offset: offsets.frame_pointers.bytecode_offset,
+
+            // Explicit padding
+            _padding: 0,
+
+            // Version & Metadata
+            v8_version: version,
+            codekind_mask: offsets.codekind.mask, // CodeKindFieldMask (version-specific)
+            codekind_shift: offsets.codekind.shift, // CodeKindFieldShift (version-specific)
+            codekind_baseline: offsets.codekind.baseline, // Baseline CodeKind (version-specific)
+            reserved: 0,
+
+            // Debug counters (initialized to zero)
+            unwinding_attempted: 0,
+            unwinding_success: 0,
+            unwinding_failed: 0,
+        };
+
+        // Verify struct size
+
+        proc_info
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct V8Offsets {
@@ -243,6 +499,21 @@ pub struct V8Offsets {
     pub code: V8Code,
     pub script: V8Script,
     pub bytecode_array: V8BytecodeArray,
+    pub v8_type: V8Type,
+    pub v8_fixed: V8Fixed,
+    pub scope_info_index: V8ScopeInfoIndex,
+    pub deopt_data_index: V8DeoptimizationDataIndex,
+    pub heap_object: V8HeapObject,
+    pub map: V8Map,
+    pub frame_types: V8FrameTypes,
+    pub codekind: V8CodeKind,
+}
+
+impl Default for V8Offsets {
+    fn default() -> Self {
+        // Return V8 9.x offsets as default (Node.js 16.x)
+        *V8_9_OFFSETS
+    }
 }
 
 #[repr(C)]
@@ -281,6 +552,8 @@ pub struct V8Code {
     pub instruction_start: u16,
     pub instruction_size: u16,
     pub flags: u16,
+    pub deoptimization_data: u16,
+    pub source_position_table: u16,
 }
 
 #[repr(C)]
@@ -289,12 +562,117 @@ pub struct V8BytecodeArray {
     pub source_position_table: u16,
 }
 
-// V8 9.x offsets (Node.js 16.x)
-const V8_9_OFFSETS: &V8Offsets = &V8Offsets {
+// V8 Type IDs for object type checking
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8Type {
+    pub scope_info: u16,
+    pub shared_function_info: u16,
+    pub js_function_first: u16,
+    pub js_function_last: u16,
+    pub string_first: u16,
+    pub script: u16,
+    pub code: u16, // Code object type ID (v8dbg_type_Code__CODE_TYPE)
+}
+
+// V8 Fixed Array/Object type boundaries
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8Fixed {
+    pub first_nonstring_type: u16,
+    pub string_representation_mask: u16,
+    pub seq_string_tag: u16,
+    pub cons_string_tag: u16,
+    pub thin_string_tag: u16,
+}
+
+// V8 ScopeInfo internal structure indices
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8ScopeInfoIndex {
+    pub first_vars: u8,
+    pub n_context_locals: u8,
+}
+
+// V8 DeoptimizationData array indices
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8DeoptimizationDataIndex {
+    pub inlined_function_count: u8,
+    pub literal_array: u8,
+    pub shared_function_info: u8,
+    pub inlining_positions: u8,
+}
+
+// V8 Frame Type values (version-specific)
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8FrameTypes {
+    pub entry_frame: u8,
+    pub construct_entry_frame: u8,
+    pub exit_frame: u8,
+    pub wasm_frame: u8,
+    pub wasm_to_js_frame: u8,
+    pub wasm_to_js_function_frame: u8, // V8 11+ only
+    pub js_to_wasm_frame: u8,
+    pub wasm_debug_break_frame: u8,
+    pub stack_switch_frame: u8, // V8 10+ only
+    pub wasm_exit_frame: u8,
+    pub c_wasm_entry_frame: u8,
+    pub wasm_compile_lazy_frame: u8,  // V8 9-10 only
+    pub wasm_liftoff_setup_frame: u8, // V8 11+ only
+    pub interpreted_frame: u8,
+    pub baseline_frame: u8,
+    pub maglev_frame: u8,   // V8 11+ only
+    pub turbofan_frame: u8, // V8 11+, replaces optimized_frame
+    pub stub_frame: u8,
+    pub turbofan_stub_with_context_frame: u8, // V8 11+ only
+    pub builtin_continuation_frame: u8,
+    pub js_builtin_continuation_frame: u8,
+    pub js_builtin_continuation_with_catch_frame: u8,
+    pub internal_frame: u8,
+    pub construct_frame: u8,
+    pub fast_construct_frame: u8, // V8 12+ only
+    pub builtin_frame: u8,
+    pub builtin_exit_frame: u8,
+    pub native_frame: u8,
+    pub api_callback_exit_frame: u8, // V8 12+ only
+    pub irregexp_frame: u8,          // V8 11+ only
+
+    // Legacy field for backward compatibility (V8 9-10)
+    pub optimized_frame: u8, // V8 9-10, replaced by turbofan_frame in V8 11+
+}
+
+// V8 HeapObject structure
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8HeapObject {
+    pub map: u16, // Offset to Map object
+}
+
+// V8 Map structure
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8Map {
+    pub instance_type: u16, // Offset to instance_type field
+}
+
+// V8 CodeKind constants (version-specific)
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct V8CodeKind {
+    pub mask: u32,       // CodeKindFieldMask
+    pub shift: u8,       // CodeKindFieldShift
+    pub baseline: u8,    // CodeKindBaseline
+    pub interpreted: u8, // CodeKindInterpretedFunction
+}
+
+// V8 9.x offsets (Node.js 16.x) - from v8_9.4.146.26_vmstructs_complete.json
+pub const V8_9_OFFSETS: &V8Offsets = &V8Offsets {
     frame_pointers: V8FramePointers {
-        marker: -16,
-        function: -8,
-        bytecode_offset: -24,
+        marker: -8,         // v8dbg_off_fp_context
+        function: -16,      // v8dbg_off_fp_function (was incorrectly -8)
+        bytecode_offset: 0, // Not available in V8 9.x
     },
     js_function: V8JSFunction {
         shared: 16,
@@ -306,9 +684,11 @@ const V8_9_OFFSETS: &V8Offsets = &V8Offsets {
         script_or_debug_info: 16,
     },
     code: V8Code {
-        instruction_start: 40,
-        instruction_size: 48,
-        flags: 56,
+        instruction_start: 96, // v8dbg_class_Code__instruction_start__uintptr_t (V8 9.x)
+        instruction_size: 40,  // v8dbg_class_Code__instruction_size__int (V8 9.x)
+        flags: 0,              // Not available in V8 9.x
+        deoptimization_data: 0, // Not available in V8 9.x
+        source_position_table: 24, // v8dbg_class_Code__source_position_table__ByteArray (V8 9.x)
     },
     script: V8Script {
         name: 12,
@@ -316,15 +696,82 @@ const V8_9_OFFSETS: &V8Offsets = &V8Offsets {
     },
     bytecode_array: V8BytecodeArray {
         source_position_table: 8,
+    },
+    v8_type: V8Type {
+        scope_info: 178,           // v8dbg_type_ScopeInfo__SCOPE_INFO_TYPE (V8 9.4)
+        shared_function_info: 179, // v8dbg_type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE
+        js_function_first: 1059,   // v8dbg_type_JSFunction__JS_FUNCTION_TYPE
+        js_function_last: 1059,
+        string_first: 0,
+        script: 112, // v8dbg_type_Script__SCRIPT_TYPE
+        code: 162,   // v8dbg_type_Code__CODE_TYPE (V8 9.4)
+    },
+    v8_fixed: V8Fixed {
+        first_nonstring_type: 64,        // v8dbg_FirstNonstringType (V8 9.4)
+        string_representation_mask: 0x7, // v8dbg_StringRepresentationMask
+        seq_string_tag: 0x0,             // v8dbg_SeqStringTag
+        cons_string_tag: 0x1,            // v8dbg_ConsStringTag
+        thin_string_tag: 0x5,            // v8dbg_ThinStringTag
+    },
+    scope_info_index: V8ScopeInfoIndex {
+        first_vars: 3,
+        n_context_locals: 2,
+    },
+    deopt_data_index: V8DeoptimizationDataIndex {
+        inlined_function_count: 0,
+        literal_array: 1,
+        shared_function_info: 2,
+        inlining_positions: 4,
+    },
+    heap_object: V8HeapObject { map: 0 },
+    map: V8Map { instance_type: 12 },
+    frame_types: V8FrameTypes {
+        entry_frame: 1,
+        construct_entry_frame: 2,
+        exit_frame: 3,
+        wasm_frame: 4,
+        wasm_to_js_frame: 5,
+        wasm_to_js_function_frame: 0, // Not in V8 9
+        js_to_wasm_frame: 6,
+        wasm_debug_break_frame: 7,
+        stack_switch_frame: 0, // Not in V8 9
+        wasm_exit_frame: 9,
+        c_wasm_entry_frame: 8,
+        wasm_compile_lazy_frame: 10, // V8 9 only
+        wasm_liftoff_setup_frame: 0, // V8 11+ only
+        interpreted_frame: 11,
+        baseline_frame: 12,
+        maglev_frame: 0,   // Not in V8 9
+        turbofan_frame: 0, // Not in V8 9, use optimized_frame
+        stub_frame: 14,
+        turbofan_stub_with_context_frame: 0, // Not in V8 9
+        builtin_continuation_frame: 15,
+        js_builtin_continuation_frame: 16,
+        js_builtin_continuation_with_catch_frame: 17,
+        internal_frame: 18,
+        construct_frame: 19,
+        fast_construct_frame: 0, // Not in V8 9
+        builtin_frame: 20,
+        builtin_exit_frame: 21,
+        native_frame: 22,
+        api_callback_exit_frame: 0, // Not in V8 9
+        irregexp_frame: 0,          // Not in V8 9
+        optimized_frame: 13,        // V8 9-10, replaced by turbofan_frame in V8 11+
+    },
+    codekind: V8CodeKind {
+        mask: 15, // Default for V8 9 (may not have CodeKind)
+        shift: 0,
+        baseline: 0,    // Not available in V8 9
+        interpreted: 0, // Not available in V8 9
     },
 };
 
-// V8 10.x offsets (Node.js 18.x)
-const V8_10_OFFSETS: &V8Offsets = &V8Offsets {
+// V8 10.x offsets (Node.js 18.x) - from v8_10.2.154.26_vmstructs_complete.json
+pub const V8_10_OFFSETS: &V8Offsets = &V8Offsets {
     frame_pointers: V8FramePointers {
-        marker: -16,
-        function: -8,
-        bytecode_offset: -24,
+        marker: -8,           // v8dbg_off_fp_context
+        function: -16,        // v8dbg_off_fp_function (was incorrectly -8)
+        bytecode_offset: -40, // v8dbg_off_fp_bytecode_offset (was incorrectly -24)
     },
     js_function: V8JSFunction {
         shared: 16,
@@ -336,9 +783,11 @@ const V8_10_OFFSETS: &V8Offsets = &V8Offsets {
         script_or_debug_info: 16,
     },
     code: V8Code {
-        instruction_start: 40,
-        instruction_size: 48,
-        flags: 56,
+        instruction_start: 128, // v8dbg_class_Code__instruction_start__uintptr_t (V8 10.x)
+        instruction_size: 40,   // v8dbg_class_Code__instruction_size__int (V8 10.x)
+        flags: 48,              // v8dbg_class_Code__flags__uint32_t (V8 10.x)
+        deoptimization_data: 0, // Not available in V8 10.x
+        source_position_table: 0, // Not available in V8 10.x
     },
     script: V8Script {
         name: 12,
@@ -346,36 +795,280 @@ const V8_10_OFFSETS: &V8Offsets = &V8Offsets {
     },
     bytecode_array: V8BytecodeArray {
         source_position_table: 8,
+    },
+    v8_type: V8Type {
+        scope_info: 256,           // v8dbg_type_ScopeInfo__SCOPE_INFO_TYPE (V8 10.2)
+        shared_function_info: 257, // v8dbg_type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE
+        js_function_first: 2065,   // v8dbg_type_JSFunction__JS_FUNCTION_TYPE
+        js_function_last: 2065,
+        string_first: 0,
+        script: 170, // v8dbg_type_Script__SCRIPT_TYPE
+        code: 240,   // v8dbg_type_Code__CODE_TYPE (V8 10.2)
+    },
+    v8_fixed: V8Fixed {
+        first_nonstring_type: 128,       // v8dbg_FirstNonstringType
+        string_representation_mask: 0x7, // v8dbg_StringRepresentationMask
+        seq_string_tag: 0x0,             // v8dbg_SeqStringTag
+        cons_string_tag: 0x1,            // v8dbg_ConsStringTag
+        thin_string_tag: 0x5,            // v8dbg_ThinStringTag
+    },
+    scope_info_index: V8ScopeInfoIndex {
+        first_vars: 3, // Assume same as V8 9.x
+        n_context_locals: 2,
+    },
+    deopt_data_index: V8DeoptimizationDataIndex {
+        inlined_function_count: 0,
+        literal_array: 1,
+        shared_function_info: 2,
+        inlining_positions: 4,
+    },
+    heap_object: V8HeapObject { map: 0 },
+    map: V8Map { instance_type: 12 },
+    frame_types: V8FrameTypes {
+        entry_frame: 1,
+        construct_entry_frame: 2,
+        exit_frame: 3,
+        wasm_frame: 4,
+        wasm_to_js_frame: 5,
+        wasm_to_js_function_frame: 0, // Not in V8 10
+        js_to_wasm_frame: 6,
+        wasm_debug_break_frame: 8,
+        stack_switch_frame: 7, // V8 10+
+        wasm_exit_frame: 10,
+        c_wasm_entry_frame: 9,
+        wasm_compile_lazy_frame: 11, // V8 9-10 only
+        wasm_liftoff_setup_frame: 0, // V8 11+ only
+        interpreted_frame: 12,
+        baseline_frame: 13,
+        maglev_frame: 0,   // Not in V8 10
+        turbofan_frame: 0, // Not in V8 10, use optimized_frame
+        stub_frame: 15,
+        turbofan_stub_with_context_frame: 0, // Not in V8 10
+        builtin_continuation_frame: 16,
+        js_builtin_continuation_frame: 17,
+        js_builtin_continuation_with_catch_frame: 18,
+        internal_frame: 19,
+        construct_frame: 20,
+        fast_construct_frame: 0, // Not in V8 10
+        builtin_frame: 21,
+        builtin_exit_frame: 22,
+        native_frame: 23,
+        api_callback_exit_frame: 0, // Not in V8 10
+        irregexp_frame: 0,          // Not in V8 10
+        optimized_frame: 14,        // V8 9-10, replaced by turbofan_frame in V8 11+
+    },
+    codekind: V8CodeKind {
+        mask: 15,        // v8dbg_CodeKindFieldMask (V8 10)
+        shift: 0,        // v8dbg_CodeKindFieldShift (V8 10)
+        baseline: 11,    // v8dbg_CodeKindBaseline (V8 10)
+        interpreted: 10, // v8dbg_CodeKindInterpretedFunction (V8 10)
     },
 };
 
-// V8 11.x offsets (Node.js 20.x)
-const V8_11_OFFSETS: &V8Offsets = &V8Offsets {
+// V8 11.x offsets (Node.js 20.x) - from v8_11.3.244.8_vmstructs_complete.json
+pub const V8_11_OFFSETS: &V8Offsets = &V8Offsets {
     frame_pointers: V8FramePointers {
-        marker: -16,
-        function: -8,
-        bytecode_offset: -24,
+        marker: -8,           // v8dbg_off_fp_context
+        function: -16,        // v8dbg_off_fp_function
+        bytecode_offset: -40, // v8dbg_off_fp_bytecode_offset
     },
     js_function: V8JSFunction {
-        shared: 16,
-        code: 24,
+        shared: 24, // v8dbg_class_JSFunction__shared__SharedFunctionInfo
+        code: 48,   // 0x30 - From OpenTelemetry runtime logs (V8 11.x)
     },
     shared_function_info: V8SharedFunctionInfo {
-        name_or_scope_info: 8,
-        function_data: 12,
-        script_or_debug_info: 16,
+        name_or_scope_info: 16, // v8dbg_class_SharedFunctionInfo__name_or_scope_info__Object
+        function_data: 8,       // v8dbg_class_SharedFunctionInfo__function_data__Object
+        script_or_debug_info: 32, // v8dbg_class_SharedFunctionInfo__script_or_debug_info__HeapObject
     },
     code: V8Code {
-        instruction_start: 40,
-        instruction_size: 48,
-        flags: 56,
+        instruction_start: 40,     // 0x28 - From OpenTelemetry runtime logs (V8 11.x)
+        instruction_size: 56,      // 0x38 - From OpenTelemetry runtime logs (V8 11.x)
+        flags: 48,                 // 0x30 - From OpenTelemetry runtime logs (V8 11.x)
+        deoptimization_data: 16, // 0x10 - v8dbg_class_Code__deoptimization_data__FixedArray (V8 11.x)
+        source_position_table: 24, // 0x18 - v8dbg_class_Code__source_position_table__ByteArray (V8 11.x)
     },
     script: V8Script {
-        name: 12,
-        source: 16,
+        name: 16,  // v8dbg_class_Script__name__Object (V8 11)
+        source: 8, // v8dbg_class_Script__source__Object (V8 11)
     },
     bytecode_array: V8BytecodeArray {
         source_position_table: 8,
+    },
+    v8_type: V8Type {
+        scope_info: 261,           // v8dbg_type_ScopeInfo__SCOPE_INFO_TYPE
+        shared_function_info: 262, // v8dbg_type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE
+        js_function_first: 2066,   // v8dbg_type_JSFunction__JS_FUNCTION_TYPE
+        js_function_last: 2080,    // 0x820 - From OpenTelemetry runtime logs (V8 11.x)
+        string_first: 0,           // String types start at 0
+        script: 167,               // v8dbg_type_Script__SCRIPT_TYPE
+        code: 245,                 // v8dbg_type_Code__CODE_TYPE (V8 11)
+    },
+    v8_fixed: V8Fixed {
+        first_nonstring_type: 128,       // v8dbg_FirstNonstringType
+        string_representation_mask: 0x7, // v8dbg_StringRepresentationMask
+        seq_string_tag: 0x0,             // v8dbg_SeqStringTag
+        cons_string_tag: 0x1,            // v8dbg_ConsStringTag
+        thin_string_tag: 0x5,            // v8dbg_ThinStringTag
+    },
+    scope_info_index: V8ScopeInfoIndex {
+        first_vars: 3,       // v8dbg_scopeinfo_idx_first_vars
+        n_context_locals: 2, // v8dbg_scopeinfo_idx_ncontextlocals
+    },
+    deopt_data_index: V8DeoptimizationDataIndex {
+        inlined_function_count: 1, // v8dbg_DeoptimizationDataInlinedFunctionCountIndex (V8 11.x)
+        literal_array: 2,          // v8dbg_DeoptimizationDataLiteralArrayIndex (V8 11.x)
+        shared_function_info: 6,   // v8dbg_DeoptimizationDataSharedFunctionInfoIndex (V8 11.x)
+        inlining_positions: 7,     // v8dbg_DeoptimizationDataInliningPositionsIndex (V8 11.x)
+    },
+    heap_object: V8HeapObject {
+        map: 0, // v8dbg_class_HeapObject__map__Map
+    },
+    map: V8Map {
+        instance_type: 12, // v8dbg_class_Map__instance_type__uint16_t
+    },
+    frame_types: V8FrameTypes {
+        entry_frame: 1,
+        construct_entry_frame: 2,
+        exit_frame: 3,
+        wasm_frame: 4,
+        wasm_to_js_frame: 5,
+        wasm_to_js_function_frame: 6, // V8 11+
+        js_to_wasm_frame: 7,
+        wasm_debug_break_frame: 9,
+        stack_switch_frame: 8, // V8 10+
+        wasm_exit_frame: 11,
+        c_wasm_entry_frame: 10,
+        wasm_compile_lazy_frame: 0,   // V8 9-10 only
+        wasm_liftoff_setup_frame: 12, // V8 11+
+        interpreted_frame: 13,
+        baseline_frame: 14,
+        maglev_frame: 15,   // V8 11+
+        turbofan_frame: 16, // V8 11+, replaces optimized_frame
+        stub_frame: 17,
+        turbofan_stub_with_context_frame: 18, // V8 11+
+        builtin_continuation_frame: 19,
+        js_builtin_continuation_frame: 20,
+        js_builtin_continuation_with_catch_frame: 21,
+        internal_frame: 22,
+        construct_frame: 23,
+        fast_construct_frame: 0, // V8 12+
+        builtin_frame: 24,
+        builtin_exit_frame: 25,
+        native_frame: 26,
+        api_callback_exit_frame: 0, // V8 12+
+        irregexp_frame: 27,         // V8 11+
+        optimized_frame: 0,         // V8 9-10 only, use turbofan_frame in V8 11+
+    },
+    codekind: V8CodeKind {
+        mask: 15,        // v8dbg_CodeKindFieldMask (V8 11)
+        shift: 0,        // v8dbg_CodeKindFieldShift (V8 11)
+        baseline: 11,    // v8dbg_CodeKindBaseline (V8 11)
+        interpreted: 10, // v8dbg_CodeKindInterpretedFunction (V8 11)
+    },
+};
+
+// V8 12.x offsets (Node.js 22.x, 23.x)
+// Based on v8_12.4.254.21_vmstructs_complete.json from opentelemetry-ebpf-profiler
+pub const V8_12_OFFSETS: &V8Offsets = &V8Offsets {
+    frame_pointers: V8FramePointers {
+        marker: -8,           // v8dbg_off_fp_context
+        function: -16,        // v8dbg_off_fp_function
+        bytecode_offset: -40, // v8dbg_off_fp_bytecode_offset
+    },
+    js_function: V8JSFunction {
+        shared: 32, // v8dbg_class_JSFunction__shared__SharedFunctionInfo
+        code: 24,   // v8dbg_class_JSFunction__code__Tagged_Code_
+    },
+    shared_function_info: V8SharedFunctionInfo {
+        name_or_scope_info: 16, // v8dbg_class_SharedFunctionInfo__name_or_scope_info__Tagged_Object_
+        function_data: 8,       // v8dbg_class_SharedFunctionInfo__function_data__Object
+        script_or_debug_info: 32, // v8dbg_class_SharedFunctionInfo__raw_script__Tagged_Object_
+    },
+    code: V8Code {
+        instruction_start: 40,     // v8dbg_class_Code__instruction_start__Address
+        instruction_size: 52,      // v8dbg_class_Code__instruction_size__int
+        flags: 48,                 // v8dbg_class_Code__flags__uint32_t
+        deoptimization_data: 8, // v8dbg_class_Code__deoptimization_data_or_interpreter_data__Tagged_Object_
+        source_position_table: 16, // v8dbg_class_Code__position_table__Tagged_Object_
+    },
+    script: V8Script {
+        name: 16,  // v8dbg_class_Script__name__Object
+        source: 8, // v8dbg_class_Script__source__Object
+    },
+    bytecode_array: V8BytecodeArray {
+        source_position_table: 8,
+    },
+    v8_type: V8Type {
+        scope_info: 272,           // v8dbg_type_ScopeInfo__SCOPE_INFO_TYPE
+        shared_function_info: 274, // v8dbg_type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE
+        js_function_first: 2066,   // v8dbg_FirstJSFunctionType
+        js_function_last: 2082,    // v8dbg_LastJSFunctionType
+        string_first: 0,           // String types start at 0
+        script: 167,               // v8dbg_type_Script__SCRIPT_TYPE
+        code: 206,                 // v8dbg_type_Code__CODE_TYPE
+    },
+    v8_fixed: V8Fixed {
+        first_nonstring_type: 128,       // v8dbg_FirstNonstringType
+        string_representation_mask: 0x7, // v8dbg_StringRepresentationMask
+        seq_string_tag: 0x0,             // v8dbg_SeqStringTag
+        cons_string_tag: 0x1,            // v8dbg_ConsStringTag
+        thin_string_tag: 0x5,            // v8dbg_ThinStringTag
+    },
+    scope_info_index: V8ScopeInfoIndex {
+        first_vars: 3,       // v8dbg_scopeinfo_idx_first_vars
+        n_context_locals: 2, // v8dbg_scopeinfo_idx_ncontextlocals
+    },
+    deopt_data_index: V8DeoptimizationDataIndex {
+        inlined_function_count: 1, // v8dbg_DeoptimizationDataInlinedFunctionCountIndex
+        literal_array: 2,          // v8dbg_DeoptimizationDataLiteralArrayIndex
+        shared_function_info: 6,   // v8dbg_DeoptimizationDataSharedFunctionInfoIndex
+        inlining_positions: 7,     // v8dbg_DeoptimizationDataInliningPositionsIndex
+    },
+    heap_object: V8HeapObject {
+        map: 0, // v8dbg_class_HeapObject__map__Map
+    },
+    map: V8Map {
+        instance_type: 12, // v8dbg_class_Map__instance_type__uint16_t
+    },
+    frame_types: V8FrameTypes {
+        entry_frame: 1,
+        construct_entry_frame: 2,
+        exit_frame: 3,
+        wasm_frame: 4,
+        wasm_to_js_frame: 5,
+        wasm_to_js_function_frame: 6, // V8 11+
+        js_to_wasm_frame: 7,
+        wasm_debug_break_frame: 9,
+        stack_switch_frame: 8, // V8 10+
+        wasm_exit_frame: 11,
+        c_wasm_entry_frame: 10,
+        wasm_compile_lazy_frame: 0,   // V8 9-10 only
+        wasm_liftoff_setup_frame: 12, // V8 11+
+        interpreted_frame: 13,
+        baseline_frame: 14,
+        maglev_frame: 15,   // V8 11+
+        turbofan_frame: 16, // V8 11+, replaces optimized_frame
+        stub_frame: 17,
+        turbofan_stub_with_context_frame: 18, // V8 11+
+        builtin_continuation_frame: 19,
+        js_builtin_continuation_frame: 20,
+        js_builtin_continuation_with_catch_frame: 21,
+        internal_frame: 22,
+        construct_frame: 23,
+        fast_construct_frame: 24, // V8 12+
+        builtin_frame: 25,
+        builtin_exit_frame: 26,
+        native_frame: 28,
+        api_callback_exit_frame: 27, // V8 12+
+        irregexp_frame: 29,          // V8 11+ (27 in V8 11, 29 in V8 12)
+        optimized_frame: 0,          // V8 9-10 only, use turbofan_frame in V8 11+
+    },
+    codekind: V8CodeKind {
+        mask: 15,       // v8dbg_CodeKindFieldMask (V8 12)
+        shift: 0,       // v8dbg_CodeKindFieldShift (V8 12)
+        baseline: 10,   // v8dbg_CodeKindBaseline (V8 12)
+        interpreted: 9, // v8dbg_CodeKindInterpretedFunction (V8 12)
     },
 };
 
@@ -383,7 +1076,7 @@ const V8_11_OFFSETS: &V8Offsets = &V8Offsets {
 pub struct V8UnwindTable {
     id_gen: IdGenerator,
     loaded_offsets: HashMap<Version, u8>,
-    process_versions: HashMap<u32, Version>, // Track V8 version per process
+    symbolizers: HashMap<u32, V8Symbolizer>, // Per-process symbolizers
     unwind_info_map_fd: i32,
     offsets_map_fd: i32,
 }
@@ -393,7 +1086,6 @@ impl V8UnwindTable {
         Self {
             unwind_info_map_fd,
             offsets_map_fd,
-            process_versions: HashMap::new(),
             ..Default::default()
         }
     }
@@ -402,48 +1094,58 @@ impl V8UnwindTable {
         trace!("load V8 unwind info for process#{pid}");
         let info = match InterpreterInfo::new(pid) {
             Ok(info) => info,
-            Err(e) => {
-                trace!("loading V8 interpreter info for process#{pid} has error: {e}");
+            Err(_e) => {
+                trace!("This may be due to namespace isolation or missing binary access");
                 return;
             }
         };
 
         let req = VersionReq::parse(">=9.0.0").unwrap();
         if !req.matches(&info.v8_version) {
-            debug!("V8 version {} is not supported", info.v8_version);
             return;
         }
 
-        // Store version info for this process
-        self.process_versions.insert(pid, info.v8_version.clone());
+        // Register version for FFI lookup
+        if let Ok(mut registry) = get_version_registry().lock() {
+            registry.insert(pid, info.v8_version.clone());
+        }
 
-        let offsets_id = self.get_or_load_offsets(&info.v8_version);
+        let _offsets_id = self.get_or_load_offsets(&info.v8_version);
 
-        let unwind_info = V8UnwindInfo {
-            isolate_address: info.isolate_address,
-            offsets_id,
-            version: info.v8_version.major as u32 * 10000
-                + info.v8_version.minor as u32 * 100
-                + info.v8_version.patch as u32,
-        };
+        // Create symbolizer for this process
+        let offsets = self.get_offsets_for_version(&info.v8_version);
+        let symbolizer = V8Symbolizer::new(pid, offsets);
+        self.symbolizers.insert(pid, symbolizer);
+
+        // Create V8ProcInfo with all offset fields populated
+        let version = info.v8_version.major as u32 * 10000
+            + info.v8_version.minor as u32 * 100
+            + info.v8_version.patch as u32;
+        trace!(
+            "Process#{pid} Final V8 version for BPF: {} (encoded: {})",
+            info.v8_version,
+            version
+        );
+        let proc_info = V8ProcInfo::from_offsets(&offsets, version);
 
         // For testing with invalid file descriptors, return early
         if self.unwind_info_map_fd < 0 {
-            trace!("skip update V8 unwind info for process#{pid} due to invalid file descriptor");
+            trace!("skip update V8 proc info for process#{pid} due to invalid file descriptor");
             return;
         }
 
         if bpf_update_elem(
             self.unwind_info_map_fd,
             &pid as *const u32 as *const c_void,
-            &unwind_info as *const V8UnwindInfo as *const c_void,
+            &proc_info as *const V8ProcInfo as *const c_void,
             BPF_ANY,
         ) != 0
         {
             warn!(
-                "failed to update v8_unwind_info_map for process#{pid}: {}",
+                "Failed to update v8_unwind_info_map for process#{pid}: errno={}",
                 get_errno()
             );
+        } else {
         }
     }
 
@@ -459,7 +1161,7 @@ impl V8UnwindTable {
         unsafe {
             // For testing with invalid file descriptors, skip BPF operations
             if self.offsets_map_fd < 0 {
-                trace!("skip update V8 offsets#{id} due to invalid file descriptor");
+                trace!("Skip update V8 offsets#{id} due to invalid file descriptor");
                 self.loaded_offsets.insert(version.clone(), id);
                 return id;
             }
@@ -471,7 +1173,13 @@ impl V8UnwindTable {
                 BPF_ANY,
             ) != 0
             {
-                warn!("failed to update v8_offsets_map: {}", get_errno());
+                warn!(
+                    "Failed to update v8_offsets_map for version {} (ID={}): errno={}",
+                    version,
+                    id,
+                    get_errno()
+                );
+            } else {
             }
         }
 
@@ -480,551 +1188,71 @@ impl V8UnwindTable {
     }
 
     fn get_offsets_for_version(&self, version: &Version) -> V8Offsets {
-        match version.major {
-            9 => *V8_9_OFFSETS,
-            10 => *V8_10_OFFSETS,
-            11 => *V8_11_OFFSETS,
-            12.. => *V8_11_OFFSETS, // Use latest available
-            _ => *V8_9_OFFSETS,     // Default to 9.x for older versions
-        }
+        // Use the global function to avoid code duplication
+        *get_offsets_for_v8_version(version)
     }
 
     pub unsafe fn unload(&mut self, pid: u32) {
+        let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
         if bpf_delete_elem(self.unwind_info_map_fd, &pid as *const u32 as *const c_void) != 0 {
-            trace!("failed to delete v8_unwind_info_map for process#{pid}");
+            // Only log if error is not ENOENT (entry doesn't exist)
+            if errno != 2 {
+                // ENOENT = 2
+            }
+        } else {
         }
 
-        // Remove version info for this process
-        self.process_versions.remove(&pid);
+        // Remove symbolizer and version registration
+        self.symbolizers.remove(&pid);
+        if let Ok(mut registry) = get_version_registry().lock() {
+            registry.remove(&pid);
+        }
     }
 
     /// Get V8 version for a specific process
-    pub fn get_process_version(&self, pid: u32) -> Option<&Version> {
-        self.process_versions.get(&pid)
+    pub fn get_process_version(&self, pid: u32) -> Option<Version> {
+        if let Ok(registry) = get_version_registry().lock() {
+            registry.get(&pid).cloned()
+        } else {
+            None
+        }
     }
 
-    /// Get appropriate V8 offsets for a process (dynamic version detection)
+    /// Get appropriate V8 offsets for a process
     pub fn get_offsets_for_process(&self, pid: u32) -> V8Offsets {
-        if let Some(version) = self.get_process_version(pid) {
-            self.get_offsets_for_version(version)
+        *get_offsets_for_pid(pid)
+    }
+
+    /// Symbolize V8 frame using metadata from eBPF.
+    ///
+    /// This is the new interface that uses the v8_symbolizer module.
+    pub fn symbolize_frame_with_metadata(
+        &mut self,
+        pid: u32,
+        metadata: &V8FrameMetadata,
+    ) -> String {
+        if let Some(symbolizer) = self.symbolizers.get_mut(&pid) {
+            let frame_info = symbolizer.symbolize_frame(metadata);
+
+            // Format frame info as string for output
+            if frame_info.line_number > 0 {
+                format!(
+                    "{}@{}:{}",
+                    frame_info.function_name, frame_info.file_name, frame_info.line_number
+                )
+            } else {
+                format!("{}@{}", frame_info.function_name, frame_info.file_name)
+            }
         } else {
-            // Fallback to latest version if version info is not available
-            *V8_11_OFFSETS
-        }
-    }
-
-    // V8 Symbolization Methods
-
-    /// Main symbolization entry point (matching OpenTelemetry interface)
-    pub fn symbolize_frame(
-        &self,
-        pid: u32,
-        pointer_and_type: u64,
-        delta_or_marker: u64,
-        return_address: bool,
-    ) -> Result<String> {
-        let frame_type = pointer_and_type & V8_FILE_TYPE_MASK;
-        let pointer = pointer_and_type & !V8_FILE_TYPE_MASK;
-
-        match frame_type {
-            V8_FILE_TYPE_MARKER => self.symbolize_marker_frame(delta_or_marker),
-            V8_FILE_TYPE_BYTECODE => self.symbolize_bytecode_frame(pid, pointer, delta_or_marker),
-            V8_FILE_TYPE_NATIVE_SFI => self.symbolize_sfi(pid, pointer, delta_or_marker),
-            V8_FILE_TYPE_NATIVE_CODE => {
-                self.symbolize_code(pid, pointer, delta_or_marker, return_address)
-            }
-            V8_FILE_TYPE_NATIVE_JSFUNC => {
-                self.symbolize_js_function_frame(pid, pointer, delta_or_marker, return_address)
-            }
-            _ => {
-                // Handle simplified symbol names from new tail-call implementation
-                if pointer == 0 {
-                    // This is a simplified symbol generated by the eBPF code
-                    match delta_or_marker {
-                        0 => Ok("V8:stub".to_string()),
-                        1 => Ok("V8:bc".to_string()),
-                        2 => Ok("V8:native".to_string()),
-                        _ => Ok(format!("V8:UnknownType#{}", delta_or_marker)),
-                    }
-                } else {
-                    Ok(format!("V8:UnknownType#{}@{:x}", frame_type, pointer))
-                }
+            // Fallback if symbolizer not available
+            match metadata.frame_type {
+                1 => format!("V8:Stub#{}", metadata.bytecode_offset),
+                2 => format!("V8:Bytecode@{:x}", metadata.jsfunc_ptr),
+                3 | 4 | 5 => format!("V8:Native@{:x}", metadata.code_ptr),
+                _ => "V8:Unknown".to_string(),
             }
         }
     }
-
-    /// Symbolize a V8 marker/stub frame
-    pub fn symbolize_marker_frame(&self, marker: u64) -> Result<String> {
-        let frame_type = marker as usize;
-        Ok(match frame_type {
-            0 => "V8:EntryFrame".to_string(),
-            1 => "V8:ExitFrame".to_string(),
-            2 => "V8:OptimizedFrame".to_string(),
-            3 => "V8:WasmFrame".to_string(),
-            4 => "V8:WasmExitFrame".to_string(),
-            5 => "V8:BuiltinExitFrame".to_string(),
-            6 => "V8:InternalFrame".to_string(),
-            7 => "V8:ConstructFrame".to_string(),
-            8 => "V8:BuiltinFrame".to_string(),
-            9 => "V8:JavaScriptFrame".to_string(),
-            10 => "V8:ArgumentsAdaptorFrame".to_string(),
-            11 => "V8:InterpretedFrame".to_string(),
-            _ => format!("V8:UnknownStub#{}", frame_type),
-        })
-    }
-
-    /// Symbolize a SharedFunctionInfo pointer
-    pub fn symbolize_sfi(&self, pid: u32, sfi_ptr: u64, delta: u64) -> Result<String> {
-        // Get process memory reader
-        let mem_maps = get_memory_mappings(pid)?;
-        let exe_area = mem_maps
-            .iter()
-            .find(|area| area.mx_start > 0) // Has executable section
-            .ok_or_else(|| Error::ProcessNotFound(pid))?;
-
-        let _file = MappedFile::new(&exe_area.path, exe_area.m_start);
-
-        // Try to extract function name from SFI
-        match self.read_sfi_name(pid, sfi_ptr) {
-            Ok(name) if !name.is_empty() => {
-                // Try to get line number from delta
-                let line = if delta > 0 {
-                    format!(":{}", (delta >> 32) as u32)
-                } else {
-                    String::new()
-                };
-                let offset = if delta & 0xFFFFFFFF != 0 {
-                    format!("+{}", delta & 0xFFFFFFFF)
-                } else {
-                    String::new()
-                };
-                Ok(format!("{}{}{}", name, line, offset))
-            }
-            _ => {
-                // Fallback to address-based symbol
-                Ok(format!("V8:SFI@{:x}", sfi_ptr))
-            }
-        }
-    }
-
-    /// Symbolize a Code object pointer
-    pub fn symbolize_code(
-        &self,
-        pid: u32,
-        code_ptr: u64,
-        delta: u64,
-        return_address: bool,
-    ) -> Result<String> {
-        // Get the SFI from the Code object
-        match self.read_code_sfi(pid, code_ptr) {
-            Ok(sfi_ptr) => {
-                let mut symbol = self.symbolize_sfi(pid, sfi_ptr, delta)?;
-                if return_address {
-                    symbol = format!("{}@ret", symbol);
-                }
-                // Add code type indicator
-                symbol = format!("{}[jit]", symbol);
-                Ok(symbol)
-            }
-            Err(_) => {
-                // Fallback to code address
-                Ok(format!(
-                    "V8:Code@{:x}{}",
-                    code_ptr,
-                    if return_address { "@ret" } else { "" }
-                ))
-            }
-        }
-    }
-
-    /// Symbolize a bytecode frame (interpreted JavaScript)
-    pub fn symbolize_bytecode_frame(&self, pid: u32, sfi_ptr: u64, delta: u64) -> Result<String> {
-        let function_name = self.read_sfi_name(pid, sfi_ptr)?;
-        let bytecode_offset = delta & 0xFFFFFFFF;
-
-        if bytecode_offset > 0 {
-            Ok(format!("{}[bc+{}]", function_name, bytecode_offset))
-        } else {
-            Ok(format!("{}[bc]", function_name))
-        }
-    }
-
-    /// Symbolize a JavaScript function frame
-    pub fn symbolize_js_function_frame(
-        &self,
-        pid: u32,
-        jsfunc_ptr: u64,
-        delta: u64,
-        return_address: bool,
-    ) -> Result<String> {
-        // Get the SharedFunctionInfo from JSFunction (dynamic version detection)
-        let offsets = self.get_offsets_for_process(pid);
-
-        match self.read_process_memory_u64(pid, jsfunc_ptr + offsets.js_function.shared as u64) {
-            Ok(sfi_ptr) => {
-                let clean_sfi = verify_heap_pointer(sfi_ptr);
-                if clean_sfi == 0 {
-                    return Ok(format!("V8:InvalidJSFunc@{:x}", jsfunc_ptr));
-                }
-
-                let mut symbol = self.symbolize_sfi(pid, clean_sfi, delta)?;
-
-                if return_address {
-                    symbol = format!("{}@ret", symbol);
-                }
-
-                // Check if this function has been compiled to native code
-                if let Ok(code_ptr) =
-                    self.read_process_memory_u64(pid, jsfunc_ptr + offsets.js_function.code as u64)
-                {
-                    let clean_code = verify_heap_pointer(code_ptr);
-                    if clean_code != 0 {
-                        symbol = format!("{}[compiled]", symbol);
-                    }
-                }
-
-                Ok(symbol)
-            }
-            Err(_) => Ok(format!("V8:JSFunc@{:x}", jsfunc_ptr)),
-        }
-    }
-
-    /// Read function name from SharedFunctionInfo
-    fn read_sfi_name(&self, pid: u32, sfi_ptr: u64) -> Result<String> {
-        // Get V8 offsets for this process (dynamic version detection)
-        let offsets = self.get_offsets_for_process(pid);
-
-        // Try to read the name_or_scope_info field
-        match self.read_process_memory_u64(
-            pid,
-            sfi_ptr + offsets.shared_function_info.name_or_scope_info as u64,
-        ) {
-            Ok(name_or_scope_ptr) => {
-                let clean_ptr = verify_heap_pointer(name_or_scope_ptr);
-                if clean_ptr == 0 {
-                    return Ok(format!("UnknownSFI@{:x}", sfi_ptr));
-                }
-
-                // Try to extract string - simplified version
-                match self.extract_v8_string(pid, clean_ptr) {
-                    Ok(name) if !name.is_empty() => Ok(name),
-                    _ => {
-                        // Try to analyze as ScopeInfo
-                        match self.analyze_scope_info(pid, clean_ptr) {
-                            Ok(scope_name) if !scope_name.is_empty() => Ok(scope_name),
-                            _ => Ok(format!("SFI@{:x}", sfi_ptr)),
-                        }
-                    }
-                }
-            }
-            Err(_) => Ok(format!("InvalidSFI@{:x}", sfi_ptr)),
-        }
-    }
-
-    /// Read SharedFunctionInfo pointer from Code object
-    fn read_code_sfi(&self, pid: u32, code_ptr: u64) -> Result<u64> {
-        // Code object doesn't directly contain SFI, need to find it through other means
-        // This is a simplified approach - in reality we'd need to traverse object relationships
-
-        // Try to read what might be an SFI pointer at a known offset
-        self.read_process_memory_u64(pid, code_ptr + 0x18) // Typical SFI offset in Code objects
-    }
-
-    /// Extract V8 string content
-    fn extract_v8_string(&self, pid: u32, string_ptr: u64) -> Result<String> {
-        // V8 strings have different layouts depending on type
-        // SeqOneByteString, SeqTwoByteString, ConsString, SlicedString, etc.
-
-        // Read the Map (type info) first
-        let map_ptr = self.read_process_memory_u64(pid, string_ptr)?;
-        let clean_map = verify_heap_pointer(map_ptr);
-
-        if clean_map == 0 {
-            return Err(Error::InvalidPointer(string_ptr));
-        }
-
-        // For now, assume it's a SeqOneByteString and try to read it
-        // Real implementation would check the Map's instance type
-
-        // Read string length (stored as SMI)
-        let length_smi = self.read_process_memory_u64(pid, string_ptr + 8)?;
-        let length = parse_v8_smi(length_smi) as usize;
-
-        if length == 0 || length > 1024 {
-            // Sanity check
-            return Err(Error::InvalidData);
-        }
-
-        // Read string data (starts at offset 16 for SeqOneByteString)
-        let mut buffer = vec![0u8; length.min(256)]; // Limit to reasonable size
-        match self.read_process_memory(pid, string_ptr + 16, &mut buffer) {
-            Ok(()) => {
-                // Convert to string, stopping at null terminator
-                let end = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
-                Ok(String::from_utf8_lossy(&buffer[..end]).to_string())
-            }
-            Err(_) => Err(Error::ProcessNotFound(pid)),
-        }
-    }
-
-    /// Analyze V8 ScopeInfo object
-    fn analyze_scope_info(&self, pid: u32, scope_info_ptr: u64) -> Result<String> {
-        // ScopeInfo contains function and variable names
-        // This is a simplified analysis - real implementation would need to parse the entire structure
-
-        // Try to find function name in ScopeInfo
-        // ScopeInfo layout is complex and version-dependent, so this is a heuristic approach
-
-        // Read potential string pointers from ScopeInfo
-        for offset in (16..64).step_by(8) {
-            if let Ok(potential_string_ptr) =
-                self.read_process_memory_u64(pid, scope_info_ptr + offset)
-            {
-                let clean_ptr = verify_heap_pointer(potential_string_ptr);
-                if clean_ptr != 0 {
-                    if let Ok(name) = self.extract_v8_string(pid, clean_ptr) {
-                        if !name.is_empty()
-                            && name.len() > 1
-                            && name
-                                .chars()
-                                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-                        {
-                            return Ok(name);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(format!("ScopeInfo@{:x}", scope_info_ptr))
-    }
-
-    /// Read 64-bit value from process memory
-    fn read_process_memory_u64(&self, pid: u32, addr: u64) -> Result<u64> {
-        let mut buffer = [0u8; 8];
-        self.read_process_memory(pid, addr, &mut buffer)?;
-        Ok(u64::from_le_bytes(buffer))
-    }
-
-    /// Read arbitrary data from process memory
-    fn read_process_memory(&self, _pid: u32, _addr: u64, _buffer: &mut [u8]) -> Result<()> {
-        // This is a placeholder - in real implementation, this would use ptrace or /proc/pid/mem
-        // For now, return an error to indicate this functionality needs proper implementation
-        Err(Error::ProcessNotFound(_pid))
-    }
-
-    // Source Position Mapping
-
-    /// Map bytecode offset to source line number
-    pub fn map_bytecode_to_source_line(
-        &self,
-        pid: u32,
-        sfi_ptr: u64,
-        bytecode_offset: u32,
-    ) -> Result<u32> {
-        let offsets = self.get_offsets_for_process(pid);
-
-        // Get the BytecodeArray from SharedFunctionInfo
-        match self.read_process_memory_u64(
-            pid,
-            sfi_ptr + offsets.shared_function_info.function_data as u64,
-        ) {
-            Ok(bytecode_array_ptr) => {
-                let clean_ptr = verify_heap_pointer(bytecode_array_ptr);
-                if clean_ptr == 0 {
-                    return Err(Error::InvalidPointer(bytecode_array_ptr));
-                }
-
-                // Get source position table
-                match self.read_process_memory_u64(
-                    pid,
-                    clean_ptr + offsets.bytecode_array.source_position_table as u64,
-                ) {
-                    Ok(source_pos_table_ptr) => {
-                        let clean_table = verify_heap_pointer(source_pos_table_ptr);
-                        if clean_table == 0 {
-                            return Ok(0); // No source position info
-                        }
-
-                        // Parse source position table to find line for bytecode offset
-                        self.parse_source_position_table(pid, clean_table, bytecode_offset)
-                    }
-                    Err(_) => Ok(0),
-                }
-            }
-            Err(_) => Ok(0),
-        }
-    }
-
-    /// Parse V8 source position table
-    fn parse_source_position_table(
-        &self,
-        pid: u32,
-        table_ptr: u64,
-        target_offset: u32,
-    ) -> Result<u32> {
-        // V8 source position tables use Variable-Length Quantity (VLQ) encoding
-        // This is a simplified parser that tries to extract line info
-
-        // Read table length first
-        let table_length = match self.read_process_memory_u64(pid, table_ptr + 8) {
-            Ok(len_smi) => parse_v8_smi(len_smi) as usize,
-            Err(_) => return Ok(0),
-        };
-
-        if table_length == 0 || table_length > 8192 {
-            return Ok(0);
-        }
-
-        // Read table data
-        let mut table_data = vec![0u8; table_length.min(1024)];
-        match self.read_process_memory(pid, table_ptr + 16, &mut table_data) {
-            Ok(()) => {
-                // Parse VLQ encoded position data
-                self.parse_vlq_position_data(&table_data, target_offset)
-            }
-            Err(_) => Ok(0),
-        }
-    }
-
-    /// Parse Variable-Length Quantity encoded position data
-    fn parse_vlq_position_data(&self, data: &[u8], target_offset: u32) -> Result<u32> {
-        let mut pos = 0;
-        let mut current_offset = 0u32;
-        let mut current_line = 1u32;
-
-        // Parse VLQ entries
-        while pos < data.len() {
-            // Read bytecode offset delta
-            let (offset_delta, new_pos) = match self.decode_vlq(data, pos) {
-                Ok((delta, np)) => (delta as u32, np),
-                Err(_) => break,
-            };
-            pos = new_pos;
-
-            current_offset += offset_delta;
-
-            // Read source position delta
-            let (source_delta, new_pos) = match self.decode_vlq(data, pos) {
-                Ok((delta, np)) => (delta, np),
-                Err(_) => break,
-            };
-            pos = new_pos;
-
-            if source_delta > 0 {
-                current_line = current_line.saturating_add(source_delta as u32);
-            }
-
-            // Check if we've reached or passed the target offset
-            if current_offset >= target_offset {
-                return Ok(current_line);
-            }
-        }
-
-        Ok(current_line)
-    }
-
-    /// Decode Variable-Length Quantity integer
-    fn decode_vlq(&self, data: &[u8], start_pos: usize) -> Result<(i64, usize)> {
-        let mut result = 0i64;
-        let mut pos = start_pos;
-        let mut shift = 0;
-
-        loop {
-            if pos >= data.len() {
-                return Err(Error::InvalidData);
-            }
-
-            let byte = data[pos];
-            pos += 1;
-
-            result |= ((byte & 0x7F) as i64) << shift;
-            shift += 7;
-
-            if (byte & 0x80) == 0 {
-                break;
-            }
-
-            if shift >= 64 {
-                return Err(Error::InvalidData);
-            }
-        }
-
-        // Convert from unsigned to signed (zigzag decoding)
-        let unsigned_result = result as u64;
-        let signed_result = ((unsigned_result >> 1) as i64) ^ (-((unsigned_result & 1) as i64));
-
-        Ok((signed_result, pos))
-    }
-
-    /// Get script information from SharedFunctionInfo
-    pub fn get_script_info(&self, pid: u32, sfi_ptr: u64) -> Result<(String, u32)> {
-        let offsets = self.get_offsets_for_process(pid);
-
-        // Get script from SharedFunctionInfo
-        match self.read_process_memory_u64(
-            pid,
-            sfi_ptr + offsets.shared_function_info.script_or_debug_info as u64,
-        ) {
-            Ok(script_ptr) => {
-                let clean_script = verify_heap_pointer(script_ptr);
-                if clean_script == 0 {
-                    return Ok(("unknown".to_string(), 0));
-                }
-
-                // Get script name
-                let script_name = match self
-                    .read_process_memory_u64(pid, clean_script + offsets.script.name as u64)
-                {
-                    Ok(name_ptr) => {
-                        let clean_name = verify_heap_pointer(name_ptr);
-                        if clean_name != 0 {
-                            self.extract_v8_string(pid, clean_name)
-                                .unwrap_or_else(|_| "script".to_string())
-                        } else {
-                            "script".to_string()
-                        }
-                    }
-                    Err(_) => "script".to_string(),
-                };
-
-                // Get line offset (for functions not starting at line 1)
-                let line_offset = match self.read_process_memory_u64(pid, sfi_ptr + 20) {
-                    // Approximate offset
-                    Ok(offset_smi) => parse_v8_smi(offset_smi) as u32,
-                    Err(_) => 0,
-                };
-
-                Ok((script_name, line_offset))
-            }
-            Err(_) => Ok(("unknown".to_string(), 0)),
-        }
-    }
-}
-
-/// Internal helper to detect if a process is running Node.js/V8
-fn detect_v8_process(pid: u32) -> bool {
-    if let Ok(exe_path) = std::fs::read_link(format!("/proc/{}/exe", pid)) {
-        if let Some(filename) = exe_path.file_name() {
-            if let Some(name) = filename.to_str() {
-                // Check for Node.js binary names
-                return name == "node"
-                    || name.starts_with("node")
-                    || name == "nodejs"
-                    || name.contains("electron");
-            }
-        }
-    }
-
-    // Additional check via command line
-    if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
-        let args: Vec<&str> = cmdline.split('\0').collect();
-        if let Some(first_arg) = args.first() {
-            return first_arg.contains("node") || first_arg.contains("electron");
-        }
-    }
-
-    false
 }
 
 /// Merge V8 interpreter stack with native stack
@@ -1047,90 +1275,69 @@ pub fn merge_stacks(interpreter_trace: &str, native_trace: &str) -> String {
     // Parse and enhance V8 frames with better symbolization
     let enhanced_js_trace = enhance_v8_trace(clean_js_trace);
 
-    // Look for V8 engine entry points in native stack
-    let v8_entry_patterns = [
-        "v8::internal::",
-        "v8::Script::",
-        "v8::Context::",
-        "v8::Function::",
-        "node::",
-        "node::Execute",
-        "node::Start",
-    ];
+    // New strategy: Replace Builtins_ and [unknown] frames with JS frames
+    replace_builtin_frames_with_js(native_trace, &enhanced_js_trace)
+}
 
-    let mut found_v8_entry = false;
-    for pattern in &v8_entry_patterns {
-        if native_trace.contains(pattern) {
-            found_v8_entry = true;
-            break;
-        }
-    }
-
-    if !found_v8_entry {
-        // Check for C helper patterns that might be called FROM JavaScript
-        let has_c_helpers = native_trace.contains("malloc")
-            || native_trace.contains("free")
-            || native_trace.contains("_Z")
-            || native_trace.contains("__libc");
-
-        if has_c_helpers {
-            // Native stack likely contains C helpers called by V8
-            // Put JS functions before C helpers: main -> JS -> C_helpers
-            let result = format!("{};{}", enhanced_js_trace, native_trace);
-            return result
-                .replace(";;", ";")
-                .trim_start_matches(';')
-                .trim_end_matches(';')
-                .to_string();
-        } else {
-            // Default case: assume native stack is main program calling V8
-            let result = format!("{};{}", native_trace, enhanced_js_trace);
-            return result
-                .replace(";;", ";")
-                .trim_start_matches(';')
-                .trim_end_matches(';')
-                .to_string();
-        }
-    }
-
-    // Found V8 entry points - this is the ideal case
-    // For V8, we typically want to show the calling sequence properly
-    // The native stack should contain the V8 engine calls, then JS functions
+/// Replace Builtins_ and [unknown] frames in native stack with JS frames
+fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String {
+    // Split both stacks into frames
     let native_frames: Vec<&str> = native_trace.split(';').filter(|f| !f.is_empty()).collect();
-    if let Some(entry_idx) = native_frames.iter().rposition(|frame| {
-        v8_entry_patterns
-            .iter()
-            .any(|pattern| frame.contains(pattern))
-    }) {
-        let mut merged_frames: Vec<Cow<'_, str>> = Vec::new();
-        for frame in native_frames.iter().take(entry_idx + 1) {
-            merged_frames.push(Cow::Borrowed(*frame));
-        }
-        for frame in enhanced_js_trace.split(';').filter(|f| !f.is_empty()) {
-            merged_frames.push(Cow::Owned(frame.to_string()));
-        }
-        for frame in native_frames.iter().skip(entry_idx + 1) {
-            merged_frames.push(Cow::Borrowed(*frame));
-        }
+    let js_frames: Vec<&str> = js_trace.split(';').filter(|f| !f.is_empty()).collect();
 
-        let mut merged = String::new();
-        for (idx, frame) in merged_frames.iter().enumerate() {
-            if idx > 0 {
-                merged.push(';');
-            }
-            merged.push_str(frame.as_ref());
-        }
-
-        return merged;
+    if js_frames.is_empty() {
+        return native_trace.to_string();
     }
 
-    // Fallback: entry pattern detected in string but not aligned with frame split
-    let result = format!("{};{}", native_trace, enhanced_js_trace);
+    let mut result_frames: Vec<&str> = Vec::new();
+    let mut js_frame_idx = 0;
+    let mut last_replacement_idx: Option<usize> = None;
+
+    for (_idx, native_frame) in native_frames.iter().enumerate() {
+        // Check if this frame should be replaced
+        // FIXME: how to find the frames necessary to be replaced
+        let should_replace = native_frame.starts_with("Builtins_")
+            || native_frame.starts_with("[unknown]")
+            || native_frame.contains("Builtins_JSEntry")
+            || native_frame.contains("V8::")
+            || native_frame.contains("V8::EntryFrame")
+            || (native_frame.starts_with("[")
+                && native_frame.contains("node")
+                && native_frame.ends_with("]"));
+
+        if should_replace && js_frame_idx < js_frames.len() {
+            // Replace with JS frame
+            result_frames.push(js_frames[js_frame_idx]);
+            last_replacement_idx = Some(result_frames.len() - 1);
+            js_frame_idx += 1;
+        } else {
+            // Before keeping this native frame, check if we need to insert remaining JS frames
+            // Only insert if: 1) we had replacements before, 2) we have remaining JS frames, 3) we haven't inserted yet
+            if last_replacement_idx.is_some() && js_frame_idx < js_frames.len() {
+                // Insert all remaining JS frames right after the last replacement
+                while js_frame_idx < js_frames.len() {
+                    result_frames.push(js_frames[js_frame_idx]);
+                    js_frame_idx += 1;
+                }
+                // Mark that we've inserted, so we don't insert again
+                last_replacement_idx = None;
+            }
+
+            // Keep native frame
+            result_frames.push(native_frame);
+        }
+    }
+
+    // If we finished with replacements and still have remaining JS frames, append them
+    if js_frame_idx < js_frames.len() {
+        while js_frame_idx < js_frames.len() {
+            result_frames.push(js_frames[js_frame_idx]);
+            js_frame_idx += 1;
+        }
+    }
+
+    let result = result_frames.join(";");
     result
-        .replace(";;", ";")
-        .trim_start_matches(';')
-        .trim_end_matches(';')
-        .to_string()
 }
 
 /// Enhance V8 trace with better symbolization
@@ -1141,12 +1348,19 @@ fn enhance_v8_trace(trace: &str) -> String {
 
     // Split frames and enhance each one
     let frames: Vec<&str> = trace.split(';').collect();
+
     let enhanced_frames: Vec<String> = frames
         .iter()
-        .map(|frame| enhance_single_v8_frame(frame))
+        .enumerate()
+        .map(|(_idx, frame)| {
+            let enhanced = enhance_single_v8_frame(frame);
+            if enhanced != *frame {}
+            enhanced
+        })
         .collect();
 
-    enhanced_frames.join(";")
+    let result = enhanced_frames.join(";");
+    result
 }
 
 /// Enhance a single V8 frame with better symbolization
@@ -1170,29 +1384,39 @@ fn enhance_single_v8_frame(frame: &str) -> String {
     }
 }
 
-pub fn get_offsets_for_v8_version(version: &Version) -> V8Offsets {
+pub fn get_offsets_for_v8_version(version: &Version) -> &'static V8Offsets {
     match version.major {
-        9 => *V8_9_OFFSETS,
-        10 => *V8_10_OFFSETS,
-        11 => *V8_11_OFFSETS,
-        12.. => *V8_11_OFFSETS, // Use latest available
-        _ => *V8_9_OFFSETS,     // Default to 9.x for older versions
+        9 => V8_9_OFFSETS,
+        10 => V8_10_OFFSETS,
+        11 => V8_11_OFFSETS,
+        12 => V8_12_OFFSETS,   // V8 12 support (Node.js 22.x, 23.x)
+        13.. => V8_12_OFFSETS, // Use V8 12 for future versions until they're explicitly supported
+        _ => V8_9_OFFSETS,     // Default to 9.x for older versions
     }
 }
 
-pub fn verify_heap_pointer(ptr: u64) -> u64 {
-    // V8 uses tagged pointers: HeapObject pointers have tag bits 01
-    if (ptr & 0x3) == 0x1 {
-        ptr & !0x3 // Remove tag bits
-    } else {
-        0 // Invalid heap pointer
+fn detect_v8_process(pid: u32) -> bool {
+    if let Ok(exe_path) = std::fs::read_link(format!("/proc/{}/exe", pid)) {
+        if let Some(filename) = exe_path.file_name() {
+            if let Some(name) = filename.to_str() {
+                // Check for Node.js binary names
+                return name == "node"
+                    || name.starts_with("node")
+                    || name == "nodejs"
+                    || name.contains("electron");
+            }
+        }
     }
-}
 
-pub fn parse_v8_smi(value: u64) -> u64 {
-    // V8 SMI (Small Integer) values are stored in the upper 32 bits
-    // SMI tag is 0, so we just extract the upper bits
-    value >> 32
+    // Additional check via command line
+    if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
+        let args: Vec<&str> = cmdline.split('\0').collect();
+        if let Some(first_arg) = args.first() {
+            return first_arg.contains("node") || first_arg.contains("electron");
+        }
+    }
+
+    false
 }
 
 /// C FFI function to detect if a process is running Node.js/V8
@@ -1230,6 +1454,9 @@ pub unsafe extern "C" fn merge_v8_stacks(
     }
     trace_len
 }
+
+// Re-export resolve_v8_frame so cbindgen can find it
+pub use super::v8_symbolizer::resolve_v8_frame;
 
 #[cfg(test)]
 #[path = "v8/tests.rs"]
