@@ -571,7 +571,8 @@ int load_ebpf_object(struct ebpf_object *obj)
 	if (ret != 0) {
 		ebpf_warning("bpf load '%s' failed, error:%s (%d).\n",
 			     obj->name, strerror(errno), errno);
-		if (!strcmp(obj->name, "socket-trace-bpf-linux-kfunc")) {
+		if (!strcmp(obj->name, "socket-trace-bpf-linux-kfunc") ||
+		    !strcmp(obj->name, "socket-trace-bpf-linux-5.2_plus")) {
 			ebpf_info("Try other eBPF bytecode binaries ...\n");
 			release_object(obj);
 			return ret;
