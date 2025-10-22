@@ -74,12 +74,15 @@ func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResourc
 			}
 			s.refreshers[lcuuid] = sd
 		}
-		sd.tryRefresh(resource)
+		if err := sd.tryRefresh(resource); err != nil {
+			log.Errorf("failed to refresh sub_domain: %s", err.Error(), sd.metadata.LogPrefixes)
+		}
 	}
 
 	// 遍历 subdomain 字典，删除 cloud 未返回的 subdomain 资源
 	for _, sd := range s.refreshers {
 		if _, ok := cloudData[sd.metadata.GetSubDomainLcuuid()]; !ok {
+			log.Info("sub_domain will be deleted", sd.metadata.LogPrefixes)
 			sd.clear()
 		}
 	}
@@ -98,7 +101,10 @@ func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResourc
 			}
 			s.refreshers[lcuuid] = sd
 		}
-		return sd.tryRefresh(resource)
+		if err := sd.tryRefresh(resource); err != nil {
+			log.Errorf("failed to refresh sub_domain: %s", err.Error(), sd.metadata.LogPrefixes)
+			return err
+		}
 	}
 	return nil
 }
