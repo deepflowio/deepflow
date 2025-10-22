@@ -128,7 +128,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 		domainLcuuid = domain.Lcuuid
 		subDomainLcuuid = domain.Lcuuid
 	case 1:
-		err = db.Where("lcuuid = ? AND type = ?", subDomains[0].Domain, ccommon.KUBERNETES).First(&domain).Error
+		err = db.Where("lcuuid = ?", subDomains[0].Domain).First(&domain).Error
 		if err != nil {
 			return err
 		}
