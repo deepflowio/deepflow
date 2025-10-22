@@ -981,13 +981,10 @@ func (t *DataSet) DeleteConfigMap(lcuuid string) {
 func (t *DataSet) AddPodGroupConfigMapConnection(item *mysqlmodel.PodGroupConfigMapConnection) {
 	t.connectionLcuuidToPodGroupID[item.Lcuuid] = item.PodGroupID
 	t.connectionLcuuidToConfigMapID[item.Lcuuid] = item.ConfigMapID
-	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
-	// log.Infof("TODO %+v", item)
 	if _, exists := t.configMapIDToPodGroupIDs[item.ConfigMapID]; !exists {
 		t.configMapIDToPodGroupIDs[item.ConfigMapID] = mapset.NewSet[int]()
 	}
 	t.configMapIDToPodGroupIDs[item.ConfigMapID].Add(item.PodGroupID)
-	// log.Infof("TODO %v", t.configMapIDToPodGroupIDs)
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
 

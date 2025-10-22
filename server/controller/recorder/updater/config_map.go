@@ -146,7 +146,8 @@ func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *
 			return nil, nil, false
 		}
 		mapInfo["data"] = string(yamlData)
-		structInfo.Data.Set(diffBase.Data, string(yamlData))
+		// structInfo.Data.Set(diffBase.Data, string(yamlData)) // FIXME recover after verify
+		structInfo.Data.Set(string(yamlData), string(yamlData))
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
