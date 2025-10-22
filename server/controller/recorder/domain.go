@@ -92,7 +92,11 @@ func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
 }
 
 func (d *domain) refreshDomainExcludeSubDomain(cloudData cloudmodel.Resource) error {
-	return d.tryRefresh(cloudData)
+	if err := d.tryRefresh(cloudData); err != nil {
+		log.Errorf("failed to refresh domain: %s", err.Error(), d.metadata.LogPrefixes)
+		return err
+	}
+	return nil
 }
 
 func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
