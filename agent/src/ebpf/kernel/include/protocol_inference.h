@@ -237,9 +237,16 @@ static __inline bool is_current_comm(char *comm)
 
 static __inline int is_http_response(const char *data)
 {
+	/*
+	 * Here, we have removed HTTP/1.x 1xx-type responses because if a server
+	 * returns two consecutive responses - such as HTTP 100 and HTTP 200 -
+	 * after an HTTP request, the upper layer will not process the HTTP 100
+	 * response. This results in the HTTP request and the HTTP 200 response
+	 * failing to be merged.
+	 */
 	return (data[0] == 'H' && data[1] == 'T' && data[2] == 'T'
 		&& data[3] == 'P' && data[4] == '/' && data[5] == '1'
-		&& data[6] == '.' && data[8] == ' ');
+		&& data[6] == '.' && data[8] == ' ' && data[9] != '1');
 }
 
 static __inline int is_http_request(const char *data, int data_len,
