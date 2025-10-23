@@ -28,7 +28,8 @@ import (
 
 const TRACE_TREE_VERSION_0X12 = 0x12 // before 20240827
 const TRACE_TREE_VERSION_0X13 = 0x13
-const TRACE_TREE_VERSION = 0x14
+const TRACE_TREE_VERSION_0x14 = 0x14 // before 20251027
+const TRACE_TREE_VERSION = 0x15
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -39,8 +40,9 @@ type TraceTree struct {
 	SearchIndex uint64
 	OrgId       uint16
 
-	TraceId, TraceId2 string
-	TreeNodes         []TreeNode
+	TraceId   string
+	UID       uint64 // uid for deduplicated metrics by same trace_tree
+	TreeNodes []TreeNode
 
 	encodedTreeNodes []byte
 }
@@ -87,6 +89,7 @@ type TreeNode struct {
 	ResponseDurationSum            uint64
 	ResponseTotal                  uint32
 	ResponseStatusServerErrorCount uint32
+	Total                          uint32
 }
 
 func (t *TraceTree) Release() {
@@ -134,6 +137,7 @@ func (t *TraceTree) Encode() {
 	t.encodedTreeNodes = t.encodedTreeNodes[:0]
 	encoder.Init(t.encodedTreeNodes)
 	encoder.WriteU8(TRACE_TREE_VERSION)
+	encoder.WriteU64(t.UID)
 	encoder.WriteU16(uint16(len(t.TreeNodes)))
 	for _, node := range t.TreeNodes {
 		// encode uniq parent span infos
@@ -184,6 +188,7 @@ func (t *TraceTree) Encode() {
 		encoder.WriteVarintU64(node.ResponseDurationSum)
 		encoder.WriteVarintU32(node.ResponseTotal)
 		encoder.WriteVarintU32(node.ResponseStatusServerErrorCount)
+		encoder.WriteVarintU32(node.Total)
 	}
 	t.encodedTreeNodes = encoder.Bytes()
 }
@@ -193,6 +198,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	if version != TRACE_TREE_VERSION && version != TRACE_TREE_VERSION_0X12 && version != TRACE_TREE_VERSION_0X13 {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
+	t.UID = decoder.ReadU64()
 	treeNodeCount := int(decoder.ReadU16())
 	if cap(t.TreeNodes) < treeNodeCount {
 		t.TreeNodes = make([]TreeNode, treeNodeCount)
@@ -252,6 +258,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		n.ResponseDurationSum = decoder.ReadVarintU64()
 		n.ResponseTotal = decoder.ReadVarintU32()
 		n.ResponseStatusServerErrorCount = decoder.ReadVarintU32()
+		n.Total = decoder.ReadVarintU32()
 	}
 	if decoder.Failed() {
 		return fmt.Errorf("trace tree decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
