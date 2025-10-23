@@ -25,23 +25,28 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-const SPAN_TRACE_VERSION = 0x12
+const SPAN_TRACE_VERSION_0x12 = 0x12 // before 20251027
+const SPAN_TRACE_VERSION = 0x13
 
 type SpanTrace struct {
 	Time          uint32 // not store, easy to use when calculating
 	QuerierRegion string // not store, easy to use when calculating
+	TraceId2      string // not store, easy to use when calculating
 
 	EndTimeUsPart uint32 // The microsecond part less than 1 second
 
-	AutoServiceType0 uint8
-	AutoServiceType1 uint8
-	AutoServiceID0   uint32
-	AutoServiceID1   uint32
-	IsIPv4           bool
-	IP40             uint32
-	IP60             net.IP
-	IP41             uint32
-	IP61             net.IP
+	CaptureNic         uint32
+	CaptureNicType     uint8
+	CaptureNetworkType uint8
+	AutoServiceType0   uint8
+	AutoServiceType1   uint8
+	AutoServiceID0     uint32
+	AutoServiceID1     uint32
+	IsIPv4             bool
+	IP40               uint32
+	IP60               net.IP
+	IP41               uint32
+	IP61               net.IP
 
 	ProcessId0             uint32
 	ProcessId1             uint32
@@ -61,6 +66,7 @@ type SpanTrace struct {
 
 	ResponseDuration uint64
 	ResponseStatus   uint8
+	Type             uint8
 }
 
 func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
@@ -69,6 +75,9 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("span trace data version is %d expect version is %d", version, SPAN_TRACE_VERSION)
 	}
 	t.EndTimeUsPart = decoder.ReadU32()
+	t.CaptureNic = decoder.ReadVarintU32()
+	t.CaptureNicType = decoder.ReadU8()
+	t.CaptureNetworkType = decoder.ReadU8()
 	t.AutoServiceType0 = decoder.ReadU8()
 	t.AutoServiceType1 = decoder.ReadU8()
 	t.AutoServiceID0 = decoder.ReadVarintU32()
@@ -101,6 +110,7 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.SyscallTraceIDResponse = decoder.ReadVarintU64()
 	t.ResponseDuration = decoder.ReadVarintU64()
 	t.ResponseStatus = decoder.ReadU8()
+	t.Type = decoder.ReadU8()
 	if decoder.Failed() {
 		return fmt.Errorf("span trace decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
 	}
