@@ -1,14 +1,30 @@
-name: verify server
+name: build server
 
-on: 
-  pull_request:
+on:
+  push:
+    branches:
+      - main
+      - v6.[1-9]
+      - v7.[1-9]
+      - 'feature-**'
     paths:
       - 'server/**'
       - 'message/**'
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true
+        type: string
+
+env:
+  IMAGE: "deepflow-server"
 
 jobs:
-  verify_server:
-    name: verify server
+  build_server:
+    name: build server
     runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
     steps:
       - name: Checkout
@@ -20,16 +36,34 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@master
         with:
-          go-version: 1.21.x
+          go-version: 1.24.x
+
+      - name: Set up GOPATH env
+        run: echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
         with:
           version: '3.6.1'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          
+
+      - name: Checkout github.com/gogo/protobuf
+        uses: actions/checkout@v3
+        with:
+          repository: 'gogo/protobuf'
+          path: "protobuf"
+          ref: 'v1.3.2'
+          fetch-depth: 1
+
+      - name: Move github.com/gogo/protobuf to $GOPATH/src
+        run: |
+          mkdir -p "${{ env.GOPATH }}/src/github.com/gogo"
+          mv protobuf "${{ env.GOPATH }}/src/github.com/gogo/protobuf"
+
       - name: Install dependencies
         run: |
+          # sudo apt-get update
+          # sudo apt-get -y install tmpl python3 python3-pip
           pip3 install ujson
 
           cd server
@@ -40,15 +74,82 @@ jobs:
           go install github.com/gogo/protobuf/gogoproto
           go install github.com/golang/protobuf/protoc-gen-go
 
-      - name: verify server
+      # - name: install docker
+      #   run: |
+      #     sudo systemctl stop unattended-upgrades
+      #     curl -fsSL https://get.docker.com | bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2.2.1
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GHCR_PUSH_TOKEN }}"
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: "deepflowce"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: Log in to ALIYUN HongKong Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "registry.cn-hongkong.aliyuncs.com"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: build server
         run: |
           cd server
-          touch vendor
-          make clean
-          go mod tidy
-          go fmt ./...
-          git diff
-          go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
-          make
-          cd querier/engine/clickhouse
-          go test
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 make -e BINARY_SUFFIX=.arm64 -e BRANCH=${{ github.ref_name }}
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64 -e BRANCH=${{ github.ref_name }}
+
+      - name: set env
+        run: |
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|=main$|=latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+
+      - name: Build and push deepflow server images to ghcr and dockerhub
+        uses: docker/build-push-action@v2
+        with:
+          context: server
+          push: true
+          file: server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+            "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+
+      - name: Build and push deepflow server images to hongkong aliyun
+        uses: docker/build-push-action@v2
+        with:
+          context: server
+          push: true
+          file: server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            "registry.cn-hongkong.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "registry.cn-hongkong.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+
+      - name: Log in to ALIYUN Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "registry.cn-beijing.aliyuncs.com"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: Build and push deepflow server images to beijing aliyun
+        uses: docker/build-push-action@v2
+        with:
+          context: server
+          push: true
+          file: server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
