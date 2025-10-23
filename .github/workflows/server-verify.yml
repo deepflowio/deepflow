@@ -31,12 +31,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip3 install ujson
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
-          GO111MODULE="off" go get github.com/gogo/protobuf/proto
-          GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
-          GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
-          GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
+
+          cd server
+          go install github.com/gogo/protobuf/protoc-gen-gofast
+          go install github.com/gogo/protobuf/proto
+          go install github.com/gogo/protobuf/jsonpb
+          go install github.com/gogo/protobuf/protoc-gen-gogo
+          go install github.com/gogo/protobuf/gogoproto
+          go install github.com/golang/protobuf/protoc-gen-go
 
       - name: verify server
         run: |
