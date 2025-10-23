@@ -30,6 +30,7 @@ const SPAN_TRACE_VERSION = 0x12
 type SpanTrace struct {
 	Time          uint32 // not store, easy to use when calculating
 	QuerierRegion string // not store, easy to use when calculating
+	TraceId2      string // not store, easy to use when calculating
 
 	EndTimeUsPart uint32 // The microsecond part less than 1 second
 

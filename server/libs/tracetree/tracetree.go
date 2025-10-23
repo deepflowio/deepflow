@@ -40,6 +40,7 @@ type TraceTree struct {
 	OrgId       uint16
 
 	TraceId   string
+	UID       uint64 // uid for deduplicated metrics by same trace_tree
 	TreeNodes []TreeNode
 
 	encodedTreeNodes []byte
@@ -133,6 +134,7 @@ func (t *TraceTree) Encode() {
 	t.encodedTreeNodes = t.encodedTreeNodes[:0]
 	encoder.Init(t.encodedTreeNodes)
 	encoder.WriteU8(TRACE_TREE_VERSION)
+	encoder.WriteU64(t.UID)
 	encoder.WriteU16(uint16(len(t.TreeNodes)))
 	for _, node := range t.TreeNodes {
 		// encode uniq parent span infos
@@ -192,6 +194,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	if version != TRACE_TREE_VERSION && version != TRACE_TREE_VERSION_0X12 && version != TRACE_TREE_VERSION_0X13 {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
+	t.UID = decoder.ReadU64()
 	treeNodeCount := int(decoder.ReadU16())
 	if cap(t.TreeNodes) < treeNodeCount {
 		t.TreeNodes = make([]TreeNode, treeNodeCount)
