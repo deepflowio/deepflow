@@ -36,6 +36,7 @@ if #[cfg(feature = "enterprise")] {
 
 #[derive(Debug)]
 enum HessianValue {
+    Null,
     Bool(bool),
     Int(i32),
     Long(i64),
@@ -49,6 +50,7 @@ enum HessianValue {
 impl Display for HessianValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            HessianValue::Null => write!(f, ""),
             HessianValue::Bool(b) => write!(f, "{}", b),
             HessianValue::Int(i) => write!(f, "{}", i),
             HessianValue::Long(l) => write!(f, "{}", l),
@@ -78,7 +80,9 @@ impl Hessian2Decoder {
         }
 
         match bytes[start] {
-            BC_END | BC_NULL => (None, 1),
+            BC_END => (None, 1),
+            // 实际值就是 null，即未初始化，不要给 None，因为可能解出 map key 但 value = null
+            BC_NULL => (Some(HessianValue::Null), 1),
             BC_TRUE => (Some(HessianValue::Bool(true)), 1),
             BC_FALSE => (Some(HessianValue::Bool(false)), 1),
             BC_REF => {
@@ -521,26 +525,50 @@ impl Hessian2Decoder {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     fn parse_args(
+        &mut self,
+        payload: &[u8],
+        start: usize,
+        direction: PacketDirection,
+    ) -> (Option<HashMap<String, HessianValue>>, usize) {
+        match direction {
+            PacketDirection::ClientToServer => self.parse_req_args(payload, start),
+            PacketDirection::ServerToClient => self.parse_resp_args(payload, start),
+        }
+    }
+
+    fn parse_req_args(
         &mut self,
         payload: &[u8],
         start: usize,
     ) -> (Option<HashMap<String, HessianValue>>, usize) {
         let payload_len = payload.len();
         let mut start_index = start;
-        let (value, read_len) = self.decode_field(&payload, start_index);
-        if start_index + read_len > payload_len {
-            return (None, start);
+        let mut args_count: u8;
+        let read_len = 0;
+        // there're several community implements for dubbo args encoding:
+        // offcial: | dubboVersion | serviceName | serviceVersion | method        | argTypes | args | attachments |
+        // dubbox:  | dubboVersion | serviceName | serviceVersion | method | 0x8f | argTypes | args | attachments |
+        // here, we try to adapt those 2 implements to find real argTypes
+        loop {
+            let (value, read_len) = self.decode_field(&payload, start_index);
+            if start_index + read_len > payload_len {
+                return (None, start);
+            }
+            start_index += read_len;
+            args_count = match value {
+                Some(HessianValue::String(arg_types)) => Self::DUBBO_ARG_TYPES_REGEX.with(|r| {
+                    r.get_or_init(|| Regex::new(DUBBO_ARG_TYPES_REGEX_STR).unwrap())
+                        .find_iter(&arg_types)
+                        .count() as u8
+                }),
+                // skip known 0x8f between | method | argTypes |
+                Some(HessianValue::Int(_)) => continue,
+                _ => return (None, start_index),
+            };
+            break;
         }
-        start_index += read_len;
-        let mut args_count = match value {
-            Some(HessianValue::String(arg_types)) => Self::DUBBO_ARG_TYPES_REGEX.with(|r| {
-                r.get_or_init(|| Regex::new(DUBBO_ARG_TYPES_REGEX_STR).unwrap())
-                    .find_iter(&arg_types)
-                    .count() as u8
-            }),
-            _ => return (None, start_index),
-        };
 
         let mut args = HashMap::new();
         while args_count > 0 {
@@ -565,6 +593,41 @@ impl Hessian2Decoder {
         return (Some(args), start_index);
     }
 
+    fn parse_resp_args(
+        &mut self,
+        payload: &[u8],
+        start: usize,
+    ) -> (Option<HashMap<String, HessianValue>>, usize) {
+        let payload_len = payload.len();
+        let mut start_index = start;
+        let (response_type, read_len) = self.decode_field(&payload, start_index);
+        if start_index + read_len > payload_len {
+            return (None, start_index);
+        }
+        start_index += read_len;
+        match response_type {
+            Some(HessianValue::Int(RESPONSE_WITH_EXCEPTION))
+            | Some(HessianValue::Int(RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS)) => {
+                // can extract exception message here but not required
+                let (_, read_len) = self.decode_field(&payload, start_index);
+                start_index += read_len;
+                (None, start_index)
+            }
+            Some(HessianValue::Int(RESPONSE_VALUE))
+            | Some(HessianValue::Int(RESPONSE_VALUE_WITH_ATTACHMENTS)) => {
+                let (response_object, read_len) = self.decode_field(&payload, start_index);
+                start_index += read_len;
+                if let Some(HessianValue::Map(map)) = response_object {
+                    (Some(map), start_index)
+                } else {
+                    (None, start_index)
+                }
+            }
+            Some(HessianValue::Int(RESPONSE_NULL_VALUE)) => (None, payload_len), // with attachments, directly read to end
+            _ => (None, start_index),
+        }
+    }
+
     fn parse_attachments(
         &mut self,
         payload: &[u8],
@@ -575,6 +638,56 @@ impl Hessian2Decoder {
             Some(HessianValue::Map(attachments)) => (Some(attachments), start + read_len),
             _ => (None, start),
         }
+    }
+
+    // fuzzy search value by key in req/resp, actually, we can only fuzzy search value in map<string, field>
+    // 在 req/resp 中模糊搜索指定的 key 对应的 value，实际上这里只能在 map<string, field> 中搜索
+    fn search_key(
+        &mut self,
+        payload: &[u8],
+        key: &str,
+        start_index: usize,
+    ) -> Option<HessianValue> {
+        let mut start = start_index;
+        while start < payload.len() {
+            if start >= payload.len() {
+                break;
+            }
+            let Some(index) = (&payload[start..]).find_substring(key) else {
+                break;
+            };
+            // 反向校验长度，decode_string 的逆实现，一般 key 的长度有限，这里需要避免 key 误匹配
+            // length validation, reverse implement of decode_string, usually we got a limited length of key, and we need to avoid mismatch
+            let key_len_validate = match key.len() {
+                len if len <= STRING_DIRECT_MAX_LEN && index > 0 => {
+                    payload[start + index - 1] as usize
+                }
+                len if len <= STRING_SHORT_MAX_LEN && index > 1 => {
+                    (((payload[start + index - 2] - BC_STRING_SHORT) as usize) << 8)
+                        + payload[start + index - 1] as usize
+                }
+                len if len <= STRING_MAX_LEN && index > 1 => {
+                    ((payload[start + index - 2] as usize) << 8)
+                        + payload[start + index - 1] as usize
+                }
+                _ => 0,
+            };
+
+            // 可能误匹配了子串，跳过长度继续搜索
+            // maybe mismatch for substring, skip and search next
+            if key.len() != key_len_validate {
+                start += index + key.len();
+                continue;
+            }
+
+            // can not guarantee the type of value, so just decoded to hessian value then to_string()
+            // 这里没法保证具体的值是什么类型，都解为 hessian value 然后 to_string()
+            if let (Some(context), _) = self.decode_field(payload, start + index + key.len()) {
+                return Some(context);
+            }
+            start += index + key.len();
+        }
+        None
     }
 }
 
@@ -640,7 +753,9 @@ fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
     let tag = payload[0];
     match tag {
         BC_STRING_DIRECT..=STRING_DIRECT_MAX => (1, tag as usize),
-        0x30..=0x33 if payload.len() > 2 => (2, ((tag as usize - 0x30) << 8) + payload[1] as usize),
+        BC_STRING_SHORT..=BC_STRING_SHORT_MAX if payload.len() > 2 => {
+            (2, ((tag as usize - 0x30) << 8) + payload[1] as usize)
+        }
         BC_STRING_CHUNK | BC_STRING if payload.len() > 3 => {
             (3, ((payload[1] as usize) << 8) + payload[2] as usize)
         }
@@ -729,6 +844,17 @@ pub fn get_req_body_info(
 }
 
 #[cfg(feature = "enterprise")]
+pub fn get_resp_body_info(
+    config: &L7LogDynamicConfig,
+    payload: &[u8],
+    info: &mut DubboInfo,
+    direction: PacketDirection,
+    port: u16,
+) {
+    on_payload_and_header(config, direction, port, payload, 0, info);
+}
+
+#[cfg(feature = "enterprise")]
 fn on_payload_and_header(
     config: &L7LogDynamicConfig,
     direction: PacketDirection,
@@ -739,36 +865,33 @@ fn on_payload_and_header(
 ) {
     #[inline]
     fn process_hessian_value(
-        policies: &HashMap<String, Vec<ExtraField>>,
-        values_map: &Option<HashMap<String, HessianValue>>,
+        fields: &Vec<ExtraField>,
         info: &mut DubboInfo,
         tags: &mut HashMap<&'static str, String>,
+        key: &str,
+        val: &str,
     ) {
-        let Some(map) = values_map else { return };
-        'outer: for (key, val) in map {
-            let lowercase_key = key.to_lowercase();
-            let Some(fields) = policies.get(&lowercase_key) else {
+        for field in fields {
+            if !field.match_key(&key) {
                 continue;
-            };
-            for field in fields {
-                if field.match_key(&key) {
-                    let Some(value) = field.set_value(&val.to_string(), tags) else {
-                        continue 'outer;
-                    };
-                    if let Some(attr_name) = &field.attribute_name {
-                        info.attributes.push(KeyVal {
-                            key: attr_name.to_owned(),
-                            val: value.clone(),
-                        });
-                    }
+            }
 
-                    if let Some(metric_name) = &field.metric_name {
-                        info.metrics.push(MetricKeyVal {
-                            key: metric_name.to_owned(),
-                            val: value.parse::<f32>().unwrap_or(0.0),
-                        });
-                    }
-                }
+            let Some(value) = field.get_value(&val) else {
+                return;
+            };
+            field.insert_value(value.clone(), tags);
+            if let Some(attr_name) = &field.attribute_name {
+                info.attributes.push(KeyVal {
+                    key: attr_name.to_owned(),
+                    val: value.clone(),
+                });
+            }
+
+            if let Some(metric_name) = &field.metric_name {
+                info.metrics.push(MetricKeyVal {
+                    key: metric_name.to_owned(),
+                    val: value.parse::<f32>().unwrap_or(0.0),
+                });
             }
         }
     }
@@ -786,45 +909,106 @@ fn on_payload_and_header(
 
     let mut hessian_decoder = Hessian2Decoder::default();
     let mut hessian_payload = None;
-    let mut attachments = None;
     let mut tags = HashMap::new();
+    let map_start_index = payload
+        .iter()
+        .position(|&b| b == BC_MAP || b == BC_MAP_UNTYPED)
+        .unwrap_or(0);
     let mut args_end_index: usize = 0;
 
     for index in indices {
         let Some(policy) = policy.policies.get(*index) else {
             continue;
         };
-        let (header_policy, body_policy) = match direction {
+        let (header_policy, map_string_policy, object_policy) = match direction {
             PacketDirection::ClientToServer => (
-                policy.from_req_key.get(&FieldType::Header),
+                policy.from_req_key.get(&FieldType::DubboHeader),
+                policy.from_req_key.get(&FieldType::DubboPayloadMapString),
                 policy.from_req_key.get(&FieldType::PayloadHessian2),
             ),
             PacketDirection::ServerToClient => (
-                policy.from_resp_key.get(&FieldType::Header),
+                policy.from_resp_key.get(&FieldType::DubboHeader),
+                policy.from_resp_key.get(&FieldType::DubboPayloadMapString),
                 policy.from_resp_key.get(&FieldType::PayloadHessian2),
             ),
         };
-        match header_policy {
-            Some(header_policy) => {
-                // attachmetns 依赖于 payload 的 last index 才能解析，所以不管是否配置 hessian2 payload，只要配置了 dubbo+header 都要尝试解一下
-                if hessian_payload.is_none() {
-                    (hessian_payload, args_end_index) = hessian_decoder.parse_args(payload, start);
-                }
-                if attachments.is_none() {
-                    (attachments, _) = hessian_decoder.parse_attachments(payload, args_end_index);
-                }
-                process_hessian_value(header_policy, &attachments, info, &mut tags);
+
+        if let Some(body_object_policy) = object_policy {
+            // assume payload is object, which only extract it from start to end, then get value by key
+            // 如果 payload 是 object，获取 object field 时，只能精确提取，无法模糊搜索
+            if hessian_payload.is_none() {
+                (hessian_payload, args_end_index) =
+                    hessian_decoder.parse_args(payload, start, direction);
             }
-            _ => (),
+
+            // 一般而言，args 可能是 string, int, object ...
+            // 如果是基本类型，可以直接通过 key 获取到 value，但如果是 object 复合类型，key 只能获取到 object 本身
+            // 所以，这里额外支持对象语法，即 x.y 类型的配置，当 value 是 object 时，尝试获取子项，这个场景通常出现在响应出参
+            // usually, args maybe (string, int, object ...)
+            // if it is a basic type, you can get the value directly by key, but if it is a composite type like object
+            // can only get the object itself by key
+            // so, we support matching x.y when value is object, this scenario usually occurs in response parameters
+            if let Some(hessian_payload_map) = hessian_payload.as_ref() {
+                for (key, fields) in body_object_policy {
+                    let mut object_map = hessian_payload_map;
+                    let mut hessian_val = None;
+                    let mut segments = key.split('.').peekable();
+                    while let Some(segment) = segments.next() {
+                        let Some(val) = object_map.get(segment) else {
+                            break;
+                        };
+                        // peek until meet last key
+                        if segments.peek().is_none() {
+                            hessian_val = Some(val);
+                            break;
+                        }
+                        let HessianValue::Map(m) = val else {
+                            break;
+                        };
+                        object_map = m;
+                    }
+                    if let Some(val) = hessian_val {
+                        process_hessian_value(
+                            fields,
+                            info,
+                            &mut tags,
+                            key.as_str(),
+                            &val.to_string(),
+                        );
+                    };
+                }
+            };
         }
-        match body_policy {
-            Some(body_policy) => {
-                if hessian_payload.is_none() {
-                    (hessian_payload, args_end_index) = hessian_decoder.parse_args(payload, start);
-                }
-                process_hessian_value(body_policy, &hessian_payload, info, &mut tags);
+
+        if let Some(body_map_string_policy) = map_string_policy {
+            // assume payload is a map, try to skip index for search key in payload
+            // for map in payload: object{xx, map} can also work, as long as it is map's value
+            // 如果 payload 是 map，可以跳索引到 BC_MAP/BC_MAP_UNTYPED 的位置，然后基于 key 来找 value
+            // 对 payload 是 object{xx, map} 的情况一样生效，只要是 map 的 value 即可
+            for (key, fields) in body_map_string_policy {
+                let key_str = key.as_str();
+                let Some(val) = hessian_decoder.search_key(payload, key_str, map_start_index)
+                else {
+                    continue;
+                };
+                process_hessian_value(fields, info, &mut tags, key_str, &val.to_string());
             }
-            _ => continue,
+        }
+
+        if let Some(header_policy) = header_policy {
+            // attachment is a hashmap, fuzzy search key to find value, and attachment is after body, so we can skip args_end_index to improve search speed
+            // attachment 一定是 map，可以模糊搜索，且 attachment 的起始索引一定在 body 之后，可以用 args_end_index 跳索引来搜索
+            for (key, fields) in header_policy {
+                let key_str = key.as_str();
+                let Some(val) = hessian_decoder.search_key(
+                    payload,
+                    key_str,
+                    args_end_index.max(map_start_index),
+                ) else {
+                    continue;
+                };
+                process_hessian_value(fields, info, &mut tags, key_str, &val.to_string());
+            }
         }
     }
     info.merge_policy_tags_to_dubbo(&mut tags);
