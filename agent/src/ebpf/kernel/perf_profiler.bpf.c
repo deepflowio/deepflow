@@ -1136,7 +1136,7 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 	    (&ci, sizeof(ci), (char *)lua_state + o->off_l_ci)) {
 		return 0;
 	}
-	// base_ci end_ci for Lua 5.1
+	/* base_ci end_ci for Lua 5.1 */
 	if (o->features & LUA_FEAT_CI_ARRAY) {
 		if (bpf_probe_read_user
 		    (&base_ci, sizeof(base_ci),
@@ -1164,14 +1164,14 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 				break;
 		}
 
-		// Load fields from this CallInfo
+		/* Load fields from this CallInfo */
 		void *ci_func = NULL, *ci_prev = NULL;
 		if (bpf_probe_read_user
 			(&ci_func, sizeof(ci_func),
 			(char *)ci + o->off_ci_func)) {
 			goto next_frame;
 		}
-		// ci_prev available in Lua 5.2+
+		/* ci_prev available in Lua 5.2+ */
 		if (o->features & LUA_FEAT_CI_LINKED)
 			(void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev),
 						(char *)ci + o->off_ci_prev);
@@ -1181,7 +1181,8 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 		    (&tt, sizeof(tt), (char *)ci_func + o->off_tvalue_tt)) {
 			goto next_frame;
 		}
-
+		
+		int variant = tt & 0x30;
 		bool is_collectable = (tt & LUA_TCOLLECTABLE) != 0;
 
 		void *valp = NULL;
@@ -1223,7 +1224,6 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 			} else {
 				goto next_frame;
 			}
-
 		} else {
 			__u8 is_c = 0;
 			if (bpf_probe_read_user
@@ -1266,15 +1266,15 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 	return 0;
 }
 
-static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame,
+static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame_ptr,
 				   stack_t * intp_stack, struct lj_ofs *o)
 {
 	(void)ctx;
-	if (!frame) {
+	if (!frame_ptr) {
 		return -1;
 	}
 
-	void *fn = frame_func_wr(frame, o);
+	void *fn = frame_func_wr(frame_ptr, o);
 	if (!fn) {
 		return -1;
 	}
@@ -1284,13 +1284,19 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame,
 		if (gcfunc_get_proto(fn, &pt, o)) {
 			return -1;
 		}
-
+		if (!pt) {
+			return -1;
+		}
 		__u64 frame = TAG_LUA | (((__u64) pt) & ~TAG_MASK);
 		add_frame(intp_stack, frame);
 	} else if (is_cfunc(fn, o)) {
 		void *cf = NULL;
-		if (gcfunc_get_cfunc(fn, &cf, o))
+		if (gcfunc_get_cfunc(fn, &cf, o)) { 
 			return -1;
+		}
+		if (!cf) {
+			return -1;
+		}
 		__u64 frame = TAG_CFUNC | (((__u64) cf) & ~TAG_MASK);
 		add_frame(intp_stack, frame);
 	} else if (is_ffunc(fn, o)) {
@@ -1321,7 +1327,7 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid,
 	if (!intp_stack)
 		return -1;
 
-	int level = 1;
+	int skip_depth = 1;
 
 	void *stack_ptr, *base_ptr;
 	if (L_get_stack(lua_state, &stack_ptr, o))
@@ -1329,22 +1335,28 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid,
 	if (L_get_base(lua_state, &base_ptr, o))
 		return -1;
 
-	// TODO: remove hardcoded TValue size, add lj.tv_size
-	void *bot = (void *)((char *)stack_ptr + (o->fr2 ? 16 : 0));
+	void *bot = stack_ptr;
 
 	void *frame, *nextframe;
 	frame = nextframe = (void *)((char *)base_ptr - 8);
 
-	// Main frame walker loop
+	/* Main frame walker loop */
 #pragma unroll
 	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
 		if (frame <= bot)
 			break;
 		if (frame_gc_equals_L(frame, lua_state, o) > 0) {
-			level++;
+			skip_depth++;
 		}
-		if (level-- == 0) {
-			level++;
+		/*
+		* Gate recording with a countdown:
+		* - We increment skip_depth for parent/dummy/vararg frames.
+		* - Each iteration we compare (skip_depth == 0) using a post-decrement.
+		*   If it was 0, we immediately ++ to keep it at 0 forever (i.e., keep recording).
+		*   If it was > 0, the decrement advances the countdown toward 0 (keep skipping).
+		*/
+		if (skip_depth-- == 0) {
+			skip_depth++;
 			if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
 				break;
 			}
@@ -1352,13 +1364,12 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid,
 				continue;
 			}
 		}
-		nextframe = frame;
-
+		
 		if (frame_islua_wr(frame, o)) {
 			frame = frame_prevl_wr(frame, o);
 		} else {
 			if (frame_isvarg_wr(frame, o))
-				level++;
+				skip_depth++;
 			frame = frame_prevd_wr(frame, o);
 		}
 	}
