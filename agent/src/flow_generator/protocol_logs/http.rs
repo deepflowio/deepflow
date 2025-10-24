@@ -294,6 +294,11 @@ pub struct HttpInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    request_header: Option<Vec<u8>>,
+    request_payload: Option<Vec<u8>>,
+    response_header: Option<Vec<u8>>,
+    response_payload: Option<Vec<u8>>,
+
     biz_type: u8,
 
     #[serde(skip)]
@@ -597,6 +602,13 @@ impl HttpInfo {
                 if self.req_content_length.is_none() {
                     self.req_content_length = other.req_content_length;
                 }
+                if self.status != L7ResponseStatus::Ok {
+                    self.request_header = other.request_header.take();
+                    self.request_payload = other.request_payload.take();
+                } else {
+                    self.response_header = None;
+                    self.response_payload = None;
+                }
                 self.captured_request_byte += other.captured_request_byte;
             }
             // merge with response
@@ -622,6 +634,14 @@ impl HttpInfo {
                     self.is_resp_end = true;
                 }
                 self.captured_response_byte += other.captured_response_byte;
+
+                if other.status != L7ResponseStatus::Ok {
+                    self.response_header = other.response_header.take();
+                    self.response_payload = other.response_payload.take();
+                } else {
+                    self.request_header = None;
+                    self.request_payload = None;
+                }
             }
             _ => {}
         }
@@ -710,7 +730,7 @@ impl HttpInfo {
 }
 
 impl From<HttpInfo> for L7ProtocolSendLog {
-    fn from(f: HttpInfo) -> Self {
+    fn from(mut f: HttpInfo) -> Self {
         let is_grpc = f.is_grpc();
 
         // grpc protocol special treatment
@@ -739,6 +759,33 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         } else {
             EbpfFlags::NONE.bits()
         };
+
+        if f.status != L7ResponseStatus::Ok {
+            if let Some(request_header) = f.request_header {
+                f.attributes.push(KeyVal {
+                    key: "request_header".to_string(),
+                    val: String::from_utf8_lossy(request_header.as_slice()).to_string(),
+                });
+            }
+            if let Some(request_payload) = f.request_payload {
+                f.attributes.push(KeyVal {
+                    key: "request_payload".to_string(),
+                    val: String::from_utf8_lossy(request_payload.as_slice()).to_string(),
+                });
+            }
+            if let Some(response_header) = f.response_header {
+                f.attributes.push(KeyVal {
+                    key: "response_header".to_string(),
+                    val: String::from_utf8_lossy(response_header.as_slice()).to_string(),
+                });
+            }
+            if let Some(response_payload) = f.response_payload {
+                f.attributes.push(KeyVal {
+                    key: "response_payload".to_string(),
+                    val: String::from_utf8_lossy(response_payload.as_slice()).to_string(),
+                });
+            }
+        }
 
         L7ProtocolSendLog {
             req_len: f.req_content_length,
@@ -956,7 +1003,7 @@ impl L7ProtocolParserInterface for HttpLog {
                 #[cfg(feature = "enterprise")]
                 let mut tags = HashMap::new();
 
-                self.parse_http_v1(
+                let l7_payload = self.parse_http_v1(
                     payload,
                     param,
                     &mut info,
@@ -967,7 +1014,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     #[cfg(feature = "enterprise")]
                     policy_indices,
                 )?;
-                self.set_info_by_config(param, config, payload, &mut info);
+                self.set_info_by_config(param, config, payload, Some(l7_payload), &mut info);
 
                 // only handle once for a packet, it also means priority is payload > header > url (if get the same key)
                 // 对一个流量只处理一次，同时意味着优先级为 payload > header > url (如果有相同的 key)
@@ -1032,7 +1079,7 @@ impl L7ProtocolParserInterface for HttpLog {
                         }
                         Ok(n) => n,
                     };
-                    self.set_info_by_config(param, config, &payload[offset..], &mut info);
+                    self.set_info_by_config(param, config, &payload[offset..], None, &mut info);
 
                     #[cfg(feature = "enterprise")]
                     info.merge_policy_tags_to_http(&mut tags);
@@ -1118,6 +1165,7 @@ impl HttpLog {
         param: &ParseParam,
         config: &LogParserConfig,
         payload: &[u8],
+        l7_payload: Option<&[u8]>,
         info: &mut HttpInfo,
     ) {
         // In uprobe mode, headers are reported in a way different from other modes:
@@ -1148,11 +1196,56 @@ impl HttpLog {
             info.endpoint = Some(handle_endpoint(config, path));
         }
 
+        let l7_dynamic_config = &config.l7_log_dynamic;
         if param.direction == PacketDirection::ServerToClient {
             if let Some(code) = info.grpc_status_code {
                 self.set_grpc_status(code, info);
             } else {
                 self.set_status(info.status_code, info);
+            }
+
+            if let Some(l7_payload) = l7_payload {
+                if info.status != L7ResponseStatus::Ok {
+                    if l7_dynamic_config.error_response_header > 0 {
+                        let error_response_header = (payload.len() - l7_payload.len())
+                            .min(l7_dynamic_config.error_response_header);
+                        if error_response_header > 0 {
+                            info.response_header = Some(payload[..error_response_header].to_vec());
+                        }
+                    }
+                    if l7_dynamic_config.error_response_payload > 0 {
+                        let error_response_payload = l7_payload
+                            .len()
+                            .min(l7_dynamic_config.error_response_payload);
+                        if error_response_payload > 0 {
+                            info.response_payload =
+                                Some(l7_payload[..error_response_payload].to_vec());
+                        }
+                    }
+                }
+            }
+        } else {
+            if let Some(l7_payload) = l7_payload {
+                if l7_dynamic_config.error_request_header > 0 {
+                    let error_request_header = (payload.len() - l7_payload.len())
+                        .min(l7_dynamic_config.error_request_header);
+                    if error_request_header > 0 {
+                        info.request_header = Some(payload[..error_request_header].to_vec());
+                    }
+                } else {
+                    info.request_header = Some(vec![]);
+                }
+
+                if l7_dynamic_config.error_request_payload > 0 {
+                    let error_request_payload = l7_payload
+                        .len()
+                        .min(l7_dynamic_config.error_request_payload);
+                    if error_request_payload > 0 {
+                        info.request_payload = Some(l7_payload[..error_request_payload].to_vec());
+                    }
+                } else {
+                    info.request_payload = Some(vec![]);
+                }
             }
         }
 
@@ -1348,15 +1441,15 @@ impl HttpLog {
         bytes
     }
 
-    pub fn parse_http_v1(
+    pub fn parse_http_v1<'a>(
         &mut self,
-        payload: &[u8],
+        payload: &'a [u8],
         param: &ParseParam,
         info: &mut HttpInfo,
         #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
         #[cfg(feature = "enterprise")] policy: Option<&Vec<ExtraCustomFieldPolicy>>,
         #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
-    ) -> Result<()> {
+    ) -> Result<&'a [u8]> {
         let (direction, config) = (
             param.direction,
             &param.parse_config.as_ref().unwrap().l7_log_dynamic,
@@ -1443,6 +1536,11 @@ impl HttpLog {
             );
         }
 
+        #[cfg(target_os = "linux")]
+        let l7_payload = headers.remaining_buf().trim_ascii_start();
+        #[cfg(target_os = "windows")]
+        let l7_payload = Self::trim_ascii_start(headers.remaining_buf());
+
         set_captured_byte!(info, param);
         // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
         if direction == PacketDirection::ServerToClient {
@@ -1452,19 +1550,9 @@ impl HttpLog {
         }
 
         #[cfg(feature = "enterprise")]
-        self.on_payload(
-            info,
-            direction,
-            tags,
-            policy,
-            policy_indices,
-            #[cfg(target_os = "linux")]
-            headers.remaining_buf().trim_ascii_start(),
-            #[cfg(target_os = "windows")]
-            Self::trim_ascii_start(headers.remaining_buf()),
-        );
+        self.on_payload(info, direction, tags, policy, policy_indices, l7_payload);
 
-        Ok(())
+        Ok(l7_payload)
     }
 
     fn has_magic(payload: &[u8]) -> bool {
@@ -2430,6 +2518,10 @@ mod tests {
             grpc_streaming_data_enabled,
             #[cfg(feature = "enterprise")]
             HashMap::new(),
+            0,
+            0,
+            0,
+            256,
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
@@ -3099,6 +3191,10 @@ mod tests {
             false,
             #[cfg(feature = "enterprise")]
             HashMap::new(),
+            0,
+            0,
+            0,
+            256,
         );
 
         // check field overwritten by higher priority field but not backwards
@@ -3288,6 +3384,10 @@ mod tests {
                     indices: SegmentBuilder::new().merge_segments(),
                 },
             )]),
+            0,
+            0,
+            0,
+            256,
         );
 
         let mut tags = HashMap::new();
@@ -3434,6 +3534,10 @@ mod tests {
                     indices: SegmentMap::default(),
                 },
             )]),
+            0,
+            0,
+            0,
+            256,
         );
         let http1_payload = r#"{"client": "192.168.1.1", "trace_id": "trace_id=test_parse_trace_id;x-request-id=xreqid","span_id": "test_parse_span_id", "user_id": "456789"}"#;
         let mut tags = HashMap::new();

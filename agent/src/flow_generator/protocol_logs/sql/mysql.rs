@@ -1666,6 +1666,10 @@ mod tests {
             false,
             #[cfg(feature = "enterprise")]
             std::collections::HashMap::new(),
+            0,
+            0,
+            0,
+            256,
         );
         for (input, tid, sid) in testcases {
             info.trace_id = None;
