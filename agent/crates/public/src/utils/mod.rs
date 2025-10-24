@@ -17,6 +17,7 @@
 pub mod bitmap;
 pub mod hash;
 pub mod net;
+pub mod searcher;
 pub mod string;
 
 #[cfg(windows)]
