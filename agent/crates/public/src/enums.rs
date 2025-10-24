@@ -438,9 +438,21 @@ pub enum FieldType {
     #[default]
     Header,
     HttpUrl,
+    // fuzzy search in string like json k-v
+    // it doesn't care if payload can be deserialize as json
+    // try to search "key": "value" string
     PayloadJson,
+    // fuzzy search in xml string
+    // try to search <key>value</key>, or <root key="value"></root>
     PayloadXml,
+    // hessian2 payload
+    // used when payload is a hessian2 object, for extract value in object field
     PayloadHessian2,
+    // in dubbo attachment, it must be a map
+    // fuzzy search in dubbo header
+    DubboHeader,
+    // used when payload is hashmap<string, string> for searching
+    DubboPayloadMapString,
 }
 
 #[cfg(test)]
