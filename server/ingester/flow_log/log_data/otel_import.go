@@ -275,7 +275,8 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				h.sqlAffectedRows = uint64(value.GetIntValue())
 				h.SqlAffectedRows = &h.sqlAffectedRows
 				isMetrics = true
-			case "message.uncompressed_size", "messaging.message_payload_size_bytes", "messaging.message_payload_compressed_size_bytes":
+			case "message.uncompressed_size", "messaging.message_payload_size_bytes", "messaging.message_payload_compressed_size_bytes",
+				"web.vitals.LCP.value", "web.vitals.TTFB.value", "web.vitals.FCP.value", "web.vitals.INP.value", "web.vitals.CLS.value":
 				isMetrics = true
 			default:
 				// nothing
