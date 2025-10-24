@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: k8s gather refresh failed [#10639](https://github.com/deepflowio/deepflow/pull/10639) by [askyrie](https://github.com/askyrie)
 * fix: wan type cidr may not be tagged [#8813](https://github.com/deepflowio/deepflow/pull/8813) by [lzf575](https://github.com/lzf575)
 * fix: the throttler cannot write all data to the queue at once [#8793](https://github.com/deepflowio/deepflow/pull/8793) by [lzf575](https://github.com/lzf575)
 * fix: recorder fails to clean 10w data at one time [#8707](https://github.com/deepflowio/deepflow/pull/8707) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -290,6 +291,7 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* 更新 v6.5 server build 依赖 [#10651](https://github.com/deepflowio/deepflow/pull/10651) by [1473371932](https://github.com/1473371932)
 * [Controller] get data error from mysql and return directly [#8043](https://github.com/deepflowio/deepflow/pull/8043) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * Cp 66 lo to v65 [#7716](https://github.com/deepflowio/deepflow/pull/7716) by [lzf575](https://github.com/lzf575)
 * support consistent timestamp in l7metrics [#7626](https://github.com/deepflowio/deepflow/pull/7626) by [yuanchaoa](https://github.com/yuanchaoa)
