@@ -57,16 +57,12 @@ cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
         use crate::common::enums::FieldType;
         use crate::common::flow::L7ProtocolEnum;
+        use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
         use enterprise_utils::l7::plugin::custom_field_policy::{
-            field_type_support_protocol, format_payload, set_from_tag, ExtraCustomFieldPolicy, ExtraField,
+            field_type_support_protocol, set_from_tag, ExtraCustomFieldPolicy, ExtraField,
         };
     }
 }
-
-// priority: base field < custom policy < plugin
-const PLUGIN_FIELD_PRIORITY: u8 = 0;
-const CUSTOM_FIELD_POLICY_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
-const BASE_FIELD_PRIORITY: u8 = CUSTOM_FIELD_POLICY_PRIORITY + 1;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -435,21 +431,28 @@ impl HttpInfo {
         self.custom_exception = tags.remove(ExtraField::RESPONSE_EXCEPTION);
         self.custom_result = tags.remove(ExtraField::RESPONSE_RESULT);
 
-        // trace info
-        if CUSTOM_FIELD_POLICY_PRIORITY < self.trace_id.prio {
-            if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
-                self.trace_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
-            }
+        if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
+            self.trace_ids
+                .merge_field(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
         }
 
-        if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
+        if CUSTOM_FIELD_POLICY_PRIORITY <= self.span_id.prio {
             if let Some(span_id) = tags.remove(ExtraField::SPAN_ID) {
-                self.span_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id);
+                let prev = replace(
+                    &mut self.span_id,
+                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id),
+                );
+                if !prev.is_default() {
+                    self.attributes.push(KeyVal {
+                        key: APM_SPAN_ID_ATTR.to_string(),
+                        val: prev.into_inner(),
+                    });
+                }
             }
         }
 
         if match self.client_ip.as_ref() {
-            Some(client_ip) if CUSTOM_FIELD_POLICY_PRIORITY < client_ip.prio => true,
+            Some(client_ip) if CUSTOM_FIELD_POLICY_PRIORITY <= client_ip.prio => true,
             None => true,
             _ => false,
         } {
@@ -464,7 +467,7 @@ impl HttpInfo {
             _ => return,
         };
 
-        if CUSTOM_FIELD_POLICY_PRIORITY < x_req_id.prio {
+        if CUSTOM_FIELD_POLICY_PRIORITY <= x_req_id.prio {
             if let Some(x_request_id) = tags.remove(ExtraField::X_REQUEST_ID) {
                 *x_req_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id)
             }
@@ -613,6 +616,7 @@ impl HttpInfo {
         super::swap_if!(self, x_request_id_0, is_default, other);
         super::swap_if!(self, x_request_id_1, is_default, other);
         self.attributes.append(&mut other.attributes);
+        self.metrics.append(&mut other.metrics);
         Ok(())
     }
 
@@ -1761,9 +1765,10 @@ impl HttpLog {
                 if let Some(fields) = field_policy.get(&lowercase_key) {
                     for field in fields {
                         if field.match_key(key) && !value.is_empty() {
-                            let Some(value) = field.set_value(value, tags) else {
+                            let Some(value) = field.get_value(value) else {
                                 continue;
                             };
+                            field.insert_value(value.clone(), tags);
                             if let Some(attr_name) = &field.attribute_name {
                                 info.attributes.push(KeyVal {
                                     key: attr_name.to_owned(),
@@ -1817,25 +1822,27 @@ impl HttpLog {
             };
             if let Some(fields) = field_policy.get(&lowercase_key) {
                 for field in fields {
-                    if field.match_key(key) {
-                        let Some(value) = field.set_value(val, tags) else {
-                            continue;
-                        };
-                        if let Some(attr_name) = &field.attribute_name {
-                            info.attributes.push(KeyVal {
-                                key: attr_name.to_owned(),
-                                val: value.clone(),
-                            });
-                        }
-
-                        if let Some(metric_name) = &field.metric_name {
-                            info.metrics.push(MetricKeyVal {
-                                key: metric_name.to_owned(),
-                                val: value.parse::<f32>().unwrap_or(0.0),
-                            });
-                        }
-                        break 'outer;
+                    if !field.match_key(key) {
+                        continue;
                     }
+                    let Some(value) = field.get_value(val) else {
+                        continue;
+                    };
+                    field.insert_value(value.clone(), tags);
+                    if let Some(attr_name) = &field.attribute_name {
+                        info.attributes.push(KeyVal {
+                            key: attr_name.to_owned(),
+                            val: value.clone(),
+                        });
+                    }
+
+                    if let Some(metric_name) = &field.metric_name {
+                        info.metrics.push(MetricKeyVal {
+                            key: metric_name.to_owned(),
+                            val: value.parse::<f32>().unwrap_or(0.0),
+                        });
+                    }
+                    break 'outer;
                 }
             }
         }
@@ -1857,8 +1864,6 @@ impl HttpLog {
         let (Some(policies), Some(policy_indices)) = (policy, policy_indices) else {
             return;
         };
-        let mut payload_entry_cache = None;
-        let mut payload_field_type = None;
         for index in policy_indices {
             let field_policy = match (policies.get(*index), direction) {
                 (Some(policy), PacketDirection::ClientToServer) => &policy.from_req_body,
@@ -1866,30 +1871,19 @@ impl HttpLog {
                 _ => continue,
             };
             for (field_type, fields) in field_policy {
-                if payload_field_type.is_some() && payload_field_type != Some(*field_type) {
-                    continue;
-                }
                 if !field_type_support_protocol(field_type, info.proto) {
                     continue;
                 }
-                if payload_entry_cache.is_none() {
-                    match format_payload(field_type, payload) {
-                        Some(payload_entry) => {
-                            payload_entry_cache = Some(payload_entry);
-                            payload_field_type = Some(*field_type);
-                        }
-                        None => continue,
-                    }
-                }
 
-                let payload_entry = payload_entry_cache.as_ref().unwrap();
                 for field in fields {
-                    let Some(extract_field) = field.get_value_from_payload(payload_entry) else {
+                    let Some(extract_field) = field.get_value_from_payload(payload, field_type)
+                    else {
                         continue;
                     };
-                    let Some(value) = field.set_value(&extract_field, tags) else {
+                    let Some(value) = field.get_value(&extract_field) else {
                         continue;
                     };
+                    field.insert_value(value.clone(), tags);
                     if let Some(attr_name) = &field.attribute_name {
                         info.attributes.push(KeyVal {
                             key: attr_name.to_owned(),
@@ -1904,8 +1898,6 @@ impl HttpLog {
                         });
                     }
                 }
-                // all field parsed, try next policy instead of next field_type
-                break;
             }
         }
     }
@@ -3160,6 +3152,80 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
+    fn get_extra_field_config() -> HashMap<&'static str, ExtraField> {
+        // 这个 hashmap 的 key 没有特殊含义，只是方便用 map[key] 取对应的 value 做单测
+        HashMap::from([
+            (
+                ExtraField::HTTP_PROXY_CLIENT,
+                ExtraField {
+                    field_match_type: MatchType::String(false),
+                    field_match_keyword: "client".into(),
+                    rewrite_native_tag: Some(ExtraField::HTTP_PROXY_CLIENT.into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::REQUEST_ID,
+                ExtraField {
+                    field_match_type: MatchType::String(false),
+                    field_match_keyword: "user_id".into(),
+                    rewrite_native_tag: Some(ExtraField::REQUEST_ID.into()),
+                    attribute_name: Some("user_id".into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::X_REQUEST_ID,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "x-request-id".into(),
+                    rewrite_native_tag: Some(ExtraField::X_REQUEST_ID.into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::TRACE_ID,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "trace_id".into(),
+                    rewrite_native_tag: Some(ExtraField::TRACE_ID.into()),
+                    subfield_match_keyword: Some("trace_id".into()),
+                    separator_between_subfield_key_and_value: Some("=".into()),
+                    separator_between_subfield_kv_pair: Some(";".into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::SPAN_ID,
+                ExtraField {
+                    field_match_type: MatchType::String(false),
+                    field_match_keyword: "span_id".into(),
+                    rewrite_native_tag: Some(ExtraField::SPAN_ID.into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::RESPONSE_EXCEPTION,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "Field_from_json".into(),
+                    attribute_name: Some("Field_from_json".into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::RESPONSE_STATUS,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "metric_from_xml".into(),
+                    metric_name: Some("metric_from_xml".into()),
+                    ..Default::default()
+                },
+            ),
+        ])
+    }
+
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_extra_field_policy() {
         let mut parser = HttpLog::new_v1();
@@ -3167,52 +3233,24 @@ mod tests {
         info.proto = L7Protocol::Http1;
         info.msg_type = LogMessageType::Request;
 
-        let rewrite_url_fields = vec![
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "client".into(),
-                rewrite_native_tag: ExtraField::HTTP_PROXY_CLIENT.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "SPAN_ID".into(),
-                rewrite_native_tag: ExtraField::SPAN_ID.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "user_id".into(),
-                rewrite_native_tag: ExtraField::REQUEST_ID.into(),
-                attribute_name: Some("user_id".into()),
-                ..Default::default()
-            },
-        ];
-
-        let rewrite_header_fields = vec![
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "x-request-id".into(),
-                rewrite_native_tag: ExtraField::X_REQUEST_ID.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "trace_id".into(),
-                rewrite_native_tag: ExtraField::TRACE_ID.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "span_id".into(),
-                rewrite_native_tag: ExtraField::SPAN_ID.into(),
-                ..Default::default()
-            },
-        ];
+        let rewrite_extra_fields = get_extra_field_config();
+        let trace_id_ignore_case = ExtraField {
+            field_match_type: MatchType::String(true),
+            field_match_keyword: "trace_id".into(),
+            rewrite_native_tag: Some(ExtraField::TRACE_ID.into()),
+            ..Default::default()
+        };
+        let span_id_ignore_case = ExtraField {
+            field_match_type: MatchType::String(true),
+            field_match_keyword: "span_id".into(),
+            rewrite_native_tag: Some(ExtraField::SPAN_ID.into()),
+            ..Default::default()
+        };
 
         let config = L7LogDynamicConfig::new(
             vec![],
             vec!["x-request-id".into()],
+            true,
             vec!["trace_id".into()],
             vec!["span_id".into()],
             ExtraLogFields::default(),
@@ -3225,9 +3263,19 @@ mod tests {
                             (
                                 FieldType::HttpUrl,
                                 HashMap::from([
-                                    ("client".into(), vec![rewrite_url_fields[0].clone()]),
-                                    ("span_id".into(), vec![rewrite_url_fields[1].clone()]),
-                                    ("user_id".into(), vec![rewrite_url_fields[2].clone()]),
+                                    (
+                                        "client".into(),
+                                        vec![rewrite_extra_fields[ExtraField::HTTP_PROXY_CLIENT]
+                                            .clone()],
+                                    ),
+                                    (
+                                        "span_id".into(),
+                                        vec![rewrite_extra_fields[ExtraField::SPAN_ID].clone()],
+                                    ),
+                                    (
+                                        "user_id".into(),
+                                        vec![rewrite_extra_fields[ExtraField::REQUEST_ID].clone()],
+                                    ),
                                 ]),
                             ),
                             (
@@ -3235,10 +3283,10 @@ mod tests {
                                 HashMap::from([
                                     (
                                         "x-request-id".into(),
-                                        vec![rewrite_header_fields[0].clone()],
+                                        vec![rewrite_extra_fields[ExtraField::X_REQUEST_ID].clone()],
                                     ),
-                                    ("trace_id".into(), vec![rewrite_header_fields[1].clone()]),
-                                    ("span_id".into(), vec![rewrite_header_fields[2].clone()]),
+                                    ("trace_id".into(), vec![trace_id_ignore_case]),
+                                    ("span_id".into(), vec![span_id_ignore_case]),
                                 ]),
                             ),
                         ]),
@@ -3263,7 +3311,7 @@ mod tests {
             Some(&vec![0usize; 1]),
         );
         info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.span_id.field, "");
+        assert_eq!(info.span_id.field, "01");
         assert_eq!(info.stream_id, Some(456789));
         assert_eq!(
             info.client_ip
@@ -3299,7 +3347,7 @@ mod tests {
             b"test_parse_trace_id",
         );
         info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.trace_id.field, "test_parse_trace_id");
+        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
         let _ = parser.on_header_extra(
             &mut info,
             PacketDirection::ClientToServer,
@@ -3317,56 +3365,20 @@ mod tests {
     #[test]
     fn test_extra_field_policy_in_payload() {
         let mut parser = HttpLog::new_v1();
-        let mut info = HttpInfo::default();
-        info.proto = L7Protocol::Http1;
-        info.msg_type = LogMessageType::Request;
+        fn get_new_info() -> HttpInfo {
+            let mut info = HttpInfo::default();
+            info.proto = L7Protocol::Http1;
+            info.msg_type = LogMessageType::Request;
+            info
+        }
+        let mut info = get_new_info();
 
-        let rewrite_body_fields = vec![
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "client".into(),
-                rewrite_native_tag: ExtraField::HTTP_PROXY_CLIENT.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "SPAN_ID".into(),
-                rewrite_native_tag: ExtraField::SPAN_ID.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(false),
-                field_match_keyword: "user_id".into(),
-                rewrite_native_tag: ExtraField::REQUEST_ID.into(),
-                attribute_name: Some("user_id".into()),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "x-request-id".into(),
-                rewrite_native_tag: ExtraField::X_REQUEST_ID.into(),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "trace_id".into(),
-                rewrite_native_tag: ExtraField::TRACE_ID.into(),
-                subfield_match_keyword: Some("trace_id".into()),
-                separator_between_subfield_key_and_value: Some("=".into()),
-                separator_between_subfield_kv_pair: Some(";".into()),
-                ..Default::default()
-            },
-            ExtraField {
-                field_match_type: MatchType::String(true),
-                field_match_keyword: "span_id".into(),
-                rewrite_native_tag: ExtraField::SPAN_ID.into(),
-                ..Default::default()
-            },
-        ];
-
+        let rewrite_extra_fields: Vec<ExtraField> =
+            get_extra_field_config().into_values().collect();
         let config = L7LogDynamicConfig::new(
             vec![],
             vec!["x-request-id".into()],
+            true,
             vec!["trace_id".into()],
             vec!["span_id".into()],
             ExtraLogFields::default(),
@@ -3378,14 +3390,14 @@ mod tests {
                         ExtraCustomFieldPolicy {
                             from_req_body: HashMap::from([(
                                 FieldType::PayloadJson,
-                                rewrite_body_fields.clone(),
+                                rewrite_extra_fields.clone(),
                             )]),
                             ..Default::default()
                         },
                         ExtraCustomFieldPolicy {
                             from_req_body: HashMap::from([(
                                 FieldType::PayloadXml,
-                                rewrite_body_fields,
+                                rewrite_extra_fields,
                             )]),
                             ..Default::default()
                         },
@@ -3394,7 +3406,14 @@ mod tests {
                 },
             )]),
         );
-        let http1_payload = r#"{"client": "192.168.1.1", "trace_id": "trace_id=test_parse_trace_id;x-request-id=xreqid","span_id": "test_parse_span_id", "user_id": "456789"}"#;
+
+        let json_payload = r#"{"client": "192.168.1.1", "trace_id": "trace_id=test_parse_trace_id;x-request-id=xreqid","span_id": "test_parse_span_id", "user_id": "456789"}"#;
+        let random_payload = vec![0x1u8, 0x2, 0x3, 0x5, 0x7, 0xA, 0xC, 0x10, 0xDF];
+        let mut json_mixed_payload = Vec::new();
+        json_mixed_payload.extend(random_payload.clone());
+        json_mixed_payload.extend(json_payload.as_bytes());
+        json_mixed_payload.extend(random_payload.clone());
+
         let mut tags = HashMap::new();
         let policy = config
             .extra_field_policies
@@ -3406,12 +3425,12 @@ mod tests {
             &mut tags,
             Some(http1_policy),
             Some(&vec![0usize, 1usize]),
-            http1_payload.as_bytes(),
+            &json_mixed_payload.as_bytes(),
         );
         info.merge_policy_tags_to_http(&mut tags);
         assert_eq!(info.span_id.field, "test_parse_span_id");
         assert_eq!(info.stream_id, Some(456789));
-        assert_eq!(info.trace_id.field, "test_parse_trace_id");
+        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
         assert_eq!(
             info.client_ip
                 .as_ref()
@@ -3424,5 +3443,53 @@ mod tests {
                 assert_eq!(attr.val, "456789");
             }
         }
+
+        info = get_new_info();
+        let xml_payload = r#"<client>192.168.1.1</client><trace_id>trace_id=test_parse_trace_id;x-request-id=xreqid</trace_id><span_id>test_parse_span_id</span_id><user_id>456789</user_id>"#;
+        let mut xml_mixed_payload = Vec::new();
+        xml_mixed_payload.extend(random_payload.clone());
+        xml_mixed_payload.extend(xml_payload.as_bytes());
+        xml_mixed_payload.extend(random_payload.clone());
+
+        parser.on_payload(
+            &mut info,
+            PacketDirection::ClientToServer,
+            &mut tags,
+            Some(http1_policy),
+            Some(&vec![0usize, 1usize]),
+            &json_mixed_payload.as_bytes(),
+        );
+        info.merge_policy_tags_to_http(&mut tags);
+        assert_eq!(info.span_id.field, "test_parse_span_id");
+        assert_eq!(info.stream_id, Some(456789));
+        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
+        assert_eq!(
+            info.client_ip
+                .as_ref()
+                .unwrap_or(&PrioField::default())
+                .field,
+            "192.168.1.1"
+        );
+        for attr in info.attributes.iter() {
+            if attr.key == "user_id" {
+                assert_eq!(attr.val, "456789");
+            }
+        }
+
+        info = get_new_info();
+        let mixed_payload = r#"{"txStartServNo": "hello", "sss": {"Field_from_json": "field_from_json_value"}}<saeawda><metric_From_XML>42</metric_From_XML></saeawda><FIELD_FROM_XML>field_from_xml</FIELD_FROM_XML>"#;
+        parser.on_payload(
+            &mut info,
+            PacketDirection::ClientToServer,
+            &mut tags,
+            Some(http1_policy),
+            Some(&vec![0usize, 1usize]),
+            &mixed_payload.as_bytes(),
+        );
+        info.merge_policy_tags_to_http(&mut tags);
+        assert!(info.attributes.len() > 0);
+        assert!(info.metrics.len() > 0);
+        assert_eq!(info.attributes[0].val, "field_from_json_value");
+        assert_eq!(info.metrics[0].val, 42.0f32);
     }
 }

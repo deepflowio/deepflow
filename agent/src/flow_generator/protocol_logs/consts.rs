@@ -69,14 +69,6 @@ pub const SPAN_ID_TYPE: usize = 1;
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
-// dubbo constants
-pub const DUBBO_MAGIC_HIGH: u8 = 0xda;
-pub const DUBBO_MAGIC_LOW: u8 = 0xbb;
-pub const DUBBO_HEADER_LEN: usize = 16;
-// Kafka constants
-pub const KAFKA_REQ_HEADER_LEN: usize = 14;
-pub const KAFKA_RESP_HEADER_LEN: usize = 8;
-
 // response status code
 // 参考：https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/#%E5%8D%8F%E8%AE%AE%E8%AF%A6%E6%83%85
 pub const OK: u8 = 20;

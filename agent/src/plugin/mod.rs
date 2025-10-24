@@ -26,11 +26,11 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        config::handler::LogParserConfig,
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::LogCache,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         protocol_logs::{
             pb_adapter::{
@@ -674,6 +674,7 @@ impl From<&CustomInfo> for LogCache {
         LogCache {
             msg_type: info.msg_type,
             resp_status: info.resp.status,
+            on_blacklist: info.is_on_blacklist,
             endpoint: info.get_endpoint(),
             ..Default::default()
         }

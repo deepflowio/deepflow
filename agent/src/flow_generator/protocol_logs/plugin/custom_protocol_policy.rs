@@ -40,7 +40,6 @@ pub struct CustomPolicyLog {
     perf_stats: Option<L7PerfStats>,
     parser: CustomPolicyParser,
     proto_str: String,
-    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for CustomPolicyLog {
@@ -125,37 +124,19 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             }
 
             info.set_is_on_blacklist(config);
-            if !info.is_on_blacklist && !self.last_is_on_blacklist {
-                match info.resp.status {
-                    L7ResponseStatus::ServerError => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                    }
-                    _ => (),
-                }
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
-                    }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+            if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if info.msg_type == LogMessageType::Response {
+                    if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                        info.req.endpoint = endpoint.to_string();
                     }
                 }
-                let endpoint = if info.req.endpoint.is_empty() {
-                    None
-                } else {
-                    Some(info.req.endpoint.clone())
-                };
-                info.cal_rrt(param, &endpoint).map(|(rrt, endpoint)| {
-                    info.rrt = rrt;
-                    if info.msg_type == LogMessageType::Response {
-                        info.req.endpoint = endpoint.unwrap_or_default();
-                    }
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
+                if let Some(stats) = info.perf_stats(param) {
+                    info.rrt = stats.rrt_sum;
+                    perf_stats.sequential_merge(&stats);
+                }
             }
 
             set_captured_byte!(info, param);
-            self.last_is_on_blacklist = info.is_on_blacklist;
             if param.parse_log {
                 Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(info)))
             } else {
@@ -183,7 +164,6 @@ pub fn get_policy_parser(s: String) -> CustomPolicyLog {
     CustomPolicyLog {
         proto_str: s.clone(),
         perf_stats: None,
-        last_is_on_blacklist: false,
         parser: CustomPolicyParser::default(),
     }
 }
@@ -191,6 +171,10 @@ pub fn get_policy_parser(s: String) -> CustomPolicyLog {
 impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
     fn from(p: (&CustomPolicyInfo, PacketDirection)) -> CustomInfo {
         let (info, direction) = p;
+        let mut trace_ids: Vec<String> = Vec::new();
+        if let Some(trace_id) = &info.trace_id {
+            trace_ids.push(trace_id.to_string());
+        }
         CustomInfo {
             req: CustomInfoRequest {
                 version: info.version.clone(),
@@ -206,7 +190,7 @@ impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
                 result: info.response_result.clone(),
             },
             trace: CustomInfoTrace {
-                trace_id: info.trace_id.clone(),
+                trace_ids,
                 span_id: info.span_id.clone(),
                 http_proxy_client: info.http_proxy_client.clone(),
                 x_request_id_0: if direction == PacketDirection::ClientToServer {
