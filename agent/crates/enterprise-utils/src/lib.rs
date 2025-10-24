@@ -15,6 +15,160 @@
  */
 
 pub mod l7 {
+    pub mod plugin {
+        pub mod custom_field_policy {
+            use std::collections::HashMap;
+
+            #[macro_export]
+            macro_rules! set_from_tag {
+                ($($_:expr),+) => {};
+            }
+            pub use set_from_tag;
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            pub struct ExtraField {
+                pub field_match_type: public::enums::MatchType,
+                pub field_match_keyword: String,
+                pub subfield_match_keyword: Option<String>,
+                pub separator_between_subfield_kv_pair: Option<String>,
+                pub separator_between_subfield_key_and_value: Option<String>,
+                pub check_value_charset: bool,
+                pub value_primary_charset: Vec<public::enums::Charset>,
+                pub value_special_charset: String,
+                pub attribute_name: Option<String>,
+                pub rewrite_native_tag: Option<String>,
+                pub response_success_values: Vec<String>,
+                pub metric_name: Option<String>,
+            }
+            impl ExtraField {
+                pub const VERSION: &'static str = "";
+                pub const REQUEST_TYPE: &'static str = "";
+                pub const REQUEST_DOMAIN: &'static str = "";
+                pub const REQUEST_RESOURCE: &'static str = "";
+                pub const REQUEST_ID: &'static str = "";
+                pub const ENDPOINT: &'static str = "";
+                pub const RESPONSE_CODE: &'static str = "";
+                pub const RESPONSE_STATUS: &'static str = "";
+                pub const RESPONSE_EXCEPTION: &'static str = "";
+                pub const RESPONSE_RESULT: &'static str = "";
+                pub const TRACE_ID: &'static str = "";
+                pub const SPAN_ID: &'static str = "";
+                pub const X_REQUEST_ID: &'static str = "";
+                pub const HTTP_PROXY_CLIENT: &'static str = "";
+
+                pub fn match_key(&self, _: &str) -> bool {
+                    unimplemented!()
+                }
+                pub fn check_value(&self, _: &String) -> bool {
+                    unimplemented!()
+                }
+                pub fn get_subvalue(&self, _: &str) -> Option<String> {
+                    unimplemented!()
+                }
+                pub fn get_value(&self, _: &str) -> Option<String> {
+                    unimplemented!()
+                }
+                pub fn insert_value(&self, _: String, _: &mut HashMap<&'static str, String>) {
+                    unimplemented!()
+                }
+                pub fn get_value_from_payload(
+                    &self,
+                    _: &[u8],
+                    _: &public::enums::FieldType,
+                ) -> Option<String> {
+                    unimplemented!()
+                }
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            pub struct ExtraCustomFieldPolicy {
+                pub from_req_key:
+                    HashMap<public::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
+                pub from_resp_key:
+                    HashMap<public::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
+                pub from_req_body: HashMap<public::enums::FieldType, Vec<ExtraField>>,
+                pub from_resp_body: HashMap<public::enums::FieldType, Vec<ExtraField>>,
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            pub struct KeywordMatcher {
+                pub match_type: public::enums::MatchType,
+                pub match_from_begining: bool,
+                pub match_keyword_bytes: Vec<u8>,
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            pub struct ExtraProtocolCharacters {
+                pub protocol_name: String,
+                pub request_characters: Vec<Vec<KeywordMatcher>>,
+                pub response_characters: Vec<Vec<KeywordMatcher>>,
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            pub struct ExtraCustomProtocolConfig {
+                pub port_segmentmap: public::segment_map::SegmentMap<usize>,
+                pub protocol_characters: Vec<ExtraProtocolCharacters>,
+            }
+
+            pub fn field_type_support_protocol(
+                _: &public::enums::FieldType,
+                _: public::l7_protocol::L7Protocol,
+            ) -> bool {
+                unimplemented!()
+            }
+        }
+
+        pub mod custom_protocol_policy {
+            use std::collections::HashMap;
+
+            #[derive(Default, Debug)]
+            pub struct CustomPolicyInfo {
+                pub is_request: bool,
+                pub version: String,
+                pub request_type: String,
+                pub request_domain: String,
+                pub request_resource: String,
+                pub endpoint: String,
+                pub request_id: Option<u32>,
+                pub response_code: Option<i32>,
+                pub response_status: String,
+                pub response_exception: String,
+                pub response_result: String,
+                pub trace_id: Option<String>,
+                pub span_id: Option<String>,
+                pub http_proxy_client: Option<String>,
+                pub x_request_id: Option<String>,
+                pub attributes: HashMap<String, String>,
+                pub metrics: HashMap<String, f32>,
+            }
+
+            #[derive(Default, Debug)]
+            pub struct CustomPolicyParser {
+                pub info: CustomPolicyInfo,
+            }
+            impl CustomPolicyParser {
+                pub fn check_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: &super::custom_field_policy::ExtraCustomProtocolConfig,
+                    _: public::enums::TrafficDirection,
+                    _: u16,
+                ) -> Option<String> {
+                    unimplemented!()
+                }
+                pub fn parse_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: public::enums::TrafficDirection,
+                    _: &Vec<super::custom_field_policy::ExtraCustomFieldPolicy>,
+                    _: &Vec<usize>,
+                ) -> bool {
+                    unimplemented!()
+                }
+            }
+        }
+    }
+
     pub mod sql {
         pub mod oracle {
             use std::fmt;

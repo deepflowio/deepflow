@@ -1965,7 +1965,7 @@ where
     Ok(charsets)
 }
 
-fn to_rewrite_native_tag<'de: 'a, 'a, D>(deserializer: D) -> Result<String, D::Error>
+fn to_rewrite_native_tag<'de: 'a, 'a, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -1973,7 +1973,8 @@ where
     match deserialize_str.as_str() {
         "version" | "request_type" | "request_domain" | "request_resource" | "request_id"
         | "endpoint" | "response_code" | "response_exception" | "response_result" | "trace_id"
-        | "span_id" | "x_request_id" | "http_proxy_client" => Ok(deserialize_str),
+        | "span_id" | "x_request_id" | "http_proxy_client" => Ok(Some(deserialize_str)),
+        "" => Ok(None),
         other => Err(de::Error::invalid_value(
             Unexpected::Str(other),
             &format!(
@@ -2007,9 +2008,11 @@ where
         "payload_json_value" => Ok(FieldType::PayloadJson),
         "payload_xml_value" => Ok(FieldType::PayloadXml),
         "payload_hessian2_value" => Ok(FieldType::PayloadHessian2),
+        "dubbo_header_value" => Ok(FieldType::DubboHeader),
+        "dubbo_paylaod_map_string_value" => Ok(FieldType::DubboPayloadMapString),
         other => Err(de::Error::invalid_value(
             Unexpected::Str(other),
-            &"[header_field|http_url_field|payload_json_value|payload_xml_value|payload_hessian2_value]"
+            &"[header_field|http_url_field|payload_json_value|payload_xml_value|payload_hessian2_value|dubbo_header_value|dubbo_paylaod_map_string_value]",
         )),
     }
 }
@@ -2041,7 +2044,7 @@ pub struct Field {
     pub value_special_charset: String,
     pub attribute_name: Option<String>,
     #[serde(deserialize_with = "to_rewrite_native_tag")]
-    pub rewrite_native_tag: String,
+    pub rewrite_native_tag: Option<String>,
     pub rewrite_response_status: RewriteResponseStatus,
     pub metric_name: Option<String>,
 }
@@ -2152,9 +2155,17 @@ impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
     fn from(v: &CustomFieldPolicy) -> ExtraCustomFieldPolicy {
         let mut extra_field_policy = ExtraCustomFieldPolicy::default();
         for field in &v.fields {
+            if field.field_match_keyword.is_empty() {
+                continue;
+            }
+
             if field.traffic_direction & TrafficDirection::Request == TrafficDirection::Request {
                 match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
+                    FieldType::Header
+                    | FieldType::HttpUrl
+                    | FieldType::PayloadHessian2
+                    | FieldType::DubboHeader
+                    | FieldType::DubboPayloadMapString => {
                         extra_field_policy
                             .from_req_key
                             .entry(field.field_type)
@@ -2180,9 +2191,13 @@ impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
 
             if field.traffic_direction & TrafficDirection::Response == TrafficDirection::Response {
                 match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
+                    FieldType::Header
+                    | FieldType::HttpUrl
+                    | FieldType::PayloadHessian2
+                    | FieldType::DubboHeader
+                    | FieldType::DubboPayloadMapString => {
                         extra_field_policy
-                            .from_req_key
+                            .from_resp_key
                             .entry(field.field_type)
                             .and_modify(|v: &mut HashMap<String, Vec<ExtraField>>| {
                                 v.entry(field.field_match_keyword.to_lowercase())
