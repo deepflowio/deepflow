@@ -554,6 +554,10 @@ macro_rules! set_captured_byte {
 pub(crate) use set_captured_byte;
 pub(crate) use swap_if;
 
+const BASE_FIELD_PRIORITY: u8 = 128;
+const CUSTOM_FIELD_POLICY_PRIORITY: u8 = 64;
+const PLUGIN_FIELD_PRIORITY: u8 = 32;
+
 pub struct PrioField<T> {
     pub prio: u8,
     pub field: T,
@@ -617,6 +621,112 @@ impl<T: Serialize> Serialize for PrioField<T> {
         S: serde::Serializer,
     {
         self.field.serialize(serializer)
+    }
+}
+
+// Wrapper around Option<Vec<PrioField<String>>> for easier manipulation
+#[derive(Serialize, Debug, Default, Clone, Eq, PartialEq)]
+pub struct PrioFields(pub Vec<PrioField<String>>);
+
+impl PrioFields {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    // insertion is kept in ascending order by prio; if prio is the same, insert it at the end (stable sort)
+    #[inline]
+    fn insert_sorted(&mut self, field: PrioField<String>) {
+        // find the first position greater than it (>), skip those that are equal
+        let pos = match self.0.binary_search_by(|x| x.prio.cmp(&field.prio)) {
+            Ok(mut i) => {
+                while i < self.0.len() && self.0[i].prio == field.prio {
+                    i += 1;
+                }
+                i
+            }
+            // no larger one found, insert it at position i
+            Err(i) => i,
+        };
+        self.0.insert(pos, field);
+    }
+
+    #[inline]
+    fn update_or_insert(&mut self, prio: u8, field: String) {
+        if field.is_empty() {
+            return;
+        }
+
+        for i in 0..self.0.len() {
+            if self.0[i].field == field {
+                if prio < self.0[i].prio {
+                    // after updating the priority, you may need to move forward
+                    self.0[i].prio = prio;
+                    let pf = self.0.remove(i);
+                    self.insert_sorted(pf);
+                }
+                return;
+            }
+        }
+
+        self.insert_sorted(PrioField::new(prio, field));
+    }
+
+    pub fn merge(&mut self, mut other: PrioFields) {
+        if other.0.is_empty() {
+            return;
+        }
+
+        // Note: insertion performance is O(n^2), so avoid having too many elements
+        // take ownership and move elements directly
+        for o in other.0.drain(..) {
+            self.update_or_insert(o.prio, o.field);
+        }
+    }
+
+    // merge a list of same-prio strings, consuming the input
+    pub fn merge_same_priority(&mut self, prio: u8, mut others: Vec<String>) {
+        if others.is_empty() {
+            return;
+        }
+
+        // Note: insertion performance is O(n^2), so avoid having too many elements
+        // move each string out of the vector without cloning
+        for field in others.drain(..) {
+            self.update_or_insert(prio, field);
+        }
+    }
+
+    // merge a single field
+    pub fn merge_field(&mut self, prio: u8, field: String) {
+        self.update_or_insert(prio, field);
+    }
+
+    // convert to Vec<String> (already sorted)
+    #[inline]
+    pub fn to_strings(&self) -> Vec<String> {
+        self.0.iter().map(|x| x.field.clone()).collect()
+    }
+
+    #[inline]
+    pub fn into_strings(self) -> Vec<String> {
+        self.0.into_iter().map(|x| x.field).collect()
+    }
+
+    // get first element's priority, or return max
+    #[inline]
+    pub fn highest_priority(&self) -> u8 {
+        self.0.first().map(|pf| pf.prio).unwrap_or(u8::MAX)
+    }
+
+    #[inline]
+    pub fn highest(&self) -> &str {
+        self.0.first().map(|pf| pf.field.as_str()).unwrap_or("")
     }
 }
 

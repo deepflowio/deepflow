@@ -32,6 +32,7 @@ message AppTrace {
     optional string parent_span_id = 3;
     optional string x_request_id = 4;
     optional string http_proxy_client = 5;
+    repeated string trace_ids = 6;
 }
 
 message KeyVal {
