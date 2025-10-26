@@ -387,6 +387,12 @@ var ColumnAdd66 = []*ColumnAdds{
 		ColumnNames: []string{"_trace_id_2"},
 		ColumnType:  ckdb.String,
 	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"is_async"},
+		ColumnType:  ckdb.UInt8,
+	},
 }
 
 var IndexAdd66 = []*IndexAdds{

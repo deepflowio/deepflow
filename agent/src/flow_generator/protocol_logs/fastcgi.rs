@@ -24,7 +24,7 @@ use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{
     L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam,
 };
-use crate::common::meta_packet::EbpfFlags;
+use crate::common::meta_packet::ApplicationFlags;
 use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
 use crate::flow_generator::protocol_logs::{
     set_captured_byte, value_is_default, BASE_FIELD_PRIORITY,
@@ -302,9 +302,9 @@ impl FastCGIInfo {
 impl From<FastCGIInfo> for L7ProtocolSendLog {
     fn from(f: FastCGIInfo) -> Self {
         let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         Self {
             captured_request_byte: f.captured_request_byte,
