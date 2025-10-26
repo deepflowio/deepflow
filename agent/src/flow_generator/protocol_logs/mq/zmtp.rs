@@ -3,7 +3,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -104,6 +104,7 @@ pub struct ZmtpInfo {
     req_msg_size: Option<u64>,
     res_msg_size: Option<u64>,
     is_tls: bool,
+    is_async: bool,
     rtt: u64,
     status: L7ResponseStatus,
     err_msg: Option<String>,
@@ -137,6 +138,7 @@ impl Default for ZmtpInfo {
             req_msg_size: None,
             res_msg_size: None,
             is_tls: false,
+            is_async: false,
             rtt: 0,
             status: L7ResponseStatus::Ok,
             err_msg: None,
@@ -201,6 +203,9 @@ impl ZmtpInfo {
             if custom.proto_str.len() > 0 {
                 self.l7_protocol_str = Some(custom.proto_str);
             }
+            if let Some(is_async) = custom.is_async {
+                self.is_async = is_async;
+            }
         }
     }
 
@@ -220,11 +225,14 @@ impl ZmtpInfo {
 
 impl From<ZmtpInfo> for L7ProtocolSendLog {
     fn from(f: ZmtpInfo) -> Self {
-        let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+        let mut flags = if f.is_tls {
+            ApplicationFlags::TLS
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE
         };
+        if f.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
+        }
         L7ProtocolSendLog {
             req_len: f.req_msg_size.map(|x| x as u32),
             resp_len: f.res_msg_size.map(|x| x as u32),
@@ -243,7 +251,7 @@ impl From<ZmtpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             version: Some(f.get_version()),
-            flags,
+            flags: flags.bits(),
             ext_info: Some(ExtendedInfo {
                 attributes: {
                     if f.attributes.is_empty() {
