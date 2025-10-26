@@ -42,7 +42,7 @@ use crate::{
         l7_protocol_log::{
             L7ParseResult, L7ProtocolParserInterface, LogCache, MultiMergeInfo, ParseParam,
         },
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::error::{Error, Result},
@@ -311,6 +311,9 @@ pub struct HttpInfo {
 
     #[serde(skip)]
     service_name: Option<String>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    is_async: bool,
 }
 
 impl HttpInfo {
@@ -401,6 +404,10 @@ impl HttpInfo {
 
         if custom.biz_type > 0 {
             self.biz_type = custom.biz_type;
+        }
+
+        if let Some(is_async) = custom.is_async {
+            self.is_async = is_async;
         }
     }
 
@@ -735,11 +742,13 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.endpoint.unwrap_or_default(),
             )
         };
-        let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
-        } else {
-            EbpfFlags::NONE.bits()
+        let mut flags = ApplicationFlags::default();
+        if f.is_tls {
+            flags = flags | ApplicationFlags::TLS;
         };
+        if f.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
+        }
 
         if f.status != L7ResponseStatus::Ok {
             if let Some(request_header) = f.request_header {
@@ -832,7 +841,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 },
                 ..Default::default()
             }),
-            flags,
+            flags: flags.bits(),
             ..Default::default()
         }
     }

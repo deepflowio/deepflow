@@ -24,6 +24,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -43,6 +44,8 @@ pub struct WebSphereMqInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_async: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_ids: PrioFields,
@@ -134,6 +137,9 @@ impl WebSphereMqInfo {
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
+        if other.is_async {
+            self.is_async = other.is_async;
+        }
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -181,11 +187,22 @@ impl WebSphereMqInfo {
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
         }
+        if let Some(is_async) = custom.is_async {
+            self.is_async = is_async;
+        }
     }
 }
 
 impl From<WebSphereMqInfo> for L7ProtocolSendLog {
     fn from(f: WebSphereMqInfo) -> Self {
+        let mut flags = if f.is_tls {
+            ApplicationFlags::TLS
+        } else {
+            ApplicationFlags::NONE
+        };
+        if f.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
+        }
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
@@ -209,6 +226,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
                 attributes: Some(f.attributes),
                 ..Default::default()
             }),
+            flags: flags.bits(),
             ..Default::default()
         }
     }
@@ -274,6 +292,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         }
 
         info.is_tls = param.is_tls();
+        info.is_async = true;
         set_captured_byte!(info, param);
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {
