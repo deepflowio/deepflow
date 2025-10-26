@@ -158,6 +158,7 @@ type L7FlowLog struct {
 	Version       string `json:"version" category:"$tag" sub:"application_layer"`
 	Type          uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
 	IsTLS         uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
+	IsAsync       uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
 
 	RequestType     string `json:"request_type" category:"$tag" sub:"application_layer"`
 	RequestDomain   string `json:"request_domain" category:"$tag" sub:"application_layer"`
@@ -219,6 +220,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 		ckdb.NewColumn("is_tls", ckdb.UInt8),
+		ckdb.NewColumn("is_async", ckdb.UInt8),
 
 		ckdb.NewColumn("request_type", ckdb.LowCardinalityString).SetComment("请求类型, HTTP请求方法、SQL命令类型、NoSQL命令类型、MQ命令类型、DNS查询类型"),
 		ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
@@ -303,7 +305,16 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	h.L7Base.Fill(l, platformData)
 
 	h.Type = uint8(l.Base.Head.MsgType)
-	h.IsTLS = uint8(l.Flags & 0x1)
+	if l.Flags&uint32(pb.FlagBits_FLAG_TLS) != 0 {
+		h.IsTLS = 1
+	} else {
+		h.IsTLS = 0
+	}
+	if l.Flags&uint32(pb.FlagBits_FLAG_ASYNC) != 0 {
+		h.IsAsync = 1
+	} else {
+		h.IsAsync = 0
+	}
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
 		h.L7ProtocolStr = l.ExtInfo.ProtocolStr

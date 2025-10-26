@@ -55,6 +55,7 @@ message AppInfo {
 
     // a null `is_end` means no need for protocol merge
     optional bool is_end = 21;
+    optional bool is_async = 22;
 
     repeated KeyVal attributes = 31;
 

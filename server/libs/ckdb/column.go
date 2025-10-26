@@ -125,6 +125,7 @@ const (
 	COLUMN_IS_KEY_SERVICE             = "is_key_service"
 	COLUMN_IS_NEW_FLOW                = "is_new_flow"
 	COLUMN_IS_TLS                     = "is_tls"
+	COLUMN_IS_ASYNC                   = "is_async"
 	COLUMN_L2_END_0                   = "l2_end_0"
 	COLUMN_L2_END_1                   = "l2_end_1"
 	COLUMN_L3_BYTE_RX                 = "l3_byte_rx"
@@ -459,6 +460,7 @@ var ColumnNames = []string{
 	COLUMN_IS_KEY_SERVICE,
 	COLUMN_IS_NEW_FLOW,
 	COLUMN_IS_TLS,
+	COLUMN_IS_ASYNC,
 	COLUMN_L2_END_0,
 	COLUMN_L2_END_1,
 	COLUMN_L3_BYTE_RX,

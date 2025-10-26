@@ -32,7 +32,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -238,9 +238,9 @@ impl From<MqttInfo> for L7ProtocolSendLog {
     fn from(f: MqttInfo) -> Self {
         let version = Some(String::from(f.get_version_str()));
         let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
 
         L7ProtocolSendLog {

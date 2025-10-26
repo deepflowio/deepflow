@@ -30,7 +30,7 @@ use crate::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
         Timestamp,
     },
     flow_generator::error::{Error, Result},
@@ -457,7 +457,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             } else {
                 None
             },
-            flags: EbpfFlags::TLS.bits(),
+            flags: ApplicationFlags::TLS.bits(),
             ..Default::default()
         };
 

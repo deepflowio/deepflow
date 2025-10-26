@@ -21,7 +21,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     flow_generator::{
         error::{Error, Result},
@@ -127,9 +127,9 @@ impl L7ProtocolInfoInterface for SomeIpInfo {
 impl From<SomeIpInfo> for L7ProtocolSendLog {
     fn from(f: SomeIpInfo) -> Self {
         let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         let attributes = vec![KeyVal {
             key: "client_id".to_string(),

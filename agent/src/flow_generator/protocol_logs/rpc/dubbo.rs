@@ -27,7 +27,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::{
@@ -77,6 +77,8 @@ pub struct DubboInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_async: bool,
 
     // header
     #[serde(skip)]
@@ -151,6 +153,9 @@ impl DubboInfo {
     pub fn merge(&mut self, other: &mut Self) {
         if other.is_tls {
             self.is_tls = other.is_tls;
+        }
+        if other.is_async {
+            self.is_async = other.is_async;
         }
         if other.event > 0 {
             self.event = other.event;
@@ -249,6 +254,9 @@ impl DubboInfo {
         // extend attribute
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
+        }
+        if let Some(is_async) = custom.is_async {
+            self.is_async = is_async;
         }
     }
 
@@ -409,10 +417,12 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             });
         }
         attrs.extend(f.attributes);
-        let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
-        } else {
-            EbpfFlags::NONE.bits()
+        let mut flags = ApplicationFlags::default();
+        if f.is_tls {
+            flags = flags | ApplicationFlags::TLS;
+        };
+        if f.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
         };
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
@@ -453,7 +463,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 metrics: Some(f.metrics),
                 ..Default::default()
             }),
-            flags,
+            flags: flags.bits(),
             ..Default::default()
         }
     }

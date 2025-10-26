@@ -26,7 +26,7 @@ use crate::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -163,9 +163,9 @@ impl L7ProtocolInfoInterface for PostgreInfo {
 impl From<PostgreInfo> for L7ProtocolSendLog {
     fn from(p: PostgreInfo) -> L7ProtocolSendLog {
         let flags = if p.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         L7ProtocolSendLog {
             captured_request_byte: p.captured_request_byte,

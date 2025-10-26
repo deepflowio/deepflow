@@ -65,6 +65,8 @@ pub struct AppInfo {
     /// a null `is_end` means no need for protocol merge
     #[prost(bool, optional, tag = "21")]
     pub is_end: ::core::option::Option<bool>,
+    #[prost(bool, optional, tag = "22")]
+    pub is_async: ::core::option::Option<bool>,
     #[prost(message, repeated, tag = "31")]
     pub attributes: ::prost::alloc::vec::Vec<KeyVal>,
     #[prost(uint32, optional, tag = "32")]

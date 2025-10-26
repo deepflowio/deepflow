@@ -26,7 +26,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -739,8 +739,8 @@ pub struct AmqpLog {
 impl From<AmqpInfo> for L7ProtocolSendLog {
     fn from(info: AmqpInfo) -> Self {
         let flags = match info.is_tls {
-            true => EbpfFlags::TLS.bits(),
-            false => EbpfFlags::NONE.bits(),
+            true => ApplicationFlags::TLS.bits(),
+            false => ApplicationFlags::NONE.bits(),
         };
         let log = L7ProtocolSendLog {
             captured_request_byte: info.captured_request_byte,

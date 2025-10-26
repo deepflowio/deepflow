@@ -205,6 +205,7 @@ type L7FlowLogBlock struct {
 	ColVersion              *proto.ColLowCardinality[string]
 	ColType                 proto.ColUInt8
 	ColIsTls                proto.ColUInt8
+	ColIsAsync              proto.ColUInt8
 	ColRequestType          *proto.ColLowCardinality[string]
 	ColRequestDomain        proto.ColStr
 	ColRequestResource      proto.ColStr
@@ -248,6 +249,7 @@ func (b *L7FlowLogBlock) Reset() {
 	b.ColVersion.Reset()
 	b.ColType.Reset()
 	b.ColIsTls.Reset()
+	b.ColIsAsync.Reset()
 	b.ColRequestType.Reset()
 	b.ColRequestDomain.Reset()
 	b.ColRequestResource.Reset()
@@ -294,6 +296,7 @@ func (b *L7FlowLogBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_VERSION, Data: b.ColVersion},
 		proto.InputColumn{Name: ckdb.COLUMN_TYPE, Data: &b.ColType},
 		proto.InputColumn{Name: ckdb.COLUMN_IS_TLS, Data: &b.ColIsTls},
+		proto.InputColumn{Name: ckdb.COLUMN_IS_ASYNC, Data: &b.ColIsAsync},
 		proto.InputColumn{Name: ckdb.COLUMN_REQUEST_TYPE, Data: b.ColRequestType},
 		proto.InputColumn{Name: ckdb.COLUMN_REQUEST_DOMAIN, Data: &b.ColRequestDomain},
 		proto.InputColumn{Name: ckdb.COLUMN_REQUEST_RESOURCE, Data: &b.ColRequestResource},
@@ -364,6 +367,7 @@ func (n *L7FlowLog) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColVersion.Append(n.Version)
 	block.ColType.Append(n.Type)
 	block.ColIsTls.Append(n.IsTLS)
+	block.ColIsAsync.Append(n.IsAsync)
 	block.ColRequestType.Append(n.RequestType)
 	block.ColRequestDomain.Append(n.RequestDomain)
 	block.ColRequestResource.Append(n.RequestResource)
