@@ -964,7 +964,7 @@ impl MysqlLog {
     ) -> bool {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
-            .unwrap_or(LogParserConfig::default().mysql_decompress_payload);
+            .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
 
         let mut parser = match PayloadParser::new(decompress, has_compressed_header, payload) {
             Ok(parser) => parser,
@@ -1044,7 +1044,7 @@ impl MysqlLog {
     ) -> Result<bool> {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
-            .unwrap_or(LogParserConfig::default().mysql_decompress_payload);
+            .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
 
         let mut parser =
             PayloadParser::new(decompress, self.has_compressed_header.unwrap(), payload)?;
@@ -1372,7 +1372,7 @@ mod tests {
     use super::*;
 
     use crate::{
-        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache},
         config::handler::{L7LogDynamicConfigBuilder, TraceType},
         flow_generator::{protocol_logs::PrioFields, L7_RRT_CACHE_CAPACITY},
         utils::test::Capture,
@@ -1407,18 +1407,6 @@ mod tests {
                 },
                 None => continue,
             };
-            let is_mysql = mysql.check_payload(
-                payload,
-                &ParseParam::new(
-                    packet as &MetaPacket,
-                    log_cache.clone(),
-                    Default::default(),
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
-                    Default::default(),
-                    true,
-                    true,
-                ),
-            );
 
             let mut param = ParseParam::new(
                 &*packet,
@@ -1432,6 +1420,7 @@ mod tests {
             param.parse_config = Some(&log_config);
             param.set_captured_byte(payload.len());
 
+            let is_mysql = mysql.check_payload(payload, &param);
             let info = mysql.parse_payload(payload, &param);
 
             if let Ok(info) = info {
