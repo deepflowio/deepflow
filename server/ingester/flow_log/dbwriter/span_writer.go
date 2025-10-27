@@ -60,6 +60,9 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.Init(t.EncodedSpan)
 	encoder.WriteU8(tracetree.SPAN_TRACE_VERSION)
 	encoder.WriteU32(uint32(t.EndTime % 1000000)) // only encode microsecond part less than 1 second
+	encoder.WriteVarintU32(t.TapPort)
+	encoder.WriteU8(t.TapPortType)
+	encoder.WriteU8(t.TapType)
 	encoder.WriteU8(t.AutoServiceType0)
 	encoder.WriteU8(t.AutoServiceType1)
 	encoder.WriteVarintU32(t.AutoServiceID0)
@@ -101,6 +104,7 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteVarintU64(t.SyscallTraceIDResponse)
 	encoder.WriteVarintU64(t.ResponseDuration)
 	encoder.WriteU8(t.ResponseStatus)
+	encoder.WriteU8(t.Type)
 	t.EncodedSpan = encoder.Bytes()
 }
 
