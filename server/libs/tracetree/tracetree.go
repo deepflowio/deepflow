@@ -40,9 +40,9 @@ type TraceTree struct {
 	SearchIndex uint64
 	OrgId       uint16
 
-	TraceId   string
-	UID       uint64 // uid for deduplicated metrics by same trace_tree
-	TreeNodes []TreeNode
+	TraceId, TraceId2 string
+	UID               uint64 // uid for deduplicated metrics by same trace_tree
+	TreeNodes         []TreeNode
 
 	encodedTreeNodes []byte
 }
