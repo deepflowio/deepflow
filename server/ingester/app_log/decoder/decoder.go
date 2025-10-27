@@ -319,6 +319,8 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	s.Body = strings.Clone(l.Message)
 	s.Type = dbwriter.StringToLogType(l.LogType)
 	s.UserID = uint32(l.UserID)
+	s.TraceID = l.TraceID
+	s.SpanID = l.SpanID
 
 	s.Time = uint32(timeObj.Unix())
 	s.Timestamp = timeObj.UnixMicro()
@@ -466,6 +468,8 @@ type AppLogEntry struct {
 	Level      string      `json:"level"`
 	Timestamp  string      `json:"timestamp"`
 	AppService string      `json:"app_service"`
+	TraceID    string      `json:"trace_id"`
+	SpanID     string      `json:"span_id"`
 }
 
 func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {
