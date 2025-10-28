@@ -75,7 +75,7 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("span trace data version is %d expect version is %d", version, SPAN_TRACE_VERSION)
 	}
 	t.EndTimeUsPart = decoder.ReadU32()
-	t.CaptureNic = decoder.ReadU32()
+	t.CaptureNic = decoder.ReadVarintU32()
 	t.CaptureNicType = decoder.ReadU8()
 	t.CaptureNetworkType = decoder.ReadU8()
 	t.AutoServiceType0 = decoder.ReadU8()
