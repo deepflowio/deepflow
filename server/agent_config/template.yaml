@@ -1562,18 +1562,34 @@ inputs:
     # unit:
     # range: []
     # enum_options:
-    #   - proc.gprocess_info
-    #   - proc.golang_symbol_table
-    #   - proc.socket_list
+    #   - proc.gprocess_info:
+    #       ch: 同步进程资源信息，并为 eBPF 原始观测数据注入所在观测点上的进程标签
+    #       en: Synchronize process resource information and inject process tags from the observation point into raw eBPF data
+    #   - proc.golang_symbol_table:
+    #       ch: 解析 Golang 特有符号表，用于 Golang 进程裁剪了标准符号表时的剖析数据优化
+    #       en: Parse Golang-specific symbol tables to optimize profiling data when Golang processes prune the standard symbol table
+    #   - proc.socket_list:
+    #       ch: 同步进程的活跃 Socket 信息，用于为应用和网络观测数据注入通信双方的进程标签
+    #       en: Synchronize active socket information of processes to inject process labels for both peers in application and network observation data
     #   #- proc.proc_event
-    #   - ebpf.socket.uprobe.golang
-    #   - ebpf.socket.uprobe.tls
+    #   - ebpf.socket.uprobe.golang:
+    #       ch: 为 Golang 进程开启 eBPF uprobe，用于协程追踪并采集 Golang HTTP2/HTTPS 通信
+    #       en: Enable eBPF uprobe for Golang processes to trace goroutines and capture Golang HTTP/2 and HTTPS communications
+    #   - ebpf.socket.uprobe.tls:
+    #       ch: 为 TLS 通信开启 eBPF uprobe，用于采集非 Golang 进程的加密通信观测数据
+    #       en: Enable eBPF uprobe for TLS communications to capture encrypted communication data from non-Golang processes
     #   #- ebpf.socket.uprobe.rdma
     #   #- ebpf.file.io_event
     #   #- ebpf.file.management_event
-    #   - ebpf.profile.on_cpu
-    #   - ebpf.profile.off_cpu
-    #   - ebpf.profile.memory
+    #   - ebpf.profile.on_cpu:
+    #       ch: 开启 On-CPU 持续剖析功能
+    #       en: Enable continuous On-CPU profiling
+    #   - ebpf.profile.off_cpu:
+    #       ch: 开启 Off-CPU 持续剖析功能
+    #       en: Enable continuous Off-CPU profiling
+    #   - ebpf.profile.memory:
+    #       ch: 开启内存持续剖析功能
+    #       en: Enable continuous memory profiling
     #   #- ebpf.profile.cuda
     #   #- ebpf.profile.hbm
     # modification: hot_update

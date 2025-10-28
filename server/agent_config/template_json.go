@@ -476,7 +476,7 @@ func (f *LineFormatter) indentLine(line string, indentCount int) string {
 
 func (f *LineFormatter) uncommentLine(line string) string {
 	line = strings.Replace(line, commentFlag+" ", "", 1)
-	if f.isCommentLine(line) {
+	if f.isStandaloneCommentLine(line) {
 		line = strings.Replace(line, commentFlag, "", 1)
 	}
 	return line
@@ -484,6 +484,10 @@ func (f *LineFormatter) uncommentLine(line string) string {
 
 func (f *LineFormatter) isCommentLine(line string) bool {
 	return strings.HasPrefix(strings.TrimSpace(line), commentFlag)
+}
+
+func (f *LineFormatter) isStandaloneCommentLine(line string) bool {
+	return f.isCommentLine(line) && strings.TrimSpace(line) == commentFlag
 }
 
 func (f *LineFormatter) isDictValueCommentLine(line string) bool {

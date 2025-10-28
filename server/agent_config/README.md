@@ -2235,14 +2235,14 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| proc.gprocess_info | |
-| proc.golang_symbol_table | |
-| proc.socket_list | |
-| ebpf.socket.uprobe.golang | |
-| ebpf.socket.uprobe.tls | |
-| ebpf.profile.on_cpu | |
-| ebpf.profile.off_cpu | |
-| ebpf.profile.memory | |
+| proc.gprocess_info | Synchronize process resource information and inject process tags from the observation point into raw eBPF data |
+| proc.golang_symbol_table | Parse Golang-specific symbol tables to optimize profiling data when Golang processes prune the standard symbol table |
+| proc.socket_list | Synchronize active socket information of processes to inject process labels for both peers in application and network observation data |
+| ebpf.socket.uprobe.golang | Enable eBPF uprobe for Golang processes to trace goroutines and capture Golang HTTP/2 and HTTPS communications |
+| ebpf.socket.uprobe.tls | Enable eBPF uprobe for TLS communications to capture encrypted communication data from non-Golang processes |
+| ebpf.profile.on_cpu | Enable continuous On-CPU profiling |
+| ebpf.profile.off_cpu | Enable continuous Off-CPU profiling |
+| ebpf.profile.memory | Enable continuous memory profiling |
 
 **Schema**:
 | Key  | Value                        |
