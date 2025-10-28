@@ -427,7 +427,7 @@ message ServiceInfo {
     optional ServiceType type = 1;
     optional uint32 id = 2;
     optional uint32 pod_cluster_id = 3 [default = 0];  // Availabel when type == POD_SERVICE_NODE
-    optional uint32 pod_group_id = 4 [default = 0];    // Availabel when type == POD_SERVICE_POD_GROUP
+    repeated uint32 pod_group_ids = 4;                 // Availabel when type in [POD_SERVICE_POD_GROUP, CUSTOM_SERVICE]
     optional uint32 epc_id = 5 [default = 0];          // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE]
     // when type == CUSTOM_SERVICE, the length of `ips` can only be 1
     repeated string ips = 6;                           // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE], list of IP addresses
@@ -435,6 +435,8 @@ message ServiceInfo {
     // 8: reserve for ip-ranges
     optional ServiceProtocol protocol = 9 [default = ANY];
     repeated uint32 server_ports = 10;                // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE], list of IP addresses
+    repeated uint32 pod_service_ids = 11;             // Availabel when type in [CUSTOM_SERVICE]
+    repeated uint32 chost_ids = 12;                   // Availabel when type in [CUSTOM_SERVICE]
 }
 
 message Groups {

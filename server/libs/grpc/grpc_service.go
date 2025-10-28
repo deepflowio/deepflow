@@ -168,7 +168,8 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 			s.podClusterIDTable[genPodXIDKey(podClusterId, trident.ServiceProtocol_ANY, 0)] = serviceId
 		// Service from 'pod + port' generate 'pod_group_id + port' table
 		case trident.ServiceType_POD_SERVICE_POD_GROUP:
-			podGroupId := svc.GetPodGroupId()
+			podGroupIds := svc.GetPodGroupIds() // FIXME @zhuofeng
+			podGroupId := podGroupIds[0]
 			for _, port := range svc.GetServerPorts() {
 				s.podGroupIDTable[genPodXIDKey(podGroupId, protocol, uint16(port))] = serviceId
 				// add Protocol ANY
