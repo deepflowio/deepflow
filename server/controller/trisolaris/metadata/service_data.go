@@ -274,7 +274,7 @@ func podGroupToProto(
 	serviceType trident.ServiceType, serviceID int) *trident.ServiceInfo {
 
 	return &trident.ServiceInfo{
-		PodGroupId:  proto.Uint32(uint32(podGroupId)),
+		PodGroupIds: []uint32{uint32(podGroupId)},
 		Protocol:    &protocol,
 		ServerPorts: serverPorts,
 		Type:        &serviceType,

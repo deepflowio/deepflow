@@ -108,6 +108,10 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		log.Errorf("failed to convert %s spec JSON to YAML: %s", p.resourceType, cloudItem.Spec, p.metadata.LogPrefixes)
 		return nil, false
 	}
+	// TODO is label required
+	if cloudItem.Label == "" {
+		cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+	}
 	dbItem := &mysqlmodel.PodGroup{
 		Name:           cloudItem.Name,
 		Type:           cloudItem.Type,
@@ -143,6 +147,14 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 	if diffBase.PodNum != cloudItem.PodNum {
 		mapInfo["pod_num"] = cloudItem.PodNum
 		structInfo.PodNum.Set(diffBase.PodNum, cloudItem.PodNum)
+	}
+
+	if cloudItem.Label == "" {
+		if diffBase.Label == "" {
+			cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+		} else {
+			cloudItem.Label = diffBase.Label
+		}
 	}
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label

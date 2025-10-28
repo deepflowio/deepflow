@@ -110,6 +110,9 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 			), m.metadata.LogPrefixes)
 		}
 	}
+	if cloudItem.Label == "" {
+		cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+	}
 	dbItem := &mysqlmodel.VM{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
@@ -160,6 +163,14 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
+	}
+
+	if cloudItem.Label == "" {
+		if diffBase.Label == "" {
+			cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+		} else {
+			cloudItem.Label = diffBase.Label
+		}
 	}
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
