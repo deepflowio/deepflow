@@ -246,7 +246,7 @@ func (s *SyncStorage) run() {
 
 func (s *SyncStorage) Start() {
 	go s.refreshDatabase()
-	go s.run()
+	s.run()
 }
 
 func (s *SyncStorage) Stop() {
