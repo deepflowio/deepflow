@@ -28,6 +28,7 @@ const (
 	DATABASE_FLOW_LOG = "flow_log"
 	TABLE_L7_FLOW_LOG = "l7_flow_log"
 	TAG_TRACE_ID      = "trace_id"
+	TAG_TRACE_IDS     = "trace_ids"
 )
 
 const (
