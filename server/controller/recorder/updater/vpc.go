@@ -81,7 +81,7 @@ func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffb
 
 func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, bool) {
 	if cloudItem.Label == "" {
-		cloudItem.Label = common.GenerateVPCShortUUID()
+		cloudItem.Label = common.GenerateResourceShortUUID(v.resourceType)
 	}
 	dbItem := &metadbmodel.VPC{
 		Name:         cloudItem.Name,
@@ -108,7 +108,7 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 
 	if cloudItem.Label == "" {
 		if diffBase.Label == "" {
-			cloudItem.Label = common.GenerateVPCShortUUID()
+			cloudItem.Label = common.GenerateResourceShortUUID(v.resourceType)
 		} else {
 			cloudItem.Label = diffBase.Label
 		}
