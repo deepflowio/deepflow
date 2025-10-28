@@ -754,6 +754,7 @@ CREATE TABLE IF NOT EXISTS pod_service (
     region              VARCHAR(64) DEFAULT '',
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
     lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -807,6 +808,7 @@ CREATE TABLE IF NOT EXISTS pod_group (
     region              VARCHAR(64) DEFAULT '',
     sub_domain          VARCHAR(64) DEFAULT '',
     domain              VARCHAR(64) DEFAULT '',
+    uid                 VARCHAR(64) DEFAULT '',
     lcuuid              VARCHAR(64) DEFAULT '',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2905,8 +2907,11 @@ CREATE TABLE IF NOT EXISTS custom_service (
     id                  SERIAL PRIMARY KEY,
     name                VARCHAR(128) NOT NULL,
     type                INTEGER DEFAULT 0,
+    match_type          INTEGER DEFAULT 0,
     resource            TEXT,
     epc_id              INTEGER DEFAULT 0,
+    pod_cluster_id      INTEGER DEFAULT 0,
+    pod_namespace_id    INTEGER DEFAULT 0,
     domain_id           INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
     team_id             INTEGER DEFAULT 1,
@@ -2916,7 +2921,8 @@ CREATE TABLE IF NOT EXISTS custom_service (
 );
 TRUNCATE TABLE custom_service;
 CREATE UNIQUE INDEX IF NOT EXISTS custom_service_name_idx ON custom_service(name);
-COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT';
+COMMENT ON COLUMN custom_service.type IS '0: unknown 1: IP 2: PORT 3: chost 4: pod_service 5: pod_group';
+COMMENT ON COLUMN custom_service.match_type IS '0: unkonwn 1: name match 2: uid match';
 COMMENT ON COLUMN custom_service.domain IS 'reserved for backend';
 COMMENT ON COLUMN custom_service.resource IS 'separated by ,';
 CREATE INDEX custom_service_updated_at_index ON custom_service(updated_at);

@@ -112,6 +112,6 @@ func GenerateKuberneteClusterIDByMD5(md5 string) (string, error) {
 	return "d-" + string(b2) + string(b8), nil
 }
 
-func GenerateVPCShortUUID() string {
-	return "vpc-" + GenerateShortUUID()
+func GenerateResourceShortUUID(resource string) string {
+	return resource + "-" + GenerateShortUUID()
 }
