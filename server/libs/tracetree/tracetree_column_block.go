@@ -26,6 +26,7 @@ type TraceTreeBlock struct {
 	ColTime            proto.ColDateTime
 	ColSearchIndex     proto.ColUInt64
 	ColTraceId         proto.ColStr
+	ColTraceId2        proto.ColStr
 	ColEncodedSpanList proto.ColStr
 }
 
@@ -33,6 +34,7 @@ func (b *TraceTreeBlock) Reset() {
 	b.ColTime.Reset()
 	b.ColSearchIndex.Reset()
 	b.ColTraceId.Reset()
+	b.ColTraceId2.Reset()
 	b.ColEncodedSpanList.Reset()
 }
 
@@ -41,6 +43,7 @@ func (b *TraceTreeBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_TIME, Data: &b.ColTime},
 		proto.InputColumn{Name: ckdb.COLUMN_SEARCH_INDEX, Data: &b.ColSearchIndex},
 		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID, Data: &b.ColTraceId},
+		proto.InputColumn{Name: ckdb.COLUMN_TRACE_ID_2, Data: &b.ColTraceId2},
 		proto.InputColumn{Name: ckdb.COLUMN_ENCODED_SPAN_LIST, Data: &b.ColEncodedSpanList},
 	)
 }
@@ -51,8 +54,10 @@ func (n *TraceTree) NewColumnBlock() ckdb.CKColumnBlock {
 
 func (n *TraceTree) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block := b.(*TraceTreeBlock)
+	n.Encode()
 	ckdb.AppendColDateTime(&block.ColTime, n.Time)
 	block.ColSearchIndex.Append(n.SearchIndex)
 	block.ColTraceId.Append(n.TraceId)
+	block.ColTraceId2.Append(n.TraceId2)
 	block.ColEncodedSpanList.AppendBytes(n.encodedTreeNodes)
 }
