@@ -36,7 +36,7 @@ pub mod l7 {
                 pub value_primary_charset: Vec<public::enums::Charset>,
                 pub value_special_charset: String,
                 pub attribute_name: Option<String>,
-                pub rewrite_native_tag: String,
+                pub rewrite_native_tag: Option<String>,
                 pub response_success_values: Vec<String>,
                 pub metric_name: Option<String>,
             }
@@ -65,16 +65,16 @@ pub mod l7 {
                 pub fn get_subvalue(&self, _: &str) -> Option<String> {
                     unimplemented!()
                 }
-                pub fn set_value(
-                    &self,
-                    _: &str,
-                    _: &mut HashMap<&'static str, String>,
-                ) -> Option<String> {
+                pub fn get_value(&self, _: &str) -> Option<String> {
+                    unimplemented!()
+                }
+                pub fn insert_value(&self, _: String, _: &mut HashMap<&'static str, String>) {
                     unimplemented!()
                 }
                 pub fn get_value_from_payload(
                     &self,
-                    _: &super::custom_protocol_policy::ParsedPayload,
+                    _: &[u8],
+                    _: &public::enums::FieldType,
                 ) -> Option<String> {
                     unimplemented!()
                 }
@@ -116,21 +116,10 @@ pub mod l7 {
             ) -> bool {
                 unimplemented!()
             }
-
-            pub fn format_payload<'a>(
-                _: &public::enums::FieldType,
-                _: &'a [u8],
-            ) -> Option<super::custom_protocol_policy::ParsedPayload<'a>> {
-                unimplemented!()
-            }
         }
 
         pub mod custom_protocol_policy {
             use std::collections::HashMap;
-
-            pub struct ParsedPayload<'a> {
-                _p: std::marker::PhantomData<&'a ()>,
-            }
 
             #[derive(Default, Debug)]
             pub struct CustomPolicyInfo {

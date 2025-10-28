@@ -17,6 +17,10 @@ pub const STRING_DIRECT_MAX: u8 = 0x1f;
 pub const BC_STRING_SHORT: u8 = 0x30;
 pub const BC_STRING_SHORT_MAX: u8 = 0x33; // STRING_SHORT_MAX >> 8 | BC_STRING_SHORT
 
+pub const STRING_DIRECT_MAX_LEN: usize = 0x1f;
+pub const STRING_SHORT_MAX_LEN: usize = 0x3ff;
+pub const STRING_MAX_LEN: usize = 0xffff;
+
 pub const BC_MAP: u8 = 0x4d;
 pub const BC_MAP_UNTYPED: u8 = 0x48;
 
@@ -78,6 +82,13 @@ pub const BC_LONG_SHORT_ZERO: u8 = 0x3c;
 pub const LONG_SHORT_MIN: i32 = -0x40000;
 pub const LONG_SHORT_MAX: u32 = 0x3ffff;
 pub const BC_LONG_INT: u8 = 0x59;
+
+pub const RESPONSE_WITH_EXCEPTION: i32 = 0;
+pub const RESPONSE_VALUE: i32 = 1;
+pub const RESPONSE_NULL_VALUE: i32 = 2;
+pub const RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS: i32 = 3;
+pub const RESPONSE_VALUE_WITH_ATTACHMENTS: i32 = 4;
+pub const RESPONSE_NULL_VALUE_WITH_ATTACHMENTS: i32 = 5;
 
 // 参考：https://dubbo.apache.org/zh/docs/concepts/rpc-protocol/#protocol-spec
 // Dubbo Request Body
