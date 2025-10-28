@@ -2206,14 +2206,14 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| proc.gprocess_info | |
-| proc.golang_symbol_table | |
-| proc.socket_list | |
-| ebpf.socket.uprobe.golang | |
-| ebpf.socket.uprobe.tls | |
-| ebpf.profile.on_cpu | |
-| ebpf.profile.off_cpu | |
-| ebpf.profile.memory | |
+| proc.gprocess_info | 同步进程资源信息，并为 eBPF 原始观测数据注入所在观测点上的进程标签 |
+| proc.golang_symbol_table | 解析 Golang 特有符号表，用于 Golang 进程裁剪了标准符号表时的剖析数据优化 |
+| proc.socket_list | 同步进程的活跃 Socket 信息，用于为应用和网络观测数据注入通信双方的进程标签 |
+| ebpf.socket.uprobe.golang | 为 Golang 进程开启 eBPF uprobe，用于协程追踪并采集 Golang HTTP2/HTTPS 通信 |
+| ebpf.socket.uprobe.tls | 为 TLS 通信开启 eBPF uprobe，用于采集非 Golang 进程的加密通信观测数据 |
+| ebpf.profile.on_cpu | 开启 On-CPU 持续剖析功能 |
+| ebpf.profile.off_cpu | 开启 Off-CPU 持续剖析功能 |
+| ebpf.profile.memory | 开启内存持续剖析功能 |
 
 **模式**:
 | Key  | Value                        |
