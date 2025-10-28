@@ -22,6 +22,7 @@ const (
 	RESOURCE_TYPE_SUB_DOMAIN_EN                      = "sub_domain"
 	RESOURCE_TYPE_HOST_EN                            = "host"
 	RESOURCE_TYPE_VM_EN                              = "vm"
+	RESOURCE_TYPE_CHOST_EN                           = "chost" // chost is alias of vm
 	RESOURCE_TYPE_VPC_EN                             = "vpc"
 	RESOURCE_TYPE_NETWORK_EN                         = "network"
 	RESOURCE_TYPE_SUBNET_EN                          = "subnet"

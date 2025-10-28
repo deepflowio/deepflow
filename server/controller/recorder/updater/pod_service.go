@@ -126,6 +126,10 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 		log.Errorf("failed to convert %s spec JSON to YAML: %s", s.resourceType, cloudItem.Spec, s.metadata.LogPrefixes)
 		return nil, false
 	}
+	// TODO is label required
+	if cloudItem.Label == "" {
+		cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+	}
 	dbItem := &metadbmodel.PodService{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
@@ -146,6 +150,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 		Region:           cloudItem.RegionLcuuid,
 		AZ:               cloudItem.AZLcuuid,
 		VPCID:            vpcID,
+		UID:              cloudItem.Label,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -174,6 +179,14 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
+	}
+
+	if cloudItem.Label == "" {
+		if diffBase.Label == "" {
+			cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
+		} else {
+			cloudItem.Label = diffBase.Label
+		}
 	}
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
