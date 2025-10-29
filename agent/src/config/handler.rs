@@ -51,8 +51,8 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
-        ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
-        UserConfig, GRPC_BUFFER_SIZE_MIN,
+        ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SessionTimeout, TagFilterOperator,
+        Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -1478,6 +1478,7 @@ pub struct L7LogDynamicConfig {
     pub x_request_id: Vec<String>,
 
     pub multiple_trace_id_collection: bool,
+    pub copy_apm_trace_id: bool,
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
 
@@ -1503,6 +1504,7 @@ impl fmt::Debug for L7LogDynamicConfig {
                 "multiple_trace_id_collection",
                 &self.multiple_trace_id_collection,
             )
+            .field("copy_apm_trace_id", &self.copy_apm_trace_id)
             .field("trace_set", &self.trace_set)
             .field("span_set", &self.span_set)
             .field(
@@ -1528,6 +1530,7 @@ impl PartialEq for L7LogDynamicConfig {
         let mut eq = self.proxy_client == other.proxy_client
             && self.x_request_id == other.x_request_id
             && self.multiple_trace_id_collection == other.multiple_trace_id_collection
+            && self.copy_apm_trace_id == other.copy_apm_trace_id
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
             && self.extra_log_fields == other.extra_log_fields
@@ -1542,20 +1545,98 @@ impl PartialEq for L7LogDynamicConfig {
 
 impl Eq for L7LogDynamicConfig {}
 
-impl L7LogDynamicConfig {
-    pub fn new(
-        mut proxy_client: Vec<String>,
-        mut x_request_id: Vec<String>,
-        multiple_trace_id_collection: bool,
-        trace_types: Vec<TraceType>,
-        span_types: Vec<TraceType>,
-        mut extra_log_fields: ExtraLogFields,
-        grpc_streaming_data_enabled: bool,
-        #[cfg(feature = "enterprise")] extra_field_policies: HashMap<
-            L7ProtocolEnum,
-            ExtraCustomFieldPolicyMap,
-        >,
-    ) -> Self {
+pub struct L7LogDynamicConfigBuilder {
+    pub proxy_client: Vec<String>,
+    pub x_request_id: Vec<String>,
+    pub multiple_trace_id_collection: bool,
+    pub copy_apm_trace_id: bool,
+    pub trace_types: Vec<TraceType>,
+    pub span_types: Vec<TraceType>,
+    pub extra_log_fields: ExtraLogFields,
+    pub grpc_streaming_data_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+}
+
+impl Default for L7LogDynamicConfigBuilder {
+    fn default() -> Self {
+        (&RequestLog::default()).into()
+    }
+}
+
+impl From<&RequestLog> for L7LogDynamicConfigBuilder {
+    fn from(c: &RequestLog) -> Self {
+        Self {
+            proxy_client: c
+                .tag_extraction
+                .tracing_tag
+                .http_real_client
+                .iter()
+                .map(|s| s.to_ascii_lowercase())
+                .collect(),
+            x_request_id: c
+                .tag_extraction
+                .tracing_tag
+                .x_request_id
+                .iter()
+                .map(|s| s.to_ascii_lowercase())
+                .collect(),
+            multiple_trace_id_collection: c.tag_extraction.tracing_tag.multiple_trace_id_collection,
+            copy_apm_trace_id: c.tag_extraction.tracing_tag.copy_apm_trace_id,
+            trace_types: c
+                .tag_extraction
+                .tracing_tag
+                .apm_trace_id
+                .iter()
+                .map(|item| TraceType::from(item.as_str()))
+                .collect(),
+            span_types: c
+                .tag_extraction
+                .tracing_tag
+                .apm_span_id
+                .iter()
+                .map(|item| TraceType::from(item.as_str()))
+                .collect(),
+            extra_log_fields: ExtraLogFields {
+                http: c
+                    .tag_extraction
+                    .custom_fields
+                    .get("HTTP")
+                    .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
+                    .unwrap_or(vec![]),
+                http2: c
+                    .tag_extraction
+                    .custom_fields
+                    .get("HTTP2")
+                    .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
+                    .unwrap_or(vec![]),
+            },
+            grpc_streaming_data_enabled: c
+                .application_protocol_inference
+                .protocol_special_config
+                .grpc
+                .streaming_data_enabled,
+            #[cfg(feature = "enterprise")]
+            extra_field_policies: c.tag_extraction.get_extra_field_policies(),
+        }
+    }
+}
+
+impl From<L7LogDynamicConfigBuilder> for L7LogDynamicConfig {
+    fn from(builder: L7LogDynamicConfigBuilder) -> Self {
+        let L7LogDynamicConfigBuilder {
+            mut proxy_client,
+            mut x_request_id,
+            multiple_trace_id_collection,
+            copy_apm_trace_id,
+            trace_types,
+            span_types,
+            mut extra_log_fields,
+            grpc_streaming_data_enabled,
+            #[cfg(feature = "enterprise")]
+            extra_field_policies,
+        } = builder;
+
         let mut expected_headers_set = get_expected_headers();
         let mut dup_checker = HashSet::new();
 
@@ -1634,6 +1715,7 @@ impl L7LogDynamicConfig {
             proxy_client,
             x_request_id,
             multiple_trace_id_collection,
+            copy_apm_trace_id,
             trace_types,
             span_types,
             trace_set,
@@ -1645,7 +1727,9 @@ impl L7LogDynamicConfig {
             extra_field_policies,
         }
     }
+}
 
+impl L7LogDynamicConfig {
     pub fn is_trace_id(&self, context: &str) -> bool {
         self.trace_set.contains(context)
     }
@@ -2042,71 +2126,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .request_log
                     .tunning
                     .session_aggregate_max_entries,
-                l7_log_dynamic: L7LogDynamicConfig::new(
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .tracing_tag
-                        .http_real_client
-                        .iter()
-                        .map(|x| x.to_ascii_lowercase())
-                        .collect(),
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .tracing_tag
-                        .x_request_id
-                        .iter()
-                        .map(|x| x.to_ascii_lowercase())
-                        .collect(),
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .tracing_tag
-                        .multiple_trace_id_collection,
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .tracing_tag
-                        .apm_trace_id
-                        .iter()
-                        .map(|item| TraceType::from(item.as_str()))
-                        .collect(),
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .tracing_tag
-                        .apm_span_id
-                        .iter()
-                        .map(|item| TraceType::from(item.as_str()))
-                        .collect(),
-                    ExtraLogFields {
-                        http: conf
-                            .processors
-                            .request_log
-                            .tag_extraction
-                            .custom_fields
-                            .get("HTTP")
-                            .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
-                            .unwrap_or(vec![]),
-                        http2: conf
-                            .processors
-                            .request_log
-                            .tag_extraction
-                            .custom_fields
-                            .get("HTTP2")
-                            .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
-                            .unwrap_or(vec![]),
-                    },
-                    conf.processors
-                        .request_log
-                        .application_protocol_inference
-                        .protocol_special_config
-                        .grpc
-                        .streaming_data_enabled,
-                    #[cfg(feature = "enterprise")]
-                    conf.get_extra_field_policies(),
-                ),
+                l7_log_dynamic: L7LogDynamicConfigBuilder::from(&conf.processors.request_log)
+                    .into(),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
                     for t in conf

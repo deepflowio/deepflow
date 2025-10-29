@@ -1832,6 +1832,7 @@ pub struct TracingTag {
     pub http_real_client: Vec<String>,
     pub x_request_id: Vec<String>,
     pub multiple_trace_id_collection: bool,
+    pub copy_apm_trace_id: bool,
     pub apm_trace_id: Vec<String>,
     pub apm_span_id: Vec<String>,
 }
@@ -1842,6 +1843,7 @@ impl Default for TracingTag {
             http_real_client: vec!["X_Forwarded_For".to_string()],
             x_request_id: vec!["X_Request_ID".to_string()],
             multiple_trace_id_collection: true,
+            copy_apm_trace_id: false,
             apm_trace_id: vec!["traceparent".to_string(), "sw8".to_string()],
             apm_span_id: vec!["traceparent".to_string(), "sw8".to_string()],
         }
@@ -2251,6 +2253,86 @@ impl Default for RequestLogTagExtraction {
             obfuscate_protocols: vec!["Redis".to_string()],
             custom_field_policies: vec![],
         }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl RequestLogTagExtraction {
+    pub fn get_extra_field_policies(&self) -> HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap> {
+        let mut extra_policy_map: HashMap<
+            L7ProtocolEnum,
+            (Vec<ExtraCustomFieldPolicy>, SegmentBuilder<usize>),
+        > = HashMap::new();
+
+        for p in &self.custom_field_policies {
+            let protocol = L7Protocol::from(p.protocol_name.clone());
+            if protocol == L7Protocol::Unknown {
+                continue;
+            }
+            let l7_protocol = if protocol == L7Protocol::Custom {
+                let Some(custom_protocol_name) = p.custom_protocol_name.as_ref() else {
+                    error!(
+                        "policy: {} not set custom_protocol_name, cannot parse correctly",
+                        p.policy_name
+                    );
+                    continue;
+                };
+                L7ProtocolEnum::Custom(public::l7_protocol::CustomProtocol::CustomPolicy(
+                    custom_protocol_name.to_owned(),
+                ))
+            } else {
+                L7ProtocolEnum::L7Protocol(protocol)
+            };
+
+            if let Some((policies, segment_builder)) = extra_policy_map.get_mut(&l7_protocol) {
+                build_extra_policy(p, policies, segment_builder);
+            } else {
+                let mut policies = vec![ExtraCustomFieldPolicy::default()];
+                let mut segment_builder = SegmentBuilder::new();
+                build_extra_policy(p, &mut policies, &mut segment_builder);
+                extra_policy_map.insert(l7_protocol, (policies, segment_builder));
+            }
+        }
+
+        #[inline]
+        fn build_extra_policy(
+            custom_field_policy: &CustomFieldPolicy,
+            extra_field_policy: &mut Vec<ExtraCustomFieldPolicy>,
+            segment_builder: &mut SegmentBuilder<usize>,
+        ) {
+            let port_pairs = if custom_field_policy.port_list.is_empty() {
+                vec![(u16::MIN, u16::MAX)]
+            } else {
+                let Some(port_pairs) = parse_u16_range_list_to_port_pairs(
+                    custom_field_policy.port_list.as_str(),
+                    false,
+                ) else {
+                    error!(
+                        "invalid port list in extra policy config: {}",
+                        custom_field_policy.port_list
+                    );
+                    return;
+                };
+                port_pairs
+            };
+            extra_field_policy.push(ExtraCustomFieldPolicy::from(custom_field_policy));
+            let index_of_policy = extra_field_policy.len() - 1;
+            for (start, end) in port_pairs {
+                segment_builder.add_range(start, end, index_of_policy);
+            }
+        }
+
+        let mut extra_policy_config = HashMap::with_capacity(extra_policy_map.len());
+        for (l7_protocol, (policies, mut builder)) in extra_policy_map {
+            extra_policy_config.insert(
+                l7_protocol,
+                ExtraCustomFieldPolicyMap {
+                    policies,
+                    indices: builder.merge_segments(),
+                },
+            );
+        }
+        extra_policy_config
     }
 }
 
@@ -3255,89 +3337,6 @@ impl UserConfig {
             port_segmentmap: port_segmentmap.merge_segments(),
             protocol_characters,
         }
-    }
-
-    #[cfg(feature = "enterprise")]
-    pub fn get_extra_field_policies(&self) -> HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap> {
-        let mut extra_policy_map: HashMap<
-            L7ProtocolEnum,
-            (Vec<ExtraCustomFieldPolicy>, SegmentBuilder<usize>),
-        > = HashMap::new();
-
-        for p in &self
-            .processors
-            .request_log
-            .tag_extraction
-            .custom_field_policies
-        {
-            let protocol = L7Protocol::from(p.protocol_name.clone());
-            if protocol == L7Protocol::Unknown {
-                continue;
-            }
-            let l7_protocol = if protocol == L7Protocol::Custom {
-                let Some(custom_protocol_name) = p.custom_protocol_name.as_ref() else {
-                    error!(
-                        "policy: {} not set custom_protocol_name, cannot parse correctly",
-                        p.policy_name
-                    );
-                    continue;
-                };
-                L7ProtocolEnum::Custom(public::l7_protocol::CustomProtocol::CustomPolicy(
-                    custom_protocol_name.to_owned(),
-                ))
-            } else {
-                L7ProtocolEnum::L7Protocol(protocol)
-            };
-
-            if let Some((policies, segment_builder)) = extra_policy_map.get_mut(&l7_protocol) {
-                build_extra_policy(p, policies, segment_builder);
-            } else {
-                let mut policies = vec![ExtraCustomFieldPolicy::default()];
-                let mut segment_builder = SegmentBuilder::new();
-                build_extra_policy(p, &mut policies, &mut segment_builder);
-                extra_policy_map.insert(l7_protocol, (policies, segment_builder));
-            }
-        }
-
-        #[inline]
-        fn build_extra_policy(
-            custom_field_policy: &CustomFieldPolicy,
-            extra_field_policy: &mut Vec<ExtraCustomFieldPolicy>,
-            segment_builder: &mut SegmentBuilder<usize>,
-        ) {
-            let port_pairs = if custom_field_policy.port_list.is_empty() {
-                vec![(u16::MIN, u16::MAX)]
-            } else {
-                let Some(port_pairs) = parse_u16_range_list_to_port_pairs(
-                    custom_field_policy.port_list.as_str(),
-                    false,
-                ) else {
-                    error!(
-                        "invalid port list in extra policy config: {}",
-                        custom_field_policy.port_list
-                    );
-                    return;
-                };
-                port_pairs
-            };
-            extra_field_policy.push(ExtraCustomFieldPolicy::from(custom_field_policy));
-            let index_of_policy = extra_field_policy.len() - 1;
-            for (start, end) in port_pairs {
-                segment_builder.add_range(start, end, index_of_policy);
-            }
-        }
-
-        let mut extra_policy_config = HashMap::with_capacity(extra_policy_map.len());
-        for (l7_protocol, (policies, mut builder)) in extra_policy_map {
-            extra_policy_config.insert(
-                l7_protocol,
-                ExtraCustomFieldPolicyMap {
-                    policies,
-                    indices: builder.merge_segments(),
-                },
-            );
-        }
-        extra_policy_config
     }
 
     pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {

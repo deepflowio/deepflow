@@ -1373,7 +1373,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::{handler::TraceType, ExtraLogFields},
+        config::handler::{L7LogDynamicConfigBuilder, TraceType},
         flow_generator::{protocol_logs::PrioFields, L7_RRT_CACHE_CAPACITY},
         utils::test::Capture,
     };
@@ -1663,21 +1663,18 @@ mod tests {
             ),
         ];
         let mut info = MysqlInfo::default();
-        let config = L7LogDynamicConfig::new(
-            vec![],
-            vec![],
-            true,
-            vec![
+        let config = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec![],
+            trace_types: vec![
                 TraceType::TraceParent,
                 TraceType::Customize("TraceID".to_owned()),
                 TraceType::Customize("jrnno".to_owned()),
             ],
-            vec![TraceType::TraceParent],
-            ExtraLogFields::default(),
-            false,
-            #[cfg(feature = "enterprise")]
-            std::collections::HashMap::new(),
-        );
+            span_types: vec![TraceType::TraceParent],
+            ..Default::default()
+        }
+        .into();
         for (input, tid, sid) in testcases {
             info.trace_ids = PrioFields::new();
             info.span_id = None;

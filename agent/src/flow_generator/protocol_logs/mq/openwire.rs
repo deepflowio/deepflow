@@ -2264,7 +2264,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
-    use crate::config::{handler::LogParserConfig, ExtraLogFields};
+    use crate::config::handler::{L7LogDynamicConfigBuilder, LogParserConfig, TraceType};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -2305,19 +2305,15 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let config = L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                std::collections::HashMap::new(),
-            );
+            let config = L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                span_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                ..Default::default()
+            };
             let parse_config = &LogParserConfig {
-                l7_log_dynamic: config.clone(),
+                l7_log_dynamic: config.into(),
                 ..Default::default()
             };
             param.set_log_parser_config(parse_config);
@@ -2388,17 +2384,14 @@ mod tests {
     #[test]
     fn check_parse_sw8_header() {
         let payload = b"\x00\x03sw8\x09\x00\x1E1-VFJBQ0VJRA==-U0VHTUVOVElE-3-";
-        let config = L7LogDynamicConfig::new(
-            vec![],
-            vec![],
-            true,
-            vec![TraceType::Sw8, TraceType::TraceParent],
-            vec![TraceType::Sw8, TraceType::TraceParent],
-            ExtraLogFields::default(),
-            false,
-            #[cfg(feature = "enterprise")]
-            std::collections::HashMap::new(),
-        );
+        let config = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec![],
+            trace_types: vec![TraceType::Sw8, TraceType::TraceParent],
+            span_types: vec![TraceType::Sw8, TraceType::TraceParent],
+            ..Default::default()
+        }
+        .into();
         let (trace_ids, span_id) = parse_trace_and_span(payload, &config).unwrap();
         assert_eq!(trace_ids.highest(), "TRACEID".to_string());
         assert_eq!(span_id, Some("SEGMENTID-3".to_string()));
