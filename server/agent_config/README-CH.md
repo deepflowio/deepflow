@@ -8174,6 +8174,34 @@ processors:
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
+##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        copy_apm_trace_id: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+设置为 true 时，将会抄写 APM TraceID 至 attribute.apm_trace_id 字段中。
+
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
 **标签**:

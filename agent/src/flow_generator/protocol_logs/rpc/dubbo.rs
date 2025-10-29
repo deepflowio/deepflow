@@ -34,6 +34,7 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             consts::*,
+            decode_base64_to_string,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
                 TraceInfo,
@@ -103,6 +104,8 @@ pub struct DubboInfo {
     pub method_name: String,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_ids: PrioFields,
+    #[serde(skip)]
+    copy_apm_trace_id: bool,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: PrioField<String>,
     #[serde(rename = "x_request_id_0", skip_serializing_if = "Option::is_none")]
@@ -190,11 +193,52 @@ impl DubboInfo {
         }
     }
 
-    fn trace_ids_add(&mut self, trace_id: String, trace_type: &TraceType) {
-        if let Some(id) = trace_type.decode_trace_id(&trace_id) {
-            self.trace_ids
-                .merge_field(BASE_FIELD_PRIORITY, id.to_string());
+    fn parse_trace_id(trace_info: String, trace_type: &TraceType) -> String {
+        if trace_info.is_empty() {
+            return trace_info;
         }
+        match trace_type {
+            TraceType::Sw3 => {
+                // sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
+                let segs: Vec<&str> = trace_info.split("|").collect();
+                if segs.len() > 7 {
+                    segs[7].to_string()
+                } else {
+                    trace_info
+                }
+            }
+            TraceType::Sw8 => {
+                // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+                let segs: Vec<&str> = trace_info.split("-").collect();
+                if segs.len() > 2 {
+                    decode_base64_to_string(segs[1])
+                } else {
+                    decode_base64_to_string(&trace_info)
+                }
+            }
+            TraceType::CloudWise => {
+                if let Some(trace_id) =
+                    cloud_platform::cloudwise::decode_trace_id(trace_info.as_str())
+                {
+                    trace_id.to_string()
+                } else {
+                    trace_info
+                }
+            }
+            _ => trace_info,
+        }
+    }
+
+    fn add_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
+        let id = Self::parse_trace_id(trace_id, &trace_type);
+        if !id.is_empty() && self.copy_apm_trace_id {
+            self.copy_apm_trace_id = false;
+            self.attributes.push(KeyVal {
+                key: APM_TRACE_ID_ATTR.to_string(),
+                val: id.clone(),
+            });
+        }
+        self.trace_ids.merge_field(BASE_FIELD_PRIORITY, id);
     }
 
     fn set_span_id(&mut self, span_id: String, trace_type: &TraceType) {
@@ -511,15 +555,16 @@ impl L7ProtocolParserInterface for DubboLog {
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        let mut info = DubboInfo::default();
+        let mut info = DubboInfo {
+            copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,
+            ..Default::default()
+        };
         self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
         info.endpoint = info.generate_endpoint();
         self.wasm_hook(param, payload, &mut info);
-        if let Some(config) = param.parse_config {
-            info.set_is_on_blacklist(config);
-        }
+        info.set_is_on_blacklist(config);
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param) {
@@ -610,7 +655,7 @@ mod kryo {
 
     fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(trace_id) = lookup_str(payload, trace_type) {
-            info.trace_ids_add(trace_id, trace_type);
+            info.add_trace_id(trace_id, trace_type);
         }
     }
 
@@ -813,7 +858,7 @@ mod fastjson2 {
 
     fn decode_trace_id(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
         if let Some(trace_id) = lookup_str(payload, trace_type) {
-            info.trace_ids_add(trace_id, trace_type);
+            info.add_trace_id(trace_id, trace_type);
         }
     }
 
@@ -1092,6 +1137,7 @@ impl DubboHeader {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::fmt;
     use std::path::Path;
     use std::time::Duration;
     use std::{fs, rc::Rc};
@@ -1099,10 +1145,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
-    use crate::config::{
-        handler::{LogParserConfig, TraceType},
-        ExtraLogFields,
-    };
+    use crate::config::handler::{L7LogDynamicConfigBuilder, LogParserConfig, TraceType};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -1123,6 +1166,35 @@ mod tests {
     }
 
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
+
+    struct ValidateInfo<'a>(&'a DubboInfo);
+
+    impl<'a> fmt::Display for ValidateInfo<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("DubboInfo")
+                .field("msg_type", &self.0.msg_type)
+                .field("event", &self.0.event)
+                .field("serial_id", &self.0.serial_id)
+                .field("data_type", &self.0.data_type)
+                .field("request_id", &self.0.request_id)
+                .field("dubbo_version", &self.0.dubbo_version)
+                .field("service_name", &self.0.service_name)
+                .field("service_version", &self.0.service_version)
+                .field("method_name", &self.0.method_name)
+                .field("trace_ids", &self.0.trace_ids)
+                .field("span_id", &self.0.span_id)
+                .field("status_code", &self.0.status_code)
+                .field("custom_result", &self.0.custom_result)
+                .field("custom_exception", &self.0.custom_exception)
+                .field("endpoint", &self.0.endpoint)
+                .field("rrt", &self.0.rrt)
+                .field("req_msg_size", &self.0.req_msg_size)
+                .field("resp_msg_size", &self.0.resp_msg_size)
+                .field("captured_request_byte", &self.0.captured_request_byte)
+                .field("captured_response_byte", &self.0.captured_response_byte)
+                .finish()
+        }
+    }
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
@@ -1146,27 +1218,20 @@ mod tests {
             };
 
             let config = LogParserConfig {
-                l7_log_dynamic: L7LogDynamicConfig::new(
-                    vec![],
-                    vec![],
-                    true,
-                    vec![
+                l7_log_dynamic: L7LogDynamicConfigBuilder {
+                    proxy_client: vec![],
+                    x_request_id: vec![],
+                    trace_types: vec![
                         TraceType::Customize("EagleEye-TraceID".to_string()),
                         TraceType::Sw8,
                     ],
-                    vec![
+                    span_types: vec![
                         TraceType::Customize("EagleEye-SpanID".to_string()),
                         TraceType::Sw8,
                     ],
-                    ExtraLogFields::default(),
-                    false,
-                    #[cfg(feature = "enterprise")]
-                    HashMap::new(),
-                    0,
-                    0,
-                    0,
-                    256,
-                ),
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             };
             let mut dubbo = DubboLog::default();
@@ -1192,7 +1257,7 @@ mod tests {
             } else {
                 DubboInfo::default()
             };
-            output.push_str(&format!("{:?} is_dubbo: {}\n", info, is_dubbo));
+            output.push_str(&format!("{} is_dubbo: {}\n", ValidateInfo(&info), is_dubbo));
         }
         output
     }
@@ -1256,21 +1321,14 @@ mod tests {
         };
 
         let config = LogParserConfig {
-            l7_log_dynamic: L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![TraceType::Sw8],
-                vec![TraceType::Sw8],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                HashMap::new(),
-                0,
-                0,
-                0,
-                256,
-            ),
+            l7_log_dynamic: L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![TraceType::Sw8],
+                span_types: vec![TraceType::Sw8],
+                ..Default::default()
+            }
+            .into(),
             ..Default::default()
         };
         let mut dubbo = DubboLog::default();
@@ -1364,21 +1422,14 @@ mod tests {
         };
 
         let config = LogParserConfig {
-            l7_log_dynamic: L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![TraceType::CloudWise],
-                vec![],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                HashMap::new(),
-                0,
-                0,
-                0,
-                256,
-            ),
+            l7_log_dynamic: L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![TraceType::CloudWise],
+                span_types: vec![],
+                ..Default::default()
+            }
+            .into(),
             ..Default::default()
         };
         let mut dubbo = DubboLog::default();
@@ -1468,27 +1519,20 @@ mod tests {
         let mut packets = capture.collect::<Vec<_>>();
 
         let config = LogParserConfig {
-            l7_log_dynamic: L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![
+            l7_log_dynamic: L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![
                     TraceType::Customize("EagleEye-TraceID".to_string()),
                     TraceType::Sw8,
                 ],
-                vec![
+                span_types: vec![
                     TraceType::Customize("EagleEye-SpanID".to_string()),
                     TraceType::Sw8,
                 ],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                HashMap::new(),
-                0,
-                0,
-                0,
-                256,
-            ),
+                ..Default::default()
+            }
+            .into(),
             ..Default::default()
         };
 
