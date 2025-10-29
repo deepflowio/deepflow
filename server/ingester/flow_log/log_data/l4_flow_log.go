@@ -689,11 +689,11 @@ func (k *KnowledgeGraph) fill(
 	}
 
 	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.L3EpcID0)
-	customServiceID0 := platformData.QueryCustomService(k.OrgId, l3EpcID0, isIPv6, ip40, ip60, 0)
+	customServiceID0 := platformData.QueryCustomService(k.OrgId, l3EpcID0, isIPv6, ip40, ip60, 0, k.ServiceID0, k.PodGroupID0, k.L3DeviceID0, k.L3DeviceType0)
 	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(customServiceID0, k.ServiceID0, k.PodGroupID0, gpID0, uint32(k.PodClusterID0), k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.L3EpcID1)
-	customServiceID1 := platformData.QueryCustomService(k.OrgId, l3EpcID1, isIPv6, ip41, ip61, port)
+	customServiceID1 := platformData.QueryCustomService(k.OrgId, l3EpcID1, isIPv6, ip41, ip61, port, k.ServiceID1, k.PodGroupID1, k.L3DeviceID1, k.L3DeviceType1)
 	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(customServiceID1, k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
 }
 
