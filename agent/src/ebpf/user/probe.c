@@ -148,6 +148,97 @@ static int ebpf_link__detach_kfunc(struct ebpf_link *link)
 	return ret;
 }
 
+static int bpf_find_uprobe_type(void)
+{
+	const char *path = "/sys/bus/event_source/devices/uprobe/type";
+	char buf[32];
+	int fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ssize_t n = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (n <= 0)
+		return -1;
+
+	buf[n] = '\0';
+	return atoi(buf);
+}
+
+static int bpf_get_uretprobe_bit(void)
+{
+	const char *path =
+	    "/sys/bus/event_source/devices/uprobe/format/retprobe";
+	const char prefix[] = "config:";
+	char buf[64];
+	int fd;
+	ssize_t n;
+	char *endptr;
+	long val;
+
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+
+	n = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (n <= 0)
+		return -1;
+
+	buf[n] = '\0';
+
+	if (strncmp(buf, prefix, sizeof(prefix) - 1) != 0)
+		return -1;
+
+	errno = 0;
+	val = strtol(buf + sizeof(prefix) - 1, &endptr, 10);
+	if (errno != 0 || endptr == buf + sizeof(prefix) - 1)
+		return -1;
+
+	return (int)val;
+}
+
+static int uprobe_try_perf_event_open(const char *name, uint64_t offs,
+				      int pid, int is_return,
+				      uint64_t ref_ctr_offset)
+{
+#define PERF_UPROBE_REF_CTR_OFFSET_SHIFT 32
+
+	struct perf_event_attr attr = {};
+	int type = bpf_find_uprobe_type();
+	int is_return_bit = bpf_get_uretprobe_bit();
+	int cpu = 0, pfd = 0;
+	if (type < 0 || is_return_bit < 0)
+		return -1;
+	if (is_return)
+		attr.config |= 1 << is_return_bit;
+	attr.config |= (ref_ctr_offset << PERF_UPROBE_REF_CTR_OFFSET_SHIFT);
+	attr.config2 = offs;	/* config2 here is kprobe_addr or probe_offset */
+	attr.size = sizeof(attr);
+	attr.type = type;
+	attr.config1 = (uint64_t) (unsigned long)((void *)name);
+
+	/*
+	 * PID filtering is only supported for uprobe events.
+	 * If pid < 0, set it to -1.
+	 * perf_event_open() does not allow both pid and cpu to be -1,
+	 * so cpu is set to -1 only when pid != -1.
+	 */
+	if (pid < 0)
+		pid = -1;
+	if (pid != -1)
+		cpu = -1;
+
+	pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */ ,
+		      PERF_FLAG_FD_CLOEXEC);
+	if (pfd > 0) {
+		close(pfd);
+		return 0;
+	}
+
+	return -1;
+}
+
 /*
  * program__attach_probe - Attach [u/k]probe handle
  *
@@ -180,6 +271,32 @@ static int program__attach_probe(const struct ebpf_prog *prog, bool retprobe,
 		pfd = bpf_attach_kprobe(progfd, attach_type, ev_name,
 					config1, offset, maxactive);
 	} else {
+		/*
+		 * In uprobe, we attempt to call the perf_event_open() system call.
+		 * If the call fails, we exit immediately to avoid writing to tracefs.
+		 * On kernels older than 3.10.0-1160.76, such write operations may
+		 * trigger a kernel crash. The Oops call path:
+		 *     vfs_write -> probes_write -> traceprobe_probes_write -> create_trace_uprobe
+		 * clearly shows that the write targets the tracing probe interface,
+		 * i.e., files under /sys/kernel/debug/tracing/ files.
+ 		 *  
+		 * Example of uprobe parameters:
+		 * attach_type: BPF_PROBE_ENTRY or BPF_PROBE_RETURN
+		 * ev_name: p__proc_9418_root_app_mem_leak_0xa8560
+		 * pid: 9418
+		 * config1: /proc/9418/root/app/mem-leak
+		 * progfd: 202
+		 * offset: 0xaf
+		 */
+		if (uprobe_try_perf_event_open
+		    (config1, offset, pid, attach_type != BPF_PROBE_ENTRY,
+		     0) != 0) {
+			ebpf_warning
+			    ("perf_event_open() call failed due to %s. ev_name=%s, pid=%d, config1=%s",
+			     strerror(errno), ev_name, pid, config1);
+			return -1;
+		}
+
 		// ref_ctr_offset Appear in linux 4.20, set 0
 		// https://lore.kernel.org/lkml/20180606083344.31320-3-ravi.bangoria@linux.ibm.com/
 		pfd = bpf_attach_uprobe(progfd, attach_type, ev_name, config1,
