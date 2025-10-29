@@ -321,7 +321,9 @@ static void exec_clear_residual_probes(const char *events_file,
 void clear_residual_probes(void)
 {
 	exec_clear_residual_probes(KPROBE_EVENTS_FILE, "kprobe");
-	exec_clear_residual_probes(UPROBE_EVENTS_FILE, "uprobe");
+	// Uprobe now exclusively uses perf_event_open() to create events,
+	// no longer relying on the tracefs.
+	// exec_clear_residual_probes(UPROBE_EVENTS_FILE, "uprobe");
 }
 
 /* Make sure max locked memory is set to unlimited. */
