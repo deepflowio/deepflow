@@ -36,8 +36,8 @@ type ServiceTable struct {
 	podGroupIDTable         map[uint64]uint32
 	customServiceIpv4Table  map[uint64]uint32
 	customServiceIpv6Table  map[EpcIDIPv6Key]uint32
-	customServicePodGroup   map[uint32]uint32
 	customServicePodService map[uint32]uint32
+	customServicePodGroup   map[uint32]uint32
 	customServiceChost      map[uint32]uint32
 }
 
@@ -123,29 +123,29 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 		return 0
 	}
 
-	// 1. pod service
-	if podServiceId != 0 {
+	// priority 1. pod service
+	if podServiceId != 0 && len(s.customServicePodService) > 0 {
 		serviceId := s.customServicePodService[podServiceId]
 		if serviceId != 0 {
 			return serviceId
 		}
 	}
-	// 2. pod group
-	if podGroupId != 0 {
+	// priority 2. pod group
+	if podGroupId != 0 && len(s.customServicePodGroup) > 0 {
 		serviceId := s.customServicePodGroup[podGroupId]
 		if serviceId != 0 {
 			return serviceId
 		}
 	}
-	// 3. chost
-	if l3DeviceId != 0 && l3DeviceType == uint8(flow_metrics.VMDevice) {
+	// priority 3. chost
+	if l3DeviceId != 0 && l3DeviceType == uint8(flow_metrics.VMDevice) && len(s.customServiceChost) > 0 {
 		serviceId := s.customServiceChost[l3DeviceId]
 		if serviceId != 0 {
 			return serviceId
 		}
 	}
 
-	// 4. port ip
+	// priority 4. port ip
 	if isIPv6 {
 		if len(s.customServiceIpv6Table) == 0 {
 			return 0
@@ -173,8 +173,8 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 		podGroupIDTable:         make(map[uint64]uint32),
 		customServiceIpv4Table:  make(map[uint64]uint32),
 		customServiceIpv6Table:  make(map[EpcIDIPv6Key]uint32),
-		customServicePodGroup:   make(map[uint32]uint32),
 		customServicePodService: make(map[uint32]uint32),
+		customServicePodGroup:   make(map[uint32]uint32),
 		customServiceChost:      make(map[uint32]uint32),
 	}
 	for i := range s.epcIDIPv4Table {
@@ -272,12 +272,12 @@ func (s *ServiceTable) addCustomService(svc *trident.ServiceInfo) {
 	epcId := int32(svc.GetEpcId())
 	serviceId := svc.GetId()
 
-	for _, podGroupId := range svc.GetPodGroupIds() {
-		s.customServicePodGroup[podGroupId] = serviceId
-	}
-
 	for _, podServiceId := range svc.GetPodServiceIds() {
 		s.customServicePodService[podServiceId] = serviceId
+	}
+
+	for _, podGroupId := range svc.GetPodGroupIds() {
+		s.customServicePodGroup[podGroupId] = serviceId
 	}
 
 	for _, chostId := range svc.GetChostIds() {
@@ -437,7 +437,7 @@ func (s *ServiceTable) String() string {
 		sb.WriteString("\n7  podServiceId            serviceID\n")
 		sb.WriteString("------------------------------------------------------\n")
 		for podServiceId, serviceId := range s.customServicePodService {
-			fmt.Fprintf(sb, "  %-11s            %-15d \n", podServiceId, serviceId)
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", podServiceId, serviceId)
 		}
 	}
 
@@ -446,7 +446,7 @@ func (s *ServiceTable) String() string {
 		sb.WriteString("\n8  podGrouopId            serviceID\n")
 		sb.WriteString("------------------------------------------------------\n")
 		for podGroupId, serviceId := range s.customServicePodGroup {
-			fmt.Fprintf(sb, "  %-11s            %-15d \n", podGroupId, serviceId)
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", podGroupId, serviceId)
 		}
 	}
 
@@ -455,7 +455,7 @@ func (s *ServiceTable) String() string {
 		sb.WriteString("\n9  chostId            serviceID\n")
 		sb.WriteString("------------------------------------------------------\n")
 		for chostId, serviceId := range s.customServiceChost {
-			fmt.Fprintf(sb, "  %-11s            %-15d \n", chostId, serviceId)
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", chostId, serviceId)
 		}
 	}
 
