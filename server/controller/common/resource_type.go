@@ -48,6 +48,7 @@ const (
 	RESOURCE_TYPE_POD_NODE_EN                        = "pod_node"
 	RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN          = "vm_pod_node_connection"
 	RESOURCE_TYPE_POD_NAMESPACE_EN                   = "pod_namespace"
+	RESOURCE_TYPE_POD_NS_EN                          = "pod_ns" // pod_ns is alias of pod_namespace
 	RESOURCE_TYPE_POD_INGRESS_EN                     = "pod_ingress"
 	RESOURCE_TYPE_POD_INGRESS_RULE_EN                = "pod_ingress_rule"
 	RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN        = "pod_ingress_rule_backend"

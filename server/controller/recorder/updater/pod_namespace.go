@@ -103,6 +103,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		AZ:               cloudItem.AZLcuuid,
 		LearnedCloudTags: cloudTags,
 		CustomCloudTags:  make(map[string]string),
+		UID:              ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
