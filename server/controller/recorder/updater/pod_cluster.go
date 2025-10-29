@@ -96,6 +96,7 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*met
 		Region:      cloudItem.RegionLcuuid,
 		AZ:          cloudItem.AZLcuuid,
 		VPCID:       vpcID,
+		UID:         ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
