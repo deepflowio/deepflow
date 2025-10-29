@@ -529,6 +529,7 @@ impl SofaRpcLog {
     }
 }
 
+#[derive(Debug)]
 struct SofaHdr {
     service: String,
     method: String,
@@ -597,6 +598,7 @@ fn read_b32_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])> {
     Some((key, value))
 }
 
+#[derive(Debug)]
 pub struct RpcTraceContext {
     pub trace_id: String,
     pub span_id: String,
