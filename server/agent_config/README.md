@@ -8296,6 +8296,34 @@ setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
 
+##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        copy_apm_trace_id: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, the APM TraceID will be copied to the attribute.apm_trace_id field.
+
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
 **Tags**:
