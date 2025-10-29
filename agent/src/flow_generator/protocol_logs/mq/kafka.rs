@@ -41,7 +41,7 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType,
+            L7ResponseStatus, LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
 };
@@ -575,7 +575,7 @@ pub struct KafkaInfo {
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub correlation_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_ids: PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
 
@@ -726,7 +726,7 @@ impl KafkaInfo {
     }
 
     fn has_trace_info(&self) -> bool {
-        !self.trace_id.is_empty() && !self.span_id.is_empty()
+        !self.trace_ids.is_empty() && !self.span_id.is_empty()
     }
 }
 
@@ -780,11 +780,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             trace_info: Some(TraceInfo {
-                trace_id: if f.trace_id.is_empty() {
-                    None
-                } else {
-                    Some(f.trace_id)
-                },
+                trace_ids: f.trace_ids.into_strings_top3(),
                 span_id: if f.span_id.is_empty() {
                     None
                 } else {
@@ -1518,7 +1514,8 @@ impl KafkaLog {
                 continue;
             }
             if let Some(trace_id) = tp.decode_trace_id(v) {
-                info.trace_id = trace_id.to_string();
+                info.trace_ids
+                    .merge_field(BASE_FIELD_PRIORITY, trace_id.to_string());
             }
             if let Some(span_id) = tp.decode_span_id(v) {
                 info.span_id = span_id.to_string();
@@ -1657,7 +1654,7 @@ mod tests {
                 .field("captured_request_byte", &self.0.captured_request_byte)
                 .field("captured_response_byte", &self.0.captured_response_byte)
                 .field("rrt", &self.0.rrt)
-                .field("trace_id", &self.0.trace_id)
+                .field("trace_ids", &self.0.trace_ids)
                 .field("span_id", &self.0.span_id)
                 .finish()
         }
