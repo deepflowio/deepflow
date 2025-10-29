@@ -292,8 +292,8 @@ static int program__attach_probe(const struct ebpf_prog *prog, bool retprobe,
 		    (config1, offset, pid, attach_type != BPF_PROBE_ENTRY,
 		     0) != 0) {
 			ebpf_warning
-			    ("perf_event_open() call failed due to %s. ev_name=%s, pid=%d, config1=%s",
-			     strerror(errno), ev_name, pid, config1);
+			    ("Uprobe for process %d disabled due to 'perf_event_open()' failure (%s).",
+			     pid, strerror(errno));
 			return -1;
 		}
 
