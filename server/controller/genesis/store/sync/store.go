@@ -271,8 +271,6 @@ func (s *SyncStorage) refreshDatabase() {
 }
 
 func (s *SyncStorage) run() {
-	s.loadFromDatabase()
-
 	ageTime := time.Duration(s.cfg.AgingTime) * time.Second
 	for {
 		time.Sleep(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
@@ -299,6 +297,7 @@ func (s *SyncStorage) run() {
 }
 
 func (s *SyncStorage) Start() {
+	s.loadFromDatabase()
 	go s.refreshDatabase()
 	go s.run()
 }
