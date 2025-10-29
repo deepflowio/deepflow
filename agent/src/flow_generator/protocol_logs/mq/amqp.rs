@@ -34,7 +34,8 @@ use crate::{
         protocol_logs::{
             decode_base64_to_string,
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be, read_u64_be},
@@ -282,8 +283,8 @@ pub struct AmqpInfo {
     #[serde(rename = "routing_key", skip_serializing_if = "Option::is_none")]
     routing_key: Option<String>,
 
-    #[serde(rename = "trace_id", skip_serializing_if = "Option::is_none")]
-    trace_id: Option<String>,
+    #[serde(rename = "trace_ids", skip_serializing_if = "value_is_default")]
+    trace_ids: PrioFields,
     #[serde(rename = "span_id", skip_serializing_if = "Option::is_none")]
     span_id: Option<String>,
 
@@ -760,7 +761,7 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: info.trace_id,
+                trace_ids: info.trace_ids.into_strings_top3(),
                 span_id: info.span_id,
                 ..Default::default()
             }),
@@ -892,6 +893,11 @@ impl L7ProtocolParserInterface for AmqpLog {
             if payload.get(offset + info.payload_size as usize) != Some(&b'\xCE') {
                 break;
             }
+            let multiple_trace_id_collection = if let Some(config) = param.parse_config {
+                config.l7_log_dynamic.multiple_trace_id_collection
+            } else {
+                true
+            };
             match info.frame_type {
                 FrameType::Method => {
                     if info.payload_size < 4 {
@@ -929,7 +935,9 @@ impl L7ProtocolParserInterface for AmqpLog {
                     if let Some((trace_id, span_id)) =
                         info.parse_trace_span(&payload[offset + 12..])
                     {
-                        info.trace_id = Some(trace_id);
+                        if multiple_trace_id_collection || info.trace_ids.is_empty() {
+                            info.trace_ids.merge_field(BASE_FIELD_PRIORITY, trace_id);
+                        }
                         info.span_id = Some(span_id);
                     }
                 }

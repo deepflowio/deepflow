@@ -492,26 +492,44 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		return innerAlias
 	case metrics.METRICS_TYPE_PERCENTAGE, metrics.METRICS_TYPE_QUOTIENT:
 		// 比例类和商值类，内层结构为sum(x)/sum(y)
-		divFields := strings.Split(f.Metrics.DBField, "/")
+		dbField := f.Metrics.DBField
+		divFields := strings.Split(strings.TrimPrefix(dbField, "1 - "), "/")
 		divField_0 := view.DefaultFunction{
 			Name:   view.FUNCTION_SUM,
 			Fields: []view.Node{&view.Field{Value: divFields[0]}},
+			Nest:   true,
 		}
 		divField_1 := view.DefaultFunction{
 			Name:   view.FUNCTION_SUM,
 			Fields: []view.Node{&view.Field{Value: divFields[1]}},
+			Nest:   true,
 		}
-		innerFunction := view.DivFunction{
+		divFunction := view.DivFunction{
 			DefaultFunction: view.DefaultFunction{
 				Name:   view.FUNCTION_DIV,
 				Fields: []view.Node{&divField_0, &divField_1},
 			},
 			DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
 		}
-		innerAlias = innerFunction.SetAlias("", true)
-		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
-		innerFunction.Init()
-		m.AddTag(&innerFunction)
+
+		// 1 - sum(x)/sum(y)
+		if strings.Trim(f.Args[0], "`") == chCommon.SUCCESS_RATIO_METRICS_NAME {
+			divFunction.Nest = true
+			innerFunction := view.DefaultFunction{
+				Name:   view.FUNCTION_MINUS,
+				Fields: []view.Node{&view.Field{Value: "1"}, &divFunction},
+			}
+			innerAlias = innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+		} else {
+			innerFunction := divFunction
+			innerAlias = innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+		}
 		return innerAlias
 	case metrics.METRICS_TYPE_TAG:
 		innerFunction := view.DefaultFunction{
@@ -850,12 +868,11 @@ func (f *TagFunction) Check() error {
 			}
 		}
 	case TAG_FUNCTION_FAST_FILTER:
-		if strings.Trim(f.Args[0], "`") != "trace_id" {
+		if strings.Trim(f.Args[0], "`") != chCommon.TRACE_ID_TAG {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
 	}
 	return nil
-
 }
 
 func (f *TagFunction) Trans(m *view.Model) view.Node {
@@ -996,7 +1013,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		if !ok {
 			// tag未定义function则走default
 			tagDes, ok = tag.GetTag(field, f.DB, f.Table, "default")
-			if ok {
+			if ok && field != chCommon.TRACE_ID_TAG {
 				tagField = tagDes.TagTranslator
 			}
 		} else {

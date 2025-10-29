@@ -1462,6 +1462,7 @@ pub struct L7LogDynamicConfig {
     // in lowercase
     pub x_request_id: Vec<String>,
 
+    pub multiple_trace_id_collection: bool,
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
 
@@ -1480,6 +1481,10 @@ impl fmt::Debug for L7LogDynamicConfig {
             .field("x_request_id", &self.x_request_id)
             .field("trace_types", &self.trace_types)
             .field("span_types", &self.span_types)
+            .field(
+                "multiple_trace_id_collection",
+                &self.multiple_trace_id_collection,
+            )
             .field("trace_set", &self.trace_set)
             .field("span_set", &self.span_set)
             .field(
@@ -1503,6 +1508,7 @@ impl PartialEq for L7LogDynamicConfig {
     fn eq(&self, other: &Self) -> bool {
         self.proxy_client == other.proxy_client
             && self.x_request_id == other.x_request_id
+            && self.multiple_trace_id_collection == other.multiple_trace_id_collection
             && self.trace_types == other.trace_types
             && self.span_types == other.span_types
             && self.extra_log_fields == other.extra_log_fields
@@ -1516,6 +1522,7 @@ impl L7LogDynamicConfig {
     pub fn new(
         mut proxy_client: Vec<String>,
         mut x_request_id: Vec<String>,
+        multiple_trace_id_collection: bool,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
         mut extra_log_fields: ExtraLogFields,
@@ -1569,6 +1576,7 @@ impl L7LogDynamicConfig {
         Self {
             proxy_client,
             x_request_id,
+            multiple_trace_id_collection,
             trace_types,
             span_types,
             trace_set,
@@ -1992,6 +2000,11 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .iter()
                         .map(|x| x.to_ascii_lowercase())
                         .collect(),
+                    conf.processors
+                        .request_log
+                        .tag_extraction
+                        .tracing_tag
+                        .multiple_trace_id_collection,
                     conf.processors
                         .request_log
                         .tag_extraction

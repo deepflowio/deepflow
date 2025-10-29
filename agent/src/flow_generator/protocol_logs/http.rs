@@ -45,13 +45,12 @@ use crate::{
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::error::{Error, Result},
-    flow_generator::protocol_logs::{set_captured_byte, L7ProtoRawDataType},
+    flow_generator::protocol_logs::{
+        set_captured_byte, L7ProtoRawDataType, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
+    },
     plugin::CustomInfo,
     utils::bytes::{read_u32_be, read_u32_le},
 };
-
-const PLUGIN_FIELD_PRIORITY: u8 = 0;
-const BASE_FIELD_PRIORITY: u8 = PLUGIN_FIELD_PRIORITY + 1;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Version {
@@ -239,7 +238,7 @@ pub struct HttpInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub version: Version,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: PrioField<String>,
+    pub trace_ids: super::PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: PrioField<String>,
 
@@ -349,19 +348,9 @@ impl HttpInfo {
             }
         }
 
-        //trace info rewrite
-        if let Some(trace_id) = custom.trace.trace_id {
-            let prev = replace(
-                &mut self.trace_id,
-                PrioField::new(PLUGIN_FIELD_PRIORITY, trace_id),
-            );
-            if !prev.is_default() {
-                self.attributes.push(KeyVal {
-                    key: APM_TRACE_ID_ATTR.to_string(),
-                    val: prev.into_inner(),
-                });
-            }
-        }
+        self.trace_ids
+            .merge_same_priority(PLUGIN_FIELD_PRIORITY, custom.trace.trace_ids);
+
         if let Some(span_id) = custom.trace.span_id {
             let prev = replace(
                 &mut self.span_id,
@@ -529,7 +518,9 @@ impl HttpInfo {
         if other.biz_type > 0 {
             self.biz_type = other.biz_type;
         }
-        super::swap_if!(self, trace_id, is_default, other);
+
+        let other_trace_ids = std::mem::take(&mut other.trace_ids);
+        self.trace_ids.merge(other_trace_ids);
         super::swap_if!(self, span_id, is_default, other);
         super::swap_if!(self, x_request_id_0, is_default, other);
         super::swap_if!(self, x_request_id_1, is_default, other);
@@ -673,7 +664,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id.into_inner()),
+                trace_ids: f.trace_ids.to_strings(),
                 span_id: Some(f.span_id.into_inner()),
                 ..Default::default()
             }),
@@ -1521,15 +1512,17 @@ impl HttpLog {
         if config.is_trace_id(key) {
             for (i, trace) in config.trace_types.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
-                if info.trace_id.prio <= prio {
+                if info.trace_ids.highest_priority() <= prio && !config.multiple_trace_id_collection
+                {
                     break;
                 }
                 if !trace.check(key) {
                     continue;
                 }
-                trace
-                    .decode_trace_id(val)
-                    .map(|id| info.trace_id = PrioField::new(prio, id.to_string()));
+
+                if let Some(trace_id) = trace.decode_trace_id(val) {
+                    info.trace_ids.merge_field(prio, trace_id.to_string());
+                }
             }
         }
         if config.is_span_id(key) {
@@ -1919,6 +1912,7 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec!["x-forwarded-for".to_owned()],
             vec![],
+            true,
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
             ExtraLogFields::default(),
@@ -2560,6 +2554,7 @@ mod tests {
         let config = L7LogDynamicConfig::new(
             vec!["X_Forwarded_For".into(), "Client".into()],
             vec!["X_Request_ID".into(), "x-request-id".into()],
+            true,
             vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
             vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
             ExtraLogFields::default(),
@@ -2631,7 +2626,7 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.trace_id.field, "b3traceid");
+        assert_eq!(info.trace_ids.highest(), "b3traceid");
         let _ = parser.on_header(
             &config,
             b"traceparent",
@@ -2639,7 +2634,7 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.trace_id.field, "b3traceid");
+        assert_eq!(info.trace_ids.highest(), "b3traceid");
         assert_eq!(info.span_id.field, "span");
     }
 

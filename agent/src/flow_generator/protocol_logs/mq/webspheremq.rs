@@ -33,7 +33,7 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            LogMessageType, PrioFields, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
         },
     },
 };
@@ -45,7 +45,7 @@ pub struct WebSphereMqInfo {
     is_tls: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_ids: PrioFields,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
 
@@ -124,7 +124,8 @@ impl WebSphereMqInfo {
         if self.status == L7ResponseStatus::default() {
             self.status = other.status;
         }
-        swap_if!(self, trace_id, is_empty, other);
+        let other_trace_ids = std::mem::take(&mut other.trace_ids);
+        self.trace_ids.merge(other_trace_ids);
         swap_if!(self, span_id, is_empty, other);
         swap_if!(self, request_type, is_empty, other);
         swap_if!(self, response_exception, is_empty, other);
@@ -169,9 +170,8 @@ impl WebSphereMqInfo {
         }
 
         //trace info rewrite
-        if let Some(trace_id) = custom.trace.trace_id {
-            self.trace_id = trace_id;
-        }
+        self.trace_ids
+            .merge_same_priority(PLUGIN_FIELD_PRIORITY, custom.trace.trace_ids);
 
         if let Some(span_id) = custom.trace.span_id {
             self.span_id = span_id;
@@ -201,7 +201,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
+                trace_ids: f.trace_ids.into_strings_top3(),
                 span_id: Some(f.span_id),
                 ..Default::default()
             }),
@@ -255,7 +255,8 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             info.response_exception = exception.to_string();
         }
         if let Some(end_to_end_id) = &self.parser.end_to_end_id {
-            info.trace_id = end_to_end_id.to_string();
+            info.trace_ids
+                .merge_field(BASE_FIELD_PRIORITY, end_to_end_id.to_string());
         }
         info.msg_type = LogMessageType::Request;
         info.status = L7ResponseStatus::Ok;

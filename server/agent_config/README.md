@@ -2235,14 +2235,14 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| proc.gprocess_info | |
-| proc.golang_symbol_table | |
-| proc.socket_list | |
-| ebpf.socket.uprobe.golang | |
-| ebpf.socket.uprobe.tls | |
-| ebpf.profile.on_cpu | |
-| ebpf.profile.off_cpu | |
-| ebpf.profile.memory | |
+| proc.gprocess_info | Synchronize process resource information and inject process tags from the observation point into raw eBPF data |
+| proc.golang_symbol_table | Parse Golang-specific symbol tables to optimize profiling data when Golang processes prune the standard symbol table |
+| proc.socket_list | Synchronize active socket information of processes to inject process labels for both peers in application and network observation data |
+| ebpf.socket.uprobe.golang | Enable eBPF uprobe for Golang processes to trace goroutines and capture Golang HTTP/2 and HTTPS communications |
+| ebpf.socket.uprobe.tls | Enable eBPF uprobe for TLS communications to capture encrypted communication data from non-Golang processes |
+| ebpf.profile.on_cpu | Enable continuous On-CPU profiling |
+| ebpf.profile.off_cpu | Enable continuous Off-CPU profiling |
+| ebpf.profile.memory | Enable continuous memory profiling |
 
 **Schema**:
 | Key  | Value                        |
@@ -7588,6 +7588,7 @@ processors:
         FastCGI: 1-65535
         HTTP: 1-65535
         HTTP2: 1-65535
+        ISO8583: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
         Memcached: 11211
@@ -7604,6 +7605,7 @@ processors:
         SomeIP: 1-65535
         TLS: 443,6443
         Tars: 1-65535
+        WebSphereMQ: 1-65535
         ZMTP: 1-65535
         bRPC: 1-65535
 ```
@@ -7658,6 +7660,7 @@ processors:
         FastCGI: []
         HTTP: []
         HTTP2: []
+        ISO8583: []
         Kafka: []
         MQTT: []
         Memcached: []
@@ -7674,6 +7677,7 @@ processors:
         SomeIP: []
         TLS: []
         Tars: []
+        WebSphereMQ: []
         ZMTP: []
         bRPC: []
         gRPC: []
@@ -8173,6 +8177,36 @@ such as X-Request-ID, etc. This feature can be turned off by setting
 it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
+
+##### Multiple TraceID Collection {#processors.request_log.tag_extraction.tracing_tag.multiple_trace_id_collection}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.multiple_trace_id_collection`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        multiple_trace_id_collection: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When configured as `false`, only one TraceID is collected.
+When configured as `true`, multiple TraceIDs will be collected.
 
 ##### APM TraceID {#processors.request_log.tag_extraction.tracing_tag.apm_trace_id}
 

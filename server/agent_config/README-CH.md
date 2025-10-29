@@ -2206,14 +2206,14 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| proc.gprocess_info | |
-| proc.golang_symbol_table | |
-| proc.socket_list | |
-| ebpf.socket.uprobe.golang | |
-| ebpf.socket.uprobe.tls | |
-| ebpf.profile.on_cpu | |
-| ebpf.profile.off_cpu | |
-| ebpf.profile.memory | |
+| proc.gprocess_info | 同步进程资源信息，并为 eBPF 原始观测数据注入所在观测点上的进程标签 |
+| proc.golang_symbol_table | 解析 Golang 特有符号表，用于 Golang 进程裁剪了标准符号表时的剖析数据优化 |
+| proc.socket_list | 同步进程的活跃 Socket 信息，用于为应用和网络观测数据注入通信双方的进程标签 |
+| ebpf.socket.uprobe.golang | 为 Golang 进程开启 eBPF uprobe，用于协程追踪并采集 Golang HTTP2/HTTPS 通信 |
+| ebpf.socket.uprobe.tls | 为 TLS 通信开启 eBPF uprobe，用于采集非 Golang 进程的加密通信观测数据 |
+| ebpf.profile.on_cpu | 开启 On-CPU 持续剖析功能 |
+| ebpf.profile.off_cpu | 开启 Off-CPU 持续剖析功能 |
+| ebpf.profile.memory | 开启内存持续剖析功能 |
 
 **模式**:
 | Key  | Value                        |
@@ -7428,6 +7428,7 @@ processors:
         FastCGI: 1-65535
         HTTP: 1-65535
         HTTP2: 1-65535
+        ISO8583: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
         Memcached: 11211
@@ -7444,6 +7445,7 @@ processors:
         SomeIP: 1-65535
         TLS: 443,6443
         Tars: 1-65535
+        WebSphereMQ: 1-65535
         ZMTP: 1-65535
         bRPC: 1-65535
 ```
@@ -7497,6 +7499,7 @@ processors:
         FastCGI: []
         HTTP: []
         HTTP2: []
+        ISO8583: []
         Kafka: []
         MQTT: []
         Memcached: []
@@ -7513,6 +7516,7 @@ processors:
         SomeIP: []
         TLS: []
         Tars: []
+        WebSphereMQ: []
         ZMTP: []
         bRPC: []
         gRPC: []
@@ -7995,6 +7999,36 @@ processors:
 配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
 的结果填充到应用调用日志的`x_request_id`字段中，作为调用链追踪的特征值。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
+
+##### 多 TraceID 采集 {#processors.request_log.tag_extraction.tracing_tag.multiple_trace_id_collection}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.multiple_trace_id_collection`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        multiple_trace_id_collection: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+- 配置为 `false` 时，根据配置 `APM TraceID` 采集到第一个匹配的 TraceID 就不继续采集。
+- 配置为 `true` 时，采集所有匹配到的 TraceID。
 
 ##### APM TraceID {#processors.request_log.tag_extraction.tracing_tag.apm_trace_id}
 
