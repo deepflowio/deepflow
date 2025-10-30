@@ -138,8 +138,7 @@ pub unsafe extern "C" fn merge_lua_stacks(
     // Merging walks the native stack in order and substitutes each Lua VM placeholder with
     // the decoded interpreter frame, preserving any surrounding C frames.
     for frame in user.split(';').filter(|s| !s.is_empty()) {
-        let should_replace =
-            frame.starts_with("[unknown") || frame.starts_with("[unkown");
+        let should_replace = frame.starts_with("[unknown") || frame.starts_with("[unkown");
         if should_replace && lua_idx < lua_frames.len() {
             if !first {
                 merged.push(b';');
@@ -168,7 +167,6 @@ pub unsafe extern "C" fn merge_lua_stacks(
 
     write_combined_output(trace_str, len, &merged)
 }
-
 
 // --------- Lua unwind table plumbing ---------
 
@@ -230,7 +228,10 @@ struct LjOfs {
 }
 
 const LUA_51_AARCH64: LuaOfs = LuaOfs {
-    features: LUA_FEAT_CI_ARRAY | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_CLOSURE_ISC,
+    features: LUA_FEAT_CI_ARRAY
+        | LUA_FEAT_LINEINFO
+        | LUA_FEAT_PC_INSTR_INDEX
+        | LUA_FEAT_CLOSURE_ISC,
     off_l_ci: 40,
     off_l_base_ci: 80,
     off_l_end_ci: 72,
