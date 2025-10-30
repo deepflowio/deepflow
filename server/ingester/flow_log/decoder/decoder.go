@@ -42,6 +42,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -445,8 +446,12 @@ func (d *Decoder) spanWrite(l *log_data.L7FlowLog) {
 		return
 	}
 
-	if (l.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) ||
-		l.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL)) && l.TraceId != "" {
+	if ((l.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) || l.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL)) ||
+		// Solving the service rendering problem of mirrored traffic on physical switches
+		(l.TapPortType == datatype.TAPPORT_FROM_GATEWAY_MAC || l.TapPortType == datatype.TAPPORT_FROM_ID) ||
+		// Resolving service rendering issues when cloud hosts do not support eBPF
+		(l.TapSide == flow_metrics.Client.String() || l.TapSide == flow_metrics.Server.String())) &&
+		l.TraceId != "" {
 		l.AddReferenceCount()
 		d.spanBuf = append(d.spanBuf, (*dbwriter.SpanWithTraceID)(l))
 		if len(d.spanBuf) >= BUFFER_SIZE {
