@@ -88,6 +88,7 @@ type ControllerConfig struct {
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
 	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
+	DMCfg         metadb.DMConfig             `yaml:"dm"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
