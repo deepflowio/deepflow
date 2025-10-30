@@ -19,6 +19,7 @@ package config
 const (
 	MetaDBTypeMySQL      = "MySQL"
 	MetaDBTypePostgreSQL = "PostgreSQL"
+	MetaDBTypeDM         = "DM"
 )
 
 type Config struct {
@@ -35,6 +36,9 @@ type Config struct {
 
 	// PostgreSQL
 	Schema string
+
+	// DM
+	DSN string
 
 	// MySQL
 	AutoIncrementIncrement uint32
@@ -134,4 +138,8 @@ type PostgreSQLConfig struct {
 	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn-max-life-time"`
 	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
 	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+type DMConfig struct {
+	DSN string `default:"" yaml:"dsn"`
 }

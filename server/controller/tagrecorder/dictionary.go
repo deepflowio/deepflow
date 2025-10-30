@@ -464,21 +464,30 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 }
 
+func (c *Dictionary) makeSourceClause(db, table string) string {
+	switch c.source.Name {
+	case metaDBCommon.SOURCE_MYSQL, metaDBCommon.SOURCE_POSTGRESQL:
+		return fmt.Sprintf(
+			SQL_SOURCE_MYSQL, c.source.Name, c.source.Host, c.source.Port, c.source.UserName, c.source.UserPassword, c.source.ReplicaSQL, db, table, table,
+		)
+	case metaDBCommon.SOURCE_DM:
+		return fmt.Sprintf(
+			SQL_SOURCE_DM, c.source.DSN, db, table, table,
+		)
+	default:
+		return ""
+	}
+}
+
 func (c *Dictionary) fillCreateSQL(dictName string, ckDatabaseName string, sqlDatabaseName string) string {
 	chTable := chDictNameToMetaDBTableName(dictName)
+	sourceClause := c.makeSourceClause(sqlDatabaseName, chTable)
 	createSQL := CREATE_SQL_MAP[dictName]
 	return fmt.Sprintf(
 		createSQL,
 		ckDatabaseName,
 		dictName,
-		c.source.Name,
-		c.source.Host,
-		c.source.Port,
-		c.source.UserName,
-		c.source.UserPassword,
-		c.source.ReplicaSQL,
-		sqlDatabaseName,
-		chTable,
-		chTable,
-		c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+		sourceClause,
+		c.cfg.TagRecorderCfg.DictionaryRefreshInterval,
+	)
 }
