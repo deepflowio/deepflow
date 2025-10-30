@@ -197,10 +197,14 @@ struct stack_ids_bitmap {
 
 int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM]);
 int start_continuous_profiler(int freq, int java_syms_update_delay,
-			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM]);
+		      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM]);
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);
 int set_profiler_cpu_aggregation(int flag);
+int get_lua_lang_flags_map_fd(void);
+int get_lua_unwind_info_map_fd(void);
+int get_lua_offsets_map_fd(void);
+int get_luajit_offsets_map_fd(void);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);
