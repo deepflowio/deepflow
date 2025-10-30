@@ -613,15 +613,18 @@ static pid_t cached_pid = -1;
 
 static void refresh_lua_offsets(pid_t pid)
 {
+	/* Avoid re-reading BPF maps when we already primed the cache for this pid. */
 	if (cached_pid == pid)
 		return;
 
+	/* Reset cache so partial population never leaks across processes. */
 	cached_pid = pid;
 	cached_have_lua_ofs = false;
 	cached_have_lj_ofs = false;
 	cached_lang_flags = 0;
 
 	int fd;
+	/* Figure out which Lua runtime(s) the process uses. */
 	fd = get_lua_lang_flags_map_fd();
 	if (fd >= 0) {
 		__u32 key = pid;
@@ -631,6 +634,7 @@ static void refresh_lua_offsets(pid_t pid)
 	}
 
 	__u32 offsets_id = 0;
+	/* Grab the offsets profile id recorded during agent-side Lua detection. */
 	fd = get_lua_unwind_info_map_fd();
 	if (fd >= 0) {
 		struct lua_unwind_info_t info = {};
@@ -639,6 +643,7 @@ static void refresh_lua_offsets(pid_t pid)
 			offsets_id = info.offsets_id;
 	}
 
+	/* Resolve and cache the concrete layout hints needed by the kernel unwinder. */
 	if (cached_lang_flags & LANG_LUA) {
 		fd = get_lua_offsets_map_fd();
 		if (fd >= 0) {
@@ -671,6 +676,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 					   stack_str_hash_t * h,
 					   bool new_cache, void *info_p)
 {
+	/* Interpreter stacks are optional; missing ids indicate the kernel skipped unwinding. */
 	if (stack_id < 0)
 		return NULL;
 
@@ -682,6 +688,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return (char *)kv.value;
 	}
 
+	/* Populate cached layout metadata for the process so frame decoding works. */
 	refresh_lua_offsets(pid);
 	if (!(cached_lang_flags & (LANG_LUA | LANG_LUAJIT)))
 		return NULL;
@@ -689,6 +696,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	if (!stack_map_name)
 		return NULL;
 
+	/* Raw frames come from the interpreter stack map populated by the Lua BPF program. */
 	int fd = bpf_table_get_fd(t, stack_map_name);
 	if (fd < 0)
 		return NULL;
@@ -713,6 +721,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 
 	int total = 0;
+	/* Convert encoded frames (tagged pointers) into printable strings. */
 	for (u32 i = 0; i < frame_count; i++) {
 		__u64 encoded = raw_frames[i];
 		if (!encoded)
@@ -787,6 +796,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 	}
 
+	/* Join all interpreter frames into the folded-string form expected by flamegraph tooling. */
 	size_t alloc_len = total + frame_count + 1;
 	char *result =
 	    clib_mem_alloc_aligned("lua_folded_str", alloc_len, 0, NULL);

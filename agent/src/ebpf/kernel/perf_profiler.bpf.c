@@ -1185,13 +1185,13 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 			(void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev),
 						(char *)ci + o->off_ci_prev);
 
-		_u32 tt = -1;
+		__u32 tt = -1;
 		if (bpf_probe_read_user
 		    (&tt, sizeof(tt), (char *)ci_func + o->off_tvalue_tt)) {
 			goto next_frame;
 		}
 
-		_u32 variant = tt & 0x30;
+		__u32 variant = tt & 0x30;
 		bool is_collectable = (tt & LUA_TCOLLECTABLE) != 0;
 
 		void *valp = NULL;
