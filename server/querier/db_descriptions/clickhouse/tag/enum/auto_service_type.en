@@ -13,7 +13,7 @@
 101     , K8s Workload            ,
 102     , Service                 ,
 103     , K8s Cluster             ,
-104     , Custom Service          ,
+104     , Biz Service             ,
 120     , Process                 ,
 130     , Deployment              ,
 131     , StatefulSet             ,
