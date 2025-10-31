@@ -4210,7 +4210,7 @@ inputs:
 **详细描述**:
 
 配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+需关注 agent 内存用量；（2）配置`HTTP2`或`gRPC`会全部开启这两个协议
 
 ##### 分段重组（SR）协议列表 {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -4252,7 +4252,7 @@ inputs:
 注意：
 1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-2. 如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+2. 配置`HTTP2`或`gRPC`会全部开启这两个协议
 
 ### File {#inputs.ebpf.file}
 

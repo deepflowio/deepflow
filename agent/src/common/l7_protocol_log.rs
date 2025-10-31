@@ -114,6 +114,7 @@ macro_rules! impl_protocol_parser {
                 match value {
                     "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
                     "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
+                    "gRPC" => Ok(Self::Http(HttpLog::new_v2(true))),
                     "Custom"=>Ok(Self::Custom(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),

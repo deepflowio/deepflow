@@ -3155,10 +3155,10 @@ inputs:
         #
         #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
         #
-        #     Attention: use `HTTP2` for `gRPC` Protocol.
+        #     Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
         #   ch: |-
         #     配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-        #     需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        #     需关注 agent 内存用量；（2）配置`HTTP2`或`gRPC`会全部开启这两个协议
         # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
         out_of_order_reassembly_protocols: []
         # type: string
@@ -3180,7 +3180,7 @@ inputs:
         #     protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
         #     this feature to be effective.
         #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-        #     Attention: use `HTTP2` for `gRPC` Protocol.
+        #     Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
         #   ch: |-
         #     配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
         #     协议解析，以增强应用协议的采集成功率。
@@ -3188,7 +3188,7 @@ inputs:
         #     注意：
         #     1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
         #        - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-        #     2. 如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        #     2. 配置`HTTP2`或`gRPC`会全部开启这两个协议
         # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
         segmentation_reassembly_protocols: []
     # type: section
