@@ -4316,7 +4316,7 @@ the agent's memory usage.
 
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -4360,7 +4360,7 @@ multiple syscalls before parsing it. This enhances the success rate of applicati
 protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
 this feature to be effective.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ### File {#inputs.ebpf.file}
 
