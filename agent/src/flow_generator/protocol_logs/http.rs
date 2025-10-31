@@ -637,6 +637,7 @@ impl HttpInfo {
         super::swap_if!(self, x_request_id_0, is_default, other);
         super::swap_if!(self, x_request_id_1, is_default, other);
         self.attributes.append(&mut other.attributes);
+        self.metrics.append(&mut other.metrics);
         Ok(())
     }
 
@@ -1973,9 +1974,6 @@ impl HttpLog {
         let (Some(policies), Some(policy_indices)) = (policy, policy_indices) else {
             return;
         };
-        // remember field type when any field parsed success
-        // in other policies, no need to try other field types
-        let mut payload_field_type = None;
         for index in policy_indices {
             let field_policy = match (policies.get(*index), direction) {
                 (Some(policy), PacketDirection::ClientToServer) => &policy.from_req_body,
@@ -1983,9 +1981,6 @@ impl HttpLog {
                 _ => continue,
             };
             for (field_type, fields) in field_policy {
-                if payload_field_type.is_some() && payload_field_type != Some(*field_type) {
-                    continue;
-                }
                 if !field_type_support_protocol(field_type, info.proto) {
                     continue;
                 }
@@ -1995,7 +1990,6 @@ impl HttpLog {
                     else {
                         continue;
                     };
-                    payload_field_type = Some(*field_type);
                     let Some(value) = field.get_value(&extract_field) else {
                         continue;
                     };
@@ -3277,6 +3271,7 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn get_extra_field_config() -> HashMap<&'static str, ExtraField> {
+        // 这个 hashmap 的 key 没有特殊含义，只是方便用 map[key] 取对应的 value 做单测
         HashMap::from([
             (
                 ExtraField::HTTP_PROXY_CLIENT,
@@ -3324,6 +3319,24 @@ mod tests {
                     field_match_type: MatchType::String(false),
                     field_match_keyword: "span_id".into(),
                     rewrite_native_tag: Some(ExtraField::SPAN_ID.into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::RESPONSE_EXCEPTION,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "Field_from_json".into(),
+                    attribute_name: Some("Field_from_json".into()),
+                    ..Default::default()
+                },
+            ),
+            (
+                ExtraField::RESPONSE_STATUS,
+                ExtraField {
+                    field_match_type: MatchType::String(true),
+                    field_match_keyword: "metric_from_xml".into(),
+                    metric_name: Some("metric_from_xml".into()),
                     ..Default::default()
                 },
             ),
@@ -3474,9 +3487,13 @@ mod tests {
     #[test]
     fn test_extra_field_policy_in_payload() {
         let mut parser = HttpLog::new_v1();
-        let mut info = HttpInfo::default();
-        info.proto = L7Protocol::Http1;
-        info.msg_type = LogMessageType::Request;
+        fn get_new_info() -> HttpInfo {
+            let mut info = HttpInfo::default();
+            info.proto = L7Protocol::Http1;
+            info.msg_type = LogMessageType::Request;
+            info
+        }
+        let mut info = get_new_info();
 
         let rewrite_extra_fields: Vec<ExtraField> =
             get_extra_field_config().into_values().collect();
@@ -3539,7 +3556,7 @@ mod tests {
         info.merge_policy_tags_to_http(&mut tags);
         assert_eq!(info.span_id.field, "test_parse_span_id");
         assert_eq!(info.stream_id, Some(456789));
-        assert_eq!(info.trace_id.field, "test_parse_trace_id");
+        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
         assert_eq!(
             info.client_ip
                 .as_ref()
@@ -3553,6 +3570,7 @@ mod tests {
             }
         }
 
+        info = get_new_info();
         let xml_payload = r#"<client>192.168.1.1</client><trace_id>trace_id=test_parse_trace_id;x-request-id=xreqid</trace_id><span_id>test_parse_span_id</span_id><user_id>456789</user_id>"#;
         let mut xml_mixed_payload = Vec::new();
         xml_mixed_payload.extend(random_payload.clone());
@@ -3583,5 +3601,21 @@ mod tests {
                 assert_eq!(attr.val, "456789");
             }
         }
+
+        info = get_new_info();
+        let mixed_payload = r#"{"txStartServNo": "hello", "sss": {"Field_from_json": "field_from_json_value"}}<saeawda><metric_From_XML>42</metric_From_XML></saeawda><FIELD_FROM_XML>field_from_xml</FIELD_FROM_XML>"#;
+        parser.on_payload(
+            &mut info,
+            PacketDirection::ClientToServer,
+            &mut tags,
+            Some(http1_policy),
+            Some(&vec![0usize, 1usize]),
+            &mixed_payload.as_bytes(),
+        );
+        info.merge_policy_tags_to_http(&mut tags);
+        assert!(info.attributes.len() > 0);
+        assert!(info.metrics.len() > 0);
+        assert_eq!(info.attributes[0].val, "field_from_json_value");
+        assert_eq!(info.metrics[0].val, 42.0f32);
     }
 }
