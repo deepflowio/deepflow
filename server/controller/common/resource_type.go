@@ -71,7 +71,7 @@ const (
 	RESOURCE_TYPE_ALL_IP_EN  = "all_ip"
 	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
 
-	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "custom_service"
+	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "biz_service"
 
 	// used for gprocess_id of process in id manager
 	RESOURCE_TYPE_GPROCESS_EN = "gprocess"
