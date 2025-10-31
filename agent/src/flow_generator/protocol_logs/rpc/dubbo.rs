@@ -1758,28 +1758,40 @@ mod tests {
         let mut config = L7LogDynamicConfig::new(
             vec![],
             vec!["x-request-id".into()],
+            true,
             vec!["trace_id".into()],
             vec!["span_id".into()],
             ExtraLogFields::default(),
             false,
             HashMap::new(),
+            0,
+            0,
+            0,
+            256,
         );
         let rewrite_hessian2_payload = vec![
             ExtraField {
-                field_match_type: MatchType::String(false),
+                field_match_type: MatchType::String(true),
                 field_match_keyword: "user.name".into(),
                 attribute_name: Some("user.name".into()),
                 ..Default::default()
             },
             ExtraField {
+                // should not found
+                field_match_type: MatchType::String(true),
+                field_match_keyword: "user.NAME".into(),
+                attribute_name: Some("user.name".into()),
+                ..Default::default()
+            },
+            ExtraField {
                 field_match_type: MatchType::String(false),
-                field_match_keyword: "user.id".into(),
+                field_match_keyword: "user.ID".into(),
                 attribute_name: Some("user.id".into()),
                 ..Default::default()
             },
             ExtraField {
                 field_match_type: MatchType::String(false),
-                field_match_keyword: "user.age".into(),
+                field_match_keyword: "user.aGe".into(),
                 attribute_name: Some("user.age".into()),
                 ..Default::default()
             },
