@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS db_version (
+    version             VARCHAR(64) PRIMARY KEY,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE db_version;
