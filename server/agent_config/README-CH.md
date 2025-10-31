@@ -3706,13 +3706,18 @@ inputs:
 是否启用使用 openssl 库的进程以支持 HTTPS 协议数据采集。
 
 可通过以下方式判断应用进程是否能够使用 `Uprobe hook openssl 库`来采集加密数据：
-- 执行命令`cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
+- 执行命令`sudo cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
   则说明该进程正在使用 openssl 库。
-
+- 如果上面没有搜到 "libssl.so" 也可能是静态编译了，这时候我们可以通过下面方式确认：
+  执行命令 `sudo nm /proc/<PID>/exe | grep SSL_write` 若包含 `SSL_write` 相关信息如：`0000000000502ac0 T SSL_write`
+  则说明该进程正在使用静态编译的 openssl 库。
+  
 启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
 在日志中您会看到类似如下信息：
 ```
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
+或者
+[eBPF] INFO openssl uprobe, pid:28890, path:/proc/28890/root/usr/sbin/nginx
 ```
 
 注意：开启此功能后，Envoy mTLS 流量可自动完成追踪；
