@@ -649,11 +649,16 @@ impl Hessian2Decoder {
         start_index: usize,
     ) -> Option<HessianValue> {
         let mut start = start_index;
+        let key_bytes = key.as_bytes();
         while start < payload.len() {
             if start >= payload.len() {
                 break;
             }
-            let Some(index) = (&payload[start..]).find_substring(key) else {
+            // 这里直接用 eq_ignore_ascii_case 搜索即可，在 process_hessian_value 中会有 field.match 按真实配置校验
+            let Some(index) = (&payload[start..])
+                .windows(key_bytes.len())
+                .position(|w| w.eq_ignore_ascii_case(key_bytes))
+            else {
                 break;
             };
             // 反向校验长度，decode_string 的逆实现，一般 key 的长度有限，这里需要避免 key 误匹配
