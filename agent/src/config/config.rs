@@ -2196,9 +2196,17 @@ impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
     fn from(v: &CustomFieldPolicy) -> ExtraCustomFieldPolicy {
         let mut extra_field_policy = ExtraCustomFieldPolicy::default();
         for field in &v.fields {
+            if field.field_match_keyword.is_empty() {
+                continue;
+            }
+
             if field.traffic_direction & TrafficDirection::Request == TrafficDirection::Request {
                 match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
+                    FieldType::Header
+                    | FieldType::HttpUrl
+                    | FieldType::PayloadHessian2
+                    | FieldType::DubboHeader
+                    | FieldType::DubboPayloadMapString => {
                         extra_field_policy
                             .from_req_key
                             .entry(field.field_type)
@@ -2224,7 +2232,11 @@ impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
 
             if field.traffic_direction & TrafficDirection::Response == TrafficDirection::Response {
                 match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
+                    FieldType::Header
+                    | FieldType::HttpUrl
+                    | FieldType::PayloadHessian2
+                    | FieldType::DubboHeader
+                    | FieldType::DubboPayloadMapString => {
                         extra_field_policy
                             .from_resp_key
                             .entry(field.field_type)
