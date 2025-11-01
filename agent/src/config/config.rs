@@ -37,7 +37,7 @@ use serde::{
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
-use crate::common::l7_protocol_log::L7ProtocolParser;
+use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -49,7 +49,7 @@ use crate::{
 use public::{
     bitmap::Bitmap,
     enums::{Charset, FieldType, TrafficDirection},
-    l7_protocol::L7Protocol,
+    l7_protocol::{L7Protocol, L7ProtocolChecker},
     proto::agent,
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -1186,6 +1186,25 @@ impl Default for EbpfSocketPreprocess {
     }
 }
 
+impl EbpfSocketPreprocess {
+    fn adjust_http2_and_grpc(protocols: &mut Vec<String>) {
+        let bitmap = L7ProtocolBitmap::from(protocols.as_slice());
+
+        if bitmap.is_enabled(L7Protocol::Grpc) && bitmap.is_disabled(L7Protocol::Http2) {
+            protocols.push("HTTP2".to_string());
+        }
+
+        if bitmap.is_enabled(L7Protocol::Http2) && bitmap.is_disabled(L7Protocol::Grpc) {
+            protocols.push("gRPC".to_string());
+        }
+    }
+
+    fn adjust(&mut self) {
+        Self::adjust_http2_and_grpc(&mut self.out_of_order_reassembly_protocols);
+        Self::adjust_http2_and_grpc(&mut self.segmentation_reassembly_protocols);
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Ebpf {
@@ -1467,6 +1486,23 @@ pub struct Inputs {
     pub resources: Resources,
     pub integration: Integration,
     pub vector: Vector,
+}
+
+impl Inputs {
+    fn adjust(&mut self) {
+        // DPDK from eBPF
+        if self.ebpf.tunning.userspace_worker_threads as usize
+            != self.cbpf.af_packet.tunning.packet_fanout_count
+            && self.cbpf.special_network.dpdk.source == DpdkSource::Ebpf
+        {
+            debug!("Update inputs.cbpf.af_packet.tunning.packet_fanout_count with self.inputs.ebpf.tunning.userspace_worker_threads({}) when self.inputs.cbpf.special_network.dpdk.source is {:?}",
+                self.ebpf.tunning.userspace_worker_threads, self.cbpf.special_network.dpdk.source);
+            self.cbpf.af_packet.tunning.packet_fanout_count =
+                self.ebpf.tunning.userspace_worker_threads as usize;
+        }
+
+        self.ebpf.socket.preprocess.adjust();
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -3125,16 +3161,7 @@ impl UserConfig {
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
     pub fn adjust(&mut self) {
-        // DPDK from eBPF
-        if self.inputs.ebpf.tunning.userspace_worker_threads as usize
-            != self.inputs.cbpf.af_packet.tunning.packet_fanout_count
-            && self.inputs.cbpf.special_network.dpdk.source == DpdkSource::Ebpf
-        {
-            debug!("Update inputs.cbpf.af_packet.tunning.packet_fanout_count with self.inputs.ebpf.tunning.userspace_worker_threads({}) when self.inputs.cbpf.special_network.dpdk.source is {:?}",
-                self.inputs.ebpf.tunning.userspace_worker_threads, self.inputs.cbpf.special_network.dpdk.source);
-            self.inputs.cbpf.af_packet.tunning.packet_fanout_count =
-                self.inputs.ebpf.tunning.userspace_worker_threads as usize;
-        }
+        self.inputs.adjust();
     }
 
     pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {

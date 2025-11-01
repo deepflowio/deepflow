@@ -3777,6 +3777,11 @@ One can use the following method to determine whether an application process can
 - Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
   information about openssl. If it does, it indicates that this process is using the
   openssl library.
+- If "libssl.so" is not found above, it may indicate that the program
+  is statically linked with OpenSSL. In that case, you can verify it by:
+  running the command `sudo nm /proc/<PID>/exe | grep SSL_write`.
+  If the output contains symbols such as `0000000000502ac0 T SSL_write`,
+  it means the process is using a statically linked OpenSSL library.
 
 After enabled, deepflow-agent will retrieve process information that
 matches the regular expression, hooking the corresponding encryption/decryption
@@ -3784,6 +3789,8 @@ interfaces of the openssl library. In the logs, you will encounter a message sim
 to the following:
 ```
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
+OR
+[eBPF] INFO openssl uprobe, pid:28890, path:/proc/28890/root/usr/sbin/nginx
 ```
 
 Note: When this feature is enabled, Envoy mTLS traffic can be automatically traced.
@@ -4309,7 +4316,7 @@ the agent's memory usage.
 
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -4353,7 +4360,7 @@ multiple syscalls before parsing it. This enhances the success rate of applicati
 protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
 this feature to be effective.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ### File {#inputs.ebpf.file}
 

@@ -29,5 +29,6 @@ const (
 const (
 	SOURCE_MYSQL      = "MYSQL"
 	SOURCE_POSTGRESQL = "POSTGRESQL"
+	SOURCE_DM         = "DM"
 	SQL_REPLICA       = "REPLICA (HOST '%s' PRIORITY 1)"
 )
