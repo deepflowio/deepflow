@@ -541,6 +541,21 @@ func (k *KnowledgeGraph) fill(
 	// 对于VIP的流量，需要使用MAC来匹配
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
 	lookupByAgent0, lookupByAgent1 := false, false
+
+	// if the local end is a loopback address, use peer Pod for matching.
+	if utils.IsLoopback(isIPv6, ip40, ip60) {
+		if podId0 == 0 && podId1 != 0 {
+			k.TagSource0 |= uint8(flow_metrics.Peer)
+			podId0 = podId1
+		}
+	}
+	if utils.IsLoopback(isIPv6, ip41, ip61) {
+		if podId1 == 0 && podId0 != 0 {
+			k.TagSource1 |= uint8(flow_metrics.Peer)
+			podId1 = podId0
+		}
+	}
+
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(flow_metrics.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
@@ -602,7 +617,9 @@ func (k *KnowledgeGraph) fill(
 		if lookupByMac0 {
 			k.TagSource0 |= uint8(flow_metrics.Mac)
 			info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
-		} else if lookupByAgent0 {
+		}
+
+		if info0 == nil && lookupByAgent0 {
 			k.TagSource0 |= uint8(flow_metrics.Agent)
 			if info := platformData.QueryVtapInfo(k.OrgId, vtapId); info != nil {
 				agentInfo = common.RegetInfoFromIP(k.OrgId, !info.IsIPv4, info.IP6, info.IP4, info.EpcId, platformData)
@@ -619,7 +636,9 @@ func (k *KnowledgeGraph) fill(
 		if lookupByMac1 {
 			k.TagSource1 |= uint8(flow_metrics.Mac)
 			info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
-		} else if lookupByAgent1 {
+		}
+
+		if info1 == nil && lookupByAgent1 {
 			k.TagSource1 |= uint8(flow_metrics.Agent)
 			if lookupByAgent0 && agentInfo != nil {
 				info1 = agentInfo
@@ -629,6 +648,7 @@ func (k *KnowledgeGraph) fill(
 				}
 			}
 		}
+
 		if info1 == nil {
 			k.TagSource1 |= uint8(flow_metrics.EpcIP)
 			info1 = common.RegetInfoFromIP(k.OrgId, isIPv6, ip61, ip41, l3EpcID1, platformData)
