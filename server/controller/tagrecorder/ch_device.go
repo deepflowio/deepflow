@@ -1110,6 +1110,11 @@ func (c *ChCustomServiceDevice) sourceToTarget(md *message.Metadata, source *mys
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_CUSTOM_SERVICE,
 	}]
+	if iconID == 0 {
+		iconID = c.resourceTypeToIconID[IconKey{
+			NodeType: "custom_service",
+		}]
+	}
 	sourceName := source.Name
 	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_CUSTOM_SERVICE,
 		DeviceID: source.ID})
