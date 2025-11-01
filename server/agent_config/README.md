@@ -1901,6 +1901,13 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
+      match_regex: \b(?:lua|luajit)(\S)*( +-\S+)* +(\S*/)*([^ /]+)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $4
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
       match_regex: ^deepflow-
       only_in_container: false
     - enabled_features:
@@ -2059,6 +2066,7 @@ inputs:
 | java | |
 | golang | |
 | python | |
+| lua | |
 | nodejs | |
 | dotnet | |
 
@@ -10788,4 +10796,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

@@ -25,6 +25,7 @@
 #include <math.h>
 #include <signal.h>		/* kill() */
 #include <bcc/perf_reader.h>
+#include <bcc/libbpf.h>
 #include "../config.h"
 #include "../common_utils.h"
 #include "../utils.h"
@@ -50,6 +51,7 @@
 #include "../proc.h"
 #include "../unwind_tracer.h"
 #include "trace_utils.h"
+#include "../probe.h"
 
 #include "../perf_profiler_bpf_common.c"
 #include "../perf_profiler_bpf_5_2_plus.c"
@@ -65,6 +67,37 @@ struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
 
 static bool g_enable_oncpu = true;
+
+#ifndef AARCH64_MUSL
+static int lua_lang_flags_fd = -1;
+static int lua_unwind_info_fd = -1;
+static int lua_offsets_fd = -1;
+static int luajit_offsets_fd = -1;
+
+static void reset_lua_map_fds(void)
+{
+	lua_lang_flags_fd = -1;
+	lua_unwind_info_fd = -1;
+	lua_offsets_fd = -1;
+	luajit_offsets_fd = -1;
+}
+
+static void refresh_lua_map_fds(struct bpf_tracer *tracer)
+{
+	reset_lua_map_fds();
+	lua_lang_flags_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
+	lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
+	lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
+	luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
+
+	if (lua_lang_flags_fd < 0 || lua_unwind_info_fd < 0 ||
+	    lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
+		ebpf_warning("lua profiling maps not available (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
+			     lua_lang_flags_fd, lua_unwind_info_fd,
+			     lua_offsets_fd, luajit_offsets_fd);
+	}
+}
+#endif
 
 /* Used for handling updates to JAVA symbol files */
 static pthread_t java_syms_update_thread;
@@ -131,6 +164,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&tracer->recv, 1);
 }
 
+
 static int release_profiler(struct bpf_tracer *tracer)
 {
 	tracer_reader_lock(tracer);
@@ -145,6 +179,7 @@ static int release_profiler(struct bpf_tracer *tracer)
 
 	/* release object */
 	release_object(tracer->obj);
+	reset_lua_map_fds();
 
 	tracer_reader_unlock(tracer);
 
@@ -354,6 +389,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
+
+	refresh_lua_map_fds(tracer);
 
 	/* clear old perf files */
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "", NULL, 0);
@@ -708,9 +745,11 @@ void build_prog_jump_tables(struct bpf_tracer *tracer)
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
 			   PROG_ONCPU_OUTPUT_FOR_PE, PROG_ONCPU_OUTPUT_PE_IDX);
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
-			   PROG_PYTHON_UNWIND_FOR_PE,
-			   PROG_PYTHON_UNWIND_PE_IDX);
-        // TODO: 增加 lua 相关的程序
+		   	   PROG_PYTHON_UNWIND_FOR_PE,
+		   	   PROG_PYTHON_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+		   	   PROG_LUA_UNWIND_FOR_PE,
+		   	   PROG_LUA_UNWIND_PE_IDX);
 	extended_prog_jump_tables(tracer);
 }
 
@@ -758,6 +797,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      NANOSEC_PER_SEC / freq,
 			      cb_ctx[PROFILER_CTX_ONCPU_IDX]);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
+	reset_lua_map_fds();
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN)
 	    || (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -922,6 +962,27 @@ struct bpf_tracer *get_profiler_tracer(void)
 	return profiler_tracer;
 }
 
+int get_lua_lang_flags_map_fd(void)
+{
+	return lua_lang_flags_fd;
+}
+
+int get_lua_unwind_info_map_fd(void)
+{
+	return lua_unwind_info_fd;
+}
+
+int get_lua_offsets_map_fd(void)
+{
+	return lua_offsets_fd;
+}
+
+int get_luajit_offsets_map_fd(void)
+{
+	return luajit_offsets_fd;
+}
+
+
 /*
  * Configure and enable the debugging functionality for Continuous Profiling.
  *
@@ -1027,6 +1088,26 @@ void release_flame_graph_hash(void)
 int set_profiler_cpu_aggregation(int flag)
 {
 	return (-1);
+}
+
+int get_lua_lang_flags_map_fd(void)
+{
+	return -1;
+}
+
+int get_lua_unwind_info_map_fd(void)
+{
+	return -1;
+}
+
+int get_lua_offsets_map_fd(void)
+{
+	return -1;
+}
+
+int get_luajit_offsets_map_fd(void)
+{
+	return -1;
 }
 
 struct bpf_tracer *get_profiler_tracer(void)
