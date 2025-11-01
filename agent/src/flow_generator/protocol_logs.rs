@@ -644,6 +644,9 @@ impl PrioFields {
     // insertion is kept in ascending order by prio; if prio is the same, insert it at the end (stable sort)
     #[inline]
     fn insert_sorted(&mut self, field: PrioField<String>) {
+        if field.field.is_empty() {
+            return;
+        }
         // find the first position greater than it (>), skip those that are equal
         let pos = match self.0.binary_search_by(|x| x.prio.cmp(&field.prio)) {
             Ok(mut i) => {
