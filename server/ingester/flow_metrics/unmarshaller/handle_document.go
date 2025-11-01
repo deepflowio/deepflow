@@ -40,7 +40,17 @@ const (
 
 func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
 	var info, info1 *grpc.Info
+
 	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
+		// if the local end is a loopback address, use peer Pod for matching
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP, t.IP6) {
+			// use peer pod information for matching
+			if t.PodID == 0 && t.PodID1 != 0 {
+				t.TagSource |= uint8(flow_metrics.Peer)
+				t.PodID = t.PodID1
+			}
+		}
+
 		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
 		if t.GPID != 0 && t.PodID == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID)
@@ -86,6 +96,13 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 	}
 
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP1, t.IP61) {
+			if t.PodID1 == 0 && t.PodID != 0 {
+				t.TagSource1 |= uint8(flow_metrics.Peer)
+				t.PodID1 = t.PodID
+			}
+		}
+
 		if t.GPID1 != 0 && t.PodID1 == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID1)
 			if podId != 0 && vtapId == t.VTAPID {
