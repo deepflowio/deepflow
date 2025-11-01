@@ -40,7 +40,23 @@ const (
 
 func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
 	var info, info1 *grpc.Info
+	lookupByPeerIp0, lookupByPeerIp1 := false, false
+
 	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
+		// if the local end is a loopback address, use peer information(POD/IP) for matching
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP, t.IP6) {
+			// use peer pod information for matching
+			if t.PodID == 0 && t.PodID1 != 0 {
+				t.TagSource |= uint8(flow_metrics.Peer)
+				t.PodID = t.PodID1
+
+				// use peer IP for matching
+			} else if !utils.IsLoopback(t.IsIPv4 == 0, t.IP1, t.IP61) &&
+				!utils.IsUnspecified(t.IsIPv4 == 0, t.IP1, t.IP61) {
+				lookupByPeerIp0 = true
+			}
+		}
+
 		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
 		if t.GPID != 0 && t.PodID == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID)
@@ -61,6 +77,11 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 			if t.MAC != 0 {
 				t.TagSource |= uint8(flow_metrics.Mac)
 				info = platformData.QueryMacInfo(t.OrgId, t.MAC|uint64(t.L3EpcID)<<48)
+			}
+
+			if info == nil && lookupByPeerIp0 {
+				t.TagSource |= uint8(flow_metrics.Peer)
+				info = common.RegetInfoFromIP(t.OrgId, t.IsIPv4 == 0, t.IP61, t.IP1, t.L3EpcID1, platformData)
 			}
 
 			if info == nil {
@@ -86,6 +107,16 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 	}
 
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP1, t.IP61) {
+			if t.PodID1 == 0 && t.PodID != 0 {
+				t.TagSource1 |= uint8(flow_metrics.Peer)
+				t.PodID1 = t.PodID
+			} else if !utils.IsLoopback(t.IsIPv4 == 0, t.IP, t.IP6) &&
+				!utils.IsUnspecified(t.IsIPv4 == 0, t.IP, t.IP6) {
+				lookupByPeerIp1 = true
+			}
+		}
+
 		if t.GPID1 != 0 && t.PodID1 == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID1)
 			if podId != 0 && vtapId == t.VTAPID {
@@ -103,6 +134,11 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 			if t.MAC1 != 0 {
 				t.TagSource1 |= uint8(flow_metrics.Mac)
 				info1 = platformData.QueryMacInfo(t.OrgId, t.MAC1|uint64(t.L3EpcID1)<<48)
+			}
+
+			if info1 == nil && lookupByPeerIp1 {
+				t.TagSource1 |= uint8(flow_metrics.Peer)
+				info1 = common.RegetInfoFromIP(t.OrgId, t.IsIPv4 == 0, t.IP6, t.IP, t.L3EpcID, platformData)
 			}
 
 			if info1 == nil {
