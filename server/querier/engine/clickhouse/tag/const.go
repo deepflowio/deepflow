@@ -86,7 +86,7 @@ var AutoServiceMap = map[string]int{
 	"daemon_set":             VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET,
 	"replica_set_controller": VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
 	"clone_set":              VIF_DEVICE_TYPE_POD_GROUP_CLONESET,
-	"custom_service":         VIF_DEVICE_TYPE_CUSTOM_SERVICE,
+	"biz_service":            VIF_DEVICE_TYPE_CUSTOM_SERVICE,
 }
 
 var PodGroupTypeSlice = []string{
