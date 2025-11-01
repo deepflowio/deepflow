@@ -47,6 +47,7 @@
 #define LUA_TSTATE_ENTRIES       65536
 #define LUA_OFFSET_PROFILES      8
 #define LUA_EVENTS_MAX_CPUS      256
+#define LUA_STATE_STACK_DEPTH    8
 
 #define LANG_NONE    0u
 #define LANG_LUA     (1u << 0)
@@ -57,8 +58,8 @@
 #define FRAME_SYMID(x)           FRAME_META(x)
 
 #define LUA_CLOSURE            (0u << 4)
-#define LUA_LIGHT_C_FUNC           (1u << 4)
-#define LUA_C_CLOSURE            (2u << 4)
+#define LUA_LIGHT_C_FUNC       (1u << 4)
+#define LUA_C_CLOSURE          (2u << 4)
 
 #ifndef PERF_MAX_STACK_DEPTH
 #define PERF_MAX_STACK_DEPTH 127
@@ -68,6 +69,12 @@ struct lua_unwind_info_t {
 	__u8 offsets_id;	/* entry in offsets map */
 	__u8 reserved[7];	/* spare for alignment */
 	__u64 state_address;	/* lua_State* in target */
+};
+
+struct lua_state_cache_t {
+	__u64 states[LUA_STATE_STACK_DEPTH];
+	__u8 depth;
+	__u8 pad[7];
 };
 
 enum func_type {
@@ -162,8 +169,9 @@ static __always_inline int uread_mref(void **p64, const void *src_mref)
 {
 	__u64 v = 0;
 	int r = bpf_probe_read_user(&v, sizeof(v), src_mref);
-	if (r)
+	if (r) {
 		return r;
+	}
 	*p64 = (void *)(unsigned long)v;
 	return 0;
 }
@@ -179,8 +187,9 @@ static __always_inline int uread_gcref(void **dst, const void *pt,
 {
 	__u64 raw;
 	int r = uread(&raw, uadd(pt, lj->off_gcproto_chunkname), sizeof(raw));
-	if (r)
+	if (r) {
 		return r;
+	}
 	*dst = decode_gcref_raw(raw, lj);
 	return 0;
 }

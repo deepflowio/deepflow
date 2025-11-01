@@ -187,8 +187,8 @@ typedef void stack_t;
 
 /* ------------------ maps for lua------------------ */
 #ifdef LINUX_VER_5_2_PLUS
-/* Cache lua_State* captured from interpreter entry per thread (key: tid, value: lua_State pointer). */
-MAP_HASH(lua_tstate_map, __u32, __u64, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
+/* Cache lua_State* stack captured from interpreter entry per thread (key: tid, value: struct lua_state_cache_t). */
+MAP_HASH(lua_tstate_map, __u32, struct lua_state_cache_t, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 /* Records which Lua runtime a process uses (key: tgid, value: LANG_* bitmask). */
 MAP_HASH(lang_flags_map, __u32, __u32, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 /* Per-process Lua unwinding metadata (key: tgid, value: struct lua_unwind_info_t). */
@@ -197,6 +197,69 @@ MAP_HASH(lua_unwind_info_map, __u32, struct lua_unwind_info_t, LUA_TSTATE_ENTRIE
 MAP_HASH(lua_offsets_map, __u32, struct lua_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
 /* LuaJIT structure layout descriptions indexed by offsets id (key: id, value: struct lj_ofs). */
 MAP_HASH(luajit_offsets_map, __u32, struct lj_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
+
+static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t *cache,
+						 __u8 idx)
+{
+	if (idx >= LUA_STATE_STACK_DEPTH)
+		return 0;
+	return cache->states[idx];
+}
+
+static __always_inline void lua_state_slot_write(struct lua_state_cache_t *cache,
+						 __u8 idx, __u64 value)
+{
+	if (idx >= LUA_STATE_STACK_DEPTH)
+		return;
+	cache->states[idx] = value;
+}
+
+static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
+{
+	__u32 tid = (__u32)id;
+	struct lua_state_cache_t *cache = lua_tstate_map__lookup(&tid);
+	if (!cache) {
+		struct lua_state_cache_t init = {};
+		init.depth = 1;
+		init.states[0] = state;
+		lua_tstate_map__update(&tid, &init);
+		return;
+	}
+
+	__u8 depth = cache->depth;
+	if (depth >= LUA_STATE_STACK_DEPTH) {
+#pragma unroll
+		for (int i = 1; i < LUA_STATE_STACK_DEPTH; i++) {
+			cache->states[i - 1] = cache->states[i];
+		}
+		depth = LUA_STATE_STACK_DEPTH - 1;
+	}
+
+	lua_state_slot_write(cache, depth, state);
+	cache->depth = depth + 1;
+}
+
+static __always_inline void lua_state_stack_pop(__u64 id)
+{
+	__u32 tid = (__u32)id;
+	struct lua_state_cache_t *cache = lua_tstate_map__lookup(&tid);
+	if (!cache)
+		return;
+
+	__u8 depth = cache->depth;
+	if (depth == 0) {
+		lua_tstate_map__delete(&tid);
+		return;
+	}
+
+	depth--;
+	cache->depth = depth;
+	if (depth < LUA_STATE_STACK_DEPTH)
+		lua_state_slot_write(cache, depth, 0);
+
+	if (depth == 0)
+		lua_tstate_map__delete(&tid);
+}
 #endif
 
 
@@ -629,8 +692,14 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
     if (flags && (*flags & (LANG_LUA | LANG_LUAJIT))) {
 		state->lua_is_jit = (*flags & LANG_LUAJIT) ? 1 : 0;
 
-		__u64 *Lptr = lua_tstate_map__lookup(&key->pid);  // pid==tid in key
-		if (Lptr && *Lptr) state->lua_L_ptr = (void *)(*Lptr);
+		struct lua_state_cache_t *cache =
+		    lua_tstate_map__lookup(&key->pid);  // pid==tid in key
+		if (cache && cache->depth > 0) {
+			__u8 top_idx = cache->depth - 1;
+			__u64 top = lua_state_slot_read(cache, top_idx);
+			if (top)
+				state->lua_L_ptr = (void *)top;
+		}
 
 		struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
 		if (uw) state->lua_offsets_id = uw->offsets_id;
@@ -1427,17 +1496,16 @@ static __always_inline int probe_entry_lua(struct pt_regs *ctx)
 	if (!param1)
 		return 0;
 
-	__u32 tid = bpf_get_current_pid_tgid();
+	__u64 id = bpf_get_current_pid_tgid();
 
-	__u64 lua_state = (__u64) param1;
-	lua_tstate_map__update(&tid, &lua_state);
+	lua_state_stack_push(id, (__u64)param1);
 	return 0;
 }
 
 static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
 {
-	__u32 tid = bpf_get_current_pid_tgid();
-	lua_tstate_map__delete(&tid);
+	__u64 id = bpf_get_current_pid_tgid();
+	lua_state_stack_pop(id);
 	return 0;
 }
 

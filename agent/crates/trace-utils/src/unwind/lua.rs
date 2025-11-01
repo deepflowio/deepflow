@@ -24,14 +24,17 @@ use crate::utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF
 
 const LANG_LUA: u32 = 1 << 0;
 const LANG_LUAJIT: u32 = 1 << 1;
+pub const LUA_RUNTIME_VERSION_LEN: usize = 32;
+pub const LUA_RUNTIME_DETECT_METHOD_LEN: usize = 256;
+pub const LUA_RUNTIME_PATH_LEN: usize = 1024;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct LuaRuntimeInfo {
-    pub kind: u32,         // 0 = none, 1 = Lua, 2 = LuaJIT
-    pub version: [u8; 32], // e.g. "5.4", "5.3", "2.1"
-    pub detection_method: [u8; 256],
-    pub path: [u8; 512],
+    pub kind: u32,                              // 0 = none, 1 = Lua, 2 = LuaJIT
+    pub version: [u8; LUA_RUNTIME_VERSION_LEN], // e.g. "5.4", "5.3", "2.1"
+    pub detection_method: [u8; LUA_RUNTIME_DETECT_METHOD_LEN],
+    pub path: [u8; LUA_RUNTIME_PATH_LEN],
 }
 
 fn trim_nul(bytes: &[u8]) -> &[u8] {
@@ -466,6 +469,7 @@ impl LuaUnwindTable {
         };
 
         let key = RuntimeKey::new(1, major as u8, minor as u8);
+        let mut inserted = false;
         let offsets_id = match self.lua_offsets_ids.get(&key) {
             Some(id) => *id,
             None => {
@@ -475,12 +479,25 @@ impl LuaUnwindTable {
                     return;
                 }
                 self.lua_offsets_ids.insert(key, id);
+                inserted = true;
                 id
             }
         };
 
-        self.update_unwind_info(pid, offsets_id, 0);
-        self.update_lang_flags(pid, LANG_LUA);
+        if self.update_unwind_info(pid, offsets_id, 0).is_err() {
+            if inserted {
+                self.rollback_lua_offsets(key, offsets_id);
+            }
+            return;
+        }
+
+        if self.update_lang_flags(pid, LANG_LUA).is_err() {
+            self.delete_unwind_info(pid);
+            if inserted {
+                self.rollback_lua_offsets(key, offsets_id);
+            }
+            return;
+        }
     }
 
     unsafe fn handle_luajit(&mut self, pid: u32, version: &str) {
@@ -491,6 +508,7 @@ impl LuaUnwindTable {
         }
 
         let key = RuntimeKey::new(2, major as u8, minor as u8);
+        let mut inserted = false;
         let offsets_id = match self.luajit_offsets_ids.get(&key) {
             Some(id) => *id,
             None => {
@@ -505,15 +523,28 @@ impl LuaUnwindTable {
                     return;
                 }
                 self.luajit_offsets_ids.insert(key, id);
+                inserted = true;
                 id
             }
         };
 
-        self.update_unwind_info(pid, offsets_id, 0);
-        self.update_lang_flags(pid, LANG_LUAJIT);
+        if self.update_unwind_info(pid, offsets_id, 0).is_err() {
+            if inserted {
+                self.rollback_luajit_offsets(key, offsets_id);
+            }
+            return;
+        }
+
+        if self.update_lang_flags(pid, LANG_LUAJIT).is_err() {
+            self.delete_unwind_info(pid);
+            if inserted {
+                self.rollback_luajit_offsets(key, offsets_id);
+            }
+            return;
+        }
     }
 
-    unsafe fn update_lang_flags(&self, pid: u32, mask: u32) {
+    unsafe fn update_lang_flags(&self, pid: u32, mask: u32) -> Result<(), i32> {
         let key = pid;
         let ret = bpf_update_elem(
             self.lang_flags_fd,
@@ -526,12 +557,19 @@ impl LuaUnwindTable {
             warn!(
                 "update lua lang flags for process#{pid} failed: bpf_update_elem() returned {errno}"
             );
+            Err(errno)
         } else {
             info!("lua lang flags updated for process#{pid}: mask=0x{mask:08x}");
+            Ok(())
         }
     }
 
-    unsafe fn update_unwind_info(&self, pid: u32, offsets_id: u8, state_addr: u64) {
+    unsafe fn update_unwind_info(
+        &self,
+        pid: u32,
+        offsets_id: u8,
+        state_addr: u64,
+    ) -> Result<(), i32> {
         let key = pid;
         let info = LuaUnwindInfo {
             offsets_id,
@@ -555,10 +593,58 @@ impl LuaUnwindTable {
             warn!(
                 "update lua unwind info for process#{pid} failed: bpf_update_elem() returned {errno}"
             );
+            Err(errno)
         } else {
             info!(
                 "lua unwind info updated for process#{pid}: offsets_id={offsets_id}, state=0x{state_addr:016x}"
             );
+            Ok(())
+        }
+    }
+
+    unsafe fn delete_unwind_info(&self, pid: u32) {
+        let key = pid;
+        if bpf_delete_elem(self.unwind_info_fd, &key as *const u32 as *const c_void) != 0 {
+            let errno = get_errno();
+            if errno != libc::ENOENT {
+                warn!(
+                    "rollback lua unwind info for process#{pid} failed: bpf_delete_elem() returned {errno}"
+                );
+            }
+        }
+    }
+
+    unsafe fn rollback_lua_offsets(&mut self, key: RuntimeKey, offsets_id: u8) {
+        if self.lua_offsets_ids.remove(&key).is_some() {
+            self.lua_id_gen.release(offsets_id as u32);
+            let map_key = offsets_id as u32;
+            if bpf_delete_elem(self.lua_offsets_fd, &map_key as *const u32 as *const c_void) != 0 {
+                let errno = get_errno();
+                if errno != libc::ENOENT {
+                    warn!(
+                        "rollback lua offsets (id={offsets_id}) failed: bpf_delete_elem() returned {errno}"
+                    );
+                }
+            }
+        }
+    }
+
+    unsafe fn rollback_luajit_offsets(&mut self, key: RuntimeKey, offsets_id: u8) {
+        if self.luajit_offsets_ids.remove(&key).is_some() {
+            self.luajit_id_gen.release(offsets_id as u32);
+            let map_key = offsets_id as u32;
+            if bpf_delete_elem(
+                self.luajit_offsets_fd,
+                &map_key as *const u32 as *const c_void,
+            ) != 0
+            {
+                let errno = get_errno();
+                if errno != libc::ENOENT {
+                    warn!(
+                        "rollback luajit offsets (id={offsets_id}) failed: bpf_delete_elem() returned {errno}"
+                    );
+                }
+            }
         }
     }
 
@@ -703,9 +789,9 @@ fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
 
     let mut info = LuaRuntimeInfo {
         kind,
-        version: [0; 32],
-        detection_method: [0; 256],
-        path: [0; 512],
+        version: [0; LUA_RUNTIME_VERSION_LEN],
+        detection_method: [0; LUA_RUNTIME_DETECT_METHOD_LEN],
+        path: [0; LUA_RUNTIME_PATH_LEN],
     };
 
     let best_path_str = best_path.as_str();

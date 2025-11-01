@@ -22,6 +22,12 @@
 #include <stdint.h>
 #include "consts.h"
 
+#define LUA_RUNTIME_DETECT_METHOD_LEN 256
+
+#define LUA_RUNTIME_PATH_LEN 1024
+
+#define LUA_RUNTIME_VERSION_LEN 32
+
 #define UNWIND_ENTRIES_PER_SHARD 65535
 
 #define UNWIND_SHARDS_PER_PROCESS 256
@@ -51,9 +57,9 @@ typedef struct unwind_table_t unwind_table_t;
 
 typedef struct {
     uint32_t kind;
-    uint8_t version[32];
-    uint8_t detection_method[256];
-    uint8_t path[512];
+    uint8_t version[LUA_RUNTIME_VERSION_LEN];
+    uint8_t detection_method[LUA_RUNTIME_DETECT_METHOD_LEN];
+    uint8_t path[LUA_RUNTIME_PATH_LEN];
 } lua_runtime_info_t;
 
 typedef struct {
@@ -208,4 +214,4 @@ void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);
 
-#endif /* TRACE_UTILS_H */
+#endif  /* TRACE_UTILS_H */
