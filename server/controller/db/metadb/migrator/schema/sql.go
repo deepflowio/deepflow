@@ -20,6 +20,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/rawsql/dameng"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/rawsql/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/rawsql/postgres"
 )
@@ -44,6 +45,8 @@ func GetSqlFmt(cfg config.Config) SqlFmt {
 		r = &mysql.SqlFmt{}
 	case config.MetaDBTypePostgreSQL:
 		r = &postgres.SqlFmt{}
+	case config.MetaDBTypeDaMeng:
+		r = &dameng.SqlFmt{}
 	default:
 		log.Errorf("unsupported database type: %s", cfg.Type)
 		return nil
