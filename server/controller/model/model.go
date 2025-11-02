@@ -747,7 +747,7 @@ type GenesisProcess struct {
 	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
-	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
+	User        string    `gorm:"column:user_name;type:varchar(256);default:null" json:"USER"`
 	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
 	NodeIP      string    `gorm:"primaryKey;column:node_ip;type:char(48)" json:"NODE_IP"`
 	StartTime   time.Time `gorm:"column:start_time;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"START_TIME"`
