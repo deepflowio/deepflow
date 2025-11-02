@@ -26,6 +26,7 @@ import (
 	"time"
 
 	mysql_driver "github.com/go-sql-driver/mysql"
+	dameng_driver "github.com/godoes/gorm-dameng"
 	postgres_driver "github.com/lib/pq"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -36,98 +37,28 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-type ClickHouseSource struct {
-	Name         string
-	Database     string
-	Host         string
-	Port         uint32
-	ProxyHost    string
-	ProxyPort    uint32
-	UserName     string
-	UserPassword string
-	ReplicaSQL   string
+type SessionConfig struct {
+	DBCfg config.Config
+	// set UseDabase=false in dsn only when migrating Metadb
+	UseDabase bool
+	// set TimeoutCoefficient=2 in dsn only when migrating Metadb
+	TimeoutCoefficient uint16
+	// set multiStatements=true in dsn only when migrating Metadb
+	MultiStatements bool
 }
 
 func GetSession(cfg config.Config) (*gorm.DB, error) {
-	connector, err := GetConnector(cfg, true, cfg.TimeOut, false)
-	if err != nil {
-		return nil, err
-	}
-	return InitSession(cfg, connector)
+	return InitSession(SessionConfig{
+		DBCfg:              cfg,
+		UseDabase:          true,
+		TimeoutCoefficient: 1,
+	})
 }
 
-func GetConnector(cfg config.Config, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
-	switch cfg.Type {
-	case config.MetaDBTypeMySQL:
-		return getMySQLConnector(cfg, useDatabase, timeout, multiStatements)
-	case config.MetaDBTypePostgreSQL:
-		return getPostgreSQLConnector(cfg, useDatabase, timeout)
-	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
-	}
-}
-
-func getMySQLConnector(cfg config.Config, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
-	var database string
-	if useDatabase {
-		database = cfg.Database
-	}
-
-	location, err := time.LoadLocation("Local")
-	if err != nil {
-		log.Error("Get location failed with error: %v", err.Error())
-		return nil, err
-	}
-
-	config := mysql_driver.NewConfig()
-	config.User = cfg.UserName
-	config.Passwd = cfg.UserPassword
-	config.Net = "tcp"
-	config.Addr = net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
-	config.DBName = database
-	config.AllowNativePasswords = true
-	config.Loc = location
-	config.Timeout = time.Duration(timeout) * time.Second
-	config.ParseTime = true
-	config.MultiStatements = multiStatements
-	config.Params = map[string]string{"charset": "utf8mb4"}
-
-	connector, err := mysql_driver.NewConnector(config)
-	if err != nil {
-		log.Error("get database(%s) connector failed with error: %v", database, err.Error())
-		return nil, err
-	}
-	return connector, nil
-}
-
-func getPostgreSQLConnector(cfg config.Config, useDatabase bool, timeout uint32) (driver.Connector, error) {
-	connStr := "user=" + cfg.UserName +
-		" password=" + cfg.UserPassword +
-		" host=" + cfg.Host +
-		" port=" + fmt.Sprintf("%d", cfg.Port) +
-		" connect_timeout=" + fmt.Sprintf("%d", int(timeout)) +
-		" sslmode=disable" +
-		" client_encoding=UTF8"
-
-	database := "postgres" // TODO
-	if useDatabase {
-		database = cfg.Database
-	}
-	connStr += " dbname=" + database +
-		" search_path=" + cfg.Schema
-
-	connector, err := postgres_driver.NewConnector(connStr)
-	if err != nil {
-		log.Error("get database(%s) connector failed with error: %v", database, err.Error())
-		return nil, err
-	}
-	return connector, nil
-}
-
-func InitSession(cfg config.Config, connector driver.Connector) (*gorm.DB, error) {
-	dialector := getDialector(cfg, connector)
+func InitSession(cfg SessionConfig) (*gorm.DB, error) {
+	dialector, err := getDialector(cfg)
 	if dialector == nil {
-		return nil, fmt.Errorf("failed to get dialector for database type: %s", cfg.Type)
+		return nil, fmt.Errorf("failed to get dialector for database type: %s, err: %s", cfg.DBCfg.Type, err.Error())
 	}
 	db, err := gorm.Open(
 		dialector,
@@ -146,27 +77,93 @@ func InitSession(cfg config.Config, connector driver.Connector) (*gorm.DB, error
 		log.Errorf("failed to initialize session: %v", err.Error())
 		return nil, err
 	}
-	log.Infof("%s, initialized mysql session successfully", cfg.Database)
+	log.Infof("%s, initialized mysql session successfully", cfg.DBCfg.Database)
 
 	sqlDB, _ := db.DB()
 	// 限制最大空闲连接数、最大连接数和连接的生命周期
-	sqlDB.SetMaxIdleConns(int(cfg.MaxIdleConns))
-	sqlDB.SetMaxOpenConns(int(cfg.MaxOpenConns))
-	sqlDB.SetConnMaxLifetime(time.Duration(int(cfg.ConnMaxLifeTime) * int(time.Minute)))
-	log.Infof("%s, db stats: %#v", cfg.Database, sqlDB.Stats())
+	sqlDB.SetMaxIdleConns(int(cfg.DBCfg.MaxIdleConns))
+	sqlDB.SetMaxOpenConns(int(cfg.DBCfg.MaxOpenConns))
+	sqlDB.SetConnMaxLifetime(time.Duration(int(cfg.DBCfg.ConnMaxLifeTime) * int(time.Minute)))
+	log.Infof("%s, db stats: %#v", cfg.DBCfg.Database, sqlDB.Stats())
 	return db, nil
 }
 
-func getDialector(cfg config.Config, connector driver.Connector) gorm.Dialector {
-	switch cfg.Type {
+func getDialector(cfg SessionConfig) (gorm.Dialector, error) {
+	switch cfg.DBCfg.Type {
 	case config.MetaDBTypeMySQL:
-		return getMySQLDialector(connector)
+		conn, err := getMySQLConnector(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return getMySQLDialector(conn), nil
 	case config.MetaDBTypePostgreSQL:
-		return getPostgresDialector(connector)
+		conn, err := getPostgreSQLConnector(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return getPostgresDialector(conn), nil
+	case config.MetaDBTypeDaMeng:
+		return getDaMengDialector(cfg), nil
 	default:
-		log.Errorf("unsupported database type: %s", cfg.Type)
-		return nil
+		return nil, fmt.Errorf("unsupported database type: %s", cfg.DBCfg.Type)
 	}
+}
+
+func getMySQLConnector(cfg SessionConfig) (driver.Connector, error) {
+	var database string
+	if cfg.UseDabase {
+		database = cfg.DBCfg.Database
+	}
+
+	location, err := time.LoadLocation("Local")
+	if err != nil {
+		log.Error("Get location failed with error: %v", err.Error())
+		return nil, err
+	}
+
+	config := mysql_driver.NewConfig()
+	config.User = cfg.DBCfg.UserName
+	config.Passwd = cfg.DBCfg.UserPassword
+	config.Net = "tcp"
+	config.Addr = net.JoinHostPort(cfg.DBCfg.Host, fmt.Sprintf("%d", cfg.DBCfg.Port))
+	config.DBName = database
+	config.AllowNativePasswords = true
+	config.Loc = location
+	config.Timeout = time.Duration(cfg.TimeoutCoefficient*cfg.DBCfg.TimeOut) * time.Second
+	config.ParseTime = true
+	config.MultiStatements = cfg.MultiStatements
+	config.Params = map[string]string{"charset": "utf8mb4"}
+
+	connector, err := mysql_driver.NewConnector(config)
+	if err != nil {
+		log.Error("get database(%s) connector failed with error: %v", database, err.Error())
+		return nil, err
+	}
+	return connector, nil
+}
+
+func getPostgreSQLConnector(cfg SessionConfig) (driver.Connector, error) {
+	connStr := "user=" + cfg.DBCfg.UserName +
+		" password=" + cfg.DBCfg.UserPassword +
+		" host=" + cfg.DBCfg.Host +
+		" port=" + fmt.Sprintf("%d", cfg.DBCfg.Port) +
+		" connect_timeout=" + fmt.Sprintf("%d", cfg.TimeoutCoefficient*cfg.DBCfg.TimeOut) +
+		" sslmode=disable" +
+		" client_encoding=UTF8"
+
+	database := "postgres" // TODO
+	if cfg.UseDabase {
+		database = cfg.DBCfg.Database
+	}
+	connStr += " dbname=" + database +
+		" search_path=" + cfg.DBCfg.Schema
+
+	connector, err := postgres_driver.NewConnector(connStr)
+	if err != nil {
+		log.Error("get database(%s) connector failed with error: %v", database, err.Error())
+		return nil, err
+	}
+	return connector, nil
 }
 
 func getMySQLDialector(conn driver.Connector) gorm.Dialector {
@@ -184,6 +181,32 @@ func getPostgresDialector(conn driver.Connector) gorm.Dialector {
 	return postgres.New(postgres.Config{
 		Conn: sql.OpenDB(conn),
 	})
+}
+
+func getDaMengDialector(cfg SessionConfig) gorm.Dialector {
+	// options := map[string]string{
+	// 	"appName":        "GORM deepflow",
+	// 	"connectTimeout": fmt.Sprintf("%d", cfg.TimeoutCoefficient*cfg.DBCfg.TimeOut),
+	// } TODO
+	dsn := fmt.Sprintf("dm://%s:%s@%s:%d", cfg.DBCfg.UserName, cfg.DBCfg.UserPassword, cfg.DBCfg.Host, cfg.DBCfg.Port)
+	if cfg.UseDabase {
+		// options["schema"] = cfg.DBCfg.Database
+		dsn = dsn + fmt.Sprintf("?schema=%s", cfg.DBCfg.Database)
+	}
+	// dsn := dameng_driver.BuildUrl(cfg.DBCfg.UserName, cfg.DBCfg.UserPassword, cfg.DBCfg.Host, int(cfg.DBCfg.Port), options)
+	return dameng_driver.New(dameng_driver.Config{DSN: dsn})
+}
+
+type ClickHouseSource struct {
+	Name         string
+	Database     string
+	Host         string
+	Port         uint32
+	ProxyHost    string
+	ProxyPort    uint32
+	UserName     string
+	UserPassword string
+	ReplicaSQL   string
 }
 
 func GetClickhouseSource(cfg config.Config) ClickHouseSource {
