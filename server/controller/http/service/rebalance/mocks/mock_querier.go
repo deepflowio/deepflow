@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	gomock "github.com/golang/mock/gomock"
 )
 
