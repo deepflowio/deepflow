@@ -36,8 +36,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 

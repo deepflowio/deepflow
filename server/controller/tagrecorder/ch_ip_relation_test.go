@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func RandID() int {

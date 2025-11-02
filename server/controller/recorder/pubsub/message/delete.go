@@ -17,7 +17,7 @@
 package message
 
 import (
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type Lcuuids struct {

@@ -24,8 +24,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
