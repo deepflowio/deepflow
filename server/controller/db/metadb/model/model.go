@@ -263,7 +263,7 @@ type DataSource struct {
 	DataTableCollection       string    `gorm:"column:data_table_collection;type:char(64);default:''" json:"DATA_TABLE_COLLECTION"`
 	State                     int       `gorm:"column:state;type:int;default:1" json:"STATE"`
 	BaseDataSourceID          int       `gorm:"column:base_data_source_id;type:int" json:"BASE_DATA_SOURCE_ID"`
-	Interval                  int       `gorm:"column:interval;type:int" json:"INTERVAL"`
+	Interval                  int       `gorm:"column:interval_time;type:int" json:"INTERVAL"`
 	RetentionTime             int       `gorm:"column:retention_time;type:int" json:"RETENTION_TIME"` // unit: hour
 	QueryTime                 int       `gorm:"column:query_time;type:int" json:"QUERY_TIME"`         // unit: minute
 	SummableMetricsOperator   string    `gorm:"column:summable_metrics_operator;type:char(64)" json:"SUMMABLE_METRICS_OPERATOR"`
@@ -496,8 +496,8 @@ func (VTapRepo) TableName() string {
 type Plugin struct {
 	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string          `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Type      int             `gorm:"column:type;type:int" json:"TYPE"`           // 1: wasm 2: so 3: lua
-	User      int             `gorm:"column:user;type:int;default:1" json:"USER"` // 1: agent 2: server
+	Type      int             `gorm:"column:type;type:int" json:"TYPE"`                // 1: wasm 2: so 3: lua
+	User      int             `gorm:"column:user_name;type:int;default:1" json:"USER"` // 1: agent 2: server
 	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -512,7 +512,7 @@ type MailServer struct {
 	Status       int    `gorm:"column:status;type:int;not null" json:"STATUS"`
 	Host         string `gorm:"column:host;type:text;not null" json:"HOST"`
 	Port         int    `gorm:"column:port;type:int;not null" json:"PORT"`
-	User         string `gorm:"column:user;type:text;not null" json:"USER"`
+	User         string `gorm:"column:user_name;type:text;not null" json:"USER"`
 	Password     string `gorm:"column:password;type:text;not null" json:"PASSWORD"`
 	Security     string `gorm:"column:security;type:text;not null" json:"SECURITY"`
 	NtlmEnabled  int    `gorm:"column:ntlm_enabled;type:int" json:"NTLM_ENABLED"`
