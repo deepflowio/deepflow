@@ -19,7 +19,7 @@ package tagrecorder
 import (
 	"testing"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func Test_genH64(t *testing.T) {

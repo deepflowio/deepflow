@@ -19,8 +19,8 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 

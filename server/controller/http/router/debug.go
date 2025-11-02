@@ -23,7 +23,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"

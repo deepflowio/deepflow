@@ -18,7 +18,7 @@ package diffbase
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func (b *DataSet) AddPodGroupConfigMapConnection(dbItem *mysqlmodel.PodGroupConfigMapConnection, seq int) {
