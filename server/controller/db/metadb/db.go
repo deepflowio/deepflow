@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -66,6 +67,7 @@ type DB struct {
 	LogPrefixName  logger.Prefix
 
 	Config config.Config
+	SqlFmt schema.SqlFmt
 }
 
 func NewDB(cfg config.Config, orgID int) (*DB, error) {
@@ -91,6 +93,7 @@ func NewDB(cfg config.Config, orgID int) (*DB, error) {
 		logger.NewORGPrefix(orgID),
 		NewDBNameLogPrefix(copiedCfg.Database),
 		copiedCfg,
+		schema.GetSqlFmt(copiedCfg),
 	}, nil
 }
 
