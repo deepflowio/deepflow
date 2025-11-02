@@ -26,7 +26,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/message/agent"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	models "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/golang/protobuf/proto"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"

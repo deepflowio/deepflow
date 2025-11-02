@@ -17,8 +17,8 @@
 package resource
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func GetVPCs(orgID int, filter map[string]interface{}) ([]*mysqlmodel.VPC, error) {

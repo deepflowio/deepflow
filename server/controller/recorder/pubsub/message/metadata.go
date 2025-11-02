@@ -18,8 +18,8 @@ package message
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	mysqlModel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 

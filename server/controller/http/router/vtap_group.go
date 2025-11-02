@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/service"

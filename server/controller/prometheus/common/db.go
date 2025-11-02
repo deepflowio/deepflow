@@ -17,7 +17,7 @@
 package common
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 )
 
 func FindPtr[T any](db *mysql.DB) ([]*T, error) {

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )

@@ -19,7 +19,7 @@ package healer
 import (
 	"time"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type dataGeneratorModel interface {

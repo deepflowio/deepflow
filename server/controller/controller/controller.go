@@ -29,7 +29,7 @@ import (
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -89,7 +89,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
-	if err := mysql.GetDBs().Init(cfg.MySqlCfg); err != nil {
+	if err := mysql.GetDBs().Init(cfg.MetadbCfg); err != nil {
 		log.Errorf("init mysql failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)

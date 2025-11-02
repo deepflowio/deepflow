@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 func GetDB(dbFile string) *gorm.DB {
