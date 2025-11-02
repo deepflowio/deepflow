@@ -79,12 +79,11 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
-	github.com/go-sql-driver/mysql v1.8.1
-	github.com/goccy/go-json v0.10.2
+	github.com/godoes/gorm-dameng v0.7.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
-	github.com/golang/snappy v0.0.4
+	github.com/golang/snappy v1.0.0
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
@@ -146,13 +145,20 @@ require (
 	gorm.io/driver/mysql v1.3.4
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/driver/sqlite v1.3.4
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.30.1
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v0.33.2
 	sigs.k8s.io/yaml v1.4.0
 	skywalking.apache.org/repo/goapi v0.0.0-20230712035303-201c1fb2d6ec
+)
+
+require (
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/golang/glog v1.2.0 // indirect
+	github.com/google/gnostic-models v0.6.9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 )
 
 require (
@@ -259,7 +265,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/paulmach/orb v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
