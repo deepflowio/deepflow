@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 )

@@ -24,7 +24,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	metadbcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -32,13 +32,13 @@ import (
 )
 
 type ORGData struct {
-	mysqlCfg mysqlcfg.MySqlConfig
+	mysqlCfg metadbcfg.Config
 	cfg      *config.ControllerConfig
 }
 
 func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 	return &ORGData{
-		mysqlCfg: cfg.MySqlCfg,
+		mysqlCfg: cfg.MetadbCfg,
 		cfg:      cfg,
 	}
 }
