@@ -22,7 +22,9 @@ import (
 	"strconv"
 	"strings"
 
+	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
 const (
@@ -55,6 +57,11 @@ const (
 	FUNCTION_ANY           = "Any"
 	FUNCTION_DERIVATIVE    = "nonNegativeDerivative"
 	FUNCTION_COUNTDISTINCT = "countDistinct"
+)
+
+const (
+	TOPK_COUNTS_DEFAULT_LIMIT = "3"
+	TOPK_COUNTS_MODE_FLAG     = "'counts'"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -237,10 +244,6 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		return
 	}
 
-	isSingleTagTok := f.Name == FUNCTION_TOPK && len(f.Args) == 1
-	if isSingleTagTok {
-		buf.WriteString("arrayStringConcat(")
-	}
 	buf.WriteString(dbFuncName)
 
 	if f.IsGroupArray {
@@ -255,6 +258,10 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	args := f.Args
 	if f.Name == FUNCTION_TOPK {
 		args = f.Args[len(f.Args)-1:]
+		// topk add counts mode
+		if ctlcommon.CompareVersion(config.Cfg.Clickhouse.Version, ctlcommon.CLICK_HOUSE_VERSION) >= 0 {
+			args = append(args, []string{TOPK_COUNTS_DEFAULT_LIMIT, TOPK_COUNTS_MODE_FLAG}...)
+		}
 	} else if f.Name == FUNCTION_ANY || f.Name == FUNCTION_UNIQ || f.Name == FUNCTION_UNIQ_EXACT {
 		args = nil
 	}
@@ -311,9 +318,6 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	}
 
 	buf.WriteString(")")
-	if isSingleTagTok {
-		buf.WriteString(", ',')")
-	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
