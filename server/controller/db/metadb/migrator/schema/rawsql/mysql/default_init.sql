@@ -111,6 +111,5 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
     values(1, 1, "过滤项: N/A | 分组项: *", "", "/v1/alarm/license-0days/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"至少一个授权文件剩余有效期\", \"return_field_unit\": \"天\"}}]", "DeepFlow 授权过期",  2, 1, 1, 24, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"天\"}", "1d", 1, 0, "{\"OP\":\"<=\",\"VALUE\":0}", @lcuuid);
 
 set @lcuuid = (select uuid());
-INSERT INTO data_source (display_name, data_table_collection, `interval`, retention_time, lcuuid)
+INSERT INTO data_source (display_name, data_table_collection, interval_time, retention_time, lcuuid)
                  VALUES ('管理侧监控数据', 'deepflow_admin.*', 0, 7*24, @lcuuid);
-                 
