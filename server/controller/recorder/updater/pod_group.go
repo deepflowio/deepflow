@@ -108,6 +108,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		log.Errorf("failed to convert %s spec JSON to YAML: %s", p.resourceType, cloudItem.Spec, p.metadata.LogPrefixes)
 		return nil, false
 	}
+
 	dbItem := &mysqlmodel.PodGroup{
 		Name:           cloudItem.Name,
 		Type:           cloudItem.Type,
@@ -123,6 +124,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		Domain:         p.metadata.GetDomainLcuuid(),
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
+		UID:            ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -144,6 +146,7 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 		mapInfo["pod_num"] = cloudItem.PodNum
 		structInfo.PodNum.Set(diffBase.PodNum, cloudItem.PodNum)
 	}
+
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)

@@ -17,10 +17,11 @@
 //! Referfence `gopacket/layers/enums.go`
 
 use std::fmt;
+use std::ops::BitAnd;
 
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
@@ -374,6 +375,84 @@ pub enum LinuxSllPacketType {
     // These ones are invisible user level,
     Loopback = 5,  // MC/BRD frame looped back
     FastRoute = 6, // FastRoute frame
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+pub enum MatchType {
+    // true: ignore case, false(default): case sensitive
+    String(bool),
+    Hex,
+}
+
+impl Default for MatchType {
+    fn default() -> MatchType {
+        MatchType::String(false)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TrafficDirection {
+    Request = 0x01,
+    Response = 0x10,
+    #[default]
+    Both = 0x11,
+}
+
+impl BitAnd for TrafficDirection {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self::Output {
+        let r = self as u8 & rhs as u8;
+        match r {
+            0x01 => TrafficDirection::Request,
+            0x10 => TrafficDirection::Response,
+            0x11 => TrafficDirection::Both,
+            _ => TrafficDirection::Both,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Charset {
+    Digits,
+    Alphabets,
+    Chinese,
+}
+
+impl Charset {
+    pub fn check(&self, c: &char) -> bool {
+        match self {
+            Charset::Digits => c.is_ascii_digit(),
+            Charset::Alphabets => c.is_ascii_alphabetic(),
+            Charset::Chinese => {
+                matches!(*c, '\u{4E00}'..='\u{9FFF}' | '\u{3400}'..='\u{4DBF}' | '\u{20000}'..='\u{2EBEF}')
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq, PartialOrd)]
+#[repr(u8)]
+pub enum FieldType {
+    #[default]
+    Header,
+    HttpUrl,
+    // fuzzy search in string like json k-v
+    // it doesn't care if payload can be deserialize as json
+    // try to search "key": "value" string
+    PayloadJson,
+    // fuzzy search in xml string
+    // try to search <key>value</key>, or <root key="value"></root>
+    PayloadXml,
+    // hessian2 payload
+    // used when payload is a hessian2 object, for extract value in object field
+    PayloadHessian2,
+    // in dubbo attachment, it must be a map
+    // fuzzy search in dubbo header
+    DubboHeader,
+    // used when payload is hashmap<string, string> for searching
+    DubboPayloadMapString,
 }
 
 #[cfg(test)]

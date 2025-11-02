@@ -6,8 +6,8 @@ toolchain go1.24.4
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20250827092345-bb20843c44b8
-	github.com/deepflowio/deepflow/server v1.6.66-0.20250708084200-e43fb36910f7
+	github.com/deepflowio/deepflow/message v0.0.0-20251101080845-a2e3ca829e49
+	github.com/deepflowio/deepflow/server v1.6.66-0.20251101080845-a2e3ca829e49
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5

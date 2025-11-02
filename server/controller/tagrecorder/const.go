@@ -56,7 +56,7 @@ const (
 	RESOURCE_TYPE_POD_INGRESS       = "pod_ingress"
 	RESOURCE_TYPE_SERVICE           = "service"
 	RESOURCE_TYPE_GPROCESS          = "gprocess"
-	RESOURCE_TYPE_CUSTOM_SERVICE    = "custom_service"
+	RESOURCE_TYPE_CUSTOM_SERVICE    = "biz_service"
 )
 
 // Scheduled tasks
@@ -589,6 +589,7 @@ var DBNodeTypeToResourceType = map[string]string{ // TODO optimize const define
 	"ip":             RESOURCE_TYPE_IP,
 	"internet":       RESOURCE_TYPE_INTERNET,
 	"gprocess":       RESOURCE_TYPE_GPROCESS,
+	"biz_service":    RESOURCE_TYPE_CUSTOM_SERVICE,
 	"custom_service": RESOURCE_TYPE_CUSTOM_SERVICE,
 }
 

@@ -22,6 +22,7 @@ const (
 	RESOURCE_TYPE_SUB_DOMAIN_EN                      = "sub_domain"
 	RESOURCE_TYPE_HOST_EN                            = "host"
 	RESOURCE_TYPE_VM_EN                              = "vm"
+	RESOURCE_TYPE_CHOST_EN                           = "chost" // chost is alias of vm
 	RESOURCE_TYPE_VPC_EN                             = "vpc"
 	RESOURCE_TYPE_NETWORK_EN                         = "network"
 	RESOURCE_TYPE_SUBNET_EN                          = "subnet"
@@ -47,6 +48,7 @@ const (
 	RESOURCE_TYPE_POD_NODE_EN                        = "pod_node"
 	RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN          = "vm_pod_node_connection"
 	RESOURCE_TYPE_POD_NAMESPACE_EN                   = "pod_namespace"
+	RESOURCE_TYPE_POD_NS_EN                          = "pod_ns" // pod_ns is alias of pod_namespace
 	RESOURCE_TYPE_POD_INGRESS_EN                     = "pod_ingress"
 	RESOURCE_TYPE_POD_INGRESS_RULE_EN                = "pod_ingress_rule"
 	RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN        = "pod_ingress_rule_backend"
@@ -69,7 +71,7 @@ const (
 	RESOURCE_TYPE_ALL_IP_EN  = "all_ip"
 	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
 
-	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "custom_service"
+	RESOURCE_TYPE_CUSTOM_SERVICE_EN = "biz_service"
 
 	// used for gprocess_id of process in id manager
 	RESOURCE_TYPE_GPROCESS_EN = "gprocess"

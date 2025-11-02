@@ -743,6 +743,7 @@ type PodCluster struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodCluster) GetDomainLcuuid() string {
@@ -764,6 +765,7 @@ type PodNamespace struct {
 	Domain           string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	LearnedCloudTags map[string]string `gorm:"column:learned_cloud_tags;type:text;default:'';serializer:json" json:"LEARNED_CLOUD_TAGS" mapstructure:"LEARNED_CLOUD_TAGS"`
 	CustomCloudTags  map[string]string `gorm:"column:custom_cloud_tags;type:text;default:'';serializer:json" json:"CUSTOM_CLOUD_TAGS" mapstructure:"CUSTOM_CLOUD_TAGS"`
+	UID              string            `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodNamespace) GetDomainLcuuid() string {
@@ -869,6 +871,7 @@ type PodService struct {
 	Region           string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain           string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	UID              string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodService) GetDomainLcuuid() string {
@@ -917,6 +920,7 @@ type PodGroup struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodGroup) GetDomainLcuuid() string {
@@ -1079,15 +1083,18 @@ func (p PodGroupConfigMapConnection) GetSubDomainLcuuid() string {
 }
 
 type CustomService struct {
-	Base         `gorm:"embedded" mapstructure:",squash"`
-	OperatedTime `gorm:"embedded" mapstructure:",squash"`
-	Name         string `gorm:"column:name;type:varchar(128);default:''" json:"NAME" mapstructure:"NAME"`
-	Type         int    `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"`
-	Resource     string `gorm:"column:resource;type:text;default:''" json:"RESOURCE" mapstructure:"RESOURCE"`
-	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"EPC_ID"`
-	DomainID     int    `gorm:"column:domain_id;type:int;default:0" json:"DOMAIN_ID" mapstructure:"DOMAIN_ID"`
-	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	TeamID       int    `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID" mapstructure:"TEAM_ID"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime   `gorm:"embedded" mapstructure:",squash"`
+	Name           string `gorm:"column:name;type:varchar(128);default:''" json:"NAME" mapstructure:"NAME"`
+	Type           int    `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"`
+	MatchType      int    `gorm:"column:match_type;type:int;default:1" json:"MATCH_TYPE" mapstructure:"MATCH_TYPE"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
+	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:0" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
+	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:0" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
+	Resource       string `gorm:"column:resource;type:text;default:''" json:"RESOURCE" mapstructure:"RESOURCE"`
+	DomainID       int    `gorm:"column:domain_id;type:int;default:0" json:"DOMAIN_ID" mapstructure:"DOMAIN_ID"`
+	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	TeamID         int    `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID" mapstructure:"TEAM_ID"`
 }
 
 func (CustomService) TableName() string {
