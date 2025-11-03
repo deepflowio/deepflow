@@ -90,6 +90,8 @@ pub struct L7ProtocolSendLog {
     pub flags: u32,
     pub captured_request_byte: u32,
     pub captured_response_byte: u32,
+    pub biz_code: String,
+    pub biz_scenario: String,
 }
 
 impl L7ProtocolSendLog {
@@ -189,5 +191,7 @@ impl L7ProtocolSendLog {
             log.ext_info = Some(ext_info);
         }
         log.flags = self.flags;
+        log.biz_code = self.biz_code;
+        log.biz_scenario = self.biz_scenario;
     }
 }

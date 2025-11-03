@@ -60,6 +60,8 @@ message AppInfo {
     repeated KeyVal attributes = 31;
 
     optional uint32 biz_type = 32;
+    optional string biz_code = 33;
+    optional string biz_scenario = 34;
 }
 
 message NatsMessage {

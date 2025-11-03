@@ -55,6 +55,9 @@ pub mod l7 {
                 pub const SPAN_ID: &'static str = "";
                 pub const X_REQUEST_ID: &'static str = "";
                 pub const HTTP_PROXY_CLIENT: &'static str = "";
+                pub const BIZ_TYPE: &'static str = "";
+                pub const BIZ_CODE: &'static str = "";
+                pub const BIZ_SCENARIO: &'static str = "";
 
                 pub fn match_key(&self, _: &str) -> bool {
                     unimplemented!()

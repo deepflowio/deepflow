@@ -301,6 +301,10 @@ pub struct HttpInfo {
 
     #[serde(skip_serializing_if = "value_is_default")]
     biz_type: u8,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_code: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_scenario: String,
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
@@ -327,6 +331,14 @@ impl HttpInfo {
         (self.msg_type == LogMessageType::Request && self.method.is_none())
             || (self.msg_type == LogMessageType::Response && self.is_invalid_status_code())
             || self.msg_type == LogMessageType::Other
+    }
+
+    // when response_code is overwritten, put it into the attributes.
+    fn response_code_to_attribute(&mut self) {
+        self.attributes.push(KeyVal {
+            key: SYS_RESPONSE_CODE_ATTR.to_string(),
+            val: self.status_code.to_string(),
+        });
     }
 
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
@@ -358,6 +370,7 @@ impl HttpInfo {
 
         if dir == PacketDirection::ServerToClient {
             if let Some(code) = custom.resp.code {
+                self.response_code_to_attribute();
                 self.status_code = code as u16;
             }
 
@@ -407,6 +420,12 @@ impl HttpInfo {
         if custom.biz_type > 0 {
             self.biz_type = custom.biz_type;
         }
+        if let Some(biz_code) = custom.biz_code {
+            self.biz_code = biz_code;
+        }
+        if let Some(biz_scenario) = custom.biz_scenario {
+            self.biz_scenario = biz_scenario;
+        }
 
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
@@ -436,6 +455,7 @@ impl HttpInfo {
             self.stream_id = req_id.parse::<u32>().map_or(None, Some);
         }
         if let Some(resp_code) = tags.remove(ExtraField::RESPONSE_CODE) {
+            self.response_code_to_attribute();
             self.status_code = resp_code.parse::<u16>().unwrap_or_default();
         }
 
@@ -486,6 +506,16 @@ impl HttpInfo {
             if let Some(x_request_id) = tags.remove(ExtraField::X_REQUEST_ID) {
                 *x_req_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id)
             }
+        }
+
+        if let Some(biz_type) = tags.remove(ExtraField::BIZ_TYPE) {
+            self.biz_type = biz_type.parse::<u8>().unwrap_or_default();
+        }
+        if let Some(biz_code) = tags.remove(ExtraField::BIZ_CODE) {
+            self.biz_code = biz_code;
+        }
+        if let Some(biz_scenario) = tags.remove(ExtraField::BIZ_SCENARIO) {
+            self.biz_scenario = biz_scenario;
         }
     }
 }
@@ -639,6 +669,8 @@ impl HttpInfo {
         if other.biz_type > 0 {
             self.biz_type = other.biz_type;
         }
+        super::swap_if!(self, biz_code, is_empty, other);
+        super::swap_if!(self, biz_scenario, is_empty, other);
 
         let other_trace_ids = std::mem::take(&mut other.trace_ids);
         self.trace_ids.merge(other_trace_ids);
@@ -844,6 +876,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_code: f.biz_code,
+            biz_scenario: f.biz_scenario,
             ..Default::default()
         }
     }

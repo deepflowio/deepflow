@@ -399,6 +399,12 @@ var ColumnAdd71 = []*ColumnAdds{
 		ColumnNames: []string{"is_async"},
 		ColumnType:  ckdb.UInt8,
 	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"biz_code", "biz_scenario"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 var IndexAdd71 = []*IndexAdds{
@@ -406,6 +412,12 @@ var IndexAdd71 = []*IndexAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log_local", "trace_tree_local", "span_with_trace_id_local"},
 		ColumnNames: []string{"_trace_id_2"},
+		IndexType:   ckdb.IndexBloomfilter,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log_local"},
+		ColumnNames: []string{"biz_code", "biz_scenario"},
 		IndexType:   ckdb.IndexBloomfilter,
 	},
 }
