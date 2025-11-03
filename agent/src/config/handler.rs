@@ -96,12 +96,12 @@ use public::utils::{bitmap::parse_range_list_to_bitmap, net::MacAddr};
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
-        use public::{
+        use public::l7_protocol::L7ProtocolEnum;
+        use enterprise_utils::l7::custom_policy::{
+            custom_field_policy,
+            custom_protocol_policy::ExtraCustomProtocolConfig,
             enums::FieldType,
-            l7_protocol::L7ProtocolEnum,
         };
-        use super::config::ExtraCustomFieldPolicyMap;
-        use enterprise_utils::l7::plugin::custom_field_policy::ExtraCustomProtocolConfig;
     }
 }
 
@@ -1042,7 +1042,7 @@ impl From<&Vec<String>> for DnsNxdomainTrie {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_max_entries: usize,
@@ -1472,7 +1472,7 @@ impl Default for TraceType {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct L7LogDynamicConfig {
     // in lowercase
     pub proxy_client: Vec<String>,
@@ -1492,7 +1492,13 @@ pub struct L7LogDynamicConfig {
     pub grpc_streaming_data_enabled: bool,
 
     #[cfg(feature = "enterprise")]
-    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+    pub extra_field_policies: HashMap<L7ProtocolEnum, custom_field_policy::PolicyMap>,
+}
+
+impl Default for L7LogDynamicConfig {
+    fn default() -> Self {
+        L7LogDynamicConfigBuilder::default().into()
+    }
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1545,8 +1551,6 @@ impl PartialEq for L7LogDynamicConfig {
     }
 }
 
-impl Eq for L7LogDynamicConfig {}
-
 pub struct L7LogDynamicConfigBuilder {
     pub proxy_client: Vec<String>,
     pub x_request_id: Vec<String>,
@@ -1557,7 +1561,7 @@ pub struct L7LogDynamicConfigBuilder {
     pub extra_log_fields: ExtraLogFields,
     pub grpc_streaming_data_enabled: bool,
     #[cfg(feature = "enterprise")]
-    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+    pub extra_field_policies: HashMap<L7ProtocolEnum, custom_field_policy::PolicyMap>,
 }
 
 impl Default for L7LogDynamicConfigBuilder {
@@ -1619,7 +1623,10 @@ impl From<&RequestLog> for L7LogDynamicConfigBuilder {
                 .grpc
                 .streaming_data_enabled,
             #[cfg(feature = "enterprise")]
-            extra_field_policies: c.tag_extraction.get_extra_field_policies(),
+            extra_field_policies: c
+                .tag_extraction
+                .custom_field_policies
+                .get_extra_field_policies(),
         }
     }
 }
@@ -2196,7 +2203,12 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .mysql
                     .decompress_payload,
                 #[cfg(feature = "enterprise")]
-                custom_protocol_config: conf.get_custom_protocol_config(),
+                custom_protocol_config: (&conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .custom_protocols)
+                    .into(),
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -5005,6 +5017,7 @@ impl ConfigHandler {
             app.protocol_special_config = new_app.protocol_special_config.clone();
             restart_agent = !first_run;
         }
+        #[cfg(feature = "enterprise")]
         if app.custom_protocols != new_app.custom_protocols {
             info!(
                 "Update processors.request_log.application_protocol_inference.custom_protocols from {:?} to {:?}.",
@@ -5102,13 +5115,13 @@ impl ConfigHandler {
             );
             tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
         }
+        #[cfg(feature = "enterprise")]
         if tag_extraction.custom_field_policies != new_tag_extraction.custom_field_policies {
             info!(
                 "Update processors.request_log.tag_extraction.custom_field_policies from {:?} to {:?}.",
                 tag_extraction.custom_field_policies, new_tag_extraction.custom_field_policies
             );
             tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
-            restart_agent = !first_run;
         }
 
         let tunning = &mut request_log.tunning;

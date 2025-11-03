@@ -29,8 +29,10 @@ cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
         use crate::common::flow::{L7Protocol, PacketDirection, L7ProtocolEnum};
         use crate::flow_generator::protocol_logs::pb_adapter::{KeyVal, MetricKeyVal};
-        use public::enums::{FieldType};
-        use enterprise_utils::l7::plugin::custom_field_policy::ExtraField;
+        use enterprise_utils::l7::custom_policy::{
+            custom_field_policy::ExtraField,
+            enums::FieldType,
+        };
     }
 }
 
