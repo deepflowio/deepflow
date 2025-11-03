@@ -76,7 +76,9 @@ type L7Base struct {
 	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
 	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
 	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
-	BizType      uint8  `json:"biz_type" category:"$tag" sub:"capture_info"`
+	BizType      uint8  `json:"biz_type" category:"$tag" sub:"business_info"`
+	BizCode      string `json:"biz_code" category:"$tag" sub:"business_info"`
+	BizScenario  string `json:"biz_scenario" category:"$tag" sub:"business_info"`
 
 	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
 	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
@@ -129,6 +131,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("gprocess_id_0", ckdb.UInt32).SetComment("全局客户端进程ID"),
 		ckdb.NewColumn("gprocess_id_1", ckdb.UInt32).SetComment("全局服务端进程ID"),
 		ckdb.NewColumn("biz_type", ckdb.UInt8).SetComment("Business Type"),
+		ckdb.NewColumn("biz_code", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
+		ckdb.NewColumn("biz_scenario", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -548,6 +552,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.GPID0 = l.Gpid_0
 	b.GPID1 = l.Gpid_1
 	b.BizType = uint8(l.BizType)
+	b.BizCode = log.BizCode
+	b.BizScenario = log.BizScenario
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1

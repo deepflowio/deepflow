@@ -30,6 +30,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
+            consts::*,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -83,6 +84,11 @@ pub struct WebSphereMqInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_code: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_scenario: String,
 }
 
 impl L7ProtocolInfoInterface for WebSphereMqInfo {
@@ -142,6 +148,22 @@ impl WebSphereMqInfo {
         }
     }
 
+    // when response_status is overwritten, put it into the attributes.
+    fn response_status_to_attribute(&mut self) {
+        self.attributes.push(KeyVal {
+            key: SYS_RESPONSE_STATUS_ATTR.to_string(),
+            val: (self.status as u8).to_string(),
+        });
+    }
+
+    // when response_code is overwritten, put it into the attributes.
+    fn response_code_to_attribute(&mut self) {
+        self.attributes.push(KeyVal {
+            key: SYS_RESPONSE_CODE_ATTR.to_string(),
+            val: self.response_code.to_string(),
+        });
+    }
+
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
         if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::WebSphereMq) {
             self.is_on_blacklist = t.request_type.is_on_blacklist(&self.request_type)
@@ -160,10 +182,12 @@ impl WebSphereMqInfo {
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
+            self.response_code_to_attribute();
             self.response_code = code;
         }
 
         if custom.resp.status != L7ResponseStatus::default() {
+            self.response_status_to_attribute();
             self.status = custom.resp.status;
         }
 
@@ -189,6 +213,13 @@ impl WebSphereMqInfo {
         }
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
+        }
+
+        if let Some(biz_code) = custom.biz_code {
+            self.biz_code = biz_code;
+        }
+        if let Some(biz_scenario) = custom.biz_scenario {
+            self.biz_scenario = biz_scenario;
         }
     }
 }
@@ -286,13 +317,13 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             }
         }
 
+        info.is_async = true;
         let has_wasm_result = self.wasm_hook(param, payload, &mut info);
         if has_wasm && !has_wasm_result {
             return Err(Error::L7ProtocolUnknown);
         }
 
         info.is_tls = param.is_tls();
-        info.is_async = true;
         set_captured_byte!(info, param);
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {

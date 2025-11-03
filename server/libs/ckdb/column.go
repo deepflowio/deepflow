@@ -58,6 +58,8 @@ const (
 	COLUMN_AZ_ID_0                    = "az_id_0"
 	COLUMN_AZ_ID_1                    = "az_id_1"
 	COLUMN_BIZ_TYPE                   = "biz_type"
+	COLUMN_BIZ_CODE                   = "biz_code"
+	COLUMN_BIZ_SCENARIO               = "biz_scenario"
 	COLUMN_BODY                       = "body"
 	COLUMN_BYTE                       = "byte"
 	COLUMN_BYTES                      = "bytes"
@@ -393,6 +395,8 @@ var ColumnNames = []string{
 	COLUMN_AZ_ID_0,
 	COLUMN_AZ_ID_1,
 	COLUMN_BIZ_TYPE,
+	COLUMN_BIZ_CODE,
+	COLUMN_BIZ_SCENARIO,
 	COLUMN_BODY,
 	COLUMN_BYTE,
 	COLUMN_BYTES,

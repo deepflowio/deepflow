@@ -142,6 +142,13 @@ pub struct DubboInfo {
     is_on_blacklist: bool,
     #[serde(skip)]
     endpoint: Option<String>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_type: u8,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_code: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_scenario: String,
 }
 
 impl DubboInfo {
@@ -191,6 +198,11 @@ impl DubboInfo {
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
+        if other.biz_type > 0 {
+            self.biz_type = other.biz_type;
+        }
+        swap_if!(self, biz_code, is_empty, other);
+        swap_if!(self, biz_scenario, is_empty, other);
     }
 
     fn parse_trace_id(trace_info: String, trace_type: &TraceType) -> String {
@@ -251,6 +263,18 @@ impl DubboInfo {
         }
     }
 
+    // when response_code is overwritten, put it into the attributes.
+    fn response_code_to_attribute(&mut self) {
+        self.attributes.push(KeyVal {
+            key: SYS_RESPONSE_CODE_ATTR.to_string(),
+            val: self
+                .status_code
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
+        });
+    }
+
     pub fn merge_custom_info(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
@@ -263,6 +287,7 @@ impl DubboInfo {
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
+            self.response_code_to_attribute();
             self.status_code = Some(code);
         }
 
@@ -338,6 +363,7 @@ impl DubboInfo {
             self.request_id = req_id.parse::<i64>().unwrap_or_default();
         }
         if let Some(resp_code) = tags.remove(ExtraField::RESPONSE_CODE) {
+            self.response_code_to_attribute();
             self.status_code = Some(resp_code.parse::<i32>().unwrap_or_default());
         }
 
@@ -383,6 +409,16 @@ impl DubboInfo {
             if let Some(x_request_id) = tags.remove(ExtraField::X_REQUEST_ID) {
                 *x_req_id = Some(PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id));
             }
+        }
+
+        if let Some(biz_type) = tags.remove(ExtraField::BIZ_TYPE) {
+            self.biz_type = biz_type.parse::<u8>().unwrap_or_default();
+        }
+        if let Some(biz_code) = tags.remove(ExtraField::BIZ_CODE) {
+            self.biz_code = biz_code;
+        }
+        if let Some(biz_scenario) = tags.remove(ExtraField::BIZ_SCENARIO) {
+            self.biz_scenario = biz_scenario;
         }
     }
 }
