@@ -251,6 +251,8 @@ pub struct HttpInfo {
     pub version: Version,
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_ids: super::PrioFields,
+    #[serde(skip)]
+    copy_apm_trace_id: bool,
     #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: PrioField<String>,
 
@@ -985,10 +987,12 @@ impl L7ProtocolParserInterface for HttpLog {
 
         match self.proto {
             L7Protocol::Http1 => {
-                let mut info = HttpInfo::default();
-
-                info.proto = self.proto;
-                info.is_tls = param.is_tls();
+                let mut info = HttpInfo {
+                    proto: self.proto,
+                    is_tls: param.is_tls(),
+                    copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,
+                    ..Default::default()
+                };
 
                 #[cfg(feature = "enterprise")]
                 let mut tags = HashMap::new();
@@ -1031,9 +1035,12 @@ impl L7ProtocolParserInterface for HttpLog {
                         break;
                     }
 
-                    let mut info = HttpInfo::default();
-                    info.proto = self.proto;
-                    info.is_tls = param.is_tls();
+                    let mut info = HttpInfo {
+                        proto: self.proto,
+                        is_tls: param.is_tls(),
+                        copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,
+                        ..Default::default()
+                    };
                     #[cfg(feature = "enterprise")]
                     let mut tags = HashMap::new();
 
@@ -2084,6 +2091,13 @@ impl HttpLog {
                 }
 
                 if let Some(trace_id) = trace.decode_trace_id(val) {
+                    if info.copy_apm_trace_id {
+                        info.copy_apm_trace_id = false;
+                        info.attributes.push(KeyVal {
+                            key: APM_TRACE_ID_ATTR.to_string(),
+                            val: trace_id.to_string(),
+                        });
+                    }
                     info.trace_ids.merge_field(prio, trace_id.to_string());
                 }
             }
@@ -2443,8 +2457,8 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 mod tests {
     use crate::config::{
         config::TagFilterOperator,
-        handler::{BlacklistTrie, LogParserConfig, TraceType},
-        ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
+        handler::{BlacklistTrie, L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
+        HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
@@ -2458,6 +2472,7 @@ mod tests {
 
     use std::cell::RefCell;
     use std::collections::HashSet;
+    use std::fmt;
     use std::fs;
     use std::mem::size_of;
     use std::net::{IpAddr, Ipv4Addr};
@@ -2479,6 +2494,43 @@ mod tests {
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
+    struct ValidateInfo<'a>(&'a HttpInfo);
+
+    impl<'a> fmt::Display for ValidateInfo<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("HttpInfo")
+                .field("headers_offset", &self.0.headers_offset)
+                .field("proto", &self.0.proto)
+                .field("msg_type", &self.0.msg_type)
+                .field("stream_id", &self.0.stream_id)
+                .field("version", &self.0.version)
+                .field("trace_ids", &self.0.trace_ids)
+                .field("span_id", &self.0.span_id)
+                .field("method", &self.0.method)
+                .field("path", &self.0.path)
+                .field("host", &self.0.host)
+                .field("user_agent", &self.0.user_agent)
+                .field("referer", &self.0.referer)
+                .field("client_ip", &self.0.client_ip)
+                .field("x_request_id_0", &self.0.x_request_id_0)
+                .field("x_request_id_1", &self.0.x_request_id_1)
+                .field("req_content_length", &self.0.req_content_length)
+                .field("resp_content_length", &self.0.resp_content_length)
+                .field("status_code", &self.0.status_code)
+                .field("status", &self.0.status)
+                .field("grpc_status_code", &self.0.grpc_status_code)
+                .field("endpoint", &self.0.endpoint)
+                .field("custom_result", &self.0.custom_result)
+                .field("custom_exception", &self.0.custom_exception)
+                .field("captured_request_byte", &self.0.captured_request_byte)
+                .field("captured_response_byte", &self.0.captured_response_byte)
+                .field("biz_type", &self.0.biz_type)
+                .field("attributes", &self.0.attributes)
+                .field("service_name", &self.0.service_name)
+                .finish()
+        }
+    }
+
     fn run(name: &str, grpc_streaming_data_enabled: bool) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
@@ -2489,21 +2541,14 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let config = L7LogDynamicConfig::new(
-            vec!["x-forwarded-for".to_owned()],
-            vec![],
-            true,
-            vec![TraceType::Sw8],
-            vec![TraceType::Sw8],
-            ExtraLogFields::default(),
+        let config: L7LogDynamicConfig = L7LogDynamicConfigBuilder {
+            proxy_client: vec!["x-forwarded-for".to_owned()],
+            trace_types: vec![TraceType::Sw8],
+            span_types: vec![TraceType::Sw8],
             grpc_streaming_data_enabled,
-            #[cfg(feature = "enterprise")]
-            HashMap::new(),
-            0,
-            0,
-            0,
-            256,
-        );
+            ..Default::default()
+        }
+        .into();
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,
             l7_log_session_aggr_timeout: [
@@ -2559,14 +2604,14 @@ mod tests {
                 L7Protocol::Http1 => {
                     if let Ok(info) = http1.parse_payload(payload, param) {
                         output.push_str(&format!(
-                            "{:?} is_http: {}\n",
-                            get_http_info(info.unwrap_single()),
+                            "{} is_http: {}\n",
+                            ValidateInfo(&get_http_info(info.unwrap_single())),
                             true
                         ));
                     } else {
                         let mut info = HttpInfo::default();
                         info.proto = protocol;
-                        output.push_str(&format!("{:?} is_http: {}\n", info, false));
+                        output.push_str(&format!("{} is_http: {}\n", ValidateInfo(&info), false));
                     }
                 }
                 L7Protocol::Http2 | L7Protocol::Grpc => {
@@ -2575,15 +2620,15 @@ mod tests {
                             L7ParseResult::Multi(m) => {
                                 for i in m {
                                     output.push_str(&format!(
-                                        "{:?} is_http: {}\n",
-                                        get_http_info(i),
+                                        "{} is_http: {}\n",
+                                        ValidateInfo(&get_http_info(i)),
                                         true
                                     ))
                                 }
                             }
                             L7ParseResult::Single(s) => output.push_str(&format!(
-                                "{:?} is_http: {}\n",
-                                get_http_info(s),
+                                "{} is_http: {}\n",
+                                ValidateInfo(&get_http_info(s)),
                                 true
                             )),
                             _ => (),
@@ -2591,15 +2636,15 @@ mod tests {
                     } else {
                         let mut info = HttpInfo::default();
                         info.proto = protocol;
-                        output.push_str(&format!("{:?} is_http: {}\n", info, false));
+                        output.push_str(&format!("{} is_http: {}\n", ValidateInfo(&info), false));
                     }
                 }
                 _ => {
                     if let Ok(info) = http1.parse_payload(payload, param) {
                         protocol = L7Protocol::Http1;
                         output.push_str(&format!(
-                            "{:?} is_http: {}\n",
-                            get_http_info(info.unwrap_single()),
+                            "{} is_http: {}\n",
+                            ValidateInfo(&get_http_info(info.unwrap_single())),
                             true
                         ));
                     } else if let Ok(info) = http2.parse_payload(payload, param) {
@@ -2608,15 +2653,15 @@ mod tests {
                             L7ParseResult::Multi(m) => {
                                 for i in m {
                                     output.push_str(&format!(
-                                        "{:?} is_http: {}\n",
-                                        get_http_info(i),
+                                        "{} is_http: {}\n",
+                                        ValidateInfo(&get_http_info(i)),
                                         true
                                     ))
                                 }
                             }
                             L7ParseResult::Single(s) => output.push_str(&format!(
-                                "{:?} is_http: {}\n",
-                                get_http_info(s),
+                                "{} is_http: {}\n",
+                                ValidateInfo(&get_http_info(s)),
                                 true
                             )),
                             _ => (),
@@ -2624,7 +2669,7 @@ mod tests {
                     } else {
                         let mut info = HttpInfo::default();
                         info.proto = protocol;
-                        output.push_str(&format!("{:?} is_http: {}\n", info, false));
+                        output.push_str(&format!("{} is_http: {}\n", ValidateInfo(&info), false));
                     }
                 }
             }
@@ -3163,21 +3208,14 @@ mod tests {
     fn header_priority() {
         let mut parser = HttpLog::new_v1();
         let mut info = HttpInfo::default();
-        let config = L7LogDynamicConfig::new(
-            vec!["X_Forwarded_For".into(), "Client".into()],
-            vec!["X_Request_ID".into(), "x-request-id".into()],
-            true,
-            vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
-            vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
-            ExtraLogFields::default(),
-            false,
-            #[cfg(feature = "enterprise")]
-            HashMap::new(),
-            0,
-            0,
-            0,
-            256,
-        );
+        let config = L7LogDynamicConfigBuilder {
+            proxy_client: vec!["X_Forwarded_For".into(), "Client".into()],
+            x_request_id: vec!["X_Request_ID".into(), "x-request-id".into()],
+            trace_types: vec!["x-b3-traceid".into(), "traceparent".into(), "sw8".into()],
+            span_types: vec!["x-b3-spanid".into(), "traceparent".into(), "sw8".into()],
+            ..Default::default()
+        }
+        .into();
 
         // check field overwritten by higher priority field but not backwards
         let _ = parser.on_header(

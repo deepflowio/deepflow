@@ -741,7 +741,7 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
 // 注意 dubbo trace id 解析是区分大小写的
 fn decode_trace_ids(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
     if let Some(trace_id) = lookup_str(payload, trace_type) {
-        info.trace_ids_add(trace_id, trace_type);
+        info.add_trace_id(trace_id, trace_type);
     }
 }
 
