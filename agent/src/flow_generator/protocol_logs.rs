@@ -415,6 +415,10 @@ impl AppProtoLogsBaseInfo {
             (self.end_time.as_micros() - self.start_time.as_micros()) as u64
         } else {
             0
+        };
+
+        if self.biz_type == 0 {
+            self.biz_type = log.biz_type;
         }
     }
 }
