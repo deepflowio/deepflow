@@ -477,8 +477,10 @@ impl SofaRpcLog {
             let sofa_hdr = SofaHdr::from(hdr_payload);
             info.target_serv = sofa_hdr.service;
             info.method = sofa_hdr.method;
-            info.trace_ids
-                .merge_field(BASE_FIELD_PRIORITY, sofa_hdr.trace_id);
+            if !sofa_hdr.trace_id.is_empty() {
+                info.trace_ids
+                    .merge_field(BASE_FIELD_PRIORITY, sofa_hdr.trace_id);
+            }
 
             if !sofa_hdr.new_rpc_trace_context.is_empty() {
                 info.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
