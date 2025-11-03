@@ -86,3 +86,5 @@ pub const SERVER_THREADPOOL_EXHAUSTED_ERROR: u8 = 100;
 
 pub const APM_TRACE_ID_ATTR: &str = "apm_trace_id";
 pub const APM_SPAN_ID_ATTR: &str = "apm_span_id";
+
+pub const SYS_RESPONSE_CODE_ATTR: &str = "sys_response_code";
