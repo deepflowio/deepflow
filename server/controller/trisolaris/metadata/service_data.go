@@ -238,14 +238,14 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 				}
 				separatorIndex := strings.LastIndex(ipPortStr, ":")
 				if separatorIndex == -1 {
-					log.Warningf("[ORG-%s] invalid ip port format: %s", md.ORGID, ipPortStr)
+					log.Warningf("[ORG-%v] invalid ip port format: %s", md.ORGID, ipPortStr)
 					continue
 				}
 				ip := ipPortStr[:separatorIndex]
 				portStr := ipPortStr[separatorIndex+1:]
 				port, err := strconv.Atoi(portStr)
 				if err != nil {
-					log.Warningf("[ORG-%s] invalid port format: %s", md.ORGID, portStr)
+					log.Warningf("[ORG-%v] invalid port format: %s", md.ORGID, portStr)
 					continue
 				}
 				ipPorts = append(ipPorts, newCustomServiceIPPortKey(cs.VPCID, ip, uint32(port)))
