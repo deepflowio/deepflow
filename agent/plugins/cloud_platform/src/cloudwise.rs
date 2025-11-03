@@ -18,6 +18,10 @@
 
 // CloudWise Trace format:
 // CLOUDWISE: JAVA:0:0:0:0:{trace-id}:0:0:0
-pub fn decode_trace_id(_: &str) -> Option<&str> {
-    None
+pub fn decode_trace_id(s: &str) -> Option<&str> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
