@@ -7,3 +7,5 @@ edition = "2021"
 bitflags.workspace = true
 public.workspace = true
 serde.workspace = true
+strum = { version = "0.27", features = ["derive"] }
+strum_macros = "0.27"

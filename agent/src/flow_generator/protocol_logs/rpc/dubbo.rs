@@ -50,7 +50,7 @@ use crate::{
 use self::consts::*;
 
 #[cfg(feature = "enterprise")]
-use enterprise_utils::l7::plugin::custom_field_policy::{set_from_tag, ExtraField};
+use enterprise_utils::l7::custom_policy::{custom_field_policy::set_from_tag, enums::NativeTag};
 
 const TRACE_ID_MAX_LEN: usize = 1024;
 
@@ -318,37 +318,37 @@ impl DubboInfo {
         if tags.is_empty() {
             return;
         }
-        set_from_tag!(self.dubbo_version, tags, ExtraField::VERSION);
+        set_from_tag!(self.dubbo_version, tags, NativeTag::Version.as_ref());
         // req
         // request_resource priority greater than request_type, ignore request_type setting
-        // set_from_tag!(self.method_name, tags, ExtraField::REQUEST_TYPE);
-        set_from_tag!(self.service_name, tags, ExtraField::REQUEST_DOMAIN);
-        set_from_tag!(self.method_name, tags, ExtraField::REQUEST_RESOURCE);
-        self.endpoint = tags.remove(ExtraField::ENDPOINT);
+        // set_from_tag!(self.method_name, tags, NativeTag::RequestType);
+        set_from_tag!(self.service_name, tags, NativeTag::RequestDomain.as_ref());
+        set_from_tag!(self.method_name, tags, NativeTag::RequestResource.as_ref());
+        self.endpoint = tags.remove(NativeTag::Endpoint.as_ref());
 
-        if let Some(req_id) = tags.remove(ExtraField::REQUEST_ID) {
+        if let Some(req_id) = tags.remove(NativeTag::RequestId.as_ref()) {
             self.request_id = req_id.parse::<i64>().unwrap_or_default();
         }
-        if let Some(resp_code) = tags.remove(ExtraField::RESPONSE_CODE) {
+        if let Some(resp_code) = tags.remove(NativeTag::ResponseCode.as_ref()) {
             self.response_code_to_attribute();
             self.status_code = Some(resp_code.parse::<i32>().unwrap_or_default());
         }
 
         // res
-        if let Some(resp_status) = tags.remove(ExtraField::RESPONSE_STATUS) {
+        if let Some(resp_status) = tags.remove(NativeTag::ResponseStatus.as_ref()) {
             self.resp_status = L7ResponseStatus::from(resp_status.as_str());
         }
-        self.custom_exception = tags.remove(ExtraField::RESPONSE_EXCEPTION);
-        self.custom_result = tags.remove(ExtraField::RESPONSE_RESULT);
+        self.custom_exception = tags.remove(NativeTag::ResponseException.as_ref());
+        self.custom_result = tags.remove(NativeTag::ResponseResult.as_ref());
 
         // trace info
-        if let Some(trace_id) = tags.remove(ExtraField::TRACE_ID) {
+        if let Some(trace_id) = tags.remove(NativeTag::TraceId.as_ref()) {
             self.trace_ids
                 .merge_field(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
         }
 
         if CUSTOM_FIELD_POLICY_PRIORITY < self.span_id.prio {
-            if let Some(span_id) = tags.remove(ExtraField::SPAN_ID) {
+            if let Some(span_id) = tags.remove(NativeTag::SpanId.as_ref()) {
                 let prev = replace(
                     &mut self.span_id,
                     PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id),
@@ -361,7 +361,7 @@ impl DubboInfo {
                 }
             }
         }
-        self.client_ip = tags.remove(ExtraField::HTTP_PROXY_CLIENT);
+        self.client_ip = tags.remove(NativeTag::HttpProxyClient.as_ref());
 
         let x_req_id = match self.msg_type {
             LogMessageType::Request => &mut self.x_request_id_0,
@@ -373,18 +373,18 @@ impl DubboInfo {
             _ => true,
         };
         if prio_check {
-            if let Some(x_request_id) = tags.remove(ExtraField::X_REQUEST_ID) {
+            if let Some(x_request_id) = tags.remove(NativeTag::XRequestId.as_ref()) {
                 *x_req_id = Some(PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id));
             }
         }
 
-        if let Some(biz_type) = tags.remove(ExtraField::BIZ_TYPE) {
+        if let Some(biz_type) = tags.remove(NativeTag::BizType.as_ref()) {
             self.biz_type = biz_type.parse::<u8>().unwrap_or_default();
         }
-        if let Some(biz_code) = tags.remove(ExtraField::BIZ_CODE) {
+        if let Some(biz_code) = tags.remove(NativeTag::BizCode.as_ref()) {
             self.biz_code = biz_code;
         }
-        if let Some(biz_scenario) = tags.remove(ExtraField::BIZ_SCENARIO) {
+        if let Some(biz_scenario) = tags.remove(NativeTag::BizScenario.as_ref()) {
             self.biz_scenario = biz_scenario;
         }
     }
@@ -1159,12 +1159,13 @@ mod tests {
     if #[cfg(feature = "enterprise")] {
             use std::collections::HashMap;
 
-            use enterprise_utils::l7::plugin::custom_field_policy::{ExtraCustomFieldPolicy, ExtraField};
+            use enterprise_utils::l7::custom_policy::{
+                custom_field_policy::{Policy, PolicyMap, ExtraField},
+                enums::{FieldType, MatchType, NativeTag},
+            };
             use crate::flow_generator::protocol_logs::LogMessageType;
             use crate::common::flow::L7ProtocolEnum;
-            use crate::config::config::ExtraCustomFieldPolicyMap;
             use public::segment_map::SegmentBuilder;
-            use public::enums::{FieldType, MatchType};
         }
     }
 
@@ -1487,18 +1488,15 @@ mod tests {
         let mut segment_map_builder = SegmentBuilder::new();
         segment_map_builder.add_single(20080, 0);
 
-        let config = L7LogDynamicConfig::new(
-            vec![],
-            vec!["x-request-id".into()],
-            true,
-            vec!["trace_id".into()],
-            vec!["span_id".into()],
-            ExtraLogFields::default(),
-            false,
-            HashMap::from([(
+        let config = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec!["x-request-id".into()],
+            trace_types: vec!["trace_id".into()],
+            span_types: vec!["span_id".into()],
+            extra_field_policies: HashMap::from([(
                 L7ProtocolEnum::L7Protocol(L7Protocol::Dubbo),
-                ExtraCustomFieldPolicyMap {
-                    policies: vec![ExtraCustomFieldPolicy {
+                PolicyMap {
+                    policies: vec![Policy {
                         from_req_key: HashMap::from([(
                             FieldType::DubboHeader,
                             HashMap::from([
@@ -1514,11 +1512,9 @@ mod tests {
                     indices: segment_map_builder.merge_segments(),
                 },
             )]),
-            0,
-            0,
-            0,
-            256,
-        );
+            ..Default::default()
+        }
+        .into();
 
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
@@ -1594,21 +1590,21 @@ mod tests {
             ExtraField {
                 field_match_type: MatchType::String(false),
                 field_match_keyword: "id".into(),
-                rewrite_native_tag: Some(ExtraField::REQUEST_RESOURCE.into()),
+                rewrite_native_tag: Some(NativeTag::RequestResource),
                 attribute_name: Some("id".into()),
                 ..Default::default()
             },
             ExtraField {
                 field_match_type: MatchType::String(false),
                 field_match_keyword: "name".into(),
-                rewrite_native_tag: Some(ExtraField::ENDPOINT.into()),
+                rewrite_native_tag: Some(NativeTag::Endpoint),
                 attribute_name: Some("name".into()),
                 ..Default::default()
             },
             ExtraField {
                 field_match_type: MatchType::String(false),
                 field_match_keyword: "age".into(),
-                rewrite_native_tag: Some(ExtraField::X_REQUEST_ID.into()),
+                rewrite_native_tag: Some(NativeTag::XRequestId),
                 attribute_name: Some("age".into()),
                 ..Default::default()
             },
@@ -1616,18 +1612,15 @@ mod tests {
         let mut segment_map_builder = SegmentBuilder::new();
         segment_map_builder.add_single(20000, 0);
 
-        let config = L7LogDynamicConfig::new(
-            vec![],
-            vec!["x-request-id".into()],
-            true,
-            vec!["trace_id".into()],
-            vec!["span_id".into()],
-            ExtraLogFields::default(),
-            false,
-            HashMap::from([(
+        let config = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec!["x-request-id".into()],
+            trace_types: vec!["trace_id".into()],
+            span_types: vec!["span_id".into()],
+            extra_field_policies: HashMap::from([(
                 L7ProtocolEnum::L7Protocol(L7Protocol::Dubbo),
-                ExtraCustomFieldPolicyMap {
-                    policies: vec![ExtraCustomFieldPolicy {
+                PolicyMap {
+                    policies: vec![Policy {
                         from_req_key: HashMap::from([(
                             FieldType::PayloadHessian2,
                             HashMap::from([
@@ -1641,11 +1634,9 @@ mod tests {
                     indices: segment_map_builder.merge_segments(),
                 },
             )]),
-            0,
-            0,
-            0,
-            256,
-        );
+            ..Default::default()
+        }
+        .into();
 
         let mut info = DubboInfo::default();
         info.msg_type = LogMessageType::Request;
@@ -1713,20 +1704,15 @@ mod tests {
             0x69, 0x64, 0x65, 0x72, 0x05, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x0a, 0x6d, 0x79, 0x41,
             0x70, 0x70, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x5a, 0x4e,
         ];
-        let mut config = L7LogDynamicConfig::new(
-            vec![],
-            vec!["x-request-id".into()],
-            true,
-            vec!["trace_id".into()],
-            vec!["span_id".into()],
-            ExtraLogFields::default(),
-            false,
-            HashMap::new(),
-            0,
-            0,
-            0,
-            256,
-        );
+        let mut config: L7LogDynamicConfig = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec!["x-request-id".into()],
+            trace_types: vec!["trace_id".into()],
+            span_types: vec!["span_id".into()],
+            extra_field_policies: HashMap::new(),
+            ..Default::default()
+        }
+        .into();
         let rewrite_hessian2_payload = vec![
             ExtraField {
                 field_match_type: MatchType::String(true),
@@ -1776,8 +1762,8 @@ mod tests {
         segment_map_builder.add_single(20000, 0);
         config.extra_field_policies = HashMap::from([(
             L7ProtocolEnum::L7Protocol(L7Protocol::Dubbo),
-            ExtraCustomFieldPolicyMap {
-                policies: vec![ExtraCustomFieldPolicy {
+            PolicyMap {
+                policies: vec![Policy {
                     from_resp_key: HashMap::from([(
                         FieldType::PayloadHessian2,
                         HashMap::from([
@@ -1816,8 +1802,8 @@ mod tests {
 
         config.extra_field_policies = HashMap::from([(
             L7ProtocolEnum::L7Protocol(L7Protocol::Dubbo),
-            ExtraCustomFieldPolicyMap {
-                policies: vec![ExtraCustomFieldPolicy {
+            PolicyMap {
+                policies: vec![Policy {
                     from_resp_key: HashMap::from([(
                         FieldType::PayloadHessian2,
                         HashMap::from([

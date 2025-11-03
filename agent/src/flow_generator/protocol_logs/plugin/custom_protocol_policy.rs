@@ -29,11 +29,11 @@ use crate::{
     },
     plugin::{CustomInfo, CustomInfoRequest, CustomInfoResp, CustomInfoTrace},
 };
-use enterprise_utils::l7::plugin::custom_protocol_policy::{CustomPolicyInfo, CustomPolicyParser};
-use public::{
+use enterprise_utils::l7::custom_policy::{
+    custom_protocol_policy::{CustomPolicyInfo, CustomPolicyParser},
     enums::TrafficDirection,
-    l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum},
 };
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
 
 #[derive(Default)]
 pub struct CustomPolicyLog {
