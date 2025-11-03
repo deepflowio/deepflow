@@ -293,7 +293,7 @@ type KubernetesCluster struct {
 type ACL struct {
 	ID                 int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	BusinessID         int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
-	Name               string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Name               string    `gorm:"column:name;type:char(255);default:null" json:"NAME"`
 	Type               int       `gorm:"column:type;type:int;default:2" json:"TYPE"`                // 1-epc; 2-custom
 	TapType            int       `gorm:"column:tap_type;type:int;default:3" json:"TAP_TYPE"`        // 1-WAN; 3-LAN
 	State              int       `gorm:"column:state;type:int;default:null;default:0" json:"STATE"` // 0-disable; 1-enable
@@ -352,7 +352,7 @@ func (ResourceGroupExtraInfo) TableName() string {
 // NpbPolicy [...]
 type NpbPolicy struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Name             string    `gorm:"column:name;type:char(255);default:null" json:"NAME"`
 	State            int       `gorm:"column:state;type:int;default:0" json:"STATE"` // 0-disable; 1-enable
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	Direction        int       `gorm:"column:direction;type:int;default:1" json:"DIRECTION"` // 1-two way; 2-server to client
