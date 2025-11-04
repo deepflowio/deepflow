@@ -389,6 +389,7 @@ type PodGroup struct {
 	Spec               string `json:"-"`
 	SpecHash           string `json:"spec_hash"`
 	Label              string `json:"label"`
+	NetworkMode        int    `json:"network_mode"`
 	Type               int    `json:"type" binding:"required"`
 	PodNum             int    `json:"pod_num" binding:"required"`
 	PodNamespaceLcuuid string `json:"pod_namespace_lcuuid" binding:"required"`
