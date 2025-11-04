@@ -113,6 +113,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		Name:           cloudItem.Name,
 		Type:           cloudItem.Type,
 		Label:          cloudItem.Label,
+		NetworkMode:    cloudItem.NetworkMode,
 		Metadata:       string(yamlMetadata),
 		MetadataHash:   cloudItem.MetadataHash,
 		Spec:           string(yamlSpec),
@@ -150,6 +151,10 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
+	}
+	if diffBase.NetworkMode != cloudItem.NetworkMode {
+		mapInfo["network_mode"] = cloudItem.NetworkMode
+		structInfo.NetworkMode.Set(diffBase.NetworkMode, cloudItem.NetworkMode)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

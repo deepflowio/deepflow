@@ -834,6 +834,7 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL COMMENT '1: Deployment 2: StatefulSet 3: ReplicationController',
     pod_num             INTEGER DEFAULT 1,
     label               TEXT COMMENT 'separated by ,',
+    network_mode        INTEGER DEFAULT 1 COMMENT '1: Pod network 2: Host network',
     metadata            MEDIUMTEXT COMMENT 'yaml',
     metadata_hash       CHAR(64) DEFAULT '',
     spec                MEDIUMTEXT COMMENT 'yaml',
