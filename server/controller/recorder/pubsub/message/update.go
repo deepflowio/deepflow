@@ -676,6 +676,7 @@ type UpdatedPodGroupFields struct {
 	Key
 	Name           fieldDetail[string]
 	Label          fieldDetail[string]
+	NetworkMode    fieldDetail[int]
 	Type           fieldDetail[int]
 	PodNum         fieldDetail[int]
 	Metadata       fieldDetail[string]

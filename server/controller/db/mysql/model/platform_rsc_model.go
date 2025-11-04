@@ -909,7 +909,8 @@ type PodGroup struct {
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" json:"TYPE" mapstructure:"TYPE"` // 1: Deployment 2: StatefulSet 3: ReplicationController
 	PodNum         int    `gorm:"column:pod_num;type:int;default:1" json:"POD_NUM" mapstructure:"POD_NUM"`
-	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"` // separated by ,
+	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"`                    // separated by ,
+	NetworkMode    int    `gorm:"column:network_mode;type:int;default:1" json:"NETWORK_MODE" mapstructure:"NETWORK_MODE"` // 1: Pod network 2: Host network
 	Metadata       string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"-"`
 	MetadataHash   string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"-"`
 	Spec           string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"-"`
