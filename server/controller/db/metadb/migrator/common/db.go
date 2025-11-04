@@ -57,18 +57,21 @@ func LogDBName(databaseName string, format string, a ...any) string {
 }
 
 func GetSessionWithoutName(cfg config.Config) (*gorm.DB, error) {
-	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)
-	if err != nil {
-		return nil, err
-	}
-	return common.InitSession(cfg, connector)
+	return common.InitSession(
+		common.SessionConfig{
+			DBCfg:              cfg,
+			TimeoutCoefficient: 1,
+		},
+	)
 }
 
 func GetSessionWithName(cfg config.Config) (*gorm.DB, error) {
-	// set multiStatements=true in dsn only when migrating Metadb
-	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
-	if err != nil {
-		return nil, err
-	}
-	return common.InitSession(cfg, connector)
+	return common.InitSession(
+		common.SessionConfig{
+			DBCfg:              cfg,
+			UseDabase:          true,
+			TimeoutCoefficient: 2,
+			MultiStatements:    true,
+		},
+	)
 }
