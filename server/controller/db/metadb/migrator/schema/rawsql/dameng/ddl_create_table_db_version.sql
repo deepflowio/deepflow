@@ -3,7 +3,7 @@
 BEGIN
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS db_version (
-        version             CHAR(64) PRIMARY KEY,
+        version             VARCHAR(64) PRIMARY KEY,
         created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )';
