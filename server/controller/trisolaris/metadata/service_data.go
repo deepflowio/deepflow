@@ -36,6 +36,8 @@ type ServiceRawData struct {
 	podServiceIDToPodServicePorts map[int][]*models.PodServicePort
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
 	podGroupIDToPodServiceID      map[int]int
+	podGroupIDToVPCID             map[int]int
+	podGroupIDToNodeIPs           map[int][]string
 	lbIDToVPCID                   map[int]int
 	customServiceIDToIPPorts      map[int]mapset.Set[customServiceIPPortKey]
 	customServiceIDToResourceIDs  map[int][]uint32
@@ -64,6 +66,8 @@ func newServiceRawData() *ServiceRawData {
 		podServiceIDToPodServicePorts: make(map[int][]*models.PodServicePort),
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
 		podGroupIDToPodServiceID:      make(map[int]int),
+		podGroupIDToVPCID:             make(map[int]int),
+		podGroupIDToNodeIPs:           make(map[int][]string),
 		lbIDToVPCID:                   make(map[int]int),
 		customServiceIDToIPPorts:      make(map[int]mapset.Set[customServiceIPPortKey]),
 		customServiceIDToResourceIDs:  make(map[int][]uint32),
@@ -88,6 +92,31 @@ func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
 
 func (r *ServiceRawData) ConvertDBData(md *MetaData) {
 	dbDataCache := md.GetDBDataCache()
+
+	// generate pod group to node ip relation
+	podNodeIDToIP := make(map[int]string)
+	podNodeIDToVPCID := make(map[int]int)
+	for _, podNode := range dbDataCache.GetPodNodes() {
+		podNodeIDToIP[podNode.ID] = podNode.IP
+		podNodeIDToVPCID[podNode.ID] = podNode.VPCID
+	}
+	for _, pod := range dbDataCache.GetPods() {
+		// get pod_node IP
+		podNodeIP, ok := podNodeIDToIP[pod.PodNodeID]
+		if !ok {
+			continue
+		}
+		// get pod_node VPCID
+		vpcID, ok := podNodeIDToVPCID[pod.PodNodeID]
+		if !ok {
+			continue
+		}
+		r.podGroupIDToVPCID[pod.PodGroupID] = vpcID
+		r.podGroupIDToNodeIPs[pod.PodGroupID] = append(
+			r.podGroupIDToNodeIPs[pod.PodGroupID], podNodeIP,
+		)
+	}
+
 	for _, psp := range dbDataCache.GetPodServicePorts() {
 		if _, ok := r.podServiceIDToPodServicePorts[psp.PodServiceID]; ok {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = append(
@@ -397,16 +426,43 @@ func (s *ServiceDataOP) generateService() {
 				keyToPorts[key] = []uint32{uint32(port.Port)}
 			}
 		}
+
 		for index := range groupKeys {
-			if valuse, ok := keyToPorts[groupKeys[index]]; ok {
+			if values, ok := keyToPorts[groupKeys[index]]; ok {
 				service := podGroupToProto(
 					podGroup.ID,
 					groupKeys[index].protocol,
-					valuse,
+					values,
 					trident.ServiceType_POD_SERVICE_POD_GROUP,
 					groupKeys[index].podServiceID,
 				)
 				services = append(services, service)
+			}
+		}
+
+		// if pod_group hostNetwork == true
+		// add ServiceType_POD_SERVICE_IP service(vpc_id + node_ips)
+		if podGroup.NetworkMode == POD_GROUP_HOST_NETWORK {
+			vpcID, ok := rData.podGroupIDToVPCID[podGroup.ID]
+			if !ok {
+				continue
+			}
+			nodeIPs, ok := rData.podGroupIDToNodeIPs[podGroup.ID]
+			if !ok {
+				continue
+			}
+			for index := range groupKeys {
+				if values, ok := keyToPorts[groupKeys[index]]; ok {
+					service := serviceToProto(
+						vpcID,
+						nodeIPs,
+						groupKeys[index].protocol,
+						values,
+						trident.ServiceType_POD_SERVICE_IP,
+						podServiceID,
+					)
+					services = append(services, service)
+				}
 			}
 		}
 	}
