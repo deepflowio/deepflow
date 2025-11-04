@@ -384,4 +384,10 @@ var ColumnAdd70 = []*ColumnAdds{
 		ColumnNames: []string{"aggregated_flow_ids"},
 		ColumnType:  ckdb.String,
 	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"_trace_id_2"},
+		ColumnType:  ckdb.String,
+	},
 }
