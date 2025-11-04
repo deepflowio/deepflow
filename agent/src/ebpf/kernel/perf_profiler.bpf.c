@@ -207,7 +207,7 @@ static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t 
 }
 
 static __always_inline void lua_state_slot_write(struct lua_state_cache_t *cache,
-						 __u8 idx, __u64 value)
+                                                 __u8 idx, __u64 value)
 {
 	if (idx >= LUA_STATE_STACK_DEPTH)
 		return;
@@ -217,8 +217,8 @@ static __always_inline void lua_state_slot_write(struct lua_state_cache_t *cache
 static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
 {
 	__u32 tid = (__u32)id;
-	struct lua_state_cache_t *cache = lua_tstate_map__lookup(&tid);
-	if (!cache) {
+	struct lua_state_cache_t *cache_ptr = lua_tstate_map__lookup(&tid);
+	if (!cache_ptr) {
 		struct lua_state_cache_t init = {};
 		init.depth = 1;
 		init.states[0] = state;
@@ -226,39 +226,48 @@ static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
 		return;
 	}
 
-	__u8 depth = cache->depth;
+	struct lua_state_cache_t cache = {};
+	__builtin_memcpy(&cache, cache_ptr, sizeof(cache));
+
+	__u8 depth = cache.depth;
 	if (depth >= LUA_STATE_STACK_DEPTH) {
 #pragma unroll
 		for (int i = 1; i < LUA_STATE_STACK_DEPTH; i++) {
-			cache->states[i - 1] = cache->states[i];
+			cache.states[i - 1] = cache.states[i];
 		}
 		depth = LUA_STATE_STACK_DEPTH - 1;
 	}
 
-	lua_state_slot_write(cache, depth, state);
-	cache->depth = depth + 1;
+	lua_state_slot_write(&cache, depth, state);
+	cache.depth = depth + 1;
+	lua_tstate_map__update(&tid, &cache);
 }
 
 static __always_inline void lua_state_stack_pop(__u64 id)
 {
 	__u32 tid = (__u32)id;
-	struct lua_state_cache_t *cache = lua_tstate_map__lookup(&tid);
-	if (!cache)
+	struct lua_state_cache_t *cache_ptr = lua_tstate_map__lookup(&tid);
+	if (!cache_ptr)
 		return;
 
-	__u8 depth = cache->depth;
+	struct lua_state_cache_t cache = {};
+	__builtin_memcpy(&cache, cache_ptr, sizeof(cache));
+
+	__u8 depth = cache.depth;
 	if (depth == 0) {
 		lua_tstate_map__delete(&tid);
 		return;
 	}
 
 	depth--;
-	cache->depth = depth;
+	cache.depth = depth;
 	if (depth < LUA_STATE_STACK_DEPTH)
-		lua_state_slot_write(cache, depth, 0);
+		lua_state_slot_write(&cache, depth, 0);
 
 	if (depth == 0)
 		lua_tstate_map__delete(&tid);
+	else
+		lua_tstate_map__update(&tid, &cache);
 }
 #endif
 
