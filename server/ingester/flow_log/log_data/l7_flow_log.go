@@ -667,9 +667,6 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		}
 
 		for i, name := range attributeNames[:minNamesLen] {
-			if attributeValues[i] == "" {
-				continue
-			}
 			flowTagInfo.FieldName = name
 
 			// tag + value
