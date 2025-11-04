@@ -160,10 +160,6 @@ mod tests {
     use super::super::*;
     use super::*;
 
-    fn contains_key(payload: &[u8], key: &str) -> bool {
-        find_bytes_ignore_case(payload, format!("\"{}\"", key).as_bytes()).is_some()
-    }
-
     pub fn extract_string_value_from_str(input: &str) -> Result<String, SearchError> {
         extract_string_value_from_bytes(input.as_bytes())
     }
