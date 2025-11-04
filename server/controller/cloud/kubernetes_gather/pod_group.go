@@ -197,6 +197,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 					podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 				}
 			}
+			networkMode := common.POD_GROUP_POD_NETWORK
+			if spec.GetPath("template", "spec", "hostNetwork").MustBool() {
+				networkMode = common.POD_GROUP_HOST_NETWORK
+			}
 			metaDataStr := k.simpleJsonMarshal(metaData)
 			specStr := k.simpleJsonMarshal(spec)
 			podGroup := model.PodGroup{
@@ -207,6 +211,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				Spec:               specStr,
 				SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
 				Label:              k.GetLabel(labels),
+				NetworkMode:        networkMode,
 				Type:               serviceType,
 				PodNum:             spec.Get("replicas").MustInt(),
 				PodNamespaceLcuuid: namespaceLcuuid,
