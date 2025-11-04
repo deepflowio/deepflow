@@ -142,7 +142,8 @@ struct socket_info_s {
 	 * participate in tracing.
 	 */
 	__u16 no_trace:1;
-	__u16 unused_bits:11;
+	__u16 mysql_first_resp:1; // Used to indicate whether the first packet of the MySQL protocol response has been received.
+	__u16 unused_bits:10;
 	__u32 reasm_bytes;	// The amount of data bytes that have been reassembled.
 
 	/*

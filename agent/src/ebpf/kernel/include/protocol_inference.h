@@ -735,6 +735,8 @@ static __inline __u32 check_and_fetch_prev_data(struct conn_info_s *conn_info)
 // ref : https://dev.mysql.com/doc/internals/en/com-process-kill.html
 static __inline enum message_type infer_mysql_message(const char *buf,
 						      size_t count,
+						      char *last_data_ptr,
+						      __u32 last_data_len,
 						      struct conn_info_s
 						      *conn_info)
 {
@@ -789,6 +791,32 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 	bool is_mysqld = is_current_comm("mysqld");
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+		__u8 data[5];
+		if (conn_info->socket_info_ptr->mysql_first_resp == 1 && conn_info->direction ==
+                    conn_info->socket_info_ptr->direction) {
+			if (last_data_len >= 5) {
+				bpf_probe_read_user(&data, sizeof(data), last_data_ptr + last_data_len - 5);
+				if (data[0] == 0xfe) {
+					conn_info->socket_info_ptr->mysql_first_resp = 0;
+					goto out;
+				}
+			}
+
+			return MSG_UNKNOWN;
+		}
+#endif
+
+		if (seq == 0) {
+			conn_info->socket_info_ptr->mysql_first_resp = 0;
+			goto out;
+		}
+
+		if (seq == 1) {
+			conn_info->socket_info_ptr->mysql_first_resp = 1;
+			goto out;
+		}
+
 		/*
 		 * Ensure the authentication response packet is captured
 		 * and distinguish it based on the 5th byte (Payload start):  
@@ -797,8 +825,10 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		 * - **Authentication Failure (ERR Packet):** `0xFF`  
 		 * - **Authentication Switch Request (Auth Switch Request):** `0xFE`
 		 */
-		if (seq <= 1 || (seq == 2 && (com == 0x0 || com == 0xFF || com == 0xFE)))
+		if (seq == 2 && (com == 0x0 || com == 0xFF || com == 0xFE)) {
+			conn_info->socket_info_ptr->mysql_first_resp = 0;
 			goto out;
+		}
 
 		return MSG_UNKNOWN;
 	}
@@ -4083,8 +4113,8 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 *     its value is the address of the first iov, and syscall_infer_len is
 	 *     the length of the first iov.
 	 */
-	char *syscall_infer_addr = NULL;
-	__u32 syscall_infer_len = 0;
+	char *syscall_infer_addr = NULL, *last_data_ptr = NULL;
+	__u32 syscall_infer_len = 0, last_data_len = 0;
 	if (extra->vecs) {
 		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
 						     count, INFER_BUF_MAX,
@@ -4096,11 +4126,21 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		 */
 		if (syscall_infer_len > count)
 			syscall_infer_len = count;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+		struct iovec iov_cpy;
+		bpf_probe_read_user(&iov_cpy, sizeof(struct iovec), &args->iov[args->iovlen - 1]);
+		last_data_ptr = iov_cpy.iov_base;
+		last_data_len = iov_cpy.iov_len;
+#endif
 	} else {
 		bpf_probe_read_user(__infer_buf->data,
 				    sizeof(__infer_buf->data), buf);
 		syscall_infer_addr = (char *)buf;
 		syscall_infer_len = count;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+		last_data_ptr = (char *)buf;
+		last_data_len = count;
+#endif
 	}
 
 	char *infer_buf = __infer_buf->data;
@@ -4262,6 +4302,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_MYSQL:
 			if ((inferred_message.type =
 			     infer_mysql_message(infer_buf, count,
+						 last_data_ptr, last_data_len,
 						 conn_info)) != MSG_UNKNOWN) {
 				if (inferred_message.type == MSG_PRESTORE)
 					return inferred_message;
@@ -4495,6 +4536,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	} else if ((inferred_message.type =
 #endif
 		    infer_mysql_message(infer_buf, count,
+					last_data_ptr, last_data_len,
 					conn_info)) != MSG_UNKNOWN) {
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
