@@ -800,6 +800,7 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL,
     pod_num             INTEGER DEFAULT 1,
     label               TEXT,
+    network_mode        INTEGER DEFAULT 1,
     metadata            TEXT,
     metadata_hash       VARCHAR(64) DEFAULT '',
     spec                TEXT,

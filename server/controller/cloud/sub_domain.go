@@ -609,6 +609,7 @@ func (c *Cloud) getSubDomainPodGroups(
 			Spec:               podGroup.Spec,
 			SpecHash:           podGroup.SpecHash,
 			Label:              podGroup.Label,
+			NetworkMode:        podGroup.NetworkMode,
 			Type:               podGroup.Type,
 			PodNum:             podGroup.PodNum,
 			PodNamespaceLcuuid: podGroup.PodNamespaceLcuuid,
