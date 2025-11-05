@@ -36,8 +36,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metaDBCommon "github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -47,7 +47,8 @@ var (
 )
 
 type Dictionary struct {
-	cfg config.ControllerConfig
+	cfg    config.ControllerConfig
+	source metaDBCommon.ClickHouseSource
 }
 
 func GetDictionary() *Dictionary {
@@ -59,6 +60,7 @@ func GetDictionary() *Dictionary {
 
 func (c *Dictionary) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
+	c.source = metaDBCommon.GetClickhouseSource(c.cfg.MetadbCfg)
 }
 
 func (c *Dictionary) Start(sCtx context.Context) {
@@ -173,19 +175,10 @@ func (c *Dictionary) Update(updateFunc func(*clickhouse.ClickHouseConfig)) {
 }
 
 func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
-	var mysqlDatabaseName string
-	var ckDatabaseName string
 	// 在本区域所有数据节点更新字典
 	// Update the dictionary at all data nodes in the region
-	var replicaSQL string
-	var mysqlPort uint32
-	if c.cfg.MySqlCfg.ProxyHost != "" {
-		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.ProxyHost)
-		mysqlPort = c.cfg.MySqlCfg.ProxyPort
-	} else {
-		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.Host)
-		mysqlPort = c.cfg.MySqlCfg.Port
-	}
+	sqlDatabaseName := c.source.Database
+	ckDatabaseName := c.cfg.ClickHouseCfg.Database
 
 	ckDb, err := clickhouse.Connect(*clickHouseCfg)
 	if err != nil {
@@ -257,17 +250,14 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		CH_DICTIONARY_ALARM_POLICY,
 	)
 	// 根据不同的组织进行更新
-	orgIDs, err := mysql.GetORGIDs()
+	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)
 	}
 	for _, orgID := range orgIDs {
-		if orgID == mysqlCommon.DEFAULT_ORG_ID {
-			mysqlDatabaseName = c.cfg.MySqlCfg.Database
-			ckDatabaseName = c.cfg.ClickHouseCfg.Database
-		} else {
-			mysqlDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.MySqlCfg.Database + "`"
-			ckDatabaseName = "`" + fmt.Sprintf(mysqlCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.ClickHouseCfg.Database + "`"
+		if orgID != metaDBCommon.DEFAULT_ORG_ID {
+			sqlDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.source.Database + "`"
+			ckDatabaseName = "`" + fmt.Sprintf(metaDBCommon.DATABASE_PREFIX_ALIGNMENT, orgID) + "_" + c.cfg.ClickHouseCfg.Database + "`"
 		}
 		var databases []string
 		// 检查并创建数据库
@@ -335,9 +325,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		var addDictError error
 		for _, dict := range addDicts.ToSlice() {
 			dictName := dict.(string)
-			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
-			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL := c.fillCreateSQL(dictName, ckDatabaseName, sqlDatabaseName)
 			log.Infof("create dictionary %s", dictName, logger.NewORGPrefix(orgID))
 			log.Info(createSQL, logger.NewORGPrefix(orgID))
 			_, err = ckDb.Exec(createSQL)
@@ -356,7 +344,6 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		var updateDictError error
 		for _, dict := range checkDicts.ToSlice() {
 			dictName := dict.(string)
-			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 			showSQL := fmt.Sprintf("SHOW CREATE DICTIONARY %s.%s", ckDatabaseName, dictName)
 			dictSQL := make([]string, 0)
 			if err := ckDb.Select(&dictSQL, showSQL); err != nil {
@@ -367,15 +354,14 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			if len(dictSQL) <= 0 {
 				break
 			}
-			createSQL := CREATE_SQL_MAP[dictName]
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL := c.fillCreateSQL(dictName, ckDatabaseName, sqlDatabaseName)
 			// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
-			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MySqlCfg.UserPassword, 1)
+			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.source.UserPassword, 1)
 			if createSQL == checkDictSQL {
 				continue
 			}
-			logCheckSQL := strings.Replace(checkDictSQL, c.cfg.MySqlCfg.UserPassword, "[HIDDEN]", 1)
-			logCreateSQL := strings.Replace(createSQL, c.cfg.MySqlCfg.UserPassword, "[HIDDEN]", 1)
+			logCheckSQL := strings.Replace(checkDictSQL, c.source.UserPassword, "[HIDDEN]", 1)
+			logCreateSQL := strings.Replace(createSQL, c.source.UserPassword, "[HIDDEN]", 1)
 			log.Infof("update dictionary %s", dictName, logger.NewORGPrefix(orgID))
 			log.Infof("exist dictionary %s", logCheckSQL, logger.NewORGPrefix(orgID))
 			log.Infof("wanted dictionary %s", logCreateSQL, logger.NewORGPrefix(orgID))
@@ -478,4 +464,32 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 	}
 
+}
+
+func (c *Dictionary) makeSourceClause(db, table string) string {
+	switch c.source.Name {
+	case metaDBCommon.SOURCE_MYSQL, metaDBCommon.SOURCE_POSTGRESQL:
+		return fmt.Sprintf(
+			SQL_SOURCE_MYSQL, c.source.Name, c.source.Host, c.source.Port, c.source.UserName, c.source.UserPassword, c.source.ReplicaSQL, db, table, table,
+		)
+	case metaDBCommon.SOURCE_DM:
+		return fmt.Sprintf(
+			SQL_SOURCE_DM, c.source.DSN, db, table, table,
+		)
+	default:
+		return ""
+	}
+}
+
+func (c *Dictionary) fillCreateSQL(dictName string, ckDatabaseName string, sqlDatabaseName string) string {
+	chTable := chDictNameToMetaDBTableName(dictName)
+	sourceClause := c.makeSourceClause(sqlDatabaseName, chTable)
+	createSQL := CREATE_SQL_MAP[dictName]
+	return fmt.Sprintf(
+		createSQL,
+		ckDatabaseName,
+		dictName,
+		sourceClause,
+		c.cfg.TagRecorderCfg.DictionaryRefreshInterval,
+	)
 }
