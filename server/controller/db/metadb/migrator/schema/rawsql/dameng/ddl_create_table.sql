@@ -442,6 +442,7 @@ BEGIN
     controller_ip       VARCHAR(64),
     lcuuid              VARCHAR(64) DEFAULT '''',
     synced_at           DATETIME DEFAULT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )';
     EXECUTE IMMEDIATE 'TRUNCATE TABLE "domain"';
