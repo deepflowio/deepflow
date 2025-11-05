@@ -228,7 +228,7 @@ const (
 		"    `icon_id` Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_TAP_TYPE_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -237,7 +237,7 @@ const (
 		"    `name` String\n" +
 		")\n" +
 		"PRIMARY KEY value\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_VTAP_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -254,7 +254,7 @@ const (
 		"    `pod_node_name` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_VTAP_PORT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -275,7 +275,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY vtap_id, tap_port\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_PORT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -291,7 +291,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY id, protocol, port\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_IP_PORT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -308,7 +308,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY ip, subnet_id, protocol, port\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_DEVICE_PORT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -325,7 +325,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY devicetype, deviceid, protocol, port\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_SERVER_PORT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -334,7 +334,7 @@ const (
 		"    `server_port_name` String\n" +
 		")\n" +
 		"PRIMARY KEY server_port\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_IP_RELATION_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -354,7 +354,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY l3_epc_id, ip\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_ID_NAME_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -363,7 +363,7 @@ const (
 		"    `name` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_NPB_TUNNEL_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -373,7 +373,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_LB_LISTENER_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -383,7 +383,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_IP_RESOURCE_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -432,7 +432,7 @@ const (
 		"    `uid` String\n" +
 		")\n" +
 		"PRIMARY KEY ip, subnet_id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_STRING_ENUM_SQL = SQL_CREATE_DICT +
@@ -445,7 +445,7 @@ const (
 		"    `description_en` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_INT_ENUM_SQL = SQL_CREATE_DICT +
@@ -458,7 +458,7 @@ const (
 		"    `description_en` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_NODE_TYPE_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -467,7 +467,7 @@ const (
 		"    `node_type` String\n" +
 		")\n" +
 		"PRIMARY KEY resource_type\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 
@@ -477,7 +477,7 @@ const (
 		"    `name` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 	CREATE_PROMETHEUS_METRIC_APP_LABEL_LAYOUT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -488,7 +488,7 @@ const (
 		"    `app_label_column_index` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_APP_LABEL_SQL = SQL_CREATE_DICT +
@@ -498,7 +498,7 @@ const (
 		"    `label_value_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY label_name_id, label_value_id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_TARGET_LABEL_SQL = SQL_CREATE_DICT +
@@ -509,7 +509,7 @@ const (
 		"    `target_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY metric_id, label_name_id, target_id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -519,7 +519,7 @@ const (
 		"    `target_label_values` String\n" +
 		")\n" +
 		"PRIMARY KEY target_id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_POLICY_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -531,7 +531,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY tunnel_type, acl_gid\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_COMPLEX_KEY_HASHED
 	CREATE_AlARM_POLICY_DICTIONARY_SQL = SQL_CREATE_DICT +
@@ -542,7 +542,7 @@ const (
 		"    `team_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		SQL_SOURCE_MYSQL +
+		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
 )
