@@ -38,8 +38,11 @@ var log = logging.MustGetLogger("clickhouse.metrics")
 
 const METRICS_OPERATOR_GTE = ">="
 const METRICS_OPERATOR_LTE = "<="
+const METRICS_OPERATOR_GT = ">"
+const METRICS_OPERATOR_LT = "<"
+const METRICS_OPERATOR_E = "="
 
-var METRICS_OPERATORS = []string{METRICS_OPERATOR_GTE, METRICS_OPERATOR_LTE}
+var METRICS_OPERATORS = []string{METRICS_OPERATOR_GTE, METRICS_OPERATOR_LTE, METRICS_OPERATOR_GT, METRICS_OPERATOR_LT, METRICS_OPERATOR_E}
 var DB_DESCRIPTIONS map[string]interface{}
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 
