@@ -97,19 +97,31 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 	}
 	serviceProtocol := toServiceProtocol(protocol)
 
+	serviceID := uint32(0)
+	// 数据中的 IP 地址是 Pod IP，或者是由 Hostnetwork Pod（自身没有 IP）使用的 Node IP
+	// -------------------------------------------------------------------------------------------------------
+	// The IP address in the data is a Pod IP, or a Node IP used by a HostNetwork Pod (which has no own Pod IP)
 	if podID != 0 {
-		return s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
-	} else if podNodeID != 0 {
-		// If serverPort is 0, the matched Service may not be accurate
-		if serverPort == 0 {
-			return 0
-		}
-		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
+		serviceID = s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
+
+		// 数据中的 IP 地址是 Node IP，当然也包括由 Hostnetwork Pod（自身没有 IP）使用的 Node IP
+		// ----------------------------------------------------------------------------------------------------------------
+		// The IP address in the data is a Node IP, including the Node IP used by a HostNetwork Pod (which has no own Pod IP)
+	} else if podNodeID != 0 && serverPort != 0 { // If serverPort is 0, the matched Service may not be accurate
+		serviceID = s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
 	}
 
-	// when querying the podGroupIDTable and podClusterIDTable, you do not need to verify the epcID
-	// because there is a scenario where the EpcID is 0 but the podGroupID and podClusterID are not 0.
-	// Currently, you need to verify the epcID because there is no data with epcID <= 0 in the epcIDIPv6Table and epcIDIPv4Table.
+	if serviceID != 0 {
+		return serviceID
+	}
+	// 注意：在 Hostnetwork 场景下，控制器会将 Hostnetwork Pod 的服务信息通过 ip + server_port 的形式下发下来。
+	// 因此如果前两步没有查询到服务信息时，还需要继续查询。
+	// ------------------------------------------------------------------------------------------------------
+	// Note: In HostNetwork scenarios, the Controller distributes service information of HostNetwork Pods
+	// in the form of (ip + server_port). Therefore, if the service information was not found in the above steps,
+	// an additional lookup is still required.
+
+	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
 	if epcID <= 0 {
 		return 0
 	}
