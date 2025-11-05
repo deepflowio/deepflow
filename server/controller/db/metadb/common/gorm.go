@@ -102,7 +102,7 @@ func getDialector(cfg SessionConfig) (gorm.Dialector, error) {
 			return nil, err
 		}
 		return getPostgresDialector(conn), nil
-	case config.MetaDBTypeDaMeng:
+	case config.MetaDBTypeDM:
 		return getDaMengDialector(cfg), nil
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", cfg.DBCfg.Type)
@@ -207,6 +207,7 @@ type ClickHouseSource struct {
 	UserName     string
 	UserPassword string
 	ReplicaSQL   string
+	DSN          string // DM
 }
 
 func GetClickhouseSource(cfg config.Config) ClickHouseSource {
@@ -238,6 +239,10 @@ func GetClickhouseSource(cfg config.Config) ClickHouseSource {
 			source.Host = "HOST '" + cfg.Host + "' "
 			source.Port = cfg.Port
 		}
+	case config.MetaDBTypeDM:
+		source.Name = SOURCE_DM
+		source.DSN = cfg.DSN
+		source.Database = cfg.Database
 	}
 	return source
 }

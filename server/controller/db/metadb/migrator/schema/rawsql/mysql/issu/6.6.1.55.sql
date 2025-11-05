@@ -34,4 +34,4 @@ CALL RenameColumnIfExists('report_policy', '`interval`', 'interval_time', "enum(
 
 DROP PROCEDURE RenameColumnIfExists;
 
-UPDATE db_version SET version='6.6.1.54';
+UPDATE db_version SET version='6.6.1.55';

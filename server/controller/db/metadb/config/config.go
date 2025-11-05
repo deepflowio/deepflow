@@ -19,7 +19,7 @@ package config
 const (
 	MetaDBTypeMySQL      = "MySQL"
 	MetaDBTypePostgreSQL = "PostgreSQL"
-	MetaDBTypeDaMeng     = "DM"
+	MetaDBTypeDM         = "DM"
 )
 
 type Config struct {
@@ -190,7 +190,7 @@ func (c PostgreSQLConfig) FullfillConfig(cfg *Config) {
 
 type DMConfig struct {
 	Enabled   bool   `default:"false" yaml:"enabled"`
-	Database  string `default:"deepflow_server" yaml:"database"`
+	Schema    string `default:"deepflow_server" yaml:"schema"`
 	Host      string `default:"dameng" yaml:"host"`
 	Port      uint32 `default:"5236" yaml:"port"`
 	ProxyHost string `default:"" yaml:"proxy-host"`
@@ -222,8 +222,8 @@ func (c DMConfig) FullfillConfig(cfg *Config) {
 	cfg.BatchSize1 = c.BatchSize1
 
 	cfg.DSN = c.DSN
-	cfg.Type = MetaDBTypeDaMeng
-	cfg.Database = c.Database
+	cfg.Type = MetaDBTypeDM
+	cfg.Database = c.Schema
 	cfg.Host = c.Host
 	cfg.Port = c.Port
 	cfg.ProxyHost = c.ProxyHost
