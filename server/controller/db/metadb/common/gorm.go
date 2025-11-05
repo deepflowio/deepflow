@@ -219,7 +219,7 @@ func GetClickhouseSource(cfg config.Config) ClickHouseSource {
 	case config.MetaDBTypeDM:
 		source.Name = SOURCE_DM
 		source.DSN = cfg.DSN
-		source.Database = cfg.Schema
+		source.Database = cfg.Database
 	}
 	return source
 }
