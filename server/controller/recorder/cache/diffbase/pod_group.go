@@ -33,6 +33,7 @@ func (b *DataSet) AddPodGroup(dbItem *metadbmodel.PodGroup, seq int) {
 		},
 		Name:            dbItem.Name,
 		Label:           dbItem.Label,
+		NetworkMode:     dbItem.NetworkMode,
 		PodNum:          dbItem.PodNum,
 		Type:            dbItem.Type,
 		Metadata:        dbItem.Metadata,
@@ -57,6 +58,7 @@ type PodGroup struct {
 	Label           string `json:"label"`
 	PodNum          int    `json:"pod_num"`
 	Type            int    `json:"type"`
+	NetworkMode     int    `json:"network_mode"`
 	Metadata        string `json:"metadata"`
 	MetadataHash    string `json:"metadata_hash"`
 	Spec            string `json:"spec"`
@@ -77,6 +79,7 @@ func (p PodGroup) ToLoggable() interface{} {
 func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup, toolDataSet *tool.DataSet) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
+	p.NetworkMode = cloudItem.NetworkMode
 	p.PodNum = cloudItem.PodNum
 	p.Type = cloudItem.Type
 
