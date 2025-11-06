@@ -148,14 +148,6 @@ impl WebSphereMqInfo {
         }
     }
 
-    // when response_status is overwritten, put it into the attributes.
-    fn response_status_to_attribute(&mut self) {
-        self.attributes.push(KeyVal {
-            key: SYS_RESPONSE_STATUS_ATTR.to_string(),
-            val: (self.status as u8).to_string(),
-        });
-    }
-
     // when response_code is overwritten, put it into the attributes.
     fn response_code_to_attribute(&mut self) {
         self.attributes.push(KeyVal {
@@ -187,7 +179,6 @@ impl WebSphereMqInfo {
         }
 
         if custom.resp.status != L7ResponseStatus::default() {
-            self.response_status_to_attribute();
             self.status = custom.resp.status;
         }
 
