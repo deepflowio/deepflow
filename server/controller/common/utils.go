@@ -17,6 +17,7 @@
 package common
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -212,4 +213,50 @@ func CompareVersion(ver1, ver2 string) int {
 	}
 
 	return v1 - v2
+}
+
+func ParseRangePorts(rangePort string) ([]int, error) {
+	if rangePort == "" {
+		return []int{}, nil
+	}
+
+	portMap := map[int]bool{}
+	rangePort = strings.ReplaceAll(rangePort, "，", ",")
+	for _, portString := range strings.Split(rangePort, ",") {
+		if portString == "" {
+			continue
+		}
+		portString = strings.TrimSpace(portString)
+		if strings.Contains(portString, "-") {
+			bounds := strings.Split(portString, "-")
+			if len(bounds) != 2 {
+				return []int{}, fmt.Errorf("invalid exposed port (%s)", portString)
+			}
+			start, err := strconv.Atoi(bounds[0])
+			if err != nil {
+				return []int{}, fmt.Errorf("invalid exposed port (%s)", bounds[0])
+			}
+			end, err := strconv.Atoi(bounds[1])
+			if err != nil {
+				return []int{}, fmt.Errorf("invalid exposed port (%s)", bounds[1])
+			}
+			if start > end {
+				start, end = end, start
+			}
+			for i := start; i <= end; i++ {
+				portMap[i] = false
+			}
+		} else {
+			port, err := strconv.Atoi(portString)
+			if err != nil {
+				return []int{}, fmt.Errorf("invalid exposed port (%s)", portString)
+			}
+			portMap[port] = false
+		}
+	}
+	var ports []int
+	for port := range portMap {
+		ports = append(ports, port)
+	}
+	return ports, nil
 }
