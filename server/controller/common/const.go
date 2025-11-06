@@ -574,6 +574,10 @@ const (
 )
 
 const (
+	DEFAULT_POD_NAMESPACE = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+)
+
+const (
 	POD_NODE_TYPE_MASTER = 1
 	POD_NODE_TYPE_NODE   = 2
 
