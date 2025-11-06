@@ -49,6 +49,7 @@ type KubernetesGather struct {
 	RegionUUID                   string
 	VPCUUID                      string
 	PortNameRegex                string
+	PodExposedPorts              string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
 	customTagLenMax              int
@@ -188,6 +189,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mys
 		db:                    db.DB,
 		RegionUUID:            configJson.Get("region_uuid").MustString(),
 		VPCUUID:               configJson.Get("vpc_uuid").MustString(),
+		PodExposedPorts:       configJson.Get("pod_exposed_ports").MustString(),
 		PodNetIPv4CIDRMaxMask: podNetIPv4CIDRMaxMask,
 		PodNetIPv6CIDRMaxMask: podNetIPv6CIDRMaxMask,
 		PortNameRegex:         portNameRegex,
@@ -358,6 +360,14 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		return model.KubernetesGatherResource{}, err
 	}
 
+	exposedServices, exposedServicePorts, err := k.getPodExposedServices()
+	if err != nil {
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: err.Error(),
+		}, err
+	}
+
 	k8sInfo, err := k.getKubernetesInfo()
 	if err != nil {
 		log.Warning(err.Error(), logger.NewORGPrefix(k.orgID))
@@ -433,6 +443,9 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
+
+	podServices = append(podServices, exposedServices...)
+	servicePorts = append(servicePorts, exposedServicePorts...)
 
 	resource := model.KubernetesGatherResource{
 		Region:                       region,
