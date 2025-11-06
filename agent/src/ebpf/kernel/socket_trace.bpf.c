@@ -373,9 +373,9 @@ static __inline int iovecs_copy(struct __socket_data *v,
 {
 /*
  * When `LOOP_LIMIT` is set too high, the 'fentry/fexit' bytecode fails
- * to load. Testing shows that the appropriate maximum value is 22.
+ * to load. Testing shows that the appropriate maximum value is 18.
  */
-#define LOOP_LIMIT 22
+#define LOOP_LIMIT 18
 
 	struct copy_data_s {
 		char data[sizeof(v->data)];
@@ -1446,13 +1446,23 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->update_time = time_stamp / NS_PER_SEC;
 		sk_info->need_reconfirm = conn_info->need_reconfirm;
 		sk_info->correlation_id = conn_info->correlation_id;
-		if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
-		    args->port > 0) {
-			bpf_probe_read_kernel(sk_info->ipaddr,
-					      sizeof(sk_info->ipaddr),
-					      args->addr);
-			sk_info->udp_pre_set_addr = 1;
-			sk_info->port = args->port;
+		if (conn_info->tuple.l4_protocol == IPPROTO_UDP) {
+			if (args->port > 0) {
+				bpf_probe_read_kernel(sk_info->ipaddr,
+						      sizeof(sk_info->ipaddr),
+						      args->addr);
+				sk_info->udp_pre_set_addr = 1;
+				sk_info->port = args->port;
+			}
+
+			/*
+			 * If a request involves two push events, the 'seq' must be
+			 * increased to ensure that it remains strictly incremental.
+			 */
+			if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+			    args && args->extra_iovlen > 0) {
+				sk_info->seq = 1;
+			} 
 		}
 
 		/*
@@ -1470,6 +1480,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		if (socket_info_ptr == NULL && ret == 0) {
 			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
 		}
+
+		sk_info->seq = 0;
 	}
 
 	/*
@@ -2492,6 +2504,18 @@ KFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		    socket_info_map__lookup(&conn_key);
 		write_args.tcp_seq =
 		    get_tcp_write_seq(sockfd, &write_args.sk, socket_info_ptr);
+		if (vlen >= 2) {
+			/*
+			 * The `sendmmsg()` system call batches two DNS query requests
+			 * (an A query and an AAAA query) for sending.
+			 * This records the memory address and data length associated
+			 * with the AAAA query request.
+			 */
+			bpf_probe_read_user(&__msgvec, sizeof(__msgvec), msgvec_ptr + 1);
+			write_args.extra_iov = msgvec[0].msg_hdr.msg_iov;
+			write_args.extra_iovlen = msgvec[0].msg_hdr.msg_iovlen;
+		}
+			
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -3086,6 +3110,30 @@ static __inline int finalize_data_output(void *ctx,
 	return 0;
 }
 
+static __inline int output_iov_data_copy(const struct data_args_t *args,
+					 struct __socket_data_buffer *v_buff,
+					 struct __socket_data *v, int max_size,
+					 __u32 reassembly_bytes)
+{
+	__u32 __len = v->syscall_len > max_size ? max_size : v->syscall_len;
+
+	/*
+	 * If data reassembly is enabled, the amount of data pushed must not
+	 * exceed the reassembly transmission limit.
+	 */
+	if (reassembly_bytes > 0)
+		__len = reassembly_bytes;
+
+	/*
+	 * the bitwise AND operation will set the range of possible values for
+	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
+	 */
+	__u32 len = __len & (sizeof(v->data) - 1);
+
+	len = iovecs_copy(v, v_buff, args, __len, len);
+	return len;
+}
+
 static __inline int output_data_copy(const struct data_args_t *args,
 				     bool vecs,
 				     struct __socket_data_buffer *v_buff,
@@ -3149,6 +3197,59 @@ static __inline int output_data_copy(const struct data_args_t *args,
 	}
 
 	return len;
+}
+
+/*
+ * Handles sending additional user data when a single system call (e.g. sendmmsg)
+ * results in multiple messages being captured and pushed.
+ *
+ * Example:
+ *   A single DNS request (one sendmmsg syscall) may include two query types:
+ *     - A record request (IPv4)
+ *     - AAAA record request (IPv6)
+ *
+ *   These two requests are stored in separate user-space memory regions.
+ *   After processing the A record request, the AAAA record must also be pushed.
+ *
+ * This function reads and outputs such extra data segments using the extra_iov
+ * buffer.
+ */
+static __inline int output_extra_data_common(struct data_args_t *args, struct __socket_data_buffer
+					     *v_buff,
+					     struct __socket_data *head,
+					     int max_size,
+					     __u32 reassembly_bytes)
+{
+	if (!(args && args->extra_iovlen))
+		return -1;
+
+	// Limit handling to UDP and DNS protocols only
+	if (head->data_type != PROTO_DNS ||
+	    head->tuple.l4_protocol != IPPROTO_UDP)
+		return -1;
+
+	args->iov = args->extra_iov;
+	args->iovlen = args->extra_iovlen;
+	struct __socket_data *extra_v =
+	    (struct __socket_data *)(v_buff->data + v_buff->len);
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*extra_v)))
+		return -1;
+
+	bpf_probe_read_kernel(extra_v,
+			      offsetof(typeof(struct __socket_data),
+				       data), head);
+	extra_v->data_seq += 1;
+	int copy_bytes = output_iov_data_copy(args, v_buff, extra_v, max_size,
+					      reassembly_bytes);
+	if (copy_bytes < 0)
+		return -1;
+
+	extra_v->data_len = copy_bytes;
+	v_buff->len +=
+	    offsetof(typeof(struct __socket_data), data) + extra_v->data_len;
+	v_buff->events_num++;
+
+	return 0;
 }
 
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
@@ -3216,9 +3317,13 @@ skip_copy:
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
 	    v_buff->events_num >= MAX_EVENTS_BURST ||
+	    (args && args->extra_iovlen) ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
+
+	output_extra_data_common((struct data_args_t *)args, v_buff, v,
+				 max_size, reassembly_bytes);
 
 exit:
 	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
@@ -3315,9 +3420,12 @@ skip_copy:
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
 	    v_buff->events_num >= MAX_EVENTS_BURST ||
+	    (args && args->extra_iovlen) ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
+
+	output_extra_data_common(args, v_buff, v, max_size, reassembly_bytes);
 
 clear_args_map_1:
 	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
