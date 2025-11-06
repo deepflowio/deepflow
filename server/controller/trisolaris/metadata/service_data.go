@@ -36,8 +36,6 @@ type ServiceRawData struct {
 	podServiceIDToPodServicePorts map[int][]*models.PodServicePort
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
 	podGroupIDToPodServiceID      map[int]int
-	podGroupIDToVPCID             map[int]int
-	podGroupIDToNodeIPs           map[int][]string
 	podServicePortToPodServiceIDs map[int][]int
 	lbIDToVPCID                   map[int]int
 	customServiceIDToIPPorts      map[int]mapset.Set[customServiceIPPortKey]
@@ -67,8 +65,6 @@ func newServiceRawData() *ServiceRawData {
 		podServiceIDToPodServicePorts: make(map[int][]*models.PodServicePort),
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
 		podGroupIDToPodServiceID:      make(map[int]int),
-		podGroupIDToVPCID:             make(map[int]int),
-		podGroupIDToNodeIPs:           make(map[int][]string),
 		podServicePortToPodServiceIDs: make(map[int][]int),
 		lbIDToVPCID:                   make(map[int]int),
 		customServiceIDToIPPorts:      make(map[int]mapset.Set[customServiceIPPortKey]),
