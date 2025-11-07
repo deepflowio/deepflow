@@ -171,9 +171,10 @@ fn test_x86_64_jit_return_address_extraction() {
 fn test_aarch64_jit_return_address_extraction() {
     let jit_support = PhpJitSupport::new(Version::new(8, 2, 0));
 
-    // Test with mock aarch64 code containing branch instruction
+    // Test with mock aarch64 code containing BR (branch register) instruction
+    // BR x16 = 0xd61f0200 in little-endian: 0x00, 0x02, 0x1f, 0xd6
     let aarch64_code = vec![
-        0x00, 0x00, 0x00, 0x14, // b +0 (branch instruction)
+        0x00, 0x02, 0x1f, 0xd6, // br x16 (branch register instruction, opcode 0xd61f0200)
         0x00, 0x00, 0x00, 0x00, // nop
         0x00, 0x00, 0x00, 0x00, // nop
         0x00, 0x00, 0x00, 0x00, // nop (next instruction location)

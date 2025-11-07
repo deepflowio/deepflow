@@ -1937,7 +1937,7 @@ List of advanced features enabled for specific processes.
 Will traverse over the entire array, so the previous ones will be matched first.
 The default matchers cover common scripting runtimes:
 - Python: matches CLI invocations like `python app.py` and rewrites the process name to the script filename (`$4`).
-- PHP: mirrors the Python pattern, capturing CLI commands such as `php80 script.php` (or `php-fpm -c ... script.php`) and rewriting to the target script (`$5`).
+- PHP: mirrors the Python pattern, capturing CLI commands such as `php script.php` (or `php-fpm -c ... script.php`) and rewriting to the target script (`$5`).
 - Node.js: follows the same idea for `node`/`nodejs` commands, keeping the executed `.js` file as the process name (`$4`).
 - `^deepflow-`: ensures DeepFlow internal binaries keep profiling enabled.
 - `.*`: final catch-all that leaves `proc.gprocess_info` enabled for any remaining processes.
@@ -2082,6 +2082,7 @@ inputs:
 | java | |
 | golang | |
 | python | |
+| php | |
 | nodejs | |
 | dotnet | |
 

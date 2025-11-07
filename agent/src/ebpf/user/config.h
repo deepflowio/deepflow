@@ -84,6 +84,7 @@
 #define PROG_PHP_UNWIND_FOR_PE      "df_PE_php_unwind"
 #define PROG_V8_UNWIND_FOR_PE "df_PE_v8_unwind"
 #define PROG_DWARF_UNWIND_BEFORE_V8_FOR_PE "df_PE_dwarf_unwind_before_v8"
+#define PROG_DWARF_UNWIND_BEFORE_PHP_FOR_PE "df_PE_dwarf_unwind_before_php"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
 // 增加 lua 相关的程序名
 
@@ -118,6 +119,7 @@ enum {
 	PROG_PHP_UNWIND_PE_IDX,
 	PROG_V8_UNWIND_PE_IDX,
 	PROG_DWARF_UNWIND_BEFORE_V8_PE_IDX,  // DWARF unwinding before V8 interpreter unwinding
+	PROG_DWARF_UNWIND_BEFORE_PHP_PE_IDX, // DWARF unwinding before PHP interpreter unwinding
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };

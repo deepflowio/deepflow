@@ -1461,7 +1461,7 @@ inputs:
     #   ch: 匹配语言
     # unit:
     # range: []
-    # enum_options: [java, golang, python, nodejs, dotnet]
+    # enum_options: [java, golang, python, php, nodejs, dotnet]
     # modification: hot_update
     # ee_feature: false
     # description:

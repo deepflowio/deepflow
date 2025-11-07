@@ -449,54 +449,20 @@ finish:
 }
 
 static char *resolve_custom_symbol_addr(symbol_t *symbols, u32 *symbol_ids, int n_symbols, bool is_start_idx, u64 address)
-
 {
 	int len = 0;
 	char *ptr = NULL;
-	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 16]; // Extra space for JIT markers
+	char format_str[CLASS_NAME_LEN + METHOD_NAME_LEN + 3];
 	memset(format_str, 0, sizeof(format_str));
 
-	// Check if this is a JIT-compiled frame (OpenTelemetry-style JIT bit set in eBPF)
-	bool is_jit_frame = (address & 0x4000000000000000ULL) != 0;
 	u32 symbol_id = address & 0xFFFFFFFF;
 
 	for (int i = 0; i < n_symbols; i++) {
 		if (symbol_ids[i] == symbol_id) {
-			// Check if this is a V8 frame (starts with "V8@")
-			if (strlen(symbols[i].method_name) >= 3 &&
-			    symbols[i].method_name[0] == 'V' &&
-			    symbols[i].method_name[1] == '8' &&
-			    symbols[i].method_name[2] == '@') {
-				// Parse the hex FP address from "V8@00007ffc1234"
-				u64 fp_addr = 0;
-				const char *hex_str = symbols[i].method_name + 3;
-				for (int j = 0; j < 16 && hex_str[j] != '\0'; j++) {
-					char c = hex_str[j];
-					int nibble = (c >= '0' && c <= '9') ? (c - '0') :
-					            (c >= 'a' && c <= 'f') ? (c - 'a' + 10) :
-					            (c >= 'A' && c <= 'F') ? (c - 'A' + 10) : 0;
-					fp_addr = (fp_addr << 4) | nibble;
-				}
-
-				// TODO: Call V8 symbolizer with FP address
-				// For now, just return the placeholder
-				snprintf(format_str, sizeof(format_str), "V8:frame@%llx",
-				        (unsigned long long)fp_addr);
-			} else if (strlen(symbols[i].class_name) > 0) {
-				// Enhanced formatting for JIT frames
-				if (is_jit_frame) {
-					snprintf(format_str, sizeof(format_str), "%s::%s [JIT]",
-						symbols[i].class_name, symbols[i].method_name);
-				} else {
-					snprintf(format_str, sizeof(format_str), "%s::%s",
-						symbols[i].class_name, symbols[i].method_name);
-				}
+			if (strlen(symbols[i].class_name) > 0) {
+				snprintf(format_str, sizeof(format_str), "%s::%s", symbols[i].class_name, symbols[i].method_name);
 			} else {
-				if (is_jit_frame) {
-					snprintf(format_str, sizeof(format_str), "%s [JIT]", symbols[i].method_name);
-				} else {
-					snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
-				}
+				snprintf(format_str, sizeof(format_str), "%s", symbols[i].method_name);
 			}
 			goto finish;
 		}
@@ -530,6 +496,12 @@ static int get_stack_ips(struct bpf_tracer *t,
 	if (full_stack && bpf_table_get_value(t, stack_map_name, stack_id, (void *)full_stack)) {
 		// Successfully read full stack_t structure, copy addrs to ips for compatibility
 		memcpy(ips, full_stack->addrs, sizeof(full_stack->addrs));
+
+		// Debug: Check if data is valid
+		int non_zero_count = 0;
+		for (int i = 0; i < PERF_MAX_STACK_DEPTH; i++) {
+			if (full_stack->addrs[i] != 0) non_zero_count++;
+		}
 		return ETR_OK;
 	}
 
@@ -658,8 +630,42 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 					strcpy(str, v8_symbol);
 				}
 			}
+		} else if (stack.frame_types[i] == FRAME_TYPE_PHP) {
+			// Extract PHP frame information
+			// ips[i] = zend_function pointer
+			// extra_data_a[i] = packed (type_info << 32) | lineno for top-level code detection
+			// extra_data_b[i] = JIT flag (1 for JIT, 0 for interpreted)
+			u64 zend_function_ptr = ips[i];
+			u64 lineno_and_type = stack.extra_data_a[i];
+			u64 is_jit = stack.extra_data_b[i];
+
+			// Call Rust PHP symbolizer (handles JIT suffix and top-level code internally)
+			char *rust_str = resolve_php_frame((u32)pid, zend_function_ptr, lineno_and_type, is_jit);
+
+			// Copy Rust string to C-managed memory
+			// This is necessary because symbol_array strings are freed with clib_mem_free
+			// but Rust strings must be freed with libc free()
+			if (rust_str != NULL) {
+				int len = strlen(rust_str);
+				str = clib_mem_alloc_aligned("php_symbol", len + 1, 0, NULL);
+				if (str) {
+					strcpy(str, rust_str);
+				}
+				// Free the Rust-allocated string using libc free
+				free(rust_str);
+			} else {
+				// Fallback if Rust returned NULL
+				char php_symbol[256];
+				u32 lineno = (u32)(lineno_and_type & 0xFFFFFFFF);
+				snprintf(php_symbol, sizeof(php_symbol), "PHP@%llx:%llu",
+				        (unsigned long long)zend_function_ptr, (unsigned long long)lineno);
+				int len = strlen(php_symbol);
+				str = clib_mem_alloc_aligned("php_symbol", len + 1, 0, NULL);
+				if (str) {
+					strcpy(str, php_symbol);
+				}
+			}
 		} else if (use_symbol_table) {
-			// Use unified symbol table mechanism for interpreted languages (Python/PHP)
 			str = resolve_custom_symbol_addr(symbols, symbol_ids, n_symbols, (i == start_idx), ips[i]);
 		} else {
 			str = resolve_addr(t, pid, (i == start_idx), ips[i], new_cache, info_p);

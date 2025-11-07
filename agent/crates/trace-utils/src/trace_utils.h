@@ -264,6 +264,8 @@ size_t merge_php_stacks(void *trace_str, size_t len, const void *i_trace, const 
 
 size_t merge_v8_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
+char *resolve_php_frame(uint32_t pid, uint64_t zend_function_ptr, uint64_t lineno, uint64_t is_jit);
+
 char *resolve_v8_frame(uint32_t pid, uint64_t pointer_and_type, uint64_t delta_or_marker, uint64_t sfi_fallback);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,

@@ -85,7 +85,6 @@ impl MappedFile {
                 }
             }
 
-            trace!("Reading mapped file: {}", path_str);
             self.contents = fs::read(&self.path)?;
         }
         Ok(())
@@ -179,11 +178,6 @@ impl MappedFile {
         let Some(ph) = Self::find_text_section_program_header(&self.path, &*self.contents)? else {
             return Ok(self.mem_start);
         };
-        trace!(
-            "mem_start: 0x{:x}, p_vaddr: 0x{:x}",
-            self.mem_start,
-            ph.p_vaddr(endian)
-        );
         Ok(self.mem_start.saturating_sub(ph.p_vaddr(endian)))
     }
 
@@ -410,7 +404,6 @@ pub struct InterpreterInfo {
 
 impl InterpreterInfo {
     pub fn new(pid: u32) -> Result<Self> {
-        trace!("find PHP interpreter info for process#{pid}");
         let exe_path: PathBuf = ["/proc", &pid.to_string(), "exe"].iter().collect();
         let exe_path = fs::read_link(&exe_path)?;
         let exe_path_str = exe_path.to_str();
@@ -421,14 +414,10 @@ impl InterpreterInfo {
             return Err(error_not_php(pid));
         };
         let lib_area = mm.iter().find(|m| Self::match_lib(&m.path));
-        debug!(
-            "process#{pid} exe: {} lib: {}",
-            exe_area.path,
-            lib_area.map(|m| m.path.as_str()).unwrap_or("n/a")
-        );
 
         let mut intp = Interpreter::new(pid, exe_area, lib_area)?;
         let (execute_ex_start, execute_ex_end) = intp.execute_ex_range()?.unwrap_or((0, 0));
+
         Ok(Self {
             version: intp.version.clone(),
             executor_globals_address: intp.executor_globals_address()?,
@@ -629,7 +618,8 @@ impl PhpUnwindTable {
         }
     }
 
-    fn recover_jit_return_address(&mut self, pid: u32, version: &Version) -> Result<u64> {
+    fn recover_jit_return_address(&mut self, pid: u32, intp_info: &InterpreterInfo) -> Result<u64> {
+        let version = &intp_info.version;
         // Use the new JIT support modules for complete implementation
         let mut jit_support = PhpJitSupport::new(version.clone());
         let mut opcache_support = PhpOpcacheSupport::new(version.clone());
@@ -660,67 +650,108 @@ impl PhpUnwindTable {
             }
         }
 
-        // Get the PHP binary path from the process
+        // Get the PHP binary - use /proc/{pid}/exe directly
+        // This works across namespace boundaries (POD accessing host processes)
         let exe_path = format!("/proc/{}/exe", pid);
-        let php_binary_path = if let Ok(path) = fs::read_link(&exe_path) {
-            path
-        } else {
-            // Fallback to common locations
-            let php_binary_paths = [
-                "/usr/bin/php",
-                "/usr/local/bin/php",
-                "/opt/php/bin/php",
-                "/usr/sbin/php-fpm",
-                "/usr/local/sbin/php-fpm",
-            ];
 
-            let mut found_path = None;
-            for path in &php_binary_paths {
-                if fs::metadata(path).is_ok() {
-                    found_path = Some(std::path::PathBuf::from(*path));
-                    break;
+        // Calculate bias (load address offset)
+        // We need to convert the file offset to runtime address by adding bias
+        // Use execute_ex as reference since we know both its file offset and runtime address
+        debug!(
+            "Process#{} execute_ex_start runtime address: 0x{:x}",
+            pid, intp_info.execute_ex_start
+        );
+
+        let bias = if intp_info.execute_ex_start != 0 {
+            // Get execute_ex file offset from binary
+            // Use /proc/{pid}/exe directly to read binary across namespace boundaries
+            match fs::read(&exe_path) {
+                Ok(binary_data) => {
+                    match object::File::parse(&binary_data[..]) {
+                        Ok(file) => {
+                            // Try both dynamic and static symbols
+                            let execute_ex_symbol = file
+                                .symbols()
+                                .chain(file.dynamic_symbols())
+                                .find(|s| s.name().map(|n| n == "execute_ex").unwrap_or(false));
+
+                            if let Some(symbol) = execute_ex_symbol {
+                                let file_offset = symbol.address();
+                                let calculated_bias =
+                                    intp_info.execute_ex_start.wrapping_sub(file_offset);
+                                debug!(
+                                    "Process#{} execute_ex: file_offset=0x{:x}, runtime=0x{:x}, bias=0x{:x}",
+                                    pid, file_offset, intp_info.execute_ex_start, calculated_bias
+                                );
+                                calculated_bias
+                            } else {
+                                debug!(
+                                    "Process#{} execute_ex symbol not found in {}, cannot calculate bias",
+                                    pid,
+                                    exe_path
+                                );
+                                0
+                            }
+                        }
+                        Err(e) => {
+                            debug!(
+                                "Process#{} failed to parse {}: {}, cannot calculate bias",
+                                pid, exe_path, e
+                            );
+                            0
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!(
+                        "Process#{} failed to read {}: {}, cannot calculate bias",
+                        pid, exe_path, e
+                    );
+                    0
                 }
             }
-
-            if let Some(path) = found_path {
-                path
-            } else {
-                debug!("Could not find PHP binary for process#{}", pid);
-                return Ok(0);
-            }
+        } else {
+            debug!(
+                "Process#{} execute_ex_start is 0, cannot calculate bias",
+                pid
+            );
+            0
         };
 
+        debug!("Calculated bias for process#{}: 0x{:x}", pid, bias);
+
         // Analyze the PHP binary for JIT return address
-        if let Ok(binary_data) = fs::read(&php_binary_path) {
+        // Use /proc/{pid}/exe directly
+        if let Ok(binary_data) = fs::read(&exe_path) {
             match jit_support.recover_jit_return_address(&binary_data) {
-                Ok(addr) if addr != 0 => {
+                Ok(file_addr) if file_addr != 0 => {
+                    // Add bias to convert file offset to runtime address
+                    let runtime_addr = file_addr.wrapping_add(bias);
                     debug!(
-                        "Successfully recovered JIT return address 0x{:x} from {}",
-                        addr,
-                        php_binary_path.display()
+                        "Successfully recovered JIT return address: file=0x{:x} + bias=0x{:x} = runtime=0x{:x} from process#{}",
+                        file_addr, bias, runtime_addr, pid
                     );
 
                     // Verify JIT is ready for use
                     if jit_support.is_jit_ready() {
-                        debug!("JIT profiling fully configured for PHP {}", version);
+                        debug!(
+                            "JIT profiling fully configured for PHP {} process#{}",
+                            version, pid
+                        );
                     } else {
-                        debug!("JIT return address recovered but JIT not fully ready");
+                        debug!(
+                            "JIT return address recovered but JIT not fully ready for process#{}",
+                            pid
+                        );
                     }
 
-                    return Ok(addr);
+                    return Ok(runtime_addr);
                 }
                 Ok(_) => {
-                    debug!(
-                        "No JIT return address found in {}",
-                        php_binary_path.display()
-                    );
+                    debug!("No JIT return address found in process#{}", pid);
                 }
                 Err(e) => {
-                    debug!(
-                        "Failed to analyze {} for JIT support: {}",
-                        php_binary_path.display(),
-                        e
-                    );
+                    debug!("Failed to analyze process#{} for JIT support: {}", pid, e);
                 }
             }
         }
@@ -765,7 +796,7 @@ impl PhpUnwindTable {
 
         let jit_return_address = if info.version >= Version::new(8, 0, 0) {
             // Try to recover JIT return address for PHP 8+
-            match self.recover_jit_return_address(pid, &info.version) {
+            match self.recover_jit_return_address(pid, &info) {
                 Ok(addr) => addr,
                 Err(e) => {
                     debug!(
@@ -796,7 +827,8 @@ impl PhpUnwindTable {
     }
 
     pub unsafe fn unload(&mut self, pid: u32) {
-        trace!("unload PHP unwind info for process#{pid}");
+        // Suppressed noisy trace log for routine cleanup operations
+        // trace!("unload PHP unwind info for process#{pid}");
         self.delete_unwind_info_map(pid);
     }
 
@@ -838,7 +870,8 @@ impl PhpUnwindTable {
             return 0; // Return success for tests
         }
 
-        trace!("delete PHP unwind info for process#{pid}");
+        // Suppressed noisy trace log for routine cleanup operations
+        // trace!("delete PHP unwind info for process#{pid}");
         unsafe {
             let ret = bpf_delete_elem(self.unwind_info_map_fd, &pid as *const u32 as *const c_void);
             if ret != 0 {
@@ -968,7 +1001,8 @@ pub unsafe extern "C" fn merge_php_stacks(
     let Ok(u_trace) = CStr::from_ptr(u_trace as *const libc::c_char).to_str() else {
         return 0;
     };
-
+    debug!("Input interpreter stack trace: {}", i_trace);
+    debug!("Input native stack trace: {}", u_trace);
     let mut trace = Vec::with_capacity(len);
 
     // OpenTelemetry-style stack merging: simple and linear
@@ -1018,7 +1052,8 @@ pub unsafe extern "C" fn merge_php_stacks(
                 merged_frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
             }
 
-            merged_frames.dedup();
+            // NOTE: Do NOT use dedup() here! It will remove consecutive duplicate frames,
+            // which breaks recursive call stacks (e.g., fibonacci:9 appearing multiple times)
             let merged_string = merged_frames.join(";");
             let _ = write!(&mut trace, "{}", merged_string);
         } else {
@@ -1043,7 +1078,7 @@ pub unsafe extern "C" fn merge_php_stacks(
                     let mut frames: Vec<&str> = Vec::new();
                     frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
                     frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
-                    frames.dedup();
+                    // NOTE: Do NOT use dedup() - it breaks recursive call stacks
                     let _ = write!(&mut trace, "{}", frames.join(";"));
                 } else {
                     // No clear interpreter functions, but native stack might contain C helpers
@@ -1068,7 +1103,7 @@ pub unsafe extern "C" fn merge_php_stacks(
                         frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
                     }
 
-                    frames.dedup();
+                    // NOTE: Do NOT use dedup() - it breaks recursive call stacks
                     let merged = frames.join(";");
                     let _ = write!(&mut trace, "{}", merged);
                 }
@@ -1093,7 +1128,102 @@ pub unsafe extern "C" fn merge_php_stacks(
         (trace_str as *mut u8).add(written).write(0); // Add null terminator
     }
 
+    debug!("Output merged stack trace: {}", cleaned_trace);
+
     written
+}
+
+/// Resolve PHP frame to human-readable symbol
+/// Called from C stringifier code to symbolize PHP stack frames
+#[no_mangle]
+pub unsafe extern "C" fn resolve_php_frame(
+    pid: u32,
+    zend_function_ptr: u64,
+    lineno_and_type: u64, // Packed: (type_info << 32) | lineno
+    _is_jit: u64, // JIT flag used in eBPF for ARM64 SP adjustment; unused in symbolization per unified [PHP] suffix
+) -> *mut std::os::raw::c_char {
+    use crate::remotememory::RemoteMemory;
+    use std::ffi::CString;
+
+    // Unpack type_info and lineno
+    let type_info = (lineno_and_type >> 32) as u32;
+    let lineno = (lineno_and_type & 0xFFFFFFFF) as u32;
+
+    // ZEND_CALL_TOP_CODE = (1<<17) | (1<<16)
+    const ZEND_CALL_TOP_CODE: u32 = (1 << 17) | (1 << 16);
+
+    // Get PHP interpreter info to determine version and offsets
+    let intp_info = match InterpreterInfo::new(pid) {
+        Ok(info) => info,
+        Err(_) => {
+            // Failed to get interpreter info, return placeholder
+            let fallback = format!("<func>@{:#x}:{} [PHP]", zend_function_ptr, lineno);
+            return CString::new(fallback).unwrap().into_raw();
+        }
+    };
+
+    let offsets = get_offsets_for_version(&intp_info.version);
+    let mem = RemoteMemory::new(pid);
+
+    // Read function name from zend_function->common.function_name
+    let function_name_ptr: u64 =
+        match mem.read_ptr(zend_function_ptr + offsets.function.common_funcname as u64) {
+            Ok(ptr) => ptr,
+            Err(_) => {
+                // Check if this is top-level code using type_info
+                if type_info & ZEND_CALL_TOP_CODE != 0 {
+                    let symbol = format!("<top-level>:{} [PHP]", lineno);
+                    return CString::new(symbol).unwrap().into_raw();
+                }
+                let fallback = format!("<func>@{:#x}:{} [PHP]", zend_function_ptr, lineno);
+                return CString::new(fallback).unwrap().into_raw();
+            }
+        };
+
+    let mut method_name = String::new();
+    if function_name_ptr != 0 {
+        // Read string data from zend_string->val
+        method_name = mem
+            .read_cstring(function_name_ptr + offsets.string.val as u64, 64)
+            .unwrap_or_else(|_| String::from("<unknown>"));
+    } else {
+        // Check if this is top-level code using type_info
+        if type_info & ZEND_CALL_TOP_CODE != 0 {
+            let symbol = format!("<top-level>:{} [PHP]", lineno);
+            return CString::new(symbol).unwrap().into_raw();
+        }
+    }
+
+    // Try to read class name from zend_function->common.scope
+    let mut class_name = String::new();
+    if let Ok(scope_ptr) = mem.read_ptr(zend_function_ptr + offsets.function.common_scope as u64) {
+        if scope_ptr != 0 {
+            if let Ok(class_name_ptr) = mem.read_ptr(scope_ptr + offsets.class_entry.name as u64) {
+                if class_name_ptr != 0 {
+                    class_name = mem
+                        .read_cstring(class_name_ptr + offsets.string.val as u64, 32)
+                        .unwrap_or_else(|_| String::new());
+                }
+            }
+        }
+    }
+
+    // Format symbol: ClassName::methodName:line [PHP] or methodName:line [PHP]
+    let symbol = if !class_name.is_empty() {
+        format!("{}::{}:{} [PHP]", class_name, method_name, lineno)
+    } else if !method_name.is_empty() {
+        format!("{}:{} [PHP]", method_name, lineno)
+    } else {
+        // Last resort: check type_info for top-level code
+        if type_info & ZEND_CALL_TOP_CODE != 0 {
+            format!("<top-level>:{} [PHP]", lineno)
+        } else {
+            format!("<func>@{:#x}:{} [PHP]", zend_function_ptr, lineno)
+        }
+    };
+
+    // Return as C string
+    CString::new(symbol).unwrap().into_raw()
 }
 
 #[no_mangle]

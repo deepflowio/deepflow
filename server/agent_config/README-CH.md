@@ -1913,7 +1913,7 @@ rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的�
 
 默认规则覆盖了常见脚本运行时：
 - Python：匹配 `python app.py` 等命令行，使用 `$4` 将进程名重写为脚本文件名。
-- PHP：沿用与 Python 相同的思路，匹配 `php80 script.php` 或 `php-fpm ... script.php` 等命令行，并用 `$5` 指向的脚本名重写进程名。
+- PHP：沿用与 Python 相同的思路，匹配 `php script.php` 或 `php-fpm ... script.php` 等命令行，并用 `$5` 指向的脚本名重写进程名。
 - Node.js：匹配 `node server.js`/`nodejs app.js` 等命令行，使用 `$4` 重写为目标 `.js` 文件。
 - `^deepflow-`：确保 DeepFlow 自身的组件保持启用相关特性。
 - `.*`：兜底规则，仍然为剩余进程保留 `proc.gprocess_info` 功能。
@@ -2053,6 +2053,7 @@ inputs:
 | java | |
 | golang | |
 | python | |
+| php | |
 | nodejs | |
 | dotnet | |
 

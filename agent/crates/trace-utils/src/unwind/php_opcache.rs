@@ -367,26 +367,5 @@ impl PhpOpcacheSupport {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_opcache_creation() {
-        let opcache = PhpOpcacheSupport::new(Version::new(8, 2, 0));
-        assert!(!opcache.is_jit_available());
-        assert!(opcache.get_jit_buffer_info().is_none());
-    }
-
-    #[test]
-    fn test_jit_buffer_info() {
-        let buffer_info = JitBufferInfo {
-            buffer_address: 0x7f8000000000,
-            buffer_size: 1024 * 1024,
-            opcache_base: 0x7f7000000000,
-        };
-
-        assert_eq!(buffer_info.buffer_address, 0x7f8000000000);
-        assert_eq!(buffer_info.buffer_size, 1024 * 1024);
-        assert_eq!(buffer_info.opcache_base, 0x7f7000000000);
-    }
-}
+#[path = "php/opcache_tests.rs"]
+mod opcache_tests;

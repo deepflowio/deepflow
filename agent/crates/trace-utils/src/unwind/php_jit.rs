@@ -234,94 +234,121 @@ impl PhpJitSupport {
     }
 
     /// Extract JIT return address from x86_64 execute_ex
+    ///
+    /// This follows the OpenTelemetry approach: find the first JMP instruction
+    /// in execute_ex and return the address right after it (the return address).
+    /// Since all JIT code is ultimately called from execute_ex, this is the
+    /// return address for all JIT code.
     fn extract_jit_return_address_x86_64(&self, code: &[u8], base_addr: u64) -> Result<u64> {
-        // Look for jump table pattern in execute_ex
-        // The JIT return address is typically found after a specific pattern
-        // This is a simplified implementation - the actual pattern varies by PHP version
+        // Scan through the code looking for JMP instructions
+        // Common JMP encodings in x86-64:
+        // - 0xff /4: jmp r/m64 (indirect jump through register or memory)
+        //   - 0xff 0xe0: jmp rax
+        //   - 0xff 0x25: jmp [rip+offset]
+        // - 0xe9: jmp rel32 (direct near jump)
+        // - 0xeb: jmp rel8 (short jump)
 
-        // Look for indirect jump instructions (0xff, 0x25 for jmp [rip+offset])
-        for i in 0..code.len().saturating_sub(8) {
-            if code[i] == 0xff && code[i + 1] == 0x25 {
-                // Found jmp [rip+offset]
-                let offset =
-                    i32::from_le_bytes([code[i + 2], code[i + 3], code[i + 4], code[i + 5]]);
+        let mut i = 0;
+        while i < code.len().saturating_sub(6) {
+            // Check for indirect jmp (ff /4)
+            if code[i] == 0xff {
+                let modrm = code[i + 1];
+                // ModR/M byte: bits 3-5 = reg/opcode field
+                // For jmp, opcode field = 4
+                let reg_opcode = (modrm >> 3) & 0x7;
 
-                // Calculate the address this jump refers to
-                let jump_target = (base_addr + i as u64 + 6).wrapping_add(offset as u64);
+                if reg_opcode == 4 {
+                    // Found a JMP instruction!
+                    // Determine instruction length based on ModR/M
+                    let inst_len = match modrm & 0xC0 {
+                        0x00 => {
+                            // [reg] or special cases
+                            if (modrm & 0x07) == 5 {
+                                // jmp [rip+disp32]
+                                6
+                            } else {
+                                2
+                            }
+                        }
+                        0x40 => 3, // [reg+disp8]
+                        0x80 => 6, // [reg+disp32]
+                        0xC0 => 2, // reg (e.g., jmp rax)
+                        _ => 2,
+                    };
 
-                // The next instruction after this jump could be our return address
-                if i + 6 < code.len() {
-                    let return_addr = base_addr + (i + 6) as u64;
-                    trace!(
-                        "Found potential JIT return address at 0x{:x} (jump target: 0x{:x})",
-                        return_addr,
-                        jump_target
+                    let return_addr = base_addr + (i + inst_len) as u64;
+                    debug!(
+                        "Found JMP instruction at offset 0x{:x}, instruction: {:02x} {:02x}, return addr: 0x{:x}",
+                        i, code[i], code[i + 1], return_addr
                     );
                     return Ok(return_addr);
                 }
             }
-        }
-
-        // Fallback: look for a mov instruction followed by jmp
-        for i in 0..code.len().saturating_sub(16) {
-            // Look for mov rax, imm64 followed by jmp patterns
-            if code[i] == 0x48 && code[i + 1] == 0xb8 {
-                // mov rax, imm64
-                let imm64 = u64::from_le_bytes([
-                    code[i + 2],
-                    code[i + 3],
-                    code[i + 4],
-                    code[i + 5],
-                    code[i + 6],
-                    code[i + 7],
-                    code[i + 8],
-                    code[i + 9],
-                ]);
-
-                // Check if followed by a jump instruction
-                if i + 10 < code.len() && (code[i + 10] == 0xff || code[i + 10] == 0xe9) {
-                    let return_addr = base_addr + (i + 10) as u64;
-                    trace!(
-                        "Found JIT return address pattern at 0x{:x} (imm64: 0x{:x})",
-                        return_addr,
-                        imm64
-                    );
-                    return Ok(return_addr);
-                }
+            // Check for direct near jump (e9 rel32)
+            else if code[i] == 0xe9 {
+                let return_addr = base_addr + (i + 5) as u64;
+                debug!(
+                    "Found JMP rel32 at offset 0x{:x}, return addr: 0x{:x}",
+                    i, return_addr
+                );
+                return Ok(return_addr);
             }
+            // Check for short jump (eb rel8) - less likely but possible
+            else if code[i] == 0xeb {
+                let return_addr = base_addr + (i + 2) as u64;
+                debug!(
+                    "Found JMP rel8 at offset 0x{:x}, return addr: 0x{:x}",
+                    i, return_addr
+                );
+                return Ok(return_addr);
+            }
+
+            i += 1;
         }
 
+        warn!("No JMP instruction found in execute_ex code");
         Ok(0)
     }
 
     /// Extract JIT return address from aarch64 execute_ex
+    ///
+    /// This follows the OpenTelemetry approach: find the first BR (branch register)
+    /// instruction in execute_ex. This is an unconditional jump through a register,
+    /// which is how PHP JIT code is called using GCC's "labels as values" feature.
+    ///
+    /// Example assembly:
+    ///   xxx - 4: ...
+    ///   xxx    : br x0
+    ///   xxx + 4: ...     <---- This is the return address we care about.
     fn extract_jit_return_address_aarch64(&self, code: &[u8], base_addr: u64) -> Result<u64> {
-        // Look for branch patterns in aarch64 execute_ex
-        // This is more complex due to aarch64's different instruction encoding
+        // Scan through the code looking for BR (branch register) instructions
+        // ARM64 instructions are always 4 bytes aligned
 
         for i in (0..code.len().saturating_sub(4)).step_by(4) {
             let instr = u32::from_le_bytes([code[i], code[i + 1], code[i + 2], code[i + 3]]);
 
-            // Check for branch instructions (simplified)
-            // b <target>: 0x14000000 | (imm26 << 0)
-            // bl <target>: 0x94000000 | (imm26 << 0)
-            if (instr & 0xfc000000) == 0x14000000 || (instr & 0xfc000000) == 0x94000000 {
-                let offset = ((instr & 0x03ffffff) as i32) << 2;
-                let jump_target = (base_addr + i as u64).wrapping_add(offset as u64);
+            // Check for BR instruction
+            // Format: 1101 0110 0001 1111 0000 00nn nnn0 0000
+            // Opcode: 0xd61f0000
+            // Mask:   0xfffffc1f (ignore bits for register selection)
+            if (instr & 0xfffffc1f) == 0xd61f0000 {
+                // Found BR instruction!
+                // Extract the register number (bits 5-9)
+                let reg = (instr >> 5) & 0x1f;
 
-                // The instruction after this branch could be our return address
-                if i + 8 < code.len() {
-                    let return_addr = base_addr + (i + 8) as u64;
-                    trace!(
-                        "Found potential JIT return address at 0x{:x} (jump target: 0x{:x})",
-                        return_addr,
-                        jump_target
+                // Return address is the next instruction (4 bytes after)
+                if i + 4 < code.len() {
+                    let return_addr = base_addr + (i + 4) as u64;
+                    debug!(
+                        "Found BR x{} at offset 0x{:x}, return addr: 0x{:x}",
+                        reg, i, return_addr
                     );
                     return Ok(return_addr);
                 }
             }
         }
 
+        warn!("No BR instruction found in execute_ex code");
         Ok(0)
     }
 
@@ -345,5 +372,5 @@ impl PhpJitSupport {
 }
 
 #[cfg(test)]
-#[path = "php_jit/tests.rs"]
-mod tests;
+#[path = "php/jit_tests.rs"]
+mod jit_tests;
