@@ -259,8 +259,17 @@ struct data_args_t {
 	const char *buf;
 	// For sendmsg()/recvmsg()/writev()/readv().
 	const struct iovec *iov;
-	void *sk;
 	size_t iovlen;
+	/*
+	 * When calling `sendmmsg()`, if multiple `struct mmsghdr` instances
+	 * are passed, these structures are stored contiguously in memory as an array.
+	 * Each `mmsghdr` contains information for an individual message to be sent.
+	 * To access the second structure, its address corresponds to the array
+	 * element’s address (i.e., `&msgvec[1]`).
+	 */ 
+	const struct iovec *extra_iov;
+	size_t extra_iovlen;
+	void *sk;
 	union {
 		// For sendmmsg()
 		unsigned int *msg_len;
