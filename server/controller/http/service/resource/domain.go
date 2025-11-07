@@ -151,7 +151,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 	for _, domain := range domains {
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
 	}
-	err = orgDB.Where("domain IN (?)", domainLcuuids).Find(&azs).Error
+	err = orgDB.Where("\"domain\" IN (?)", domainLcuuids).Find(&azs).Error // TODO extract common method
 	if err != nil {
 		return response, err
 	}
@@ -610,7 +610,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 }
 
 func cleanSoftDeletedResource(db *metadb.DB, lcuuid string) {
-	condition := "domain = ? AND deleted_at IS NOT NULL"
+	condition := "\"domain\" = ? AND deleted_at IS NOT NULL"
 	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid, db.LogPrefixORGID)
 	forceDelete[metadbmodel.CEN](db, condition, lcuuid)
 	forceDelete[metadbmodel.PeerConnection](db, "remote_domain = ? OR local_domain = ? AND deleted_at IS NOT NULL", lcuuid, lcuuid)
@@ -677,73 +677,73 @@ func deleteDomain(domain *metadbmodel.Domain, db *metadb.DB, userInfo *httpcommo
 	}
 
 	lcuuid := domain.Lcuuid
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.WANIP{}) // TODO use forceDelete func
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.LANIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.FloatingIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VInterface{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.CEN{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.WANIP{}) // TODO use forceDelete func
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.LANIP{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.FloatingIP{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VInterface{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.CEN{})
 	db.Unscoped().Where("local_domain = ? OR remote_domain = ?", lcuuid, lcuuid).Delete(&metadbmodel.PeerConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.RedisInstance{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.RDSInstance{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.LBVMConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.LBTargetServer{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.LBListener{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.LB{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.NATVMConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.NATRule{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.NATGateway{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.Process{})
-	// db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PrometheusTarget{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.DHCPPort{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.RedisInstance{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.RDSInstance{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.LBVMConnection{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.LBTargetServer{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.LBListener{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.LB{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.NATVMConnection{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.NATRule{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.NATGateway{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.Process{})
+	// db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PrometheusTarget{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VIP{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.DHCPPort{})
 	var vRouters []metadbmodel.VRouter
-	db.Unscoped().Where("domain = ?", lcuuid).Find(&vRouters)
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Find(&vRouters)
 	vRouterIDs := make([]int, len(vRouters))
 	for _, vRouter := range vRouters {
 		vRouterIDs = append(vRouterIDs, vRouter.ID)
 	}
 	db.Unscoped().Where("vnet_id IN ?", vRouterIDs).Delete(&metadbmodel.RoutingTable{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VRouter{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VMPodNodeConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodGroupConfigMapConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.ConfigMap{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.Pod{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodReplicaSet{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodGroup{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VRouter{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VMPodNodeConnection{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodGroupConfigMapConnection{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.ConfigMap{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.Pod{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodReplicaSet{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodGroup{})
 	var podServices []metadbmodel.PodService
-	db.Unscoped().Where("domain = ?", lcuuid).Find(&podServices)
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Find(&podServices)
 	podServiceIDs := make([]int, len(podServices))
 	for _, podService := range podServices {
 		podServiceIDs = append(podServiceIDs, podService.ID)
 	}
 	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&metadbmodel.PodServicePort{})
 	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&metadbmodel.PodGroupPort{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodService{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodService{})
 	var podIngresses []metadbmodel.PodIngress
-	db.Unscoped().Where("domain = ?", lcuuid).Find(&podIngresses)
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Find(&podIngresses)
 	podIngressIDs := make([]int, len(podIngresses))
 	for _, podIngress := range podIngresses {
 		podIngressIDs = append(podIngressIDs, podIngress.ID)
 	}
 	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&metadbmodel.PodIngressRule{})
 	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&metadbmodel.PodIngressRuleBackend{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodIngress{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodNamespace{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodNode{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.PodCluster{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VM{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.Host{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodIngress{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodNamespace{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodNode{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.PodCluster{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VM{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.Host{})
 	var networks []metadbmodel.Network
-	db.Unscoped().Where("domain = ?", lcuuid).Find(&networks)
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Find(&networks)
 	networkIDs := make([]int, len(networks))
 	for _, network := range networks {
 		networkIDs = append(networkIDs, network.ID)
 	}
 	db.Unscoped().Where("vl2id IN ?", networkIDs).Delete(&metadbmodel.Subnet{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.Network{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.VPC{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.SubDomain{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&metadbmodel.AZ{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.Network{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.VPC{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.SubDomain{})
+	db.Unscoped().Where("\"domain\" = ?", lcuuid).Delete(&metadbmodel.AZ{})
 
 	db.Delete(&domain)
 
@@ -767,7 +767,7 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 		db = db.Where("lcuuid = ?", fLcuuid)
 	}
 	if fDomain, ok := filter["domain"]; ok {
-		db = db.Where("domain = ?", fDomain)
+		db = db.Where("\"domain\" = ?", fDomain)
 	}
 	if fClusterID, ok := filter["cluster_id"]; ok {
 		db = db.Where("cluster_id = ?", fClusterID)

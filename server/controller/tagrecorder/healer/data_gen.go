@@ -333,7 +333,7 @@ func (s *dataGeneratorComponent[GT]) generate() error {
 				q = q.Where("sub_domain_id = ?", s.md.GetSubDomainID())
 			}
 		} else {
-			q = q.Where("domain = ?", s.md.GetDomainLcuuid())
+			q = q.Where("\"domain\" = ?", s.md.GetDomainLcuuid())
 			if s.filterSubDomain {
 				subDomainLcuuid := s.md.GetSubDomainLcuuid()
 				if subDomainLcuuid != "" {
