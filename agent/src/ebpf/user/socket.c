@@ -2202,8 +2202,8 @@ static inline int __set_data_limit_max(int limit_size)
 
 /**
  * Set maximum amount of data passed to the agent by eBPF programe.
- * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
- *               it will automatically adjust to 8192 bytes.
+ * @limit_size : The maximum length of data. If @limit_size exceeds 16384,
+ *               it will automatically adjust to 16384 bytes.
  *               If limit_size is 0, Use the default values 4096.
  *
  * @return the set maximum buffer size value on success, < 0 on failure.
