@@ -370,7 +370,7 @@ func (c *Cleaner) cleanHostDirty(domainLcuuid string) {
 	if len(deviceIDs) != 0 {
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_HOST, deviceIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_HOST, deviceIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -386,7 +386,7 @@ func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
 	if len(vmIDs) != 0 {
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -397,7 +397,7 @@ func (c *Cleaner) cleanVMDirty(domainLcuuid string) {
 
 		vmPodNodeConns, _ := WhereFindPtr[mysqlmodel.VMPodNodeConnection](
 			c.org.DB,
-			"domain = ? AND vm_id NOT IN ?", domainLcuuid, vmIDs,
+			"\"domain\" = ? AND vm_id NOT IN ?", domainLcuuid, vmIDs,
 		)
 		if len(vmPodNodeConns) != 0 {
 			c.org.DB.Unscoped().Delete(&vmPodNodeConns)
@@ -413,7 +413,7 @@ func (c *Cleaner) cleanNetworkDirty(domainLcuuid string) {
 	if len(networkIDs) != 0 {
 		subnets, _ := WhereFindPtr[mysqlmodel.Subnet](
 			c.org.DB,
-			"domain = ? AND vl2id NOT IN ?", domainLcuuid, networkIDs,
+			"\"domain\" = ? AND vl2id NOT IN ?", domainLcuuid, networkIDs,
 		)
 		if len(subnets) != 0 {
 			c.org.DB.Unscoped().Delete(&subnets)
@@ -427,7 +427,7 @@ func (c *Cleaner) cleanVRouterDirty(domainLcuuid string) {
 	if len(vrouterIDs) != 0 {
 		rts, _ := WhereFindPtr[mysqlmodel.RoutingTable](
 			c.org.DB,
-			"domain = ? AND vnet_id NOT IN ?", domainLcuuid, vrouterIDs,
+			"\"domain\" = ? AND vnet_id NOT IN ?", domainLcuuid, vrouterIDs,
 		)
 		if len(rts) != 0 {
 			c.org.DB.Unscoped().Delete(&rts)
@@ -436,7 +436,7 @@ func (c *Cleaner) cleanVRouterDirty(domainLcuuid string) {
 
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VROUTER, vrouterIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_VROUTER, vrouterIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -452,7 +452,7 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 	if len(podIngressIDs) != 0 {
 		podIngressRules, _ := WhereFindPtr[mysqlmodel.PodIngressRule](
 			c.org.DB,
-			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
+			"\"domain\" = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
 		if len(podIngressRules) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngressRules)
@@ -461,7 +461,7 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 
 		podIngressRuleBkds, _ := WhereFindPtr[mysqlmodel.PodIngressRuleBackend](
 			c.org.DB,
-			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
+			"\"domain\" = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
 		if len(podIngressRuleBkds) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngressRuleBkds)
@@ -470,7 +470,7 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 
 		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
 			c.org.DB,
-			"domain = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
+			"\"domain\" = ? AND pod_ingress_id NOT IN ?", domainLcuuid, podIngressIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
@@ -485,7 +485,7 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 	if len(podServiceIDs) != 0 {
 		podServicePorts, _ := WhereFindPtr[mysqlmodel.PodServicePort](
 			c.org.DB,
-			"domain = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
+			"\"domain\" = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
 		)
 		if len(podServicePorts) != 0 {
 			c.org.DB.Unscoped().Delete(&podServicePorts)
@@ -494,7 +494,7 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 
 		podGroupPorts, _ := WhereFindPtr[mysqlmodel.PodGroupPort](
 			c.org.DB,
-			"domain = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
+			"\"domain\" = ? AND pod_service_id NOT IN ?", domainLcuuid, podServiceIDs,
 		)
 		if len(podGroupPorts) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroupPorts)
@@ -503,7 +503,7 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -519,7 +519,7 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 	if len(podGroupIDs) != 0 {
 		podGroupPorts, _ := WhereFindPtr[mysqlmodel.PodGroupPort](
 			c.org.DB,
-			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
+			"\"domain\" = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
 		if len(podGroupPorts) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroupPorts)
@@ -528,7 +528,7 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 
 		pods, _ := WhereFindPtr[mysqlmodel.Pod](
 			c.org.DB,
-			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
+			"\"domain\" = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
@@ -538,7 +538,7 @@ func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 
 		podReplicaSets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
 			c.org.DB,
-			"domain = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
+			"\"domain\" = ? AND pod_group_id NOT IN ?", domainLcuuid, podGroupIDs,
 		)
 		if len(podReplicaSets) != 0 {
 			c.org.DB.Unscoped().Delete(&podReplicaSets)
@@ -552,7 +552,7 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 	if len(podNodeIDs) != 0 {
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -563,7 +563,7 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 
 		vmPodNodeConns, _ := WhereFindPtr[mysqlmodel.VMPodNodeConnection](
 			c.org.DB,
-			"domain = ? AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
+			"\"domain\" = ? AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
 		)
 		if len(vmPodNodeConns) != 0 {
 			c.org.DB.Unscoped().Delete(&vmPodNodeConns)
@@ -574,7 +574,7 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 
 		pods, _ := WhereFindPtr[mysqlmodel.Pod](
 			c.org.DB,
-			"domain = ? AND pod_node_id != 0 AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
+			"\"domain\" = ? AND pod_node_id != 0 AND pod_node_id NOT IN ?", domainLcuuid, podNodeIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
@@ -589,7 +589,7 @@ func (c *Cleaner) cleanPodDirty(domainLcuuid string) {
 	if len(podIDs) != 0 {
 		vifs, _ := WhereFindPtr[mysqlmodel.VInterface](
 			c.org.DB,
-			"domain = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs,
+			"\"domain\" = ? AND devicetype = ? AND deviceid NOT IN ?", domainLcuuid, ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs,
 		)
 		if len(vifs) != 0 {
 			c.org.DB.Unscoped().Delete(&vifs)
@@ -605,7 +605,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 	if len(podClusterIDs) != 0 {
 		pods, _ := WhereFindPtr[mysqlmodel.Pod](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
@@ -614,7 +614,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podReplicasets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podReplicasets) != 0 {
 			c.org.DB.Unscoped().Delete(&podReplicasets)
@@ -623,7 +623,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podGroups, _ := WhereFindPtr[mysqlmodel.PodGroup](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podGroups) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroups)
@@ -632,7 +632,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
@@ -641,7 +641,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podIngresses, _ := WhereFindPtr[mysqlmodel.PodIngress](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podIngresses) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngresses)
@@ -650,7 +650,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podNamespaces, _ := WhereFindPtr[mysqlmodel.PodNamespace](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podNamespaces) != 0 {
 			c.org.DB.Unscoped().Delete(&podNamespaces)
@@ -659,7 +659,7 @@ func (c *Cleaner) cleanPodClusterDirty(domainLcuuid string) {
 		}
 		podNodes, _ := WhereFindPtr[mysqlmodel.PodNode](
 			c.org.DB,
-			"domain = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
+			"\"domain\" = ? AND pod_cluster_id NOT IN ?", domainLcuuid, podClusterIDs,
 		)
 		if len(podNodes) != 0 {
 			c.org.DB.Unscoped().Delete(&podNodes)
@@ -674,7 +674,7 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 	if len(podNamespaceIDs) != 0 {
 		pods, _ := WhereFindPtr[mysqlmodel.Pod](
 			c.org.DB,
-			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+			"\"domain\" = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(pods) != 0 {
 			c.org.DB.Unscoped().Delete(&pods)
@@ -683,7 +683,7 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 		}
 		podGroups, _ := WhereFindPtr[mysqlmodel.PodGroup](
 			c.org.DB,
-			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+			"\"domain\" = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podGroups) != 0 {
 			c.org.DB.Unscoped().Delete(&podGroups)
@@ -692,7 +692,7 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 		}
 		podReplicasets, _ := WhereFindPtr[mysqlmodel.PodReplicaSet](
 			c.org.DB,
-			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+			"\"domain\" = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podReplicasets) != 0 {
 			c.org.DB.Unscoped().Delete(&podReplicasets)
@@ -701,7 +701,7 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 		}
 		podIngresses, _ := WhereFindPtr[mysqlmodel.PodIngress](
 			c.org.DB,
-			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+			"\"domain\" = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podIngresses) != 0 {
 			c.org.DB.Unscoped().Delete(&podIngresses)
@@ -710,7 +710,7 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 		}
 		podServices, _ := WhereFindPtr[mysqlmodel.PodService](
 			c.org.DB,
-			"domain = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
+			"\"domain\" = ? AND pod_namespace_id NOT IN ?", domainLcuuid, podNamespaceIDs,
 		)
 		if len(podServices) != 0 {
 			c.org.DB.Unscoped().Delete(&podServices)
@@ -725,7 +725,7 @@ func (c *Cleaner) cleanVInterfaceDirty(domainLcuuid string) {
 	if len(vifIDs) != 0 {
 		lanIPs, _ := WhereFindPtr[mysqlmodel.LANIP](
 			c.org.DB,
-			"domain = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
+			"\"domain\" = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
 		)
 		if len(lanIPs) != 0 {
 			c.org.DB.Unscoped().Delete(&lanIPs)
@@ -734,7 +734,7 @@ func (c *Cleaner) cleanVInterfaceDirty(domainLcuuid string) {
 
 		wanIPs, _ := WhereFindPtr[mysqlmodel.WANIP](
 			c.org.DB,
-			"domain = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
+			"\"domain\" = ? AND vifid NOT IN ?", domainLcuuid, vifIDs,
 		)
 		if len(wanIPs) != 0 {
 			c.org.DB.Unscoped().Delete(&wanIPs)
