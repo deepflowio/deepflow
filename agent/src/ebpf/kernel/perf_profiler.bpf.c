@@ -1456,8 +1456,6 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx,
     int eq = frame_gc_equals_L(frame, lua_state, o);
     if (eq > 0) {
         skip_depth++;
-    } else if (eq < 0) {
-        return 0;
     }
 
     if (skip_depth-- == 0) {
@@ -1520,9 +1518,11 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 							      PROG_LUA_UNWIND_PE_IDX);
 					}
 				}
-				state->luajit_frame = NULL;
-				state->luajit_bot = NULL;
-				state->luajit_skip_depth = 0;
+				else {
+					state->luajit_frame = NULL;
+					state->luajit_bot = NULL;
+					state->luajit_skip_depth = 0;
+				}
 			}
 		} else {
 			struct lua_ofs *o =
