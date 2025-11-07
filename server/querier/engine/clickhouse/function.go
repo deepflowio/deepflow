@@ -511,7 +511,9 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 			},
 			DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
 		}
-
+		if f.Metrics.Type == metrics.METRICS_TYPE_PERCENTAGE {
+			divFunction.IsLeast = true
+		}
 		// 1 - sum(x)/sum(y)
 		if strings.Trim(f.Args[0], "`") == chCommon.SUCCESS_RATIO_METRICS_NAME {
 			divFunction.Nest = true
@@ -617,6 +619,17 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 			// Percentage type weighted average
 			if f.Name == view.FUNCTION_AVG {
 				outFunc = view.GetFunc(view.FUNCTION_DELAY_AVG)
+				outFunc.SetIsLeast(true)
+			} else {
+				dbField := f.Metrics.DBField
+				if strings.Contains(dbField, "/") {
+					if strings.HasPrefix(dbField, "1 - ") {
+						dbFieldNoPrefix := strings.TrimPrefix(dbField, "1 - ")
+						f.Metrics.DBField = "1 - " + fmt.Sprintf("least(%s, 1)", dbFieldNoPrefix)
+					} else {
+						f.Metrics.DBField = fmt.Sprintf("least(%s, 1)", dbField)
+					}
+				}
 			}
 			outFunc.SetMath("*100")
 		}
