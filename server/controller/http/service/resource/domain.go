@@ -30,7 +30,6 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"
-	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -150,7 +149,7 @@ func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interfa
 	for _, domain := range domains {
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
 	}
-	err = orgDB.Where("\"domain\" IN (?)", domainLcuuids).Find(&azs).Error // TODO extract common method
+	err = orgDB.Where("\"domain\" IN (?)", domainLcuuids).Find(&azs).Error // FIXME extract common method. change for dm
 	if err != nil {
 		return response, err
 	}
@@ -464,7 +463,8 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate), db.LogPrefixORGID)
 
-	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
+	// err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
+	err = db.Create(&domain).Error // FIXME change for dm
 	if err != nil {
 		return nil, response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
