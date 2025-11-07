@@ -497,7 +497,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX sub_domain_lcuuid_index ON sub_domain(lcuuid)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS region (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(64) DEFAULT '''',
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '''',
@@ -513,7 +513,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX region_lcuuid_index ON region(lcuuid)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS az (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(64) DEFAULT '''',
     create_method       INTEGER DEFAULT 0,
     label               VARCHAR(64) DEFAULT '''',
@@ -529,7 +529,7 @@ BEGIN
     
     -- Computes
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS vm (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     state               INTEGER NOT NULL,
     name                VARCHAR(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
@@ -561,7 +561,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE INDEX vm_id_index ON vm(id)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS host_device (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     type                INTEGER,
     state               INTEGER,
     name                VARCHAR(256) DEFAULT '''',
@@ -671,7 +671,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE vl2_net';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS vnet (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     state               INTEGER NOT NULL,
     name                varchar(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
@@ -705,7 +705,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE INDEX routing_table_vnet_id_index ON routing_table(vnet_id)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS dhcp_port (
-    id                  INTEGER AUTO_INCREMENT NOT NULL,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL,
     name                VARCHAR(256) DEFAULT '''',
     "domain"            VARCHAR(64) DEFAULT '''',
     region              VARCHAR(64) DEFAULT '''',
@@ -821,7 +821,7 @@ BEGIN
     
     -- Network Services
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS nat_gateway (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
     floating_ips        TEXT,
@@ -868,7 +868,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE nat_vm_connection';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS lb (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
     "model"             INTEGER DEFAULT 0,
@@ -973,7 +973,7 @@ BEGIN
     
     -- Storage Services
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS redis_instance (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
     state               TINYINT NOT NULL DEFAULT 0,
@@ -994,7 +994,7 @@ BEGIN
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN redis_instance.state IS ''0. Unknown 1. Running 2. Recovering''';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS rds_instance (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     label               VARCHAR(64) DEFAULT '''',
     state               TINYINT NOT NULL DEFAULT 0,
@@ -1020,7 +1020,7 @@ BEGIN
     
     -- Kubernetes
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_cluster (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     cluster_name        VARCHAR(256) DEFAULT '''',
     version             VARCHAR(256) DEFAULT '''',
@@ -1038,7 +1038,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE pod_cluster';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_node (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     alias               VARCHAR(64) DEFAULT '''',
     type                INTEGER DEFAULT NULL,
@@ -1082,7 +1082,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE vm_pod_node_connection';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_namespace (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     learned_cloud_tags  TEXT,
     custom_cloud_tags   TEXT,
@@ -1100,7 +1100,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE pod_namespace';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_ingress (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     alias               VARCHAR(64) DEFAULT '''',
     pod_namespace_id    INTEGER DEFAULT NULL,
@@ -1147,7 +1147,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE pod_ingress_rule_backend';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_service (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     label               TEXT,
     annotation          TEXT,
@@ -1205,7 +1205,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE INDEX pod_service_port_pod_service_id_index ON pod_service_port(pod_service_id)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_group (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     alias               VARCHAR(64) DEFAULT '''',
     type                INTEGER DEFAULT NULL,
@@ -1253,7 +1253,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE pod_group_port';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod_rs (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     alias               VARCHAR(64) DEFAULT '''',
     label               TEXT,
@@ -1276,7 +1276,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE INDEX pod_rs_pod_namespace_id_index ON pod_rs(pod_namespace_id)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS pod (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '''',
     alias               VARCHAR(64) DEFAULT '''',
     label               TEXT,
@@ -1354,7 +1354,7 @@ BEGIN
 
     -- Processes
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS process (
-    id                  INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    id                  INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name                TEXT,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
@@ -2591,7 +2591,7 @@ BEGIN
 
     -- Prometheus
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS prometheus_metric_name (
-    id             INTEGER NOT NULL PRIMARY KEY,
+    id             INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name           VARCHAR(256) NOT NULL UNIQUE,
     synced_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -2599,7 +2599,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE prometheus_metric_name';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS prometheus_label_name (
-    id             INTEGER NOT NULL PRIMARY KEY,
+    id             INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
     name           VARCHAR(256) NOT NULL UNIQUE,
     synced_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
