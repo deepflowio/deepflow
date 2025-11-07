@@ -153,7 +153,10 @@ typedef struct {
 
 	void *lua_L_ptr;
 	__u8  lua_is_jit;       // 0: Lua 5.x, 1: LuaJIT
-	__u32 lua_offsets_id; 
+	__u32 lua_offsets_id;
+	void *luajit_frame;
+	void *luajit_bot;
+	__s32 luajit_skip_depth;
 } unwind_state_t;
 
 /*
@@ -167,6 +170,9 @@ void reset_unwind_state(unwind_state_t * state)
 	__builtin_memset(&state->regs, 0, sizeof(regs_t));
 	__builtin_memset(&state->stack, 0, sizeof(stack_t));
 	__builtin_memset(&state->intp_stack, 0, sizeof(stack_t));
+	state->luajit_frame = NULL;
+	state->luajit_bot = NULL;
+	state->luajit_skip_depth = 0;
 }
 
 MAP_PERARRAY(heap, __u32, unwind_state_t, 1, FEATURE_FLAG_PROFILE_ONCPU | FEATURE_FLAG_PROFILE_OFFCPU | FEATURE_FLAG_PROFILE_MEMORY | FEATURE_DWARF_UNWINDING)
@@ -714,9 +720,9 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		if (uw) state->lua_offsets_id = uw->offsets_id;
     }
 
-    if (state->lua_L_ptr != NULL) {
+	if (state->lua_L_ptr != NULL) {
 		pre_lua_unwind(ctx, state, &oncpu_maps, PROG_LUA_UNWIND_PE_IDX);
-    }
+	}
 
 	process_shard_list_t *shard_list =
 	    process_shard_list_table__lookup(&key->tgid);
@@ -1399,60 +1405,87 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame_
 	return 0;
 }
 
-static int luajit_unwind(struct bpf_perf_event_data *ctx, __u32 tid,
-			 void *lua_state, struct lj_ofs *o,
-			 stack_t * intp_stack)
+static int luajit_unwind(struct bpf_perf_event_data *ctx,
+             unwind_state_t *state, struct lj_ofs *o)
 {
-	(void)tid;
+    stack_t *intp_stack = &state->intp_stack;
+    void *lua_state = state->lua_L_ptr;
 
-	if (!intp_stack)
-		return -1;
+    if (!intp_stack || !lua_state){
+        return 0;
+    }
 
-	int skip_depth = 1;
-	void *stack_ptr, *base_ptr;
-	if (L_get_stack(lua_state, &stack_ptr, o))
-		return -1;
-	if (L_get_base(lua_state, &base_ptr, o))
-		return -1;
+    if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
+        return 0;
+    }
 
-	void *bot = (void *)((char *)stack_ptr + o->tv_sz);
+    if (!state->luajit_frame || !state->luajit_bot) {
+        void *stack_ptr = NULL, *base_ptr = NULL;
+        if (L_get_stack(lua_state, &stack_ptr, o)) {
+            return 0;
+        }
+        if (L_get_base(lua_state, &base_ptr, o)) {
+            return 0;
+        }
 
-	void *frame;
-	frame = (void *)((char *)base_ptr - o->tv_sz);
+        state->luajit_bot = (void *)((char *)stack_ptr + o->tv_sz);
+        state->luajit_frame = (void *)((char *)base_ptr - o->tv_sz);
+        state->luajit_skip_depth = 1;
+    }
 
-	/* Main frame walker loop */
-#pragma unroll
-	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
-		if (frame <= bot)
-			break;
-		if (frame_gc_equals_L(frame, lua_state, o) > 0) {
-			skip_depth++;
-		}
-		/*
-		* Walk logic refer to LuaJIT source code:
-		* https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_debug.c
-		* Gate recording with a countdown:
-		* - We increment skip_depth for parent/dummy/vararg frames.
-		* - Each iteration we compare (skip_depth == 0) using a post-decrement.
-		*   If it was 0, we immediately ++ to keep it at 0 forever (i.e., keep recording).
-		*   If it was > 0, the decrement advances the countdown toward 0 (keep skipping).
-		*/
-		if (skip_depth-- == 0) {
-			skip_depth++;
-			if (lua_get_funcdata(ctx, frame, intp_stack, o) != 0) {
-				continue;
-			}
-		}
+    void *frame = state->luajit_frame;
+    void *bot = state->luajit_bot;
+    if (!frame || frame <= bot) {
+        return 0;
+    }
 
-		if (frame_islua_wr(frame, o)) {
-			frame = frame_prevl_wr(frame, o);
-		} else {
-			if (frame_isvarg_wr(frame, o))
-				skip_depth++;
-			frame = frame_prevd_wr(frame, o);
-		}
-	}
-	return 0;
+    /*
+     * Frame walk logic mirrors LuaJIT’s lj_debug.c:
+     * https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_debug.c
+     *  - skip_depth counts how many dummy frames to skip.
+     *  - we post-decrement skip_depth to detect when it hits zero (record),
+     *    then immediately bump it back so it stays at zero for the rest of
+     *    the run.
+     *  - state->luajit_frame/skip_depth persist across tail calls, so each
+     *    invocation processes a single frame but the countdown semantics
+     *    remain identical to the upstream implementation.
+     */
+
+    int skip_depth = state->luajit_skip_depth;
+
+    int eq = frame_gc_equals_L(frame, lua_state, o);
+    if (eq > 0) {
+        skip_depth++;
+    } else if (eq < 0) {
+        return 0;
+    }
+
+    if (skip_depth-- == 0) {
+        skip_depth++;
+        if (lua_get_funcdata(ctx, frame, intp_stack, o) != 0) {
+            goto advance;
+        }
+    }
+
+advance:
+    if (frame_islua_wr(frame, o) > 0) {
+        frame = frame_prevl_wr(frame, o);
+    } else {
+        if (frame_isvarg_wr(frame, o) > 0)
+            skip_depth++;
+        frame = frame_prevd_wr(frame, o);
+    }
+
+    state->luajit_skip_depth = skip_depth;
+    state->luajit_frame = frame;
+
+    if (!frame || frame <= bot) {
+        state->luajit_frame = NULL;
+        state->luajit_bot = NULL;
+        return 0;
+    }
+
+    return 1;
 }
 
 PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
@@ -1479,9 +1512,17 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 			struct lj_ofs *o =
 			    luajit_offsets_map__lookup(&state->lua_offsets_id);
 			if (o) {
-				luajit_unwind(ctx, state->key.tgid,
-					      state->lua_L_ptr, o,
-					      &state->intp_stack);
+				int once = luajit_unwind(ctx, state, o);
+				if (once > 0) {
+					state->runs++;
+					if (state->runs < STACK_FRAMES_PER_RUN) {
+						bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+							      PROG_LUA_UNWIND_PE_IDX);
+					}
+				}
+				state->luajit_frame = NULL;
+				state->luajit_bot = NULL;
+				state->luajit_skip_depth = 0;
 			}
 		} else {
 			struct lua_ofs *o =
