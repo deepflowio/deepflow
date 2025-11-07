@@ -85,7 +85,7 @@ endpoint                  , endpoint                  , endpoint                
 process_id                , process_id_0              , process_id_1               , int            ,                       , Service Info      , 111          , 0             , 
 process_kname             , process_kname_0           , process_kname_1            , string         ,                       , Service Info      , 111          , 0             , 
 
-trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info      , 111          , 0             , 
+trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info      , 111          , 0             , 010
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info      , 111          , 0             , 
 parent_span_id            , parent_span_id            , parent_span_id             , string         ,                       , Tracing Info      , 111          , 0             , 
 span_kind                 , span_kind                 , span_kind                  , int_enum       , span_kind             , Tracing Info      , 111          , 0             , 
