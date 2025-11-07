@@ -132,6 +132,7 @@ type Function interface {
 	SetFillNullAsZero(bool)
 	SetIsGroupArray(bool)
 	SetCondition(string)
+	SetIsLeast(bool)
 	SetTime(*Time)
 	SetMath(string)
 	GetFlag() int
@@ -174,6 +175,7 @@ type DefaultFunction struct {
 	FillNullAsZero bool
 	IsGroupArray   bool // 是否针对list做聚合，例:SUMArray(rtt_max)
 	Nest           bool // 是否为内层嵌套算子
+	IsLeast        bool // 是否限制最大值
 	Time           *Time
 	Math           string
 	NodeBase
@@ -407,6 +409,10 @@ func (f *DefaultFunction) SetIsGroupArray(isGroupArray bool) {
 
 func (f *DefaultFunction) SetCondition(condition string) {
 	f.Condition = condition
+}
+
+func (f *DefaultFunction) SetIsLeast(isLeast bool) {
+	f.IsLeast = isLeast
 }
 
 func (f *DefaultFunction) SetMath(math string) {
@@ -762,6 +768,9 @@ type DivFunction struct {
 }
 
 func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
+	if f.IsLeast {
+		buf.WriteString("least(")
+	}
 	if f.DivType == FUNCTION_DIV_TYPE_DEFAULT {
 		buf.WriteString("divide(")
 		f.Fields[0].WriteTo(buf)
@@ -785,6 +794,9 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(FormatField(f.Fields[1].(Function).GetDefaultAlias(true)))
 		buf.WriteString("`")
 	}
+	if f.IsLeast {
+		buf.WriteString(", 1)")
+	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
@@ -797,10 +809,14 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 func (f *DivFunction) GetWiths() []Node {
 	f.Withs = append(f.Withs, f.Fields[0].GetWiths()...)
 	f.Withs = append(f.Withs, f.Fields[1].GetWiths()...)
+	divFunctionStr := fmt.Sprintf("divide(%s, %s)", f.Fields[0].ToString(), f.Fields[1].ToString())
+	if f.IsLeast {
+		divFunctionStr = fmt.Sprintf("least(%s, 1)", divFunctionStr)
+	}
 	if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL {
 		with := fmt.Sprintf(
-			"if(%s>0, divide(%s, %s), null)",
-			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
+			"if(%s>0, %s, null)",
+			f.Fields[1].ToString(), divFunctionStr,
 		)
 		alias := FormatField(fmt.Sprintf(
 			"divide_0diveider_as_null%s%s",
@@ -810,8 +826,8 @@ func (f *DivFunction) GetWiths() []Node {
 		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 	} else if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_0 {
 		with := fmt.Sprintf(
-			"if(%s>0, divide(%s, %s), 0)",
-			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
+			"if(%s>0, %s, 0)",
+			f.Fields[1].ToString(), divFunctionStr,
 		)
 		alias := FormatField(fmt.Sprintf(
 			"divide_0diveider_as_0%s%s",
@@ -927,6 +943,9 @@ func (f *DelayAvgFunction) Init() {
 					Name:   FUNCTION_DIV,
 					Fields: []Node{&dividendSumFunc, &divisorSumFunc},
 				},
+			}
+			if f.IsLeast {
+				f.divFunction.IsLeast = true
 			}
 
 			// 1 - Sum(Numerator)/Sum(Denominator)
