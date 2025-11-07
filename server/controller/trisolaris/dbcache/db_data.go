@@ -497,7 +497,9 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
-	podGroups, err := dbmgr.DBMgr[models.PodGroup](db).GetFields([]string{"id", "name", "type", "uid"})
+	podGroups, err := dbmgr.DBMgr[models.PodGroup](db).GetFields([]string{
+		"id", "name", "type", "uid", "network_mode",
+	})
 	if err == nil {
 		d.podGroups = podGroups
 	} else {
