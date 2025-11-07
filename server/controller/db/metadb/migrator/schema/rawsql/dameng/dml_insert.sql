@@ -54,8 +54,8 @@ BEGIN
     EXECUTE IMMEDIATE 'INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                      VALUES (26, ''事件-文件读写指标'', ''event.file_event_metrics'', 1, 7*24, ''Sum'', ''Avg'', NEWID())';
 
-    EXECUTE IMMEDIATE 'INSERT INTO az (id, name, lcuuid, region, "domain") values(1, ''系统默认'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'')';
-    EXECUTE IMMEDIATE 'INSERT INTO region (id, name, lcuuid) values(1, ''系统默认'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'')';
+    EXECUTE IMMEDIATE 'INSERT INTO az (name, lcuuid, region, "domain") values(''系统默认'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'')';
+    EXECUTE IMMEDIATE 'INSERT INTO region (name, lcuuid) values(''系统默认'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'')';
     EXECUTE IMMEDIATE 'INSERT INTO vl2(state, name, net_type, isp, lcuuid, "domain") values(0, ''PublicNetwork'', 3, 7, ''ffffffff-ffff-ffff-ffff-ffffffffffff'', ''ffffffff-ffff-ffff-ffff-ffffffffffff'')';
 
     EXECUTE IMMEDIATE 'INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) values(63999, 63999, ''Internet'', -1, 0, 0, 0)';
