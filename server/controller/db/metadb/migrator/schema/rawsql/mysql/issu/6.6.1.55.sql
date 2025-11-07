@@ -1,37 +1,31 @@
-DROP PROCEDURE IF EXISTS RenameColumnIfExists;
+DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
-CREATE PROCEDURE RenameColumnIfExists(
+CREATE PROCEDURE AddColumnIfNotExists(
     IN tableName VARCHAR(255),
-    IN oldColName VARCHAR(255),
-    IN newColName VARCHAR(255),
-    IN colType VARCHAR(255)
+    IN colName VARCHAR(255),
+    IN colType VARCHAR(255),
+    IN afterCol VARCHAR(255)
 )
 BEGIN
-    DECLARE index_count INT;
+    DECLARE column_count INT;
 
-    -- check if old column exists
     SELECT COUNT(*)
-    INTO index_count
+    INTO column_count
     FROM information_schema.columns
-    WHERE table_schema = DATABASE()
-    AND table_name = tableName
-    AND column_name = newColName;
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = tableName
+    AND column_name = colName;
 
-    -- if new column not exists, rename column
-    IF index_count = 0 THEN
-        SET @sql = CONCAT('ALTER TABLE ', tableName, ' CHANGE ', oldColName, ' ', newColName, ' ', colType);
+    IF column_count = 0 THEN
+        SET @sql = CONCAT('ALTER TABLE ', tableName, ' ADD COLUMN ', colName, ' ', colType, ' AFTER ', afterCol);
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
         DEALLOCATE PREPARE stmt;
     END IF;
 END;
 
-CALL RenameColumnIfExists('mail_server', 'user', 'user_name', 'TEXT NOT NULL');
-CALL RenameColumnIfExists('plugin', 'user', 'user_name', "INTEGER NOT NULL DEFAULT 1 COMMENT '1: agent 2: server'");
-CALL RenameColumnIfExists('genesis_process', 'user', 'user_name', "VARCHAR(256) DEFAULT ''");
-CALL RenameColumnIfExists('data_source', "`interval`", 'interval_time', "INTEGER NOT NULL COMMENT 'uint: s'");
-CALL RenameColumnIfExists('report_policy', '`interval`', 'interval_time', "enum('1d','1h') NOT NULL DEFAULT '1h'");
+CALL AddColumnIfNotExists('pod_group', 'network_mode', "INTEGER DEFAULT 1 COMMENT '1: Pod network 2: Host network'", 'label');
 
-DROP PROCEDURE RenameColumnIfExists;
+DROP PROCEDURE AddColumnIfNotExists;
 
 UPDATE db_version SET version='6.6.1.55';

@@ -1211,6 +1211,7 @@ BEGIN
     type                INTEGER DEFAULT NULL,
     pod_num             INTEGER DEFAULT 1,
     label               TEXT,
+    network_mode        INTEGER DEFAULT 1,
     metadata            MEDIUMTEXT,
     metadata_hash       VARCHAR(64) DEFAULT '''',
     spec                MEDIUMTEXT,
@@ -1230,6 +1231,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE pod_group';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN pod_group.type IS ''1: Deployment 2: StatefulSet 3: ReplicationController''';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN pod_group.label IS ''separated by ,''';
+    EXECUTE IMMEDIATE 'COMMENT ON COLUMN pod_group.network_mode IS ''1: Pod network 2: Host network''';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN pod_group.metadata IS ''yaml''';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN pod_group.spec IS ''yaml''';
     EXECUTE IMMEDIATE 'CREATE INDEX pod_group_pod_namespace_id_index ON pod_group(pod_namespace_id)';
