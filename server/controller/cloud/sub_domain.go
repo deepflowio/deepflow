@@ -180,7 +180,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 func (c *Cloud) getOwnDomainResource() model.Resource {
 	oResource := model.Resource{}
 	var vpcs []mysqlmodel.VPC
-	err := c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
+	err := c.db.DB.Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
 	if err != nil {
 		log.Errorf("get own domain resource vpc failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
@@ -191,42 +191,42 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 	}
 
 	var vms []mysqlmodel.VM
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vms).Error
+	err = c.db.DB.Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&vms).Error
 	if err != nil {
 		log.Errorf("get own domain resource vm failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var vinterfaces []mysqlmodel.VInterface
-	err = c.db.DB.Select("id", "lcuuid", "iftype", "mac", "devicetype", "deviceid", "region").Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
+	err = c.db.DB.Select("id", "lcuuid", "iftype", "mac", "devicetype", "deviceid", "region").Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
 	if err != nil {
 		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var wanIPs []mysqlmodel.WANIP
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
+	err = c.db.DB.Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
 	if err != nil {
 		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var lanIPs []mysqlmodel.LANIP
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
+	err = c.db.DB.Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
 	if err != nil {
 		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var networks []mysqlmodel.Network
-	err = c.db.DB.Where("domain = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
+	err = c.db.DB.Where("\"domain\" = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
 	if err != nil {
 		log.Errorf("get own domain resource network failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var subnets []mysqlmodel.Subnet
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
+	err = c.db.DB.Where("\"domain\" = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
 	if err != nil {
 		log.Errorf("get own domain resource subnet failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
