@@ -1443,6 +1443,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->direction = conn_info->direction;
 		sk_info->pre_direction = conn_info->direction;
 		sk_info->role = conn_info->role;
+		sk_info->data_source = extra->source;
 		sk_info->update_time = time_stamp / NS_PER_SEC;
 		sk_info->need_reconfirm = conn_info->need_reconfirm;
 		sk_info->correlation_id = conn_info->correlation_id;
@@ -1528,8 +1529,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * be re inferred to determine the upper layer protocol of TLS.
 		 */
 		if (socket_info_ptr->l7_proto == PROTO_TLS ||
-		    socket_info_ptr->l7_proto == PROTO_UNKNOWN)
+		    socket_info_ptr->l7_proto == PROTO_UNKNOWN) {
 			socket_info_ptr->l7_proto = conn_info->protocol;
+			socket_info_ptr->data_source = extra->source;
+		}
 
 		/*
 		 * Ensure that the accumulation operation of capturing the
@@ -2851,6 +2854,7 @@ KRETFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 					__u16 l7_proto,
+					enum process_data_extra_source source,
 					struct member_fields_offset *offset,
 					void *ctx)
 {
@@ -2877,10 +2881,10 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	v->tgid = (__u32) (pid_tgid >> 32);
 	v->pid = (__u32) pid_tgid;
 	v->timestamp = bpf_ktime_get_ns();
-	v->source = DATA_SOURCE_CLOSE;
+	v->source = source;
 	v->syscall_len = 0;
 	v->data_seq = seq;
-	v->msg_type = MSG_COMMON;
+	v->msg_type = MSG_CLOSE;
 	v->data_type = l7_proto;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
@@ -2940,6 +2944,7 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
+	enum process_data_extra_source source = 0;
 	struct socket_info_s *socket_info_ptr =
 	    socket_info_map__lookup(&conn_key);
 	if (socket_info_ptr == NULL) {
@@ -2947,11 +2952,14 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 		return 0;
 	}
 
-	if (socket_info_ptr->uid)
+	if (socket_info_ptr->uid) {
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+		source = socket_info_ptr->data_source;
+	}
+
 	delete_socket_info(conn_key, socket_info_ptr);
 	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
-			   socket_info_ptr->l7_proto,
+			   socket_info_ptr->l7_proto, source,
 			   offset, (void *)ctx);
 	return 0;
 }
