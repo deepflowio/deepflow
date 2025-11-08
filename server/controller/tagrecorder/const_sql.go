@@ -19,7 +19,7 @@ package tagrecorder
 const (
 	SQL_CREATE_DICT               = "CREATE DICTIONARY %s.%s\n"
 	SQL_SOURCE_MYSQL              = "SOURCE(%s(%sPORT %d USER '%s' PASSWORD '%s' %sDB %s TABLE %s UPDATE_FIELD 'updated_at' INVALIDATE_QUERY 'select max(updated_at) from %s'))\n"
-	SQL_SOURCE_DM                 = "SOURCE(ODBC(CONNECTION_STRING 'DSN=%s' DB %s TABLE %s INVALIDATE_QUERY 'select max(updated_at) from %s'))\n"
+	SQL_SOURCE_DM                 = "SOURCE(ODBC(CONNECTION_STRING 'DSN=%s' DB %s TABLE %s INVALIDATE_QUERY 'select max(updated_at) from %s.%s'))\n"
 	SQL_LIFETIME                  = "LIFETIME(MIN 30 MAX %d)\n"
 	SQL_LAYOUT_FLAT               = "LAYOUT(FLAT())"
 	SQL_LAYOUT_COMPLEX_KEY_HASHED = "LAYOUT(COMPLEX_KEY_HASHED())"
