@@ -1368,7 +1368,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"trace_id %s %s OR "+chCommon.TRACE_ID_2_TAG+" %s %s",
 			"",
-			"",
+			"trace_ids",
 		),
 	}
 	// X_Request_ID
