@@ -142,7 +142,8 @@ struct socket_info_s {
 	 * participate in tracing.
 	 */
 	__u16 no_trace:1;
-	__u16 unused_bits:11;
+	__u16 data_source:4; // The source of the stored data, defined in the 'enum process_data_extra_source'. 
+	__u16 unused_bits:7;
 	__u32 reasm_bytes;	// The amount of data bytes that have been reassembled.
 
 	/*
