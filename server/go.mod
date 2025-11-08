@@ -100,8 +100,8 @@ require (
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
-	gorm.io/driver/sqlite v1.3.4
-	gorm.io/gorm v1.30.1
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.0
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
@@ -111,6 +111,7 @@ require (
 require (
 	bou.ke/monkey v1.0.2
 	github.com/IBM/sarama v1.43.0
+	github.com/askyrie/gorm-dameng v0.0.0-20251110084342-f6b959d55d92
 	github.com/bytedance/sonic v1.12.5
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
@@ -122,7 +123,6 @@ require (
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
-	github.com/godoes/gorm-dameng v0.7.2
 	github.com/golang/mock v1.6.0
 	github.com/grafana/pyroscope-go v1.2.0
 	github.com/json-iterator/go v1.1.12
@@ -167,6 +167,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/godoes/gorm-dameng v0.7.2 // indirect
 	github.com/golang/glog v1.2.5 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -257,7 +258,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v1.14.12 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
