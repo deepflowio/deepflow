@@ -478,6 +478,7 @@ pub struct FlowConfig {
     pub capture_mode: PacketCaptureType,
 
     pub capacity: u32,
+    pub rrt_cache_capacity: u32,
     pub hash_slots: u32,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
@@ -538,6 +539,7 @@ impl From<&UserConfig> for FlowConfig {
             l7_log_tap_types: generate_tap_types_array(
                 &conf.outputs.flow_log.filters.l7_capture_network_types,
             ),
+            rrt_cache_capacity: conf.processors.flow_log.tunning.rrt_cache_capacity,
             capacity: conf.processors.flow_log.tunning.concurrent_flow_limit,
             hash_slots: conf.processors.flow_log.tunning.flow_map_hash_slots,
             packet_delay: conf
@@ -4902,6 +4904,14 @@ impl ConfigHandler {
 
         let tunning = &mut flow_log.tunning;
         let new_tunning = &mut new_flow_log.tunning;
+        if tunning.rrt_cache_capacity != new_tunning.rrt_cache_capacity {
+            info!(
+                "Update processors.flow_log.tunning.rrt_cache_capacity from {:?} to {:?}.",
+                tunning.rrt_cache_capacity, new_tunning.rrt_cache_capacity
+            );
+            tunning.rrt_cache_capacity = new_tunning.rrt_cache_capacity;
+            restart_agent = !first_run;
+        }
         if tunning.concurrent_flow_limit != new_tunning.concurrent_flow_limit {
             info!(
                 "Update processors.flow_log.tunning.concurrent_flow_limit from {:?} to {:?}.",
