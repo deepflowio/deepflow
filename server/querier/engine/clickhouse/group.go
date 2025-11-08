@@ -61,7 +61,11 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 				stmts = append(stmts, &GroupTag{Value: "`" + autoTagKey + "`", AsTagMap: asTagMap})
 			}
 		} else if tagItem.TagTranslator != "" {
-			stmts = append(stmts, &GroupTag{Value: tagItem.TagTranslator, Alias: name, AsTagMap: asTagMap})
+			if strings.Trim(name, "`") == chCommon.TRACE_ID_TAG {
+				stmts = append(stmts, &GroupTag{Value: chCommon.TRACE_IDS_TAG, AsTagMap: asTagMap})
+			} else {
+				stmts = append(stmts, &GroupTag{Value: tagItem.TagTranslator, Alias: name, AsTagMap: asTagMap})
+			}
 		} else {
 			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		}
