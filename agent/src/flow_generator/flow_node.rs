@@ -88,7 +88,16 @@ impl FlowMapKey {
         }
     }
 
-    pub(super) fn new(lookup_key: &LookupKey, tap_port: TapPort) -> Self {
+    pub(super) fn new(packet: &MetaPacket) -> Self {
+        if packet.tap_port.is_from(TapPort::FROM_EBPF) {
+            return Self {
+                lhs: 0,
+                rhs: packet.generate_ebpf_flow_id(),
+            };
+        }
+
+        let lookup_key = &packet.lookup_key;
+        let tap_port = &packet.tap_port;
         match lookup_key.eth_type {
             EthernetType::IPV4 | EthernetType::IPV6 => {
                 let lhs = Self::l3_hash(lookup_key);

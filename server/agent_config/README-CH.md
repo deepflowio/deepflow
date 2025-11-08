@@ -890,6 +890,8 @@ global:
 
 deepflow-agent 是否向 deepflow-server 做 NTP 同步的开关。
 
+注意：开启 NTP 前控制器需要先开启 NTP 服务，直到完成同步时间后采集器才会继续运行。
+
 ### 最大时钟偏差 {#global.ntp.max_drift}
 
 **标签**:
@@ -3711,7 +3713,7 @@ inputs:
 - 如果上面没有搜到 "libssl.so" 也可能是静态编译了，这时候我们可以通过下面方式确认：
   执行命令 `sudo nm /proc/<PID>/exe | grep SSL_write` 若包含 `SSL_write` 相关信息如：`0000000000502ac0 T SSL_write`
   则说明该进程正在使用静态编译的 openssl 库。
-  
+
 启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
 在日志中您会看到类似如下信息：
 ```
@@ -9270,10 +9272,36 @@ processors:
 
 **详细描述**:
 
-FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
-例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-将无法计算 L7 的 RRT。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等于 65535 时，
-将会被强制设置为 u32::MAX。
+FlowMap 中存储的最大并发 Flow 数量。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等
+于 65535 时，将会被强制设置为 u32::MAX。
+
+#### RRT 缓存容量 {#processors.flow_log.tunning.rrt_cache_capacity}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.tunning.rrt_cache_capacity`
+
+**默认值**:
+```yaml
+processors:
+  flow_log:
+    tunning:
+      rrt_cache_capacity: 16000
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 64000000] |
+
+**详细描述**:
+
+FlowMap 中 RRT Cache 表的容量。该表用于计算 RRT 延迟指标，过大会导致采集器内存占用高，过小会导致RRT指标缺失。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
 
