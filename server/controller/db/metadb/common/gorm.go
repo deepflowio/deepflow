@@ -25,8 +25,8 @@ import (
 	"os"
 	"time"
 
+	dameng_driver "github.com/askyrie/gorm-dameng"
 	mysql_driver "github.com/go-sql-driver/mysql"
-	dameng_driver "github.com/godoes/gorm-dameng"
 	postgres_driver "github.com/lib/pq"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
