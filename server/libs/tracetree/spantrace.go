@@ -21,27 +21,34 @@ import (
 	"net"
 
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const SPAN_TRACE_VERSION_0x12 = 0x12 // before 20251027
-const SPAN_TRACE_VERSION = 0x13
+const SPAN_TRACE_VERSION_0x13 = 0x13 // before 20251108
+const SPAN_TRACE_VERSION = 0x14
 
 type SpanTrace struct {
-	Time          uint32 // not store, easy to use when calculating
 	QuerierRegion string // not store, easy to use when calculating
 	TraceId2      string // not store, easy to use when calculating
+	Time          uint32 // not store, easy to use when calculating
 
 	EndTimeUsPart uint32 // The microsecond part less than 1 second
 
+	SignalSource       uint16 // must before auto_instance
 	CaptureNic         uint32
 	CaptureNicType     uint8
 	CaptureNetworkType uint8
 	AutoServiceType0   uint8
 	AutoServiceType1   uint8
+	AutoInstanceType0  uint8 // only eBPF/otel span
+	AutoInstanceType1  uint8 // only eBPF/otel span
 	AutoServiceID0     uint32
 	AutoServiceID1     uint32
+	AutoInstanceID0    uint32 // only eBPF/otel span
+	AutoInstanceID1    uint32 // only eBPF/otel span
 	IsIPv4             bool
 	IP40               uint32
 	IP60               net.IP
@@ -59,12 +66,18 @@ type SpanTrace struct {
 	SpanId                 string
 	ParentSpanId           string
 	AppService             string
-	Topic                  string // only valid when is Kafka protocol, from l7FlowLog RequestDomain
-	RequestType            string // only valid when is Kafka protocol
+	Endpoint               string
+	RequestType            string
+	RequestDomain          string
+	RequestResource        string // notice: will be cut to 255 when write
+	ResponseResult         string
+	L7ProtocolStr          string
+	RequestId              uint64
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
 
 	ResponseDuration uint64
+	ResponseCode     uint32
 	ResponseStatus   uint8
 	Type             uint8
 }
@@ -75,13 +88,22 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("span trace data version is %d expect version is %d", version, SPAN_TRACE_VERSION)
 	}
 	t.EndTimeUsPart = decoder.ReadU32()
+	t.SignalSource = decoder.ReadU16()
 	t.CaptureNic = decoder.ReadVarintU32()
 	t.CaptureNicType = decoder.ReadU8()
 	t.CaptureNetworkType = decoder.ReadU8()
 	t.AutoServiceType0 = decoder.ReadU8()
 	t.AutoServiceType1 = decoder.ReadU8()
+	if t.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) || t.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+		t.AutoInstanceType0 = decoder.ReadU8()
+		t.AutoInstanceType1 = decoder.ReadU8()
+	}
 	t.AutoServiceID0 = decoder.ReadVarintU32()
 	t.AutoServiceID1 = decoder.ReadVarintU32()
+	if t.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) || t.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+		t.AutoInstanceID0 = decoder.ReadVarintU32()
+		t.AutoInstanceID1 = decoder.ReadVarintU32()
+	}
 	t.IsIPv4 = decoder.ReadBool()
 	if t.IsIPv4 {
 		t.IP40 = decoder.ReadU32()
@@ -103,12 +125,18 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.SpanId = decoder.ReadString255()
 	t.ParentSpanId = decoder.ReadString255()
 	t.AppService = decoder.ReadString255()
-	t.Topic = decoder.ReadString255()
+	t.Endpoint = decoder.ReadString255()
 	t.RequestType = decoder.ReadString255()
+	t.RequestDomain = decoder.ReadString255()
+	t.RequestResource = decoder.ReadString255()
+	t.ResponseResult = decoder.ReadString255()
+	t.L7ProtocolStr = decoder.ReadString255()
+	t.RequestId = decoder.ReadVarintU64()
 
 	t.SyscallTraceIDRequest = decoder.ReadVarintU64()
 	t.SyscallTraceIDResponse = decoder.ReadVarintU64()
 	t.ResponseDuration = decoder.ReadVarintU64()
+	t.ResponseCode = decoder.ReadVarintU32()
 	t.ResponseStatus = decoder.ReadU8()
 	t.Type = decoder.ReadU8()
 	if decoder.Failed() {
