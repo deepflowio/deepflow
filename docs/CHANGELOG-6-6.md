@@ -46,6 +46,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: querier supports group trace_id [#10770](https://github.com/deepflowio/deepflow/pull/10770) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: eBPF Modify the method of marking the close event [#10769](https://github.com/deepflowio/deepflow/pull/10769) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
@@ -76,3 +78,7 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### OTHER
+* Support is sync biz code scenario [#10778](https://github.com/deepflowio/deepflow/pull/10778) by [lzf575](https://github.com/lzf575)
