@@ -2340,6 +2340,7 @@ impl Default for Conntrack {
 #[serde(default)]
 pub struct ProcessorsFlowLogTunning {
     pub flow_map_hash_slots: u32,
+    pub rrt_cache_capacity: u32,
     pub concurrent_flow_limit: u32,
     pub memory_pool_size: usize,
     pub max_batched_buffer_size: usize,
@@ -2352,6 +2353,7 @@ impl Default for ProcessorsFlowLogTunning {
     fn default() -> Self {
         Self {
             flow_map_hash_slots: 131072,
+            rrt_cache_capacity: 16000,
             concurrent_flow_limit: 65535,
             memory_pool_size: 65536,
             max_batched_buffer_size: 131072,

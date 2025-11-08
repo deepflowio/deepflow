@@ -48,7 +48,7 @@ use crate::error;
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
-        MSG_REASM_SEG, MSG_REASM_START, MSG_REQUEST_END, MSG_RESPONSE_END,
+        MSG_CLOSE, MSG_REASM_SEG, MSG_REASM_START, MSG_REQUEST_END, MSG_RESPONSE_END,
         PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV,
         SOCK_DIR_SND,
     },
@@ -236,6 +236,7 @@ pub struct MetaPacket<'a> {
     pub raw_from_ebpf_offset: usize,
     pub sub_packet_index: usize,
     pub sub_packets: Vec<SubPacket>,
+    pub is_socket_closed: bool,
 
     pub socket_id: u64,
     pub cap_start_seq: u64,
@@ -1160,6 +1161,7 @@ impl<'a> MetaPacket<'a> {
             EbpfFlags::NONE
         };
         packet.segment_flags = SegmentFlags::from(data.msg_type);
+        packet.is_socket_closed = data.msg_type == MSG_CLOSE;
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
         if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {
