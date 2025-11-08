@@ -153,8 +153,6 @@ pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 #[allow(dead_code)]
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
-pub const DATA_SOURCE_CLOSE: u8 = 6;
-#[allow(dead_code)]
 pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
 cfg_if::cfg_if! {
     if #[cfg(feature = "extended_observability")] {
@@ -190,6 +188,18 @@ pub const MSG_REASM_SEG: u8 = 6;
 // set to 'MSG_COMMON'.
 #[allow(dead_code)]
 pub const MSG_COMMON: u8 = 7;
+// Explanation of the case where the same socket has two sources:
+// Typical example:
+// TLS handshake and uprobe TLS encrypted data essentially share the same socket.
+// Initially, the handshake is traced via kprobe.
+// After a successful handshake, encrypted data is traced via uprobe.
+// Finally, a close event occurs.
+//
+// There is only one close event because there is only one socket communication.
+// The system sends only one close syscall, and at that time,
+// the close event's SOURCE is identified as uprobe.
+#[allow(dead_code)]
+pub const MSG_CLOSE: u8 = 10;
 
 //Register event types
 #[allow(dead_code)]
