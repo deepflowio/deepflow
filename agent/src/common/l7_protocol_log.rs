@@ -460,7 +460,7 @@ impl RrtCache {
     const LOG_INTERVAL: u64 = 60_000_000;
 
     // When the number of concurrent transactions exceeds this value, the RRT calculation error will occur.
-    const MAX_RRT_CACHE_PER_FLOW: usize = 128;
+    const MAX_RRT_CACHE_PER_FLOW: usize = 16;
 
     pub fn get(&mut self, key: &LogCacheKey) -> Option<&LogCache> {
         self.logs.get(key)

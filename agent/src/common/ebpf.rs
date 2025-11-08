@@ -46,7 +46,6 @@ const EBPF_TYPE_TLS_UPROBE: u8 = 1;
 const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
 const EBPF_TYPE_IO_EVENT: u8 = 4;
 const EBPF_TYPE_GO_HTTP2_UPROBE_DATA: u8 = 5;
-const EBPF_TYPE_SOCKET_CLOSE_EVENT: u8 = 6;
 const EBPF_TYPE_UNIX_SOCKET: u8 = 8;
 const EBPF_TYPE_NONE: u8 = 255;
 
@@ -80,7 +79,6 @@ pub enum EbpfType {
     */
     GoHttp2UprobeData = EBPF_TYPE_GO_HTTP2_UPROBE_DATA,
     IOEvent = EBPF_TYPE_IO_EVENT,
-    SocketCloseEvent = EBPF_TYPE_SOCKET_CLOSE_EVENT,
     UnixSocket = EBPF_TYPE_UNIX_SOCKET,
     None = EBPF_TYPE_NONE, // 非 ebpf 类型.
 }
@@ -95,7 +93,6 @@ impl TryFrom<u8> for EbpfType {
             GO_HTTP2_UPROBE_DATA => Ok(Self::GoHttp2UprobeData),
             SYSCALL => Ok(Self::TracePoint),
             IO_EVENT => Ok(Self::IOEvent),
-            SOCKET_CLOSE_EVENT => Ok(Self::SocketCloseEvent),
             UNIX_SOCKET => Ok(Self::UnixSocket),
             _ => Err(format!("unknown ebpf type: {}", value)),
         }
