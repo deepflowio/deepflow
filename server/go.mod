@@ -111,7 +111,7 @@ require (
 require (
 	bou.ke/monkey v1.0.2
 	github.com/IBM/sarama v1.43.0
-	github.com/askyrie/gorm-dameng v0.0.0-20251110084342-f6b959d55d92
+	github.com/askyrie/gorm-dameng v0.0.0-20251111065341-c5cc7a0c14b8
 	github.com/bytedance/sonic v1.12.5
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
