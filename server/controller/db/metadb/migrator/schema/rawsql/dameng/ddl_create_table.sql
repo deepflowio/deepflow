@@ -1370,7 +1370,7 @@ BEGIN
     user_name           VARCHAR(256) DEFAULT '''',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     os_app_tags         TEXT,
-    netns_id            INTEGER DEFAULT 0,
+    netns_id            BIGINT DEFAULT 0,
     sub_domain          VARCHAR(64) DEFAULT '''',
     "domain"            VARCHAR(64) DEFAULT '''',
     lcuuid              VARCHAR(64) DEFAULT '''',
@@ -1586,7 +1586,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE genesis_lldp';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS genesis_vinterface (
-    netns_id              INTEGER DEFAULT 0,
+    netns_id              BIGINT DEFAULT 0,
     lcuuid                VARCHAR(64),
     name                  VARCHAR(64),
     mac                   VARCHAR(32),
@@ -1609,7 +1609,7 @@ BEGIN
     EXECUTE IMMEDIATE 'CREATE INDEX genesis_vinterface_node_ip_index ON genesis_vinterface(node_ip)';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS genesis_process (
-    netns_id            INTEGER DEFAULT 0,
+    netns_id            BIGINT DEFAULT 0,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
     lcuuid              VARCHAR(64) DEFAULT '''',

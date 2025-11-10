@@ -217,8 +217,7 @@ func (k *KubernetesCluster) getClusterID(clusterID string, value string, force b
 			CreatedAt: time.Now(),
 			SyncedAt:  time.Now(),
 		}
-		// err := mgr.InsertIgnore(data)
-		err := mgr.Insert(data) // FIXME change for dm
+		err := mgr.InsertIgnore(data)
 		if err != nil {
 			log.Error(k.Log(err.Error()))
 		}
