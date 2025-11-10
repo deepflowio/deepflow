@@ -254,6 +254,15 @@ controller:
         event:
           # context lines count for config diff
           config_diff_context: 3
+        self_heal: 
+          enabled: true
+          resources:
+          #  - pod_service
+          #  - pod_group
+          #  - pod
+          #  - config_map
+        tagrecorder_self_heal: 
+          enabled: true
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
