@@ -31,8 +31,10 @@ type RecorderConfig struct {
 	ResourceMaxID1               int    `default:"499999" yaml:"resource_max_id_1"`
 	MySQLBatchSize               int    `default:"2500" yaml:"mysql_batch_size"`
 
-	LogDebug LogDebugConfig `yaml:"log_debug"`
-	EventCfg eventConfig.Config
+	LogDebug               LogDebugConfig `yaml:"log_debug"`
+	EventCfg               eventConfig.Config
+	SelfHealCfg            SelfHealConfig            `yaml:"self_heal"`
+	TagRecorderSelfHealCfg TagRecorderSelfHealConfig `yaml:"tagrecorder_self_heal"`
 }
 
 func Get() *RecorderConfig {
@@ -47,4 +49,13 @@ type LogDebugConfig struct {
 	Enabled       bool     `default:"false" yaml:"enabled"`
 	DetailEnabled bool     `default:"false" yaml:"detail_enabled"`
 	ResourceTypes []string `default:"" yaml:"resource_type"`
+}
+
+type SelfHealConfig struct {
+	Enabled   bool     `default:"true" yaml:"enabled"`
+	Resources []string `default:"" yaml:"resources"`
+}
+
+type TagRecorderSelfHealConfig struct {
+	Enabled bool `default:"true" yaml:"enabled"`
 }
