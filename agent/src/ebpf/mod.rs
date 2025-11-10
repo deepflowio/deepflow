@@ -67,13 +67,13 @@ pub const SOCK_DATA_TARS: u16 = 46;
 #[allow(dead_code)]
 pub const SOCK_DATA_SOME_IP: u16 = 47;
 #[allow(dead_code)]
+pub const SOCK_DATA_ISO8583: u16 = 48;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;
 #[allow(dead_code)]
 pub const SOCK_DATA_ORACLE: u16 = 62;
-#[allow(dead_code)]
-pub const SOCK_DATA_ISO8583: u16 = 70;
 #[allow(dead_code)]
 pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
