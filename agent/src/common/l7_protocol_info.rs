@@ -129,7 +129,7 @@ cfg_if::cfg_if! {
             SomeIpInfo(crate::flow_generator::protocol_logs::SomeIpInfo),
             PingInfo(PingInfo),
             CustomInfo(CustomInfo),
-            Iso8583Info(crate::flow_generator::protocol_logs::Iso8583Info),
+            Iso8583Info(crate::flow_generator::protocol_logs::rpc::Iso8583Info),
             // add new protocol info below
         );
     }
