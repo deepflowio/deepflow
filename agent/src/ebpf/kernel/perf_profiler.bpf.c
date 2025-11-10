@@ -704,7 +704,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 	}
 
 	__u32 *flags = lang_flags_map__lookup(&key->tgid);
-    if (flags && (*flags & (LANG_LUA | LANG_LUAJIT))) {
+	if (flags && (*flags & (LANG_LUA | LANG_LUAJIT))) {
 		state->lua_is_jit = (*flags & LANG_LUAJIT) ? 1 : 0;
 
 		struct lua_state_cache_t *cache =
@@ -718,7 +718,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 
 		struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
 		if (uw) state->lua_offsets_id = uw->offsets_id;
-    }
+	}
 
 	if (state->lua_L_ptr != NULL) {
 		pre_lua_unwind(ctx, state, &oncpu_maps, PROG_LUA_UNWIND_PE_IDX);
