@@ -29,6 +29,8 @@ pub use tars::{TarsInfo, TarsLog};
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         mod some_ip;
+        mod iso8583;
         pub use some_ip::{SomeIpInfo, SomeIpLog};
+        pub use iso8583::{Iso8583Info, Iso8583Log};
     }
 }
