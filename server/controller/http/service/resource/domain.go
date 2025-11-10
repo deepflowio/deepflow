@@ -30,6 +30,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"
+	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -464,7 +465,9 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate), db.LogPrefixORGID)
 
 	// err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
-	err = db.Create(&domain).Error // FIXME change for dm
+	err = db.Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{}),
+	}).Create(&domain).Error
 	if err != nil {
 		return nil, response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
