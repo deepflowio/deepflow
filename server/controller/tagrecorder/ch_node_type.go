@@ -39,7 +39,7 @@ func (n *ChNodeType) generateNewData(db *mysql.DB) (map[NodeTypeKey]mysqlmodel.C
 	keyToItem := make(map[NodeTypeKey]mysqlmodel.ChNodeType)
 	for resourceType, nodeType := range RESOURCE_TYPE_TO_NODE_TYPE {
 		keyToItem[NodeTypeKey{ResourceType: resourceType}] = mysqlmodel.ChNodeType{
-			ResourceType: resourceType,
+			ResourceType: &resourceType,
 			NodeType:     nodeType,
 		}
 	}
@@ -47,7 +47,7 @@ func (n *ChNodeType) generateNewData(db *mysql.DB) (map[NodeTypeKey]mysqlmodel.C
 }
 
 func (n *ChNodeType) generateKey(dbItem mysqlmodel.ChNodeType) NodeTypeKey {
-	return NodeTypeKey{ResourceType: dbItem.ResourceType}
+	return NodeTypeKey{ResourceType: *dbItem.ResourceType}
 }
 
 func (n *ChNodeType) generateUpdateInfo(oldItem, newItem mysqlmodel.ChNodeType) (map[string]interface{}, bool) {
