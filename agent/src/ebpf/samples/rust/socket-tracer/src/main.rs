@@ -240,14 +240,14 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
             proto_tag.push_str("TARS");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOME_IP {
             proto_tag.push_str("SomeIP");
+        } else if sk_proto_safe(sd) == SOCK_DATA_ISO8583 {
+            proto_tag.push_str("ISO8583");
         } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
             proto_tag.push_str("MONGO");
         } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
             proto_tag.push_str("TLS");
         } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
             proto_tag.push_str("ORACLE");
-        } else if sk_proto_safe(sd) == SOCK_DATA_ISO8583 {
-            proto_tag.push_str("ISO8583");
         } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
             proto_tag.push_str("OPENWIRE");
         } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
@@ -424,6 +424,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_BRPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_TARS as c_int);
         enable_ebpf_protocol(SOCK_DATA_SOME_IP as c_int);
+        enable_ebpf_protocol(SOCK_DATA_ISO8583 as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
@@ -438,7 +439,6 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
         enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_ISO8583 as c_int);
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
