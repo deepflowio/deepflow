@@ -1093,7 +1093,7 @@ CREATE TABLE IF NOT EXISTS topo_position (
 CREATE TABLE IF NOT EXISTS acl (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     business_id            INTEGER NOT NULL,
-    name                   CHAR(64),
+    name                   CHAR(255),
     type                   INTEGER DEFAULT 2 COMMENT '1-epc; 2-custom',
     tap_type               INTEGER DEFAULT 3 COMMENT '1-WAN; 3-LAN',
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
@@ -1144,7 +1144,7 @@ TRUNCATE TABLE resource_group_extra_info;
 
 CREATE TABLE IF NOT EXISTS npb_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                   CHAR(64),
+    name                   CHAR(255),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
     business_id            INTEGER NOT NULL,
     direction              TINYINT(1) DEFAULT 1 COMMENT '1-all; 2-forward; 3-backward;',
