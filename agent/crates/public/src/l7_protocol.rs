@@ -52,14 +52,12 @@ pub enum L7Protocol {
     Brpc = 45,
     Tars = 46,
     SomeIp = 47,
+    Iso8583 = 48,
 
     // SQL
     MySQL = 60,
     PostgreSQL = 61,
     Oracle = 62,
-
-    // ISO
-    Iso8583 = 70,
 
     // NoSQL
     Redis = 80,
