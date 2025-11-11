@@ -1580,8 +1580,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			socket_info_ptr->trace_id = 0;
 		}
 
-		if (!conn_info->is_reasm_seg)
+		if (!conn_info->is_reasm_seg) {
 			socket_info_ptr->reasm_bytes = 0;
+			socket_info_ptr->finish_reasm = false;
+		}
 
 		/*
 		 * Below, confirm the actual size of the data to be transmitted after
@@ -3473,9 +3475,6 @@ static __inline int data_submit(void *ctx)
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
-	if (!conn_info->is_reasm_seg && conn_info->socket_info_ptr)
-		conn_info->socket_info_ptr->finish_reasm = false;
-
 	struct data_args_t *args;
 	if (conn_info->direction == T_INGRESS)
 		args = active_read_args_map__lookup(&id);
