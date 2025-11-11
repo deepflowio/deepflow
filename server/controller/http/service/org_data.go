@@ -32,11 +32,11 @@ import (
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
+	metadbcfg "github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -46,9 +46,9 @@ import (
 
 // CreateORGData create database and backs up the controller and analyzer tables.
 // Returns the database name and error.
-func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig) (string, error) {
+func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg metadbcfg.Config) (string, error) {
 	log.Infof("create org data", logger.NewORGPrefix(dataCreate.ORGID))
-	mysql.CheckORGNumberAndLog()
+	metadb.CheckORGNumberAndLog()
 
 	defaultDatabase := mysqlCfg.Database
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, dataCreate.ORGID)
@@ -62,14 +62,14 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 
 	var controllers []mysqlmodel.Controller
 	var analyzers []mysqlmodel.Analyzer
-	if err := mysql.DefaultDB.Unscoped().Find(&controllers).Error; err != nil {
+	if err := metadb.DefaultDB.Unscoped().Find(&controllers).Error; err != nil {
 		return defaultDatabase, err
 	}
-	if err := mysql.DefaultDB.Unscoped().Find(&analyzers).Error; err != nil {
+	if err := metadb.DefaultDB.Unscoped().Find(&analyzers).Error; err != nil {
 		return defaultDatabase, err
 	}
 
-	db, err := mysql.GetDB(dataCreate.ORGID)
+	db, err := metadb.GetDB(dataCreate.ORGID)
 	if err != nil {
 		return cfg.Database, err
 	}
@@ -82,7 +82,7 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 	return cfg.Database, nil
 }
 
-func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
+func DeleteORGData(orgID int, mysqlCfg metadbcfg.Config) (err error) {
 	log.Infof("delete org data", logger.NewORGPrefix(orgID))
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	if err = migrator.DropDatabase(cfg); err != nil {
@@ -130,7 +130,7 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	// master region
 	if cfg.TrisolarisCfg.NodeType != controllerCommon.TRISOLARIS_NODE_TYPE_MASTER {
 		var controller mysqlmodel.Controller
-		err := mysql.DefaultDB.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
+		err := metadb.DefaultDB.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
 		if err != nil {
 			log.Error(err)
 			return errResponse, err
@@ -219,7 +219,7 @@ func (c *DeletedORGChecker) check() {
 	log.Infof("check deleted orgs start")
 	defer log.Infof("check deleted orgs end")
 
-	deletedORGIDs, err := mysql.GetDeletedORGIDs()
+	deletedORGIDs, err := metadb.GetDeletedORGIDs()
 	if err != nil {
 		log.Errorf("failed to get deleted orgs: %s", err.Error())
 		return
@@ -260,7 +260,7 @@ func (c *DeletedORGChecker) triggerAllServersToDelete(ids []int) error {
 		}
 	}
 	var controllers []*mysqlmodel.Controller
-	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+	if err := metadb.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Errorf("failed to get controllers: %s", err.Error())
 		return err
 	}
