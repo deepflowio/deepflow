@@ -25,7 +25,6 @@ pub(crate) mod ping;
 pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
-use std::collections::HashSet;
 
 pub use self::http::{check_http_method, parse_v1_headers, HttpInfo, HttpLog};
 use self::pb_adapter::L7ProtocolSendLog;
@@ -49,12 +48,10 @@ pub use sql::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
-        pub mod iso8583;
         pub mod tls;
 
-        pub use iso8583::{Iso8583Info, Iso8583Log};
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
-        pub use rpc::{SomeIpInfo, SomeIpLog};
+        pub use rpc::{Iso8583Info, Iso8583Log, SomeIpInfo, SomeIpLog};
         pub use sql::{OracleInfo, OracleLog};
         pub use tls::{TlsInfo, TlsLog};
     }
@@ -64,6 +61,8 @@ cfg_if::cfg_if! {
 pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 
 use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
     fmt,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str,
@@ -627,6 +626,78 @@ impl<T: Serialize> Serialize for PrioField<T> {
         S: serde::Serializer,
     {
         self.field.serialize(serializer)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum PrioStrings {
+    Single(PrioField<String>),
+    Multiple(HashMap<String, u8>),
+}
+
+impl Default for PrioStrings {
+    fn default() -> Self {
+        Self::Multiple(Default::default())
+    }
+}
+
+impl Serialize for PrioStrings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Single(field) => field.serialize(serializer),
+            Self::Multiple(_) => {
+                let r = self.clone().into_sorted_vec();
+                r.serialize(serializer)
+            }
+        }
+    }
+}
+
+impl PrioStrings {
+    pub fn new(multi: bool) -> Self {
+        if multi {
+            Self::Multiple(HashMap::new())
+        } else {
+            Self::Single(PrioField::default())
+        }
+    }
+
+    pub fn is_default(&self) -> bool {
+        match self {
+            Self::Single(field) => field.is_default(),
+            Self::Multiple(m) => m.is_empty(),
+        }
+    }
+
+    pub fn push(&mut self, prio: u8, value: Cow<str>) {
+        match self {
+            Self::Single(field) if prio < field.prio => {
+                *field = PrioField::new(prio, value.into_owned())
+            }
+            Self::Multiple(m) => {
+                if let Some(p) = m.get_mut(value.as_ref()) {
+                    *p = prio.min(*p);
+                } else {
+                    m.insert(value.into_owned(), prio);
+                }
+            }
+            _ => (),
+        }
+    }
+
+    pub fn into_sorted_vec(self) -> Vec<String> {
+        match self {
+            Self::Single(field) => vec![field.field],
+            Self::Multiple(m) => {
+                let mut strings = m.into_iter().collect::<Vec<_>>();
+                // smaller is higher priority, sort by ascending order
+                strings.sort_unstable_by_key(|(_, p)| *p);
+                strings.into_iter().map(|(k, _)| k).collect()
+            }
+        }
     }
 }
 
