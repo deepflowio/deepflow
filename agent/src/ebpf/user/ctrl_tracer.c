@@ -128,10 +128,10 @@ static void datadump_help(void)
 	fprintf(stderr, "    45:  PROTO_BRPC\n");
 	fprintf(stderr, "    46:  PROTO_TARS\n");
 	fprintf(stderr, "    47:  PROTO_SOME_IP\n");
+	fprintf(stderr, "    48:  PROTO_ISO8583\n");
 	fprintf(stderr, "    60:  PROTO_MYSQL\n");
 	fprintf(stderr, "    61:  PROTO_POSTGRESQL\n");
 	fprintf(stderr, "    62:  PROTO_ORACLE\n");
-	fprintf(stderr, "    70:  PROTO_ISO8583\n");
 	fprintf(stderr, "    80:  PROTO_REDIS\n");
 	fprintf(stderr, "    81:  PROTO_MONGO\n");
 	fprintf(stderr, "    82:  PROTO_MEMCACHED\n");

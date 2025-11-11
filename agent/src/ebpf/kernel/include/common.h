@@ -52,6 +52,8 @@ enum message_type {
 	MSG_PRESTORE,
 	// 对于l7的协议推断需要再确认逻辑。
 	MSG_RECONFIRM,
+	// Indicates a socket close event
+	MSG_CLOSE,
 	// 用于信息相关清理，一般用于socket信息清除
 	MSG_CLEAR
 };
@@ -74,10 +76,10 @@ enum traffic_protocol {
 	PROTO_BRPC = 45,
 	PROTO_TARS = 46,
 	PROTO_SOME_IP = 47,
+	PROTO_ISO8583 = 48,
 	PROTO_MYSQL = 60,
 	PROTO_POSTGRESQL = 61,
 	PROTO_ORACLE = 62,
-	PROTO_ISO8583 = 70,
 	PROTO_REDIS = 80,
 	PROTO_MONGO = 81,
 	PROTO_MEMCACHED = 82,
@@ -97,6 +99,10 @@ enum traffic_protocol {
 	PROTO_NUM = 200
 };
 
+/*
+ * Note that the maximum value here should not exceed 15,
+ * because 'struct socket_info_s' uses 4 bits to store 'data_source'.
+ */
 enum process_data_extra_source {
 	DATA_SOURCE_SYSCALL,
 	DATA_SOURCE_GO_TLS_UPROBE,
@@ -104,7 +110,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_OPENSSL_UPROBE,
 	DATA_SOURCE_IO_EVENT,
 	DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE,
-	DATA_SOURCE_CLOSE,
+	DATA_SOURCE_RESERVED,
 	DATA_SOURCE_DPDK,
 	DATA_SOURCE_UNIX_SOCKET,
 };

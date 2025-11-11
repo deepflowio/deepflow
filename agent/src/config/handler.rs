@@ -96,12 +96,12 @@ use public::utils::{bitmap::parse_range_list_to_bitmap, net::MacAddr};
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
-        use public::{
+        use public::l7_protocol::L7ProtocolEnum;
+        use enterprise_utils::l7::custom_policy::{
+            custom_field_policy,
+            custom_protocol_policy::ExtraCustomProtocolConfig,
             enums::FieldType,
-            l7_protocol::L7ProtocolEnum,
         };
-        use super::config::ExtraCustomFieldPolicyMap;
-        use enterprise_utils::l7::plugin::custom_field_policy::ExtraCustomProtocolConfig;
     }
 }
 
@@ -478,6 +478,7 @@ pub struct FlowConfig {
     pub capture_mode: PacketCaptureType,
 
     pub capacity: u32,
+    pub rrt_cache_capacity: u32,
     pub hash_slots: u32,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
@@ -539,6 +540,7 @@ impl From<&UserConfig> for FlowConfig {
             l7_log_tap_types: generate_tap_types_array(
                 &conf.outputs.flow_log.filters.l7_capture_network_types,
             ),
+            rrt_cache_capacity: conf.processors.flow_log.tunning.rrt_cache_capacity,
             capacity: conf.processors.flow_log.tunning.concurrent_flow_limit,
             hash_slots: conf.processors.flow_log.tunning.flow_map_hash_slots,
             packet_delay: conf
@@ -1046,7 +1048,7 @@ impl From<&Vec<String>> for DnsNxdomainTrie {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_max_entries: usize,
@@ -1496,7 +1498,7 @@ pub struct L7LogDynamicConfig {
     pub grpc_streaming_data_enabled: bool,
 
     #[cfg(feature = "enterprise")]
-    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+    pub extra_field_policies: HashMap<L7ProtocolEnum, custom_field_policy::PolicyMap>,
 
     pub error_request_header: usize,
     pub error_response_header: usize,
@@ -1568,8 +1570,6 @@ impl PartialEq for L7LogDynamicConfig {
     }
 }
 
-impl Eq for L7LogDynamicConfig {}
-
 pub struct L7LogDynamicConfigBuilder {
     pub proxy_client: Vec<String>,
     pub x_request_id: Vec<String>,
@@ -1580,7 +1580,7 @@ pub struct L7LogDynamicConfigBuilder {
     pub extra_log_fields: ExtraLogFields,
     pub grpc_streaming_data_enabled: bool,
     #[cfg(feature = "enterprise")]
-    pub extra_field_policies: HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap>,
+    pub extra_field_policies: HashMap<L7ProtocolEnum, custom_field_policy::PolicyMap>,
     pub error_request_header: usize,
     pub error_request_payload: usize,
     pub error_response_header: usize,
@@ -1646,7 +1646,10 @@ impl From<&RequestLog> for L7LogDynamicConfigBuilder {
                 .grpc
                 .streaming_data_enabled,
             #[cfg(feature = "enterprise")]
-            extra_field_policies: c.tag_extraction.get_extra_field_policies(),
+            extra_field_policies: c
+                .tag_extraction
+                .custom_field_policies
+                .get_extra_field_policies(),
             error_request_header: c.tag_extraction.raw.error_request_header,
             error_request_payload: c.tag_extraction.raw.error_request_payload,
             error_response_header: c.tag_extraction.raw.error_response_header,
@@ -2235,7 +2238,12 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .mysql
                     .decompress_payload,
                 #[cfg(feature = "enterprise")]
-                custom_protocol_config: conf.get_custom_protocol_config(),
+                custom_protocol_config: (&conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .custom_protocols)
+                    .into(),
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -4950,6 +4958,14 @@ impl ConfigHandler {
 
         let tunning = &mut flow_log.tunning;
         let new_tunning = &mut new_flow_log.tunning;
+        if tunning.rrt_cache_capacity != new_tunning.rrt_cache_capacity {
+            info!(
+                "Update processors.flow_log.tunning.rrt_cache_capacity from {:?} to {:?}.",
+                tunning.rrt_cache_capacity, new_tunning.rrt_cache_capacity
+            );
+            tunning.rrt_cache_capacity = new_tunning.rrt_cache_capacity;
+            restart_agent = !first_run;
+        }
         if tunning.concurrent_flow_limit != new_tunning.concurrent_flow_limit {
             info!(
                 "Update processors.flow_log.tunning.concurrent_flow_limit from {:?} to {:?}.",
@@ -5043,6 +5059,7 @@ impl ConfigHandler {
             app.protocol_special_config = new_app.protocol_special_config.clone();
             restart_agent = !first_run;
         }
+        #[cfg(feature = "enterprise")]
         if app.custom_protocols != new_app.custom_protocols {
             info!(
                 "Update processors.request_log.application_protocol_inference.custom_protocols from {:?} to {:?}.",
@@ -5147,13 +5164,13 @@ impl ConfigHandler {
             );
             tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
         }
+        #[cfg(feature = "enterprise")]
         if tag_extraction.custom_field_policies != new_tag_extraction.custom_field_policies {
             info!(
                 "Update processors.request_log.tag_extraction.custom_field_policies from {:?} to {:?}.",
                 tag_extraction.custom_field_policies, new_tag_extraction.custom_field_policies
             );
             tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
-            restart_agent = !first_run;
         }
         let raw = &mut tag_extraction.raw;
         let new_raw = &mut new_tag_extraction.raw;

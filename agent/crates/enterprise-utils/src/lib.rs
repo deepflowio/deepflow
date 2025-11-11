@@ -15,9 +15,36 @@
  */
 
 pub mod l7 {
-    pub mod plugin {
+    pub mod custom_policy {
+        pub mod config {
+            use std::collections::HashMap;
+
+            use serde::Deserialize;
+
+            use public::l7_protocol::L7ProtocolEnum;
+
+            use super::custom_field_policy::PolicyMap;
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+            pub struct CustomProtocolConfigs;
+            impl CustomProtocolConfigs {
+                pub fn port_range(&self) -> String {
+                    unimplemented!()
+                }
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+            pub struct CustomFieldPolicies;
+            impl CustomFieldPolicies {
+                pub fn get_extra_field_policies(&self) -> HashMap<L7ProtocolEnum, PolicyMap> {
+                    unimplemented!()
+                }
+            }
+        }
+
         pub mod custom_field_policy {
             use std::collections::HashMap;
+            use std::sync::Arc;
 
             #[macro_export]
             macro_rules! set_from_tag {
@@ -25,40 +52,22 @@ pub mod l7 {
             }
             pub use set_from_tag;
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            #[derive(Clone, Debug, Default, PartialEq)]
             pub struct ExtraField {
-                pub field_match_type: public::enums::MatchType,
+                pub field_match_type: super::enums::MatchType,
                 pub field_match_keyword: String,
                 pub subfield_match_keyword: Option<String>,
                 pub separator_between_subfield_kv_pair: Option<String>,
                 pub separator_between_subfield_key_and_value: Option<String>,
                 pub check_value_charset: bool,
-                pub value_primary_charset: Vec<public::enums::Charset>,
+                pub value_primary_charset: Vec<super::enums::Charset>,
                 pub value_special_charset: String,
                 pub attribute_name: Option<String>,
-                pub rewrite_native_tag: Option<String>,
+                pub rewrite_native_tag: Option<super::enums::NativeTag>,
                 pub response_success_values: Vec<String>,
                 pub metric_name: Option<String>,
             }
             impl ExtraField {
-                pub const VERSION: &'static str = "";
-                pub const REQUEST_TYPE: &'static str = "";
-                pub const REQUEST_DOMAIN: &'static str = "";
-                pub const REQUEST_RESOURCE: &'static str = "";
-                pub const REQUEST_ID: &'static str = "";
-                pub const ENDPOINT: &'static str = "";
-                pub const RESPONSE_CODE: &'static str = "";
-                pub const RESPONSE_STATUS: &'static str = "";
-                pub const RESPONSE_EXCEPTION: &'static str = "";
-                pub const RESPONSE_RESULT: &'static str = "";
-                pub const TRACE_ID: &'static str = "";
-                pub const SPAN_ID: &'static str = "";
-                pub const X_REQUEST_ID: &'static str = "";
-                pub const HTTP_PROXY_CLIENT: &'static str = "";
-                pub const BIZ_TYPE: &'static str = "";
-                pub const BIZ_CODE: &'static str = "";
-                pub const BIZ_SCENARIO: &'static str = "";
-
                 pub fn match_key(&self, _: &str) -> bool {
                     unimplemented!()
                 }
@@ -77,52 +86,107 @@ pub mod l7 {
                 pub fn get_value_from_payload(
                     &self,
                     _: &[u8],
-                    _: &public::enums::FieldType,
+                    _: &super::enums::FieldType,
                 ) -> Option<String> {
                     unimplemented!()
                 }
             }
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq)]
-            pub struct ExtraCustomFieldPolicy {
+            #[derive(Clone, Debug, Default, PartialEq)]
+            pub struct Policy {
+                pub feature_string: Option<String>,
+
                 pub from_req_key:
-                    HashMap<public::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
+                    HashMap<super::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
                 pub from_resp_key:
-                    HashMap<public::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
-                pub from_req_body: HashMap<public::enums::FieldType, Vec<ExtraField>>,
-                pub from_resp_body: HashMap<public::enums::FieldType, Vec<ExtraField>>,
+                    HashMap<super::enums::FieldType, HashMap<String, Vec<ExtraField>>>,
+                pub from_req_body: HashMap<super::enums::FieldType, Vec<ExtraField>>,
+                pub from_resp_body: HashMap<super::enums::FieldType, Vec<ExtraField>>,
+            }
+            impl Policy {
+                pub fn apply_in(
+                    &self,
+                    _: &mut Vec<Operation>,
+                    _: &super::enums::FieldType,
+                    _: &[u8],
+                ) {
+                    unimplemented!()
+                }
+                pub fn apply(&self, _: &super::enums::FieldType, _: &[u8]) -> Vec<Operation> {
+                    unimplemented!()
+                }
             }
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            #[derive(Clone, Default, Debug, PartialEq)]
+            pub struct PolicyMap {
+                pub indices: public::segment_map::SegmentMap<usize>,
+                pub policies: Vec<Policy>,
+            }
+            impl PolicyMap {
+                pub fn select(&self, _: u16) -> Option<PolicyMapSlice> {
+                    unimplemented!()
+                }
+            }
+
+            pub struct PolicyMapSlice;
+            impl PolicyMapSlice {
+                pub fn apply_in(
+                    &self,
+                    _: &mut Vec<Operation>,
+                    _: &super::enums::FieldType,
+                    _: &[u8],
+                ) {
+                    unimplemented!()
+                }
+                pub fn apply(&self, _: &super::enums::FieldType, _: &[u8]) -> Vec<Operation> {
+                    unimplemented!()
+                }
+            }
+
+            pub fn field_type_support_protocol(
+                _: &super::enums::FieldType,
+                _: public::l7_protocol::L7Protocol,
+            ) -> bool {
+                unimplemented!()
+            }
+
+            #[derive(Clone, Debug, PartialEq)]
+            pub enum Operation {
+                Rewrite(super::enums::NativeTag, Option<Arc<String>>),
+                AddAttribute(String, Option<Arc<String>>),
+                AddMetric(String, Option<f32>),
+            }
+        }
+
+        pub mod custom_protocol_policy {
+            use std::collections::HashMap;
+
+            use super::config::CustomProtocolConfigs;
+
+            #[derive(Clone, Debug, Default, PartialEq)]
             pub struct KeywordMatcher {
-                pub match_type: public::enums::MatchType,
+                pub match_type: super::enums::MatchType,
                 pub match_from_begining: bool,
                 pub match_keyword_bytes: Vec<u8>,
             }
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            #[derive(Clone, Debug, Default, PartialEq)]
             pub struct ExtraProtocolCharacters {
                 pub protocol_name: String,
                 pub request_characters: Vec<Vec<KeywordMatcher>>,
                 pub response_characters: Vec<Vec<KeywordMatcher>>,
             }
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq)]
+            #[derive(Clone, Debug, Default, PartialEq)]
             pub struct ExtraCustomProtocolConfig {
-                pub port_segmentmap: public::segment_map::SegmentMap<usize>,
+                pub port_map: public::segment_map::SegmentMap<usize>,
                 pub protocol_characters: Vec<ExtraProtocolCharacters>,
             }
-
-            pub fn field_type_support_protocol(
-                _: &public::enums::FieldType,
-                _: public::l7_protocol::L7Protocol,
-            ) -> bool {
-                unimplemented!()
+            impl From<&CustomProtocolConfigs> for ExtraCustomProtocolConfig {
+                fn from(_: &CustomProtocolConfigs) -> Self {
+                    unimplemented!()
+                }
             }
-        }
-
-        pub mod custom_protocol_policy {
-            use std::collections::HashMap;
 
             #[derive(Default, Debug)]
             pub struct CustomPolicyInfo {
@@ -153,8 +217,8 @@ pub mod l7 {
                 pub fn check_payload(
                     &mut self,
                     _: &[u8],
-                    _: &super::custom_field_policy::ExtraCustomProtocolConfig,
-                    _: public::enums::TrafficDirection,
+                    _: &ExtraCustomProtocolConfig,
+                    _: super::enums::TrafficDirection,
                     _: u16,
                 ) -> Option<String> {
                     unimplemented!()
@@ -162,12 +226,86 @@ pub mod l7 {
                 pub fn parse_payload(
                     &mut self,
                     _: &[u8],
-                    _: public::enums::TrafficDirection,
-                    _: &Vec<super::custom_field_policy::ExtraCustomFieldPolicy>,
+                    _: super::enums::TrafficDirection,
+                    _: &Vec<super::custom_field_policy::Policy>,
                     _: &Vec<usize>,
                 ) -> bool {
                     unimplemented!()
                 }
+            }
+        }
+
+        pub mod enums {
+            use serde::Deserialize;
+
+            #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+            pub enum MatchType {
+                String(bool),
+            }
+            impl Default for MatchType {
+                fn default() -> Self {
+                    Self::String(false)
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq)]
+            pub enum TrafficDirection {
+                Request,
+                Response,
+                #[default]
+                Both,
+            }
+
+            #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+            pub enum Charset {
+                Dummy,
+            }
+
+            #[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq, PartialOrd)]
+            pub enum FieldType {
+                #[default]
+                Header,
+                HttpUrl,
+                PayloadJson,
+                PayloadXml,
+                DubboHeader,
+                DubboPayloadMapString,
+                PayloadHessian2,
+                SqlInsertionColumn,
+            }
+
+            #[derive(
+                Clone,
+                Copy,
+                Debug,
+                strum::AsRefStr,
+                strum::EnumString,
+                strum::Display,
+                strum::IntoStaticStr,
+                Hash,
+                PartialEq,
+                Eq,
+            )]
+            #[strum(serialize_all = "snake_case", ascii_case_insensitive)]
+            pub enum NativeTag {
+                Version,
+                RequestType,
+                RequestDomain,
+                RequestResource,
+                RequestId,
+                Endpoint,
+                ResponseCode,
+                // can not be set, only extracted by response_code match success_value
+                ResponseStatus,
+                ResponseException,
+                ResponseResult,
+                TraceId,
+                SpanId,
+                XRequestId,
+                HttpProxyClient,
+                BizType,
+                BizCode,
+                BizScenario,
             }
         }
     }
@@ -273,40 +411,6 @@ pub mod l7 {
         }
     }
 
-    pub mod iso {
-        pub mod iso8583 {
-            use public::bitmap::Bitmap;
-
-            pub struct Iso8583ParseConfig {
-                pub extract_fields: Bitmap,
-                pub translation_enabled: bool,
-                pub pan_obfuscate: bool,
-            }
-
-            #[derive(Debug, Clone)]
-            pub struct FieldValue {
-                pub id: u32,
-                pub description: String,
-                pub value: String,
-                pub translated: Option<String>, // if translation_enabled configured
-            }
-
-            #[derive(Default)]
-            pub struct Iso8583Parser {
-                pub fields: Vec<FieldValue>,
-            }
-
-            impl Iso8583Parser {
-                pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
-                    unimplemented!()
-                }
-
-                pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &Iso8583ParseConfig) -> bool {
-                    unimplemented!()
-                }
-            }
-        }
-    }
     pub mod mq {
         pub mod web_sphere_mq {
 
@@ -355,6 +459,39 @@ pub mod rpc {
     pub mod remote_exec {
         pub fn extra_commands() -> Vec<public::rpc::remote_exec::Command> {
             unimplemented!()
+        }
+    }
+
+    pub mod iso8583 {
+        use public::bitmap::Bitmap;
+
+        pub struct Iso8583ParseConfig {
+            pub extract_fields: Bitmap,
+            pub translation_enabled: bool,
+            pub pan_obfuscate: bool,
+        }
+
+        #[derive(Debug, Clone)]
+        pub struct FieldValue {
+            pub id: u32,
+            pub description: String,
+            pub value: String,
+            pub translated: Option<String>, // if translation_enabled configured
+        }
+
+        #[derive(Default)]
+        pub struct Iso8583Parser {
+            pub fields: Vec<FieldValue>,
+        }
+
+        impl Iso8583Parser {
+            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
+                unimplemented!()
+            }
+
+            pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &Iso8583ParseConfig) -> bool {
+                unimplemented!()
+            }
         }
     }
 }

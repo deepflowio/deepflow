@@ -906,6 +906,9 @@ global:
 Whether to synchronize the clock to the deepflow-server, this behavior
 will not change the time of the deepflow-agent running environment.
 
+Notice: Before enabling NTP, the controller needs to first start the NTP service. The agent will
+only continue to work after the time synchronization is complete.
+
 ### Maximum Drift {#global.ntp.max_drift}
 
 **Tags**:
@@ -8681,7 +8684,7 @@ Field name.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -8709,7 +8712,9 @@ Example:
 - policy_name: "my_policy" # name of current policy
   protocol_name: HTTP # protocol name, if protocol is Grpc, please set it to HTTP2, optional values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
   custom_protocol_name: "my_protocol"  # when protocol_name is Custom are effected, and there must be a `processors.request_log.application_protocol_inference.custom_protocols` configuration with the same name, otherwise it cannot be parsed
-  port_list: 1-65535
+  filters:
+    port_list: 1-65535 # can be used to filter ports
+    feature_string: "" # can be used to match payload before extraction
   fields:
   - field_name: "my_field"
     field_match_type: "string"  # optional values: "string"
@@ -8720,7 +8725,7 @@ Example:
     separator_between_subfield_kv_pair: "," # default: empty
     separator_between_subfield_key_and_value: "=" # default: empty
 
-    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value, default value: header_field
+    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value/sql_insertion_column, default value: header_field, see below for details
     traffic_direction: request # could be limited to search only in request (or only in response), optional values: request/response/both, default value: both
     check_value_charset: false # used for checking whether the extracted result is legal
     value_primary_charset: ["digits", "alphabets", "chinese"] # used for checking the character set of the extracted result, optional values: digits/alphabets/chinese
@@ -8737,6 +8742,7 @@ notice: the different values of field_type will affect the extraction method of 
 - `payload_json_value`: extract field from Json Payload, such as `"key": 1`, or `"key": "value"`, or `"key": None`, etc.
 - `payload_xml_value`: extract field from XML Payload, such as `<key attr="xxx">value</key>`
 - `payload_hessian2_value`: extract field from Payload encoded with Hessian2
+- `sql_insertion_column`: extract field from SQL insertion column, such as `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Only supports MySQL now.
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9482,10 +9488,37 @@ processors:
 
 **Description**:
 
-Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
-the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
-is not enough, it will be unable to calculate the rrt of l7. When `inputs.cbpf.common.capture_mode`
-is `Physical Mirror` and concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
+Maximum number of flows that can be stored in FlowMap. When `inputs.cbpf.common.capture_mode` is `Physical Mirror`
+and concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
+
+#### RRT Cache Capacity {#processors.flow_log.tunning.rrt_cache_capacity}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.tunning.rrt_cache_capacity`
+
+**Default value**:
+```yaml
+processors:
+  flow_log:
+    tunning:
+      rrt_cache_capacity: 16000
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 64000000] |
+
+**Description**:
+
+The capacity of the RRT Cache table in FlowMap. This table is used to calculate RRT latency metrics. If it is too large,
+it will cause high memory usage in the agent; if it is too small, RRT metrics may be missing.
 
 #### Memory Pool Size {#processors.flow_log.tunning.memory_pool_size}
 

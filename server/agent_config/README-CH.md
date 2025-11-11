@@ -890,6 +890,8 @@ global:
 
 deepflow-agent 是否向 deepflow-server 做 NTP 同步的开关。
 
+注意：开启 NTP 前控制器需要先开启 NTP 服务，直到完成同步时间后采集器才会继续运行。
+
 ### 最大时钟偏差 {#global.ntp.max_drift}
 
 **标签**:
@@ -3711,7 +3713,7 @@ inputs:
 - 如果上面没有搜到 "libssl.so" 也可能是静态编译了，这时候我们可以通过下面方式确认：
   执行命令 `sudo nm /proc/<PID>/exe | grep SSL_write` 若包含 `SSL_write` 相关信息如：`0000000000502ac0 T SSL_write`
   则说明该进程正在使用静态编译的 openssl 库。
-  
+
 启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
 在日志中您会看到类似如下信息：
 ```
@@ -8494,7 +8496,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -8522,7 +8524,9 @@ processors:
 - policy_name: "my_policy" # 策略名称
   protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
   custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
-  port_list: 1-65535
+  filters:
+    port_list: 1-65535 # 可以用于过滤端口
+    feature_string: "" # 可以用于提取前匹配 Payload
   fields:
   - field_name: "my_field" # 配置的字段
     field_match_type: "string" # 可选值："string"
@@ -8533,7 +8537,7 @@ processors:
     separator_between_subfield_kv_pair: "," # 用于分割 key-value 键值对的分隔符，默认值：空
     separator_between_subfield_key_and_value: "=" # 用于分割 key 和 value 的分隔符，默认值：空
 
-    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value，默认值为 `header_field`，含义见下方说明
+    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value/sql_insertion_column，默认值为 `header_field`，含义见下方说明
     traffic_direction: request # 可以限定仅在请求（或仅在响应）中搜索，默认值为 both，可选值：request/response/both
     check_value_charset: false # 可用于检查提取结果是否合法
     value_primary_charset: ["digits", "alphabets", "chinese"] # 提取结果校验字符集，可选值：digits/alphabets/chinese
@@ -8550,6 +8554,7 @@ processors:
 - `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
 - `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
 - `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
+- `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。目前只支持 MySQL 协议。
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9267,10 +9272,36 @@ processors:
 
 **详细描述**:
 
-FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
-例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-将无法计算 L7 的 RRT。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等于 65535 时，
-将会被强制设置为 u32::MAX。
+FlowMap 中存储的最大并发 Flow 数量。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等
+于 65535 时，将会被强制设置为 u32::MAX。
+
+#### RRT 缓存容量 {#processors.flow_log.tunning.rrt_cache_capacity}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.tunning.rrt_cache_capacity`
+
+**默认值**:
+```yaml
+processors:
+  flow_log:
+    tunning:
+      rrt_cache_capacity: 16000
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 64000000] |
+
+**详细描述**:
+
+FlowMap 中 RRT Cache 表的容量。该表用于计算 RRT 延迟指标，过大会导致采集器内存占用高，过小会导致RRT指标缺失。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
 

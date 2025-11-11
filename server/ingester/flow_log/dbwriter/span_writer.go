@@ -60,13 +60,22 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.Init(t.EncodedSpan)
 	encoder.WriteU8(tracetree.SPAN_TRACE_VERSION)
 	encoder.WriteU32(uint32(t.EndTime % 1000000)) // only encode microsecond part less than 1 second
+	encoder.WriteU16(t.SignalSource)
 	encoder.WriteVarintU32(t.TapPort)
 	encoder.WriteU8(t.TapPortType)
 	encoder.WriteU8(t.TapType)
 	encoder.WriteU8(t.AutoServiceType0)
 	encoder.WriteU8(t.AutoServiceType1)
+	if t.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) || t.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+		encoder.WriteU8(t.AutoInstanceType0)
+		encoder.WriteU8(t.AutoInstanceType1)
+	}
 	encoder.WriteVarintU32(t.AutoServiceID0)
 	encoder.WriteVarintU32(t.AutoServiceID1)
+	if t.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) || t.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+		encoder.WriteVarintU32(t.AutoInstanceID0)
+		encoder.WriteVarintU32(t.AutoInstanceID1)
+	}
 	encoder.WriteBool(t.IsIPv4)
 	if t.IsIPv4 {
 		encoder.WriteU32(t.IP40)
@@ -92,17 +101,25 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteString255(t.SpanId)
 	encoder.WriteString255(t.ParentSpanId)
 	encoder.WriteString255(t.AppService)
-	// topic: currently only taken from Kafka's RequestDomain
-	if t.L7Protocol == uint8(datatype.L7_PROTOCOL_KAFKA) {
-		encoder.WriteString255(t.RequestDomain)
-		encoder.WriteString255(t.RequestType)
+	encoder.WriteString255(t.Endpoint)
+	encoder.WriteString255(t.RequestType)
+	encoder.WriteString255(t.RequestDomain)
+	encoder.WriteString255(t.RequestResource)
+	encoder.WriteString255(t.ResponseResult)
+	encoder.WriteString255(t.L7ProtocolStr)
+	if t.RequestId != nil {
+		encoder.WriteVarintU64(*t.RequestId)
 	} else {
-		encoder.WriteString255("")
-		encoder.WriteString255("")
+		encoder.WriteVarintU64(0)
 	}
 	encoder.WriteVarintU64(t.SyscallTraceIDRequest)
 	encoder.WriteVarintU64(t.SyscallTraceIDResponse)
 	encoder.WriteVarintU64(t.ResponseDuration)
+	if t.ResponseCode != nil {
+		encoder.WriteVarintU32(uint32(*t.ResponseCode))
+	} else {
+		encoder.WriteVarintU32(0)
+	}
 	encoder.WriteU8(t.ResponseStatus)
 	encoder.WriteU8(t.Type)
 	t.EncodedSpan = encoder.Bytes()
