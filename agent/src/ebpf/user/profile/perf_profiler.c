@@ -745,8 +745,8 @@ void build_prog_jump_tables(struct bpf_tracer *tracer)
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
 			   PROG_ONCPU_OUTPUT_FOR_PE, PROG_ONCPU_OUTPUT_PE_IDX);
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
-		   	   PROG_PYTHON_UNWIND_FOR_PE,
-		   	   PROG_PYTHON_UNWIND_PE_IDX);
+			   PROG_PYTHON_UNWIND_FOR_PE,
+			   PROG_PYTHON_UNWIND_PE_IDX);
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
 		   	   PROG_LUA_UNWIND_FOR_PE,
 		   	   PROG_LUA_UNWIND_PE_IDX);
