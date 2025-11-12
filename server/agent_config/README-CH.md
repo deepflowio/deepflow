@@ -8495,7 +8495,7 @@ processors:
 - `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
 - `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
 - `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
-- `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。目前只支持 MySQL 协议。
+- `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。目前只支持 MySQL 协议，且只能提取插入的第一列内容。
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
