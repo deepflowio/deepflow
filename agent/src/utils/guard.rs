@@ -720,10 +720,19 @@ impl Guard {
                 } else if exception_handler.has(Exception::FreeDiskCircuitBreaker) {
                     warn!("Set the state to melt_down when the free disk exceeds the threshold.");
                     state.melt_down();
-                } else if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                } else if is_kernel_meltdown() && exception_handler.has(Exception::KernelVersionCircuitBreaker) {
                     warn!("Set the state to melt_down when the kernel version circuit breaker.");
                     state.melt_down();
                 } else {
+                    #[cfg(feature = "enterprise")]
+                    if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                        // ebpf_meltdown and ebpf_uprobe_meltdown cannot block the main thread.
+                        if is_kernel_ebpf_meltdown() {
+                            warn!("Set the state to ebpf_melt_down when the kernel version circuit breaker.");
+                        } else if is_kernel_ebpf_uprobe_meltdown() {
+                            warn!("Set the state to ebpf_uprobe_melt_down when the kernel version circuit breaker.");
+                        }
+                    }
                     state.recover();
                 }
 
@@ -799,6 +808,34 @@ impl Guard {
 
         if let Some(thread) = self.thread_watchdog.lock().unwrap().take() {
             let _ = thread.join();
+        }
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+        pub fn is_kernel_meltdown() -> bool {
+            enterprise_utils::kernel_version::is_kernel_meltdown()
+        }
+
+        pub fn is_kernel_ebpf_meltdown() -> bool {
+            enterprise_utils::kernel_version::is_kernel_ebpf_meltdown()
+        }
+
+        pub fn is_kernel_ebpf_uprobe_meltdown() -> bool {
+            enterprise_utils::kernel_version::is_kernel_ebpf_uprobe_meltdown()
+        }
+    } else {
+        pub fn is_kernel_meltdown() -> bool {
+            false
+        }
+
+        pub fn is_kernel_ebpf_meltdown() -> bool {
+            false
+        }
+
+        pub fn is_kernel_ebpf_uprobe_meltdown() -> bool {
+            false
         }
     }
 }
