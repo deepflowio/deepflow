@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package common
+package edition
 
 import (
 	"fmt"
@@ -22,35 +22,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
 )
 
-type DBConfig struct {
-	DB     *gorm.DB
-	Config config.Config
-	SqlFmt schema.SqlFmt
-}
-
-func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
-	return &DBConfig{
-		DB:     db,
-		Config: cfg,
-		SqlFmt: schema.GetSqlFmt(cfg),
-	}
-}
-
-func (dc *DBConfig) GetDatabaseName() string {
-	return dc.Config.Database
-}
-
-func (dc *DBConfig) SetDB(db *gorm.DB) {
-	dc.DB = db
-}
-
-func (dc *DBConfig) SetConfig(c config.Config) {
-	dc.Config = c
-}
-
-func LogDBName(databaseName string, format string, a ...any) string {
-	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
+func GetDialector(cfg config.SessionConfig) (gorm.Dialector, error) {
+	return nil, fmt.Errorf("unsupported database type: %s", cfg.DBCfg.Type)
 }
