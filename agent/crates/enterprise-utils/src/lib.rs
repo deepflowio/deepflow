@@ -436,7 +436,7 @@ pub mod l7 {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub mod utils {
+pub mod kernel_version {
     bitflags::bitflags! {
         #[derive(Default)]
         pub struct ActionFlags: u8 {
@@ -446,10 +446,24 @@ pub mod utils {
             const ALARM = 0b000100;
             const MELTDOWN = 0b001000;
             const TERMINATE = 0b010000;
+            const EBPF_MELTDOWN = 0b0100000;
+            const EBPF_UPROBE_MELTDOWN = 0b1000000;
         }
     }
 
     pub fn kernel_version_check() -> ActionFlags {
+        unimplemented!()
+    }
+
+    pub fn is_kernel_meltdown() -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_kernel_ebpf_meltdown() -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_kernel_ebpf_uprobe_meltdown() -> bool {
         unimplemented!()
     }
 }
