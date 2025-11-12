@@ -196,6 +196,9 @@ pub struct AgentState {
     terminated: AtomicBool,
     state: Mutex<(InnerState, Option<ChangedConfig>)>,
     notifier: Condvar,
+
+    ebpf_meltdown: AtomicBool,
+    ebpf_uprobe_meltdown: AtomicBool,
 }
 
 impl AgentState {
@@ -297,6 +300,23 @@ impl AgentState {
             });
         }
         self.notifier.notify_one();
+    }
+
+    pub fn set_ebpf_meltdown(&self, v: bool) {
+        self.ebpf_meltdown.store(v, Ordering::Relaxed);
+        // notify in case other threads are waiting on state change
+        self.notifier.notify_one();
+    }
+    pub fn is_ebpf_meltdown(&self) -> bool {
+        self.ebpf_meltdown.load(Ordering::Relaxed)
+    }
+
+    pub fn set_ebpf_uprobe_meltdown(&self, v: bool) {
+        self.ebpf_uprobe_meltdown.store(v, Ordering::Relaxed);
+        self.notifier.notify_one();
+    }
+    pub fn is_ebpf_uprobe_meltdown(&self) -> bool {
+        self.ebpf_uprobe_meltdown.load(Ordering::Relaxed)
     }
 }
 
@@ -649,6 +669,18 @@ impl Trident {
             state.melt_down();
         } else if action.contains(ActionFlags::ALARM) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
+        }
+
+        if action.contains(ActionFlags::EBPF_MELTDOWN) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            state.set_ebpf_meltdown(true);
+            info!("kernel check: EBPF_MELTDOWN set via AgentState");
+        }
+
+        if action.contains(ActionFlags::EBPF_UPROBE_MELTDOWN) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            state.set_ebpf_uprobe_meltdown(true);
+            info!("kernel check: EBPF_UPROBE_MELTDOWN set via AgentState");
         }
     }
 
@@ -1090,6 +1122,7 @@ impl Trident {
                         runtime.clone(),
                         sender_leaky_bucket.clone(),
                         ipmac_tx.clone(),
+                        state.clone(),
                     )?;
 
                     comp.start();
@@ -2113,6 +2146,7 @@ impl AgentComponents {
         runtime: Arc<Runtime>,
         sender_leaky_bucket: Arc<LeakyBucket>,
         ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
+        state: Arc<AgentState>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -2821,6 +2855,7 @@ impl AgentComponents {
         let mut ebpf_dispatcher_component = None;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
+            && !state.is_ebpf_meltdown()
             && (candidate_config.capture_mode != PacketCaptureType::Analyzer
                 || candidate_config
                     .user_config
@@ -2902,6 +2937,7 @@ impl AgentComponents {
                 stats_collector.clone(),
                 exception_handler.clone(),
                 &process_listener,
+                state.is_ebpf_uprobe_meltdown(),
             ) {
                 Ok(ebpf_collector) => {
                     synchronizer
@@ -3408,6 +3444,7 @@ impl Components {
         runtime: Arc<Runtime>,
         sender_leaky_bucket: Arc<LeakyBucket>,
         ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
+        state: Arc<AgentState>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
         if crate::utils::environment::running_in_only_watch_k8s_mode() {
@@ -3434,6 +3471,7 @@ impl Components {
             runtime,
             sender_leaky_bucket,
             ipmac_tx,
+            state,
         )?;
         return Ok(Components::Agent(components));
     }
