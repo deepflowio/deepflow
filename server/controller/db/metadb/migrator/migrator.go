@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/session"
 )
 
 var log = logging.MustGetLogger("db.metadb.migrator")
@@ -84,7 +85,7 @@ func upgradeDatabase(cfg config.Config, run bool) error {
 }
 
 func CreateDatabase(cfg config.Config) (databaseExisted bool, err error) {
-	db, err := common.GetSessionWithoutName(cfg)
+	db, err := session.GetSessionWithoutName(cfg)
 	if err != nil {
 		return
 	}
@@ -95,7 +96,7 @@ func CreateDatabase(cfg config.Config) (databaseExisted bool, err error) {
 		return
 	}
 	if !databaseExisted {
-		db, err = common.GetSessionWithName(cfg)
+		db, err = session.GetSessionWithName(cfg)
 		if err != nil {
 			return
 		}
@@ -106,7 +107,7 @@ func CreateDatabase(cfg config.Config) (databaseExisted bool, err error) {
 }
 
 func DropDatabase(cfg config.Config) error {
-	db, err := common.GetSessionWithoutName(cfg)
+	db, err := session.GetSessionWithoutName(cfg)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand => ./controller/cloud/tencent/expand
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition => ./controller/db/metadb/migrator/edition
+	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition => ./controller/db/metadb/session/edition
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis => ./controller/genesis/store/sync/redis
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
@@ -60,6 +61,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
@@ -79,7 +81,6 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
-	github.com/godoes/gorm-dameng v0.7.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
@@ -264,7 +265,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/paulmach/orb v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect

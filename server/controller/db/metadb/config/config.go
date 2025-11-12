@@ -19,7 +19,7 @@ package config
 const (
 	MetaDBTypeMySQL      = "MySQL"
 	MetaDBTypePostgreSQL = "PostgreSQL"
-	MetaDBTypeDaMeng = "DM"
+	MetaDBTypeDM = "DM"
 )
 
 type Config struct {
@@ -222,7 +222,7 @@ func (c DMConfig) FullfillConfig(cfg *Config) {
 	cfg.BatchSize1 = c.BatchSize1
 
 	cfg.DSN = c.DSN
-	cfg.Type = MetaDBTypeDaMeng
+	cfg.Type = MetaDBTypeDM
 	cfg.Database = c.Database
 	cfg.Host = c.Host
 	cfg.Port = c.Port

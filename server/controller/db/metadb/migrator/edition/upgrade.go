@@ -20,10 +20,11 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/session"
 )
 
 func UpgradeDatabase(cfg config.Config) error {
-	db, err := common.GetSessionWithName(cfg)
+	db, err := session.GetSessionWithName(cfg)
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func upgradeIfDBVersionNotLatest(dc *common.DBConfig) error {
 func recreateDatabaseAndInitTables(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "recreate database and initialize tables"))
 	common.DropDatabase(dc)
-	db, err := common.GetSessionWithoutName(dc.Config)
+	db, err := session.GetSessionWithoutName(dc.Config)
 	if err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func recreateDatabaseAndInitTables(dc *common.DBConfig) error {
 		return err
 	}
 
-	db, err = common.GetSessionWithName(dc.Config)
+	db, err = session.GetSessionWithName(dc.Config)
 	if err != nil {
 		return err
 	}

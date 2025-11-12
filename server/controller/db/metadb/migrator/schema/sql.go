@@ -45,7 +45,7 @@ func GetSqlFmt(cfg config.Config) SqlFmt {
 		r = &mysql.SqlFmt{}
 	case config.MetaDBTypePostgreSQL:
 		r = &postgres.SqlFmt{}
-	case config.MetaDBTypeDaMeng:
+	case config.MetaDBTypeDM:
 		r = &dameng.SqlFmt{}
 	default:
 		log.Errorf("unsupported database type: %s", cfg.Type)
