@@ -199,7 +199,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 	}
 
 	var vtaps []metadbmodel.VTap
-	if err = orgDB.Select("ctrl_ip", "ctrl_mac", "name").Find(&vtaps).Error; err != nil {
+	if err = orgDB.Select("id", "ctrl_ip", "ctrl_mac", "name").Find(&vtaps).Error; err != nil {
 		return response, err
 	}
 	valueToVtap := map[string]metadbmodel.VTap{}

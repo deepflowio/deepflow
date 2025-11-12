@@ -92,7 +92,7 @@ func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
 
-	db.Select("type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
+	db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
