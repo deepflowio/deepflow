@@ -122,8 +122,10 @@ func (obj *_DBMgr[M]) GetBatchFromName(name string) (result []*M, err error) {
 // InsertiIgnore
 func (obj *_DBMgr[M]) InsertIgnore(data *M) (err error) {
 	db := obj.DB.WithContext(obj.ctx)
-	err = db.Clauses(clause.OnConflict{DoNothing: true}).Create(data).Error
-
+	err = db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "cluster_id"}},
+		DoNothing: true,
+	}).Create(data).Error
 	return
 }
 
