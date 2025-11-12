@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/session"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -75,10 +76,10 @@ func NewDB(cfg config.Config, orgID int) (*DB, error) {
 	var err error
 	copiedCfg := cfg
 	if orgID == common.DEFAULT_ORG_ID {
-		db, err = common.GetSession(copiedCfg)
+		db, err = session.GetSession(copiedCfg)
 	} else {
 		copiedCfg = common.ReplaceConfigDatabaseName(cfg, orgID)
-		db, err = common.GetSession(copiedCfg)
+		db, err = session.GetSession(copiedCfg)
 	}
 	if err != nil {
 		logConfig := copiedCfg
