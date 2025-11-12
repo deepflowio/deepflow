@@ -466,7 +466,8 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 	// err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
 	err = db.Clauses(clause.OnConflict{
-		DoUpdates: clause.AssignmentColumns([]string{}),
+		Columns:   []clause.Column{{Name: "lcuuid"}},
+		DoNothing: true,
 	}).Create(&domain).Error
 	if err != nil {
 		return nil, response.ServiceError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))

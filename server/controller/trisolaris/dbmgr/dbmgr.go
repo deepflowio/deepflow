@@ -124,9 +124,9 @@ func (obj *_DBMgr[M]) InsertIgnore(data *M) (err error) {
 	db := obj.DB.WithContext(obj.ctx)
 	// err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(data).Error
 	err = db.Clauses(clause.OnConflict{
-		DoUpdates: clause.AssignmentColumns([]string{}),
+		Columns:   []clause.Column{{Name: "cluster_id"}},
+		DoNothing: true,
 	}).Create(data).Error
-
 	return
 }
 
