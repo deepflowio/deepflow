@@ -8742,7 +8742,7 @@ notice: the different values of field_type will affect the extraction method of 
 - `payload_json_value`: extract field from Json Payload, such as `"key": 1`, or `"key": "value"`, or `"key": None`, etc.
 - `payload_xml_value`: extract field from XML Payload, such as `<key attr="xxx">value</key>`
 - `payload_hessian2_value`: extract field from Payload encoded with Hessian2
-- `sql_insertion_column`: extract field from SQL insertion column, such as `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Only supports MySQL now.
+- `sql_insertion_column`: extract field from SQL insertion column, such as `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Only supports first column of insert query in MySQL now.
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 
