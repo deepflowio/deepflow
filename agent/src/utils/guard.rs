@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#[cfg(feature = "enterprise")]
+use std::cell::OnceCell;
 #[cfg(target_os = "linux")]
 use std::time::Instant;
 use std::{
@@ -57,7 +59,69 @@ use crate::utils::environment::get_disk_usage;
 use crate::utils::environment::SocketInfo;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
+#[cfg(feature = "enterprise")]
+use enterprise_utils::utils::{kernel_version_check, ActionFlags};
 use public::proto::agent::{Exception, PacketCaptureType, SysMemoryMetric, SystemLoadMetric};
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug)]
+struct KernelMeltDownFlags {
+    is_meltdown: bool,
+    is_ebpf_meltdown: bool,
+    is_ebpf_uprobe_meltdown: bool,
+}
+
+#[cfg(feature = "enterprise")]
+thread_local! {
+    static KERNEL_MELTDOWN_FLAGS: OnceCell<KernelMeltDownFlags> = OnceCell::new();
+}
+
+#[cfg(feature = "enterprise")]
+impl KernelMeltDownFlags {
+    pub fn get() -> Self {
+        KERNEL_MELTDOWN_FLAGS
+            .with(|p| *p.get_or_init(|| KernelMeltDownFlags::from_kernel_version_check()))
+    }
+
+    pub fn from_kernel_version_check() -> Self {
+        let action = kernel_version_check();
+        Self {
+            is_meltdown: action.contains(ActionFlags::MELTDOWN),
+            is_ebpf_meltdown: action.contains(ActionFlags::EBPF_MELTDOWN),
+            is_ebpf_uprobe_meltdown: action.contains(ActionFlags::EBPF_UPROBE_MELTDOWN),
+        }
+    }
+}
+
+pub fn is_kernel_meltdown() -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "enterprise")] {
+            KernelMeltDownFlags::get().is_meltdown
+        } else {
+            false
+        }
+    }
+}
+
+pub fn is_kernel_ebpf_meltdown() -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "enterprise")] {
+            KernelMeltDownFlags::get().is_ebpf_meltdown
+        } else {
+            false
+        }
+    }
+}
+
+pub fn is_kernel_ebpf_uprobe_meltdown() -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "enterprise")] {
+            KernelMeltDownFlags::get().is_ebpf_uprobe_meltdown
+        } else {
+            false
+        }
+    }
+}
 
 struct SystemLoadGuard {
     system: Arc<Mutex<System>>,
@@ -720,10 +784,18 @@ impl Guard {
                 } else if exception_handler.has(Exception::FreeDiskCircuitBreaker) {
                     warn!("Set the state to melt_down when the free disk exceeds the threshold.");
                     state.melt_down();
-                } else if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                } else if is_kernel_meltdown() && exception_handler.has(Exception::KernelVersionCircuitBreaker) {
                     warn!("Set the state to melt_down when the kernel version circuit breaker.");
                     state.melt_down();
                 } else {
+                    if exception_handler.has(Exception::KernelVersionCircuitBreaker) {
+                        // ebpf_meltdown and ebpf_uprobe_meltdown cannot block the main thread.
+                        if is_kernel_ebpf_meltdown() {
+                            warn!("Set the state to ebpf_melt_down when the kernel version circuit breaker.");
+                        } else if is_kernel_ebpf_uprobe_meltdown() {
+                            warn!("Set the state to ebpf_uprobe_melt_down when the kernel version circuit breaker.");
+                        }
+                    }
                     state.recover();
                 }
 

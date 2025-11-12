@@ -97,7 +97,7 @@ use crate::{
             get_env, kernel_check, running_in_container, running_in_k8s, tap_interface_check,
             trident_process_check,
         },
-        guard::Guard,
+        guard::{is_kernel_ebpf_meltdown, Guard},
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, Countable, QueueStats, RefCountable},
@@ -647,8 +647,15 @@ impl Trident {
         } else if action.contains(ActionFlags::MELTDOWN) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
             state.melt_down();
-        } else if action.contains(ActionFlags::ALARM) {
+            warn!("kernel check: set MELTDOWN");
+        } else if action.contains(ActionFlags::EBPF_MELTDOWN) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            // set ebpf_meltdown
+            warn!("kernel check: set EBPF_MELTDOWN");
+        } else if action.contains(ActionFlags::EBPF_UPROBE_MELTDOWN) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            // set ebpf_uprobe_meltdown
+            warn!("kernel check: set EBPF_UPROBE_MELTDOWN");
         }
     }
 
@@ -2821,6 +2828,7 @@ impl AgentComponents {
         let mut ebpf_dispatcher_component = None;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
+            && !is_kernel_ebpf_meltdown()
             && (candidate_config.capture_mode != PacketCaptureType::Analyzer
                 || candidate_config
                     .user_config

@@ -446,6 +446,8 @@ pub mod utils {
             const ALARM = 0b000100;
             const MELTDOWN = 0b001000;
             const TERMINATE = 0b010000;
+            const EBPF_MELTDOWN = 0b0100000;
+            const EBPF_UPROBE_MELTDOWN = 0b1000000;
         }
     }
 
