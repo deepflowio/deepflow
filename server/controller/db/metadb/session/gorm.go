@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package common
+package session
 
 import (
 	"database/sql"
@@ -25,7 +25,8 @@ import (
 	"os"
 	"time"
 
-	dameng_driver "github.com/askyrie/gorm-dameng"
+	"github.com/op/go-logging"
+
 	mysql_driver "github.com/go-sql-driver/mysql"
 	postgres_driver "github.com/lib/pq"
 	"gorm.io/driver/mysql"
@@ -35,27 +36,41 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition"
 )
 
-type SessionConfig struct {
-	DBCfg config.Config
-	// set UseDabase=false in dsn only when migrating Metadb
-	UseDabase bool
-	// set TimeoutCoefficient=2 in dsn only when migrating Metadb
-	TimeoutCoefficient uint16
-	// set multiStatements=true in dsn only when migrating Metadb
-	MultiStatements bool
+var log = logging.MustGetLogger("db.metadb.session")
+
+func GetSessionWithoutName(cfg config.Config) (*gorm.DB, error) {
+	return initSession(
+		config.SessionConfig{
+			DBCfg:              cfg,
+			TimeoutCoefficient: 1,
+		},
+	)
+}
+
+func GetSessionWithName(cfg config.Config) (*gorm.DB, error) {
+	return initSession(
+		config.SessionConfig{
+			DBCfg:              cfg,
+			UseDabase:          true,
+			TimeoutCoefficient: 2,
+			MultiStatements:    true,
+		},
+	)
 }
 
 func GetSession(cfg config.Config) (*gorm.DB, error) {
-	return InitSession(SessionConfig{
-		DBCfg:              cfg,
-		UseDabase:          true,
-		TimeoutCoefficient: 1,
-	})
+	return initSession(
+		config.SessionConfig{
+			DBCfg:              cfg,
+			UseDabase:          true,
+			TimeoutCoefficient: 1,
+		})
 }
 
-func InitSession(cfg SessionConfig) (*gorm.DB, error) {
+func initSession(cfg config.SessionConfig) (*gorm.DB, error) {
 	dialector, err := getDialector(cfg)
 	if dialector == nil {
 		return nil, fmt.Errorf("failed to get dialector for database type: %s, err: %s", cfg.DBCfg.Type, err.Error())
@@ -88,7 +103,7 @@ func InitSession(cfg SessionConfig) (*gorm.DB, error) {
 	return db, nil
 }
 
-func getDialector(cfg SessionConfig) (gorm.Dialector, error) {
+func getDialector(cfg config.SessionConfig) (gorm.Dialector, error) {
 	switch cfg.DBCfg.Type {
 	case config.MetaDBTypeMySQL:
 		conn, err := getMySQLConnector(cfg)
@@ -102,14 +117,12 @@ func getDialector(cfg SessionConfig) (gorm.Dialector, error) {
 			return nil, err
 		}
 		return getPostgresDialector(conn), nil
-	case config.MetaDBTypeDM:
-		return getDaMengDialector(cfg), nil
 	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.DBCfg.Type)
+		return edition.GetDialector(cfg)
 	}
 }
 
-func getMySQLConnector(cfg SessionConfig) (driver.Connector, error) {
+func getMySQLConnector(cfg config.SessionConfig) (driver.Connector, error) {
 	var database string
 	if cfg.UseDabase {
 		database = cfg.DBCfg.Database
@@ -142,7 +155,7 @@ func getMySQLConnector(cfg SessionConfig) (driver.Connector, error) {
 	return connector, nil
 }
 
-func getPostgreSQLConnector(cfg SessionConfig) (driver.Connector, error) {
+func getPostgreSQLConnector(cfg config.SessionConfig) (driver.Connector, error) {
 	connStr := "user=" + cfg.DBCfg.UserName +
 		" password=" + cfg.DBCfg.UserPassword +
 		" host=" + cfg.DBCfg.Host +
@@ -181,68 +194,4 @@ func getPostgresDialector(conn driver.Connector) gorm.Dialector {
 	return postgres.New(postgres.Config{
 		Conn: sql.OpenDB(conn),
 	})
-}
-
-func getDaMengDialector(cfg SessionConfig) gorm.Dialector {
-	// options := map[string]string{
-	// 	"appName":        "GORM deepflow",
-	// 	"connectTimeout": fmt.Sprintf("%d", cfg.TimeoutCoefficient*cfg.DBCfg.TimeOut),
-	// } TODO
-	dsn := fmt.Sprintf("dm://%s:%s@%s:%d", cfg.DBCfg.UserName, cfg.DBCfg.UserPassword, cfg.DBCfg.Host, cfg.DBCfg.Port)
-	if cfg.UseDabase {
-		// options["schema"] = cfg.DBCfg.Database
-		dsn = dsn + fmt.Sprintf("?schema=%s", cfg.DBCfg.Database)
-	}
-	// dsn := dameng_driver.BuildUrl(cfg.DBCfg.UserName, cfg.DBCfg.UserPassword, cfg.DBCfg.Host, int(cfg.DBCfg.Port), options)
-	return dameng_driver.New(dameng_driver.Config{DSN: dsn})
-}
-
-type ClickHouseSource struct {
-	Name         string
-	Database     string
-	Host         string
-	Port         uint32
-	ProxyHost    string
-	ProxyPort    uint32
-	UserName     string
-	UserPassword string
-	ReplicaSQL   string
-	DSN          string // DM
-}
-
-func GetClickhouseSource(cfg config.Config) ClickHouseSource {
-	source := ClickHouseSource{}
-	switch cfg.Type {
-	case config.MetaDBTypeMySQL:
-		source.Name = SOURCE_MYSQL
-		source.Database = cfg.Database
-		source.Host = ""
-		source.UserName = cfg.UserName
-		source.UserPassword = cfg.UserPassword
-		if cfg.ProxyHost != "" {
-			source.ReplicaSQL = fmt.Sprintf(SQL_REPLICA, cfg.ProxyHost) + " "
-			source.Port = cfg.ProxyPort
-		} else {
-			source.ReplicaSQL = fmt.Sprintf(SQL_REPLICA, cfg.Host) + " "
-			source.Port = cfg.Port
-		}
-	case config.MetaDBTypePostgreSQL:
-		source.Name = SOURCE_POSTGRESQL
-		source.Database = cfg.Database
-		source.ReplicaSQL = ""
-		source.UserName = cfg.UserName
-		source.UserPassword = cfg.UserPassword
-		if cfg.ProxyHost != "" {
-			source.Host = "HOST '" + cfg.ProxyHost + "' "
-			source.Port = cfg.ProxyPort
-		} else {
-			source.Host = "HOST '" + cfg.Host + "' "
-			source.Port = cfg.Port
-		}
-	case config.MetaDBTypeDM:
-		source.Name = SOURCE_DM
-		source.DSN = cfg.DSN
-		source.Database = cfg.Database
-	}
-	return source
 }
