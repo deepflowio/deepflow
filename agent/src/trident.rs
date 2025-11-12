@@ -123,7 +123,7 @@ use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
 #[cfg(feature = "enterprise")]
-use enterprise_utils::utils::{kernel_version_check, ActionFlags};
+use enterprise_utils::kernel_version::{kernel_version_check, ActionFlags};
 use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
@@ -646,8 +646,15 @@ impl Trident {
         } else if action.contains(ActionFlags::MELTDOWN) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
             state.melt_down();
-        } else if action.contains(ActionFlags::ALARM) {
+            warn!("kernel check: set MELTDOWN");
+        } else if action.contains(ActionFlags::EBPF_MELTDOWN) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            // set ebpf_meltdown
+            warn!("kernel check: set EBPF_MELTDOWN");
+        } else if action.contains(ActionFlags::EBPF_UPROBE_MELTDOWN) {
+            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            // set ebpf_uprobe_meltdown
+            warn!("kernel check: set EBPF_UPROBE_MELTDOWN");
         }
     }
 
@@ -2816,8 +2823,10 @@ impl AgentComponents {
         let ebpf_dispatcher_id = dispatcher_components.len();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut ebpf_dispatcher_component = None;
+        let is_kernel_ebpf_meltdown = crate::utils::guard::is_kernel_ebpf_meltdown();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
+            && !is_kernel_ebpf_meltdown
             && (candidate_config.capture_mode != PacketCaptureType::Analyzer
                 || candidate_config
                     .user_config
