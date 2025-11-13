@@ -337,6 +337,7 @@ type Domain struct {
 	CreatedAt      string                 `json:"CREATED_AT"`
 	SyncedAt       string                 `json:"SYNCED_AT"`
 	Lcuuid         string                 `json:"LCUUID"`
+	DomainID       int                    `json:"DOMAIN_ID"`
 }
 
 type DomainCreate struct {
@@ -375,6 +376,7 @@ type SubDomain struct {
 	SyncedAt     string                 `json:"SYNCED_AT"`
 	Lcuuid       string                 `json:"LCUUID"`
 	DomainName   string                 `json:"DOMAIN_NAME"`
+	SubDomainID  int                    `json:"SUB_DOMAIN_ID"`
 }
 
 type SubDomainCreate struct {
