@@ -165,13 +165,38 @@ typedef struct {
     py_type_object_t type_object;
 } python_offsets_t;
 
+extern int bpf_lookup_elem(int fd, void *key, void *value);
+
+extern void *clib_mem_alloc_aligned(const char *name,
+                                    size_t size,
+                                    uint32_t align,
+                                    size_t *alloc_sz);
+
+extern void clib_mem_free(void *ptr);
+
 bool frame_pointer_heuristic_check(uint32_t pid);
+
+extern int get_lua_lang_flags_map_fd(void);
+
+extern int get_lua_offsets_map_fd(void);
+
+extern int get_lua_unwind_info_map_fd(void);
+
+extern int get_luajit_offsets_map_fd(void);
 
 int32_t is_lua_process(uint32_t pid);
 
 bool is_python_process(uint32_t pid);
 
 int32_t lua_detect(uint32_t pid, lua_runtime_info_t *out);
+
+char *lua_format_folded_stack_trace(void *tracer,
+                                    uint32_t pid,
+                                    const uint64_t *frames,
+                                    uint32_t frame_count,
+                                    bool new_cache,
+                                    void *info_p,
+                                    const char *err_tag);
 
 lua_unwind_table_t *lua_unwind_table_create(int32_t lang_flags_fd,
                                             int32_t unwind_info_fd,
@@ -201,6 +226,13 @@ void python_unwind_table_unload(python_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
 
+extern char *resolve_addr(void *tracer,
+                          uint32_t pid,
+                          bool is_start_idx,
+                          uint64_t address,
+                          bool new_cache,
+                          void *info_p);
+
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 
 unwind_table_t *unwind_table_create(int32_t process_shard_list_map_fd,
@@ -214,4 +246,4 @@ void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);
 
-#endif  /* TRACE_UTILS_H */
+#endif /* TRACE_UTILS_H */

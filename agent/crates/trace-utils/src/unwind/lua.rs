@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, ffi::CStr, mem, ptr, slice, str};
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    mem::{self, MaybeUninit},
+    ptr, slice, str,
+    sync::{Mutex, OnceLock},
+};
 
-use libc::{c_char, c_void};
+use libc::{c_char, c_int, c_void, iovec};
 use log::{debug, info, trace, warn};
 
 use crate::maps::get_memory_mappings;
@@ -169,6 +175,465 @@ pub unsafe extern "C" fn merge_lua_stacks(
     }
 
     write_combined_output(trace_str, len, &merged)
+}
+
+const TAG_BITS: u64 = 2;
+const TAG_SHIFT: u64 = 64 - TAG_BITS;
+const TAG_MASK: u64 = 0x3 << TAG_SHIFT;
+const TAG_LUA: u64 = 0x0 << TAG_SHIFT;
+const TAG_CFUNC: u64 = 0x1 << TAG_SHIFT;
+const TAG_FFUNC: u64 = 0x2 << TAG_SHIFT;
+const LUA_CHUNK_READ_MAX: usize = 4096;
+
+struct LuaLayoutCache {
+    pid: i32,
+    lang_flags: u32,
+    lua_ofs: Option<LuaOfs>,
+    lj_ofs: Option<LjOfs>,
+}
+
+impl LuaLayoutCache {
+    const fn new() -> Self {
+        Self {
+            pid: -1,
+            lang_flags: 0,
+            lua_ofs: None,
+            lj_ofs: None,
+        }
+    }
+}
+
+static LUA_LAYOUT_CACHE: OnceLock<Mutex<LuaLayoutCache>> = OnceLock::new();
+
+fn lua_cache() -> &'static Mutex<LuaLayoutCache> {
+    LUA_LAYOUT_CACHE.get_or_init(|| Mutex::new(LuaLayoutCache::new()))
+}
+
+extern "C" {
+    fn bpf_lookup_elem(fd: c_int, key: *mut c_void, value: *mut c_void) -> c_int;
+    fn get_lua_lang_flags_map_fd() -> c_int;
+    fn get_lua_unwind_info_map_fd() -> c_int;
+    fn get_lua_offsets_map_fd() -> c_int;
+    fn get_luajit_offsets_map_fd() -> c_int;
+    fn resolve_addr(
+        tracer: *mut c_void,
+        pid: u32,
+        is_start_idx: bool,
+        address: u64,
+        new_cache: bool,
+        info_p: *mut c_void,
+    ) -> *mut c_char;
+    fn clib_mem_alloc_aligned(
+        name: *const c_char,
+        size: usize,
+        align: u32,
+        alloc_sz: *mut usize,
+    ) -> *mut c_void;
+    fn clib_mem_free(ptr: *mut c_void);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_format_folded_stack_trace(
+    tracer: *mut c_void,
+    pid: u32,
+    frames: *const u64,
+    frame_count: u32,
+    new_cache: bool,
+    info_p: *mut c_void,
+    err_tag: *const c_char,
+) -> *mut c_char {
+    if frames.is_null() || frame_count == 0 {
+        return ptr::null_mut();
+    }
+
+    let Some(layout) = refresh_lua_layout(pid) else {
+        return ptr::null_mut();
+    };
+
+    let err_bytes = if err_tag.is_null() {
+        b"[interpreter stack trace error]".to_vec()
+    } else {
+        CStr::from_ptr(err_tag).to_bytes().to_vec()
+    };
+
+    let raw = slice::from_raw_parts(frames, frame_count as usize);
+    let mut parts: Vec<Vec<u8>> = Vec::new();
+    let mut total_len = 0usize;
+
+    for &encoded in raw {
+        if encoded == 0 {
+            continue;
+        }
+        if let Some(bytes) =
+            decode_lua_frame(encoded, tracer, pid, new_cache, info_p, &layout, &err_bytes)
+        {
+            total_len += bytes.len();
+            parts.push(bytes);
+        }
+    }
+
+    if parts.is_empty() {
+        return ptr::null_mut();
+    }
+
+    let total_size = total_len + parts.len().saturating_sub(1) + 1;
+    let name = CStr::from_bytes_with_nul(b"lua_folded_str\0").unwrap();
+    let buf = clib_mem_alloc_aligned(name.as_ptr(), total_size, 0, ptr::null_mut::<usize>())
+        as *mut c_char;
+    if buf.is_null() {
+        return ptr::null_mut();
+    }
+
+    let mut out = buf as *mut u8;
+    let mut first = true;
+    for part in parts {
+        if !first {
+            ptr::write(out, b';');
+            out = out.add(1);
+        }
+        ptr::copy_nonoverlapping(part.as_ptr(), out, part.len());
+        out = out.add(part.len());
+        first = false;
+    }
+    ptr::write(out, 0);
+
+    buf
+}
+
+struct LuaLayoutState {
+    lang_flags: u32,
+    lua_ofs: Option<LuaOfs>,
+    lj_ofs: Option<LjOfs>,
+}
+
+fn refresh_lua_layout(pid: u32) -> Option<LuaLayoutState> {
+    let cache_lock = lua_cache();
+    let mut cache = cache_lock.lock().unwrap();
+    let pid_i32 = pid as i32;
+    if cache.pid != pid_i32 {
+        cache.pid = pid_i32;
+        cache.lang_flags = 0;
+        cache.lua_ofs = None;
+        cache.lj_ofs = None;
+
+        let pid_key = pid as u32;
+        if let Some(flags) =
+            lookup_map_value::<u32>(unsafe { get_lua_lang_flags_map_fd() }, pid_key)
+        {
+            cache.lang_flags = flags;
+        }
+
+        let mut offsets_id = 0u32;
+        if let Some(info) =
+            lookup_map_value::<LuaUnwindInfo>(unsafe { get_lua_unwind_info_map_fd() }, pid_key)
+        {
+            offsets_id = info.offsets_id as u32;
+        }
+
+        if cache.lang_flags & LANG_LUA != 0 {
+            if let Some(ofs) =
+                lookup_map_value::<LuaOfs>(unsafe { get_lua_offsets_map_fd() }, offsets_id)
+            {
+                cache.lua_ofs = Some(ofs);
+            }
+        }
+
+        if cache.lang_flags & LANG_LUAJIT != 0 {
+            if let Some(ofs) =
+                lookup_map_value::<LjOfs>(unsafe { get_luajit_offsets_map_fd() }, offsets_id)
+            {
+                cache.lj_ofs = Some(ofs);
+            }
+        }
+    }
+
+    if cache.lang_flags == 0 {
+        return None;
+    }
+
+    Some(LuaLayoutState {
+        lang_flags: cache.lang_flags,
+        lua_ofs: cache.lua_ofs,
+        lj_ofs: cache.lj_ofs,
+    })
+}
+
+fn lookup_map_value<T: Copy>(fd: c_int, mut key: u32) -> Option<T> {
+    if fd < 0 {
+        return None;
+    }
+    let mut value = MaybeUninit::<T>::uninit();
+    let ret = unsafe {
+        bpf_lookup_elem(
+            fd,
+            &mut key as *mut _ as *mut c_void,
+            value.as_mut_ptr() as *mut c_void,
+        )
+    };
+    if ret == 0 {
+        Some(unsafe { value.assume_init() })
+    } else {
+        None
+    }
+}
+
+fn decode_lua_frame(
+    encoded: u64,
+    tracer: *mut c_void,
+    pid: u32,
+    new_cache: bool,
+    info_p: *mut c_void,
+    layout: &LuaLayoutState,
+    err_bytes: &[u8],
+) -> Option<Vec<u8>> {
+    let tag = encoded & TAG_MASK;
+    if tag == TAG_LUA {
+        let proto = encoded & !TAG_MASK;
+        if proto == 0 {
+            return None;
+        }
+        let mut chunk = [0u8; 128];
+        let chunk_len = lua_decode_chunkname(
+            pid,
+            proto,
+            layout.lang_flags,
+            layout.lua_ofs.as_ref(),
+            layout.lj_ofs.as_ref(),
+            &mut chunk,
+        );
+        let line = lua_decode_firstline(
+            pid,
+            proto,
+            layout.lang_flags,
+            layout.lua_ofs.as_ref(),
+            layout.lj_ofs.as_ref(),
+        );
+
+        let mut out = Vec::with_capacity(32);
+        let line_bytes = line
+            .map(|lno| lno.to_string())
+            .unwrap_or_else(|| "?".to_string());
+
+        if let Some(len) = chunk_len {
+            out.extend_from_slice(b"L:");
+            out.extend_from_slice(&chunk[..len]);
+            out.extend_from_slice(b":");
+            out.extend_from_slice(line_bytes.as_bytes());
+        } else {
+            out.extend_from_slice(b"L:line=");
+            out.extend_from_slice(line_bytes.as_bytes());
+        }
+        return Some(out);
+    } else if tag == TAG_CFUNC {
+        let addr = encoded & !TAG_MASK;
+        unsafe {
+            let ptr = resolve_addr(tracer, pid, false, addr, new_cache, info_p);
+            if ptr.is_null() {
+                return Some(format!("C:0x{addr:016x}").into_bytes());
+            }
+            let cstr = CStr::from_ptr(ptr);
+            let bytes = cstr.to_bytes();
+            let owned = if bytes.starts_with(b"[unknown") {
+                format!("[unkown] C:0x{addr:016x}").into_bytes()
+            } else {
+                bytes.to_vec()
+            };
+            clib_mem_free(ptr as *mut c_void);
+            return Some(owned);
+        }
+    } else if tag == TAG_FFUNC {
+        let ffid = encoded & !TAG_MASK;
+        return Some(format!("builtin#{ffid}").into_bytes());
+    }
+
+    Some(err_bytes.to_vec())
+}
+
+fn lua_decode_chunkname(
+    pid: u32,
+    proto: u64,
+    lang_flags: u32,
+    lua_ofs: Option<&LuaOfs>,
+    lj_ofs: Option<&LjOfs>,
+    dst: &mut [u8],
+) -> Option<usize> {
+    if proto == 0 {
+        return None;
+    }
+
+    if lang_flags & LANG_LUAJIT != 0 {
+        if let Some(len) = lua_decode_luajit_chunkname(pid, proto, lj_ofs, dst) {
+            return Some(len);
+        }
+    }
+
+    if lang_flags & LANG_LUA != 0 {
+        if let Some(len) = lua_decode_lua_chunkname(pid, proto, lua_ofs, dst) {
+            return Some(len);
+        }
+    }
+
+    None
+}
+
+fn lua_decode_lua_chunkname(
+    pid: u32,
+    proto: u64,
+    lua_ofs: Option<&LuaOfs>,
+    dst: &mut [u8],
+) -> Option<usize> {
+    let lua_ofs = lua_ofs?;
+    if dst.len() < 2 {
+        return None;
+    }
+
+    // Read proto->source (TString*)
+    let mut ts_ptr: usize = 0;
+    read_value(pid, proto + lua_ofs.off_proto_source as u64, &mut ts_ptr).ok()?;
+    if ts_ptr == 0 {
+        return None;
+    }
+
+    let max_copy = dst.len() - 1;
+    if max_copy == 0 {
+        return None;
+    }
+
+    let mut copy_len = LUA_CHUNK_READ_MAX.min(max_copy) as usize;
+    if copy_len > 0 {
+        read_bytes(
+            pid,
+            ts_ptr as u64 + lua_ofs.sizeof_tstring as u64,
+            &mut dst[..copy_len],
+        )
+        .ok()?;
+    }
+
+    if let Some(zero_idx) = dst[..copy_len].iter().position(|&b| b == 0) {
+        copy_len = zero_idx;
+    }
+    dst[copy_len] = 0;
+    Some(copy_len)
+}
+
+fn lua_decode_luajit_chunkname(
+    pid: u32,
+    proto: u64,
+    lj_ofs: Option<&LjOfs>,
+    dst: &mut [u8],
+) -> Option<usize> {
+    let lj_ofs = lj_ofs?;
+    if dst.len() < 2 {
+        return None;
+    }
+
+    let mut raw_ref = 0u64;
+    read_value(
+        pid,
+        proto + lj_ofs.off_gcproto_chunkname as u64,
+        &mut raw_ref,
+    )
+    .ok()?;
+
+    let gcs_ptr = if lj_ofs.gc64 != 0 {
+        raw_ref & ((1u64 << 47) - 1)
+    } else {
+        (raw_ref & 0xffff_ffff) as u64
+    };
+    if gcs_ptr == 0 {
+        return None;
+    }
+
+    let mut len = 0u32;
+    read_value(pid, gcs_ptr + lj_ofs.off_gcstr_len as u64, &mut len).ok()?;
+
+    let max_copy = dst.len() - 1;
+    let mut copy_len = len.min(LUA_CHUNK_READ_MAX as u32) as usize;
+    if copy_len > max_copy {
+        copy_len = max_copy;
+    }
+
+    if copy_len > 0 {
+        read_bytes(
+            pid,
+            gcs_ptr + lj_ofs.off_gcstr_data as u64,
+            &mut dst[..copy_len],
+        )
+        .ok()?;
+    }
+    dst[copy_len] = 0;
+    Some(copy_len)
+}
+
+fn lua_decode_firstline(
+    pid: u32,
+    proto: u64,
+    lang_flags: u32,
+    lua_ofs: Option<&LuaOfs>,
+    lj_ofs: Option<&LjOfs>,
+) -> Option<u32> {
+    if lang_flags & LANG_LUA != 0 {
+        if let Some(ofs) = lua_ofs {
+            let mut line = 0i32;
+            match read_value(pid, proto + ofs.off_proto_linedefined as u64, &mut line) {
+                Ok(()) if line > 0 => return Some(line as u32),
+                Ok(()) => trace!(
+                    "lua_decode_firstline: Lua proto line <= 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
+                ),
+                Err(()) => trace!(
+                    "lua_decode_firstline: failed to read Lua line info (pid={pid}, proto=0x{proto:016x})"
+                ),
+            }
+        } else {
+            trace!("lua_decode_firstline: missing Lua offsets for pid={pid}, proto=0x{proto:016x}");
+        }
+    }
+
+    if lang_flags & LANG_LUAJIT != 0 {
+        if let Some(ofs) = lj_ofs {
+            let mut line = 0i32;
+            match read_value(pid, proto + ofs.off_gcproto_firstline as u64, &mut line) {
+                Ok(()) if line > 0 => return Some(line as u32),
+                Ok(()) => trace!(
+                    "lua_decode_firstline: LuaJIT proto line <= 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
+                ),
+                Err(()) => trace!(
+                    "lua_decode_firstline: failed to read LuaJIT line info (pid={pid}, proto=0x{proto:016x})"
+                ),
+            }
+        } else {
+            trace!(
+                "lua_decode_firstline: missing LuaJIT offsets for pid={pid}, proto=0x{proto:016x}"
+            );
+        }
+    }
+
+    None
+}
+
+fn read_value<T: Copy>(pid: u32, addr: u64, out: &mut T) -> Result<(), ()> {
+    let buf = unsafe { slice::from_raw_parts_mut(out as *mut T as *mut u8, mem::size_of::<T>()) };
+    read_bytes(pid, addr, buf)
+}
+
+fn read_bytes(pid: u32, addr: u64, buf: &mut [u8]) -> Result<(), ()> {
+    if addr == 0 {
+        return Err(());
+    }
+    let local = iovec {
+        iov_base: buf.as_mut_ptr() as *mut c_void,
+        iov_len: buf.len(),
+    };
+    let remote = iovec {
+        iov_base: addr as usize as *mut c_void,
+        iov_len: buf.len(),
+    };
+    let ret = unsafe { libc::process_vm_readv(pid as libc::pid_t, &local, 1, &remote, 1, 0) };
+    if ret == buf.len() as isize {
+        Ok(())
+    } else {
+        Err(())
+    }
 }
 
 // --------- Lua unwind table plumbing ---------
@@ -406,7 +871,6 @@ impl LuaUnwindTable {
     }
 
     pub unsafe fn load(&mut self, pid: u32) {
-        trace!("load lua unwind info for process#{pid}");
         let info = match detect_runtime(pid) {
             Some(info) => info,
             None => {
@@ -419,11 +883,8 @@ impl LuaUnwindTable {
         let path = info.path_str().trim();
         let label = info.detection_method_str().trim();
         info!(
-            "detected Lua runtime for process#{pid}: kind={}, version=\"{}\", path=\"{}\", method=\"{}\"",
-            info.kind,
-            version,
-            path,
-            label
+            "Detect Lua for process#{pid}: kind={}, version=\"{}\", path=\"{}\", method=\"{}\"",
+            info.kind, version, path, label
         );
 
         match info.kind {
@@ -559,7 +1020,7 @@ impl LuaUnwindTable {
             );
             Err(errno)
         } else {
-            info!("lua lang flags updated for process#{pid}: mask=0x{mask:08x}");
+            trace!("lua lang flags updated for process#{pid}: mask=0x{mask:08x}");
             Ok(())
         }
     }
@@ -595,7 +1056,7 @@ impl LuaUnwindTable {
             );
             Err(errno)
         } else {
-            info!(
+            trace!(
                 "lua unwind info updated for process#{pid}: offsets_id={offsets_id}, state=0x{state_addr:016x}"
             );
             Ok(())

@@ -653,9 +653,6 @@ static map_group_t oncpu_maps = {.state = &NAME(profiler_state_map),
 	.progs_jmp = &NAME(cp_progs_jmp_pe_map),
 };
 
-
- /* LINUX_VER_5_2_PLUS */
-
 PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 	__u32 count_idx = ENABLE_IDX;
 	__u64 *enable_ptr = profiler_state_map__lookup(&count_idx);
@@ -748,7 +745,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 	}
 #endif
 
-	return collect_stack_and_send_output((struct pt_regs *)&ctx->regs, key, NULL, NULL,
+	return collect_stack_and_send_output(&ctx->regs, key, NULL, NULL,
 					     &oncpu_maps, false);
 }
 
@@ -1195,7 +1192,7 @@ PROGPE(oncpu_output) (struct bpf_perf_event_data * ctx) {
 	if (state == NULL) {
 		return 0;
 	}
-	return collect_stack_and_send_output((struct pt_regs *)&ctx->regs, &state->key,
+	return collect_stack_and_send_output(&ctx->regs, &state->key,
 					     &state->stack, &state->intp_stack,
 					     &oncpu_maps, false);
 }

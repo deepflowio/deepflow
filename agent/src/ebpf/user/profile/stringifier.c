@@ -39,7 +39,6 @@
  * Due to the reuse of stack trace identifiers and destructive reads, the Stringifier
  * caches the result of its stringification. In each iteration of a continuous perf profiler.
  */
-/* *INDENT-OFF* */
 #ifndef AARCH64_MUSL
 #include "../config.h"
 #include "../utils.h"
@@ -61,8 +60,6 @@
 #include <bcc/bcc_syms.h>
 #include "../proc.h"
 #include "trace_utils.h"
-#include "lua_decoder.h"
-
 // static const char *k_err_tag = "[kernel stack trace error]";
 // static const char *u_err_tag = "[user stack trace error]";
 static const char *i_err_tag = "[interpreter stack trace error]";
@@ -70,6 +67,11 @@ static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
+
+extern char *lua_format_folded_stack_trace(void *tracer_handle, uint32_t pid,
+					   const __u64 *frames, __u32 frame_count,
+					   bool new_cache, void *info_p,
+					   const char *err_tag);
 
 /*
  * To track the scenario where stack data is missing in the eBPF
@@ -379,21 +381,24 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	return ret;
 }
 
-static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
-			  u64 address, bool is_create, void *info_p)
+char *resolve_addr(void *tracer_handle, uint32_t pid, bool is_start_idx,
+		   u64 address, bool new_cache, void *info_p)
 {
-	ASSERT(pid >= 0);
+	struct bpf_tracer *t = tracer_handle;
+	pid_t pid_signed = (pid_t)pid;
+
+	ASSERT(pid_signed >= 0);
 
 	int len = 0;
 	char *ptr = NULL;
 	char format_str[32];
 	struct bcc_symbol sym;
 	memset(&sym, 0, sizeof(sym));
-	void *resolver = get_symbol_cache(pid, is_create);
+	void *resolver = get_symbol_cache(pid_signed, new_cache);
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym, info_p, &ptr);
+	int ret = symcache_resolve(pid_signed, resolver, address, &sym, info_p, &ptr);
 	if (ret == 0 && ptr) {
 		char *p = ptr;
 		/*
@@ -603,71 +608,6 @@ failed:
 
 	return NULL;
 }
-/* *INDENT-ON* */
-static struct lua_ofs cached_lua_ofs;
-static bool cached_have_lua_ofs;
-static struct lj_ofs cached_lj_ofs;
-static bool cached_have_lj_ofs;
-static __u32 cached_lang_flags;
-static pid_t cached_pid = -1;
-
-static void refresh_lua_offsets(pid_t pid)
-{
-	/* Avoid re-reading BPF maps when we already primed the cache for this pid. */
-	if (cached_pid == pid)
-		return;
-
-	/* Reset cache so partial population never leaks across processes. */
-	cached_pid = pid;
-	cached_have_lua_ofs = false;
-	cached_have_lj_ofs = false;
-	cached_lang_flags = 0;
-
-	int fd;
-	/* Figure out which Lua runtime(s) the process uses. */
-	fd = get_lua_lang_flags_map_fd();
-	if (fd >= 0) {
-		__u32 key = pid;
-		__u32 val = 0;
-		if (bpf_lookup_elem(fd, &key, &val) == 0)
-			cached_lang_flags = val;
-	}
-
-	__u32 offsets_id = 0;
-	/* Grab the offsets profile id recorded during agent-side Lua detection. */
-	fd = get_lua_unwind_info_map_fd();
-	if (fd >= 0) {
-		struct lua_unwind_info_t info = {};
-		__u32 key = pid;
-		if (bpf_lookup_elem(fd, &key, &info) == 0)
-			offsets_id = info.offsets_id;
-	}
-
-	/* Resolve and cache the concrete layout hints needed by the kernel unwinder. */
-	if (cached_lang_flags & LANG_LUA) {
-		fd = get_lua_offsets_map_fd();
-		if (fd >= 0) {
-			__u32 key = offsets_id;
-			struct lua_ofs ofs = {};
-			if (bpf_lookup_elem(fd, &key, &ofs) == 0) {
-				cached_lua_ofs = ofs;
-				cached_have_lua_ofs = true;
-			}
-		}
-	}
-
-	if (cached_lang_flags & LANG_LUAJIT) {
-		fd = get_luajit_offsets_map_fd();
-		if (fd >= 0) {
-			__u32 key = offsets_id;
-			struct lj_ofs ofs = {};
-			if (bpf_lookup_elem(fd, &key, &ofs) == 0) {
-				cached_lj_ofs = ofs;
-				cached_have_lj_ofs = true;
-			}
-		}
-	}
-}
 
 static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 					   int stack_id,
@@ -688,11 +628,6 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return (char *)kv.value;
 	}
 
-	/* Populate cached layout metadata for the process so frame decoding works. */
-	refresh_lua_offsets(pid);
-	if (!(cached_lang_flags & (LANG_LUA | LANG_LUAJIT)))
-		return NULL;
-
 	if (!stack_map_name)
 		return NULL;
 
@@ -706,8 +641,6 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0)
 		return NULL;
 
-	int ret = VEC_OK;
-	uword *frames = NULL;
 	u32 frame_count = 0;
 	for (; frame_count < PERF_MAX_STACK_DEPTH; frame_count++) {
 		if (raw_frames[frame_count] == 0)
@@ -716,119 +649,11 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	if (frame_count == 0)
 		return NULL;
 
-	vec_validate_init_empty(frames, frame_count, 0, ret);
-	if (ret != VEC_OK)
-		return NULL;
-
-	int total = 0;
-	/* Convert encoded frames (tagged pointers) into printable strings. */
-	for (u32 i = 0; i < frame_count; i++) {
-		__u64 encoded = raw_frames[i];
-		if (!encoded)
-			continue;
-		__u64 tag = encoded & TAG_MASK;
-		char buf[256] = { 0 };
-		char *out = NULL;
-
-		if (tag == TAG_LUA) {
-			char chunk[128] = { 0 };
-			uintptr_t proto = (uintptr_t) (encoded & ~TAG_MASK);
-			bool have_chunk = lua_decode_chunkname(pid, proto,
-							       cached_lang_flags,
-							       cached_have_lua_ofs
-							       ? &cached_lua_ofs
-							       : NULL,
-							       cached_have_lj_ofs
-							       ? &cached_lj_ofs
-							       : NULL,
-							       chunk,
-							       sizeof(chunk));
-			__u32 line = lua_decode_firstline(pid, proto,
-							  cached_lang_flags,
-							  cached_have_lua_ofs ?
-							  &cached_lua_ofs :
-							  NULL,
-							  cached_have_lj_ofs ?
-							  &cached_lj_ofs :
-							  NULL);
-			if (have_chunk && line)
-				snprintf(buf, sizeof(buf), "L:%s:%u", chunk,
-					line);
-			else if (have_chunk)
-				snprintf(buf, sizeof(buf), "L:%s:?", chunk);
-			else if (line)
-				snprintf(buf, sizeof(buf), "L:line=%u", line);
-			else
-				snprintf(buf, sizeof(buf), "L:line=?");
-			out = create_symbol_str(strlen(buf), buf, "");
-		} else if (tag == TAG_CFUNC) {
-			unsigned long addr =
-			    (unsigned long)(encoded & ~TAG_MASK);
-			out =
-			    resolve_addr(t, pid, false, addr, new_cache,
-					info_p);
-			if (!out) {
-				snprintf(buf, sizeof(buf), "C:0x%016lx", addr);
-				out = create_symbol_str(strlen(buf), buf, "");
-			} else if (strncmp(out, "[unknown", 8) == 0) {
-				clib_mem_free(out);
-				snprintf(buf, sizeof(buf),
-					 "[unkown] C:0x%016lx", addr);
-				out = create_symbol_str(strlen(buf), buf, "");
-			}
-		} else if (tag == TAG_FFUNC) {
-			unsigned long ffid = encoded & ~TAG_MASK;
-			snprintf(buf, sizeof(buf), "builtin#%lu", ffid);
-			out = create_symbol_str(strlen(buf), buf, "");
-		} else {
-			snprintf(buf, sizeof(buf), "%s", i_err_tag);
-			out = create_symbol_str(strlen(buf), buf, "");
-		}
-
-		if (out) {
-			frames[i] = pointer_to_uword(out);
-			total += strlen(out);
-		}
-	}
-
-	if (total == 0) {
-		vec_free(frames);
-		return NULL;
-	}
-
-	/* Join all interpreter frames into the folded-string form expected by flamegraph tooling. */
-	size_t alloc_len = total + frame_count + 1;
 	char *result =
-	    clib_mem_alloc_aligned("lua_folded_str", alloc_len, 0, NULL);
-	if (!result) {
-		for (u32 i = 0; i < frame_count; i++)
-			if (frames[i])
-				clib_mem_free((void *)frames[i]);
-		vec_free(frames);
+	    lua_format_folded_stack_trace(t, pid, raw_frames, frame_count,
+					  new_cache, info_p, i_err_tag);
+	if (!result)
 		return NULL;
-	}
-
-	char *ptr = result;
-	bool first = true;
-	for (u32 i = 0; i < frame_count; i++) {
-		char *s = (char *)frames[i];
-		if (!s)
-			continue;
-		if (!first)
-			*ptr++ = ';';
-		size_t l = strlen(s);
-		memcpy(ptr, s, l);
-		ptr += l;
-		first = false;
-		clib_mem_free(s);
-	}
-	if (first) {
-		clib_mem_free(result);
-		vec_free(frames);
-		return NULL;
-	}
-	*ptr = '\0';
-	vec_free(frames);
 
 	kv.value = pointer_to_uword(result);
 	if (stack_str_hash_add_del(h, &kv, 1)) {
@@ -838,7 +663,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 
 	return result;
 }
-/* *INDENT-OFF* */
+
 static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       int stack_id,
 				       pid_t pid,
@@ -1005,29 +830,47 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	bool has_intpstack = v->intpstack > 0;
-	bool lua_intp = false;
+	bool is_lua = false;
+	bool is_python = false;
+
 	if (has_intpstack) {
-		i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
-					    v->tgid, custom_stack_map_name,
-					    h, new_cache, info_p);
-		if (i_trace_str != NULL) {
-			lua_intp = true;
-			len += strlen(i_trace_str) + 1;
-		} else {
-			i_trace_str = folded_stack_trace_string(t, v->intpstack,
-								v->tgid,
-								custom_stack_map_name,
-								h, new_cache,
-								info_p,
-								v->timestamp,
-								ignore_libs, true);
+		if (is_lua_process((uint32_t)v->tgid)) {
+			i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
+														v->tgid,
+														custom_stack_map_name,
+														h, new_cache,
+														info_p);
 			if (i_trace_str != NULL) {
-				len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
-			} else {
-				len += strlen(i_err_tag);
+				is_lua = true;
 			}
 		}
+
+		if (!i_trace_str && is_python_process((uint32_t)v->tgid)) {
+			i_trace_str = folded_stack_trace_string(t, v->intpstack,
+													v->tgid,
+													custom_stack_map_name,
+													h, new_cache,
+													info_p,
+													v->timestamp,
+													ignore_libs, true);
+			if (i_trace_str != NULL) {
+				is_python = true;
+			}
+		}
+
+		if (i_trace_str != NULL) {
+			if (is_python) {
+				len += strlen(i_trace_str)
+					+ strlen(INCOMPLETE_PYTHON_STACK)
+					+ 2;
+			} else {
+				len += strlen(i_trace_str) + 1;
+			}
+		} else {
+			len += strlen(i_err_tag);
+		}
 	}
+
 
 	trace_str = alloc_stack_trace_str(len);
 	if (trace_str == NULL) {
@@ -1038,10 +881,10 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		if (lua_intp) {
+		if (is_lua) {
 			offset += merge_lua_stacks(trace_str + offset, len - offset,
 						   u_trace_str, i_trace_str);
-		} else {
+		} else if (is_python) {
 			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		}
 	} else if (i_trace_str) {
