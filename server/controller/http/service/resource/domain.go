@@ -244,6 +244,7 @@ func GetDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]interf
 			CreatedAt:    domain.CreatedAt.Format(common.GO_BIRTHDAY),
 			SyncedAt:     syncedAt,
 			Lcuuid:       domain.Lcuuid,
+			DomainID:     domain.ID,
 		}
 
 		if _, ok := domainToRegionLcuuidsToAZLcuuids[domain.Lcuuid]; ok {
@@ -808,6 +809,7 @@ func GetSubDomains(orgDB *metadb.DB, excludeTeamIDs []int, filter map[string]int
 			SyncedAt:     syncedAt,
 			Domain:       subDomain.Domain,
 			Lcuuid:       subDomain.Lcuuid,
+			SubDomainID:  subDomain.ID,
 		}
 
 		subDomainResp.Config = make(map[string]interface{})
