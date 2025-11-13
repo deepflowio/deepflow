@@ -18,7 +18,6 @@ package healer
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
@@ -378,11 +377,6 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 	if err := delExec.Delete(&dbItems).Error; err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 		return err
-	}
-	err := h.msgMetadata.DB.Model(&metadbmodel.ChTagLastUpdatedAt{}).Where("table_name = ?", h.targetDataGen.getResourceType()).
-		Updates(map[string]interface{}{"updated_at": time.Now()}).Error
-	if err != nil {
-		log.Errorf("update %s updated_at error: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 	}
 	return nil
 }
