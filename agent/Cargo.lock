@@ -3472,6 +3472,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "public-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "public",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
