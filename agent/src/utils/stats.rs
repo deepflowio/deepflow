@@ -41,11 +41,6 @@ const TICK_CYCLE: Duration = Duration::from_secs(1);
 pub const STATS_MIN_INTERVAL: Duration = Duration::from_secs(10);
 const STATS_SENDER_QUEUE_SIZE: usize = 4096;
 
-pub enum StatsOption {
-    Tag(&'static str, String),
-    Interval(Duration),
-}
-
 struct Source {
     module: &'static str,
     interval: Duration,
@@ -131,19 +126,6 @@ impl Sendable for ArcBatch {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::DeepflowStats
-    }
-}
-
-pub trait Module {
-    fn name(&self) -> &'static str;
-
-    // instances of the implemented type must return the same set of tag keys
-    fn tags(&self) -> Vec<StatsOption> {
-        vec![]
-    }
-
-    fn options(&self) -> Vec<StatsOption> {
-        vec![]
     }
 }
 

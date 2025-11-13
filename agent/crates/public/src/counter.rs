@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::sync::Weak;
+use std::{sync::Weak, time::Duration};
 
 use cadence::{
     ext::{MetricValue, ToCounterValue, ToGaugeValue},
@@ -85,5 +85,23 @@ impl Countable {
             Countable::Owned(c) => c.closed(),
             Countable::Ref(c) => c.strong_count() == 0,
         }
+    }
+}
+
+pub enum StatsOption {
+    Tag(&'static str, String),
+    Interval(Duration),
+}
+
+pub trait Module {
+    fn name(&self) -> &'static str;
+
+    // instances of the implemented type must return the same set of tag keys
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![]
+    }
+
+    fn options(&self) -> Vec<StatsOption> {
+        vec![]
     }
 }
