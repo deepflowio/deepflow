@@ -29,11 +29,12 @@ use crate::{
     },
     plugin::{CustomInfo, CustomInfoRequest, CustomInfoResp, CustomInfoTrace},
 };
+
 use enterprise_utils::l7::custom_policy::{
     custom_protocol_policy::{CustomPolicyInfo, CustomPolicyParser},
     enums::TrafficDirection,
 };
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
+use public::l7_protocol::{CustomProtocol, L7Protocol};
 
 #[derive(Default)]
 pub struct CustomPolicyLog {
@@ -59,8 +60,8 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         }
 
         let (port, direction) = match param.direction {
-            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::Request),
-            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::Response),
+            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::REQUEST),
+            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
         };
 
         match self
@@ -86,29 +87,21 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        let custom_protocol =
-            L7ProtocolEnum::Custom(CustomProtocol::CustomPolicy(self.proto_str.clone()));
+        let protocol = CustomProtocol::CustomPolicy(self.proto_str.clone());
 
-        let (port, direction) = match param.direction {
-            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::Request),
-            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::Response),
+        let direction = match param.direction {
+            PacketDirection::ClientToServer => TrafficDirection::REQUEST,
+            PacketDirection::ServerToClient => TrafficDirection::RESPONSE,
         };
 
-        let Some(policy) = config
+        let Some(policies) = config
             .l7_log_dynamic
-            .extra_field_policies
-            .get(&custom_protocol)
+            .get_custom_field_policies(protocol.into(), param)
         else {
             return Err(Error::NoParseConfig);
         };
-        let Some(indices) = policy.indices.find(port) else {
-            return Err(Error::NoParseConfig);
-        };
 
-        if self
-            .parser
-            .parse_payload(payload, direction, &policy.policies, indices)
-        {
+        if self.parser.parse_payload(payload, direction, policies) {
             let mut info = CustomInfo::from((&self.parser.info, param.direction));
             info.msg_type = param.direction.into();
             info.proto_str = self.proto_str.clone();

@@ -8808,43 +8808,226 @@ processors:
 
 **Description**:
 
-Custom field extraction policies, used to extract custom fields from L7 protocols
+Custom field extraction policy, used to extract possible custom fields from L7 protocols via simple rules.
 Example:
 ```yaml
-- policy_name: "my_policy" # name of current policy
-  protocol_name: HTTP # protocol name, if protocol is Grpc, please set it to HTTP2, optional values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
-  custom_protocol_name: "my_protocol"  # when protocol_name is Custom are effected, and there must be a `processors.request_log.application_protocol_inference.custom_protocols` configuration with the same name, otherwise it cannot be parsed
+- policy_name: "my_policy" # Policy name
+  protocol_name: HTTP # Protocol name. If you want to parse Grpc, configure as HTTP2. Possible values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
+  custom_protocol_name: "my_protocol"  # Effective only when protocol_name is Custom. Note: At this time, there must be a `processors.request_log.application_protocol_inference.custom_protocols` config, and the custom protocol name must match exactly, otherwise parsing will not work.
   filters:
-    port_list: 1-65535 # can be used to filter ports
-    feature_string: "" # can be used to match payload before extraction
+    traffic_direction: both # Search in request, response, or both. Default is both.
+    port_list: 1-65535 # Can be used to filter by port.
+    feature_string: "" # For pre-matching Payload extraction, does not apply to header_field type.
+  # Whether to save the original payload.
+  # Note: This configuration is only effective when the "filters" are met.
+  raw:
+    save_request:
+      enabled: false
+      output:
+        attribute_name: request
+        priority: 0
+    save_response:
+      enabled: false
+      output:
+        attribute_name: response
+        priority: 0
   fields:
-  - field_name: "my_field"
-    field_match_type: "string"  # optional values: "string"
-    field_match_ignore_case: "false" # wheather ignore case when match field, default: false
-    field_match_keyword: "abc"  # can be filled with additional characters to improve accuracy, for example `"\"abc\": \""`
-
-    subfield_match_keyword: "y" # in some cases, we need to extract a subfield, for example, in the HTTP Cookie field, we only need to extract part of it, such as extracting the value corresponding to y from `abc: x=1,y=2,z=3` (the value is `x=1,y=2,z=3`)
-    separator_between_subfield_kv_pair: "," # default: empty
-    separator_between_subfield_key_and_value: "=" # default: empty
-
-    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value/sql_insertion_column, default value: header_field, see below for details
-    traffic_direction: request # could be limited to search only in request (or only in response), optional values: request/response/both, default value: both
-    check_value_charset: false # used for checking whether the extracted result is legal
-    value_primary_charset: ["digits", "alphabets", "chinese"] # used for checking the character set of the extracted result, optional values: digits/alphabets/chinese
-    value_special_charset: ".-_" # used for checking the character set of the extracted result
-    attribute_name: "xyz" # this field will appear in the calling log's attribute.xyz, default value is empty, if empty, this field will not be added to attribute
-    rewrite_native_tag: version # rewrite can fill in one of the following fields to overwrite the corresponding field value: version/request_type/request_domain/request_resource/request_id/endpoint/response_code/response_exception/response_result/trace_id/span_id/x_request_id/http_proxy_client
-    rewrite_response_status: # rewrite response_status field, when response_code is in success_values array, response_status will be set to success, otherwise set to server_error
-      success_values: []
-    metric_name: "xyz"  # this field will appear in the calling log's metrics.xyz, default value is empty
-```
-notice: the different values of field_type will affect the extraction method of the field, as follows:
-- `http_url_field`: extract field from HTTP URL parameters at the end of the URL, such as `?key=value&key2=value2`
-- `header_field`: extract field from the Header part of HTTP/Dubbo/SofaRPC/... protocols, such as HTTP Header like `key: value`
-- `payload_json_value`: extract field from Json Payload, such as `"key": 1`, or `"key": "value"`, or `"key": None`, etc.
-- `payload_xml_value`: extract field from XML Payload, such as `<key attr="xxx">value</key>`
-- `payload_hessian2_value`: extract field from Payload encoded with Hessian2
-- `sql_insertion_column`: extract field from SQL insertion column, such as `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Only supports first column of insert query in MySQL now.
+  - name: "my_field" # Configured field
+    # Field extraction type, possible values and meanings:
+    # - `http_url_field`: Extract field from HTTP URL parameters at the end of the URL, e.g. `?key=value&key2=value2`
+    # - `header_field`: Extract field from protocol header section (HTTP/Dubbo/SofaRPC/...); for HTTP, e.g. `key: value`
+    # - `payload_json_value`: Extract field from JSON payload, e.g. `"key": 1`, `"key": "value"`, `"key": None`, etc.
+    # - `payload_xml_value`: Extract field from XML payload, e.g. `<key attr="xxx">value</key>`
+    # - `payload_hessian2_value`: Extract field from payload using Hessian2 encoding.
+    # - `sql_insertion_column`: Extract column from SQL insert statement, e.g. `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Currently only MySQL is supported and only the first column's value can be extracted.
+    type: "http_url_field"
+    # Matching rule
+    match:
+      # Match type, possible values: "string" and "path"
+      # When set to "string":
+      # - For http_url_field and header_field, matches key; for sql_insertion_column, matches SQL insert column name.
+      # - For payload_json_value and payload_xml_value, matches JSON or XML content and takes the first matched element as the result.
+      # "path" type applies only to parse_json_value and parse_xml_value, supports extraction using hierarchical syntax like "aaa.bbb.ccc" for JSON and XML content.
+      type: "string"
+      keyword: "abc"
+      # Ignore case. Default: false. Only valid when `type` is "string".
+      ignore_case: false
+      # Apply field rule to all leaf nodes. Default: false.
+      # Only effective for parse_json_value and parse_xml_value types.
+      # When set to true:
+      # - Apply keyword matching to all leaf nodes in JSON or XML content.
+      # - Only attribute_name in output is valid, serving as the prefix of the output result. The output name uses attribute_name as prefix and the leaf node's path as suffix, separated by ".".
+      # - This field cannot be used in compound_fields.
+      all_leaves: false
+    # Post-processing. Note that settings are executed in order.
+    # Configuration format:
+    # - type: post_processing_type
+    #   settings:
+    #   - key: setting_key
+    #     value: setting_value
+    # Supported types for 'type' are:
+    # - remap
+    # - obfuscate
+    # - url_decode
+    # - base64_decode
+    # - parse_json_value
+    # - parse_xml_value
+    # - parse_key_value
+    # See below for details and configuration of each type
+    post:
+    # remap is used to map the extraction result to another value
+    # Supported settings:
+    # - dictionary_name: Name of the dictionary
+    - type: remap
+      settings:
+      - key: dictionary_name
+        value: dict_1
+    # obfuscate is used for masking/desensitizing extracted results
+    # Supported settings:
+    # - mask: The character used for masking, default is *, supports only ascii characters
+    # - preset: Use a prebuilt masking method, valid values are:
+    #   - id-card-name: Chinese ID card name masking (show only the first character of the name)
+    #   - id-card-number: Chinese ID card number masking (show only first 6 and last 4 digits)
+    #   - phone-number: Phone number masking (hide at least 4 characters in the middle)
+    # - range: Indicates which characters (by index) to mask with *, e.g. retain only the first and last character
+    - type: obfuscate
+      settings:
+      - key: mask
+        value: *
+      - key: preset
+        value: id-card-name
+      - key: range
+        value: "1, -1" # Mask from the second to the last character, keeping only the first character
+      - key: range # Multiple 'range' settings represent multiple masked ranges
+        value: "6, -5" # Mask from the 7th to the 5th from last character
+    # url_decode is used to decode the extracted result using URL-decoding
+    - type: url_decode
+    # base64_decode is used to decode the extracted result using Base64, output must be valid UTF-8
+    - type: base64_decode
+    # parse_json_value is used to further parse the extracted result as JSON
+    # Supported settings:
+    # - keyword: Key word to match
+    # - type: Value type, options are string/path
+    # - ignore_case: Whether to ignore case, default false
+    # - skip: Skip the first N matches, use from this index
+    - type: parse_json_value
+      settings:
+      - key: keyword
+        value: xyz
+      - key: type
+        value: string
+      - key: ignore_case
+        value: false
+      - key: skip
+        value: 0
+    # parse_xml_value is used to further parse the extracted result as XML
+    # Supported settings:
+    # - keyword: Key word to match
+    # - type: Value type, options are string/path
+    # - ignore_case: Whether to ignore case, default false
+    # - skip: Skip the first N matches, use from this index
+    - type: parse_xml_value
+      # This configuration is the same as fields->match, but in key/value form.
+      # Also, skip is supported to indicate which matching result to take.
+      settings:
+      - key: keyword
+        value: xyz
+      - key: type
+        value: string
+      - key: ignore_case
+        value: false
+      - key: skip
+        value: 0
+    # parse_key_value parses the result as key-value pairs
+    # Supported settings:
+    # - key_value_pair_separator: Separator between key-value pairs, default ","
+    # - key_value_separator: Separator between key and value, default "="
+    # - keyword: Key word to match
+    # - ignore_case: Whether to ignore case, default false
+    - type: parse_key_value
+      settings:
+      - key: key_value_pair_separator
+        value: ","
+      - key: key_value_separator
+        value: "="
+      - key: keyword
+        value: xyz
+      - key: ignore_case
+        value: true
+    # Validate if the post-processed result is legal
+    verify:
+      check_charset: false # Can be used to check if extraction result is valid
+      primary_charset: ["digits", "alphabets", "hanzi"] # Charsets used to check extraction result; optional values: digits/alphabets/hanzi
+      special_characters: ".-_" # Additional special characters allowed in result charset
+    output:
+      attribute_name: "xyz" # This field will appear in calling log as attribute.xyz. Default is empty; if empty, this field will not be added to the attribute.
+      metric_name: "xyz" # This field will appear in calling log as metrics.xyz. Default is empty.
+      rewrite_native_tag:
+        # Fill one of the following fields to overwrite the corresponding value
+        # - version
+        # - request_type
+        # - request_domain
+        # - request_resource
+        # - request_id
+        # - endpoint
+        # - response_code
+        # - response_exception
+        # - response_result
+        # - trace_id
+        # - span_id
+        # - x_request_id
+        # - http_proxy_client
+        # - biz_type
+        # - biz_code
+        # - biz_scenario
+        name: version
+        condition:
+          enum_whitelist: [] # Whitelist: when the extraction result is in the list, overwrite. If empty, does not take effect.
+          enum_blacklist: [] # Blacklist: when result matches any in the list, do not update.
+      # Match to these arrays by extraction value. If matched, rewrite response_status to the corresponding value.
+      rewrite_response_status:
+        ok_values: []
+        client_error_values: []
+        server_error_values: []
+        default_status: "" # Optional: ok/client_error/server_error. If empty and no match, will NOT rewrite. Default is empty.
+      # Field output priority. Default is 0. Range 0-255. Smaller values have higher priority.
+      # For fields that keep only one value (except trace_id), only the one with the smallest priority is kept.
+      # For fields with multiple values (trace_id), output them in order from highest to lowest priority.
+      priority: 0
+  # Directly use a constant value as the field value
+  const_fields:
+  - value: "123"
+    # Output configuration, refer to the "output" section of "fields"
+    # "metric", "rewrite_response_status", and the "condition" in "rewrite_native_tag" are not supported here
+    output:
+      attribute_name: "xyz"
+      rewrite_native_tag:
+        name: version
+      priority: 0
+  compound_fields:
+  - format: "{field1_name}-{field2_name}" # Output format. field1_name and field2_name are the configured field names
+    output: # Configure as described in "output" section of "fields"
+      attribute_name: "xyz"
+      metric_name: "xyz"
+      rewrite_native_tag:
+        name: version
+        condition:
+          enum_whitelist: []
+          enum_blacklist: []
+      rewrite_response_status:
+        ok_values: []
+        client_error_values: []
+        server_error_values: []
+        default_status: ""
+      priority: 0
+  dictionaries:
+  - name: dict_1
+    entries:
+    - key: key1
+      value: value1
+    - key: key2
+      value: value2
+    default: value3
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 

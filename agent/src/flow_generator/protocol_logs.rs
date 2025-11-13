@@ -88,44 +88,7 @@ use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
 
-#[derive(Serialize, Debug, Default, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
-#[repr(u8)]
-pub enum L7ResponseStatus {
-    Ok = 0,
-    Timeout = 2,
-    ServerError = 3,
-    ClientError = 4,
-    #[default]
-    Unknown = 5,
-    ParseFailed = 6,
-}
-
-impl L7ResponseStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Ok => "ok",
-            Self::Timeout => "timeout",
-            Self::ServerError => "server_error",
-            Self::ClientError => "client_error",
-            Self::ParseFailed => "parse_failed",
-            Self::Unknown => "unknown",
-        }
-    }
-}
-
-impl From<&str> for L7ResponseStatus {
-    fn from(s: &str) -> Self {
-        match s {
-            "ok" => L7ResponseStatus::Ok,
-            "timeout" => L7ResponseStatus::Timeout,
-            "server_error" => L7ResponseStatus::ServerError,
-            "client_error" => L7ResponseStatus::ClientError,
-            "parse_failed" => L7ResponseStatus::ParseFailed,
-            "unknown" => L7ResponseStatus::Unknown,
-            _ => L7ResponseStatus::Unknown,
-        }
-    }
-}
+pub use public::enums::L7ResponseStatus;
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
 #[repr(u8)]
@@ -807,19 +770,5 @@ impl PrioFields {
     #[inline]
     pub fn highest(&self) -> &str {
         self.0.first().map(|pf| pf.field.as_str()).unwrap_or("")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validate_l7_response_status_as_uint() {
-        assert_eq!(L7ResponseStatus::Ok as u32, 0);
-        assert_eq!(L7ResponseStatus::Timeout as u32, 2);
-        assert_eq!(L7ResponseStatus::ServerError as u32, 3);
-        assert_eq!(L7ResponseStatus::ClientError as u32, 4);
-        assert_eq!(L7ResponseStatus::Unknown as u32, 5);
     }
 }

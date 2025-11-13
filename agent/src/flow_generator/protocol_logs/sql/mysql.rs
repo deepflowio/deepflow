@@ -61,10 +61,9 @@ use public::l7_protocol::L7ProtocolChecker;
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         use enterprise_utils::l7::custom_policy::{
-            custom_field_policy,
-            enums::{FieldType as PolicyFieldType, NativeTag},
+            custom_field_policy::{PolicySlice, Store, enums::{Op, Operation, Source}},
+            enums::{NativeTag, TrafficDirection},
         };
-        use public::l7_protocol::L7ProtocolEnum;
 
         use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
     }
@@ -175,10 +174,6 @@ pub struct MysqlInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
-
-    #[cfg(feature = "enterprise")]
-    #[serde(skip)]
-    custom_field_operations: Vec<custom_field_policy::Operation>,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -297,56 +292,6 @@ impl MysqlInfo {
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    fn apply_custom_field_policies_on_sql(&mut self, param: &ParseParam, sql: &str) {
-        let port = match param.direction {
-            PacketDirection::ClientToServer => param.port_dst,
-            PacketDirection::ServerToClient => param.port_src,
-        };
-        let Some(policies) = param
-            .parse_config
-            .as_ref()
-            .and_then(|c| {
-                c.l7_log_dynamic
-                    .extra_field_policies
-                    .get(&L7ProtocolEnum::L7Protocol(L7Protocol::MySQL))
-            })
-            .and_then(|p| p.select(port))
-        else {
-            return;
-        };
-        policies.apply_in(
-            &mut self.custom_field_operations,
-            &PolicyFieldType::SqlInsertionColumn,
-            sql.as_bytes(),
-        );
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn merge_custom_field_operations(&mut self) {
-        for operation in self.custom_field_operations.drain(..) {
-            match operation {
-                custom_field_policy::Operation::Rewrite(tag, Some(value)) => {
-                    match tag {
-                        NativeTag::TraceId => self.trace_ids.push(
-                            CUSTOM_FIELD_POLICY_PRIORITY,
-                            std::borrow::Cow::Borrowed(value.as_ref()),
-                        ),
-                        NativeTag::SpanId => self.span_id = Some(value.to_string()),
-                        _ => {} // other tags are ignored
-                    }
-                }
-                custom_field_policy::Operation::AddAttribute(key, Some(value)) => {
-                    self.attributes.push(KeyVal {
-                        key: key.to_string(),
-                        val: value.to_string(),
-                    });
-                }
-                _ => (), // other types are ignored
-            }
-        }
-    }
-
     fn get_table_name_from_sql(
         sql: &mut SplitWhitespace,
         key: &'static str,
@@ -458,7 +403,8 @@ impl MysqlInfo {
         &mut self,
         param: &ParseParam,
         payload: &[u8],
-        obfuscate_cache: &Option<ObfuscateCache>,
+        parser: &mut MysqlLog,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<()> {
         let config = param.parse_config.as_ref();
         let payload = mysql_string(payload);
@@ -470,12 +416,18 @@ impl MysqlInfo {
         };
 
         #[cfg(feature = "enterprise")]
-        self.apply_custom_field_policies_on_sql(param, sql_string);
+        if let Some(policies) = custom_policies {
+            policies.apply(
+                &mut parser.custom_field_store,
+                TrafficDirection::REQUEST,
+                Source::Sql(sql_string),
+            );
+        }
 
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
         }
-        let context = match attempt_obfuscation(obfuscate_cache, payload) {
+        let context = match attempt_obfuscation(&parser.obfuscate_cache, payload) {
             Some(mut m) => {
                 let valid_len = match str::from_utf8(&m) {
                     Ok(_) => m.len(),
@@ -589,7 +541,11 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.status,
                 code: f.error_code,
-                exception: f.error_message,
+                exception: if f.status != L7ResponseStatus::Ok {
+                    f.error_message
+                } else {
+                    Default::default()
+                },
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
@@ -656,6 +612,9 @@ pub struct MysqlLog {
 
     // if compression is enabled, both requests and responses will have compression header
     has_compressed_header: Option<bool>,
+
+    #[cfg(feature = "enterprise")]
+    custom_field_store: Store,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -715,8 +674,29 @@ impl L7ProtocolParserInterface for MysqlLog {
             let _ = self.check_compressed_header(payload)?;
         }
 
+        #[cfg(feature = "enterprise")]
+        let custom_policies = {
+            self.custom_field_store.clear();
+            let port = match param.direction {
+                PacketDirection::ClientToServer => param.port_dst,
+                PacketDirection::ServerToClient => param.port_src,
+            };
+            param.parse_config.as_ref().and_then(|c| {
+                c.l7_log_dynamic
+                    .extra_field_policies
+                    .select(L7Protocol::MySQL.into(), port)
+            })
+        };
+
         let mut decompress_buffer = take_buffer();
-        let result = self.parse(param, &mut decompress_buffer, payload, &mut info);
+        let result = self.parse(
+            param,
+            &mut decompress_buffer,
+            payload,
+            &mut info,
+            #[cfg(feature = "enterprise")]
+            custom_policies,
+        );
         give_buffer(decompress_buffer);
         match result {
             Ok(is_greeting) => {
@@ -769,7 +749,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         }
         if param.parse_log {
             #[cfg(feature = "enterprise")]
-            info.merge_custom_field_operations();
+            self.merge_custom_field_operations(custom_policies, &mut info);
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {
             Ok(L7ParseResult::None)
@@ -987,11 +967,11 @@ impl MysqlLog {
     }
 
     fn request(
+        &mut self,
         param: &ParseParam,
         payload: &[u8],
-        pc: &mut ParameterCounter,
         info: &mut MysqlInfo,
-        obfuscate_cache: &Option<ObfuscateCache>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<LogMessageType> {
         if payload.len() < COMMAND_LEN {
             return Err(Error::Truncated(TruncationType::Request));
@@ -1009,30 +989,35 @@ impl MysqlLog {
                 info.request_string(
                     param,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
-                    obfuscate_cache,
+                    self,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
                 )?;
             }
             COM_STMT_PREPARE => {
                 info.request_string(
                     param,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
-                    obfuscate_cache,
+                    self,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
                 )?;
                 if let Some(config) = config {
                     if config
                         .obfuscate_enabled_protocols
                         .is_disabled(L7Protocol::MySQL)
                     {
-                        pc.set(info.context.as_bytes());
+                        self.pc.set(info.context.as_bytes());
                     }
                 }
             }
             COM_STMT_EXECUTE => {
                 info.statement_id(&payload[STATEMENT_ID_OFFSET..]);
                 if payload.len() > EXECUTE_STATEMENT_PARAMS_OFFSET {
-                    pc.get(&payload[EXECUTE_STATEMENT_PARAMS_OFFSET..], info);
+                    self.pc
+                        .get(&payload[EXECUTE_STATEMENT_PARAMS_OFFSET..], info);
                 }
-                pc.reset();
+                self.pc.reset();
             }
             COM_PING => {}
             _ => return Err(Error::CommandNotSupported(info.command)),
@@ -1258,6 +1243,7 @@ impl MysqlLog {
         decompress_buffer: &mut Vec<u8>,
         payload: &[u8],
         info: &mut MysqlInfo,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<bool> {
         let (config, direction) = (param.parse_config.as_ref(), param.direction);
         let decompress = config
@@ -1302,8 +1288,13 @@ impl MysqlLog {
         };
         match msg_type {
             LogMessageType::Request if header.seq_id == 0 => {
-                msg_type =
-                    Self::request(param, payload, &mut self.pc, info, &self.obfuscate_cache)?;
+                msg_type = self.request(
+                    param,
+                    payload,
+                    info,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
+                )?;
                 if msg_type == LogMessageType::Request {
                     self.has_request = true;
                     self.has_login = false;
@@ -1335,6 +1326,41 @@ impl MysqlLog {
         info.msg_type = msg_type;
 
         Ok(false)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_custom_field_operations(
+        &mut self,
+        policies: Option<PolicySlice>,
+        info: &mut MysqlInfo,
+    ) {
+        let Some(policies) = policies else {
+            return;
+        };
+        for Operation { op, prio } in self.custom_field_store.drain_with(policies) {
+            match op {
+                Op::RewriteResponseStatus(status) => {
+                    info.status = status;
+                }
+                Op::RewriteNativeTag(tag, value) => {
+                    match tag {
+                        NativeTag::TraceId => info.trace_ids.push(
+                            CUSTOM_FIELD_POLICY_PRIORITY + prio,
+                            std::borrow::Cow::Borrowed(value.as_ref()),
+                        ),
+                        NativeTag::SpanId => info.span_id = Some(value.to_string()),
+                        _ => {} // other tags are ignored
+                    }
+                }
+                Op::AddAttribute(key, value) => {
+                    info.attributes.push(KeyVal {
+                        key: key.to_string(),
+                        val: value.to_string(),
+                    });
+                }
+                _ => (), // other types are ignored
+            }
+        }
     }
 }
 

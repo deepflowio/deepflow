@@ -976,6 +976,7 @@ impl Trident {
                         let callbacks = config_handler.on_config(
                             cfg.user_config,
                             &exception_handler,
+                            &stats_collector,
                             None,
                             #[cfg(target_os = "linux")]
                             &api_watcher,
@@ -1056,6 +1057,7 @@ impl Trident {
                     let callbacks = config_handler.on_config(
                         user_config,
                         &exception_handler,
+                        &stats_collector,
                         None,
                         #[cfg(target_os = "linux")]
                         &api_watcher,
@@ -1120,6 +1122,7 @@ impl Trident {
                         .on_config(
                             user_config,
                             &exception_handler,
+                            &stats_collector,
                             Some(components),
                             #[cfg(target_os = "linux")]
                             &api_watcher,
@@ -1168,6 +1171,7 @@ impl Trident {
                     config_handler.on_config(
                         user_config,
                         &exception_handler,
+                        &stats_collector,
                         None,
                         #[cfg(target_os = "linux")]
                         &api_watcher,
