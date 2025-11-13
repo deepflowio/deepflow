@@ -1904,7 +1904,7 @@ inputs:
       match_regex: \b(?:lua|luajit)(\S)*( +-\S+)* +(\S*/)*([^ /]+)
       match_type: cmdline_with_args
       only_in_container: false
-      rewrite_name: $4
+      rewrite_name: $5
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info

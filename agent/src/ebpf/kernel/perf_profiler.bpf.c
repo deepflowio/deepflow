@@ -207,16 +207,18 @@ MAP_HASH(luajit_offsets_map, __u32, struct lj_ofs, LUA_OFFSET_PROFILES, FEATURE_
 static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t *cache,
 						 __u8 idx)
 {
-	if (idx >= LUA_STATE_STACK_DEPTH)
+	if (idx >= LUA_STATE_STACK_DEPTH) {
 		return 0;
+	}
 	return cache->states[idx];
 }
 
 static __always_inline void lua_state_slot_write(struct lua_state_cache_t *cache,
                                                  __u8 idx, __u64 value)
 {
-	if (idx >= LUA_STATE_STACK_DEPTH)
+	if (idx >= LUA_STATE_STACK_DEPTH) {
 		return;
+	}
 	cache->states[idx] = value;
 }
 
@@ -253,8 +255,9 @@ static __always_inline void lua_state_stack_pop(__u64 id)
 {
 	__u32 tid = (__u32)id;
 	struct lua_state_cache_t *cache_ptr = lua_tstate_map__lookup(&tid);
-	if (!cache_ptr)
+	if (!cache_ptr) {
 		return;
+	}
 
 	struct lua_state_cache_t cache = {};
 	__builtin_memcpy(&cache, cache_ptr, sizeof(cache));
@@ -267,13 +270,15 @@ static __always_inline void lua_state_stack_pop(__u64 id)
 
 	depth--;
 	cache.depth = depth;
-	if (depth < LUA_STATE_STACK_DEPTH)
+	if (depth < LUA_STATE_STACK_DEPTH) {
 		lua_state_slot_write(&cache, depth, 0);
+	}
 
-	if (depth == 0)
+	if (depth == 0) {
 		lua_tstate_map__delete(&tid);
-	else
+	} else {
 		lua_tstate_map__update(&tid, &cache);
+	}
 }
 #endif
 
@@ -665,8 +670,9 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		return 0;
 	}
 
-	if (unlikely(*enable_ptr == 0))
+	if (unlikely(*enable_ptr == 0)) {
 		return 0;
+	}
 
 #ifdef LINUX_VER_5_2_PLUS
 	__u32 zero = 0;
@@ -712,8 +718,9 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		if (cache && cache->depth > 0) {
 			__u8 top_idx = cache->depth - 1;
 			__u64 top = lua_state_slot_read(cache, top_idx);
-			if (top)
+			if (top) {
 				state->lua_L_ptr = (void *)top;
+			}
 		}
 
 		struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
@@ -1184,7 +1191,7 @@ URETPROG(python_save_tstate_addr) (struct pt_regs * ctx) {
 
 PROGPE(oncpu_output) (struct bpf_perf_event_data * ctx) {
 	__u32 zero = 0;
-	unwind_state_t * state = heap__lookup(&zero);
+	unwind_state_t *state = heap__lookup(&zero);
 	if (state == NULL) {
 		return 0;
 	}
@@ -1248,13 +1255,15 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 #pragma unroll
 	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
 
-		if (intp_stack->len >= STACK_FRAMES_PER_RUN)
+		if (intp_stack->len >= STACK_FRAMES_PER_RUN) {
 			break;
+		}
 
 		if (o->features & LUA_FEAT_CI_ARRAY) {
 			if ((char *)ci < (char *)base_ci
-			    || (char *)ci >= (char *)end_ci)
+			    || (char *)ci >= (char *)end_ci) {
 				break;
+			}
 		}
 
 		/* Load fields from this CallInfo */
@@ -1265,9 +1274,10 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 			goto next_frame;
 		}
 		/* ci_prev available in Lua 5.2+ */
-		if (o->features & LUA_FEAT_CI_LINKED)
+		if (o->features & LUA_FEAT_CI_LINKED) {
 			(void)bpf_probe_read_user(&ci_prev, sizeof(ci_prev),
 						(char *)ci + o->off_ci_prev);
+		}
 
 		__u32 tt = -1;
 		if (bpf_probe_read_user
@@ -1345,10 +1355,11 @@ static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
 			}
 		}
 
-	      next_frame:
+next_frame:
 		if (o->features & LUA_FEAT_CI_LINKED) {
-			if (!ci_prev)
+			if (!ci_prev) {
 				break;
+			}
 			ci = ci_prev;
 			continue;
 		} else {
@@ -1394,8 +1405,9 @@ static inline int lua_get_funcdata(struct bpf_perf_event_data *ctx, void *frame_
 		add_frame(intp_stack, frame);
 	} else if (is_ffunc(fn, o)) {
 		__u8 ffid = 0;
-		if (gcfunc_get_ffid(fn, &ffid, o))
+		if (gcfunc_get_ffid(fn, &ffid, o)) {
 			return -1;
+		}
 		__u64 frame = TAG_FFUNC | (__u64) ffid;
 		add_frame(intp_stack, frame);
 	} else {
@@ -1466,13 +1478,14 @@ static int luajit_unwind(struct bpf_perf_event_data *ctx,
     }
 
 advance:
-    if (frame_islua_wr(frame, o) > 0) {
-        frame = frame_prevl_wr(frame, o);
-    } else {
-        if (frame_isvarg_wr(frame, o) > 0)
-            skip_depth++;
-        frame = frame_prevd_wr(frame, o);
-    }
+	if (frame_islua_wr(frame, o) > 0) {
+		frame = frame_prevl_wr(frame, o);
+	} else {
+		if (frame_isvarg_wr(frame, o) > 0) {
+			skip_depth++;
+		}
+		frame = frame_prevd_wr(frame, o);
+	}
 
     state->luajit_skip_depth = skip_depth;
     state->luajit_frame = frame;
@@ -1543,8 +1556,9 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 static __always_inline int probe_entry_lua(struct pt_regs *ctx)
 {
 	void *param1 = (void *)PT_REGS_PARM1(ctx);
-	if (!param1)
+	if (!param1) {
 		return 0;
+	}
 
 	__u64 id = bpf_get_current_pid_tgid();
 
