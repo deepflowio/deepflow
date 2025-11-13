@@ -892,6 +892,16 @@ impl Default for PacketDirection {
     }
 }
 
+#[cfg(feature = "enterprise")]
+impl From<PacketDirection> for enterprise_utils::l7::custom_policy::enums::TrafficDirection {
+    fn from(direction: PacketDirection) -> Self {
+        match direction {
+            PacketDirection::ClientToServer => Self::REQUEST,
+            PacketDirection::ServerToClient => Self::RESPONSE,
+        }
+    }
+}
+
 impl Display for PacketDirection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
