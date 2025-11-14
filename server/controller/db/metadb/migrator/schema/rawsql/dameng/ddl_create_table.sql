@@ -207,7 +207,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE agent_group_configuration';
 
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS vtap (
-    id                      INTEGER IDENTITY(1, 1) NOT NULL PRIMARY KEY,
+    id                      INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
     name                    VARCHAR(256) NOT NULL,
     raw_hostname            VARCHAR(256),
     owner                   VARCHAR(64) DEFAULT '''',
@@ -262,7 +262,7 @@ BEGIN
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN vtap.enable_features IS ''separated by ,''';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN vtap.disable_features IS ''separated by ,''';
     EXECUTE IMMEDIATE 'COMMENT ON COLUMN vtap.follow_group_features IS ''separated by ,''';
-    
+
     -- Analyzers
     EXECUTE IMMEDIATE 'CREATE TABLE IF NOT EXISTS analyzer (
     id                      INTEGER AUTO_INCREMENT NOT NULL PRIMARY KEY,
