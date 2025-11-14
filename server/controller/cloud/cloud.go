@@ -431,9 +431,18 @@ func (c *Cloud) run() {
 func (c *Cloud) startKubernetesGatherTask() {
 	log.Infof("cloud (%s) kubernetes gather task started", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 	c.runKubernetesGatherTask()
+	ticker := time.NewTicker(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second)
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second) {
-			c.runKubernetesGatherTask()
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.cCtx.Done():
+				log.Infof("cloud (%s) kubernetes gather task stopped", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+				return
+			case <-ticker.C:
+				c.runKubernetesGatherTask()
+			}
 		}
 	}()
 }
@@ -442,7 +451,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 	var domain metadbmodel.Domain
 	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(c.orgID))
+		log.Errorf("get domain (%s) failed: %s", c.basicInfo.Name, err.Error(), logger.NewORGPrefix(c.orgID))
 		return
 	}
 
