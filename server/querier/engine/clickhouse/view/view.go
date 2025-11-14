@@ -398,24 +398,30 @@ func (sv *SubView) ToString() string {
 
 func (sv *SubView) removeDup(ns NodeSet) []Node {
 	// 对NodeSet集合去重
-	tmpMap := make(map[string]interface{})
+	tmpMap := make(map[string]bool)
 	nodeList := ns.getList()
 	targetList := nodeList[:0]
 	for _, node := range nodeList {
 		str := node.ToString()
-		strNoPreffix := strings.Trim(str, "`")
-		if _, ok := tmpMap[strNoPreffix]; !ok {
-			targetList = append(targetList, node)
-			tmpMap[strNoPreffix] = nil
-			// if the tag after as already exists, it is also considered duplicate​​​
-			strUpper := strNoPreffix
-			if strings.Contains(strNoPreffix, " as ") {
-				strUpper = strings.ReplaceAll(strNoPreffix, " as ", " AS ")
+		postAs := ""
+		// x as y
+		// if the tag after as already exists, it is also considered duplicate​​​
+		if strings.Contains(str, " ") {
+			strSlice := strings.Fields(str)
+			if len(strSlice) == 3 && strings.ToUpper(strSlice[1]) == "AS" {
+				postAs = strings.Trim(strSlice[2], "`")
 			}
-			strSlice := strings.Split(strUpper, " AS ")
-			if len(strSlice) == 2 {
-				postAsNoPrefix := strings.Trim(strSlice[1], "`")
-				tmpMap[postAsNoPrefix] = nil
+		}
+		if postAs != "" {
+			if !tmpMap[postAs] {
+				targetList = append(targetList, node)
+				tmpMap[postAs] = true
+			}
+		} else {
+			strNoBackquote := strings.Trim(str, "`")
+			if !tmpMap[strNoBackquote] {
+				targetList = append(targetList, node)
+				tmpMap[strNoBackquote] = true
 			}
 		}
 	}
