@@ -45,7 +45,7 @@
 typedef int errno_t;
 typedef uword rsize_t;
 
-always_inline void memset_s_inline(void *s, rsize_t smax, int c, rsize_t n)
+static inline __attribute__((__always_inline__)) void memset_s_inline(void *s, rsize_t smax, int c, rsize_t n)
 {
 	u8 bad;
 

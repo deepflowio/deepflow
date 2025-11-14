@@ -1461,7 +1461,7 @@ inputs:
     #   ch: 匹配语言
     # unit:
     # range: []
-    # enum_options: [java, golang, python, nodejs, dotnet]
+    # enum_options: [java, golang, python, php, nodejs, dotnet]
     # modification: hot_update
     # ee_feature: false
     # description:
@@ -1630,6 +1630,16 @@ inputs:
         rewrite_name: $3
         enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
       - match_regex: \bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $4
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $5
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)
         match_type: cmdline_with_args
         only_in_container: false
         rewrite_name: $4

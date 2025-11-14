@@ -617,6 +617,32 @@ impl Default for Proc {
                     ..Default::default()
                 },
                 ProcessMatcher {
+                    match_regex: Regex::new(
+                        r"\bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)",
+                    )
+                    .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$5".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(r"\b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)")
+                        .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$4".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
                     match_regex: Regex::new("^deepflow-").unwrap(),
                     only_in_container: false,
                     enabled_features: vec![
