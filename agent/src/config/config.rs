@@ -1633,6 +1633,48 @@ impl Default for GrpcConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct InferenceWhitelist {
+    pub process_name: String,
+    pub port_list: Vec<u16>,
+}
+
+impl InferenceWhitelist {
+    fn format_name(name: &[u8]) -> &[u8] {
+        for i in (0..name.len()).rev() {
+            if name[i] == 0 {
+                return &name[..i];
+            }
+        }
+
+        name
+    }
+
+    pub fn is_matched(&self, name: &[u8], src_port: u16, dst_port: u16) -> bool {
+        if Self::format_name(name) != self.process_name.as_bytes() {
+            return false;
+        }
+
+        for p in self.port_list.iter() {
+            if *p == src_port || *p == dst_port {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+impl Default for InferenceWhitelist {
+    fn default() -> Self {
+        Self {
+            process_name: "envoy".to_string(),
+            port_list: vec![15001, 15006],
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
@@ -1648,6 +1690,7 @@ pub struct ApplicationProtocolInference {
     pub inference_max_retries: usize,
     #[serde(with = "humantime_serde")]
     pub inference_result_ttl: Duration,
+    pub inference_whitelist: Vec<InferenceWhitelist>,
     pub enabled_protocols: Vec<String>,
     pub protocol_special_config: ProtocolSpecialConfig,
     #[cfg(feature = "enterprise")]
@@ -1659,6 +1702,7 @@ impl Default for ApplicationProtocolInference {
         Self {
             inference_max_retries: 128,
             inference_result_ttl: Duration::from_secs(60),
+            inference_whitelist: vec![InferenceWhitelist::default()],
             enabled_protocols: vec![
                 "HTTP".to_string(),
                 "HTTP2".to_string(),
