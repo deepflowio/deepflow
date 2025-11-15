@@ -20,7 +20,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
@@ -374,6 +374,46 @@ pub enum LinuxSllPacketType {
     // These ones are invisible user level,
     Loopback = 5,  // MC/BRD frame looped back
     FastRoute = 6, // FastRoute frame
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
+#[repr(u8)]
+#[serde(rename_all = "snake_case")]
+pub enum L7ResponseStatus {
+    Ok = 0,
+    Timeout = 2,
+    ServerError = 3,
+    ClientError = 4,
+    #[default]
+    Unknown = 5,
+    ParseFailed = 6,
+}
+
+impl L7ResponseStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Timeout => "timeout",
+            Self::ServerError => "server_error",
+            Self::ClientError => "client_error",
+            Self::ParseFailed => "parse_failed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl From<&str> for L7ResponseStatus {
+    fn from(s: &str) -> Self {
+        match s {
+            "ok" => L7ResponseStatus::Ok,
+            "timeout" => L7ResponseStatus::Timeout,
+            "server_error" => L7ResponseStatus::ServerError,
+            "client_error" => L7ResponseStatus::ClientError,
+            "parse_failed" => L7ResponseStatus::ParseFailed,
+            "unknown" => L7ResponseStatus::Unknown,
+            _ => L7ResponseStatus::Unknown,
+        }
+    }
 }
 
 #[cfg(test)]
