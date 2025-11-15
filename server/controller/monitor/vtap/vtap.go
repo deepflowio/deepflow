@@ -85,16 +85,30 @@ func (v *VTapCheck) Stop() {
 
 func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	var vtaps []mysqlmodel.VTap
+	var vms []mysqlmodel.VM
+	var podNodes []mysqlmodel.PodNode
 	var reg = regexp.MustCompile(` |:`)
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
+
+	db.Select("id", "lcuuid", "name", "region").Find(&vms)
+	lcuuidToVM := make(map[string]mysqlmodel.VM)
+	for _, vm := range vms {
+		lcuuidToVM[vm.Lcuuid] = vm
+	}
+
+	db.Select("id", "lcuuid", "name", "region").Find(&podNodes)
+	lcuuidToPodNode := make(map[string]mysqlmodel.PodNode)
+	for _, podNode := range podNodes {
+		lcuuidToPodNode[podNode.Lcuuid] = podNode
+	}
 
 	db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
-			var vm mysqlmodel.VM
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
+			vm, ok := lcuuidToVM[vtap.Lcuuid]
+			if !ok {
 				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
 			} else {
@@ -158,8 +172,8 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
-			var podNode mysqlmodel.PodNode
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+			podNode, ok := lcuuidToPodNode[vtap.Lcuuid]
+			if !ok {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
 			} else {
@@ -235,13 +249,16 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 	var vtaps []mysqlmodel.VTap
 	var podNodes []mysqlmodel.PodNode
 	var conns []mysqlmodel.VMPodNodeConnection
+	var vms []mysqlmodel.VM
 
 	log.Debugf("vtap type check start", db.LogPrefixORGID)
 
-	db.Find(&podNodes)
-	idToPodNode := make(map[int]*mysqlmodel.PodNode)
-	for i, podNode := range podNodes {
-		idToPodNode[podNode.ID] = &podNodes[i]
+	db.Select("id", "lcuuid", "name").Find(&podNodes)
+	idToPodNode := make(map[int]mysqlmodel.PodNode)
+	lcuuidToPodNode := make(map[string]mysqlmodel.PodNode)
+	for _, podNode := range podNodes {
+		idToPodNode[podNode.ID] = podNode
+		lcuuidToPodNode[podNode.Lcuuid] = podNode
 	}
 
 	db.Find(&conns)
@@ -252,8 +269,9 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vms []mysqlmodel.VM
-	if err := db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
+	if err := db.Select("id", "htype").Where(
+		"htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S},
+	).Find(&vms).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
 	vmIDToVMType := make(map[int]int)
@@ -291,8 +309,8 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 				continue
 			}
 		} else {
-			var podNode mysqlmodel.PodNode
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+			podNode, ok := lcuuidToPodNode[vtap.Lcuuid]
+			if !ok {
 				continue
 			}
 			vmID, ok := podNodeIDToVMID[podNode.ID]
