@@ -146,13 +146,17 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, key string, data common.G
 			log.Errorf("get mysql session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 			return
 		}
-		db.Clauses(clause.OnConflict{
+		err = db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "vtap_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": s.nodeIP}),
+			DoUpdates: clause.AssignmentColumns([]string{"node_ip"}),
 		}).Create(&model.GenesisStorage{
 			VtapID: vtapID,
 			NodeIP: s.nodeIP,
-		})
+		}).Error
+		if err != nil {
+			log.Errorf("update storage (vtap_id:%d/node_ip:%s) failed: %s", vtapID, s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+			return
+		}
 	}
 	s.dirty = true
 }
