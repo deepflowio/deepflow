@@ -25,6 +25,7 @@ use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
 use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::common::{L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL};
+use crate::config::InferenceWhitelist;
 
 #[derive(Eq, Hash, PartialEq)]
 struct AppTable4Key {
@@ -63,6 +64,8 @@ pub struct AppTable {
 
     l7_protocol_inference_max_fail_count: u32,
     l7_protocol_inference_ttl: u64,
+
+    inference_whitelist: Vec<InferenceWhitelist>,
 }
 
 impl Default for AppTable {
@@ -72,6 +75,7 @@ impl Default for AppTable {
             ipv6: LruCache::new(Self::APP_LRU_SIZE),
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT as u32,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL as u64,
+            inference_whitelist: vec![InferenceWhitelist::default()],
         }
     }
 }
@@ -83,11 +87,13 @@ impl AppTable {
     pub fn new(
         l7_protocol_inference_max_fail_count: usize,
         l7_protocol_inference_ttl: usize,
+        inference_whitelist: Vec<InferenceWhitelist>,
     ) -> Self {
         let l7_protocol_inference_ttl = l7_protocol_inference_ttl as u64;
         Self {
             l7_protocol_inference_max_fail_count: l7_protocol_inference_max_fail_count as u32,
             l7_protocol_inference_ttl,
+            inference_whitelist,
             ..Default::default()
         }
     }
@@ -201,6 +207,21 @@ impl AppTable {
         }
     }
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    fn is_whitelist(&self, packet: &MetaPacket) -> bool {
+        for list in &self.inference_whitelist {
+            if list.is_matched(
+                &packet.process_kname,
+                packet.lookup_key.src_port,
+                packet.lookup_key.dst_port,
+            ) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     // EBPF数据MetaPacket中direction未赋值
     // return (proto, port, fail_count, last_time)
     pub fn get_protocol_from_ebpf(
@@ -209,6 +230,11 @@ impl AppTable {
         local_epc: i32,
         remote_epc: i32,
     ) -> Option<(L7ProtocolEnum, u16, u32, u64)> {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if self.is_whitelist(packet) {
+            return None;
+        }
+
         let (ip, _, dport) = Self::get_ip_epc_port(packet, true);
         let pid = if ip.is_loopback() {
             packet.process_id
