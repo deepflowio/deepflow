@@ -7232,6 +7232,97 @@ deepflow-agent will mark the application protocol for each
 changes, the validity period after successfully identifying the protocol will be
 limited to this value.
 
+#### Inference whitelist {#processors.request_log.application_protocol_inference.inference_whitelist}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list:
+        - 15001
+        - 15006
+        process_name: envoy
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+应用协议端口白名单列表，目前仅支持 eBPF 流量。
+
+配置键：
+- process_name: 进程名称，不支持正则表达式
+- port_list: 端口白名单列表
+
+##### Process name {#processors.request_log.application_protocol_inference.inference_whitelist.process_name}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.process_name`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - process_name: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Process name
+
+##### Port list {#processors.request_log.application_protocol_inference.inference_whitelist.port_list}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.port_list`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Port list
+
 #### Enabled Protocols {#processors.request_log.application_protocol_inference.enabled_protocols}
 
 **Tags**:
