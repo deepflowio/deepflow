@@ -300,6 +300,7 @@ impl FlowMap {
             app_table: AppTable::new(
                 config.l7_protocol_inference_max_fail_count,
                 config.l7_protocol_inference_ttl,
+                config.l7_protocol_inference_whitelist.clone(),
             ),
             policy_getter,
             start_time,
