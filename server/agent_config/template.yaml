@@ -4991,6 +4991,69 @@ processors:
       #     新周期。
       # upgrade_from: static_config.l7-protocol-inference-ttl
       inference_result_ttl: 60s
+      # type: dict
+      # name:
+      #   en: Inference whitelist
+      #   ch: 推理白名单
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Application protocol port whitelist, currently only supports eBPF traffic. When eBPF data is on the whitelist,
+      #     the application table is no longer used to query the application protocol. The corresponding application protocol
+      #     is obtained by polling all currently supported protocols. Having too much data on the whitelist greatly reduces the
+      #     processing performance of eBPF data.
+      #
+      #     Configuration Key:
+      #     - process_name: Process name, regular expressions are not supported
+      #     - port_list: Port Whitelist
+      #   ch: |-
+      #     应用协议端口白名单列表，目前仅支持 eBPF 流量。当 eBPF 数据在白名单列表中时，不会再使用应用表查询应用协议，
+      #     对应的应用协议通过轮训目前所有支持的协议来获取，白名单数据过多会降低 eBPF 数据的处理性能。
+      #
+      #     配置键：
+      #     - process_name: 进程名称，不支持正则表达式
+      #     - port_list: 端口白名单列表
+      # ---
+      # type: string
+      # name:
+      #   en: Process name
+      #   ch: 进程名称
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Process name
+      #   ch: |-
+      #     进程名称
+      # ---
+      # process_name: ""
+      # ---
+      # type: int
+      # name:
+      #   en: Port list
+      #   ch: 端口列表
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Port list
+      #   ch: |-
+      #     端口列表
+      # ---
+      # port_list: []
+      inference_whitelist:
+      - process_name: envoy
+        port_list: [15001, 15006]
       # type: string
       # name:
       #   en: Enabled Protocols
