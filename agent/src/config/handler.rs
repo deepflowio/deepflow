@@ -56,6 +56,7 @@ use super::{
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
+use crate::config::InferenceWhitelist;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
@@ -496,6 +497,7 @@ pub struct FlowConfig {
 
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
+    pub l7_protocol_inference_whitelist: Vec<InferenceWhitelist>,
 
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_flag: u8,
@@ -611,6 +613,12 @@ impl From<&UserConfig> for FlowConfig {
                 .application_protocol_inference
                 .inference_result_ttl
                 .as_secs() as usize,
+            l7_protocol_inference_whitelist: conf
+                .processors
+                .request_log
+                .application_protocol_inference
+                .inference_whitelist
+                .clone(),
             packet_sequence_flag: conf.processors.packet.tcp_header.header_fields_flag, // Enterprise Edition Feature: packet-sequence
             packet_sequence_block_size: conf.processors.packet.tcp_header.block_size, // Enterprise Edition Feature: packet-sequence
             l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
@@ -5007,6 +5015,14 @@ impl ConfigHandler {
                 app.inference_result_ttl, new_app.inference_result_ttl
             );
             app.inference_result_ttl = new_app.inference_result_ttl;
+            restart_agent = !first_run;
+        }
+        if app.inference_whitelist != new_app.inference_whitelist {
+            info!(
+                "Update processors.request_log.application_protocol_inference.inference_whitelist from {:?} to {:?}.",
+                app.inference_whitelist, new_app.inference_whitelist
+            );
+            app.inference_whitelist = new_app.inference_whitelist.clone();
             restart_agent = !first_run;
         }
         if app.protocol_special_config != new_app.protocol_special_config {
