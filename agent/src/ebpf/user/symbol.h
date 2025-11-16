@@ -28,12 +28,13 @@
 struct tracer_probes_conf;
 
 enum uprobe_type {
-	GO_UPROBE = 0,
-	OPENSSL_UPROBE,
-	MEMPROF_UPROBE,
-	PYTHON_UPROBE,
+    GO_UPROBE = 0,
+    OPENSSL_UPROBE,
+    MEMPROF_UPROBE,
+    PYTHON_UPROBE,
 	ENVOY_UPROBE,
-	OTHER_UPROBE
+	LUA_UPROBE,
+    OTHER_UPROBE
 };
 
 enum proc_act_type {

@@ -1876,6 +1876,13 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
+      match_regex: \b(?:lua|luajit)(\S)*( +-\S+)* +(\S*/)*([^ /]+)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: $5
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
       match_regex: ^deepflow-
       only_in_container: false
     - enabled_features:
@@ -2032,6 +2039,7 @@ inputs:
 | java | |
 | golang | |
 | python | |
+| lua | |
 | nodejs | |
 | dotnet | |
 
@@ -10605,4 +10613,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

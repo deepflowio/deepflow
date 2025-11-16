@@ -39,7 +39,6 @@
  * Due to the reuse of stack trace identifiers and destructive reads, the Stringifier
  * caches the result of its stringification. In each iteration of a continuous perf profiler.
  */
-
 #ifndef AARCH64_MUSL
 #include "../config.h"
 #include "../utils.h"
@@ -61,7 +60,6 @@
 #include <bcc/bcc_syms.h>
 #include "../proc.h"
 #include "trace_utils.h"
-
 // static const char *k_err_tag = "[kernel stack trace error]";
 // static const char *u_err_tag = "[user stack trace error]";
 static const char *i_err_tag = "[interpreter stack trace error]";
@@ -69,6 +67,11 @@ static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
+
+extern char *lua_format_folded_stack_trace(void *tracer_handle, uint32_t pid,
+					   const __u64 *frames, __u32 frame_count,
+					   bool new_cache, void *info_p,
+					   const char *err_tag);
 
 /*
  * To track the scenario where stack data is missing in the eBPF
@@ -378,21 +381,24 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	return ret;
 }
 
-static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
-			  u64 address, bool is_create, void *info_p)
+char *resolve_addr(void *tracer_handle, uint32_t pid, bool is_start_idx,
+		   u64 address, bool new_cache, void *info_p)
 {
-	ASSERT(pid >= 0);
+	struct bpf_tracer *t = tracer_handle;
+	pid_t pid_signed = (pid_t)pid;
+
+	ASSERT(pid_signed >= 0);
 
 	int len = 0;
 	char *ptr = NULL;
 	char format_str[32];
 	struct bcc_symbol sym;
 	memset(&sym, 0, sizeof(sym));
-	void *resolver = get_symbol_cache(pid, is_create);
+	void *resolver = get_symbol_cache(pid_signed, new_cache);
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym, info_p, &ptr);
+	int ret = symcache_resolve(pid_signed, resolver, address, &sym, info_p, &ptr);
 	if (ret == 0 && ptr) {
 		char *p = ptr;
 		/*
@@ -483,13 +489,13 @@ static int get_stack_ips(struct bpf_tracer *t,
 }
 
 static char *build_stack_trace_string(struct bpf_tracer *t,
-				      const char *stack_map_name,
-				      pid_t pid,
-				      int stack_id,
-				      stack_str_hash_t * h,
-				      bool new_cache,
-				      int *ret_val, void *info_p, u64 ts,
-				      bool ignore_libs, bool use_symbol_table)
+		      const char *stack_map_name,
+		      pid_t pid,
+		      int stack_id,
+		      stack_str_hash_t * h,
+		      bool new_cache,
+		      int *ret_val, void *info_p, u64 ts,
+		      bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -601,6 +607,61 @@ failed:
 	vec_free(symbol_array);
 
 	return NULL;
+}
+
+static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
+					   int stack_id,
+					   pid_t pid,
+					   const char *stack_map_name,
+					   stack_str_hash_t * h,
+					   bool new_cache, void *info_p)
+{
+	/* Interpreter stacks are optional; missing ids indicate the kernel skipped unwinding. */
+	if (stack_id < 0)
+		return NULL;
+
+	stack_str_hash_kv kv;
+	kv.key = ((u64) pid << 32) | (u32) stack_id;
+	kv.value = 0;
+	if (stack_str_hash_search(h, &kv, &kv) == 0) {
+		__sync_fetch_and_add(&h->hit_hash_count, 1);
+		return (char *)kv.value;
+	}
+
+	if (!stack_map_name)
+		return NULL;
+
+	/* Raw frames come from the interpreter stack map populated by the Lua BPF program. */
+	int fd = bpf_table_get_fd(t, stack_map_name);
+	if (fd < 0)
+		return NULL;
+
+	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = { 0 };
+	__u32 key = stack_id;
+	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0)
+		return NULL;
+
+	u32 frame_count = 0;
+	for (; frame_count < PERF_MAX_STACK_DEPTH; frame_count++) {
+		if (raw_frames[frame_count] == 0)
+			break;
+	}
+	if (frame_count == 0)
+		return NULL;
+
+	char *result =
+	    lua_format_folded_stack_trace(t, pid, raw_frames, frame_count,
+					  new_cache, info_p, i_err_tag);
+	if (!result)
+		return NULL;
+
+	kv.value = pointer_to_uword(result);
+	if (stack_str_hash_add_del(h, &kv, 1)) {
+		clib_mem_free(result);
+		result = NULL;
+	}
+
+	return result;
 }
 
 static char *folded_stack_trace_string(struct bpf_tracer *t,
@@ -769,14 +830,47 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	bool has_intpstack = v->intpstack > 0;
+	bool is_lua = false;
+	bool is_python = false;
+
 	if (has_intpstack) {
-		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid, custom_stack_map_name, h, new_cache, info_p, v->timestamp, ignore_libs, true);
+		if (is_lua_process((uint32_t)v->tgid)) {
+			i_trace_str = folded_lua_stack_trace_string(t, v->intpstack,
+														v->tgid,
+														custom_stack_map_name,
+														h, new_cache,
+														info_p);
+			if (i_trace_str != NULL) {
+				is_lua = true;
+			}
+		}
+
+		if (!i_trace_str && is_python_process((uint32_t)v->tgid)) {
+			i_trace_str = folded_stack_trace_string(t, v->intpstack,
+													v->tgid,
+													custom_stack_map_name,
+													h, new_cache,
+													info_p,
+													v->timestamp,
+													ignore_libs, true);
+			if (i_trace_str != NULL) {
+				is_python = true;
+			}
+		}
+
 		if (i_trace_str != NULL) {
-			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
+			if (is_python) {
+				len += strlen(i_trace_str)
+					+ strlen(INCOMPLETE_PYTHON_STACK)
+					+ 2;
+			} else {
+				len += strlen(i_trace_str) + 1;
+			}
 		} else {
 			len += strlen(i_err_tag);
 		}
 	}
+
 
 	trace_str = alloc_stack_trace_str(len);
 	if (trace_str == NULL) {
@@ -784,10 +878,15 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		goto error;
 	}
 
-	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
+	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		if (is_lua) {
+			offset += merge_lua_stacks(trace_str + offset, len - offset,
+						   u_trace_str, i_trace_str);
+		} else if (is_python) {
+			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		}
 	} else if (i_trace_str) {
 		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
 	} else if (u_trace_str) {
