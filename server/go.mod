@@ -11,6 +11,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand => ./controller/cloud/tencent/expand
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition => ./controller/db/metadb/migrator/edition
 	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition => ./controller/db/metadb/session/edition
+	github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/edition => ./controller/db/metadb/sqladapter/edition
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync => ./controller/genesis/store/sync
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
@@ -55,6 +56,8 @@ require (
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/config/configdefaults v0.0.0-00010101000000-000000000000
@@ -113,7 +116,6 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/IBM/sarama v1.43.0
 	github.com/bytedance/sonic v1.12.5
-	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/dd_import v0.0.0-00010101000000-000000000000
