@@ -19,7 +19,7 @@ package config
 const (
 	MetaDBTypeMySQL      = "MySQL"
 	MetaDBTypePostgreSQL = "PostgreSQL"
-	MetaDBTypeDM = "DM"
+	MetaDBTypeDM         = "DM"
 )
 
 type Config struct {
