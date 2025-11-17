@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,44 +14,15 @@
  * limitations under the License.
  */
 
-package common
+package edition
 
 import (
 	"fmt"
 
-	"gorm.io/gorm"
-
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/types"
 )
 
-type DBConfig struct {
-	DB     *gorm.DB
-	Config config.Config
-	SqlFmt types.SQLAdapter
-}
-
-func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
-	return &DBConfig{
-		DB:     db,
-		Config: cfg,
-		SqlFmt: sqladapter.GetSQLAdapter(cfg),
-	}
-}
-
-func (dc *DBConfig) GetDatabaseName() string {
-	return dc.Config.Database
-}
-
-func (dc *DBConfig) SetDB(db *gorm.DB) {
-	dc.DB = db
-}
-
-func (dc *DBConfig) SetConfig(c config.Config) {
-	dc.Config = c
-}
-
-func LogDBName(databaseName string, format string, a ...any) string {
-	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
+func GetAdapter(cfg config.Config) (types.SQLAdapter, error) {
+	return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
 }
