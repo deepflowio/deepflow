@@ -256,7 +256,10 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 				}
 			}
 			customServiceIDToResourceIDs[cs.ID] = resourceIDs
+
+			continue
 		}
+
 		var ipPorts []customServiceIPPortKey
 
 		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
