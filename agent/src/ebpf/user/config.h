@@ -71,14 +71,23 @@
 #define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
 #define MAP_PYTHON_UNWIND_INFO_NAME     "__python_unwind_info_map"
 #define MAP_PYTHON_OFFSETS_NAME         "__python_offsets_map"
-#define MAP_SYMBOL_TABLE_NAME          "__symbol_table"
+#define MAP_SYMBOL_TABLE_NAME           "__symbol_table"
+
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
 #define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 #define PROG_PYTHON_UNWIND_FOR_PE   "df_PE_python_unwind"
+#define PROG_LUA_UNWIND_FOR_PE      "df_PE_lua_unwind"
 #define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
-// 增加 lua 相关的程序名
+
+// lua related maps
+#define MAP_LUA_LANG_FLAGS_NAME         "__lang_flags_map"
+#define MAP_LUA_UNWIND_INFO_NAME        "__lua_unwind_info_map"
+#define MAP_LUA_OFFSETS_NAME            "__lua_offsets_map"
+#define MAP_LUAJIT_OFFSETS_NAME         "__luajit_offsets_map"
+#define MAP_LUA_TSTATE_NAME             "__lua_tstate_map"
+
 
 #define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
 #define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"
@@ -108,6 +117,7 @@ enum {
 enum {
 	PROG_DWARF_UNWIND_PE_IDX,
 	PROG_PYTHON_UNWIND_PE_IDX,
+	PROG_LUA_UNWIND_PE_IDX,
 	PROG_ONCPU_OUTPUT_PE_IDX,
 	CP_PROG_PE_NUM
 };
