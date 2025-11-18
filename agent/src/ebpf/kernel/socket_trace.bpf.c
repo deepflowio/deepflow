@@ -1630,6 +1630,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->tgid = tgid;
 	v->is_tls = false;
 	v->pid = (__u32) bpf_get_current_pid_tgid();
+	v->fd = args->fd; 
 
 	// For blocking reads, there is a significant deviation between the
 	// entry time of the system call and the real time of the read
@@ -2855,7 +2856,7 @@ KRETFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 }
 
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
-					__u16 l7_proto,
+					__u16 l7_proto, int fd,
 					enum process_data_extra_source source,
 					struct member_fields_offset *offset,
 					void *ctx)
@@ -2888,6 +2889,7 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	v->data_seq = seq;
 	v->msg_type = MSG_CLOSE;
 	v->data_type = l7_proto;
+	v->fd = fd;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
@@ -2961,7 +2963,7 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 
 	delete_socket_info(conn_key, socket_info_ptr);
 	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
-			   socket_info_ptr->l7_proto, source,
+			   socket_info_ptr->l7_proto, fd, source,
 			   offset, (void *)ctx);
 	return 0;
 }
