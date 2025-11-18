@@ -33,7 +33,7 @@ type MySQLChModel interface {
 		metadbmodel.ChDevice | metadbmodel.ChIPRelation | metadbmodel.ChPodGroup | metadbmodel.ChNetwork | metadbmodel.ChPod | metadbmodel.ChPodCluster |
 		metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChTapType | metadbmodel.ChVTap | metadbmodel.ChPodK8sLabels | metadbmodel.ChNodeType | metadbmodel.ChGProcess | metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations |
 		metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
-		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel
+		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel | metadbmodel.ChCustomBizService | metadbmodel.ChCustomBizServiceFilter
 }
 
 type SubscriberMetaDBChModel interface {
