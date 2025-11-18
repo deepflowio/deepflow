@@ -2234,6 +2234,26 @@ CREATE TABLE IF NOT EXISTS ch_user (
 TRUNCATE TABLE ch_user;
 CREATE INDEX ch_user_updated_at_index ON ch_user(updated_at);
 
+CREATE TABLE IF NOT EXISTS ch_custom_biz_service (
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(256),
+    uid             VARCHAR(64),
+    icon_id         INTEGER,
+    team_id         INTEGER DEFAULT 1,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE ch_custom_biz_service;
+CREATE INDEX ch_custom_biz_service_updated_at_index ON ch_custom_biz_service(updated_at);
+
+CREATE TABLE IF NOT EXISTS ch_custom_biz_service_filter (
+    id               SERIAL PRIMARY KEY,
+    client_filter    TEXT,
+    server_filter    TEXT,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE ch_custom_biz_service_filter;
+CREATE INDEX ch_custom_biz_service_filter_updated_at_index ON ch_custom_biz_service_filter(updated_at);
+
 -- NPB/PCAP
 CREATE TABLE IF NOT EXISTS acl (
     id                     SERIAL PRIMARY KEY,
