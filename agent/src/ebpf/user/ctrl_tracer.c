@@ -53,6 +53,7 @@ struct df_bpf_conf {
 	int timeout;
 	char *match_str;
 	int pid;
+	int fd;
 	int l7_proto;
 	bool is_all_files;
 	char *comm_str;
@@ -85,7 +86,11 @@ static void tracer_help(void)
 
 static void socktrace_help(void)
 {
-	fprintf(stderr, "Usage:\n" "    %s tracer show\n", DF_BPF_NAME);
+	fprintf(stderr,
+		"Usage:\n"
+		"    %s socktrace show\n"
+		"    %s socktrace get --pid <PID> --fd <FD>\n",
+		DF_BPF_NAME, DF_BPF_NAME);
 }
 
 static void match_pids_help(void)
@@ -517,6 +522,7 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	struct bpf_offset_param_array *array = NULL;
 	size_t size, i;
 	int err;
+	struct socktrace_msg msg = { 0 };
 	char linux_ver_str[LINUX_VER_LEN];
 	memset((void *)linux_ver_str, 0, sizeof(linux_ver_str));
 	get_kernel_version(linux_ver_str);
@@ -524,9 +530,12 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 
 	switch (conf->cmd) {
 	case DF_BPF_CMD_SHOW:
+		msg.pid = conf->pid;
+		msg.fd = conf->fd;
 		err =
-		    df_bpf_getsockopt(SOCKOPT_GET_SOCKTRACE_SHOW, NULL,
-				      0, (void **)&sk_trace_params, &size);
+		    df_bpf_getsockopt(SOCKOPT_GET_SOCKTRACE_SHOW, &msg,
+				      sizeof(msg), (void **)&sk_trace_params,
+				      &size);
 		if (err != 0)
 			return err;
 
@@ -543,28 +552,52 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			return ETR_INVAL;
 		}
 
-		printf("kern_socket_map_max:\t%u\n",
+		printf
+		    ("The socket information for process ID %d, socket fd %d is as follows:\n",
+		     msg.pid, msg.fd);
+		printf("  socket_id:\t%lu\n", sk_trace_params->socket_id);
+		printf("  seq:\t\t%lu\n", sk_trace_params->seq);
+		printf("  l7_proto:\t%u(%s)\n", sk_trace_params->l7_proto,
+		       get_proto_name(sk_trace_params->l7_proto));
+		printf("  data_source:\t%u\n", sk_trace_params->data_source);
+		printf("  direction:\t%u\n", sk_trace_params->direction);
+		printf("  pre_direction:\t%u\n",
+		       sk_trace_params->pre_direction);
+		printf("  is_tls:\t\t%d\n", sk_trace_params->is_tls);
+		printf("  peer_fd:\t%u\n", sk_trace_params->peer_fd);
+		printf("  prev_data_len:\t%u\n",
+		       sk_trace_params->prev_data_len);
+		printf("  allow_reassembly:\t%d\n",
+		       sk_trace_params->allow_reassembly);
+		printf("  finish_reasm:\t%d\n", sk_trace_params->finish_reasm);
+		printf("  force_reasm:\t%d\n", sk_trace_params->force_reasm);
+		printf("  no_trace:\t%d\n", sk_trace_params->no_trace);
+		printf("  reasm_bytes:\t%u\n", sk_trace_params->reasm_bytes);
+		printf("  update_time:\t%u\n\n", sk_trace_params->update_time);
+		printf("Monitoring information:\n");
+		printf("  kern_socket_map_max:\t%u\n",
 		       sk_trace_params->kern_socket_map_max);
-		printf("kern_socket_map_used:\t%u\n",
+		printf("  kern_socket_map_used:\t%u\n",
 		       sk_trace_params->kern_socket_map_used);
-		printf("kern_trace_map_max:\t%u\n",
+		printf("  kern_trace_map_max:\t%u\n",
 		       sk_trace_params->kern_trace_map_max);
-		printf("kern_trace_map_used:\t%u\n",
+		printf("  kern_trace_map_used:\t%u\n",
 		       sk_trace_params->kern_trace_map_used);
-		printf("proc_exec_event_count:\t%lu\n",
+		printf("  proc_exec_event_count:\t%lu\n",
 		       sk_trace_params->proc_exec_event_count);
-		printf("proc_exit_event_count:\t%lu\n",
+		printf("  proc_exit_event_count:\t%lu\n",
 		       sk_trace_params->proc_exit_event_count);
-		printf("datadump_enable:\t%s\n",
+		printf("  datadump_enable:\t%s\n",
 		       sk_trace_params->datadump_enable ? "true" : "false");
-		printf("datadump_pid:\t%d\n", sk_trace_params->datadump_pid);
-		printf("datadump_proto:\t%d\n",
+		printf("  datadump_pid:\t%d\n", sk_trace_params->datadump_pid);
+		printf("  datadump_proto:\t%d\n",
 		       sk_trace_params->datadump_proto);
-		printf("datadump_comm:\t%s\n", sk_trace_params->datadump_comm);
-		printf("datadump_file_path:\t%s\n\n",
+		printf("  datadump_comm:\t%s\n",
+		       sk_trace_params->datadump_comm);
+		printf("  datadump_file_path:\t%s\n\n",
 		       sk_trace_params->datadump_file_path);
 
-		printf("tracer_state:\t%s\n\n",
+		printf("  tracer_state:\t%s\n\n",
 		       get_tracer_state_name(sk_trace_params->tracer_state));
 
 		for (i = 0; i < array->count; i++) {
@@ -734,8 +767,7 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 				snprintf(cmdbuf, sizeof(cmdbuf),
 					 "grep -n -A 1 \"%s\" %s",
 					 match_str,
-					 conf->
-					 is_all_files ?
+					 conf->is_all_files ?
 					 "/var/log/datadump-*.log" :
 					 "$(ls -t /var/log/datadump-*.log | head -n 1)");
 				printf("%s\n", cmdbuf);
@@ -904,6 +936,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"timeout", required_argument, NULL, 't'},
 		{"match-str", required_argument, NULL, 'm'},
 		{"pid", required_argument, NULL, 'p'},
+		{"fd", required_argument, NULL, 'f'},
 		{"comm", required_argument, NULL, 'c'},
 		{"l7-proto", required_argument, NULL, 'l'},
 		{NULL, 0, NULL, 0},
@@ -925,7 +958,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	}
 
 	while ((opt =
-		getopt_long(argc, argv, "vhVCOAt:m:p:c:l:", opts,
+		getopt_long(argc, argv, "vhVCOAt:m:p:f:c:l:", opts,
 			    NULL)) != -1) {
 		switch (opt) {
 		case 'v':
@@ -958,6 +991,14 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 			if (conf->pid < 0) {
 				fprintf(stderr,
 					"Invalid option: --pid, need >= 0\n");
+				return -1;
+			}
+			break;
+		case 'f':
+			conf->fd = atoi(optarg);
+			if (conf->pid < 0) {
+				fprintf(stderr,
+					"Invalid option: --fd, need >= 0\n");
 				return -1;
 			}
 			break;
@@ -1007,8 +1048,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 			break;
 		case '?':
 		default:
-			fprintf(stderr, "aa Invalid option: %s\n",
-				argv[optind]);
+			fprintf(stderr, "Invalid option: %s\n", argv[optind]);
 			return -1;
 		}
 	}
@@ -1032,7 +1072,8 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		exit(1);
 	}
 
-	if (strcmp(argv[1], "show") == 0 || strcmp(argv[1], "list") == 0) {
+	if (strcmp(argv[1], "show") == 0 || strcmp(argv[1], "list") == 0
+	    || strcmp(argv[1], "get") == 0) {
 		conf->cmd = DF_BPF_CMD_SHOW;
 		goto show_exit;
 	} else if (strcmp(argv[1], "set") == 0) {
@@ -1046,7 +1087,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		goto show_exit;
 	} else if (strcmp(argv[1], "print") == 0) {
 		conf->cmd = DF_BPF_CMD_PRINT;
-    goto show_exit;
+		goto show_exit;
 	} else if (strcmp(argv[1], "ls") == 0) {
 		conf->cmd = DF_BPF_CMD_SHOW;
 		goto show_exit;
