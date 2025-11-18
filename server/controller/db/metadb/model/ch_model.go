@@ -653,3 +653,27 @@ type ChUser struct {
 	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
+
+type ChCustomBizService struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	IconID    int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	UID       string    `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
+
+func (ChCustomBizService) TableName() string {
+	return "ch_custom_biz_service"
+}
+
+type ChCustomBizServiceFilter struct {
+	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ClientFilter string    `gorm:"column:client_filter;type:text" json:"CLIENT_FILTER"`
+	ServerFilter string    `gorm:"column:server_filter;type:text" json:"SERVER_FILTER"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
+
+func (ChCustomBizServiceFilter) TableName() string {
+	return "ch_custom_biz_service_filter"
+}
