@@ -710,7 +710,9 @@ void build_prog_jump_tables(struct bpf_tracer *tracer)
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
 			   PROG_PYTHON_UNWIND_FOR_PE,
 			   PROG_PYTHON_UNWIND_PE_IDX);
-        // TODO: 增加 lua 相关的程序
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+		   	   PROG_LUA_UNWIND_FOR_PE,
+		   	   PROG_LUA_UNWIND_PE_IDX);
 	extended_prog_jump_tables(tracer);
 }
 

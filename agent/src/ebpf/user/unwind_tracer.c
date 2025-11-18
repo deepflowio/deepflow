@@ -55,6 +55,48 @@ static unwind_table_t *g_unwind_table = NULL;
 static pthread_mutex_t g_python_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static python_unwind_table_t *g_python_unwind_table = NULL;
 
+static pthread_mutex_t g_lua_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
+static lua_unwind_table_t *g_lua_unwind_table = NULL;
+static void lua_queue_existing_processes(struct bpf_tracer *tracer);
+
+static struct symbol lua_symbols[] = {
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_resume",
+        .symbol_prefix = NULL,
+        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_pcall",
+        .symbol_prefix = NULL,
+        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_pcallk",
+        .symbol_prefix = NULL,
+        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_yield",
+        .symbol_prefix = NULL,
+        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
+        .is_probe_ret = false,
+    },
+    {
+        .type = LUA_UPROBE,
+        .symbol = "lua_yieldk",
+        .symbol_prefix = NULL,
+        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
+        .is_probe_ret = false,
+    },
+};
+
 static struct {
     bool dwarf_enabled;
     struct {
@@ -229,17 +271,40 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_python_unwind_table = python_table;
     pthread_mutex_unlock(&g_python_unwind_table_lock);
 
-    // TODO: 创建 lua 剖析使用的 bpf table 并设置大小
+    int lua_lang_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
+    int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
+    int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
+    int luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
+
+    if (lua_lang_fd < 0 || lua_unwind_info_fd < 0 || lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
+        ebpf_warning("Failed to get lua profiling map fds (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
+                     lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+        return -1;
+    }
+
+    lua_unwind_table_t *lua_table =
+        lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+    if (lua_table == NULL) {
+        ebpf_warning("Failed to create lua unwind table\n");
+        return -1;
+    }
+    lua_set_map_fds(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+
+    pthread_mutex_lock(&g_lua_unwind_table_lock);
+    g_lua_unwind_table = lua_table;
+    pthread_mutex_unlock(&g_lua_unwind_table_lock);
+
+	if (dwarf_available() && get_dwarf_enabled() && tracer) {
+		lua_queue_existing_processes(tracer);
+	}
 
     return 0;
 }
 
-/* *INDENT-OFF* */
 static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
                                             .symbol = "PyEval_SaveThread",
                                             .probe_func = URETPROBE_FUNC_NAME(python_save_tstate_addr),
                                             .is_probe_ret = true, }, };
-/* *INDENT-ON* */
 
 static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     char *path = NULL;
@@ -279,6 +344,82 @@ out:
     return;
 }
 
+static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
+    lua_runtime_info_t info = {0};
+    char path[sizeof(info.path)] = {0};
+    int n = 0;
+
+    if (pid <= 1) {
+        return;
+    }
+
+    if (!is_user_process(pid)) {
+        return;
+    }
+
+    if (lua_detect(pid, &info) != 0) {
+        return;
+    }
+
+    if (info.kind == 0 || info.path[0] == '\0') {
+        return;
+    }
+
+    size_t len = strnlen((const char *)info.path, sizeof(info.path));
+    if (len == 0) {
+        return;
+    }
+
+    if (len >= sizeof(path)) {
+        len = sizeof(path) - 1;
+    }
+    memcpy(path, info.path, len);
+    path[len] = '\0';
+
+    n = add_probe_sym_to_tracer_probes(pid, path, conf, lua_symbols, NELEMS(lua_symbols));
+    if (n > 0) {
+        ebpf_info("A lua %d uprobe, pid:%d, path:%s\n", n, pid, path);
+    }
+}
+
+static void lua_queue_existing_processes(struct bpf_tracer *tracer)
+{
+	DIR *dir = NULL;
+	struct dirent *entry = NULL;
+	if (tracer == NULL || tracer->state != TRACER_RUNNING) {
+		return;
+	}
+
+	dir = opendir("/proc");
+	if (!dir) {
+		ebpf_warning("Failed to open /proc when queuing existing lua processes.\n");
+		return;
+	}
+
+	while ((entry = readdir(dir))) {
+		if (entry->d_type != DT_DIR) {
+			continue;
+		}
+
+		int pid = atoi(entry->d_name);
+		if (pid <= 1) {
+			continue;
+		}
+
+		if (!process_probing_check(pid)) {
+			continue;
+		}
+
+		if (!is_lua_process(pid)) {
+			continue;
+		}
+
+		add_event_to_proc_list(&proc_events, tracer, pid, NULL);
+	}
+
+	closedir(dir);
+}
+
 void unwind_tracer_drop() {
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
@@ -294,6 +435,13 @@ void unwind_tracer_drop() {
         g_python_unwind_table = NULL;
     }
     pthread_mutex_unlock(&g_python_unwind_table_lock);
+
+    pthread_mutex_lock(&g_lua_unwind_table_lock);
+    if (g_lua_unwind_table) {
+        lua_unwind_table_destroy(g_lua_unwind_table);
+        g_lua_unwind_table = NULL;
+    }
+    pthread_mutex_unlock(&g_lua_unwind_table_lock);
 }
 
 void unwind_process_exec(int pid) {
@@ -320,6 +468,7 @@ void unwind_events_handle(void) {
     int count = 0;
     pthread_mutex_lock(&g_unwind_table_lock);
     pthread_mutex_lock(&g_python_unwind_table_lock);
+    pthread_mutex_lock(&g_lua_unwind_table_lock);
     do {
         event = get_first_event(&proc_events);
         if (!event)
@@ -340,8 +489,14 @@ void unwind_events_handle(void) {
         }
 
         if (tracer && is_lua_process(event->pid)) {
-            // TODO: 加载 lua 剖析使用的 bpf table
-            // TODO: 如果有相关 uprobe 则注册
+            if (g_lua_unwind_table) {
+                lua_unwind_table_load(g_lua_unwind_table, event->pid);
+            }
+            pthread_mutex_lock(&tracer->mutex_probes_lock);
+            lua_parse_and_register(event->pid, tracer->tps);
+            tracer_uprobes_update(tracer);
+            tracer_hooks_process(tracer, HOOK_ATTACH, &count);
+            pthread_mutex_unlock(&tracer->mutex_probes_lock);
         }
 
         if (g_unwind_table && requires_dwarf_unwind_table(event->pid)) {
@@ -352,6 +507,7 @@ void unwind_events_handle(void) {
         process_event_free(event);
 
     } while (true);
+    pthread_mutex_unlock(&g_lua_unwind_table_lock);
     pthread_mutex_unlock(&g_python_unwind_table_lock);
     pthread_mutex_unlock(&g_unwind_table_lock);
 }
@@ -391,7 +547,11 @@ void unwind_process_exit(int pid) {
     }
     pthread_mutex_unlock(&g_python_unwind_table_lock);
 
-    // TODO: 卸载 lua 剖析使用的 bpf table
+    pthread_mutex_lock(&g_lua_unwind_table_lock);
+    if (g_lua_unwind_table) {
+        lua_unwind_table_unload(g_lua_unwind_table, pid);
+    }
+    pthread_mutex_unlock(&g_lua_unwind_table_lock);
 }
 
 // Ensure exclusive access to *unwind_table before calling this function
