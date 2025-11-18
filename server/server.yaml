@@ -93,6 +93,13 @@ controller:
     port: 20825
     timeout: 30
 
+  # deepflow querier js config
+  querier-js-service:
+    enabled: false
+    host: querier-js
+    port: 30420
+    timeout: 30
+
   # deepflow fpermit service config
   fpermit:
     enabled: false
