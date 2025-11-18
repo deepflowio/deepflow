@@ -59,6 +59,13 @@ type DFWebService struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
+type QuerierJSService struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"querier-js" yaml:"host"`
+	Port    int    `default:"30420" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type ControllerConfig struct {
 	LogFile                        string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel                       string `default:"info" yaml:"log-level"`
@@ -82,9 +89,10 @@ type ControllerConfig struct {
 	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
 	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
-	DFWebService DFWebService   `yaml:"df-web-service"`
-	FPermit      common.FPermit `yaml:"fpermit"`
-	Pcap         configs.Pcap   `yaml:"pcap"`
+	DFWebService     DFWebService     `yaml:"df-web-service"`
+	QuerierJSService QuerierJSService `yaml:"querier-js-service"`
+	FPermit          common.FPermit   `yaml:"fpermit"`
+	Pcap             configs.Pcap     `yaml:"pcap"`
 
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
