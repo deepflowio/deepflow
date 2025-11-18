@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -30,11 +30,12 @@ import (
 )
 
 type SyncStorage struct {
+	nodeIP          string
+	dirty           bool
 	cfg             config.GenesisConfig
 	vCtx            context.Context
 	vCancel         context.CancelFunc
 	channel         chan GenesisSyncData
-	dirty           bool
 	mutex           sync.Mutex
 	genesisSyncInfo GenesisSyncDataOperation
 }
@@ -42,61 +43,60 @@ type SyncStorage struct {
 func NewSyncStorage(cfg config.GenesisConfig, sChan chan GenesisSyncData, ctx context.Context) *SyncStorage {
 	vCtx, vCancel := context.WithCancel(ctx)
 	return &SyncStorage{
+		nodeIP:          os.Getenv(ccommon.NODE_IP_KEY),
 		cfg:             cfg,
 		vCtx:            vCtx,
 		vCancel:         vCancel,
 		channel:         sChan,
-		dirty:           false,
 		mutex:           sync.Mutex{},
 		genesisSyncInfo: GenesisSyncDataOperation{},
 	}
 }
 
-func (s *SyncStorage) Renew(vtapID uint32, refresh bool, data GenesisSyncDataOperation) {
+func (s *SyncStorage) Renew(vtapID uint32, refresh bool, data GenesisSyncData) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if data.VIPs != nil {
-		s.genesisSyncInfo.VIPs.Renew(data.VIPs.Fetch(), now)
+		s.genesisSyncInfo.VIPs.Renew(vtapID, data.VIPs, now)
 	}
 	if data.VMs != nil {
-		s.genesisSyncInfo.VMs.Renew(data.VMs.Fetch(), now)
+		s.genesisSyncInfo.VMs.Renew(vtapID, data.VMs, now)
 	}
 	if data.VPCs != nil {
-		s.genesisSyncInfo.VPCs.Renew(data.VPCs.Fetch(), now)
+		s.genesisSyncInfo.VPCs.Renew(vtapID, data.VPCs, now)
 	}
 	if data.Hosts != nil {
-		s.genesisSyncInfo.Hosts.Renew(data.Hosts.Fetch(), now)
+		s.genesisSyncInfo.Hosts.Renew(vtapID, data.Hosts, now)
 	}
 	if data.Lldps != nil {
-		s.genesisSyncInfo.Lldps.Renew(data.Lldps.Fetch(), now)
+		s.genesisSyncInfo.Lldps.Renew(vtapID, data.Lldps, now)
 	}
 	if data.Ports != nil {
-		s.genesisSyncInfo.Ports.Renew(data.Ports.Fetch(), now)
+		s.genesisSyncInfo.Ports.Renew(vtapID, data.Ports, now)
 	}
 	if data.Networks != nil {
-		s.genesisSyncInfo.Networks.Renew(data.Networks.Fetch(), now)
+		s.genesisSyncInfo.Networks.Renew(vtapID, data.Networks, now)
 	}
-	if data.IPlastseens != nil {
-		s.genesisSyncInfo.IPlastseens.Renew(data.IPlastseens.Fetch(), now)
+	if data.IPLastSeens != nil {
+		s.genesisSyncInfo.IPlastseens.Renew(vtapID, data.IPLastSeens, now)
 	}
 	if data.Vinterfaces != nil {
-		s.genesisSyncInfo.Vinterfaces.Renew(data.Vinterfaces.Fetch(), now)
+		s.genesisSyncInfo.Vinterfaces.Renew(vtapID, data.Vinterfaces, now)
 	}
 	if data.Processes != nil {
-		s.genesisSyncInfo.Processes.Renew(data.Processes.Fetch(), now)
+		s.genesisSyncInfo.Processes.Renew(vtapID, data.Processes, now)
 	}
 	if !refresh {
 		return
 	}
-	nodeIP := os.Getenv(common.NODE_IP_KEY)
-	err := mysql.Db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, nodeIP).Update("node_ip", nodeIP).Error
+	err := mysql.Db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
 	if err != nil {
-		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, nodeIP, err)
+		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, s.nodeIP, err)
 	}
 }
 
-func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
+func (s *SyncStorage) Update(data GenesisSyncData, vtapID uint32) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -104,56 +104,59 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 	updateFlag := false
 	if data.VIPs != nil {
 		updateFlag = true
-		s.genesisSyncInfo.VIPs.Update(data.VIPs.Fetch(), now)
+		s.genesisSyncInfo.VIPs.Update(vtapID, data.VIPs, now)
 	}
 	if data.VMs != nil {
 		updateFlag = true
-		s.genesisSyncInfo.VMs.Update(data.VMs.Fetch(), now)
+		s.genesisSyncInfo.VMs.Update(vtapID, data.VMs, now)
 	}
 	if data.VPCs != nil {
 		updateFlag = true
-		s.genesisSyncInfo.VPCs.Update(data.VPCs.Fetch(), now)
+		s.genesisSyncInfo.VPCs.Update(vtapID, data.VPCs, now)
 	}
 	if data.Hosts != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Hosts.Update(data.Hosts.Fetch(), now)
+		s.genesisSyncInfo.Hosts.Update(vtapID, data.Hosts, now)
 	}
 	if data.Lldps != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Lldps.Update(data.Lldps.Fetch(), now)
+		s.genesisSyncInfo.Lldps.Update(vtapID, data.Lldps, now)
 	}
 	if data.Ports != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Ports.Update(data.Ports.Fetch(), now)
+		s.genesisSyncInfo.Ports.Update(vtapID, data.Ports, now)
 	}
 	if data.Networks != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Networks.Update(data.Networks.Fetch(), now)
+		s.genesisSyncInfo.Networks.Update(vtapID, data.Networks, now)
 	}
-	if data.IPlastseens != nil {
+	if data.IPLastSeens != nil {
 		updateFlag = true
-		s.genesisSyncInfo.IPlastseens.Update(data.IPlastseens.Fetch(), now)
+		s.genesisSyncInfo.IPlastseens.Update(vtapID, data.IPLastSeens, now)
 	}
 	if data.Vinterfaces != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
+		s.genesisSyncInfo.Vinterfaces.Update(vtapID, data.Vinterfaces, now)
 	}
 	if data.Processes != nil {
 		updateFlag = true
-		s.genesisSyncInfo.Processes.Update(data.Processes.Fetch(), now)
+		s.genesisSyncInfo.Processes.Update(vtapID, data.Processes, now)
 	}
 	if updateFlag && vtapID != 0 {
 		// push immediately after update
 		s.fetch()
 
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		mysql.Db.Clauses(clause.OnConflict{
+		err := mysql.Db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "vtap_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
+			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": s.nodeIP}),
 		}).Create(&model.GenesisStorage{
 			VtapID: vtapID,
-			NodeIP: nodeIP,
-		})
+			NodeIP: s.nodeIP,
+		}).Error
+		if err != nil {
+			log.Errorf("update storage (vtap_id:%d/node_ip:%s) failed: %s", vtapID, s.nodeIP, err.Error())
+			return
+		}
 	}
 	s.dirty = true
 }
@@ -250,8 +253,7 @@ func (s *SyncStorage) refreshDatabase() {
 		storages := []model.GenesisStorage{}
 		invalidStorages := []model.GenesisStorage{}
 		mysql.Db.Find(&vTaps)
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		mysql.Db.Where("node_ip = ?", nodeIP).Find(&storages)
+		mysql.Db.Where("node_ip = ?", s.nodeIP).Find(&storages)
 		for _, v := range vTaps {
 			vTapIDs[v.ID] = false
 		}
@@ -263,9 +265,9 @@ func (s *SyncStorage) refreshDatabase() {
 		if len(invalidStorages) > 0 {
 			err := mysql.Db.Delete(&invalidStorages).Error
 			if err != nil {
-				log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err)
+				log.Errorf("node (%s) clean genesis storage invalid data failed: %s", s.nodeIP, err)
 			} else {
-				log.Infof("node (%s) clean genesis storage invalid data success", nodeIP)
+				log.Infof("node (%s) clean genesis storage invalid data success", s.nodeIP)
 			}
 		}
 
