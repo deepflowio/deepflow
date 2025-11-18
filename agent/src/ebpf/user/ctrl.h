@@ -90,6 +90,11 @@ struct cpdbg_msg {
 	int timeout;
 };
 
+struct socktrace_msg {
+	int pid;
+	int fd;
+};
+
 int sockopt_ctl(void *arg);
 int ctrl_init(void);
 int sockopt_register(struct tracer_sockopts *sockopts);
