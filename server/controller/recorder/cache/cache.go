@@ -19,7 +19,6 @@ package cache
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/op/go-logging"
@@ -207,11 +206,19 @@ func (c *Cache) TryRefresh() bool {
 }
 
 func (c *Cache) triggerTagrecorderHealers() {
-	if c.Sequence == 0 || c.metadata.Config.TagRecorderSelfHealCfg.Enabled {
+	if c.needTagSelfHealing() {
 		c.tagrecorderHealers.Run()
 	} else {
 		log.Info("tagrecorder self heal is disabled", c.metadata.LogPrefixes)
 	}
+}
+
+func (c *Cache) needSelfHealing() bool {
+	return c.metadata.Config.SelfHealCfg.Enabled || c.Sequence == 0
+}
+
+func (c *Cache) needTagSelfHealing() bool {
+	return c.metadata.Config.TagRecorderSelfHealCfg.Enabled || c.Sequence == 0
 }
 
 // 所有缓存的刷新入口
@@ -220,6 +227,11 @@ func (c *Cache) Refresh() {
 
 	c.triggerTagrecorderHealers()
 
+	if !c.needSelfHealing() {
+		log.Info("self heal is disabled", c.metadata.LogPrefixes)
+		return
+	}
+
 	oldDiffBaseDataSet := c.DiffBaseDataSet
 	oldToolDataSet := c.ToolDataSet
 
@@ -227,14 +239,6 @@ func (c *Cache) Refresh() {
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
 	c.SetLogLevel(logging.DEBUG, RefreshSignalCallerSelfHeal)
 	c.refreshFailed = false
-	selfHealEnabled := c.metadata.Config.SelfHealCfg.Enabled
-	selfHealResources := c.metadata.Config.SelfHealCfg.Resources
-	seq := c.Sequence
-
-	if !selfHealEnabled && seq != 0 {
-		log.Info("self heal is disabled", c.metadata.LogPrefixes)
-		return
-	}
 
 	// 分类刷新资源的相关缓存
 
@@ -274,23 +278,14 @@ func (c *Cache) Refresh() {
 	podIngressIDs := c.refreshPodIngresses()
 	c.refreshPodIngressRules(podIngressIDs)
 	c.refreshPodIngresseRuleBackends(podIngressIDs)
-	podServiceIDs := []int{}
-	if seq == 0 || len(selfHealResources) == 0 || slices.Contains(selfHealResources, "pod_service") {
-		podServiceIDs = c.refreshPodServices()
-		c.refreshPodServicePorts(podServiceIDs)
-	}
-	if seq == 0 || len(selfHealResources) == 0 || slices.Contains(selfHealResources, "pod_group") {
-		c.refreshPodGroups()
-		c.refreshPodGroupPorts(podServiceIDs)
-		c.refreshPodGroupConfigMapConnections()
-	}
+	podServiceIDs := c.refreshPodServices()
+	c.refreshPodServicePorts(podServiceIDs)
+	c.refreshPodGroups()
+	c.refreshPodGroupPorts(podServiceIDs)
+	c.refreshPodGroupConfigMapConnections()
 	c.refreshPodReplicaSets()
-	if seq == 0 || len(selfHealResources) == 0 || slices.Contains(selfHealResources, "pod") {
-		c.refreshPods()
-	}
-	if seq == 0 || len(selfHealResources) == 0 || slices.Contains(selfHealResources, "config_map") {
-		c.refreshConfigMaps()
-	}
+	c.refreshPods()
+	c.refreshConfigMaps()
 
 	networkIDs := c.refreshNetworks()
 	c.refreshSubnets(networkIDs)
