@@ -57,7 +57,7 @@ use tokio::time;
 
 use super::{
     ntp::{NtpMode, NtpPacket, NtpTime},
-    RPC_RETRY_INTERVAL,
+    RPC_RECONNECT_INTERVAL, RPC_RETRY_INTERVAL,
 };
 
 use crate::common::endpoint::EPC_INTERNET;
@@ -1118,6 +1118,7 @@ impl Synchronizer {
                     let message = stream.message().await;
                     if session.get_version() != version {
                         info!("grpc server or config changed");
+                        time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
                     if let Err(m) = message {
@@ -1126,11 +1127,13 @@ impl Synchronizer {
                             &mut grpc_failed_count,
                             format!("from trigger {:?}", m),
                         );
+                        time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
                     let message = message.unwrap();
                     if message.is_none() {
                         debug!("end of stream");
+                        time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
                     let message = message.unwrap();
