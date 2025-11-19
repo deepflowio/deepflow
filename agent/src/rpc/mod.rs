@@ -31,6 +31,7 @@ cfg_if::cfg_if! {
 use std::time::{Duration, SystemTime};
 
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
+const RPC_RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 
 pub fn get_timestamp(ntp_diff: i64) -> Duration {
     let now = SystemTime::now()
