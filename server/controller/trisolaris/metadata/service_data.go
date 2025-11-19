@@ -243,8 +243,6 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 				} else {
 					resourceIDMap = podGroupNameToID
 				}
-			default:
-				continue
 			}
 			for _, resource := range resources {
 				resource = strings.TrimSpace(resource)
