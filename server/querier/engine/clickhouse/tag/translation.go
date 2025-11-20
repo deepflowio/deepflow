@@ -832,8 +832,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 单个外部字段-ext_metrics
 	tagResourceMap["tag."] = map[string]*Tag{
 		"default": NewTag(
-			"tag_values[indexOf(tag_names,'%s')]",
-			"tag_values[indexOf(tag_names,'%s')] != ''",
+			// null indicates the absence of this key
+			"if(indexOf(tag_names,'%s') != 0,tag_values[indexOf(tag_names,'%s')], NULL)",
+			"indexOf(tag_names,'%s') != 0",
 			"tag_values[indexOf(tag_names,'%s')] %s %v",
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 			"",
@@ -842,8 +843,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 单个外部字段-l7_flow_log
 	tagResourceMap["attribute."] = map[string]*Tag{
 		"default": NewTag(
-			"attribute_values[indexOf(attribute_names,'%s')]",
-			"attribute_values[indexOf(attribute_names,'%s')] != ''",
+			// null indicates the absence of this key
+			"if(indexOf(attribute_names,'%s') != 0, attribute_values[indexOf(attribute_names,'%s')], NULL)",
+			"indexOf(attribute_names,'%s') != 0",
 			"attribute_values[indexOf(attribute_names,'%s')] %s %v",
 			"%s(attribute_values[indexOf(attribute_names,'%s')],%v)",
 			"",
