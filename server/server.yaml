@@ -649,6 +649,8 @@ ingester:
   #    tables-contain: 1s_local
   #  - database: profile
   #  - database: application_log
+  #  - database: event
+  #    tables-contain: perf_event_local
 
   ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #ingester-enabled: true
