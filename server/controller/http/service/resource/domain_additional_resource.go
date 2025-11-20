@@ -898,7 +898,7 @@ func getRegionDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]str
 
 func getAZDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string][]string, error) {
 	var azs []metadbmodel.AZ
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&azs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -914,7 +914,7 @@ func getAZDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string][]strin
 
 func getVPCDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string][]string, error) {
 	var vpcs []metadbmodel.VPC
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&vpcs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -930,7 +930,7 @@ func getVPCDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string][]stri
 
 func getSubnetDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
 	var subnets []metadbmodel.Network
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&subnets).Error
 	if err != nil {
 		return nil, nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -973,7 +973,7 @@ func getSubnetDataFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map
 
 func getDataInfoFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]string, error) {
 	var hosts []metadbmodel.Host
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&hosts).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -1027,7 +1027,7 @@ func isIPInCIDR(cidr, ip string) bool {
 
 func getCHostsFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]metadbmodel.VM, error) {
 	var chosts []metadbmodel.VM
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&chosts).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -1046,7 +1046,7 @@ func getCHostsFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[str
 
 func getPodNamespaceFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]metadbmodel.PodNamespace, error) {
 	var podNamespaces []metadbmodel.PodNamespace
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1065,7 +1065,7 @@ func getPodNamespaceFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]m
 
 func getPodNamespaceInSubdomainFromDB(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]metadbmodel.PodNamespace, error) {
 	var podNamespaces []metadbmodel.PodNamespace
-	err := orgDB.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Where("sub_domain != ''").Find(&podNamespaces).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1132,7 +1132,7 @@ func GetDomainAdditionalResourceExample() (string, error) {
 
 func getPeerConnectionDomainToRegionUUIDs(orgDB *metadb.DB, domainUUIDs []string) (map[string][]string, error) {
 	var azs []metadbmodel.AZ
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&azs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1150,7 +1150,7 @@ func getPeerConnectionDomainToRegionUUIDs(orgDB *metadb.DB, domainUUIDs []string
 
 func getVPCUUIDToRegionUUID(orgDB *metadb.DB, domainUUIDs []string) (map[string]map[string]string, error) {
 	var vpcs []metadbmodel.VPC
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&vpcs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,

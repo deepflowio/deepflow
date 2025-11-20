@@ -49,7 +49,7 @@ func formatLogDeleteABecauseBHasGone[MT metadbmodel.AssetResourceConstraint](a, 
 
 func getIDs[MT metadbmodel.AssetResourceConstraint](db *metadb.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
-	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
+	db.Where(map[string]interface{}{"domain": domainLcuuid}).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
 		ids = append(ids, (*item).GetID())
 	}

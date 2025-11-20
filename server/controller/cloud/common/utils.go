@@ -618,7 +618,7 @@ func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool, db *gorm.DB) (map[
 	}
 
 	var azs []metadbmodel.AZ
-	err := db.Where("domain = ?", domain).Find(&azs).Error
+	err := db.Where(map[string]interface{}{"domain": domain}).Find(&azs).Error
 	if err != nil {
 		return map[string]string{}, err
 	}
@@ -633,12 +633,12 @@ func GetNodeHostNameByDomain(lcuuid string, isSubDomain bool, db *gorm.DB) (map[
 	}
 	var podNodes []metadbmodel.PodNode
 	if isSubDomain {
-		err = db.Where("domain = ? AND sub_domain = ?", domain, lcuuid).Find(&podNodes).Error
+		err = db.Where(map[string]interface{}{"domain": domain, "sub_domain": lcuuid}).Find(&podNodes).Error
 		if err != nil {
 			return map[string]string{}, err
 		}
 	} else {
-		err = db.Where("domain = ?", domain).Find(&podNodes).Error
+		err = db.Where(map[string]interface{}{"domain": domain}).Find(&podNodes).Error
 		if err != nil {
 			return map[string]string{}, err
 		}
@@ -666,7 +666,7 @@ func GetHostAndVmHostNameByDomain(domain string, db *gorm.DB) (map[string]string
 	vmLcuuidToHostName := map[string]string{}
 
 	var azs []metadbmodel.AZ
-	err := db.Where("domain = ?", domain).Find(&azs).Error
+	err := db.Where(map[string]interface{}{"domain": domain}).Find(&azs).Error
 	if err != nil {
 		return map[string]string{}, map[string]string{}, err
 	}
@@ -680,7 +680,7 @@ func GetHostAndVmHostNameByDomain(domain string, db *gorm.DB) (map[string]string
 		return map[string]string{}, map[string]string{}, err
 	}
 	var podNodes []metadbmodel.PodNode
-	err = db.Where("domain = ?", domain).Find(&podNodes).Error
+	err = db.Where(map[string]interface{}{"domain": domain}).Find(&podNodes).Error
 	if err != nil {
 		return map[string]string{}, map[string]string{}, err
 	}
@@ -704,7 +704,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 	vtapIDToSubDomain := make(map[int]string)
 
 	var azs []metadbmodel.AZ
-	err := db.Where("domain = ?", domain).Find(&azs).Error
+	err := db.Where(map[string]interface{}{"domain": domain}).Find(&azs).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
 	}
@@ -714,7 +714,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 	}
 
 	var podNodes []metadbmodel.PodNode
-	err = db.Where("domain = ?", domain).Find(&podNodes).Error
+	err = db.Where(map[string]interface{}{"domain": domain}).Find(&podNodes).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
 	}
@@ -724,7 +724,7 @@ func GetVTapSubDomainMappingByDomain(domain string, db *gorm.DB) (map[int]string
 	}
 
 	var pods []metadbmodel.Pod
-	err = db.Where("domain = ?", domain).Find(&pods).Error
+	err = db.Where(map[string]interface{}{"domain": domain}).Find(&pods).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
 	}
