@@ -180,6 +180,8 @@ func (v *VTapInfo) AddVTapCache(vtap *mysql_model.VTap) {
 	vTapCache.setAgentLocalSegments(v.GenerateAgentLocalSegments(vTapCache))
 	vTapCache.setAgentRemoteSegments(v.GetAgentRemoteSegment(vTapCache))
 
+	vTapCache.SetAutoGRPCBufferSizeInterval(v.config.AutoGRPCBufferSizeInterval)
+
 	v.vTapCaches.Add(vTapCache)
 	v.vtapIDCaches.Add(vTapCache)
 	if vTapCache.GetVTapType() == VTAP_TYPE_KVM {
