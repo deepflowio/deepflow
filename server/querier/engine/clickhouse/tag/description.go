@@ -1514,15 +1514,26 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		for _, deviceType := range autoMap[tag] {
 			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
 		}
+		deviceWhereSql := whereSql
 		if whereSql != "" {
-			whereSql += fmt.Sprintf("AND devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
+			deviceWhereSql += fmt.Sprintf("AND devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 		} else {
-			whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
+			deviceWhereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 		}
 		sql = fmt.Sprintf(
 			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid, icon_id FROM device_map %s GROUP BY value, display_name, device_type, uid, icon_id ORDER BY %s ASC %s",
-			whereSql, orderBy, limitSql,
+			deviceWhereSql, orderBy, limitSql,
 		)
+		// custom biz service
+		if tag == "auto_service" {
+			customBizServiceSql := fmt.Sprintf(
+				"SELECT id AS value, name AS display_name, %d AS device_type, uid, icon_id FROM custom_biz_service_map %s GROUP BY value, display_name, device_type, uid, icon_id ORDER BY %s ASC %s",
+				VIF_DEVICE_TYPE_CUSTOM_BIZ_SERVICE, whereSql, orderBy, limitSql,
+			)
+			sqlList = append(sqlList, sql)
+			sqlList = append(sqlList, customBizServiceSql)
+			return nil, sqlList, nil
+		}
 	} else if tag == "vpc" || tag == "l2_vpc" {
 		sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == "ip" {

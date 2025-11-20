@@ -14,6 +14,7 @@
 102     , Service                 ,
 103     , K8s Cluster             ,
 104     , Biz Service             ,
+105     , Custom Biz Service      ,
 120     , Process                 ,
 130     , Deployment              ,
 131     , StatefulSet             ,

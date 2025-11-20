@@ -33,6 +33,7 @@ const (
 	VIF_DEVICE_TYPE_SERVICE                         = 102
 	VIF_DEVICE_TYPE_POD_CLUSTER                     = 103
 	VIF_DEVICE_TYPE_CUSTOM_SERVICE                  = 104
+	VIF_DEVICE_TYPE_CUSTOM_BIZ_SERVICE              = 105
 	VIF_DEVICE_TYPE_GPROCESS                        = 120
 	VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT            = 130
 	VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET           = 131
