@@ -45,6 +45,7 @@ type Config struct {
 	NodeType                       string   `default:"master" yaml:"node-type"`
 	RegionDomainPrefix             string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime            int      `default:"600" yaml:"clear-kubernetes-time"`
+	AutoSizeInterval               float64  `default:"600" yaml:"auto-size-interval"` // unit: second
 	NodeIP                         string
 	VTapCacheRefreshInterval       int  `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
