@@ -150,7 +150,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			}
 			nameNoPreffix := strings.TrimPrefix(name, "tag.")
 			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		}
 	} else {

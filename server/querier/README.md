@@ -397,3 +397,6 @@ clickhouse指标量及算子特殊处理：
   - 拆层时 percentage, quotient 类型的指标  
   - 不拆层时 flow_metrics 数据库的 percentage 指标
   - flow_log 数据库中 l4_flow_log 和 l7_flow_log 中翻译为除法的指标
+- Native Tag null 值解析
+  - null 表示没有这个 key
+  - "" 表示有这个 key，且值为空
