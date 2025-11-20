@@ -286,6 +286,7 @@
 
 
 #### Chore
+* chore: add the priority cleanup table file_event, when disk is full [#10868](https://github.com/deepflowio/deepflow/pull/10868) by [lzf575](https://github.com/lzf575)
 * chore: bump golang.org/x/net to v0.27.0 [#7306](https://github.com/deepflowio/deepflow/pull/7306) by [zhangzujian](https://github.com/zhangzujian)
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
