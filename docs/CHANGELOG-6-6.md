@@ -76,3 +76,7 @@
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
+
+
+#### Chore
+* chore: add the priority cleanup table file_event, when disk is full [#10867](https://github.com/deepflowio/deepflow/pull/10867) by [lzf575](https://github.com/lzf575)
