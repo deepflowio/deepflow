@@ -485,7 +485,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomains.Add(lcuuid)
 		}
 
-		c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subDomains)
+		c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&subDomains)
 		lcuuidToSubDomain := make(map[string]*mysqlmodel.SubDomain)
 		for index, subDomain := range subDomains {
 			lcuuidToSubDomain[subDomain.Lcuuid] = &subDomains[index]
@@ -598,9 +598,9 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // new centent field: compressed_content
 func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*mysqlmodel.DomainAdditionalResource, error) {
 	var dbItem mysqlmodel.DomainAdditionalResource
-	result := db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
+	result := db.Select("content").Where(map[string]interface{}{"domain": domainUUID}).Where("content!=''").First(&dbItem)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		result = db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)
+		result = db.Select("compressed_content").Where(map[string]interface{}{"domain": domainUUID}).First(&dbItem)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

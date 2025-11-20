@@ -49,7 +49,7 @@ func formatLogDeleteABecauseBHasGone[MT mysqlmodel.AssetResourceConstraint](a, b
 
 func getIDs[MT mysqlmodel.AssetResourceConstraint](db *mysql.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
-	db.Where("domain = ?", domainLcuuid).Select("id").Find(&dbItems)
+	db.Where(map[string]interface{}{"domain": domainLcuuid}).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
 		ids = append(ids, (*item).GetID())
 	}

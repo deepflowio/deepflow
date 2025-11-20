@@ -897,7 +897,7 @@ func getRegionDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]stri
 
 func getAZDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
 	var azs []mysqlmodel.AZ
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&azs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -913,7 +913,7 @@ func getAZDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string
 
 func getVPCDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
 	var vpcs []mysqlmodel.VPC
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&vpcs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -929,7 +929,7 @@ func getVPCDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]strin
 
 func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
 	var subnets []mysqlmodel.Network
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&subnets).Error
 	if err != nil {
 		return nil, nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -972,7 +972,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 
 func getDataInfoFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]string, error) {
 	var hosts []mysqlmodel.Host
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&hosts).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -1026,7 +1026,7 @@ func isIPInCIDR(cidr, ip string) bool {
 
 func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.VM, error) {
 	var chosts []mysqlmodel.VM
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&chosts).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.SERVER_ERROR,
@@ -1045,7 +1045,7 @@ func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[stri
 
 func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.PodNamespace, error) {
 	var podNamespaces []mysqlmodel.PodNamespace
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1064,7 +1064,7 @@ func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]ma
 
 func getPodNamespaceInSubdomainFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.PodNamespace, error) {
 	var podNamespaces []mysqlmodel.PodNamespace
-	err := orgDB.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Where("sub_domain != ''").Find(&podNamespaces).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1131,7 +1131,7 @@ func GetDomainAdditionalResourceExample() (string, error) {
 
 func getPeerConnectionDomainToRegionUUIDs(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
 	var azs []mysqlmodel.AZ
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&azs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
@@ -1149,7 +1149,7 @@ func getPeerConnectionDomainToRegionUUIDs(orgDB *mysql.DB, domainUUIDs []string)
 
 func getVPCUUIDToRegionUUID(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]string, error) {
 	var vpcs []mysqlmodel.VPC
-	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	err := orgDB.Where(map[string]interface{}{"domain": domainUUIDs}).Find(&vpcs).Error
 	if err != nil {
 		return nil, response.ServiceError(
 			httpcommon.INVALID_POST_DATA,
