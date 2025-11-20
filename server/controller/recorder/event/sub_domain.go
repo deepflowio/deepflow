@@ -48,7 +48,7 @@ func NewWholeSubDomain(q *queue.OverwriteQueue) *WholeSubDomain {
 // If the population fails, incomplete resource events are also written to the queue.
 func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 	var dbItems []metadbmodel.ResourceEvent // TODO use domain_id, sub_domain_id
-	err := md.GetDB().Where("domain = ? AND sub_domain = ?", md.GetDomainLcuuid(), md.GetSubDomainLcuuid()).Find(&dbItems).Error
+	err := md.GetDB().Where(map[string]interface{}{"domain": md.GetDomainLcuuid(), "sub_domain": md.GetSubDomainLcuuid()}).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query resource_event failed: %s", err.Error(), md.LogPrefixes)
 		return
