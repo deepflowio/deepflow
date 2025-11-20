@@ -303,6 +303,9 @@ controller:
     # that was not synchronized before a certain period of time 
     clear-kubernetes-time: 600
 
+    # auto grpc message size change to smaller interval, unit: second
+    auto-grpc-buffer-size-interval: 3600
+
     ## plaform data real refresh delay time
     ## uint: s, default: 1
     #platform-data-refresh-delay-time: 1

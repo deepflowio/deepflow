@@ -39,7 +39,6 @@ import (
 	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata/agentmetadata"
@@ -273,6 +272,10 @@ type VTapCache struct {
 	lastPushBytes     uint64
 	lastGPIDSyncBytes uint64
 
+	// auto grpc buffer size interval
+	autoGRPCBufferSizeInterval   float64
+	autoGRPCBufferSizeLastChange atomic.Value // time.Time
+
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
 	// ID of the container cluster where the container type vtap resides
@@ -292,7 +295,8 @@ func (c *VTapCache) String() string {
 		"{id: %d, name: %s, rawHostname: %s, state: %d, enable: %d, vTapType: %d, "+
 			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
 			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
-			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, vTapGroupShortID: %s, licenseType: %d, "+
+			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, vTapGroupShortID: %s, "+
+			"autoGRPCBufferSizeInterval: %d, autoGRPCBufferSizeLastChangeTime: %s, licenseType: %d, "+
 			"tapMode: %d, teamID: %d, organizeID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
 			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
 			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
@@ -301,7 +305,8 @@ func (c *VTapCache) String() string {
 		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.GetVTapState(), c.GetVTapEnabled(), c.GetVTapType(),
 		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
 		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
-		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.GetVTapGroupShortID(), c.GetLicenseType(),
+		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.GetVTapGroupShortID(),
+		c.GetAutoGRPCBufferSizeInterval(), c.FormatLastChangeTime(), c.GetLicenseType(),
 		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
 		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
 		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
@@ -361,6 +366,8 @@ func NewVTapCache(vtap *mysqlmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledIndicatorMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledLogMonitoring = atomicbool.NewBool(false)
+
+	vTapCache.autoGRPCBufferSizeLastChange.Store(&time.Time{})
 
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
@@ -1489,27 +1496,58 @@ func (c *VTapCache) GetAgentRemoteSegments() []*agent.Segment {
 	return c.agentRemoteSegments
 }
 
-func (c *VTapCache) UpdateLastSyncBytes(bytes uint64) {
+func (c *VTapCache) maxGRPCBytes() uint64 {
+	return max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes)
+}
+
+func (c *VTapCache) GetGRPCBufferFromLastSync(bytes uint64) uint64 {
 	c.lastSyncBytes = bytes
-	c.grpcBufferSize = c.calculateGRPCBytes()
+	c.grpcBufferSize = c.maxGRPCBytes()
+	log.Infof(c.vTapInfo.Logf("agent (%s-%s) update last sync size: %d, current max buffer: %d", c.GetCtrlIP(), c.GetCtrlMac(), bytes, c.grpcBufferSize))
+	return c.calculateGRPCBytes()
 }
 
-func (c *VTapCache) UpdateLastPushBytes(bytes uint64) {
+func (c *VTapCache) GetGRPCBufferFromLastPush(bytes uint64) uint64 {
 	c.lastPushBytes = bytes
-	c.grpcBufferSize = c.calculateGRPCBytes()
+	c.grpcBufferSize = c.maxGRPCBytes()
+	log.Infof(c.vTapInfo.Logf("agent (%s-%s) update last push size: %d, current max buffer: %d", c.GetCtrlIP(), c.GetCtrlMac(), bytes, c.grpcBufferSize))
+	return c.calculateGRPCBytes()
 }
 
-func (c *VTapCache) UpdateLastGPIDSyncBytes(bytes uint64) {
+func (c *VTapCache) GetGRPCBufferFromLastGPIDSync(bytes uint64) uint64 {
 	c.lastGPIDSyncBytes = bytes
-	c.grpcBufferSize = c.calculateGRPCBytes()
+	c.grpcBufferSize = c.maxGRPCBytes()
+	log.Infof(c.vTapInfo.Logf("agent (%s-%s) update last gpid sync size: %d, current max buffer: %d", c.GetCtrlIP(), c.GetCtrlMac(), bytes, c.grpcBufferSize))
+	return c.calculateGRPCBytes()
 }
 
 func (c *VTapCache) calculateGRPCBytes() uint64 {
-	return common.CalculateBufferSize(max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes))
+	return CalculateBufferSize(c.grpcBufferSize)
 }
 
 func (c *VTapCache) GetGRPCBufferSize() uint64 {
 	return c.grpcBufferSize
+}
+
+func (c *VTapCache) SetAutoGRPCBufferSizeInterval(interval float64) {
+	c.autoGRPCBufferSizeInterval = interval
+}
+
+func (c *VTapCache) GetAutoGRPCBufferSizeInterval() float64 {
+	return c.autoGRPCBufferSizeInterval
+}
+
+func (c *VTapCache) FormatLastChangeTime() string {
+	return c.autoGRPCBufferSizeLastChange.Load().(*time.Time).Format(GO_BIRTHDAY)
+}
+
+func (c *VTapCache) UpdateLastChangeTime(t time.Time) {
+	c.autoGRPCBufferSizeLastChange.Store(&t)
+}
+
+func (c *VTapCache) AllowMessageToReduce() bool {
+	lastChange := c.autoGRPCBufferSizeLastChange.Load().(*time.Time)
+	return time.Now().Sub(*lastChange).Seconds() > c.autoGRPCBufferSizeInterval
 }
 
 type VTapCacheMap struct {
