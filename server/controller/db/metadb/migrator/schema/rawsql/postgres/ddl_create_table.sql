@@ -1322,8 +1322,7 @@ CREATE TABLE IF NOT EXISTS config_map (
     lcuuid              CHAR(64) NOT NULL,
     synced_at           TIMESTAMP DEFAULT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          TIMESTAMP DEFAULT NULL
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE config_map;
 CREATE INDEX config_map_data_hash_index ON config_map (data_hash);

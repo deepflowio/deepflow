@@ -2225,7 +2225,6 @@ CREATE TABLE IF NOT EXISTS config_map (
     synced_at           DATETIME DEFAULT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL,
     INDEX data_hash_index(data_hash),
     INDEX domain_index(domain)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
