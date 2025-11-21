@@ -66,6 +66,7 @@ resp_tcp_seq              , resp_tcp_seq              , resp_tcp_seq            
 l7_protocol               , l7_protocol               , l7_protocol                , int_enum       , l7_protocol           , Application Layer , 111          , 0             , 
 l7_protocol_str           , l7_protocol_str           , l7_protocol_str            , string         ,                       , Application Layer , 111          , 0             , 
 is_tls                    , is_tls                    , is_tls                     , int_enum       , bool                  , Application Layer , 111          , 0             , 
+is_async                  , is_async                  , is_async                   , int_enum       , bool                  , Application Layer , 111          , 0             ,
 version                   , version                   , version                    , string         ,                       , Application Layer , 111          , 0             , 
 type                      , type                      , type                       , int_enum       , l7_log_type           , Application Layer , 111          , 0             , 
 request_type              , request_type              , request_type               , string         ,                       , Application Layer , 111          , 0             , 
@@ -84,7 +85,7 @@ endpoint                  , endpoint                  , endpoint                
 process_id                , process_id_0              , process_id_1               , int            ,                       , Service Info      , 111          , 0             , 
 process_kname             , process_kname_0           , process_kname_1            , string         ,                       , Service Info      , 111          , 0             , 
 
-trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info      , 111          , 0             , 
+trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info      , 111          , 0             ,
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info      , 111          , 0             , 
 parent_span_id            , parent_span_id            , parent_span_id             , string         ,                       , Tracing Info      , 111          , 0             , 
 span_kind                 , span_kind                 , span_kind                  , int_enum       , span_kind             , Tracing Info      , 111          , 0             , 
@@ -123,4 +124,7 @@ capture_nic_name          , capture_nic_name          , capture_nic_name        
 capture_nic_type          , capture_nic_type          , capture_nic_type           , int_enum       , capture_nic_type      , Capture Info      , 111          , 0             , 
 tap_side                  , tap_side                  , tap_side                   , string_enum    , observation_point     , Capture Info      , 111          , 1             , 
 observation_point         , observation_point         , observation_point          , string_enum    , observation_point     , Capture Info      , 111          , 0             , 
-biz_type                  , biz_type                  , biz_type                   , int            ,                       , Capture Info      , 111          , 0             , 
+
+biz_type                  , biz_type                  , biz_type                   , int            ,                       , Business Info     , 111          , 0             , 
+biz_code                  , biz_code                  , biz_code                   , string         ,                       , Business Info     , 111          , 0             , 
+biz_scenario              , biz_scenario              , biz_scenario               , string         ,                       , Business Info     , 111          , 0             , 

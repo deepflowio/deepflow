@@ -37,7 +37,7 @@ use serde::{
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
-use crate::common::l7_protocol_log::L7ProtocolParser;
+use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -48,24 +48,13 @@ use crate::{
 
 use public::{
     bitmap::Bitmap,
-    enums::{Charset, FieldType, TrafficDirection},
-    l7_protocol::L7Protocol,
+    l7_protocol::{L7Protocol, L7ProtocolChecker},
     proto::agent,
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
-cfg_if::cfg_if! {
-if #[cfg(feature = "enterprise")] {
-        use public::{
-            enums::MatchType,
-            l7_protocol::L7ProtocolEnum,
-            segment_map::{parse_u16_range_list_to_port_pairs, SegmentBuilder, SegmentMap},
-        };
-        use enterprise_utils::l7::plugin::custom_field_policy::{
-            ExtraCustomFieldPolicy, ExtraProtocolCharacters, ExtraCustomProtocolConfig, ExtraField, KeywordMatcher,
-        };
-    }
-}
+#[cfg(feature = "enterprise")]
+use enterprise_utils::l7::custom_policy::config::{CustomFieldPolicies, CustomProtocolConfigs};
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -1186,6 +1175,25 @@ impl Default for EbpfSocketPreprocess {
     }
 }
 
+impl EbpfSocketPreprocess {
+    fn adjust_http2_and_grpc(protocols: &mut Vec<String>) {
+        let bitmap = L7ProtocolBitmap::from(protocols.as_slice());
+
+        if bitmap.is_enabled(L7Protocol::Grpc) && bitmap.is_disabled(L7Protocol::Http2) {
+            protocols.push("HTTP2".to_string());
+        }
+
+        if bitmap.is_enabled(L7Protocol::Http2) && bitmap.is_disabled(L7Protocol::Grpc) {
+            protocols.push("gRPC".to_string());
+        }
+    }
+
+    fn adjust(&mut self) {
+        Self::adjust_http2_and_grpc(&mut self.out_of_order_reassembly_protocols);
+        Self::adjust_http2_and_grpc(&mut self.segmentation_reassembly_protocols);
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Ebpf {
@@ -1469,6 +1477,23 @@ pub struct Inputs {
     pub vector: Vector,
 }
 
+impl Inputs {
+    fn adjust(&mut self) {
+        // DPDK from eBPF
+        if self.ebpf.tunning.userspace_worker_threads as usize
+            != self.cbpf.af_packet.tunning.packet_fanout_count
+            && self.cbpf.special_network.dpdk.source == DpdkSource::Ebpf
+        {
+            debug!("Update inputs.cbpf.af_packet.tunning.packet_fanout_count with self.inputs.ebpf.tunning.userspace_worker_threads({}) when self.inputs.cbpf.special_network.dpdk.source is {:?}",
+                self.ebpf.tunning.userspace_worker_threads, self.cbpf.special_network.dpdk.source);
+            self.cbpf.af_packet.tunning.packet_fanout_count =
+                self.ebpf.tunning.userspace_worker_threads as usize;
+        }
+
+        self.ebpf.socket.preprocess.adjust();
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Policy {
@@ -1647,6 +1672,48 @@ impl Default for GrpcConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct InferenceWhitelist {
+    pub process_name: String,
+    pub port_list: Vec<u16>,
+}
+
+impl InferenceWhitelist {
+    fn format_name(name: &[u8]) -> &[u8] {
+        for i in (0..name.len()).rev() {
+            if name[i] == 0 {
+                return &name[..i];
+            }
+        }
+
+        name
+    }
+
+    pub fn is_matched(&self, name: &[u8], src_port: u16, dst_port: u16) -> bool {
+        if Self::format_name(name) != self.process_name.as_bytes() {
+            return false;
+        }
+
+        for p in self.port_list.iter() {
+            if *p == src_port || *p == dst_port {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+impl Default for InferenceWhitelist {
+    fn default() -> Self {
+        Self {
+            process_name: "envoy".to_string(),
+            port_list: vec![15001, 15006],
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
@@ -1662,9 +1729,11 @@ pub struct ApplicationProtocolInference {
     pub inference_max_retries: usize,
     #[serde(with = "humantime_serde")]
     pub inference_result_ttl: Duration,
+    pub inference_whitelist: Vec<InferenceWhitelist>,
     pub enabled_protocols: Vec<String>,
     pub protocol_special_config: ProtocolSpecialConfig,
-    pub custom_protocols: Vec<CustomProtocolConfig>,
+    #[cfg(feature = "enterprise")]
+    pub custom_protocols: CustomProtocolConfigs,
 }
 
 impl Default for ApplicationProtocolInference {
@@ -1672,6 +1741,7 @@ impl Default for ApplicationProtocolInference {
         Self {
             inference_max_retries: 128,
             inference_result_ttl: Duration::from_secs(60),
+            inference_whitelist: vec![InferenceWhitelist::default()],
             enabled_protocols: vec![
                 "HTTP".to_string(),
                 "HTTP2".to_string(),
@@ -1682,7 +1752,8 @@ impl Default for ApplicationProtocolInference {
                 "TLS".to_string(),
             ],
             protocol_special_config: ProtocolSpecialConfig::default(),
-            custom_protocols: vec![],
+            #[cfg(feature = "enterprise")]
+            custom_protocols: CustomProtocolConfigs::default(),
         }
     }
 }
@@ -1716,10 +1787,10 @@ impl Default for Filters {
                 ("bRPC".to_string(), "1-65535".to_string()),
                 ("Tars".to_string(), "1-65535".to_string()),
                 ("SomeIP".to_string(), "1-65535".to_string()),
+                ("ISO8583".to_string(), "1-65535".to_string()),
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
-                ("ISO8583".to_string(), "1-65535".to_string()),
                 ("Redis".to_string(), "1-65535".to_string()),
                 ("MongoDB".to_string(), "1-65535".to_string()),
                 ("Memcached".to_string(), "11211".to_string()),
@@ -1747,10 +1818,10 @@ impl Default for Filters {
                 ("bRPC".to_string(), vec![]),
                 ("Tars".to_string(), vec![]),
                 ("SomeIP".to_string(), vec![]),
+                ("ISO8583".to_string(), vec![]),
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
                 ("Oracle".to_string(), vec![]),
-                ("ISO8583".to_string(), vec![]),
                 ("Redis".to_string(), vec![]),
                 ("MongoDB".to_string(), vec![]),
                 ("Memcached".to_string(), vec![]),
@@ -1837,6 +1908,7 @@ pub struct TracingTag {
     pub http_real_client: Vec<String>,
     pub x_request_id: Vec<String>,
     pub multiple_trace_id_collection: bool,
+    pub copy_apm_trace_id: bool,
     pub apm_trace_id: Vec<String>,
     pub apm_span_id: Vec<String>,
 }
@@ -1847,6 +1919,7 @@ impl Default for TracingTag {
             http_real_client: vec!["X_Forwarded_For".to_string()],
             x_request_id: vec!["X_Request_ID".to_string()],
             multiple_trace_id_collection: true,
+            copy_apm_trace_id: false,
             apm_trace_id: vec!["traceparent".to_string(), "sw8".to_string()],
             apm_span_id: vec!["traceparent".to_string(), "sw8".to_string()],
         }
@@ -1885,337 +1958,6 @@ impl Default for HttpEndpoint {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct PortFilter {
-    pub port_list: String,
-}
-
-fn to_match_type<'de: 'a, 'a, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let match_type = <&'a str>::deserialize(deserializer)?.to_lowercase();
-    match match_type.as_str() {
-        "string" | "hex" => Ok(match_type),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"[string|hex]",
-        )),
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Matcher {
-    pub match_keyword: String,
-    #[serde(deserialize_with = "to_match_type")]
-    pub match_type: String,
-    pub match_ignore_case: bool,
-    pub match_from_begining: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Character {
-    pub character: Vec<Matcher>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct CustomProtocolConfig {
-    pub protocol_name: String,
-    pub pre_filter: PortFilter,
-    pub request_characters: Vec<Character>,
-    pub response_characters: Vec<Character>,
-}
-
-fn to_traffic_direction<'de: 'a, 'a, D>(deserializer: D) -> Result<TrafficDirection, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match <&'a str>::deserialize(deserializer)?
-        .to_lowercase()
-        .as_str()
-    {
-        "request" => Ok(TrafficDirection::Request),
-        "response" => Ok(TrafficDirection::Response),
-        "both" => Ok(TrafficDirection::Both),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"[request|response|both]",
-        )),
-    }
-}
-
-fn to_charset_arr<'de, D>(deserializer: D) -> Result<Vec<Charset>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let charset: Vec<&str> = Vec::deserialize(deserializer)?;
-    let mut charsets = Vec::with_capacity(charset.len());
-    for c in charset {
-        match c.to_lowercase().as_str() {
-            "digits" => charsets.push(Charset::Digits),
-            "alphabets" => charsets.push(Charset::Alphabets),
-            "chinese" => charsets.push(Charset::Chinese),
-            other => {
-                return Err(de::Error::invalid_value(
-                    Unexpected::Str(other),
-                    &"[digits|alphabets|chinese]",
-                ))
-            }
-        }
-    }
-    Ok(charsets)
-}
-
-fn to_rewrite_native_tag<'de: 'a, 'a, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let deserialize_str = <&'a str>::deserialize(deserializer)?.to_lowercase();
-    match deserialize_str.as_str() {
-        "version" | "request_type" | "request_domain" | "request_resource" | "request_id"
-        | "endpoint" | "response_code" | "response_exception" | "response_result" | "trace_id"
-        | "span_id" | "x_request_id" | "http_proxy_client" => Ok(Some(deserialize_str)),
-        "" => Ok(None),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &format!(
-                "[{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}]",
-                "version",
-                "request_type",
-                "request_domain",
-                "request_resource",
-                "request_id",
-                "endpoint",
-                "response_code",
-                "response_exception",
-                "response_result",
-                "trace_id",
-                "span_id",
-                "x_request_id",
-                "http_proxy_client"
-            )
-            .as_str(),
-        )),
-    }
-}
-
-fn to_field_type<'de: 'a, 'a, D>(deserializer: D) -> Result<FieldType, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match <&'a str>::deserialize(deserializer)?.to_lowercase().as_str() {
-        "header_field" => Ok(FieldType::Header),
-        "http_url_field" => Ok(FieldType::HttpUrl),
-        "payload_json_value" => Ok(FieldType::PayloadJson),
-        "payload_xml_value" => Ok(FieldType::PayloadXml),
-        "payload_hessian2_value" => Ok(FieldType::PayloadHessian2),
-        "dubbo_header_value" => Ok(FieldType::DubboHeader),
-        "dubbo_paylaod_map_string_value" => Ok(FieldType::DubboPayloadMapString),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"[header_field|http_url_field|payload_json_value|payload_xml_value|payload_hessian2_value|dubbo_header_value|dubbo_paylaod_map_string_value]",
-        )),
-    }
-}
-
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct RewriteResponseStatus {
-    pub success_values: Vec<String>,
-}
-
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Field {
-    pub field_name: String,
-    #[serde(deserialize_with = "to_match_type")]
-    pub field_match_type: String,
-    pub field_match_keyword: String,
-    pub field_match_ignore_case: bool,
-    pub subfield_match_keyword: Option<String>,
-    pub separator_between_subfield_kv_pair: Option<String>,
-    pub separator_between_subfield_key_and_value: Option<String>,
-    #[serde(deserialize_with = "to_field_type")]
-    pub field_type: FieldType,
-    #[serde(deserialize_with = "to_traffic_direction")]
-    pub traffic_direction: TrafficDirection,
-    pub check_value_charset: bool,
-    #[serde(deserialize_with = "to_charset_arr")]
-    pub value_primary_charset: Vec<Charset>,
-    pub value_special_charset: String,
-    pub attribute_name: Option<String>,
-    #[serde(deserialize_with = "to_rewrite_native_tag")]
-    pub rewrite_native_tag: Option<String>,
-    pub rewrite_response_status: RewriteResponseStatus,
-    pub metric_name: Option<String>,
-}
-
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct CustomFieldPolicy {
-    pub policy_name: String,
-    pub protocol_name: String,
-    // only for custom protocol
-    pub custom_protocol_name: Option<String>,
-    pub port_list: String,
-    pub fields: Vec<Field>,
-}
-
-#[cfg(feature = "enterprise")]
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub struct ExtraCustomFieldPolicyMap {
-    pub indices: SegmentMap<usize>,
-    pub policies: Vec<ExtraCustomFieldPolicy>,
-}
-
-#[cfg(feature = "enterprise")]
-impl From<&Field> for ExtraField {
-    fn from(v: &Field) -> ExtraField {
-        ExtraField {
-            // default: match string with case sensitive
-            field_match_type: match v.field_match_type.as_str() {
-                "string" => MatchType::String(v.field_match_ignore_case),
-                _ => MatchType::String(false),
-            },
-            field_match_keyword: v.field_match_keyword.clone(),
-            subfield_match_keyword: v.subfield_match_keyword.clone(),
-            separator_between_subfield_kv_pair: v.separator_between_subfield_kv_pair.clone(),
-            separator_between_subfield_key_and_value: v
-                .separator_between_subfield_key_and_value
-                .clone(),
-            check_value_charset: v.check_value_charset,
-            value_primary_charset: v.value_primary_charset.clone(),
-            value_special_charset: v.value_special_charset.clone(),
-            attribute_name: v.attribute_name.clone(),
-            rewrite_native_tag: v.rewrite_native_tag.clone(),
-            response_success_values: v.rewrite_response_status.success_values.clone(),
-            metric_name: v.metric_name.clone(),
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<Matcher> for KeywordMatcher {
-    fn from(value: Matcher) -> KeywordMatcher {
-        let (match_keyword_bytes, match_type) = match value.match_type.as_str() {
-            "string" => (
-                value.match_keyword.as_bytes().to_vec(),
-                MatchType::String(value.match_ignore_case),
-            ),
-            "hex" => match hex::decode(&value.match_keyword) {
-                Ok(v) => (v, MatchType::Hex),
-                Err(e) => {
-                    error!(
-                        "custom protocol match hex string: {} failed. error: {}",
-                        value.match_keyword, e,
-                    );
-                    (vec![], MatchType::Hex)
-                }
-            },
-            _ => (vec![], MatchType::String(value.match_ignore_case)),
-        };
-        KeywordMatcher {
-            match_type,
-            match_keyword_bytes,
-            match_from_begining: value.match_from_begining,
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<&CustomProtocolConfig> for ExtraProtocolCharacters {
-    fn from(v: &CustomProtocolConfig) -> ExtraProtocolCharacters {
-        ExtraProtocolCharacters {
-            protocol_name: v.protocol_name.clone(),
-            request_characters: v
-                .request_characters
-                .iter()
-                .map(|r| {
-                    r.character
-                        .iter()
-                        .map(|c| KeywordMatcher::from(c.clone()))
-                        .collect()
-                })
-                .collect(),
-            response_characters: v
-                .response_characters
-                .iter()
-                .map(|r| {
-                    r.character
-                        .iter()
-                        .map(|c| KeywordMatcher::from(c.clone()))
-                        .collect()
-                })
-                .collect(),
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<&CustomFieldPolicy> for ExtraCustomFieldPolicy {
-    fn from(v: &CustomFieldPolicy) -> ExtraCustomFieldPolicy {
-        let mut extra_field_policy = ExtraCustomFieldPolicy::default();
-        for field in &v.fields {
-            if field.traffic_direction & TrafficDirection::Request == TrafficDirection::Request {
-                match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
-                        extra_field_policy
-                            .from_req_key
-                            .entry(field.field_type)
-                            .and_modify(|v: &mut HashMap<String, Vec<ExtraField>>| {
-                                v.entry(field.field_match_keyword.to_lowercase())
-                                    .and_modify(|e: &mut Vec<ExtraField>| e.push(field.into()))
-                                    .or_insert_with(|| vec![field.into()]);
-                            })
-                            .or_insert(HashMap::from([(
-                                field.field_match_keyword.to_lowercase(),
-                                vec![field.into()],
-                            )]));
-                    }
-                    _ => {
-                        extra_field_policy
-                            .from_req_body
-                            .entry(field.field_type)
-                            .and_modify(|v: &mut Vec<ExtraField>| v.push(field.into()))
-                            .or_insert_with(|| vec![field.into()]);
-                    }
-                }
-            }
-
-            if field.traffic_direction & TrafficDirection::Response == TrafficDirection::Response {
-                match field.field_type {
-                    FieldType::Header | FieldType::HttpUrl | FieldType::PayloadHessian2 => {
-                        extra_field_policy
-                            .from_resp_key
-                            .entry(field.field_type)
-                            .and_modify(|v: &mut HashMap<String, Vec<ExtraField>>| {
-                                v.entry(field.field_match_keyword.to_lowercase())
-                                    .and_modify(|e: &mut Vec<ExtraField>| e.push(field.into()))
-                                    .or_insert_with(|| vec![field.into()]);
-                            })
-                            .or_insert(HashMap::from([(
-                                field.field_match_keyword.to_lowercase(),
-                                vec![field.into()],
-                            )]));
-                    }
-                    _ => {
-                        extra_field_policy
-                            .from_resp_body
-                            .entry(field.field_type)
-                            .and_modify(|v: &mut Vec<ExtraField>| v.push(field.into()))
-                            .or_insert_with(|| vec![field.into()]);
-                    }
-                }
-            }
-        }
-        extra_field_policy
-    }
-}
-
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CustomFields {
@@ -2249,7 +1991,8 @@ pub struct RequestLogTagExtraction {
     pub http_endpoint: HttpEndpoint,
     pub obfuscate_protocols: Vec<String>,
     pub custom_fields: HashMap<String, Vec<CustomFields>>,
-    pub custom_field_policies: Vec<CustomFieldPolicy>,
+    #[cfg(feature = "enterprise")]
+    pub custom_field_policies: CustomFieldPolicies,
     pub raw: RequestLogTagExtractionRaw,
 }
 
@@ -2263,7 +2006,8 @@ impl Default for RequestLogTagExtraction {
                 ("HTTP2".to_string(), vec![]),
             ]),
             obfuscate_protocols: vec!["Redis".to_string()],
-            custom_field_policies: vec![],
+            #[cfg(feature = "enterprise")]
+            custom_field_policies: CustomFieldPolicies::default(),
             raw: RequestLogTagExtractionRaw::default(),
         }
     }
@@ -2371,6 +2115,7 @@ impl Default for Conntrack {
 #[serde(default)]
 pub struct ProcessorsFlowLogTunning {
     pub flow_map_hash_slots: u32,
+    pub rrt_cache_capacity: u32,
     pub concurrent_flow_limit: u32,
     pub memory_pool_size: usize,
     pub max_batched_buffer_size: usize,
@@ -2383,6 +2128,7 @@ impl Default for ProcessorsFlowLogTunning {
     fn default() -> Self {
         Self {
             flow_map_hash_slots: 131072,
+            rrt_cache_capacity: 16000,
             concurrent_flow_limit: 65535,
             memory_pool_size: 65536,
             max_batched_buffer_size: 131072,
@@ -3113,16 +2859,7 @@ impl UserConfig {
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
     pub fn adjust(&mut self) {
-        // DPDK from eBPF
-        if self.inputs.ebpf.tunning.userspace_worker_threads as usize
-            != self.inputs.cbpf.af_packet.tunning.packet_fanout_count
-            && self.inputs.cbpf.special_network.dpdk.source == DpdkSource::Ebpf
-        {
-            debug!("Update inputs.cbpf.af_packet.tunning.packet_fanout_count with self.inputs.ebpf.tunning.userspace_worker_threads({}) when self.inputs.cbpf.special_network.dpdk.source is {:?}",
-                self.inputs.ebpf.tunning.userspace_worker_threads, self.inputs.cbpf.special_network.dpdk.source);
-            self.inputs.cbpf.af_packet.tunning.packet_fanout_count =
-                self.inputs.ebpf.tunning.userspace_worker_threads as usize;
-        }
+        self.inputs.adjust();
     }
 
     pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
@@ -3216,24 +2953,31 @@ impl UserConfig {
 
         #[cfg(feature = "enterprise")]
         {
-            let custom_str = L7ProtocolParser::Custom(
-                crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog::default(),
-            )
-            .as_str();
+            use std::collections::hash_map;
+
             let custom_ports = self
                 .processors
                 .request_log
                 .application_protocol_inference
                 .custom_protocols
-                .iter()
-                .map(|p| p.pre_filter.port_list.clone())
-                .collect::<Vec<String>>()
-                .join(",");
-
+                .port_range();
             if !custom_ports.is_empty() {
-                new.entry(custom_str.to_string())
-                    .and_modify(|v| *v = format!("{},{}", v, custom_ports))
-                    .or_insert(custom_ports);
+                let custom_str = L7ProtocolParser::Custom(Default::default()).as_str();
+                match new.entry(custom_str.to_string()) {
+                    hash_map::Entry::Occupied(mut entry) => {
+                        if entry.get().is_empty() {
+                            // unlikely to happen
+                            entry.insert(custom_ports);
+                        } else {
+                            let old_ports = entry.get_mut();
+                            old_ports.push(',');
+                            old_ports.push_str(&custom_ports);
+                        }
+                    }
+                    hash_map::Entry::Vacant(entry) => {
+                        entry.insert(custom_ports);
+                    }
+                }
             }
         }
 
@@ -3259,125 +3003,6 @@ impl UserConfig {
         }
         port_bitmap.sort_unstable_by_key(|p| p.0.clone());
         port_bitmap
-    }
-
-    #[cfg(feature = "enterprise")]
-    pub fn get_custom_protocol_config(&self) -> ExtraCustomProtocolConfig {
-        let custom_protocol_config = &self
-            .processors
-            .request_log
-            .application_protocol_inference
-            .custom_protocols;
-        let mut port_segmentmap = SegmentBuilder::new();
-        let mut protocol_characters = Vec::new();
-        for c in custom_protocol_config {
-            let port_pairs = if c.pre_filter.port_list.is_empty() {
-                vec![(u16::MIN, u16::MAX)]
-            } else {
-                let Some(port_pairs) =
-                    parse_u16_range_list_to_port_pairs(c.pre_filter.port_list.as_str(), false)
-                else {
-                    error!(
-                        "invalid port list in custom protocol config: {}",
-                        c.pre_filter.port_list,
-                    );
-                    continue;
-                };
-                port_pairs
-            };
-            protocol_characters.push(ExtraProtocolCharacters::from(c));
-            let index_of_characters = protocol_characters.len() - 1;
-            for (start, end) in port_pairs {
-                port_segmentmap.add_range(start, end, index_of_characters);
-            }
-        }
-        ExtraCustomProtocolConfig {
-            port_segmentmap: port_segmentmap.merge_segments(),
-            protocol_characters,
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    pub fn get_extra_field_policies(&self) -> HashMap<L7ProtocolEnum, ExtraCustomFieldPolicyMap> {
-        let mut extra_policy_map: HashMap<
-            L7ProtocolEnum,
-            (Vec<ExtraCustomFieldPolicy>, SegmentBuilder<usize>),
-        > = HashMap::new();
-
-        for p in &self
-            .processors
-            .request_log
-            .tag_extraction
-            .custom_field_policies
-        {
-            let protocol = L7Protocol::from(p.protocol_name.clone());
-            if protocol == L7Protocol::Unknown {
-                continue;
-            }
-            let l7_protocol = if protocol == L7Protocol::Custom {
-                let Some(custom_protocol_name) = p.custom_protocol_name.as_ref() else {
-                    error!(
-                        "policy: {} not set custom_protocol_name, cannot parse correctly",
-                        p.policy_name
-                    );
-                    continue;
-                };
-                L7ProtocolEnum::Custom(public::l7_protocol::CustomProtocol::CustomPolicy(
-                    custom_protocol_name.to_owned(),
-                ))
-            } else {
-                L7ProtocolEnum::L7Protocol(protocol)
-            };
-
-            if let Some((policies, segment_builder)) = extra_policy_map.get_mut(&l7_protocol) {
-                build_extra_policy(p, policies, segment_builder);
-            } else {
-                let mut policies = vec![ExtraCustomFieldPolicy::default()];
-                let mut segment_builder = SegmentBuilder::new();
-                build_extra_policy(p, &mut policies, &mut segment_builder);
-                extra_policy_map.insert(l7_protocol, (policies, segment_builder));
-            }
-        }
-
-        #[inline]
-        fn build_extra_policy(
-            custom_field_policy: &CustomFieldPolicy,
-            extra_field_policy: &mut Vec<ExtraCustomFieldPolicy>,
-            segment_builder: &mut SegmentBuilder<usize>,
-        ) {
-            let port_pairs = if custom_field_policy.port_list.is_empty() {
-                vec![(u16::MIN, u16::MAX)]
-            } else {
-                let Some(port_pairs) = parse_u16_range_list_to_port_pairs(
-                    custom_field_policy.port_list.as_str(),
-                    false,
-                ) else {
-                    error!(
-                        "invalid port list in extra policy config: {}",
-                        custom_field_policy.port_list
-                    );
-                    return;
-                };
-                port_pairs
-            };
-            extra_field_policy.push(ExtraCustomFieldPolicy::from(custom_field_policy));
-            let index_of_policy = extra_field_policy.len() - 1;
-            for (start, end) in port_pairs {
-                segment_builder.add_range(start, end, index_of_policy);
-            }
-        }
-
-        let mut extra_policy_config = HashMap::with_capacity(extra_policy_map.len());
-        for (l7_protocol, (policies, mut builder)) in extra_policy_map {
-            extra_policy_config.insert(
-                l7_protocol,
-                ExtraCustomFieldPolicyMap {
-                    policies,
-                    indices: builder.merge_segments(),
-                },
-            );
-        }
-        extra_policy_config
     }
 
     pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {

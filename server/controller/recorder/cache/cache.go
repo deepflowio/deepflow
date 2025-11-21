@@ -206,7 +206,19 @@ func (c *Cache) TryRefresh() bool {
 }
 
 func (c *Cache) triggerTagrecorderHealers() {
-	c.tagrecorderHealers.Run()
+	if c.needTagSelfHealing() {
+		c.tagrecorderHealers.Run()
+	} else {
+		log.Info("tagrecorder self heal is disabled", c.metadata.LogPrefixes)
+	}
+}
+
+func (c *Cache) needSelfHealing() bool {
+	return c.metadata.Config.SelfHealCfg.Enabled || c.Sequence == 0
+}
+
+func (c *Cache) needTagSelfHealing() bool {
+	return c.metadata.Config.TagRecorderSelfHealCfg.Enabled || c.Sequence == 0
 }
 
 // 所有缓存的刷新入口
@@ -214,6 +226,11 @@ func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
 
 	c.triggerTagrecorderHealers()
+
+	if !c.needSelfHealing() {
+		log.Info("self heal is disabled", c.metadata.LogPrefixes)
+		return
+	}
 
 	oldDiffBaseDataSet := c.DiffBaseDataSet
 	oldToolDataSet := c.ToolDataSet
@@ -253,6 +270,7 @@ func (c *Cache) Refresh() {
 		c.refreshRedisInstances()
 		c.refreshVIP()
 	}
+
 	c.refreshPodClusters()
 	c.refreshPodNodes()
 	c.refreshVMPodNodeConnections()
@@ -264,10 +282,11 @@ func (c *Cache) Refresh() {
 	c.refreshPodServicePorts(podServiceIDs)
 	c.refreshPodGroups()
 	c.refreshPodGroupPorts(podServiceIDs)
+	c.refreshPodGroupConfigMapConnections()
 	c.refreshPodReplicaSets()
 	c.refreshPods()
 	c.refreshConfigMaps()
-	c.refreshPodGroupConfigMapConnections()
+
 	networkIDs := c.refreshNetworks()
 	c.refreshSubnets(networkIDs)
 	c.refreshVInterfaces()

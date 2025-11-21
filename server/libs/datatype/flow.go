@@ -158,10 +158,10 @@ const (
 	L7_PROTOCOL_BRPC        L7Protocol = 45
 	L7_PROTOCOL_TARS        L7Protocol = 46
 	L7_PROTOCOL_SOME_IP     L7Protocol = 47
+	L7_PROTOCOL_ISO8583     L7Protocol = 48
 	L7_PROTOCOL_MYSQL       L7Protocol = 60
 	L7_PROTOCOL_POSTGRE     L7Protocol = 61
 	L7_PROTOCOL_ORACLE      L7Protocol = 62
-	L7_PROTOCOL_ISO8583     L7Protocol = 70
 	L7_PROTOCOL_REDIS       L7Protocol = 80
 	L7_PROTOCOL_MONGODB     L7Protocol = 81
 	L7_PROTOCOL_MEMCACHED   L7Protocol = 82

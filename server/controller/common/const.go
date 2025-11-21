@@ -574,6 +574,10 @@ const (
 )
 
 const (
+	DEFAULT_POD_NAMESPACE = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+)
+
+const (
 	POD_NODE_TYPE_MASTER = 1
 	POD_NODE_TYPE_NODE   = 2
 
@@ -582,6 +586,11 @@ const (
 
 	POD_NODE_SERVER_TYPE_HOST = 1
 	POD_NODE_SERVER_TYPE_VM   = 2
+)
+
+const (
+	POD_GROUP_POD_NETWORK  = 1
+	POD_GROUP_HOST_NETWORK = 2
 )
 
 const (

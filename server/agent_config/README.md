@@ -906,6 +906,9 @@ global:
 Whether to synchronize the clock to the deepflow-server, this behavior
 will not change the time of the deepflow-agent running environment.
 
+Notice: Before enabling NTP, the controller needs to first start the NTP service. The agent will
+only continue to work after the time synchronization is complete.
+
 ### Maximum Drift {#global.ntp.max_drift}
 
 **Tags**:
@@ -3777,6 +3780,11 @@ One can use the following method to determine whether an application process can
 - Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
   information about openssl. If it does, it indicates that this process is using the
   openssl library.
+- If "libssl.so" is not found above, it may indicate that the program
+  is statically linked with OpenSSL. In that case, you can verify it by:
+  running the command `sudo nm /proc/<PID>/exe | grep SSL_write`.
+  If the output contains symbols such as `0000000000502ac0 T SSL_write`,
+  it means the process is using a statically linked OpenSSL library.
 
 After enabled, deepflow-agent will retrieve process information that
 matches the regular expression, hooking the corresponding encryption/decryption
@@ -3784,6 +3792,8 @@ interfaces of the openssl library. In the logs, you will encounter a message sim
 to the following:
 ```
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
+OR
+[eBPF] INFO openssl uprobe, pid:28890, path:/proc/28890/root/usr/sbin/nginx
 ```
 
 Note: When this feature is enabled, Envoy mTLS traffic can be automatically traced.
@@ -4309,7 +4319,7 @@ the agent's memory usage.
 
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -4353,7 +4363,7 @@ multiple syscalls before parsing it. This enhances the success rate of applicati
 protocol parsing. Note that `out_of_order_reassembly_protocols` must also be enabled for
 this feature to be effective.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-Attention: use `HTTP2` for `gRPC` Protocol.
+Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 ### File {#inputs.ebpf.file}
 
@@ -6390,7 +6400,10 @@ transforms:
     - host_metrics
     source: |
       .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
-      .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+      host_name, _ = get_env_var("K8S_NODE_NAME_FOR_DEEPFLOW")
+      if !is_empty(host_name) {
+        .tags.host = host_name
+      }
       metrics_map = {
         "boot_time": "boot_time_seconds",
         "memory_active_bytes": "memory_Active_bytes",
@@ -7221,6 +7234,100 @@ deepflow-agent will mark the application protocol for each
 <vpc, ip, protocol, port> tuple. In order to avoid misidentification caused by IP
 changes, the validity period after successfully identifying the protocol will be
 limited to this value.
+
+#### Inference whitelist {#processors.request_log.application_protocol_inference.inference_whitelist}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list:
+        - 15001
+        - 15006
+        process_name: envoy
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Application protocol port whitelist, currently only supports eBPF traffic. When eBPF data is on the whitelist,
+the application table is no longer used to query the application protocol. The corresponding application protocol
+is obtained by polling all currently supported protocols. Having too much data on the whitelist greatly reduces the
+processing performance of eBPF data.
+
+Configuration Key:
+- process_name: Process name, regular expressions are not supported
+- port_list: Port Whitelist
+
+##### Process name {#processors.request_log.application_protocol_inference.inference_whitelist.process_name}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.process_name`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - process_name: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Process name
+
+##### Port list {#processors.request_log.application_protocol_inference.inference_whitelist.port_list}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.port_list`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Port list
 
 #### Enabled Protocols {#processors.request_log.application_protocol_inference.enabled_protocols}
 
@@ -8348,6 +8455,34 @@ setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
 
+##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        copy_apm_trace_id: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, the APM TraceID will be copied to the attribute.apm_trace_id field.
+
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
 **Tags**:
@@ -8646,7 +8781,7 @@ Field name.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -8674,7 +8809,9 @@ Example:
 - policy_name: "my_policy" # name of current policy
   protocol_name: HTTP # protocol name, if protocol is Grpc, please set it to HTTP2, optional values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
   custom_protocol_name: "my_protocol"  # when protocol_name is Custom are effected, and there must be a `processors.request_log.application_protocol_inference.custom_protocols` configuration with the same name, otherwise it cannot be parsed
-  port_list: 1-65535
+  filters:
+    port_list: 1-65535 # can be used to filter ports
+    feature_string: "" # can be used to match payload before extraction
   fields:
   - field_name: "my_field"
     field_match_type: "string"  # optional values: "string"
@@ -8685,7 +8822,7 @@ Example:
     separator_between_subfield_kv_pair: "," # default: empty
     separator_between_subfield_key_and_value: "=" # default: empty
 
-    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value, default value: header_field
+    field_type: "http_url_field" # field type of extraction, optional values: http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value/sql_insertion_column, default value: header_field, see below for details
     traffic_direction: request # could be limited to search only in request (or only in response), optional values: request/response/both, default value: both
     check_value_charset: false # used for checking whether the extracted result is legal
     value_primary_charset: ["digits", "alphabets", "chinese"] # used for checking the character set of the extracted result, optional values: digits/alphabets/chinese
@@ -8702,6 +8839,7 @@ notice: the different values of field_type will affect the extraction method of 
 - `payload_json_value`: extract field from Json Payload, such as `"key": 1`, or `"key": "value"`, or `"key": None`, etc.
 - `payload_xml_value`: extract field from XML Payload, such as `<key attr="xxx">value</key>`
 - `payload_hessian2_value`: extract field from Payload encoded with Hessian2
+- `sql_insertion_column`: extract field from SQL insertion column, such as `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Only supports first column of insert query in MySQL now.
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9447,10 +9585,37 @@ processors:
 
 **Description**:
 
-Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
-the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
-is not enough, it will be unable to calculate the rrt of l7. When `inputs.cbpf.common.capture_mode`
-is `Physical Mirror` and concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
+Maximum number of flows that can be stored in FlowMap. When `inputs.cbpf.common.capture_mode` is `Physical Mirror`
+and concurrent_flow_limit is less than or equal to 65535, it will be forced to u32::MAX.
+
+#### RRT Cache Capacity {#processors.flow_log.tunning.rrt_cache_capacity}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.tunning.rrt_cache_capacity`
+
+**Default value**:
+```yaml
+processors:
+  flow_log:
+    tunning:
+      rrt_cache_capacity: 16000
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 64000000] |
+
+**Description**:
+
+The capacity of the RRT Cache table in FlowMap. This table is used to calculate RRT latency metrics. If it is too large,
+it will cause high memory usage in the agent; if it is too small, RRT metrics may be missing.
 
 #### Memory Pool Size {#processors.flow_log.tunning.memory_pool_size}
 

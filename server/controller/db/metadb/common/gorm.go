@@ -46,6 +46,7 @@ type ClickHouseSource struct {
 	UserName     string
 	UserPassword string
 	ReplicaSQL   string
+	DSN          string // DM
 }
 
 func GetSession(cfg config.Config) (*gorm.DB, error) {
@@ -215,6 +216,10 @@ func GetClickhouseSource(cfg config.Config) ClickHouseSource {
 			source.Host = "HOST '" + cfg.Host + "' "
 			source.Port = cfg.Port
 		}
+	case config.MetaDBTypeDM:
+		source.Name = SOURCE_DM
+		source.DSN = cfg.DSN
+		source.Database = cfg.Database
 	}
 	return source
 }

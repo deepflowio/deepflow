@@ -24,11 +24,13 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
+            consts::*,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -43,6 +45,8 @@ pub struct WebSphereMqInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_async: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_ids: PrioFields,
@@ -80,6 +84,11 @@ pub struct WebSphereMqInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_code: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_scenario: String,
 }
 
 impl L7ProtocolInfoInterface for WebSphereMqInfo {
@@ -134,6 +143,17 @@ impl WebSphereMqInfo {
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
+        if other.is_async {
+            self.is_async = other.is_async;
+        }
+    }
+
+    // when response_code is overwritten, put it into the attributes.
+    fn response_code_to_attribute(&mut self) {
+        self.attributes.push(KeyVal {
+            key: SYS_RESPONSE_CODE_ATTR.to_string(),
+            val: self.response_code.to_string(),
+        });
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -154,6 +174,7 @@ impl WebSphereMqInfo {
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
+            self.response_code_to_attribute();
             self.response_code = code;
         }
 
@@ -181,11 +202,29 @@ impl WebSphereMqInfo {
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
         }
+        if let Some(is_async) = custom.is_async {
+            self.is_async = is_async;
+        }
+
+        if let Some(biz_code) = custom.biz_code {
+            self.biz_code = biz_code;
+        }
+        if let Some(biz_scenario) = custom.biz_scenario {
+            self.biz_scenario = biz_scenario;
+        }
     }
 }
 
 impl From<WebSphereMqInfo> for L7ProtocolSendLog {
     fn from(f: WebSphereMqInfo) -> Self {
+        let mut flags = if f.is_tls {
+            ApplicationFlags::TLS
+        } else {
+            ApplicationFlags::NONE
+        };
+        if f.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
+        }
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
@@ -209,6 +248,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
                 attributes: Some(f.attributes),
                 ..Default::default()
             }),
+            flags: flags.bits(),
             ..Default::default()
         }
     }
@@ -268,6 +308,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             }
         }
 
+        info.is_async = true;
         let has_wasm_result = self.wasm_hook(param, payload, &mut info);
         if has_wasm && !has_wasm_result {
             return Err(Error::L7ProtocolUnknown);

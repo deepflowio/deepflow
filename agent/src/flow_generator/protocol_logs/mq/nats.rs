@@ -25,7 +25,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::{
@@ -200,6 +200,8 @@ pub struct NatsInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_async: bool,
 
     rtt: u64,
 
@@ -731,10 +733,13 @@ impl Default for NatsMessage {
 
 impl From<NatsInfo> for L7ProtocolSendLog {
     fn from(info: NatsInfo) -> Self {
-        let flags = match info.is_tls {
-            true => EbpfFlags::TLS.bits(),
-            false => EbpfFlags::NONE.bits(),
+        let mut flags = match info.is_tls {
+            true => ApplicationFlags::TLS,
+            false => ApplicationFlags::NONE,
         };
+        if info.is_async {
+            flags = flags | ApplicationFlags::ASYNC;
+        }
         let name = info.get_name();
         let subject = info
             .get_subject()
@@ -743,7 +748,7 @@ impl From<NatsInfo> for L7ProtocolSendLog {
         let log = L7ProtocolSendLog {
             captured_request_byte: info.captured_request_byte,
             captured_response_byte: info.captured_response_byte,
-            flags,
+            flags: flags.bits(),
             version: Some(info.version),
             req_len: info.req_len,
             resp_len: info.resp_len,
@@ -883,6 +888,9 @@ impl NatsLog {
             if custom.proto_str.len() > 0 {
                 info.l7_protocol_str = Some(custom.proto_str);
             }
+            if let Some(is_async) = custom.is_async {
+                info.is_async = is_async;
+            }
         }
     }
 }
@@ -986,7 +994,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::{handler::TraceType, ExtraLogFields},
+        config::handler::{L7LogDynamicConfigBuilder, TraceType},
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -1026,23 +1034,15 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let config = L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                std::collections::HashMap::new(),
-                0,
-                0,
-                0,
-                256,
-            );
+            let config = L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                span_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                ..Default::default()
+            };
             let parse_config = &LogParserConfig {
-                l7_log_dynamic: config.clone(),
+                l7_log_dynamic: config.into(),
                 ..Default::default()
             };
 

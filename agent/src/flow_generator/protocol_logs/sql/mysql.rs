@@ -17,9 +17,7 @@
 mod comment_parser;
 mod consts;
 
-use std::cell::Cell;
-use std::io::Read;
-use std::str;
+use std::{cell::Cell, io::Read, str};
 
 use flate2::bufread::ZlibDecoder;
 use log::{debug, trace};
@@ -38,20 +36,35 @@ use crate::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::{L7LogDynamicConfig, LogParserConfig},
     flow_generator::{
         error,
         protocol_logs::{
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            consts::APM_TRACE_ID_ATTR,
+            pb_adapter::{
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+            },
             set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
-            PrioFields, BASE_FIELD_PRIORITY,
+            PrioStrings, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes,
 };
 use public::l7_protocol::L7ProtocolChecker;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+        use enterprise_utils::l7::custom_policy::{
+            custom_field_policy,
+            enums::{FieldType as PolicyFieldType, NativeTag},
+        };
+        use public::l7_protocol::L7ProtocolEnum;
+
+        use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
+    }
+}
 
 const SERVER_STATUS_CODE_MIN: u16 = 1000;
 const CLIENT_STATUS_CODE_MIN: u16 = 2000;
@@ -147,11 +160,20 @@ pub struct MysqlInfo {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
-    trace_ids: PrioFields,
+    trace_ids: PrioStrings,
+    #[serde(skip)]
+    copy_apm_trace_id: bool,
     span_id: Option<String>,
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip)]
+    custom_field_operations: Vec<custom_field_policy::Operation>,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -266,12 +288,63 @@ impl MysqlInfo {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    fn apply_custom_field_policies_on_sql(&mut self, param: &ParseParam, sql: &str) {
+        let port = match param.direction {
+            PacketDirection::ClientToServer => param.port_dst,
+            PacketDirection::ServerToClient => param.port_src,
+        };
+        let Some(policies) = param
+            .parse_config
+            .as_ref()
+            .and_then(|c| {
+                c.l7_log_dynamic
+                    .extra_field_policies
+                    .get(&L7ProtocolEnum::L7Protocol(L7Protocol::MySQL))
+            })
+            .and_then(|p| p.select(port))
+        else {
+            return;
+        };
+        policies.apply_in(
+            &mut self.custom_field_operations,
+            &PolicyFieldType::SqlInsertionColumn,
+            sql.as_bytes(),
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_custom_field_operations(&mut self) {
+        for operation in self.custom_field_operations.drain(..) {
+            match operation {
+                custom_field_policy::Operation::Rewrite(tag, Some(value)) => {
+                    match tag {
+                        NativeTag::TraceId => self.trace_ids.push(
+                            CUSTOM_FIELD_POLICY_PRIORITY,
+                            std::borrow::Cow::Borrowed(value.as_ref()),
+                        ),
+                        NativeTag::SpanId => self.span_id = Some(value.to_string()),
+                        _ => {} // other tags are ignored
+                    }
+                }
+                custom_field_policy::Operation::AddAttribute(key, Some(value)) => {
+                    self.attributes.push(KeyVal {
+                        key: key.to_string(),
+                        val: value.to_string(),
+                    });
+                }
+                _ => (), // other types are ignored
+            }
+        }
+    }
+
     fn request_string(
         &mut self,
-        config: Option<&LogParserConfig>,
+        param: &ParseParam,
         payload: &[u8],
         obfuscate_cache: &Option<ObfuscateCache>,
     ) -> Result<()> {
+        let config = param.parse_config.as_ref();
         let payload = mysql_string(payload);
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::InvalidSqlStatement);
@@ -279,6 +352,10 @@ impl MysqlInfo {
         let Ok(sql_string) = str::from_utf8(payload) else {
             return Err(Error::InvalidSqlStatement);
         };
+
+        #[cfg(feature = "enterprise")]
+        self.apply_custom_field_policies_on_sql(param, sql_string);
+
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
         }
@@ -306,18 +383,24 @@ impl MysqlInfo {
             return;
         }
         debug!("extract id from sql {sql}");
-        'outer: for comment in comment_parser::MysqlCommentParserIter::new(sql) {
+        for comment in comment_parser::MysqlCommentParserIter::new(sql) {
             trace!("comment={comment}");
             for (key, value) in KvExtractor::new(comment) {
                 trace!("key={key} value={value}");
                 for (index, tt) in config.trace_types.iter().enumerate() {
-                    if tt.check(key) {
-                        if let Some(trace_id) = tt.decode_trace_id(value) {
-                            self.trace_ids.merge_field(
-                                index as u8 + BASE_FIELD_PRIORITY,
-                                trace_id.to_string(),
-                            )
+                    if !tt.check(key) {
+                        continue;
+                    }
+                    if let Some(trace_id) = tt.decode_trace_id(value) {
+                        if self.copy_apm_trace_id {
+                            self.copy_apm_trace_id = false;
+                            self.attributes.push(KeyVal {
+                                key: APM_TRACE_ID_ATTR.to_string(),
+                                val: trace_id.clone().into_owned(),
+                            });
                         }
+                        self.trace_ids
+                            .push(index as u8 + BASE_FIELD_PRIORITY, trace_id);
                         if !config.multiple_trace_id_collection {
                             break;
                         }
@@ -327,14 +410,6 @@ impl MysqlInfo {
                     if st.check(key) {
                         self.span_id = st.decode_span_id(value).map(|s| s.to_string());
                         break;
-                    }
-                }
-                if !self.trace_ids.is_empty() && config.span_types.is_empty()
-                    || self.span_id.is_some() && config.trace_types.is_empty()
-                    || !self.trace_ids.is_empty() && self.span_id.is_some()
-                {
-                    if !config.multiple_trace_id_collection {
-                        break 'outer;
                     }
                 }
             }
@@ -362,9 +437,9 @@ impl MysqlInfo {
 impl From<MysqlInfo> for L7ProtocolSendLog {
     fn from(f: MysqlInfo) -> Self {
         let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         let log = L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
@@ -400,12 +475,19 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
+                attributes: {
+                    if f.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(f.attributes)
+                    }
+                },
                 request_id: f.statement_id.into(),
                 ..Default::default()
             }),
-            trace_info: if !f.trace_ids.is_empty() || f.span_id.is_some() {
+            trace_info: if !f.trace_ids.is_default() || f.span_id.is_some() {
                 Some(TraceInfo {
-                    trace_ids: f.trace_ids.into_strings_top3(),
+                    trace_ids: f.trace_ids.into_sorted_vec(),
                     span_id: f.span_id,
                     ..Default::default()
                 })
@@ -490,9 +572,22 @@ impl L7ProtocolParserInterface for MysqlLog {
             return Err(error::Error::InvalidIpProtocol);
         }
 
-        let mut info = MysqlInfo::default();
-        info.protocol_version = self.protocol_version;
-        info.is_tls = param.is_tls();
+        let (copy_apm_trace_id, multiple_trace_id_collection) = param
+            .parse_config
+            .map(|c| {
+                (
+                    c.l7_log_dynamic.copy_apm_trace_id,
+                    c.l7_log_dynamic.multiple_trace_id_collection,
+                )
+            })
+            .unwrap_or((false, false));
+        let mut info = MysqlInfo {
+            protocol_version: self.protocol_version,
+            is_tls: param.is_tls(),
+            copy_apm_trace_id,
+            trace_ids: PrioStrings::new(multiple_trace_id_collection),
+            ..Default::default()
+        };
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -502,13 +597,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         }
 
         let mut decompress_buffer = take_buffer();
-        let result = self.parse(
-            param.parse_config,
-            &mut decompress_buffer,
-            payload,
-            param.direction,
-            &mut info,
-        );
+        let result = self.parse(param, &mut decompress_buffer, payload, &mut info);
         give_buffer(decompress_buffer);
         match result {
             Ok(is_greeting) => {
@@ -555,6 +644,8 @@ impl L7ProtocolParserInterface for MysqlLog {
             }
         }
         if param.parse_log {
+            #[cfg(feature = "enterprise")]
+            info.merge_custom_field_operations();
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {
             Ok(L7ParseResult::None)
@@ -772,7 +863,7 @@ impl MysqlLog {
     }
 
     fn request(
-        config: Option<&LogParserConfig>,
+        param: &ParseParam,
         payload: &[u8],
         pc: &mut ParameterCounter,
         info: &mut MysqlInfo,
@@ -781,6 +872,7 @@ impl MysqlLog {
         if payload.len() < COMMAND_LEN {
             return Err(Error::Truncated(TruncationType::Request));
         }
+        let config = param.parse_config.as_ref();
         info.command = payload[COMMAND_OFFSET];
         let mut msg_type = LogMessageType::Request;
         match info.command {
@@ -791,14 +883,14 @@ impl MysqlLog {
             COM_FIELD_LIST | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY => {
                 info.request_string(
-                    config,
+                    param,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
                     obfuscate_cache,
                 )?;
             }
             COM_STMT_PREPARE => {
                 info.request_string(
-                    config,
+                    param,
                     &payload[COMMAND_OFFSET + COMMAND_LEN..],
                     obfuscate_cache,
                 )?;
@@ -920,7 +1012,7 @@ impl MysqlLog {
         str::from_utf8(&payload[..n]).ok()
     }
 
-    fn login(payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
+    fn login(payload: &[u8], mut info: Option<&mut MysqlInfo>) -> Result<()> {
         if payload.len() < LOGIN_USERNAME_OFFSET {
             return Err(Error::Truncated(TruncationType::Login));
         }
@@ -940,12 +1032,16 @@ impl MysqlLog {
 
         match Self::string_null(&payload[LOGIN_USERNAME_OFFSET..]) {
             Some(context) if context.is_ascii() => {
-                info.context = format!("Login username: {}", context);
+                if let Some(info) = info.as_mut() {
+                    info.context = format!("Login username: {}", context);
+                }
             }
             _ => return Err(Error::InvalidLoginInfo("username not found or not ascii")),
         }
 
-        info.status = L7ResponseStatus::Ok;
+        if let Some(info) = info.as_mut() {
+            info.status = L7ResponseStatus::Ok;
+        }
 
         Ok(())
     }
@@ -994,10 +1090,7 @@ impl MysqlLog {
                 let context = mysql_string(&payload[1..]);
                 context.is_ascii() && is_mysql(context)
             }
-            _ if header.seq_id != 0 => {
-                let mut log_info = MysqlInfo::default();
-                MysqlLog::login(payload, &mut log_info).is_ok()
-            }
+            _ if header.seq_id != 0 => MysqlLog::login(payload, None).is_ok(),
             _ => false,
         }
     }
@@ -1036,12 +1129,12 @@ impl MysqlLog {
     // return is_greeting?
     fn parse(
         &mut self,
-        config: Option<&LogParserConfig>,
+        param: &ParseParam,
         decompress_buffer: &mut Vec<u8>,
         payload: &[u8],
-        direction: PacketDirection,
         info: &mut MysqlInfo,
     ) -> Result<bool> {
+        let (config, direction) = (param.parse_config.as_ref(), param.direction);
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
             .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
@@ -1085,7 +1178,7 @@ impl MysqlLog {
         match msg_type {
             LogMessageType::Request if header.seq_id == 0 => {
                 msg_type =
-                    Self::request(config, payload, &mut self.pc, info, &self.obfuscate_cache)?;
+                    Self::request(param, payload, &mut self.pc, info, &self.obfuscate_cache)?;
                 if msg_type == LogMessageType::Request {
                     self.has_request = true;
                     self.has_login = false;
@@ -1094,7 +1187,7 @@ impl MysqlLog {
             LogMessageType::Request
                 if direction == PacketDirection::ClientToServer && header.seq_id == 1 =>
             {
-                Self::login(payload, info)?;
+                Self::login(payload, Some(info))?;
                 self.has_login = true;
             }
             LogMessageType::Response
@@ -1373,8 +1466,8 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache},
-        config::{handler::TraceType, ExtraLogFields},
-        flow_generator::{protocol_logs::PrioFields, L7_RRT_CACHE_CAPACITY},
+        config::handler::{L7LogDynamicConfigBuilder, TraceType},
+        flow_generator::{protocol_logs::PrioStrings, L7_RRT_CACHE_CAPACITY},
         utils::test::Capture,
     };
 
@@ -1652,30 +1745,24 @@ mod tests {
             ),
         ];
         let mut info = MysqlInfo::default();
-        let config = L7LogDynamicConfig::new(
-            vec![],
-            vec![],
-            true,
-            vec![
+        let config: L7LogDynamicConfig = L7LogDynamicConfigBuilder {
+            proxy_client: vec![],
+            x_request_id: vec![],
+            trace_types: vec![
                 TraceType::TraceParent,
                 TraceType::Customize("TraceID".to_owned()),
                 TraceType::Customize("jrnno".to_owned()),
             ],
-            vec![TraceType::TraceParent],
-            ExtraLogFields::default(),
-            false,
-            #[cfg(feature = "enterprise")]
-            std::collections::HashMap::new(),
-            0,
-            0,
-            0,
-            256,
-        );
+            span_types: vec![TraceType::TraceParent],
+            ..Default::default()
+        }
+        .into();
         for (input, tid, sid) in testcases {
-            info.trace_ids = PrioFields::new();
+            info.trace_ids = PrioStrings::new(config.multiple_trace_id_collection);
             info.span_id = None;
             info.extract_trace_and_span_id(&config, input);
-            assert_eq!(info.trace_ids.highest(), tid.unwrap());
+            let trace_ids = info.trace_ids.clone().into_sorted_vec();
+            assert_eq!(trace_ids.first().unwrap(), tid.unwrap());
             assert_eq!(info.span_id.as_ref().map(|s| s.as_str()), sid);
         }
     }

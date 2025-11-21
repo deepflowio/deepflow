@@ -29,7 +29,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::{LogParserConfig, TraceType},
     flow_generator::{
@@ -275,9 +275,9 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
 impl From<SofaRpcInfo> for L7ProtocolSendLog {
     fn from(s: SofaRpcInfo) -> Self {
         let flags = if s.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         Self {
             captured_request_byte: s.captured_request_byte,
@@ -477,8 +477,10 @@ impl SofaRpcLog {
             let sofa_hdr = SofaHdr::from(hdr_payload);
             info.target_serv = sofa_hdr.service;
             info.method = sofa_hdr.method;
-            info.trace_ids
-                .merge_field(BASE_FIELD_PRIORITY, sofa_hdr.trace_id);
+            if !sofa_hdr.trace_id.is_empty() {
+                info.trace_ids
+                    .merge_field(BASE_FIELD_PRIORITY, sofa_hdr.trace_id);
+            }
 
             if !sofa_hdr.new_rpc_trace_context.is_empty() {
                 info.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
@@ -529,6 +531,7 @@ impl SofaRpcLog {
     }
 }
 
+#[derive(Debug)]
 struct SofaHdr {
     service: String,
     method: String,
@@ -597,6 +600,7 @@ fn read_b32_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])> {
     Some((key, value))
 }
 
+#[derive(Debug)]
 pub struct RpcTraceContext {
     pub trace_id: String,
     pub span_id: String,

@@ -104,7 +104,7 @@ func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]in
 		return domainToIconID, resourceToIconID, nil
 	}
 	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
+	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons?flushCache=true", cfg.DFWebService.Host, cfg.DFWebService.Port), body)
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err

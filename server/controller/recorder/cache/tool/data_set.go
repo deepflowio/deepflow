@@ -1976,6 +1976,10 @@ func (t *DataSet) GetPodNodeLcuuidByID(id int) (string, bool) {
 }
 
 func (t *DataSet) GetPodNamespaceIDByLcuuid(lcuuid string) (int, bool) {
+	if lcuuid == ctrlrcommon.DEFAULT_POD_NAMESPACE {
+		return 0, true
+	}
+
 	id, exists := t.podNamespaceLcuuidToID[lcuuid]
 	if exists {
 		return id, true

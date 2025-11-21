@@ -135,6 +135,16 @@ controller:
     host: postgresql
     port: 5432
     timeout: 30
+
+  # dameng相关配置
+  dm:
+    enabled: false
+    dsn: DM8DSN
+    schema: deepflow
+    user-name: root
+    user-password: deepflow
+    host: dm
+    port: 5236
     
     # whether drop meta database when init failed
     drop-database-enabled: false
@@ -285,6 +295,15 @@ controller:
         event:
           # context lines count for config diff
           config_diff_context: 3
+        self_heal: 
+          enabled: true
+          resources:
+          #  - pod_service
+          #  - pod_group
+          #  - pod
+          #  - config_map
+        tagrecorder_self_heal: 
+          enabled: true
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
@@ -719,6 +738,8 @@ ingester:
   #    tables-contain: 1s_local
   #  - database: profile
   #  - database: application_log
+  #  - database: event
+  #    tables-contain: file_event_local
 
   ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #ingester-enabled: true

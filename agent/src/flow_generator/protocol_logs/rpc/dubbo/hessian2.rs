@@ -29,8 +29,10 @@ cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
         use crate::common::flow::{L7Protocol, PacketDirection, L7ProtocolEnum};
         use crate::flow_generator::protocol_logs::pb_adapter::{KeyVal, MetricKeyVal};
-        use public::enums::{FieldType};
-        use enterprise_utils::l7::plugin::custom_field_policy::ExtraField;
+        use enterprise_utils::l7::custom_policy::{
+            custom_field_policy::ExtraField,
+            enums::FieldType,
+        };
     }
 }
 
@@ -649,11 +651,16 @@ impl Hessian2Decoder {
         start_index: usize,
     ) -> Option<HessianValue> {
         let mut start = start_index;
+        let key_bytes = key.as_bytes();
         while start < payload.len() {
             if start >= payload.len() {
                 break;
             }
-            let Some(index) = (&payload[start..]).find_substring(key) else {
+            // 这里直接用 eq_ignore_ascii_case 搜索即可，在 process_hessian_value 中会有 field.match 按真实配置校验
+            let Some(index) = (&payload[start..])
+                .windows(key_bytes.len())
+                .position(|w| w.eq_ignore_ascii_case(key_bytes))
+            else {
                 break;
             };
             // 反向校验长度，decode_string 的逆实现，一般 key 的长度有限，这里需要避免 key 误匹配
@@ -736,7 +743,7 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
 // 注意 dubbo trace id 解析是区分大小写的
 fn decode_trace_ids(payload: &[u8], trace_type: &TraceType, info: &mut DubboInfo) {
     if let Some(trace_id) = lookup_str(payload, trace_type) {
-        info.trace_ids_add(trace_id, trace_type);
+        info.add_trace_id(trace_id, trace_type);
     }
 }
 
