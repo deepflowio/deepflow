@@ -382,7 +382,7 @@ type ChIntEnum struct {
 }
 
 type ChNodeType struct {
-	ResourceType int       `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
+	ResourceType *int      `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
 	NodeType     string    `gorm:"column:node_type;type:varchar(256);default:null" json:"NODE_TYPE"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
