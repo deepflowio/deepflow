@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/op/go-logging"
@@ -100,7 +101,7 @@ func NewCache(ctx context.Context, md *rcommon.Metadata, selfHealInterval time.D
 
 		metadata: md,
 
-		SelfHealInterval: selfHealInterval,
+		SelfHealInterval: selfHealInterval + time.Duration(rand.Intn(60))*time.Minute, // add random interval to avoid all cache refresh at once
 		RefreshSignal:    make(chan struct{}, 1),
 		DiffBaseDataSet:  diffbase.NewDataSet(md), // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
 		ToolDataSet:      tool.NewDataSet(md),     // 各类资源的映射关系，用于按需进行数据转换
@@ -173,7 +174,7 @@ func (c *Cache) ResetRefreshSignal(caller string) {
 
 func (c *Cache) StartSelfHealing() {
 	go func() {
-		log.Info("recorder cache self heal started", c.metadata.LogPrefixes)
+		log.Infof("recorder cache self heal started, interval: %s", c.SelfHealInterval.String(), c.metadata.LogPrefixes)
 		c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
 		c.TryRefresh()
 
@@ -221,6 +222,18 @@ func (c *Cache) needTagSelfHealing() bool {
 	return c.metadata.Config.TagRecorderSelfHealCfg.Enabled || c.Sequence == 0
 }
 
+func (c *Cache) randomSleep() {
+	if c.Sequence == 0 {
+		return
+	}
+	// 生成 10-30 的随机数（对应 1.0-3.0 秒，粒度 0.1秒）
+	randomValue := rand.Intn(21) + 10 // 0-20 + 10 = 10-30
+	// 转换为 Duration（乘以 0.1秒 = 100毫秒）
+	duration := time.Duration(randomValue) * 100 * time.Millisecond
+	time.Sleep(duration)
+	log.Infof("cache refresh sleep %s", duration.String(), c.metadata.LogPrefixes)
+}
+
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
@@ -248,7 +261,9 @@ func (c *Cache) Refresh() {
 	c.refreshAZs()
 	c.refreshVPCs()
 	c.refreshHosts()
+	c.randomSleep()
 	c.refreshVMs()
+	c.randomSleep()
 
 	// 仅domain缓存需要刷新的资源
 	if c.metadata.GetSubDomainLcuuid() == "" {
@@ -280,18 +295,26 @@ func (c *Cache) Refresh() {
 	c.refreshPodIngresseRuleBackends(podIngressIDs)
 	podServiceIDs := c.refreshPodServices()
 	c.refreshPodServicePorts(podServiceIDs)
+	c.randomSleep()
 	c.refreshPodGroups()
+	c.randomSleep()
 	c.refreshPodGroupPorts(podServiceIDs)
 	c.refreshPodGroupConfigMapConnections()
 	c.refreshPodReplicaSets()
+	c.randomSleep()
 	c.refreshPods()
+	c.randomSleep()
 	c.refreshConfigMaps()
+	c.randomSleep()
 
 	networkIDs := c.refreshNetworks()
 	c.refreshSubnets(networkIDs)
 	c.refreshVInterfaces()
+	c.randomSleep()
 	c.refreshWANIPs()
+	c.randomSleep()
 	c.refreshLANIPs()
+	c.randomSleep()
 	c.refreshProcesses()
 
 	if c.refreshFailed {
