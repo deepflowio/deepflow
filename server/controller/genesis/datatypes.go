@@ -207,7 +207,7 @@ func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Dur
 			continue
 		}
 
-		vtapID := iData.FieldByName("vtap_id").Uint()
+		vtapID := iData.FieldByName("VtapID").Uint()
 		g.lastSeen[fmt.Sprintf("%d", vtapID)] = lastTime
 		g.dataDict2[uint32(vtapID)] = append(g.dataDict2[uint32(vtapID)], data)
 	}
