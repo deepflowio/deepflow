@@ -472,7 +472,7 @@ func (c *Dictionary) makeSourceClause(db, table string) string {
 		)
 	case metaDBCommon.SOURCE_DM:
 		return fmt.Sprintf(
-			SQL_SOURCE_DM, c.source.DSN, db, table, table,
+			SQL_SOURCE_DM, c.source.DSN, db, table, db, table,
 		)
 	default:
 		return ""
