@@ -18,18 +18,18 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
 type ConfigMap struct {
-	OperatorBase[*mysqlmodel.ConfigMap, mysqlmodel.ConfigMap]
+	OperatorBase[*metadbmodel.ConfigMap, metadbmodel.ConfigMap]
 }
 
 func NewConfigMap() *ConfigMap {
 	operater := &ConfigMap{
-		newOperatorBase[*mysqlmodel.ConfigMap](
+		newOperatorBase[*metadbmodel.ConfigMap](
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
-			true,
+			false,
 			false,
 		),
 	}
