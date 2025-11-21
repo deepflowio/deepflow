@@ -112,6 +112,7 @@ type CHEngine struct {
 	ORGID              string
 	Language           string
 	NativeField        map[string]*metrics.Metrics
+	IsCustomBizService []string
 }
 
 func init() {
@@ -1945,6 +1946,15 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 				whereTag = metricStruct.DBField
 			}
 			whereValue := sqlparser.String(node.Right)
+			// custom biz service trans
+			if len(e.IsCustomBizService) > 0 {
+				for _, suffix := range e.IsCustomBizService {
+					if "auto_service_id"+suffix == whereTag || "auto_service_type"+suffix == whereTag {
+						stmt := &CustomBizServiceTag{Tag: whereTag, Value: whereValue}
+						return stmt.Trans(node, w, e)
+					}
+				}
+			}
 			stmt := GetWhere(whereTag, whereValue)
 			return stmt.Trans(node, w, e)
 		case *sqlparser.FuncExpr, *sqlparser.BinaryExpr:
@@ -2020,10 +2030,16 @@ func (e *CHEngine) parseTimeWhere(node sqlparser.Expr, w *Where) (view.Node, err
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
+			whereValue := sqlparser.String(node.Right)
 			if whereTag == "time" {
-				whereValue := sqlparser.String(node.Right)
 				stmt := GetWhere(whereTag, whereValue)
 				return stmt.Trans(node, w, e)
+			}
+			// mark custom biz service
+			for _, suffix := range []string{"", "_0", "_1"} {
+				if whereTag == "auto_service_type"+suffix && whereValue == fmt.Sprintf("%d", tag.VIF_DEVICE_TYPE_CUSTOM_BIZ_SERVICE) {
+					e.IsCustomBizService = append(e.IsCustomBizService, suffix)
+				}
 			}
 		}
 	}

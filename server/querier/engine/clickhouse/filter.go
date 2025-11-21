@@ -162,6 +162,11 @@ type WhereTag struct {
 	Value string
 }
 
+type CustomBizServiceTag struct {
+	Tag   string
+	Value string
+}
+
 // k8s.label, k8s.annotation, cloud.tag
 func TransLabelFilter(translator, regexpTranslator, key, op, value string) (filter string) {
 	opLower := strings.ToLower(op)
@@ -1149,6 +1154,35 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 	}
 
+}
+
+func (t *CustomBizServiceTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, error) {
+	whereTag := t.Tag
+	col := "server_filter"
+	if strings.Contains(whereTag, "type") {
+		return &view.Expr{Value: "1=1"}, nil
+	} else {
+		if strings.Contains(whereTag, "_0") {
+			col = "client_filter"
+		}
+	}
+	sql := fmt.Sprintf("SELECT %s FROM flow_tag.custom_biz_service_filter_map WHERE id=%s", col, t.Value)
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "flow_tag",
+	}
+	filterRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, ORGID: e.ORGID})
+	if err != nil {
+		return nil, err
+	}
+	filter := "1=1"
+	for _, v := range filterRst.Values {
+		filter = v.([]interface{})[0].(string)
+	}
+	return &view.Expr{Value: "(" + filter + ")"}, nil
 }
 
 func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string, error) {
