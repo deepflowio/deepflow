@@ -672,6 +672,10 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 
 		return nil
 	}
+
+	// FIXME: sleep 0.1s
+	time.Sleep(100 * time.Millisecond)
+
 	response, err := e.pushResponse(r, true)
 	if err != nil {
 		log.Error(err)
