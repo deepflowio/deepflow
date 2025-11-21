@@ -101,6 +101,8 @@ func (c *UpdaterManager) refresh() {
 		NewChAlarmPolicy(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
+		NewChCustomBizService(c.resourceTypeToIconID),
+		NewChCustomBizServiceFilter(),
 	}
 
 	if c.cfg.FPermit.Enabled {
