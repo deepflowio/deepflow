@@ -40,13 +40,29 @@ func isPodVTap(vtapType int) bool {
 	}
 }
 
-func checkGRPCBufferSize(currentSize, sendBytes uint64) (uint64, bool) {
+func exceedsGRPCBuffer(currentSize, sendSize uint64) bool {
+	// the minimum size of the agent grpc buffer is 1MB
+	if currentSize < common.MEGA_BYTE {
+		return false
+	}
+
+	requiredSize := common.CalculateBufferSize(sendSize)
+
+	// 检查是否需要增大缓冲区
+	if requiredSize <= currentSize {
+		return false
+	}
+
+	return true
+}
+
+func changeGRPCBufferSize(currentSize, sendSize uint64, allowReduce bool) (uint64, bool) {
 	// the minimum size of the agent grpc buffer is 1MB
 	if currentSize < common.MEGA_BYTE {
 		return 0, false
 	}
 
-	requiredSize := common.CalculateBufferSize(sendBytes)
+	requiredSize := common.CalculateBufferSize(sendSize)
 
 	// 检查是否需要增大缓冲区
 	if requiredSize > currentSize {
@@ -55,8 +71,12 @@ func checkGRPCBufferSize(currentSize, sendBytes uint64) (uint64, bool) {
 
 	// 检查是否可以减小缓冲区（小于当前大小的一半）
 	if requiredSize < currentSize/2 {
+		// 是否被允许减小
+		if !allowReduce {
+			return 0, false
+		}
 		return requiredSize, true
 	}
 
-	return currentSize, false
+	return 0, false
 }
