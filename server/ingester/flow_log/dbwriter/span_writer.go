@@ -135,6 +135,7 @@ func (t *SpanWithTraceID) Encode() {
 	}
 	encoder.WriteU8(t.ResponseStatus)
 	encoder.WriteU8(t.Type)
+	encoder.WriteU8(t.IsAsync)
 	t.EncodedSpan = encoder.Bytes()
 }
 
