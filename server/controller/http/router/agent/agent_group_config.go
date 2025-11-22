@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package router
+package agent
 
 import (
 	"io"
@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
-	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/http/service/agent"
 )
 
 type AgentGroupConfig struct {
@@ -63,7 +63,7 @@ func getYAMLAgentGroupConfigTmpl(c *gin.Context) {
 
 func getJsonAgentGroupConfigTmpl(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigTemplateJson()
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigTemplateJson()
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
@@ -71,14 +71,14 @@ func getJsonAgentGroupConfigTmpl(cfg *config.ControllerConfig) gin.HandlerFunc {
 func getJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfig(groupLcuuid, service.DataTypeJSON)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfig(groupLcuuid, agent.DataTypeJSON)
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
 func getJsonAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(service.DataTypeJSON)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(agent.DataTypeJSON)
 		response.JSON(c, response.SetData(data.([]byte)), response.SetError(err)) // TODO 不需要转换类型
 	}
 }
@@ -91,7 +91,7 @@ func postJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, postData, service.DataTypeJSON)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, postData, agent.DataTypeJSON)
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
@@ -104,14 +104,14 @@ func putJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, postData, service.DataTypeJSON)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, postData, agent.DataTypeJSON)
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
 
 func getYAMLAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(service.DataTypeYAML)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(agent.DataTypeYAML)
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	}
 }
@@ -119,7 +119,7 @@ func getYAMLAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 func getYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfig(groupLcuuid, service.DataTypeYAML)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfig(groupLcuuid, agent.DataTypeYAML)
 		response.JSON(c, response.SetData(string(data)), response.SetError(err)) // TODO 不需要转换类型
 	}
 }
@@ -132,7 +132,7 @@ func postYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, bytes, service.DataTypeYAML)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateAgentGroupConfig(groupLcuuid, bytes, agent.DataTypeYAML)
 		response.JSON(c, response.SetData(string(data)), response.SetError(err)) // TODO 不需要转换类型
 	}
 }
@@ -145,7 +145,7 @@ func putYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		groupLcuuid := c.Param("group-lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, bytes, service.DataTypeYAML)
+		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateAgentGroupConfig(groupLcuuid, bytes, agent.DataTypeYAML)
 		response.JSON(c, response.SetData(string(data)), response.SetError(err)) // TODO 不需要转换类型
 	}
 }
@@ -153,7 +153,7 @@ func putYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 func deleteAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groupLcuuid := c.Param("group-lcuuid")
-		err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).DeleteAgentGroupConfig(groupLcuuid)
+		err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).DeleteAgentGroupConfig(groupLcuuid)
 		response.JSON(c, response.SetError(err))
 	}
 }

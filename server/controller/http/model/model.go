@@ -16,6 +16,10 @@
 
 package model
 
+import (
+	agentconf "github.com/deepflowio/deepflow/server/agent_config"
+)
+
 type ORGDataCreate struct {
 	ORGID int `json:"ORGANIZATION_ID" binding:"required"`
 }
@@ -39,4 +43,24 @@ type VTapInterfaceQuery struct {
 	FuzzyVTapName   string `schema:"fuzzy_vtap_name,omitempty"`
 	FuzzyTapName    string `schema:"fuzzy_tap_name,omitempty"`
 	FuzzyTapMAC     string `schema:"fuzzy_tap_mac,omitempty"`
+}
+
+type AgentGroupConfigChangelogPostBody struct {
+	Operator    string `json:"OPERATOR" binding:"required"`
+	Description string `json:"DESCRIPTION" binding:"required"`
+	YamlDiff    string `json:"YAML_DIFF" binding:"required"`
+}
+
+type AgentGroupConfigChangelogPatchBody struct {
+	Description string `json:"DESCRIPTION" binding:"required"`
+}
+
+type AgentGroupConfigChangelogResponse struct {
+	agentconf.MetadbAgentGroupConfigurationChangelog
+}
+
+type AgentGroupConfigChangelogQuery struct {
+	TimeStart string `schema:"time_start,omitempty"`
+	TimeEnd   string `schema:"time_end,omitempty"`
+	Interval  string `schema:"interval,omitempty"`
 }

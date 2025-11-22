@@ -181,6 +181,17 @@ TRUNCATE TABLE agent_group_configuration;
 COMMENT ON COLUMN agent_group_configuration.created_at IS 'Timestamp when the record was created';
 COMMENT ON COLUMN agent_group_configuration.updated_at IS 'Timestamp when the record was last updated';
 
+CREATE TABLE IF NOT EXISTS agent_group_configuration_changelog (
+    id                              SERIAL PRIMARY KEY,
+    agent_group_configuration_id    INTEGER NOT NULL,
+    operator                        VARCHAR(64) NOT NULL,
+    description                     TEXT,
+    yaml_diff                       TEXT,
+    created_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE agent_group_configuration_changelog;
+
 CREATE TABLE IF NOT EXISTS vtap (
     id                      SERIAL PRIMARY KEY,
     name                    VARCHAR(256) NOT NULL,
