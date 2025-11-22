@@ -1101,6 +1101,7 @@ func NewChCustomServiceDevice(resourceTypeToIconID map[IconKey]int) *ChCustomSer
 		),
 		resourceTypeToIconID,
 	}
+	mng.setSubscribeRecorder(false)
 	mng.subscriberDG = mng
 	return mng
 }
