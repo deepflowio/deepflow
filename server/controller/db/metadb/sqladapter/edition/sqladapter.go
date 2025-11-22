@@ -14,25 +14,15 @@
  * limitations under the License.
  */
 
-package db
+package edition
 
 import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"fmt"
+
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/types"
 )
 
-type ConfigMap struct {
-	OperatorBase[*metadbmodel.ConfigMap, metadbmodel.ConfigMap]
-}
-
-func NewConfigMap() *ConfigMap {
-	operater := &ConfigMap{
-		newOperatorBase[*metadbmodel.ConfigMap](
-			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
-			false,
-			false,
-		),
-	}
-	operater.toLoggable = true
-	return operater
+func GetAdapter(cfg config.Config) (types.SQLAdapter, error) {
+	return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
 }

@@ -1055,7 +1055,7 @@ func (p Pod) GetSubDomainLcuuid() string {
 
 type ConfigMap struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
-	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime   `gorm:"embedded" mapstructure:",squash"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Data           string    `gorm:"column:data;type:text;default:''" json:"DATA" mapstructure:"-"`
 	DataHash       string    `gorm:"column:data_hash;type:char(64);default:''" json:"DATA_HASH" mapstructure:"-"`

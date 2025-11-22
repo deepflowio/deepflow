@@ -14,25 +14,14 @@
  * limitations under the License.
  */
 
-package db
+package config
 
-import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-)
-
-type ConfigMap struct {
-	OperatorBase[*metadbmodel.ConfigMap, metadbmodel.ConfigMap]
-}
-
-func NewConfigMap() *ConfigMap {
-	operater := &ConfigMap{
-		newOperatorBase[*metadbmodel.ConfigMap](
-			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
-			false,
-			false,
-		),
-	}
-	operater.toLoggable = true
-	return operater
+type SessionConfig struct {
+	DBCfg Config
+	// set UseDabase=false in dsn only when migrating Metadb
+	UseDabase bool
+	// set TimeoutCoefficient=2 in dsn only when migrating Metadb
+	TimeoutCoefficient uint16
+	// set multiStatements=true in dsn only when migrating Metadb
+	MultiStatements bool
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Yunshan Networks
+ * Copyright (c) 2025 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package sqladapter
 
 import (
 	"fmt"
@@ -22,38 +22,38 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-type SqlFmt struct {
+type PostgreSQLAdapter struct {
 	cfg config.Config
 }
 
-func (f *SqlFmt) SetConfig(cfg config.Config) {
+func (f *PostgreSQLAdapter) SetConfig(cfg config.Config) {
 	f.cfg = cfg
 }
 
-func (f *SqlFmt) GetRawSqlDirectory(parentDir string) string {
-	return parentDir + "/mysql"
+func (f *PostgreSQLAdapter) GetRawSqlDirectory(parentDir string) string {
+	return parentDir + "/postgres"
 }
 
-func (f *SqlFmt) CreateDatabase() string {
+func (f *PostgreSQLAdapter) CreateDatabase() string {
 	return fmt.Sprintf("CREATE DATABASE %s", f.cfg.Database)
 }
 
-func (f *SqlFmt) DropDatabase() string {
+func (f *PostgreSQLAdapter) DropDatabase() string {
 	return fmt.Sprintf("DROP DATABASE IF EXISTS %s", f.cfg.Database)
 }
 
-func (f *SqlFmt) SelectDatabase() string {
-	return fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", f.cfg.Database)
+func (f *PostgreSQLAdapter) SelectDatabase() string {
+	return fmt.Sprintf("SELECT datname FROM pg_catalog.pg_database WHERE datname='%s'", f.cfg.Database)
 }
 
-func (f *SqlFmt) SelectTable(tableName string) string {
-	return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", f.cfg.Database, tableName)
+func (f *PostgreSQLAdapter) SelectTable(tableName string) string {
+	return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_catalog='%s' AND table_schema='%s' AND table_name='%s'", f.cfg.Database, f.cfg.Schema, tableName)
 }
 
-func (f *SqlFmt) SelectColumn(tableName, columnName string) string {
+func (f *PostgreSQLAdapter) SelectColumn(tableName, columnName string) string {
 	return fmt.Sprintf("SELECT %s FROM %s", columnName, tableName)
 }
 
-func (f *SqlFmt) InsertDBVersion(tableName, version string) string {
+func (f *PostgreSQLAdapter) InsertDBVersion(tableName, version string) string {
 	return fmt.Sprintf("INSERT INTO %s (version) VALUES ('%s')", tableName, version)
 }

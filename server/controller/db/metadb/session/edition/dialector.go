@@ -14,25 +14,16 @@
  * limitations under the License.
  */
 
-package db
+package edition
 
 import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"fmt"
+
+	"gorm.io/gorm"
+
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-type ConfigMap struct {
-	OperatorBase[*metadbmodel.ConfigMap, metadbmodel.ConfigMap]
-}
-
-func NewConfigMap() *ConfigMap {
-	operater := &ConfigMap{
-		newOperatorBase[*metadbmodel.ConfigMap](
-			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
-			false,
-			false,
-		),
-	}
-	operater.toLoggable = true
-	return operater
+func GetDialector(cfg config.SessionConfig) (gorm.Dialector, error) {
+	return nil, fmt.Errorf("unsupported database type: %s", cfg.DBCfg.Type)
 }

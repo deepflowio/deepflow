@@ -484,9 +484,9 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomains.Add(lcuuid)
 		}
 
-		c.db.DB.Where(
-			"enabled = ? AND domain = ? AND state != ?",
-			common.DOMAIN_ENABLED_TRUE, c.basicInfo.Lcuuid, common.RESOURCE_STATE_CODE_NO_LICENSE,
+		c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Where(
+			"enabled = ? AND state != ?",
+			common.DOMAIN_ENABLED_TRUE, common.RESOURCE_STATE_CODE_NO_LICENSE,
 		).Find(&subDomains)
 		lcuuidToSubDomain := make(map[string]*metadbmodel.SubDomain)
 		for index, subDomain := range subDomains {
@@ -600,13 +600,13 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // new centent field: compressed_content
 func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*metadbmodel.DomainAdditionalResource, error) {
 	var dbItems []metadbmodel.DomainAdditionalResource
-	result := db.Select("content").Where("domain = ? AND content != ''", domainUUID).Find(&dbItems)
+	result := db.Select("content").Where(map[string]interface{}{"domain": domainUUID}).Where("content != ''").Find(&dbItems)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		result = db.Select("compressed_content").Where("domain = ?", domainUUID).Find(&dbItems)
+		result = db.Select("compressed_content").Where(map[string]interface{}{"domain": domainUUID}).Find(&dbItems)
 		if result.Error != nil {
 			return nil, result.Error
 		}

@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2024 Yunshan Networks
+/**
+ * Copyright (c) 2025 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package db
+package types
 
 import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
 )
 
-type ConfigMap struct {
-	OperatorBase[*metadbmodel.ConfigMap, metadbmodel.ConfigMap]
-}
-
-func NewConfigMap() *ConfigMap {
-	operater := &ConfigMap{
-		newOperatorBase[*metadbmodel.ConfigMap](
-			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
-			false,
-			false,
-		),
-	}
-	operater.toLoggable = true
-	return operater
+type SQLAdapter interface {
+	SetConfig(config.Config)
+	GetRawSqlDirectory(parentDir string) string
+	CreateDatabase() string
+	DropDatabase() string
+	SelectDatabase() string
+	SelectTable(string) string
+	SelectColumn(tableName, columnName string) string
+	InsertDBVersion(tableName, version string) string
 }

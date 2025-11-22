@@ -79,7 +79,7 @@ func GetDeletedORGIDs() ([]int, error) {
 
 func CheckIfORGTableExists() (bool, error) {
 	var orgTable string
-	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
+	err := DefaultDB.Raw(DefaultDB.SqlFmt.SelectTable(ORG_TABLE)).Scan(&orgTable).Error
 	if err != nil {
 		log.Errorf("failed to check org table: %v", err.Error())
 		return false, err
