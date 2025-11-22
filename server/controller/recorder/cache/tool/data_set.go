@@ -1117,7 +1117,7 @@ func (t *DataSet) DeleteProcess(dbItem *metadbmodel.Process) {
 }
 
 func (t *DataSet) GetProcessIdentifierByDBProcess(p *metadbmodel.Process) ProcessIdentifier {
-	return t.GetProcessIdentifier(p.Name, p.PodGroupID, p.VTapID, p.CommandLine)
+	return t.GetProcessIdentifier(p.Name, p.ProcessName, p.PodGroupID, p.VTapID, p.CommandLine)
 }
 
 func (t *DataSet) GetProcessIdentifier(name, processName string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
