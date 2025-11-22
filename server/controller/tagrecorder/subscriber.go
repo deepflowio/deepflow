@@ -201,6 +201,7 @@ type SubscriberComponent[
 	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
 	hookers             map[int]interface{}
 	softDelete          bool
+	subscribeRecorder   bool // Whether to subscribe to recorder messages, default is true
 }
 
 func newSubscriberComponent[
@@ -221,6 +222,7 @@ func newSubscriberComponent[
 		resourceTypeName:    resourceTypeName,
 		hookers:             make(map[int]interface{}),
 		softDelete:          false,
+		subscribeRecorder:   true,
 	}
 	s.initDBOperator()
 	return s
@@ -272,7 +274,14 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 	s.dbOperator.setConfig(cfg)
 }
 
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) setSubscribeRecorder(subscribeRecorder bool) {
+	s.subscribeRecorder = subscribeRecorder
+}
+
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
+	if !s.subscribeRecorder {
+		return
+	}
 	pubsub.Subscribe(
 		s,
 		pubsub.NewSubscriptionSpec(s.subResourceTypeName, pubsub.TopicResourceBatchAddedFull),
