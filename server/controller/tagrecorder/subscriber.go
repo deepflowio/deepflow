@@ -241,10 +241,28 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) initD
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
 	keys := []KT{}
 	targets := []CT{}
+	seenKeys := map[KT]bool{}
 	for _, item := range sources {
+		if item == nil {
+			log.Errorf("subscriber resource is nil")
+			continue
+		}
 		ks, ts := s.subscriberDG.sourceToTarget(md, item)
-		keys = append(keys, ks...)
-		targets = append(targets, ts...)
+		if len(ks) == 0 || len(ts) == 0 {
+			continue
+		}
+		if len(ks) != len(ts) {
+			log.Errorf("sourceToTarget returned mismatched lengths: keys=%d, targets=%d", len(ks), len(ts))
+			continue
+		}
+		// deduplicate
+		for i, k := range ks {
+			if !seenKeys[k] {
+				keys = append(keys, k)
+				targets = append(targets, ts[i])
+				seenKeys[k] = true
+			}
+		}
 	}
 	return keys, targets
 }
