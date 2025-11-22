@@ -174,7 +174,7 @@ func (c *Cache) ResetRefreshSignal(caller string) {
 
 func (c *Cache) StartSelfHealing() {
 	go func() {
-		log.Infof("recorder cache self heal started, interval: %s", c.SelfHealInterval.String(), c.metadata.LogPrefixes)
+		log.Infof("recorder cache self-healing started, interval: %s", c.SelfHealInterval.String(), c.metadata.LogPrefixes)
 		c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
 		c.TryRefresh()
 
@@ -190,7 +190,7 @@ func (c *Cache) StartSelfHealing() {
 				break LOOP
 			}
 		}
-		log.Info("recorder cache self heal completed", c.metadata.LogPrefixes)
+		log.Info("recorder cache self-healing completed", c.metadata.LogPrefixes)
 	}()
 }
 
@@ -210,7 +210,7 @@ func (c *Cache) triggerTagrecorderHealers() {
 	if c.needTagSelfHealing() {
 		c.tagrecorderHealers.Run()
 	} else {
-		log.Info("tagrecorder self heal is disabled", c.metadata.LogPrefixes)
+		log.Info("tagrecorder self-healing is disabled", c.metadata.LogPrefixes)
 	}
 }
 
@@ -237,14 +237,14 @@ func (c *Cache) randomSleep() {
 // 所有缓存的刷新入口
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
-
 	c.triggerTagrecorderHealers()
 
 	if !c.needSelfHealing() {
-		log.Info("self heal is disabled", c.metadata.LogPrefixes)
+		log.Info("self-healing is disabled", c.metadata.LogPrefixes)
 		return
 	}
 
+	log.Infof("cache self-healing started, sequence now: %d", c.Sequence, c.metadata.LogPrefixes)
 	oldDiffBaseDataSet := c.DiffBaseDataSet
 	oldToolDataSet := c.ToolDataSet
 
@@ -318,9 +318,11 @@ func (c *Cache) Refresh() {
 	c.refreshProcesses()
 
 	if c.refreshFailed {
-		log.Errorf("cache refresh failed, sequence now: %d", c.Sequence, c.metadata.LogPrefixes)
+		log.Errorf("cache self-healing failed, sequence now: %d", c.Sequence, c.metadata.LogPrefixes)
 		c.DiffBaseDataSet = oldDiffBaseDataSet
 		c.ToolDataSet = oldToolDataSet
+	} else {
+		log.Infof("cache self-healing completed, sequence now: %d", c.Sequence, c.metadata.LogPrefixes)
 	}
 }
 

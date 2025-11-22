@@ -191,7 +191,7 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 			}
 		}
 		gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
-			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
+			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, cloudItem.ProcessName, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
 		)
 		if !ok {
 			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
