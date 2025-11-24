@@ -194,16 +194,28 @@ typedef void stack_t;		// placeholder
 
 /* ------------------ maps for lua------------------ */
 #ifdef LINUX_VER_5_2_PLUS
-/* Cache lua_State* stack captured from interpreter entry per thread (key: tid, value: struct lua_state_cache_t). */
+/* Cache lua_State* stack captured from interpreter entry per thread (key: tid, value: struct lua_state_cache_t).
+ * Memory: LUA_TSTATE_ENTRIES(65536) * (key 4B + value 72B + hash header) -> roughly a few MB worst case.
+ */
 MAP_HASH(lua_tstate_map, __u32, struct lua_state_cache_t, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
-/* Records which Lua runtime a process uses (key: tgid, value: LANG_* bitmask). */
+/* Records which Lua runtime a process uses (key: tgid, value: LANG_* bitmask).
+ * Memory: LUA_TSTATE_ENTRIES(65536) * (key 4B + value 4B + hash header) -> roughly sub‑MB.
+ */
 MAP_HASH(lang_flags_map, __u32, __u32, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
-/* Per-process Lua unwinding metadata (key: tgid, value: struct lua_unwind_info_t). */
-MAP_HASH(lua_unwind_info_map, __u32, struct lua_unwind_info_t, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
-/* Lua 5.x structure layout descriptions indexed by offsets id (key: id, value: struct lua_ofs). */
-MAP_HASH(lua_offsets_map, __u32, struct lua_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
-/* LuaJIT structure layout descriptions indexed by offsets id (key: id, value: struct lj_ofs). */
-MAP_HASH(luajit_offsets_map, __u32, struct lj_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
+/* Per-process Lua unwinding metadata (key: tgid, value: lua_unwind_info_t).
+ * Memory: LUA_TSTATE_ENTRIES(65536) * (key 4B + value 16B + hash header) -> roughly low MB.
+ */
+MAP_HASH(lua_unwind_info_map, __u32, lua_unwind_info_t, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
+/* Lua 5.x structure layout descriptions indexed by offsets id (key: id, value: lua_ofs).
+ * Memory: up to LUA_OFFSET_PROFILES(8) * (key 4B + value ~92B + hash header) -> about a few KB kernel memory.
+ * Arch: map is generic; values currently reflect arm64 layouts. x86_64 support is provided by loading x86 offsets from userspace.
+ */
+MAP_HASH(lua_offsets_map, __u32, lua_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
+/* LuaJIT structure layout descriptions indexed by offsets id (key: id, value: lj_ofs).
+ * Memory: up to LUA_OFFSET_PROFILES(8) * (key 4B + value ~56B + hash header) -> about a few KB kernel memory.
+ * Arch: map is generic; values mirror the arch provided by userspace (currently AArch64/GC64; load GC32/x86_64 offsets from userspace when supported).
+ */
+MAP_HASH(luajit_offsets_map, __u32, lj_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
 
 static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t *cache,
 						 __u8 idx)
@@ -720,7 +732,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 			}
 		}
 
-		struct lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
+		lua_unwind_info_t *uw = lua_unwind_info_map__lookup(&key->tgid);
 		if (uw) state->lua_offsets_id = uw->offsets_id;
 	}
 
@@ -1220,7 +1232,7 @@ int pre_lua_unwind(void *ctx, unwind_state_t * state,
 }
 
 static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
-				      void *lua_state, struct lua_ofs *o, 
+				      void *lua_state, lua_ofs *o, 
 					  stack_t * intp_stack)
 {
 	if (!intp_stack) {
@@ -1367,7 +1379,7 @@ next_frame:
 }
 
 static inline int lua_get_funcdata(void *frame_ptr,
-				   stack_t * intp_stack, struct lj_ofs *o)
+				   stack_t * intp_stack, lj_ofs *o)
 {
 	if (!frame_ptr) {
 		return -1;
@@ -1413,7 +1425,7 @@ static inline int lua_get_funcdata(void *frame_ptr,
 }
 
 static int luajit_unwind(struct bpf_perf_event_data *ctx,
-			unwind_state_t *state, struct lj_ofs *o)
+			unwind_state_t *state, lj_ofs *o)
 {
 	stack_t *intp_stack = &state->intp_stack;
 	void *lua_state = state->lua_L_ptr;
@@ -1515,7 +1527,7 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 
 	if (state->lua_L_ptr != NULL) {
 		if (state->lua_is_jit) {
-			struct lj_ofs *o =
+			lj_ofs *o =
 			    luajit_offsets_map__lookup(&state->lua_offsets_id);
 			if (o) {
 				int once = luajit_unwind(ctx, state, o);
@@ -1533,7 +1545,7 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 				}
 			}
 		} else {
-			struct lua_ofs *o =
+			lua_ofs *o =
 			    lua_offsets_map__lookup(&state->lua_offsets_id);
 			if (o) {
 				lua_unwind(ctx, state->lua_L_ptr, o,
