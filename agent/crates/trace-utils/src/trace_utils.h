@@ -165,6 +165,57 @@ typedef struct {
     py_type_object_t type_object;
 } python_offsets_t;
 
+typedef struct {
+    uint8_t offsets_id;
+    uint8_t reserved[7];
+    uint64_t state_address;
+} lua_unwind_info_t;
+
+typedef struct {
+    uint32_t features;
+    uint32_t off_l_ci;
+    uint32_t off_l_base_ci;
+    uint32_t off_l_end_ci;
+    uint32_t off_ci_func;
+    uint32_t off_ci_top;
+    uint32_t off_ci_savedpc;
+    uint32_t off_ci_prev;
+    uint32_t off_tvalue_tt;
+    uint32_t off_tvalue_val;
+    uint32_t off_closure_isc;
+    uint32_t off_lclosure_p;
+    uint32_t off_cclosure_f;
+    uint32_t off_proto_source;
+    uint32_t off_proto_linedefined;
+    uint32_t off_proto_code;
+    uint32_t off_proto_sizecode;
+    uint32_t off_proto_lineinfo;
+    uint32_t off_proto_abslineinfo;
+    uint32_t off_tstring_len;
+    uint32_t sizeof_tstring;
+    uint32_t sizeof_callinfo;
+    uint32_t sizeof_tvalue;
+} lua_ofs;
+
+typedef struct {
+    uint8_t fr2;
+    uint8_t gc64;
+    uint16_t pad;
+    uint32_t tv_sz;
+    uint32_t off_l_base;
+    uint32_t off_l_stack;
+    uint32_t off_gcproto_firstline;
+    uint32_t off_gcproto_chunkname;
+    uint32_t off_gcstr_data;
+    uint32_t off_gcfunc_cfunc;
+    uint32_t off_gcfunc_ffid;
+    uint32_t off_gcfunc_pc;
+    uint32_t off_gcproto_bc;
+    uint32_t off_gcstr_len;
+    uint32_t off_l_glref;
+    uint32_t off_global_state_dispatchmode;
+} lj_ofs;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
 
 int32_t is_lua_process(uint32_t pid);
