@@ -87,11 +87,11 @@ func (e *RemoteExecute) receiveAndHandle(
 	stream api.Synchronizer_RemoteExecuteServer,
 ) {
 	defer func() {
-		log.Infof("agent(key: %s) remote exec stream receive goroutine done", ctx.key)
-		ctx.wg.Done()
 		if r := recover(); r != nil {
 			e.handlePanic(ctx)
 		}
+		log.Infof("agent(key: %s) remote exec stream receive goroutine done", ctx.key)
+		ctx.wg.Done()
 	}()
 
 	agentInactivityTimer := time.NewTimer(agentInactivityTimeout)
