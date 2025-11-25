@@ -70,12 +70,13 @@ func (s *ChCustomBizService) generateNewData(db *metadb.DB) (map[IDKey]metadbmod
 		for j, _ := range bizData.Get("svcs").MustArray() {
 			serviceData := bizData.Get("svcs").GetIndex(j)
 			serviceID := serviceData.Get("ID").MustInt()
+			iconID := serviceData.Get("ICON_ID").MustInt()
 			serviceName := serviceData.Get("NAME").MustString()
 			keyToItem[IDKey{ID: serviceID}] = metadbmodel.ChCustomBizService{
 				ID:     serviceID,
 				Name:   fmt.Sprintf("%s/%s", bizName, serviceName),
 				UID:    "",
-				IconID: s.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_CUSTOM_BIZ_SERVICE}],
+				IconID: iconID,
 				TeamID: teamID,
 			}
 		}
