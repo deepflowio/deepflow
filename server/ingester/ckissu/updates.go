@@ -387,7 +387,7 @@ var ColumnAdd70 = []*ColumnAdds{
 	{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"_trace_id_2"},
+		ColumnNames: []string{"_trace_id_2", "biz_code", "biz_scenario"},
 		ColumnType:  ckdb.String,
 	},
 }
