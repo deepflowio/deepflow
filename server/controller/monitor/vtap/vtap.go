@@ -256,7 +256,7 @@ func (v *VTapCheck) typeCheck(db *metadb.DB) {
 
 	log.Debugf("vtap type check start", db.LogPrefixORGID)
 
-	db.Select("id", "lcuuid", "name").Find(&podNodes)
+	db.Select("id", "lcuuid", "name", "ip").Find(&podNodes)
 	idToPodNode := make(map[int]metadbmodel.PodNode)
 	lcuuidToPodNode := make(map[string]metadbmodel.PodNode)
 	for _, podNode := range podNodes {
