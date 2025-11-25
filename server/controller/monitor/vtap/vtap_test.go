@@ -107,7 +107,6 @@ func GetDB() *mysql.DB {
 		LogPrefixORGID: logger.NewORGPrefix(1),
 		LogPrefixName:  mysql.NewDBNameLogPrefix("test_db"),
 		Config:         dbConfig,
-		SqlFmt:         nil, // SQL adapter not used in tests
 	}
 }
 
