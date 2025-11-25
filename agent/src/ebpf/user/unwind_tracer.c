@@ -420,6 +420,40 @@ static void lua_queue_existing_processes(struct bpf_tracer *tracer)
 	closedir(dir);
 }
 
+static void clear_lua_probes_by_pid(struct bpf_tracer *tracer, int pid)
+{
+	struct probe *probe;
+	struct list_head *p, *n;
+	struct symbol_uprobe *sym_uprobe;
+
+	if (tracer == NULL) {
+		return;
+	}
+
+	list_for_each_safe(p, n, &tracer->probes_head) {
+		probe = container_of(p, struct probe, list);
+		if (!(probe->type == UPROBE && probe->private_data != NULL)) {
+			continue;
+		}
+		sym_uprobe = probe->private_data;
+
+		if (sym_uprobe->type != LUA_UPROBE) {
+			continue;
+		}
+
+		if (sym_uprobe->pid != pid) {
+			continue;
+		}
+
+		if (probe_detach(probe) != 0) {
+			ebpf_warning("path:%s, symbol name:%s probe_detach() failed.\n",
+				     sym_uprobe->binary_path, sym_uprobe->name);
+		}
+
+		free_probe_from_tracer(probe);
+	}
+}
+
 void unwind_tracer_drop() {
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
@@ -552,6 +586,10 @@ void unwind_process_exit(int pid) {
         lua_unwind_table_unload(g_lua_unwind_table, pid);
     }
     pthread_mutex_unlock(&g_lua_unwind_table_lock);
+
+    pthread_mutex_lock(&tracer->mutex_probes_lock);
+    clear_lua_probes_by_pid(tracer, pid);
+    pthread_mutex_unlock(&tracer->mutex_probes_lock);
 }
 
 // Ensure exclusive access to *unwind_table before calling this function
