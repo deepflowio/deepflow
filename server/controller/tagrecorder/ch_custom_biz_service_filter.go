@@ -17,7 +17,6 @@
 package tagrecorder
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,44 +25,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
-
-/*
-	{
-	  "conditions":{
-	    "RESOURCE_SETS":[
-	      {
-	        "id":"R100000",
-	        "condition":[
-	          {
-	            "type":"tag",
-	            "key":"chost",
-	            "op":"=",
-	            "rsType":"select",
-	            "val":2
-	          }
-			]
-	      }
-		]
-	  }
-	}
-*/
-
-type Conditions struct {
-	ResourceSets []ResourceSet `json:"RESOURCE_SETS"`
-}
-
-type ResourceSet struct {
-	ID        string          `json:"id"`
-	Condition []ConditionItem `json:"condition"`
-}
-
-type ConditionItem struct {
-	Type   string      `json:"type"`
-	Key    string      `json:"key"`
-	Op     string      `json:"op"`
-	RsType string      `json:"rsType"`
-	Val    interface{} `json:"val"`
-}
 
 type ChCustomBizServiceFilter struct {
 	UpdaterComponent[metadbmodel.ChCustomBizServiceFilter, IDKey]
@@ -101,7 +62,11 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 	for i, _ := range bizRes.Get("DATA").MustArray() {
 		bizData := bizRes.Get("DATA").GetIndex(i)
 		bizType := bizData.Get("TYPE").MustInt()
+		svcs := bizData.Get("svcs").MustArray()
 		if bizType != CUSTOM_BIZ_SERVICE_TYPE {
+			continue
+		}
+		if len(svcs) == 0 {
 			continue
 		}
 		tableName := bizData.Get("TABLE_NAME").MustString()
@@ -115,129 +80,97 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 			log.Errorf("tableName is illegal: %s", tableName, db.LogPrefixORGID)
 			return nil, false
 		}
-		clientResourceSets := []ResourceSet{}
-		clientBody := map[string]interface{}{}
-		clientBody["conditions"] = &Conditions{}
-		selects := map[string][]string{}
-		selects["TAGS"] = []string{""}
-		clientBody["selects"] = selects
-		clientBody["db"] = database
-		clientBody["tableName"] = table
-		clientBody["paths"] = []map[string]string{}
 
-		serverResourceSets := []ResourceSet{}
-		serverBody := map[string]interface{}{}
-		serverBody["conditions"] = &Conditions{}
-		serverBody["selects"] = selects
-		serverBody["db"] = database
-		serverBody["tableName"] = table
-		serverBody["paths"] = []map[string]string{}
+		clientResourceSets := []map[string]interface{}{}
+		clientPaths := []map[string]interface{}{}
+		serverResourceSets := []map[string]interface{}{}
+		serverPaths := []map[string]interface{}{}
 
-		for j, _ := range bizData.Get("svcs").MustArray() {
+		for j, _ := range svcs {
 			serviceData := bizData.Get("svcs").GetIndex(j)
 			serviceID := serviceData.Get("ID").MustInt()
 			reSetID := fmt.Sprintf("R%d", serviceID)
-			if clientPaths, ok := clientBody["paths"].([]map[string]string); ok {
-				clientBody["paths"] = append(clientPaths, map[string]string{"client": reSetID})
-			}
-			if serverPaths, ok := serverBody["paths"].([]map[string]string); ok {
-				serverBody["paths"] = append(serverPaths, map[string]string{"server": reSetID})
-			}
 
 			// c
 			for cIndex, _ := range serviceData.Get("SEARCH_PARAMS").Get("c").MustArray() {
 				cParams := serviceData.Get("SEARCH_PARAMS").Get("c").GetIndex(cIndex)
-				conditions := []ConditionItem{}
+				conditions := []map[string]interface{}{}
 				for dIndex, _ := range cParams.Get("condition").MustArray() {
-					cCondition := cParams.Get("condition").GetIndex(dIndex)
-					cConditionBytes, marErr := cCondition.MarshalJSON()
-					if marErr != nil {
-						log.Error(marErr)
-						return nil, false
-					}
-					var conditionItem ConditionItem
-					jsonErr := json.Unmarshal(cConditionBytes, &conditionItem)
-					if jsonErr != nil {
-						log.Error(jsonErr)
-						return nil, false
-					}
-					conditions = append(conditions, conditionItem)
+					cCondition := cParams.Get("condition").GetIndex(dIndex).MustMap()
+					conditions = append(conditions, cCondition)
 				}
 				if len(conditions) > 0 {
-					cResourceSet := ResourceSet{}
-					cResourceSet.ID = reSetID
-					cResourceSet.Condition = conditions
+					cResourceSet := map[string]interface{}{}
+					cResourceSet["id"] = reSetID
+					cResourceSet["condition"] = conditions
 					clientResourceSets = append(clientResourceSets, cResourceSet)
+					clientPaths = append(clientPaths, map[string]interface{}{"client": reSetID})
 				}
 			}
 			// s
 			for sIndex, _ := range serviceData.Get("SEARCH_PARAMS").Get("s").MustArray() {
 				sParams := serviceData.Get("SEARCH_PARAMS").Get("s").GetIndex(sIndex)
-				conditions := []ConditionItem{}
+				conditions := []map[string]interface{}{}
 				for dIndex, _ := range sParams.Get("condition").MustArray() {
-					sCondition := sParams.Get("condition").GetIndex(dIndex)
-					sConditionBytes, marErr := sCondition.MarshalJSON()
-					if marErr != nil {
-						log.Error(marErr)
-						return nil, false
-					}
-					var conditionItem ConditionItem
-					jsonErr := json.Unmarshal(sConditionBytes, &conditionItem)
-					if jsonErr != nil {
-						log.Error(jsonErr)
-						return nil, false
-					}
-					conditions = append(conditions, conditionItem)
+					sCondition := sParams.Get("condition").GetIndex(dIndex).MustMap()
+					conditions = append(conditions, sCondition)
 				}
 				if len(conditions) > 0 {
-					sResourceSet := ResourceSet{}
-					sResourceSet.ID = reSetID
-					sResourceSet.Condition = conditions
+					sResourceSet := map[string]interface{}{}
+					sResourceSet["id"] = reSetID
+					sResourceSet["condition"] = conditions
 					serverResourceSets = append(serverResourceSets, sResourceSet)
+					serverPaths = append(serverPaths, map[string]interface{}{"server": reSetID})
 				}
 			}
 			// dual
 			for dualIndex, _ := range serviceData.Get("SEARCH_PARAMS").Get("dual").MustArray() {
 				dualParams := serviceData.Get("SEARCH_PARAMS").Get("dual").GetIndex(dualIndex)
-				conditions := []ConditionItem{}
+				conditions := []map[string]interface{}{}
 				for dIndex, _ := range dualParams.Get("condition").MustArray() {
-					dualCondition := dualParams.Get("condition").GetIndex(dIndex)
-					dualConditionBytes, marErr := dualCondition.MarshalJSON()
-					if marErr != nil {
-						log.Error(marErr)
-						return nil, false
-					}
-					var conditionItem ConditionItem
-					jsonErr := json.Unmarshal(dualConditionBytes, &conditionItem)
-					if jsonErr != nil {
-						log.Error(jsonErr)
-						return nil, false
-					}
-					conditions = append(conditions, conditionItem)
+					dualCondition := dualParams.Get("condition").GetIndex(dIndex).MustMap()
+					conditions = append(conditions, dualCondition)
 				}
 				if len(conditions) > 0 {
-					dualResourceSet := ResourceSet{}
-					dualResourceSet.ID = reSetID
-					dualResourceSet.Condition = conditions
+					dualResourceSet := map[string]interface{}{}
+					dualResourceSet["id"] = reSetID
+					dualResourceSet["condition"] = conditions
 					clientResourceSets = append(clientResourceSets, dualResourceSet)
 					serverResourceSets = append(serverResourceSets, dualResourceSet)
+					clientPaths = append(clientPaths, map[string]interface{}{"client": reSetID})
+					serverPaths = append(serverPaths, map[string]interface{}{"server": reSetID})
 				}
 			}
 		}
 
-		clientConditions := map[string][]ResourceSet{}
-		clientConditions["RESOURCE_SETS"] = clientResourceSets
-		clientBody["conditions"] = clientConditions
+		clientBody := map[string]interface{}{
+			"conditions": map[string]interface{}{
+				"RESOURCE_SETS": clientResourceSets,
+			},
+			"selects": map[string]interface{}{
+				"TAGS": []interface{}{""},
+			},
+			"tableName": table,
+			"paths":     clientPaths,
+			"db":        database,
+		}
 
-		serverConditions := map[string][]ResourceSet{}
-		serverConditions["RESOURCE_SETS"] = serverResourceSets
-		serverBody["conditions"] = serverConditions
-		log.Infof("clientbody: %+v", clientBody)
-		log.Infof("serverbody: %+v", serverBody)
+		serverBody := map[string]interface{}{
+			"conditions": map[string]interface{}{
+				"RESOURCE_SETS": serverResourceSets,
+			},
+			"selects": map[string]interface{}{
+				"TAGS": []interface{}{""},
+			},
+			"tableName": table,
+			"paths":     serverPaths,
+			"db":        database,
+		}
+
 		// client
 		clientRes, clientErr := common.CURLPerform(
 			"POST",
-			fmt.Sprintf("http://%s:%d/querier-params", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
+			fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
 			clientBody,
 		)
 		if clientErr != nil {
@@ -258,6 +191,7 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 			serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
 			if ok {
 				serviceFilter.ClientFilter = clientFilter
+				keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
 			} else {
 				keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
 					ID:           serviceIDInt,
@@ -269,7 +203,7 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 		// server
 		serverRes, serverErr := common.CURLPerform(
 			"POST",
-			fmt.Sprintf("http://%s:%d/querier-params", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
+			fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
 			serverBody,
 		)
 		if serverErr != nil {
@@ -290,6 +224,7 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 			serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
 			if ok {
 				serviceFilter.ServerFilter = serverFilter
+				keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
 			} else {
 				keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
 					ID:           serviceIDInt,
