@@ -131,14 +131,14 @@ func TestExtractExecFileFromCmd(t *testing.T) {
 			expected: "script.py",
 		},
 		{
-			name:     "Python with -m option (should not match)",
+			name:     "Python with -m option",
 			command:  "python3 -m http.server 8000",
 			expected: "http.server",
 		},
 		{
-			name:     "Python with -m option (should not match)",
+			name:     "Python with -m option",
 			command:  "python3 --bind 192.168.1.100 -m http.server 8000",
-			expected: "http.server", // got 192.168.1.100
+			expected: "http.server",
 		},
 
 		// No Match Test Cases
