@@ -22,23 +22,13 @@ type TopoFrame struct {
 }
 
 type Node struct {
-	// currently only id was used in api
-	Item struct {
-		ID uint32 `json:"id"`
-	} `json:"item"`
-	HashID string `json:"hash_id,omitempty"`
-	// global unique id
+	// unique id to match item in front-end
 	UID string `json:"uid,omitempty"`
-	// compute by backend, service unique id
+	// service uid from trace_map
 	ServiceUID      string `json:"service_uid,omitempty"`
 	AutoService     string `json:"auto_service,omitempty"`
 	AutoServiceID   uint32 `json:"auto_service_id,omitempty"`
 	AutoServiceType uint8  `json:"auto_service_type,omitempty"`
-	// is_internet => auto_service = ip
-	// !is_internet => auto_service = auto_service_id
-	IsInternet uint8  `json:"is_internet,omitempty"`
-	Region     string `json:"region,omitempty"`
-	RegionId   uint32 `json:"region_id,omitempty"`
 }
 
 type Link struct {
