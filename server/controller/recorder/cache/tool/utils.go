@@ -9,27 +9,21 @@ func extractExecFileFromCmd(commandLine string) string {
 	// with or without file extensions.
 
 	// Java: First try to match -jar pattern
-	javaJarRe := regexp.MustCompile(`\bjava[\d\.-]*\b(?:.*?) -jar\s+([^\s]+)`)
+	javaJarRe := regexp.MustCompile(`\bjava[\d\.-]*\b(?:.*?)?\s+-jar\s+([^\s]+)`)
 	if matches := javaJarRe.FindStringSubmatch(commandLine); len(matches) > 1 {
 		return matches[1]
 	}
 
-	// Java: If no -jar, match first non-option argument (main class)
-	javaClassRe := regexp.MustCompile(`\bjava[\d\.-]*\b(?:.*?)?\s+([^\s-]\S*)`)
-	if matches := javaClassRe.FindStringSubmatch(commandLine); len(matches) > 1 {
+	// Python: Match -m module pattern
+	pythonModuleRe := regexp.MustCompile(`\bpython[\d\.-]*\b(?:.*?)?\s+-m\s+([^\s]+)`)
+	if matches := pythonModuleRe.FindStringSubmatch(commandLine); len(matches) > 1 {
 		return matches[1]
 	}
 
-	// Node.js: Match first non-option argument
-	nodeRe := regexp.MustCompile(`\bnode[\d\.-]*\b(?:.*?)?\s+([^\s-]\S*)`)
-	if matches := nodeRe.FindStringSubmatch(commandLine); len(matches) > 1 {
-		return matches[1]
-	}
-
-	// Python: Match first non-option argument
-	pythonRe := regexp.MustCompile(`\bpython[\d\.-]*\b(?:.*?)?\s+([^\s-]\S*)`)
-	if matches := pythonRe.FindStringSubmatch(commandLine); len(matches) > 1 {
-		return matches[1]
+	// Java (without -jar), Node.js, and Python: Match first non-option argument
+	generalRe := regexp.MustCompile(`\b(java|node|python)[\d\.-]*\b(?:.*?)?\s+([^\s-]\S*)`)
+	if matches := generalRe.FindStringSubmatch(commandLine); len(matches) > 2 {
+		return matches[2]
 	}
 
 	// If no valid process executor found or no file extracted, return original command line
