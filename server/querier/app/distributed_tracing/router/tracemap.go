@@ -32,6 +32,7 @@ var log = logging.MustGetLogger("tracemap")
 
 func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) {
 	e.POST("/v1/trace_map", traceMap(cfg, generator))
+	e.POST("/v1/flow_map", flowMap(cfg, generator))
 }
 
 func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) gin.HandlerFunc {
@@ -51,5 +52,22 @@ func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) 
 		defer close(done)
 		go tracemap.TraceMap(args, cfg, c, done, generator)
 		<-done
+	})
+}
+
+func flowMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var args model.FlowMap
+
+		// 参数校验
+		err := c.ShouldBindBodyWith(&args, binding.JSON)
+		if err != nil {
+			router.BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			return
+		}
+		args.Context = c.Request.Context()
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		c.Header("Content-Type", "application/json")
+		tracemap.FlowMap(args, cfg, c, generator)
 	})
 }

@@ -18,13 +18,14 @@ package model
 
 type TopoFrame struct {
 	Nodes []Node `json:"nodes"`
-	Link  []Link `json:"link"`
+	Links []Link `json:"links"`
 }
 
 type Node struct {
 	// unique id to match item in front-end
-	UID string `json:"uid,omitempty"`
+	LcUUID string `json:"lcuuid,omitempty"`
 	// service uid from trace_map
+	Name            string `json:"name,omitempty"`
 	ServiceUID      string `json:"service_uid,omitempty"`
 	AutoService     string `json:"auto_service,omitempty"`
 	AutoServiceID   uint32 `json:"auto_service_id,omitempty"`

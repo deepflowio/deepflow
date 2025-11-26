@@ -26,3 +26,7 @@ func TraceMap(args model.TraceMap, cfg *config.QuerierConfig, c *gin.Context, do
 	done <- true
 	return
 }
+
+func FlowMap(args model.FlowMap, cfg *config.QuerierConfig, c *gin.Context, generator *TraceMapGenerator) {
+	return
+}
