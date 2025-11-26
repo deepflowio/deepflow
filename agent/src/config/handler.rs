@@ -3760,6 +3760,7 @@ impl ConfigHandler {
                 proc.enabled, new_proc.enabled
             );
             proc.enabled = new_proc.enabled;
+            restart_agent = !first_run;
         }
         if proc.min_lifetime != new_proc.min_lifetime {
             info!(
