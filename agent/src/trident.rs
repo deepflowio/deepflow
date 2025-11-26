@@ -2348,7 +2348,9 @@ impl AgentComponents {
                 .clone(),
         ));
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        platform_synchronizer.set_process_listener(&process_listener);
+        if candidate_config.user_config.inputs.proc.enabled {
+            platform_synchronizer.set_process_listener(&process_listener);
+        }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
