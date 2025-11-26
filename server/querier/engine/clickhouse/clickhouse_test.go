@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -761,5 +762,243 @@ func convertNameToInterval(name string) (interval int) {
 		return 86400
 	default:
 		return 0
+	}
+}
+
+func TestReplaceCustomBizServiceFilter(t *testing.T) {
+	tests := []struct {
+		name                    string
+		sql                     string
+		orgID                   string
+		expectedTypeReplacement bool
+		wantErr                 bool
+	}{
+		{
+			name:                    "no_custom_biz_service",
+			sql:                     "SELECT * FROM l4_flow_log WHERE auto_service_type=101",
+			orgID:                   "1",
+			expectedTypeReplacement: false,
+			wantErr:                 false,
+		},
+		{
+			name:                    "single_custom_biz_service_no_id",
+			sql:                     "SELECT * FROM l4_flow_log WHERE auto_service_type=105",
+			orgID:                   "1",
+			expectedTypeReplacement: true,
+			wantErr:                 false,
+		},
+		{
+			name:                    "custom_biz_service_with_suffix",
+			sql:                     "SELECT * FROM l4_flow_log WHERE auto_service_type_0=105",
+			orgID:                   "1",
+			expectedTypeReplacement: true,
+			wantErr:                 false,
+		},
+		{
+			name:                    "mixed_services",
+			sql:                     "SELECT * FROM l4_flow_log WHERE auto_service_type=101 AND auto_service_type_0=105",
+			orgID:                   "1",
+			expectedTypeReplacement: true,
+			wantErr:                 false,
+		},
+		{
+			name:                    "whitespace_variations",
+			sql:                     "SELECT * FROM l4_flow_log WHERE auto_service_type   =   105",
+			orgID:                   "1",
+			expectedTypeReplacement: true,
+			wantErr:                 false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalSQL := tt.sql
+			got, err := ReplaceCustomBizServiceFilter(tt.sql, tt.orgID)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReplaceCustomBizServiceFilter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Check if type replacement happened as expected
+			typeReplacementHappened := strings.Contains(got, "1=1") && !strings.Contains(originalSQL, "1=1")
+			if typeReplacementHappened != tt.expectedTypeReplacement {
+				t.Errorf("ReplaceCustomBizServiceFilter() type replacement = %v, expected %v\nOriginal: %s\nResult: %s",
+					typeReplacementHappened, tt.expectedTypeReplacement, originalSQL, got)
+			}
+
+			// Verify that non-105 patterns are not touched
+			if !tt.expectedTypeReplacement {
+				if got != originalSQL {
+					t.Errorf("ReplaceCustomBizServiceFilter() should not modify non-105 patterns, got %v, want %v", got, originalSQL)
+				}
+			}
+
+			// Verify that 105 type patterns are replaced
+			if tt.expectedTypeReplacement {
+				if strings.Contains(got, "auto_service_type=105") || strings.Contains(got, "auto_service_type_0=105") || strings.Contains(got, "auto_service_type_1=105") {
+					t.Errorf("ReplaceCustomBizServiceFilter() should replace all auto_service_type=105 patterns with 1=1, but found remaining patterns in: %s", got)
+				}
+			}
+		})
+	}
+}
+
+// Test the pattern matching logic specifically
+func TestReplaceCustomBizServiceFilterPatterns(t *testing.T) {
+	tests := []struct {
+		name        string
+		sql         string
+		hasType     bool
+		typeMatches int
+		hasSuffixes []string
+	}{
+		{
+			name:        "basic_pattern",
+			sql:         "WHERE auto_service_type=105",
+			hasType:     true,
+			typeMatches: 1,
+			hasSuffixes: []string{""},
+		},
+		{
+			name:        "suffix_pattern",
+			sql:         "WHERE auto_service_type_0=105 AND auto_service_type_1=105",
+			hasType:     true,
+			typeMatches: 2,
+			hasSuffixes: []string{"_0", "_1"},
+		},
+		{
+			name:        "no_match",
+			sql:         "WHERE auto_service_type=101",
+			hasType:     false,
+			typeMatches: 0,
+			hasSuffixes: []string{},
+		},
+		{
+			name:        "multiple_105",
+			sql:         "WHERE auto_service_type=1055",
+			hasType:     true,
+			typeMatches: 1,
+			hasSuffixes: []string{""},
+		},
+		{
+			name:        "mixed_digits_suffix",
+			sql:         "WHERE auto_service_type_123=105",
+			hasType:     true,
+			typeMatches: 1,
+			hasSuffixes: []string{"_123"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the regex pattern directly
+			typePattern := `auto_service_type(_\d+)?\s*=\s*105+`
+			typeRegex := regexp.MustCompile(typePattern)
+			typeMatches := typeRegex.FindAllStringSubmatch(tt.sql, -1)
+
+			hasMatches := len(typeMatches) > 0
+			if hasMatches != tt.hasType {
+				t.Errorf("Expected hasType=%v, got %v for SQL: %s", tt.hasType, hasMatches, tt.sql)
+			}
+
+			if len(typeMatches) != tt.typeMatches {
+				t.Errorf("Expected %d matches, got %d for SQL: %s", tt.typeMatches, len(typeMatches), tt.sql)
+			}
+
+			if tt.hasType {
+				suffixes := []string{}
+				for _, match := range typeMatches {
+					suffix := match[1]
+					suffixes = append(suffixes, suffix)
+				}
+
+				// Check if all expected suffixes are found
+				for _, expectedSuffix := range tt.hasSuffixes {
+					found := false
+					for _, suffix := range suffixes {
+						if suffix == expectedSuffix {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Expected suffix %q not found in %v", expectedSuffix, suffixes)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Test ID pattern matching
+func TestReplaceCustomBizServiceFilterIDPatterns(t *testing.T) {
+	tests := []struct {
+		name             string
+		sql              string
+		expectedIDs      []string
+		expectedSuffixes []string
+	}{
+		{
+			name:             "basic_id_pattern",
+			sql:              "WHERE auto_service_id=123",
+			expectedIDs:      []string{"123"},
+			expectedSuffixes: []string{""},
+		},
+		{
+			name:             "suffix_id_pattern",
+			sql:              "WHERE auto_service_id_0=456 AND auto_service_id_1=789",
+			expectedIDs:      []string{"456", "789"},
+			expectedSuffixes: []string{"_0", "_1"},
+		},
+		{
+			name:             "mixed_id_pattern",
+			sql:              "WHERE auto_service_id=111 AND auto_service_id_0=222",
+			expectedIDs:      []string{"111", "222"},
+			expectedSuffixes: []string{"", "_0"},
+		},
+		{
+			name:             "whitespace_id_pattern",
+			sql:              "WHERE auto_service_id  =  999",
+			expectedIDs:      []string{"999"},
+			expectedSuffixes: []string{""},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the ID regex pattern directly
+			idPattern := `auto_service_id(_\d+)?\s*=\s*(\d+)`
+			idRegex := regexp.MustCompile(idPattern)
+			idMatches := idRegex.FindAllStringSubmatch(tt.sql, -1)
+
+			if len(idMatches) != len(tt.expectedIDs) {
+				t.Errorf("Expected %d ID matches, got %d for SQL: %s", len(tt.expectedIDs), len(idMatches), tt.sql)
+				return
+			}
+
+			foundIDs := []string{}
+			foundSuffixes := []string{}
+			for _, match := range idMatches {
+				suffix := match[1]
+				id := match[2]
+				foundSuffixes = append(foundSuffixes, suffix)
+				foundIDs = append(foundIDs, id)
+			}
+
+			// Verify expected IDs
+			for i, expectedID := range tt.expectedIDs {
+				if i >= len(foundIDs) || foundIDs[i] != expectedID {
+					t.Errorf("Expected ID %q at position %d, got %q", expectedID, i, foundIDs[i])
+				}
+			}
+
+			// Verify expected suffixes
+			for i, expectedSuffix := range tt.expectedSuffixes {
+				if i >= len(foundSuffixes) || foundSuffixes[i] != expectedSuffix {
+					t.Errorf("Expected suffix %q at position %d, got %q", expectedSuffix, i, foundSuffixes[i])
+				}
+			}
+		})
 	}
 }

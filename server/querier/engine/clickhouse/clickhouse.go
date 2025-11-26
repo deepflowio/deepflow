@@ -147,7 +147,7 @@ func createTopKColumn(functionAs, prefix string, elementIndex, argsLength int) (
 }
 
 func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
-	typePattern := `auto_service_type(_\d+)?\s*=\s*105+`
+	typePattern := `auto_service_type(_\d+)?\s*=\s*105\b`
 	typeRegex := regexp.MustCompile(typePattern)
 	typeMatches := typeRegex.FindAllStringSubmatch(sql, -1)
 	suffixes := []string{}
