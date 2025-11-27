@@ -23,40 +23,42 @@ import (
 )
 
 const (
-	RESOURCE_TYPE_REGION            = "region"
-	RESOURCE_TYPE_AZ                = "az"
-	RESOURCE_TYPE_HOST              = "host"
-	RESOURCE_TYPE_VPC               = "epc"
-	RESOURCE_TYPE_NAT_GATEWAY       = "nat_gateway"
-	RESOURCE_TYPE_LB                = "lb"
-	RESOURCE_TYPE_VL2               = "vl2"
-	RESOURCE_TYPE_REDIS             = "redis_instance"
-	RESOURCE_TYPE_RDS               = "rds_instance"
-	RESOURCE_TYPE_VM                = "vm"
-	RESOURCE_TYPE_VGW               = "vgateway"
-	RESOURCE_TYPE_DHCP_PORT         = "dhcp_port"
-	RESOURCE_TYPE_IP                = "ip"
-	RESOURCE_TYPE_POD_CLUSTER       = "pod_cluster"
-	RESOURCE_TYPE_POD_NODE          = "pod_node"
-	RESOURCE_TYPE_POD_NAMESPACE     = "pod_namespace"
-	RESOURCE_TYPE_POD_GROUP         = "pod_group"
-	RESOURCE_TYPE_POD_SERVICE       = "pod_service"
-	RESOURCE_TYPE_POD               = "pod"
-	RESOURCE_TYPE_INTERNET          = "internet"
-	RESOURCE_TYPE_INTERNET_IP       = "internet_ip"
-	RESOURCE_TYPE_VINTERFACE        = "vinterface"
-	RESOURCE_TYPE_WANIP             = "wan_ip"
-	RESOURCE_TYPE_LANIP             = "lan_ip"
-	RESOURCE_TYPE_NAT_RULE          = "nat_rule"
-	RESOURCE_TYPE_NAT_VM_CONNECTION = "nat_vm_connection"
-	RESOURCE_TYPE_LB_LISTENER       = "lb_listener"
-	RESOURCE_TYPE_LB_TARGET_SERVER  = "lb_target_server"
-	RESOURCE_TYPE_LB_VM_CONNECTION  = "lb_vm_connection"
-	RESOURCE_TYPE_POD_GROUP_PORT    = "pod_group_port"
-	RESOURCE_TYPE_POD_INGRESS       = "pod_ingress"
-	RESOURCE_TYPE_SERVICE           = "service"
-	RESOURCE_TYPE_GPROCESS          = "gprocess"
-	RESOURCE_TYPE_CUSTOM_SERVICE    = "biz_service"
+	RESOURCE_TYPE_REGION                    = "region"
+	RESOURCE_TYPE_AZ                        = "az"
+	RESOURCE_TYPE_HOST                      = "host"
+	RESOURCE_TYPE_VPC                       = "epc"
+	RESOURCE_TYPE_NAT_GATEWAY               = "nat_gateway"
+	RESOURCE_TYPE_LB                        = "lb"
+	RESOURCE_TYPE_VL2                       = "vl2"
+	RESOURCE_TYPE_REDIS                     = "redis_instance"
+	RESOURCE_TYPE_RDS                       = "rds_instance"
+	RESOURCE_TYPE_VM                        = "vm"
+	RESOURCE_TYPE_VGW                       = "vgateway"
+	RESOURCE_TYPE_DHCP_PORT                 = "dhcp_port"
+	RESOURCE_TYPE_IP                        = "ip"
+	RESOURCE_TYPE_POD_CLUSTER               = "pod_cluster"
+	RESOURCE_TYPE_POD_NODE                  = "pod_node"
+	RESOURCE_TYPE_POD_NAMESPACE             = "pod_namespace"
+	RESOURCE_TYPE_POD_GROUP                 = "pod_group"
+	RESOURCE_TYPE_POD_SERVICE               = "pod_service"
+	RESOURCE_TYPE_POD                       = "pod"
+	RESOURCE_TYPE_INTERNET                  = "internet"
+	RESOURCE_TYPE_INTERNET_IP               = "internet_ip"
+	RESOURCE_TYPE_VINTERFACE                = "vinterface"
+	RESOURCE_TYPE_WANIP                     = "wan_ip"
+	RESOURCE_TYPE_LANIP                     = "lan_ip"
+	RESOURCE_TYPE_NAT_RULE                  = "nat_rule"
+	RESOURCE_TYPE_NAT_VM_CONNECTION         = "nat_vm_connection"
+	RESOURCE_TYPE_LB_LISTENER               = "lb_listener"
+	RESOURCE_TYPE_LB_TARGET_SERVER          = "lb_target_server"
+	RESOURCE_TYPE_LB_VM_CONNECTION          = "lb_vm_connection"
+	RESOURCE_TYPE_POD_GROUP_PORT            = "pod_group_port"
+	RESOURCE_TYPE_POD_INGRESS               = "pod_ingress"
+	RESOURCE_TYPE_SERVICE                   = "service"
+	RESOURCE_TYPE_GPROCESS                  = "gprocess"
+	RESOURCE_TYPE_CUSTOM_SERVICE            = "biz_service"
+	RESOURCE_TYPE_CUSTOM_BIZ_SERVICE        = "custom_biz_service"
+	RESOURCE_TYPE_CUSTOM_BIZ_SERVICE_FILTER = "custom_biz_service_filter"
 )
 
 // Scheduled tasks
@@ -68,16 +70,18 @@ const (
 	RESOURCE_TYPE_CH_OS_APP_TAG  = "ch_os_app_tag"
 	RESOURCE_TYPE_CH_OS_APP_TAGS = "ch_os_app_tags"
 
-	RESOURCE_TYPE_TAP_TYPE        = "ch_tap_type"
-	RESOURCE_TYPE_CH_VTAP         = "ch_vtap"
-	RESOURCE_TYPE_CH_VTAP_PORT    = "ch_vtap_port"
-	RESOURCE_TYPE_CH_LB_LISTENER  = "ch_lb_listener"
-	RESOURCE_TYPE_CH_STRING_ENUM  = "ch_string_enum"
-	RESOURCE_TYPE_CH_INT_ENUM     = "ch_int_enum"
-	RESOURCE_TYPE_CH_NODE_TYPE    = "ch_node_type"
-	RESOURCE_TYPE_CH_POLICY       = "ch_policy"
-	RESOURCE_TYPE_CH_NPB_TUNNEL   = "ch_npb_tunnel"
-	RESOURCE_TYPE_CH_ALARM_POLICY = "ch_alarm_policy"
+	RESOURCE_TYPE_TAP_TYPE                     = "ch_tap_type"
+	RESOURCE_TYPE_CH_VTAP                      = "ch_vtap"
+	RESOURCE_TYPE_CH_VTAP_PORT                 = "ch_vtap_port"
+	RESOURCE_TYPE_CH_LB_LISTENER               = "ch_lb_listener"
+	RESOURCE_TYPE_CH_STRING_ENUM               = "ch_string_enum"
+	RESOURCE_TYPE_CH_INT_ENUM                  = "ch_int_enum"
+	RESOURCE_TYPE_CH_NODE_TYPE                 = "ch_node_type"
+	RESOURCE_TYPE_CH_POLICY                    = "ch_policy"
+	RESOURCE_TYPE_CH_NPB_TUNNEL                = "ch_npb_tunnel"
+	RESOURCE_TYPE_CH_ALARM_POLICY              = "ch_alarm_policy"
+	RESOURCE_TYPE_CH_CUSTOM_BIZ_SERVICE        = "ch_custom_biz_service"
+	RESOURCE_TYPE_CH_CUSTOM_BIZ_SERVICE_FILTER = "ch_custom_biz_service_filter"
 
 	RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "ch_promytheus_metric_app_label_layout"
 	RESOURCE_TYPE_CH_TARGET_LABEL                       = "ch_target_label"
@@ -194,6 +198,9 @@ const (
 
 	CH_APP_LABEL_LIVE_VIEW    = "app_label_live_view"
 	CH_TARGET_LABEL_LIVE_VIEW = "target_label_live_view"
+
+	CH_DICTIONARY_CUSTOM_BIZ_SERVICE        = "custom_biz_service_map"
+	CH_DICTIONARY_CUSTOM_BIZ_SERVICE_FILTER = "custom_biz_service_filter_map"
 )
 
 const (
@@ -545,6 +552,28 @@ const (
 		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
+	CREATE_CUSTOM_BIZ_SERVICE_DICTIONARY_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `uid` String,\n" +
+		"    `team_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"%s" +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
+	CREATE_CUSTOM_BIZ_SERVICE_FILTER_DICTIONARY_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `client_filter` String,\n" +
+		"    `server_filter` String\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"%s" +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
 )
 
 const (
@@ -568,28 +597,29 @@ const (
 )
 
 var DBNodeTypeToResourceType = map[string]string{ // TODO optimize const define
-	"region":      RESOURCE_TYPE_REGION,
-	"az":          RESOURCE_TYPE_AZ,
-	"host":        RESOURCE_TYPE_HOST,
-	"l3_epc":      RESOURCE_TYPE_VPC,
-	"subnet":      RESOURCE_TYPE_VL2,
-	"vm":          RESOURCE_TYPE_VM,
-	"router":      RESOURCE_TYPE_VGW,
-	"dhcp_port":   RESOURCE_TYPE_DHCP_PORT,
-	"nat_gateway": RESOURCE_TYPE_NAT_GATEWAY,
-	"lb":          RESOURCE_TYPE_LB,
-	"redis":       RESOURCE_TYPE_REDIS,
-	"rds":         RESOURCE_TYPE_RDS,
-	"pod_cluster": RESOURCE_TYPE_POD_CLUSTER,
-	"pod_node":    RESOURCE_TYPE_POD_NODE,
-	"pod_ns":      RESOURCE_TYPE_POD_NAMESPACE,
-	"pod_group":   RESOURCE_TYPE_POD_GROUP,
-	"pod_service": RESOURCE_TYPE_POD_SERVICE,
-	"pod":         RESOURCE_TYPE_POD,
-	"ip":          RESOURCE_TYPE_IP,
-	"internet":    RESOURCE_TYPE_INTERNET,
-	"gprocess":    RESOURCE_TYPE_GPROCESS,
-	"biz_service": RESOURCE_TYPE_CUSTOM_SERVICE,
+	"region":             RESOURCE_TYPE_REGION,
+	"az":                 RESOURCE_TYPE_AZ,
+	"host":               RESOURCE_TYPE_HOST,
+	"l3_epc":             RESOURCE_TYPE_VPC,
+	"subnet":             RESOURCE_TYPE_VL2,
+	"vm":                 RESOURCE_TYPE_VM,
+	"router":             RESOURCE_TYPE_VGW,
+	"dhcp_port":          RESOURCE_TYPE_DHCP_PORT,
+	"nat_gateway":        RESOURCE_TYPE_NAT_GATEWAY,
+	"lb":                 RESOURCE_TYPE_LB,
+	"redis":              RESOURCE_TYPE_REDIS,
+	"rds":                RESOURCE_TYPE_RDS,
+	"pod_cluster":        RESOURCE_TYPE_POD_CLUSTER,
+	"pod_node":           RESOURCE_TYPE_POD_NODE,
+	"pod_ns":             RESOURCE_TYPE_POD_NAMESPACE,
+	"pod_group":          RESOURCE_TYPE_POD_GROUP,
+	"pod_service":        RESOURCE_TYPE_POD_SERVICE,
+	"pod":                RESOURCE_TYPE_POD,
+	"ip":                 RESOURCE_TYPE_IP,
+	"internet":           RESOURCE_TYPE_INTERNET,
+	"gprocess":           RESOURCE_TYPE_GPROCESS,
+	"biz_service":        RESOURCE_TYPE_CUSTOM_SERVICE,
+	"custom_biz_service": RESOURCE_TYPE_CUSTOM_BIZ_SERVICE,
 }
 
 var CREATE_SQL_MAP = map[string]string{
@@ -650,7 +680,9 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POLICY:     CREATE_POLICY_DICTIONARY_SQL,
 	CH_DICTIONARY_NPB_TUNNEL: CREATE_NPB_TUNNEL_DICTIONARY_SQL,
 
-	CH_DICTIONARY_ALARM_POLICY: CREATE_AlARM_POLICY_DICTIONARY_SQL,
+	CH_DICTIONARY_ALARM_POLICY:              CREATE_AlARM_POLICY_DICTIONARY_SQL,
+	CH_DICTIONARY_CUSTOM_BIZ_SERVICE:        CREATE_CUSTOM_BIZ_SERVICE_DICTIONARY_SQL,
+	CH_DICTIONARY_CUSTOM_BIZ_SERVICE_FILTER: CREATE_CUSTOM_BIZ_SERVICE_FILTER_DICTIONARY_SQL,
 
 	CH_PROMETHEUS_LABEL_NAME:              CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
 	CH_PROMETHEUS_METRIC_NAME:             CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
@@ -708,3 +740,5 @@ var SUB_DOMAIN_RESOURCE_TYPES = []string{
 	common.RESOURCE_TYPE_POD_NODE_EN, common.RESOURCE_TYPE_POD_CLUSTER_EN, common.RESOURCE_TYPE_PROCESS_EN,
 	common.RESOURCE_TYPE_POD_INGRESS_EN, common.RESOURCE_TYPE_POD_NAMESPACE_EN, common.RESOURCE_TYPE_NETWORK_EN,
 }
+
+var CUSTOM_BIZ_SERVICE_TYPE = 1

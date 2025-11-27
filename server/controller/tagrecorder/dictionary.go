@@ -246,6 +246,8 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		CH_DICTIONARY_POLICY,
 		CH_DICTIONARY_NPB_TUNNEL,
 		CH_DICTIONARY_ALARM_POLICY,
+		CH_DICTIONARY_CUSTOM_BIZ_SERVICE,
+		CH_DICTIONARY_CUSTOM_BIZ_SERVICE_FILTER,
 	)
 	// 根据不同的组织进行更新
 	orgIDs, err := metadb.GetORGIDs()
@@ -472,7 +474,7 @@ func (c *Dictionary) makeSourceClause(db, table string) string {
 		)
 	case metaDBCommon.SOURCE_DM:
 		return fmt.Sprintf(
-			SQL_SOURCE_DM, c.source.DSN, db, table, table,
+			SQL_SOURCE_DM, c.source.DSN, db, table, db, table,
 		)
 	default:
 		return ""

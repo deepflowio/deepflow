@@ -1151,6 +1151,30 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 
 }
 
+func TransCustomBizFilter(idFilter, orgID, id string) (string, error) {
+	filter := "1=1"
+	col := "server_filter"
+	if strings.Contains(idFilter, "_0") {
+		col = "client_filter"
+	}
+	sql := fmt.Sprintf("SELECT %s FROM flow_tag.custom_biz_service_filter_map WHERE id=%s", col, id)
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "flow_tag",
+	}
+	filterRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, ORGID: orgID})
+	if err != nil {
+		return filter, err
+	}
+	for _, v := range filterRst.Values {
+		filter = v.([]interface{})[0].(string)
+	}
+	return filter, err
+}
+
 func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string, error) {
 	filter := ""
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
