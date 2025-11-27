@@ -450,6 +450,7 @@ func ParseCompressedInfo(cInfo []byte) (bytes.Buffer, error) {
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
+	defer r.Close()
 	_, err = out.ReadFrom(r)
 	if err != nil {
 		return bytes.Buffer{}, err
