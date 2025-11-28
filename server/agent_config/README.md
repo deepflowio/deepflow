@@ -39,7 +39,7 @@ deepflow-agent uses cgroups to limit CPU usage.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -64,6 +64,11 @@ global:
 **Description**:
 
 deepflow-agent uses cgroups to limit memory usage.
+
+Note:
+- Memory of the dedicated deepflow-agent is not limited
+- Memory limits for container deepflow-agent are enforced by container
+- Memory limits for container deepflow-agent in the same cluster need to be consistent
 
 ### Maximum Log Backhaul Rate {#global.limits.max_log_backhaul_rate}
 
