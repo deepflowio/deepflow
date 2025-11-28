@@ -37,13 +37,23 @@ global:
     # unit: MiB
     # range: [128, 100000]
     # enum_options: []
-    # modification: hot_update
+    # modification: agent_restart
     # ee_feature: false
     # description:
     #   en: |-
     #     deepflow-agent uses cgroups to limit memory usage.
+    #
+    #     Note:
+    #     - Memory of the dedicated deepflow-agent is not limited
+    #     - Memory limits for container deepflow-agent are enforced by container
+    #     - Memory limits for container deepflow-agent in the same cluster need to be consistent
     #   ch: |-
-    #     deepflow-agent 使用 cgroups 限制自身的 memory 用量.
+    #     deepflow-agent 使用 cgroups 限制自身的 memory 用量。
+    #
+    #     注意：
+    #     - 专属采集器内存不受限制
+    #     - 容器采集器内存限制由容器管理工具来实现
+    #     - 同集群的容器采集器内存限制需要一致
     # upgrade_from: max_memory
     max_memory: 768
     # type: int
