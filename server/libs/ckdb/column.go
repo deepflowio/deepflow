@@ -328,6 +328,7 @@ const (
 	COLUMN_TRACE_ID                   = "trace_id"
 	COLUMN_TRACE_ID_2                 = "_trace_id_2"
 	COLUMN_TRACE_ID_INDEX             = "trace_id_index"
+	COLUMN_TRIGGER_THRESHOLD          = "trigger_threshold"
 	COLUMN_TUNNEL_IP_ID               = "tunnel_ip_id"
 	COLUMN_TUNNEL_IS_IPV4             = "tunnel_is_ipv4"
 	COLUMN_TUNNEL_RX_ID               = "tunnel_rx_id"
@@ -664,6 +665,7 @@ var ColumnNames = []string{
 	COLUMN_TRACE_FLAGS,
 	COLUMN_TRACE_ID,
 	COLUMN_TRACE_ID_INDEX,
+	COLUMN_TRIGGER_THRESHOLD,
 	COLUMN_TUNNEL_IP_ID,
 	COLUMN_TUNNEL_IS_IPV4,
 	COLUMN_TUNNEL_RX_ID,
