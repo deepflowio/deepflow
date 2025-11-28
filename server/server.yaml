@@ -318,6 +318,12 @@ controller:
       port: 123
       timeout: 1
 
+    # grpc service push config
+    push:
+      enabled: true
+      # unit: second , min: 1 max: 10
+      delay-max: 0
+
     trident-type-for-unknow-vtap: 0
 
     platform-vips:
