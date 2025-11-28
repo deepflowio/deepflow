@@ -231,9 +231,15 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	} else {
 		// Normal query, added to sqllist
 		// replace custom_biz_filter
-		sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
-		if err != nil {
-			return nil, nil, err
+		fromMatch := fromRegexp.FindStringSubmatch(sql)
+		if len(fromMatch) > 1 {
+			table := fromMatch[1]
+			if table != "alert_event" {
+				sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
 		}
 		sqlList = append(sqlList, sql)
 	}
