@@ -18,11 +18,11 @@ package script
 
 import (
 	"bytes"
-	"compress/zlib"
 	"encoding/json"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
+	"github.com/klauspost/compress/zlib"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
