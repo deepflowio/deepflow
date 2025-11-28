@@ -670,21 +670,31 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 
 		return nil
 	}
-	response, err := e.pushResponse(r, true)
-	if err != nil {
-		log.Error(err)
-	}
-	err = in.Send(response)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
+
+	enabledPush := trisolaris.GetPushEnabled()
+
+	firstPush := true
 	for {
-		pushmanager.Wait(orgID)
-		response, err := e.pushResponse(r, false)
+		if !firstPush {
+			pushmanager.Wait(orgID)
+		}
+
+		if !enabledPush {
+			firstPush = false
+			log.Debugf("push disabled for agent (%s-%s)", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
+			continue
+		}
+
+		sleepRand := trisolaris.GetPushDelayRand()
+		log.Debugf("agent(%s-%s) push sleep %d ms", r.GetCtrlIp(), r.GetCtrlMac(), sleepRand, logger.NewORGPrefix(orgID))
+		time.Sleep(time.Duration(sleepRand) * time.Millisecond)
+
+		response, err := e.pushResponse(r, firstPush)
 		if err != nil {
 			log.Error(err)
 		}
+		firstPush = false
+
 		err = in.Send(response)
 		if err != nil {
 			log.Error(err)

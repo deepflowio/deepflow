@@ -18,13 +18,13 @@ package model
 
 import (
 	"bytes"
-	"compress/zlib"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/klauspost/compress/zlib"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
