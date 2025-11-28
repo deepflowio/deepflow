@@ -39,7 +39,7 @@ deepflow-agent 使用 cgroups 来限制自身的 CPU 用量，
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -63,7 +63,12 @@ global:
 
 **详细描述**:
 
-deepflow-agent 使用 cgroups 限制自身的 memory 用量.
+deepflow-agent 使用 cgroups 限制自身的 memory 用量。
+
+注意：
+- 专属采集器内存不受限制
+- 容器采集器内存限制由容器管理工具来实现
+- 同集群的容器采集器内存限制需要一致
 
 ### 日志每小时回传上限 {#global.limits.max_log_backhaul_rate}
 
