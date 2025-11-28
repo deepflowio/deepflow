@@ -18,6 +18,7 @@ package trisolaris
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -92,6 +93,20 @@ func GetOrgIDByTeamID(teamID string) int {
 		return 0
 	}
 	return trisolarisManager.GetOrgIDByTeamID(teamID)
+}
+
+func GetPushEnabled() bool {
+	if trisolarisManager == nil {
+		return false
+	}
+	return trisolarisManager.GetPushEnabled()
+}
+
+func GetPushDelayRand() int64 {
+	if trisolarisManager == nil {
+		return 0
+	}
+	return trisolarisManager.GetPushDelayRand()
 }
 
 func GetORGVTapInfo(orgID int) *vtap.VTapInfo {
@@ -553,4 +568,16 @@ func (m *TrisolarisManager) TimedCheckORG() {
 			log.Info("end check org data from timed")
 		}
 	}
+}
+
+func (m *TrisolarisManager) GetPushEnabled() bool {
+	return m.config.Push.Enabled
+}
+
+func (m *TrisolarisManager) GetPushDelayRand() int64 {
+	if m.config.Push.DelayMax == 0 {
+		return 0
+	}
+	seed := time.Now().UnixNano()
+	return int64(rand.New(rand.NewSource(seed)).Intn(1000 * m.config.Push.DelayMax))
 }
