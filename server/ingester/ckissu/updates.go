@@ -405,6 +405,12 @@ var ColumnAdd71 = []*ColumnAdds{
 		ColumnNames: []string{"biz_code", "biz_scenario"},
 		ColumnType:  ckdb.String,
 	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alert_event", "alert_event_local"},
+		ColumnNames: []string{"trigger_threshold"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 var IndexAdd71 = []*IndexAdds{

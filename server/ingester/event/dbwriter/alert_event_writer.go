@@ -49,16 +49,17 @@ type AlertEventStore struct {
 	Time uint32
 	_id  uint64
 
-	PolicyId     uint32
-	PolicyType   uint8
-	AlertPolicy  string
-	MetricValue  float64
-	EventLevel   uint8
-	TargetTags   string
-	TagStrKeys   []string
-	TagStrValues []string
-	TagIntKeys   []string
-	TagIntValues []int64
+	PolicyId         uint32
+	PolicyType       uint8
+	AlertPolicy      string
+	MetricValue      float64
+	EventLevel       uint8
+	TargetTags       string
+	TagStrKeys       []string
+	TagStrValues     []string
+	TagIntKeys       []string
+	TagIntValues     []int64
+	TriggerThreshold string
 
 	XTargetUid   string
 	XQueryRegion string
@@ -90,6 +91,7 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("tag_string_values", ckdb.ArrayString),
 		ckdb.NewColumn("tag_int_names", ckdb.ArrayLowCardinalityString),
 		ckdb.NewColumn("tag_int_values", ckdb.ArrayInt64),
+		ckdb.NewColumn("trigger_threshold", ckdb.LowCardinalityString),
 
 		ckdb.NewColumn("_target_uid", ckdb.String),
 		ckdb.NewColumn("_query_region", ckdb.LowCardinalityString),
