@@ -169,7 +169,10 @@ func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
 				if err != nil {
 					return sql, err
 				}
-				sql = strings.ReplaceAll(sql, match[0], transFilter)
+				if transFilter == "" {
+					transFilter = "1!=1"
+				}
+				sql = strings.ReplaceAll(sql, match[0], fmt.Sprintf("(%s)", transFilter))
 			}
 		}
 	}
