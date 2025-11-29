@@ -17,9 +17,11 @@
 mod comment_parser;
 mod consts;
 
-use std::cell::Cell;
-use std::io::Read;
-use std::str;
+use std::{
+    cell::Cell,
+    io::Read,
+    str::{self, SplitWhitespace},
+};
 
 use flate2::bufread::ZlibDecoder;
 use log::{debug, trace};
@@ -136,6 +138,7 @@ pub struct MysqlInfo {
     pub error_message: String,
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
+    pub endpoint: Option<String>,
 
     rrt: u64,
     // This field is extracted in the following message:
@@ -188,6 +191,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     // all unmerged responses are skipped because segmented responses can produce multiple OK responses
     fn skip_send(&self) -> bool {
         self.msg_type == LogMessageType::Response
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
     }
 }
 
@@ -265,6 +272,113 @@ impl MysqlInfo {
         }
     }
 
+    fn get_table_name_from_sql(
+        sql: &mut SplitWhitespace,
+        key: &'static str,
+        action: &'static str,
+    ) -> Option<String> {
+        let mut flag = false;
+        for word in sql {
+            if word.eq_ignore_ascii_case(key) {
+                flag = true;
+                continue;
+            }
+            if flag {
+                let Some(first_quote) = word.find('`') else {
+                    return Some(format!("{} {}", action, word));
+                };
+                if first_quote + 1 >= word.len() {
+                    return Some(format!("{} {}", action, word));
+                }
+                let word = &word[first_quote + 1..];
+                let Some(second_quote) = word.find('`') else {
+                    return Some(format!("{} {}", action, word));
+                };
+                return Some(format!("{} {}", action, &word[..second_quote]));
+            }
+        }
+
+        None
+    }
+
+    fn generate_endpoint(&mut self) {
+        if self.context.is_empty() {
+            return;
+        }
+
+        let mut words = self.context.split_whitespace();
+        let Some(action) = words.next() else {
+            self.endpoint = Some(self.context.clone());
+            return;
+        };
+
+        match action.to_ascii_uppercase().as_str() {
+            // select * from table_name
+            // SELECT count(*) AS count_1 FROM
+            //   (SELECT user_app_biz_path.id AS user_app_biz_path_id FROM user_app_biz_path WHERE user_app_biz_path.app_biz_lcuid = '03bc900c-8632-4d9f-8baa-de7d869e4711') AS anon_1
+            "SELECT" => {
+                let mut last = self.context.as_str();
+                for word in words.rev() {
+                    if word.eq_ignore_ascii_case("from") {
+                        self.endpoint = Some(format!("SELECT {}", last.trim_matches('`')));
+                        return;
+                    }
+                    last = word;
+                }
+            }
+            // insert into table_name
+            "INSERT" => {
+                if let Some(table_name) =
+                    Self::get_table_name_from_sql(&mut words, "into", "INSERT")
+                {
+                    self.endpoint = Some(table_name);
+                    return;
+                }
+            }
+            // update table_name set ...
+            "UPDATE" => {
+                if let Some(table_name) = words.next() {
+                    self.endpoint = Some(format!("UPDATE {}", table_name.trim_matches('`')));
+                    return;
+                }
+            }
+            // delete from table_name
+            "DELETE" => {
+                if let Some(table_name) =
+                    Self::get_table_name_from_sql(&mut words, "from", "DELETE")
+                {
+                    self.endpoint = Some(table_name);
+                    return;
+                }
+            }
+            "ALTER" => {
+                if let Some(table_name) =
+                    Self::get_table_name_from_sql(&mut words, "table", "ALTER")
+                {
+                    self.endpoint = Some(table_name);
+                    return;
+                }
+            }
+            "CREATE" => {
+                if let Some(table_name) =
+                    Self::get_table_name_from_sql(&mut words, "table", "CREATE")
+                {
+                    self.endpoint = Some(table_name);
+                    return;
+                }
+            }
+            "DROP" => {
+                if let Some(table_name) = Self::get_table_name_from_sql(&mut words, "table", "DROP")
+                {
+                    self.endpoint = Some(table_name);
+                    return;
+                }
+            }
+            _ => {}
+        }
+        self.endpoint = Some(self.context.clone());
+    }
+
     fn request_string(
         &mut self,
         config: Option<&LogParserConfig>,
@@ -296,6 +410,7 @@ impl MysqlInfo {
             _ => String::from_utf8_lossy(payload).to_string(),
         };
         self.context = context;
+        self.generate_endpoint();
         Ok(())
     }
 
@@ -381,6 +496,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: String::from(f.get_command_str()),
                 resource: f.context,
+                endpoint: f.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -415,6 +531,7 @@ impl From<&MysqlInfo> for LogCache {
             msg_type: info.msg_type,
             resp_status: info.status,
             on_blacklist: info.is_on_blacklist,
+            endpoint: info.endpoint.clone(),
             ..Default::default()
         }
     }
@@ -539,6 +656,11 @@ impl L7ProtocolParserInterface for MysqlLog {
             info.set_is_on_blacklist(config);
         }
         if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                    info.endpoint = Some(endpoint.to_string());
+                }
+            }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
                 perf_stats.sequential_merge(&stats);
@@ -931,6 +1053,7 @@ impl MysqlLog {
         match Self::string_null(&payload[LOGIN_USERNAME_OFFSET..]) {
             Some(context) if context.is_ascii() => {
                 info.context = format!("Login username: {}", context);
+                info.generate_endpoint();
             }
             _ => return Err(Error::InvalidLoginInfo("username not found or not ascii")),
         }
