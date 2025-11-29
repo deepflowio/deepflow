@@ -1152,7 +1152,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 }
 
 func TransCustomBizFilter(idFilter, orgID, id string) (string, error) {
-	filter := "1=1"
+	filter := "1!=1"
 	col := "server_filter"
 	if strings.Contains(idFilter, "_0") {
 		col = "client_filter"
