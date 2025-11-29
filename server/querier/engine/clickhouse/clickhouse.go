@@ -154,7 +154,7 @@ func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
 	suffixes := []string{}
 	if len(typeMatches) != 0 {
 		for _, match := range typeMatches {
-			suffix := match[1]
+			suffix := match[2]
 			suffixes = append(suffixes, suffix)
 			sql = strings.ReplaceAll(sql, match[0], "1=1")
 		}
