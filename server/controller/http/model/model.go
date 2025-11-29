@@ -16,6 +16,10 @@
 
 package model
 
+import (
+	agentconf "github.com/deepflowio/deepflow/server/agent_config"
+)
+
 type ORGDataCreate struct {
 	ORGID int `json:"ORGANIZATION_ID" binding:"required"`
 }
@@ -39,4 +43,35 @@ type VTapInterfaceQuery struct {
 	FuzzyVTapName   string `schema:"fuzzy_vtap_name,omitempty"`
 	FuzzyTapName    string `schema:"fuzzy_tap_name,omitempty"`
 	FuzzyTapMAC     string `schema:"fuzzy_tap_mac,omitempty"`
+}
+
+// AgentGroupConfigChangelogQuery 定义了查询采集器配置变更记录的请求参数
+type AgentGroupConfigChangelogQuery struct {
+	TimeStart int    `schema:"time_start" json:"time_start" binding:"required"` // 查询时间范围开始
+	TimeEnd   int    `schema:"time_end" json:"time_end" binding:"required"`     // 查询时间范围结束
+	Interval  string `schema:"interval" json:"interval" binding:"required"`     // 查询时间粒度
+}
+
+// AgentGroupConfigChangelogCreate 定义了创建采集器配置变更记录的请求参数
+type AgentGroupConfigChangelogCreate struct {
+	UserID   int    `json:"USER_ID" binding:"required"`   // 变更人（用户ID）
+	Remarks  string `json:"REMARKS" binding:"required"`   // 变更备注
+	YamlDiff string `json:"YAML_DIFF" binding:"required"` // 变更 Diff
+}
+
+// AgentGroupConfigChangelogUpdate 定义了更新采集器配置变更记录的请求参数
+type AgentGroupConfigChangelogUpdate struct {
+	Remarks string `json:"REMARKS" binding:"required"` // 变更备注
+}
+
+// AgentGroupConfigChangelogTrendResponse 定义了采集器配置变更记录的响应参数
+type AgentGroupConfigChangelogTrendResponse struct {
+	TimeSlot   string                              `json:"TIME_SLOT"` // 时间槽，用于获取趋势时的聚合展示，仅在获取趋势时返回
+	Count      int                                 `json:"COUNT"`     // 该时间槽内的记录数，用于获取趋势时的聚合展示，仅在获取趋势时返回
+	ChangeLogs []AgentGroupConfigChangelogResponse `json:"CHANGELOGS,omitempty"`
+}
+
+// AgentGroupConfigChangelogResponse 定义了采集器配置变更记录的响应参数
+type AgentGroupConfigChangelogResponse struct {
+	agentconf.MetadbAgentGroupConfigurationChangelog
 }

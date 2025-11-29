@@ -20,15 +20,30 @@ import "time"
 
 type MySQLAgentGroupConfiguration struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:not null" json:"LCUUID"`
-	AgentGroupLcuuid string    `gorm:"column:agent_group_lcuuid;type:char(64);default:not null" json:"AGENT_GROUP_LCUUID"`
-	Yaml             string    `gorm:"column:yaml;type:text;default:not null" json:"YAML"`
+	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+	AgentGroupLcuuid string    `gorm:"column:agent_group_lcuuid;type:char(64);not null" json:"AGENT_GROUP_LCUUID"`
+	Yaml             string    `gorm:"column:yaml;type:text;not null" json:"YAML"`
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
 func (MySQLAgentGroupConfiguration) TableName() string {
 	return "agent_group_configuration"
+}
+
+type MetadbAgentGroupConfigurationChangelog struct {
+	ID                 int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+	AgentGroupConfigID int       `gorm:"column:agent_group_configuration_id;type:int;not null" json:"AGENT_GROUP_CONFIGURATION_ID"`
+	YamlDiff           string    `gorm:"column:yaml_diff;type:mediumtext;not null" json:"YAML_DIFF"`
+	UserID             int       `gorm:"column:user_id;type:int;not null" json:"USER_ID"`
+	Remarks            string    `gorm:"column:remarks;type:text;not null" json:"REMARKS"`
+	CreatedAt          time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT" mapstructure:"CREATED_AT"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
+}
+
+func (MetadbAgentGroupConfigurationChangelog) TableName() string {
+	return "agent_group_configuration_changelog"
 }
 
 type AgentGroupConfigModel struct {
