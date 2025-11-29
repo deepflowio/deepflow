@@ -1,2 +1,2 @@
-{"msg_type":"Request","request_type":3,"request_resource":"use `test`","response_code":0,"response_status":"Unknown","rrt":0,"statement_id":0,"captured_request_byte":22,"captured_response_byte":0,"trace_ids":[],"span_id":null} is_mysql: true
-{"msg_type":"Response","request_type":0,"response_code":0,"response_status":"Ok","rrt":0,"statement_id":131072,"captured_request_byte":0,"captured_response_byte":18,"trace_ids":[],"span_id":null} is_mysql: false
+{"msg_type":"Request","request_type":3,"request_resource":"use `test`","response_code":0,"response_status":"Unknown","endpoint":"use `test`","rrt":0,"statement_id":0,"captured_request_byte":22,"captured_response_byte":0,"trace_ids":[],"span_id":null} is_mysql: true
+{"msg_type":"Response","request_type":0,"response_code":0,"response_status":"Ok","endpoint":"use `test`","rrt":0,"statement_id":131072,"captured_request_byte":0,"captured_response_byte":18,"trace_ids":[],"span_id":null} is_mysql: false
