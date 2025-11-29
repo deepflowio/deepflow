@@ -150,6 +150,8 @@ pub struct MysqlInfo {
     pub error_message: String,
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
+    #[serde(skip)]
+    pub endpoint: Option<String>,
 
     rrt: u64,
     // This field is extracted in the following message:
@@ -211,6 +213,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     // all unmerged responses are skipped because segmented responses can produce multiple OK responses
     fn skip_send(&self) -> bool {
         self.msg_type == LogMessageType::Response
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
     }
 }
 
@@ -338,6 +344,69 @@ impl MysqlInfo {
         }
     }
 
+    fn generate_endpoint(&mut self) {
+        if self.context.is_empty() {
+            return;
+        }
+
+        let words: Vec<&str> = self.context.split_whitespace().collect();
+        if words.len() < 2 {
+            self.endpoint = Some(self.context.clone());
+            return;
+        }
+
+        match words[0].to_ascii_lowercase().as_str() {
+            // select * from table_name
+            // SELECT count(*) AS count_1 FROM
+            //   (SELECT user_app_biz_path.id AS user_app_biz_path_id FROM user_app_biz_path WHERE user_app_biz_path.app_biz_lcuid = '03bc900c-8632-4d9f-8baa-de7d869e4711') AS anon_1
+            "select" => {
+                let mut last = self.context.as_str();
+                for word in words[1..].iter().rev() {
+                    if word.to_ascii_lowercase().as_str() == "from" {
+                        self.endpoint = Some(last.to_string());
+                        return;
+                    }
+                    last = word;
+                }
+            }
+            // insert into table_name
+            "insert" => {
+                let mut flag = false;
+                for word in words[1..].iter() {
+                    if word.to_ascii_lowercase().as_str() == "into" {
+                        flag = true;
+                        continue;
+                    }
+                    if flag {
+                        self.endpoint = Some(word.to_string());
+                        return;
+                    }
+                }
+            }
+            // update table_name set ...
+            "update" => {
+                self.endpoint = Some(words[1].to_string());
+                return;
+            }
+            // delete from table_name
+            "delete" => {
+                let mut flag = false;
+                for word in words[1..].iter() {
+                    if word.to_ascii_lowercase().as_str() == "from" {
+                        flag = true;
+                        continue;
+                    }
+                    if flag {
+                        self.endpoint = Some(word.to_string());
+                        return;
+                    }
+                }
+            }
+            _ => {}
+        }
+        self.endpoint = Some(self.context.clone());
+    }
+
     fn request_string(
         &mut self,
         param: &ParseParam,
@@ -374,6 +443,7 @@ impl MysqlInfo {
             _ => String::from_utf8_lossy(payload).to_string(),
         };
         self.context = context;
+        self.generate_endpoint();
         Ok(())
     }
 
@@ -466,6 +536,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: String::from(f.get_command_str()),
                 resource: f.context,
+                endpoint: f.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -507,6 +578,7 @@ impl From<&MysqlInfo> for LogCache {
             msg_type: info.msg_type,
             resp_status: info.status,
             on_blacklist: info.is_on_blacklist,
+            endpoint: info.endpoint.clone(),
             ..Default::default()
         }
     }
@@ -638,6 +710,11 @@ impl L7ProtocolParserInterface for MysqlLog {
             info.set_is_on_blacklist(config);
         }
         if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                    info.endpoint = Some(endpoint.to_string());
+                }
+            }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
                 perf_stats.sequential_merge(&stats);
