@@ -51,8 +51,26 @@ sort_by = "Name"
 usize_is_size_t = true
 
 [export]
-include = ["ProcessShardList", "UnwindEntryShard", "PythonUnwindInfo", "PythonOffsets"]
-exclude = ["bpf_update_elem", "bpf_delete_elem", "BPF_ANY"]
+include = [
+  "ProcessShardList",
+  "UnwindEntryShard",
+  "PythonUnwindInfo",
+  "PythonOffsets",
+  "LuaRuntimeInfo",
+  "LuaUnwindInfo",
+  "LuaUnwindTable",
+  "LuaOfs",
+  "LjOfs"
+]
+exclude = [
+  "bpf_update_elem",
+  "bpf_delete_elem",
+  "BPF_ANY",
+  "bpf_lookup_elem",
+  "resolve_addr",
+  "clib_mem_alloc_aligned",
+  "clib_mem_free",
+]
 item_types = []
 renaming_overrides_prefixing = false
 
@@ -76,6 +94,11 @@ PyTypeObject = "py_type_object_t"
 PythonOffsets = "python_offsets_t"
 PythonUnwindInfo = "python_unwind_info_t"
 PythonUnwindTable = "python_unwind_table_t"
+LuaRuntimeInfo = "lua_runtime_info_t"
+LuaUnwindInfo = "lua_unwind_info_t"
+LuaUnwindTable = "lua_unwind_table_t"
+LuaOfs = "lua_ofs"
+LjOfs = "lj_ofs"
 
 [struct]
 rename_fields = "SnakeCase"
