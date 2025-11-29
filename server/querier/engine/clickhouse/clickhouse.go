@@ -193,6 +193,17 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	debug_info := &client.DebugInfo{}
+	// replace custom_biz_filter
+	fromMatch := fromRegexp.FindStringSubmatch(sql)
+	if len(fromMatch) > 1 {
+		table := fromMatch[1]
+		if table != "alert_event" {
+			sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
@@ -234,17 +245,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		e.DB = "flow_tag"
 	} else {
 		// Normal query, added to sqllist
-		// replace custom_biz_filter
-		fromMatch := fromRegexp.FindStringSubmatch(sql)
-		if len(fromMatch) > 1 {
-			table := fromMatch[1]
-			if table != "alert_event" {
-				sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-		}
 		sqlList = append(sqlList, sql)
 	}
 	results := &common.Result{}
