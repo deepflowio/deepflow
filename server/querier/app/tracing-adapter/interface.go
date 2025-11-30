@@ -55,7 +55,7 @@ func ensureAdapterConfig() {
 				continue
 			}
 			// allow multiple hosts configs
-			log.Debugf("load adapter configs, name: %s, addr: %s", apm.Name, apm.Addr)
+			log.Infof("load adapter configs, name: %s, addr: %s", apm.Name, apm.Addr)
 			pipeline = append(pipeline, adapterPipeline{apm, service.Adapters[apm.Name]})
 		}
 	})

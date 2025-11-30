@@ -36,6 +36,7 @@ func Register() error {
 		Adapters = make(map[string]model.TraceAdapter, 0)
 	}
 	Adapters["skywalking"] = &SkyWalkingAdapter{}
+	Adapters["pinpoint"] = &PinpointAdapter{}
 	subServices := packet_service.GetPacketServices()
 	if subServices != nil {
 		for k, v := range subServices {
