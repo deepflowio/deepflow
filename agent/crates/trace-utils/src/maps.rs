@@ -77,6 +77,31 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
                     trace!("found {:?}", la);
                     areas.push(la);
                 }
+
+                // CRITICAL FIX: Filter out /dev/zero to prevent OOM in DWARF unwinder
+                //
+                // Background: PHP 8.0+ JIT uses mmap(/dev/zero) with executable permission (r-xs)
+                // to create JIT buffers. This results in memory mappings like:
+                //   488c0000-4c8c0000 r-xs 08000000 00:01 291490382  /dev/zero (deleted)
+                //
+                // Problem: DWARF unwinder (UnwindTable::load()) reads all executable mappings
+                // via fs::read(/proc/{pid}/root/dev/zero). In container+XFS environments, this
+                // triggers XFS readahead on the character device, causing infinite memory
+                // allocation and OOM kill.
+                //
+                // Why only PHP JIT: Non-JIT PHP and other runtimes use /dev/zero without
+                // executable permission (rw-s), which get_memory_mappings() filters out
+                // (only returns mappings with 'x' permission). Only JIT buffers need r-xs.
+                //
+                // Why filter here: PHP unwinder's checks only protect its own code paths.
+                // DWARF unwinder runs independently and processes all executable mappings.
+                // Filtering at get_memory_mappings() protects all unwinders (PHP/Python/V8/DWARF).
+                if path.contains("/dev/zero") {
+                    trace!("Skipping /dev/zero mapping to prevent OOM: {}", path);
+                    last_executable = false;
+                    continue;
+                }
+
                 last_area.replace(MemoryArea {
                     m_start,
                     mx_start: if perms.contains('x') { m_start } else { 0 },

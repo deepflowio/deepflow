@@ -961,6 +961,15 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		if (!get_dwarf_enabled()) {
 			enabled_feats &= ~FEATURE_FLAG_DWARF_UNWINDING;
 		}
+		if (!php_profiler_enabled()) {
+			enabled_feats &= ~FEATURE_FLAG_PROFILE_PHP;
+		}
+		if (!v8_profiler_enabled()) {
+			enabled_feats &= ~FEATURE_FLAG_PROFILE_V8;
+		}
+		if (!python_profiler_enabled()) {
+			enabled_feats &= ~FEATURE_FLAG_PROFILE_PYTHON;
+		}
 		enabled_feats &= ~extended_feature_flags(map);
 		if (enabled_feats == 0 &&
 		    map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
@@ -979,6 +988,13 @@ int ebpf_obj_load(struct ebpf_object *obj)
 			    ("bcc_create_map() failed, map name:%s - %s\n",
 			     map->name, strerror(errno));
 			goto failed;
+		}
+		// Log language profiler map creation with max_entries for verification
+		if (strstr(map->name, "php_") || strstr(map->name, "v8_") ||
+		    strstr(map->name, "python_")) {
+			ebpf_info
+			    ("Language profiler map created: name=%s, max_entries=%d (1 means disabled)\n",
+			     map->name, map->def.max_entries);
 		}
 		ebpf_debug
 		    ("map->fd:%d map->def.type:%d, map->name:%s, map->def.key_size:%d,"

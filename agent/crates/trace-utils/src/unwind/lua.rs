@@ -21,5 +21,6 @@
 #[no_mangle]
 pub unsafe extern "C" fn is_lua_process(_: u32) -> bool {
     // TODO: 判断是否是 lua/nginx 进程
-    todo!()
+    // 暂时返回 false，避免 todo!() 宏 panic 导致程序崩溃
+    false
 }

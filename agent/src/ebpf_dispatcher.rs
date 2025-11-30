@@ -1048,6 +1048,30 @@ impl EbpfCollector {
                 config.ebpf.profile.unwinding.dwarf_shard_map_size as i32,
             );
 
+            // Language-specific profiling configuration
+            // Set feature regex for each language profiler based on configuration
+            // When xxx_disabled is false, set regex to ".*" to enable the feature
+            // When xxx_disabled is true, don't set regex (feature remains disabled)
+            let languages = &config.ebpf.profile.languages;
+            if !languages.python_disabled {
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_PYTHON,
+                    CString::new(".*").unwrap().as_c_str().as_ptr(),
+                );
+            }
+            if !languages.php_disabled {
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_PHP,
+                    CString::new(".*").unwrap().as_c_str().as_ptr(),
+                );
+            }
+            if !languages.nodejs_disabled {
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_V8,
+                    CString::new(".*").unwrap().as_c_str().as_ptr(),
+                );
+            }
+
             #[cfg(feature = "extended_observability")]
             {
                 if !off_cpu.disabled {

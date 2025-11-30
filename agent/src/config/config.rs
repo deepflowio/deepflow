@@ -617,6 +617,32 @@ impl Default for Proc {
                     ..Default::default()
                 },
                 ProcessMatcher {
+                    match_regex: Regex::new(
+                        r"\bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)",
+                    )
+                    .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$5".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
+                    match_regex: Regex::new(r"\b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)")
+                        .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "$4".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
                     match_regex: Regex::new("^deepflow-").unwrap(),
                     only_in_container: false,
                     enabled_features: vec![
@@ -1121,6 +1147,24 @@ impl Default for Unwinding {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfProfileLanguages {
+    pub python_disabled: bool,
+    pub php_disabled: bool,
+    pub nodejs_disabled: bool,
+}
+
+impl Default for EbpfProfileLanguages {
+    fn default() -> Self {
+        Self {
+            python_disabled: false,
+            php_disabled: false,
+            nodejs_disabled: false,
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfProfile {
@@ -1129,6 +1173,7 @@ pub struct EbpfProfile {
     pub memory: EbpfProfileMemory,
     pub unwinding: Unwinding,
     pub preprocess: EbpfProfilePreprocess,
+    pub languages: EbpfProfileLanguages,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
