@@ -1102,7 +1102,8 @@ impl Default for LogParserConfig {
 
 impl fmt::Debug for LogParserConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LogParserConfig")
+        let mut ds = f.debug_struct("LogParserConfig");
+        let r = ds
             .field(
                 "l7_log_collect_nps_threshold",
                 &self.l7_log_collect_nps_threshold,
@@ -1140,8 +1141,12 @@ impl fmt::Debug for LogParserConfig {
                 "unconcerned_dns_nxdomain_trie",
                 &self.unconcerned_dns_nxdomain_response_suffixes,
             )
-            .field("mysql_decompress_payload", &self.mysql_decompress_payload)
-            .finish()
+            .field("mysql_decompress_payload", &self.mysql_decompress_payload);
+
+        #[cfg(feature = "enterprise")]
+        r.field("custom_protocol_config", &self.custom_protocol_config);
+
+        r.finish()
     }
 }
 
@@ -1522,7 +1527,8 @@ impl Default for L7LogDynamicConfig {
 
 impl fmt::Debug for L7LogDynamicConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("L7LogDynamicConfig")
+        let mut ds = f.debug_struct("L7LogDynamicConfig");
+        let r = ds
             .field("proxy_client", &self.proxy_client)
             .field("x_request_id", &self.x_request_id)
             .field("trace_types", &self.trace_types)
@@ -1546,8 +1552,12 @@ impl fmt::Debug for L7LogDynamicConfig {
             .field(
                 "grpc_streaming_data_enabled",
                 &self.grpc_streaming_data_enabled,
-            )
-            .field("error_request_header", &self.error_request_header)
+            );
+
+        #[cfg(feature = "enterprise")]
+        let r = r.field("extra_field_policies", &self.extra_field_policies);
+
+        r.field("error_request_header", &self.error_request_header)
             .field("error_response_header", &self.error_response_header)
             .field("error_request_payload", &self.error_request_payload)
             .field("error_response_payload", &self.error_response_payload)
