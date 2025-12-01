@@ -17,9 +17,8 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"errors"
-
-	"github.com/bitly/go-simplejson"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -34,12 +33,13 @@ func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 		return model.PodCluster{}, errors.New("not found k8s version info")
 	}
 
-	vJson, vErr := simplejson.NewJson([]byte(vInfo[0]))
+	vRaw := json.RawMessage(vInfo[0])
+	vJson, vErr := rawMessageToMap(vRaw)
 	if vErr != nil {
 		log.Errorf("pod cluster initialization version json error: (%s)", vErr.Error(), logger.NewORGPrefix(k.orgID))
 		return model.PodCluster{}, vErr
 	}
-	version := vJson.Get("gitVersion").MustString()
+	version := getJSONString(vJson, "gitVersion")
 	if version == "" {
 		return model.PodCluster{}, errors.New("not found k8s gitversion")
 	}

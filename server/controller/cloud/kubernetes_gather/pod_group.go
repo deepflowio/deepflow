@@ -17,9 +17,9 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"strings"
 
-	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
@@ -27,6 +27,15 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+// rawMessageToMap 将 json.RawMessage 解析为 map[string]interface{}
+func rawMessageToMap(raw json.RawMessage) (map[string]interface{}, error) {
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get podgroups starting", logger.NewORGPrefix(k.orgID))
@@ -48,28 +57,29 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 	for t, podController := range podControllers {
 		for _, c := range podController {
 			podTargetPorts := map[string]int{}
-			cData, cErr := simplejson.NewJson([]byte(c))
+			cRaw := json.RawMessage(c)
+			cData, cErr := rawMessageToMap(cRaw)
 			if cErr != nil {
 				err = cErr
-				log.Errorf("podgroup initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
+				log.Errorf("podgroup initialization json error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
 				return
 			}
-			metaData, ok := cData.CheckGet("metadata")
+			metaData, ok := getJSONMap(cData, "metadata")
 			if !ok {
 				log.Info("podgroup metadata not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			uID := metaData.Get("uid").MustString()
+			uID := getJSONString(metaData, "uid")
 			if uID == "" {
 				log.Info("podgroup uid not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			name := metaData.Get("name").MustString()
+			name := getJSONString(metaData, "name")
 			if name == "" {
 				log.Infof("podgroup (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			namespace := metaData.Get("namespace").MustString()
+			namespace := getJSONString(metaData, "namespace")
 			if namespace == "" {
 				log.Infof("podgroup (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 				continue
@@ -79,7 +89,9 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				log.Infof("podgroup (%s) namespace id not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			spec := cData.Get("spec")
+			spec, _ := getJSONMap(cData, "spec")
+			metaDataStr := k.simpleJsonMarshal(metaData)
+			specStr := k.simpleJsonMarshal(spec)
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 			var serviceType int
 			var label string
@@ -97,16 +109,24 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				serviceType = common.POD_GROUP_CLONESET
 				label = "cloneset:" + namespace + ":" + name
 			case 4:
-				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
-					uLcuuid = common.IDGenerateUUID(k.orgID, metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString())
-					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
-					if k.podGroupLcuuids.Contains(uLcuuid) {
-						log.Debugf("inplaceset pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
-						continue
+				ownerRefs, _ := getJSONArray(metaData, "ownerReferences")
+				isInPlaceSet := false
+				if len(ownerRefs) > 0 {
+					if ownerRef, ok := ownerRefs[0].(map[string]interface{}); ok {
+						if getJSONString(ownerRef, "kind") == "InPlaceSet" {
+							isInPlaceSet = true
+							uLcuuid = common.IDGenerateUUID(k.orgID, getJSONString(ownerRef, "uid"))
+							name = getJSONString(ownerRef, "name")
+							if k.podGroupLcuuids.Contains(uLcuuid) {
+								log.Debugf("inplaceset pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
+								continue
+							}
+							serviceType = common.POD_GROUP_DEPLOYMENT
+							label = "inplaceset:" + namespace + ":" + name
+						}
 					}
-					serviceType = common.POD_GROUP_DEPLOYMENT
-					label = "inplaceset:" + namespace + ":" + name
-				} else {
+				}
+				if !isInPlaceSet {
 					// when certain Pods do not have a corresponding workload or the corresponding workload is not supported,
 					// the lua plugin can be used to abstract the name and type of the workload according to the pod information
 					// 当某些 pod 因为缺少对应的工作负载或对应的工作负载不被支持的时候，
@@ -148,23 +168,25 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				groupIDsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[namespace+label] = groupIDsSet
 			}
-			mLabels := spec.GetPath("template", "metadata", "labels").MustMap()
-			for key, v := range mLabels {
-				vString, ok := v.(string)
-				if !ok {
-					vString = ""
-				}
-				nsLabel := namespace + key + "_" + vString
-				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
-				if ok {
-					k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
-				} else {
-					nsGroupIDsSet := mapset.NewSet()
-					nsGroupIDsSet.Add(uLcuuid)
-					k.nsLabelToGroupLcuuids[nsLabel] = nsGroupIDsSet
+			templateLabels := getJSONPath(spec, "template", "metadata", "labels")
+			if templateLabels != nil {
+				for key, v := range templateLabels {
+					vString, ok := v.(string)
+					if !ok {
+						vString = ""
+					}
+					nsLabel := namespace + key + "_" + vString
+					_, ok = k.nsLabelToGroupLcuuids[nsLabel]
+					if ok {
+						k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
+					} else {
+						nsGroupIDsSet := mapset.NewSet()
+						nsGroupIDsSet.Add(uLcuuid)
+						k.nsLabelToGroupLcuuids[nsLabel] = nsGroupIDsSet
+					}
 				}
 			}
-			labels := metaData.Get("labels").MustMap()
+			labels, _ := getJSONMap(metaData, "labels")
 			for key, v := range labels {
 				vString, ok := v.(string)
 				if !ok {
@@ -181,28 +203,32 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				}
 			}
 
-			containers := spec.GetPath("template", "spec", "containers")
-			for i := range containers.MustArray() {
-				container := containers.GetIndex(i)
-				cPorts, ok := container.CheckGet("ports")
-				if !ok {
-					continue
-				}
-				for j := range cPorts.MustArray() {
-					cPort := cPorts.GetIndex(j)
-					cPortName, err := cPort.Get("name").String()
-					if err != nil {
+			templateSpec := getJSONPath(spec, "template", "spec")
+			if templateSpec != nil {
+				containers, _ := getJSONArray(templateSpec, "containers")
+				for _, containerInterface := range containers {
+					container, ok := containerInterface.(map[string]interface{})
+					if !ok {
 						continue
 					}
-					podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
+					ports, _ := getJSONArray(container, "ports")
+					for _, portInterface := range ports {
+						port, ok := portInterface.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						cPortName := getJSONString(port, "name")
+						if cPortName == "" {
+							continue
+						}
+						podTargetPorts[cPortName] = getJSONInt(port, "containerPort")
+					}
 				}
 			}
 			networkMode := common.POD_GROUP_POD_NETWORK
-			if spec.GetPath("template", "spec", "hostNetwork").MustBool() {
+			if templateSpec != nil && getJSONBool(templateSpec, "hostNetwork") {
 				networkMode = common.POD_GROUP_HOST_NETWORK
 			}
-			metaDataStr := k.simpleJsonMarshal(metaData)
-			specStr := k.simpleJsonMarshal(spec)
 			podGroup := model.PodGroup{
 				Lcuuid:             uLcuuid,
 				Name:               name,
@@ -213,7 +239,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 				Label:              k.GetLabel(labels),
 				NetworkMode:        networkMode,
 				Type:               serviceType,
-				PodNum:             spec.Get("replicas").MustInt(),
+				PodNum:             getJSONInt(spec, "replicas"),
 				PodNamespaceLcuuid: namespaceLcuuid,
 				AZLcuuid:           k.azLcuuid,
 				RegionLcuuid:       k.RegionUUID,
@@ -233,30 +259,33 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 	log.Debug("get replicationcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
 		podTargetPorts := map[string]int{}
-		rData, rErr := simplejson.NewJson([]byte(r))
+		rRaw := json.RawMessage(r)
+		rData, rErr := rawMessageToMap(rRaw)
 		if rErr != nil {
 			err = rErr
-			log.Errorf("replicationcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
+			log.Errorf("replicationcontroller initialization json error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
-		metaData, ok := rData.CheckGet("metadata")
+		metaData, ok := getJSONMap(rData, "metadata")
 		if !ok {
 			log.Info("replicationcontroller metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		uID := metaData.Get("uid").MustString()
+		uID := getJSONString(metaData, "uid")
 		if uID == "" {
 			log.Info("replicationcontroller uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		name := metaData.Get("name").MustString()
+		name := getJSONString(metaData, "name")
 		if name == "" {
 			log.Infof("replicationcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		spec := rData.Get("spec")
+		spec, _ := getJSONMap(rData, "spec")
+		metaDataStr := k.simpleJsonMarshal(metaData)
+		specStr := k.simpleJsonMarshal(spec)
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
-		namespace := metaData.Get("namespace").MustString()
+		namespace := getJSONString(metaData, "namespace")
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
 			log.Infof("replicationcontroller (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
@@ -272,40 +301,46 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			rcLcuuidsSet.Add(uLcuuid)
 			k.nsLabelToGroupLcuuids[namespace+label] = rcLcuuidsSet
 		}
-		labels := spec.GetPath("template", "metadata", "labels").MustMap()
-		for key, v := range labels {
-			vString, ok := v.(string)
-			if !ok {
-				continue
-			}
-			nsLabel := namespace + key + "_" + vString
-			_, ok = k.nsLabelToGroupLcuuids[nsLabel]
-			if ok {
-				k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
-			} else {
-				nsRCLcuuidsSet := mapset.NewSet()
-				nsRCLcuuidsSet.Add(uLcuuid)
-				k.nsLabelToGroupLcuuids[nsLabel] = nsRCLcuuidsSet
-			}
-		}
-		containers := spec.GetPath("template", "spec", "containers")
-		for i := range containers.MustArray() {
-			container := containers.GetIndex(i)
-			cPorts, ok := container.CheckGet("ports")
-			if !ok {
-				continue
-			}
-			for j := range cPorts.MustArray() {
-				cPort := cPorts.GetIndex(j)
-				cPortName, err := cPort.Get("name").String()
-				if err != nil {
+		templateLabels := getJSONPath(spec, "template", "metadata", "labels")
+		if templateLabels != nil {
+			for key, v := range templateLabels {
+				vString, ok := v.(string)
+				if !ok {
 					continue
 				}
-				podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
+				nsLabel := namespace + key + "_" + vString
+				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
+				if ok {
+					k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
+				} else {
+					nsRCLcuuidsSet := mapset.NewSet()
+					nsRCLcuuidsSet.Add(uLcuuid)
+					k.nsLabelToGroupLcuuids[nsLabel] = nsRCLcuuidsSet
+				}
 			}
 		}
-		metaDataStr := k.simpleJsonMarshal(metaData)
-		specStr := k.simpleJsonMarshal(spec)
+		templateSpec := getJSONPath(spec, "template", "spec")
+		if templateSpec != nil {
+			containers, _ := getJSONArray(templateSpec, "containers")
+			for _, containerInterface := range containers {
+				container, ok := containerInterface.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				ports, _ := getJSONArray(container, "ports")
+				for _, portInterface := range ports {
+					port, ok := portInterface.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					cPortName := getJSONString(port, "name")
+					if cPortName == "" {
+						continue
+					}
+					podTargetPorts[cPortName] = getJSONInt(port, "containerPort")
+				}
+			}
+		}
 		podRC := model.PodGroup{
 			Lcuuid:             uLcuuid,
 			Name:               name,
@@ -313,9 +348,9 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			MetadataHash:       cloudcommon.GenerateMD5Sum(metaDataStr),
 			Spec:               specStr,
 			SpecHash:           cloudcommon.GenerateMD5Sum(specStr),
-			Label:              k.GetLabel(labels),
+			Label:              k.GetLabel(templateLabels),
 			Type:               serviceType,
-			PodNum:             spec.Get("replicas").MustInt(),
+			PodNum:             getJSONInt(spec, "replicas"),
 			RegionLcuuid:       k.RegionUUID,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,

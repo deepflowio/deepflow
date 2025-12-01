@@ -17,11 +17,11 @@
 package plugin
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	simplejson "github.com/bitly/go-simplejson"
 	lua "github.com/yuin/gopher-lua"
 	"gorm.io/gorm"
 
@@ -32,7 +32,7 @@ import (
 
 var log = logger.MustGetLogger("cloud.kubernetes_gather.plugin")
 
-func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string, string, error) {
+func GeneratePodGroup(orgID int, db *gorm.DB, metaData map[string]interface{}) (string, string, error) {
 	var plugins []metadbmodel.Plugin
 	err := db.Where("type = ?", common.PLUGIN_TYPE_LUA).Find(&plugins).Error
 	if err != nil {
@@ -51,7 +51,7 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 		if err := L.DoString(string(plugin.Image)); err != nil {
 			return "", "", fmt.Errorf("lua script loading error: (%s)", err.Error())
 		}
-		metaBytes, err := metaData.MarshalJSON()
+		metaBytes, err := json.Marshal(metaData)
 		if err != nil {
 			return "", "", fmt.Errorf("metaData marshal error: (%s)", err.Error())
 		}
@@ -82,25 +82,37 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 	return podGroupType, podGroupName, nil
 }
 
-func customSCIPodGroup(orgID int, metaData *simplejson.Json) (string, string) {
-	providerType := strings.ToLower(
-		metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString(),
-	)
+func customSCIPodGroup(orgID int, metaData map[string]interface{}) (string, string) {
+	labelsRaw, _ := metaData["labels"].(map[string]interface{})
+	if labelsRaw == nil {
+		return "", ""
+	}
+
+	providerType := ""
+	if v, ok := labelsRaw["virtual-kubelet.io/provider-cluster-type"].(string); ok {
+		providerType = strings.ToLower(v)
+	}
 	if providerType != "serverless" && providerType != "proprietary" {
 		log.Debugf("abstract type (%s) not support", providerType, logger.NewORGPrefix(orgID))
 		return "", ""
 	}
 
-	abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
+	abstractPGType := ""
+	if v, ok := labelsRaw["virtual-kubelet.io/provider-workload-type"].(string); ok {
+		abstractPGType = v
+	}
 	if abstractPGType == "" {
-		if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
+		if _, ok := labelsRaw["statefulset.kubernetes.io/pod-name"]; ok {
 			abstractPGType = "StatefulSet"
 		} else {
 			abstractPGType = "Deployment"
 		}
 	}
 
-	resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
+	resourceName := ""
+	if v, ok := labelsRaw["virtual-kubelet.io/provider-resource-name"].(string); ok {
+		resourceName = v
+	}
 	if resourceName == "" {
 		log.Debug("sci pod not found provider-resource-name", logger.NewORGPrefix(orgID))
 		return "", ""

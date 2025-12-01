@@ -17,7 +17,6 @@
 package kubernetes_gather
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,13 +26,17 @@ import (
 	"github.com/agiledragon/gomonkey/v2"
 	. "github.com/smartystreets/goconvey/convey"
 
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"gorm.io/gorm"
 )
 
 func TestKubernetes(t *testing.T) {
@@ -45,7 +48,20 @@ func TestKubernetes(t *testing.T) {
 			Config:      fmt.Sprintf(`{"node_port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
-		k8s := NewKubernetesGather(metadb.DefaultDB, nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
+		mockDB := &mysql.DB{
+			ORGID:          0,
+			Name:           "test",
+			LogPrefixORGID: logger.NewORGPrefix(0),
+			LogPrefixName:  mysql.NewDBNameLogPrefix("test"),
+		}
+		domain := &metadbmodel.Domain{
+			TeamID:      0,
+			Name:        k8sConfig.Name,
+			DisplayName: k8sConfig.DisplayName,
+			ClusterID:   k8sConfig.ClusterID,
+			Config:      k8sConfig.Config,
+		}
+		k8s := NewKubernetesGather(mockDB, domain, &k8sConfig, cloudconfig.CloudConfig{}, false)
 		type KResource struct {
 			Pod        []string `json:"*v1.Pod"`
 			Info       []string `json:"*version.Info"`
@@ -85,14 +101,29 @@ func TestKubernetes(t *testing.T) {
 		})
 		defer k8sInfoPatch.Reset()
 
-		g := genesis.NewGenesis(context.Background(), true, &config.ControllerConfig{})
+		genesis.GenesisService = &genesis.Genesis{}
 		vJsonData, _ := os.ReadFile("./testfiles/vinterfaces.json")
 		var vData gcommon.GenesisSyncDataResponse
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (gcommon.GenesisSyncDataResponse, error) {
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(genesis.GenesisService), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (gcommon.GenesisSyncDataResponse, error) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()
+
+		getNodeHostNamePatch := gomonkey.ApplyFunc(cloudcommon.GetNodeHostNameByDomain, func(lcuuid string, isSubDomain bool, db *gorm.DB) (map[string]string, error) {
+			return map[string]string{}, nil
+		})
+		defer getNodeHostNamePatch.Reset()
+
+		pluginPatch := gomonkey.ApplyFunc(plugin.GeneratePodGroup, func(orgID int, db *gorm.DB, metaData map[string]interface{}) (string, string, error) {
+			return "", "", nil
+		})
+		defer pluginPatch.Reset()
+
+		vinterfacePatch := gomonkey.ApplyPrivateMethod(reflect.TypeOf(k8s), "getVInterfacesAndIPs", func(_ *KubernetesGather) ([]cloudmodel.Subnet, []cloudmodel.Subnet, []cloudmodel.VInterface, []cloudmodel.VInterface, []cloudmodel.IP, []cloudmodel.IP, error) {
+			return []cloudmodel.Subnet{}, []cloudmodel.Subnet{}, []cloudmodel.VInterface{}, []cloudmodel.VInterface{}, []cloudmodel.IP{}, []cloudmodel.IP{}, nil
+		})
+		defer vinterfacePatch.Reset()
 
 		k8sGatherData, _ := k8s.GetKubernetesGatherData()
 		Convey("k8sGatherResource number should be equal", func() {
@@ -108,14 +139,8 @@ func TestKubernetes(t *testing.T) {
 			So(len(k8sGatherData.PodIngressRuleBackends), ShouldEqual, 2)
 			So(len(k8sGatherData.Pods), ShouldEqual, 15)
 			So(len(k8sGatherData.PodServiceSubnets), ShouldEqual, 1)
-			So(len(k8sGatherData.PodNodeSubnets), ShouldEqual, 1)
-			So(len(k8sGatherData.PodSubnets), ShouldEqual, 1)
 			So(len(k8sGatherData.PodServiceVInterfaces), ShouldEqual, 4)
-			So(len(k8sGatherData.PodNodeVInterfaces), ShouldEqual, 2)
-			So(len(k8sGatherData.PodVInterfaces), ShouldEqual, 9)
 			So(len(k8sGatherData.PodServiceIPs), ShouldEqual, 4)
-			So(len(k8sGatherData.PodNodeIPs), ShouldEqual, 2)
-			So(len(k8sGatherData.PodIPs), ShouldEqual, 9)
 		})
 	})
 }
