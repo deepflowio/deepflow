@@ -95,7 +95,13 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 
 	log.Infof("update mailServer(%s) config %v", mailServer.UserName, mailServerUpdate)
 
-	for _, key := range []string{"STATUS", "HOST", "PORT", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
+	for _, key := range []string{"STATUS", "PORT", "NTLM_ENABLED"} {
+		if _, ok := mailServerUpdate[key]; ok {
+			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
+		}
+	}
+
+	for _, key := range []string{"HOST", "PASSWORD", "SECURITY", "NTLM_NAME", "NTLM_PASSWORD"} {
 		if _, ok := mailServerUpdate[key]; ok {
 			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
 		}
@@ -103,7 +109,9 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 	if _, ok := mailServerUpdate["USER"]; ok {
 		dbUpdateMap["user_name"] = mailServerUpdate["USER"]
 	}
-	metadb.DefaultDB.Model(&mailServer).Updates(dbUpdateMap)
+	if ret := metadb.DefaultDB.Model(&mailServer).Updates(dbUpdateMap); ret.Error != nil {
+		log.Infof("%v", ret)
+	}
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
 	return response[0], err
