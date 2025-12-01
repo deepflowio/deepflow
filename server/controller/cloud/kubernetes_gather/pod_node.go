@@ -17,10 +17,10 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
-	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -35,35 +35,40 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		log.Warningf("get pod node hostname error : (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
 	}
 	for _, n := range k.k8sInfo["*v1.Node"] {
-		nData, nErr := simplejson.NewJson([]byte(n))
+		nRaw := json.RawMessage(n)
+		nData, nErr := rawMessageToMap(nRaw)
 		if nErr != nil {
 			err = nErr
-			log.Errorf("node initialization simplejson error: (%s)", nErr.Error(), logger.NewORGPrefix(k.orgID))
+			log.Errorf("node initialization json error: (%s)", nErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
-		metaData, ok := nData.CheckGet("metadata")
+		metaData, ok := getJSONMap(nData, "metadata")
 		if !ok {
 			log.Info("node metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		uID := metaData.Get("uid").MustString()
+		uID := getJSONString(metaData, "uid")
 		if uID == "" {
 			log.Info("node uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		name := metaData.Get("name").MustString()
+		name := getJSONString(metaData, "name")
 		if name == "" {
 			log.Infof("node (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		nodeIPItems := nData.Get("status").Get("addresses")
+		statusData := getJSONPath(nData, "status")
+		nodeIPItems, _ := getJSONArray(statusData, "addresses")
 		nodeIPs := []string{}
-		for i := range nodeIPItems.MustArray() {
-			nodeIPitem := nodeIPItems.GetIndex(i)
-			if nodeIPitem.Get("type").MustString() != "InternalIP" {
+		for _, nodeIPInterface := range nodeIPItems {
+			nodeIPitem, ok := nodeIPInterface.(map[string]interface{})
+			if !ok {
 				continue
 			}
-			nIP := nodeIPitem.Get("address").MustString()
+			if getJSONString(nodeIPitem, "type") != "InternalIP" {
+				continue
+			}
+			nIP := getJSONString(nodeIPitem, "address")
 			if nIP == "" {
 				log.Warningf("invalid node internal address (%s)", nIP, logger.NewORGPrefix(k.orgID))
 				continue
@@ -75,7 +80,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			continue
 		}
 		nodeIP := nodeIPs[0]
-		labels := metaData.Get("labels").MustMap()
+		labels, _ := getJSONMap(metaData, "labels")
 		nodeType := common.POD_NODE_TYPE_NODE
 		// support k8s version less than 1.20
 		_, masterOK := labels["node-role.kubernetes.io/master"]
@@ -84,28 +89,31 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		if masterOK || controlPlaneOK {
 			nodeType = common.POD_NODE_TYPE_MASTER
 		}
-		statusConditions := nData.Get("status").Get("conditions")
+		statusConditions, _ := getJSONArray(statusData, "conditions")
 		statusReasons := []string{}
-		for i := range statusConditions.MustArray() {
-			statusCondition := statusConditions.GetIndex(i)
-			statusReason := statusCondition.Get("reason").MustString()
+		for _, statusConditionInterface := range statusConditions {
+			statusCondition, ok := statusConditionInterface.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			statusReason := getJSONString(statusCondition, "reason")
 			if statusReason == "KubeletReady" {
-				statusReasons = append(statusReasons, statusCondition.Get("status").MustString())
+				statusReasons = append(statusReasons, getJSONString(statusCondition, "status"))
 			}
 		}
 		state := common.POD_NODE_STATE_EXCEPTION
 		if len(statusReasons) != 0 && statusReasons[0] == "True" {
 			state = common.POD_NODE_STATE_NORMAL
 		}
-		capacity := nData.Get("status").Get("capacity")
-		memoryCapacity := capacity.Get("memory").MustString()
+		capacity, _ := getJSONMap(statusData, "capacity")
+		memoryCapacity := interfaceToString(capacity["memory"])
 		memoryStr := strings.Replace(memoryCapacity, "Ki", "", -1)
 		memoryInt, err := strconv.Atoi(memoryStr)
 		memory := 0
 		if err == nil {
 			memory = memoryInt / 1024
 		}
-		cpuNum, err := strconv.Atoi(capacity.Get("cpu").MustString())
+		cpuNum, err := strconv.Atoi(interfaceToString(capacity["cpu"]))
 		if err != nil {
 			log.Warningf("node (%s) cpu num transition int error", name, logger.NewORGPrefix(k.orgID))
 		}
@@ -127,9 +135,10 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		}
 		podNodes = append(podNodes, podNode)
 		k.nodeIPToLcuuid[nodeIP] = uLcuuid
-		podCIDR := nData.Get("spec").Get("podCidr").MustString()
+		specData := getJSONPath(nData, "spec")
+		podCIDR := getJSONString(specData, "podCidr")
 		if podCIDR == "" {
-			podCIDR = nData.Get("spec").Get("podCIDR").MustString()
+			podCIDR = getJSONString(specData, "podCIDR")
 		}
 		if podCIDR != "" {
 			podNetworkCIDRs = append(podNetworkCIDRs, podCIDR)

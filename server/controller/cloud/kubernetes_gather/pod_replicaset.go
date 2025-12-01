@@ -17,9 +17,9 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"strings"
 
-	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -30,48 +30,66 @@ import (
 func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get replicasets,replicasetcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicaSet"] {
-		rData, rErr := simplejson.NewJson([]byte(r))
+		rRaw := json.RawMessage(r)
+		rData, rErr := rawMessageToMap(rRaw)
 		if rErr != nil {
 			err = rErr
-			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
+			log.Errorf("replicaset,replicasetcontroller initialization json error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
-		metaData, ok := rData.CheckGet("metadata")
+		metaData, ok := getJSONMap(rData, "metadata")
 		if !ok {
 			log.Info("replicaset,replicasetcontroller metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		uID := metaData.Get("uid").MustString()
+		uID := getJSONString(metaData, "uid")
 		if uID == "" {
 			log.Info("replicaset,replicasetcontroller uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		name := metaData.Get("name").MustString()
+		name := getJSONString(metaData, "name")
 		if name == "" {
 			log.Infof("replicaset,replicasetcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		spec := rData.Get("spec")
-		replicas := spec.Get("replicas").MustInt()
+		spec, _ := getJSONMap(rData, "spec")
+		if spec == nil {
+			log.Infof("replicaset,replicasetcontroller (%s) spec not found", name, logger.NewORGPrefix(k.orgID))
+			continue
+		}
+		replicas := getJSONInt(spec, "replicas")
 		if replicas == 0 {
 			log.Debugf("replicaset,replicasetcontroller (%s) is inactive", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		namespace := metaData.Get("namespace").MustString()
+		namespace := getJSONString(metaData, "namespace")
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
 			log.Infof("replicaset,replicasetcontroller (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		podGroups := metaData.Get("ownerReferences")
-		podGroupLcuuid := podGroups.GetIndex(0).Get("uid").MustString()
-		if len(podGroups.MustArray()) == 0 || podGroupLcuuid == "" {
+		podGroups, _ := getJSONArray(metaData, "ownerReferences")
+		if len(podGroups) == 0 {
+			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
+			continue
+		}
+		firstOwner, ok := podGroups[0].(map[string]interface{})
+		if !ok {
+			log.Infof("replicaset,replicasetcontroller (%s) ownerReferences invalid", name, logger.NewORGPrefix(k.orgID))
+			continue
+		}
+		podGroupLcuuid := getJSONString(firstOwner, "uid")
+		if podGroupLcuuid == "" {
 			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		podGroupLcuuid = common.IDGenerateUUID(k.orgID, podGroupLcuuid)
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
-		labelString := k.GetLabel(metaData.Get("labels").MustMap())
+		labels, _ := getJSONMap(metaData, "labels")
+		if labels == nil {
+			labels = map[string]interface{}{}
+		}
+		labelString := k.GetLabel(labels)
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {
 			podGroupLcuuid = uLcuuid
 			// ReplicaSetController类型名称去掉最后的'-' + hash值
@@ -89,20 +107,22 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 				rscLcuuidsSet.Add(uLcuuid)
 				k.nsLabelToGroupLcuuids[namespace+label] = rscLcuuidsSet
 			}
-			mLabels := spec.GetPath("template", "metadata", "labels").MustMap()
-			for key, v := range mLabels {
-				vString, ok := v.(string)
-				if !ok {
-					vString = ""
-				}
-				nsLabel := namespace + key + "_" + vString
-				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
-				if ok {
-					k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
-				} else {
-					nsRSCLcuuidsSet := mapset.NewSet()
-					nsRSCLcuuidsSet.Add(uLcuuid)
-					k.nsLabelToGroupLcuuids[nsLabel] = nsRSCLcuuidsSet
+			templateLabels := getJSONPath(spec, "template", "metadata", "labels")
+			if templateLabels != nil {
+				for key, v := range templateLabels {
+					vString, ok := v.(string)
+					if !ok {
+						vString = ""
+					}
+					nsLabel := namespace + key + "_" + vString
+					_, ok = k.nsLabelToGroupLcuuids[nsLabel]
+					if ok {
+						k.nsLabelToGroupLcuuids[nsLabel].Add(uLcuuid)
+					} else {
+						nsRSCLcuuidsSet := mapset.NewSet()
+						nsRSCLcuuidsSet.Add(uLcuuid)
+						k.nsLabelToGroupLcuuids[nsLabel] = nsRSCLcuuidsSet
+					}
 				}
 			}
 			metaDataStr := k.simpleJsonMarshal(metaData)

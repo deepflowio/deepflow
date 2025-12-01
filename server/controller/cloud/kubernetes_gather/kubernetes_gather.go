@@ -17,7 +17,9 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -254,30 +256,200 @@ func (k *KubernetesGather) GetLabel(labelMap map[string]interface{}) string {
 	return strings.Join(labelSlice, ", ")
 }
 
-func (k *KubernetesGather) simpleJsonMarshal(json *simplejson.Json) string {
-	bytes, err := json.MarshalJSON()
+func (k *KubernetesGather) simpleJsonMarshal(data map[string]interface{}) string {
+	bytes, err := json.Marshal(data)
 	if err != nil {
-		log.Infof("simplejson (%s) marshal failed: %s", json, err.Error(), logger.NewORGPrefix(k.orgID))
+		log.Infof("json marshal failed: %s", err.Error(), logger.NewORGPrefix(k.orgID))
 		return ""
 	}
 	return string(bytes)
 }
 
-func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid string, mainSpec *simplejson.Json) []cloudmodel.PodGroupConfigMapConnection {
+// getJSONValue 从 map[string]interface{} 中获取值
+func getJSONValue(m map[string]interface{}, key string) (interface{}, bool) {
+	if m == nil {
+		return nil, false
+	}
+	val, ok := m[key]
+	return val, ok
+}
+
+// getJSONString 从 map[string]interface{} 中获取字符串值
+func getJSONString(m map[string]interface{}, key string) string {
+	val, ok := getJSONValue(m, key)
+	if !ok {
+		return ""
+	}
+	if str, ok := val.(string); ok {
+		return str
+	}
+	return ""
+}
+
+// getJSONMap 从 map[string]interface{} 中获取 map 值
+func getJSONMap(m map[string]interface{}, key string) (map[string]interface{}, bool) {
+	val, ok := getJSONValue(m, key)
+	if !ok {
+		return nil, false
+	}
+	if m, ok := val.(map[string]interface{}); ok {
+		return m, true
+	}
+	return nil, false
+}
+
+// getJSONArray 从 map[string]interface{} 中获取数组值
+func getJSONArray(m map[string]interface{}, key string) ([]interface{}, bool) {
+	val, ok := getJSONValue(m, key)
+	if !ok {
+		return nil, false
+	}
+	if arr, ok := val.([]interface{}); ok {
+		return arr, true
+	}
+	return nil, false
+}
+
+// getJSONPath 从 map[string]interface{} 中按路径获取值
+func getJSONPath(m map[string]interface{}, path ...string) map[string]interface{} {
+	current := m
+	for _, key := range path {
+		val, ok := getJSONValue(current, key)
+		if !ok {
+			return nil
+		}
+		if next, ok := val.(map[string]interface{}); ok {
+			current = next
+		} else {
+			return nil
+		}
+	}
+	return current
+}
+
+func getJSONInt(m map[string]interface{}, key string) int {
+	val, ok := getJSONValue(m, key)
+	if !ok {
+		return 0
+	}
+	switch v := val.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case uint64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return int(i)
+		}
+	case string:
+		if v == "" {
+			return 0
+		}
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return 0
+}
+
+func getJSONBool(m map[string]interface{}, key string) bool {
+	val, ok := getJSONValue(m, key)
+	if !ok {
+		return false
+	}
+	if b, ok := val.(bool); ok {
+		return b
+	}
+	if s, ok := val.(string); ok {
+		return s == "true" || s == "True"
+	}
+	return false
+}
+
+func interfaceToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case json.Number:
+		return v.String()
+	case float64:
+		return strconv.Itoa(int(v))
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	default:
+		return ""
+	}
+}
+
+func interfaceToInt(value interface{}) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case uint64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return int(i)
+		}
+	case string:
+		if v == "" {
+			return 0
+		}
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return 0
+}
+
+func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid string, mainSpec map[string]interface{}) []cloudmodel.PodGroupConfigMapConnection {
 	var connections []cloudmodel.PodGroupConfigMapConnection
 
 	existSet := map[string]bool{}
-	spec := mainSpec.GetPath("template", "spec")
-	containers := spec.Get("containers")
-	for c := range containers.MustArray() {
-		envs := containers.GetIndex(c).Get("env")
-		for e := range envs.MustArray() {
-			env := envs.GetIndex(e)
-			ref, ok := env.Get("valueFrom").CheckGet("configMapKeyRef")
+	templateSpec := getJSONPath(mainSpec, "template", "spec")
+	if templateSpec == nil {
+		return connections
+	}
+
+	containers, _ := getJSONArray(templateSpec, "containers")
+	for _, containerInterface := range containers {
+		container, ok := containerInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		envs, _ := getJSONArray(container, "env")
+		for _, envInterface := range envs {
+			env, ok := envInterface.(map[string]interface{})
 			if !ok {
 				continue
 			}
-			cmName := ref.Get("Name").MustString()
+			valueFrom, _ := getJSONMap(env, "valueFrom")
+			if valueFrom == nil {
+				continue
+			}
+			ref, _ := getJSONMap(valueFrom, "configMapKeyRef")
+			if ref == nil {
+				continue
+			}
+			cmName := getJSONString(ref, "Name")
+			if cmName == "" {
+				cmName = getJSONString(ref, "name")
+			}
+			if cmName == "" {
+				continue
+			}
 			cmLcuuid, ok := k.configMapToLcuuid[[2]string{nsName, cmName}]
 			if !ok {
 				log.Infof("pod group (%s) imported env config map (%s) not found", pgName, cmName, logger.NewORGPrefix(k.orgID))
@@ -296,14 +468,20 @@ func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid st
 		}
 	}
 
-	volumes := spec.Get("volumes")
-	for v := range volumes.MustArray() {
-		volume := volumes.GetIndex(v)
-		cm, ok := volume.CheckGet("configMap")
+	volumes, _ := getJSONArray(templateSpec, "volumes")
+	for _, volumeInterface := range volumes {
+		volume, ok := volumeInterface.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		cmName := cm.Get("name").MustString()
+		cm, _ := getJSONMap(volume, "configMap")
+		if cm == nil {
+			continue
+		}
+		cmName := getJSONString(cm, "name")
+		if cmName == "" {
+			continue
+		}
 		cmLcuuid, ok := k.configMapToLcuuid[[2]string{nsName, cmName}]
 		if !ok {
 			log.Infof("pod group (%s) imported volumes config map (%s) not found", pgName, cmName, logger.NewORGPrefix(k.orgID))
@@ -479,8 +657,8 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		Pods:                         pods,
 	}
 
-	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
-	statsd.MetaStatsd.RegisterStatsdTable(k)
+	//k.cloudStatsd.ResCount = statsd.GetResCount(resource)
+	//statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil
 }
 

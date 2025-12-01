@@ -17,7 +17,8 @@
 package kubernetes_gather
 
 import (
-	"github.com/bitly/go-simplejson"
+	"encoding/json"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -27,31 +28,35 @@ func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 	log.Debug("get pod namespaces starting", logger.NewORGPrefix(k.orgID))
 	podNamespaces := []model.PodNamespace{}
 	for _, n := range k.k8sInfo["*v1.Namespace"] {
-		nData, err := simplejson.NewJson([]byte(n))
+		nRaw := json.RawMessage(n)
+		nData, err := rawMessageToMap(nRaw)
 		if err != nil {
-			log.Errorf("pod namespace initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			log.Errorf("pod namespace initialization json error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
 			return podNamespaces, err
 		}
-		metaData, ok := nData.CheckGet("metadata")
+		metaData, ok := getJSONMap(nData, "metadata")
 		if !ok {
 			log.Info("pod namespace metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		uID := metaData.Get("uid").MustString()
+		uID := getJSONString(metaData, "uid")
 		if uID == "" {
 			log.Info("pod namespace uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		name := metaData.Get("name").MustString()
+		name := getJSONString(metaData, "name")
 		if name == "" {
 			log.Infof("pod namespace (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		k.namespaceToLcuuid[name] = uLcuuid
-		clusterNativeName := metaData.GetPath("labels", "virtual-kubelet.io/provider-cluster-native-name").MustString()
-		if clusterNativeName != "" {
-			k.namespaceToExLabels[name] = map[string]interface{}{"virtual-kubelet.io/provider-cluster-native-name": clusterNativeName}
+		labels := getJSONPath(metaData, "labels")
+		if labels != nil {
+			clusterNativeName := getJSONString(labels, "virtual-kubelet.io/provider-cluster-native-name")
+			if clusterNativeName != "" {
+				k.namespaceToExLabels[name] = map[string]interface{}{"virtual-kubelet.io/provider-cluster-native-name": clusterNativeName}
+			}
 		}
 		podNamespace := model.PodNamespace{
 			Lcuuid:           uLcuuid,
