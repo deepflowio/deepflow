@@ -126,7 +126,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
 
 	// pods
-	pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, nodeLcuuidToAZLcuuid)
+	pods := c.getSubDomainPods(lcuuid, azLcuuid, &kubernetesGatherResource, nodeLcuuidToAZLcuuid)
 
 	// IP
 	ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
@@ -665,12 +665,16 @@ func (c *Cloud) getSubDomainPodReplicaSets(
 }
 
 func (c *Cloud) getSubDomainPods(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, nodeLcuuidToAZLcuuid map[string]string,
+	subDomainLcuuid, azLcuuid string, resource *kubernetes_model.KubernetesGatherResource, nodeLcuuidToAZLcuuid map[string]string,
 ) []model.Pod {
 	var retPods []model.Pod
 
 	// 遍历Pods，更新az信息；并添加到Cloud的Resource中
 	for _, pod := range resource.Pods {
+		podAZLcuuid, ok := nodeLcuuidToAZLcuuid[pod.PodNodeLcuuid]
+		if !ok || podAZLcuuid == "" {
+			podAZLcuuid = azLcuuid
+		}
 		retPods = append(retPods, model.Pod{
 			Lcuuid:              pod.Lcuuid,
 			Name:                pod.Name,
@@ -686,7 +690,7 @@ func (c *Cloud) getSubDomainPods(
 			PodNamespaceLcuuid:  pod.PodNamespaceLcuuid,
 			PodClusterLcuuid:    pod.PodClusterLcuuid,
 			VPCLcuuid:           pod.VPCLcuuid,
-			AZLcuuid:            nodeLcuuidToAZLcuuid[pod.PodNodeLcuuid],
+			AZLcuuid:            podAZLcuuid,
 			RegionLcuuid:        pod.RegionLcuuid,
 			SubDomainLcuuid:     subDomainLcuuid,
 		})
