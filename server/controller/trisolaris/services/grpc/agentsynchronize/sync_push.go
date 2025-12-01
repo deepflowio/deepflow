@@ -681,6 +681,7 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 
 		if !enabledPush {
 			firstPush = false
+			in.Send(&api.SyncResponse{Status: &STATUS_HEARTBEAT})
 			log.Debugf("push disabled for agent (%s-%s)", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
 			continue
 		}
