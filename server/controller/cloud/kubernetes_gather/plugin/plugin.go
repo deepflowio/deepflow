@@ -39,6 +39,10 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 		return "", "", err
 	}
 
+	if len(plugins) == 0 {
+		return "", "", nil
+	}
+
 	// TODO: convert to lua script
 	podGroupType, podGroupName := customSCIPodGroup(orgID, metaData)
 	if podGroupType != "" && podGroupName != "" {
