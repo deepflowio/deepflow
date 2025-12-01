@@ -32,7 +32,7 @@ func (h *HuaWei) getLBs() (
 	requiredAttrs := []string{"id", "name", "vip_port_id", "vip_subnet_id", "vip_address"}
 	for project, token := range h.projectTokenMap {
 		jLBs, err := h.getRawData(newRawDataGetContext(
-			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.Domain), token.token, "loadbalancers", pageQueryMethodMarker,
+			fmt.Sprintf("https://elb.%s.%s/v2/%s/elb/loadbalancers", project.name, h.config.Domain, project.id), token.token, "loadbalancers", pageQueryMethodMarker,
 		))
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
@@ -113,7 +113,7 @@ func (h *HuaWei) getLBs() (
 			h.toolDataSet.lbLcuuidToIP[id] = ip
 		}
 
-		lls, ltss, err := h.formatListenersAndTargetServers(project.name, token.token)
+		lls, ltss, err := h.formatListenersAndTargetServers(project, token.token)
 		if err == nil {
 			lbListeners = append(lbListeners, lls...)
 			lbTargetSevers = append(lbTargetSevers, ltss...)
@@ -124,9 +124,9 @@ func (h *HuaWei) getLBs() (
 	return
 }
 
-func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbListeners []model.LBListener, lbTargetSevers []model.LBTargetServer, err error) {
+func (h *HuaWei) formatListenersAndTargetServers(project Project, token string) (lbListeners []model.LBListener, lbTargetSevers []model.LBTargetServer, err error) {
 	jLs, err := h.getRawData(newRawDataGetContext(
-		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.Domain), token, "listeners", pageQueryMethodMarker,
+		fmt.Sprintf("https://elb.%s.%s/v2/%s/elb/listeners", project.name, h.config.Domain, project.id), token, "listeners", pageQueryMethodMarker,
 	))
 	if err != nil {
 		return nil, nil, err
@@ -179,7 +179,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		poolID, ok := jL.CheckGet("default_pool_id")
 		if ok && poolID.MustString() != "" {
 			jTSs, err := h.getRawData(newRawDataGetContext(
-				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.Domain, poolID.MustString()), token, "members", pageQueryMethodMarker,
+				fmt.Sprintf("https://elb.%s.%s/v2/%s/elb/pools/%s/members", project.name, h.config.Domain, project.id, poolID.MustString()), token, "members", pageQueryMethodMarker,
 			))
 			if err != nil {
 				return nil, nil, err
