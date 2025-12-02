@@ -30,7 +30,7 @@
 
 #define UNWIND_ENTRIES_PER_SHARD 65535
 
-#define UNWIND_SHARDS_PER_PROCESS 256
+#define UNWIND_SHARDS_PER_PROCESS 1024
 
 enum CfaType {
     CFA_TYPE_RBP_OFFSET,
@@ -72,7 +72,7 @@ typedef struct {
 } shard_info_t;
 
 typedef struct {
-    uint8_t len;
+    uint16_t len;
     shard_info_t entries[UNWIND_SHARDS_PER_PROCESS];
 } process_shard_list_t;
 
