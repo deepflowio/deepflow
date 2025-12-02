@@ -100,7 +100,9 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
 		}
 	}
-
+	if _, ok := mailServerUpdate["USER"]; ok {
+		dbUpdateMap["user_name"] = mailServerUpdate["USER"]
+	}
 	mysql.DefaultDB.Model(&mailServer).Updates(dbUpdateMap)
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
