@@ -1208,7 +1208,8 @@ impl Trimmable for ReplicaSet {
 }
 
 impl Trimmable for ReplicationController {
-    fn trim(self) -> Self {
+    fn trim(mut self) -> Self {
+        self.metadata.managed_fields = None;
         ReplicationController {
             metadata: self.metadata,
             spec: self.spec,
@@ -1260,7 +1261,8 @@ impl Trimmable for ConfigMap {
 }
 
 impl Trimmable for DaemonSet {
-    fn trim(self) -> Self {
+    fn trim(mut self) -> Self {
+        self.metadata.managed_fields = None;
         DaemonSet {
             metadata: self.metadata,
             spec: self.spec,
@@ -1270,7 +1272,8 @@ impl Trimmable for DaemonSet {
 }
 
 impl Trimmable for StatefulSet {
-    fn trim(self) -> Self {
+    fn trim(mut self) -> Self {
+        self.metadata.managed_fields = None;
         StatefulSet {
             metadata: self.metadata,
             spec: self.spec,
@@ -1280,7 +1283,8 @@ impl Trimmable for StatefulSet {
 }
 
 impl Trimmable for Deployment {
-    fn trim(self) -> Self {
+    fn trim(mut self) -> Self {
+        self.metadata.managed_fields = None;
         Deployment {
             metadata: self.metadata,
             spec: self.spec,
@@ -1293,6 +1297,7 @@ impl Trimmable for Service {
     fn trim(mut self) -> Self {
         let mut trim_svc = Service::default();
         trim_svc.metadata = self.metadata;
+        trim_svc.metadata.managed_fields = None;
         trim_svc.spec = self.spec;
         if let Some(svc_status) = self.status.take() {
             trim_svc.status = Some(ServiceStatus {
