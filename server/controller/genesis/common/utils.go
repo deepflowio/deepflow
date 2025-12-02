@@ -18,7 +18,6 @@ package common
 
 import (
 	"bytes"
-	"compress/zlib"
 	"crypto/tls"
 	. "encoding/binary"
 	"encoding/csv"
@@ -34,6 +33,7 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+	"github.com/klauspost/compress/zlib"
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/message/agent"
@@ -450,6 +450,7 @@ func ParseCompressedInfo(cInfo []byte) (bytes.Buffer, error) {
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
+	defer r.Close()
 	_, err = out.ReadFrom(r)
 	if err != nil {
 		return bytes.Buffer{}, err

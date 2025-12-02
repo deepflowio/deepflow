@@ -147,13 +147,14 @@ func createTopKColumn(functionAs, prefix string, elementIndex, argsLength int) (
 }
 
 func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
-	typePattern := `auto_service_type(_\d+)?\s*=\s*105\b`
+	//typePattern := `auto_service_type(_\d+)?\s*=\s*105\b`
+	typePattern := `(` + "`" + `?auto_service_type(_\d+)?` + "`" + `?)\s*=\s*105\b`
 	typeRegex := regexp.MustCompile(typePattern)
 	typeMatches := typeRegex.FindAllStringSubmatch(sql, -1)
 	suffixes := []string{}
 	if len(typeMatches) != 0 {
 		for _, match := range typeMatches {
-			suffix := match[1]
+			suffix := match[2]
 			suffixes = append(suffixes, suffix)
 			sql = strings.ReplaceAll(sql, match[0], "1=1")
 		}
@@ -168,7 +169,10 @@ func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
 				if err != nil {
 					return sql, err
 				}
-				sql = strings.ReplaceAll(sql, match[0], transFilter)
+				if transFilter == "" {
+					transFilter = "1!=1"
+				}
+				sql = strings.ReplaceAll(sql, match[0], fmt.Sprintf("(%s)", transFilter))
 			}
 		}
 	}
@@ -189,6 +193,17 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	debug_info := &client.DebugInfo{}
+	// replace custom_biz_filter
+	fromMatch := fromRegexp.FindStringSubmatch(sql)
+	if len(fromMatch) > 1 {
+		table := fromMatch[1]
+		if table != "alert_event" {
+			sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
@@ -230,11 +245,6 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		e.DB = "flow_tag"
 	} else {
 		// Normal query, added to sqllist
-		// replace custom_biz_filter
-		sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
-		if err != nil {
-			return nil, nil, err
-		}
 		sqlList = append(sqlList, sql)
 	}
 	results := &common.Result{}
