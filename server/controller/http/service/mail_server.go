@@ -95,7 +95,7 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 
 	log.Infof("update mailServer(%s) config %v", mailServer.User, mailServerUpdate)
 
-	for _, key := range []string{"STATUS", "HOST", "PORT", "USER", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
+	for _, key := range []string{"STATUS", "HOST", "PORT", "PASSWORD", "SECURITY", "NTLM_ENABLED", "NTLM_NAME", "NTLM_PASSWORD"} {
 		if _, ok := mailServerUpdate[key]; ok {
 			dbUpdateMap[strings.ToLower(key)] = mailServerUpdate[key]
 		}
