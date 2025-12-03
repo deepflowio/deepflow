@@ -872,6 +872,15 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			shard_info = shard_list->entries + shard_index;
 			shard =
 			    unwind_entry_shard_table__lookup(&shard_info->id);
+			// Validate that IP is actually within the shard's valid range
+			// If IP < offset+pc_min or IP >= offset+pc_max, this shard doesn't cover our IP
+			// This can happen when IP is in special regions like [uprobes] that have no DWARF info
+			if (regs->ip < shard_info->offset + shard_info->pc_min ||
+			    regs->ip >= shard_info->offset + shard_info->pc_max) {
+				bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
+					state->stack.len, regs->ip);
+				goto finish;
+			}
 		}
 		// bpf_debug("frame#%d", state->stack.len);
 		// bpf_debug("ip=%lx bp=%lx sp=%lx", regs->ip, regs->bp, regs->sp);

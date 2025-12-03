@@ -124,17 +124,49 @@ impl UnwindTable {
 
         let base_path: PathBuf = ["/proc", &pid.to_string(), "root"].iter().collect();
         for m in mm {
-            if m.path.chars().next() == Some('[') {
-                trace!("ignore file {}", m.path);
+            // Determine the path for logging/display purposes
+            let path: PathBuf = if m.path == "[vdso]" {
+                PathBuf::from("[vdso]")
+            } else if m.path.chars().next() == Some('[') {
+                trace!("ignore special mapping {}", m.path);
                 continue;
-            }
-            let mut path = base_path.clone();
-            path.push(&m.path[1..]);
-            let data = match fs::read(&path) {
-                Ok(d) => d,
-                Err(e) => {
-                    debug!("load file {} failed: {e}", path.display());
-                    continue;
+            } else {
+                let mut p = base_path.clone();
+                p.push(&m.path[1..]);
+                p
+            };
+
+            // Load the data from file or process memory
+            let data = if m.path == "[vdso]" {
+                // vdso is a special kernel-injected ELF object in process memory
+                // Read it directly from /proc/pid/mem
+                let mem_path: PathBuf = ["/proc", &pid.to_string(), "mem"].iter().collect();
+                let size = (m.m_end - m.m_start) as usize;
+                match fs::File::open(&mem_path) {
+                    Ok(mut file) => {
+                        use std::io::{Read, Seek, SeekFrom};
+                        let mut buf = vec![0u8; size];
+                        if file.seek(SeekFrom::Start(m.m_start)).is_ok()
+                            && file.read_exact(&mut buf).is_ok() {
+                            trace!("loaded vdso from process memory at {:#x}, size={}", m.m_start, size);
+                            buf
+                        } else {
+                            debug!("failed to read vdso from process#{pid} memory");
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        debug!("failed to open /proc/{}/mem: {}", pid, e);
+                        continue;
+                    }
+                }
+            } else {
+                match fs::read(&path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        debug!("load file {} failed: {e}", path.display());
+                        continue;
+                    }
                 }
             };
 
