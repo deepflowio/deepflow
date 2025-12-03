@@ -61,7 +61,7 @@ func ensureAdapterConfig() {
 	})
 }
 
-func GetAdaptTrace(traceID string) (*model.ExTrace, error) {
+func GetAdaptTrace(traceID, spanID string) (*model.ExTrace, error) {
 	ensureAdapterConfig()
 	result := &model.ExTrace{Spans: make([]model.ExSpan, 0)}
 	if pipeline == nil {
@@ -71,13 +71,13 @@ func GetAdaptTrace(traceID string) (*model.ExTrace, error) {
 		if v.adpater == nil {
 			continue
 		}
-		r, err := v.adpater.GetTrace(traceID, &v.config)
+		r, err := v.adpater.GetTrace(traceID, spanID, &v.config)
 		if err != nil {
-			log.Errorf("load %s data with traceid %s gets error: %s", v.config.Name, traceID, err)
+			log.Errorf("load %s data with traceid %s spanid %s gets error: %s", v.config.Name, traceID, spanID, err)
 			continue
 		}
 		if r != nil && len(r.Spans) > 0 {
-			log.Debugf("load %s data with traceid %s get %d spans", v.config.Name, traceID, len(r.Spans))
+			log.Debugf("load %s data with traceid %s spanid %s get %d spans", v.config.Name, traceID, spanID, len(r.Spans))
 			result.Spans = append(result.Spans, r.Spans...)
 		}
 	}
@@ -87,7 +87,8 @@ func GetAdaptTrace(traceID string) (*model.ExTrace, error) {
 func TraceHandler() gin.HandlerFunc {
 	return gin.HandlerFunc(func(ctx *gin.Context) {
 		traceID := ctx.Query("traceid")
-		result, err := GetAdaptTrace(traceID)
+		spanID := ctx.Query("spanid")
+		result, err := GetAdaptTrace(traceID, spanID)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, model.ExTraceResponse{Error: err.Error(), Status: common.FAIL, Data: nil})
 			return
