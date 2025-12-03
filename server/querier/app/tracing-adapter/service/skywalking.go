@@ -111,7 +111,7 @@ type SkyWalkingAdapter struct {
 
 var log_sw = logging.MustGetLogger("tracing-adapter.skywalking")
 
-func (s *SkyWalkingAdapter) GetTrace(traceID string, c *config.ExternalAPM) (*model.ExTrace, error) {
+func (s *SkyWalkingAdapter) GetTrace(traceID, spanID string, c *config.ExternalAPM) (*model.ExTrace, error) {
 	swConfig := &skywalkingConfig{}
 	err := mapstructure.Decode(c.ExtraConfig, swConfig)
 	if err != nil {

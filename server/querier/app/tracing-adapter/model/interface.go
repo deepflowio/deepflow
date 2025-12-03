@@ -19,5 +19,5 @@ package model
 import "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 
 type TraceAdapter interface {
-	GetTrace(traceID string, c *config.ExternalAPM) (*ExTrace, error)
+	GetTrace(traceID string, spanID string, c *config.ExternalAPM) (*ExTrace, error)
 }
