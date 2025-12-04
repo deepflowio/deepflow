@@ -66,7 +66,6 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
-	log.Infof("TODO cfg: %#v", cfg)
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("==================== Launching DeepFlow-Server-Controller ====================")
 	log.Infof("controller config:\n%s", string(bytes))

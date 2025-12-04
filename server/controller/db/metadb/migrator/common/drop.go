@@ -16,7 +16,17 @@
 
 package common
 
+import (
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/session"
+)
+
 func DropDatabase(dc *DBConfig) error {
+	db, err := session.GetSessionWithoutName(dc.Config)
+	if err != nil {
+		return err
+	}
+	dc.SetDB(db)
+
 	log.Infof(LogDBName(dc.Config.Database, "drop database"))
 	var databaseName string
 	dc.DB.Raw(dc.SqlFmt.SelectDatabase()).Scan(&databaseName)
