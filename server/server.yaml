@@ -117,6 +117,16 @@ controller:
     # unit: minute
     conn_max_life_time: 60
 
+  # dameng相关配置
+  dm:
+    enabled: false
+    dsn: DM8DSN
+    schema: deepflow
+    user-name: root
+    user-password: deepflow
+    host: dm
+    port: 5236
+
   # redis相关配置
   redis:
     enabled: true
