@@ -35,6 +35,7 @@ type AlertEventBlock struct {
 	ColTagIntNames      *proto.ColArr[string]
 	ColTagIntValues     *proto.ColArr[int64]
 	ColTriggerThreshold *proto.ColLowCardinality[string]
+	ColMetricUnit       *proto.ColLowCardinality[string]
 	ColTargetUid        proto.ColStr
 	ColQueryRegion      *proto.ColLowCardinality[string]
 	ColTeamId           proto.ColUInt16
@@ -55,6 +56,7 @@ func (b *AlertEventBlock) Reset() {
 	b.ColTagIntNames.Reset()
 	b.ColTagIntValues.Reset()
 	b.ColTriggerThreshold.Reset()
+	b.ColMetricUnit.Reset()
 	b.ColTargetUid.Reset()
 	b.ColQueryRegion.Reset()
 	b.ColTeamId.Reset()
@@ -76,6 +78,7 @@ func (b *AlertEventBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_TAG_INT_NAMES, Data: b.ColTagIntNames},
 		proto.InputColumn{Name: ckdb.COLUMN_TAG_INT_VALUES, Data: b.ColTagIntValues},
 		proto.InputColumn{Name: ckdb.COLUMN_TRIGGER_THRESHOLD, Data: b.ColTriggerThreshold},
+		proto.InputColumn{Name: ckdb.COLUMN_METRIC_UNIT, Data: b.ColMetricUnit},
 		proto.InputColumn{Name: ckdb.COLUMN__TARGET_UID, Data: &b.ColTargetUid},
 		proto.InputColumn{Name: ckdb.COLUMN__QUERY_REGION, Data: b.ColQueryRegion},
 		proto.InputColumn{Name: ckdb.COLUMN_TEAM_ID, Data: &b.ColTeamId},
@@ -92,6 +95,7 @@ func (n *AlertEventStore) NewColumnBlock() ckdb.CKColumnBlock {
 		ColTagIntNames:      new(proto.ColStr).LowCardinality().Array(),
 		ColTagIntValues:     new(proto.ColInt64).Array(),
 		ColTriggerThreshold: new(proto.ColStr).LowCardinality(),
+		ColMetricUnit:       new(proto.ColStr).LowCardinality(),
 	}
 }
 
@@ -110,6 +114,7 @@ func (n *AlertEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColTagIntNames.Append(n.TagIntKeys)
 	block.ColTagIntValues.Append(n.TagIntValues)
 	block.ColTriggerThreshold.Append(n.TriggerThreshold)
+	block.ColMetricUnit.Append(n.MetricUnit)
 	block.ColTargetUid.Append(n.XTargetUid)
 	block.ColQueryRegion.Append(n.XQueryRegion)
 	block.ColTeamId.Append(n.TeamID)
