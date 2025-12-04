@@ -30,9 +30,9 @@ func DropDatabaseIfInitTablesFailed(dc *DBConfig, editionFunc EditionInitTablesF
 	log.Info(LogDBName(dc.Config.Database, "drop database if fails to initialize tables"))
 	err := editionFunc(dc)
 	if err != nil {
-		err := DropDatabase(dc)
-		if err != nil {
-			log.Error(LogDBName(dc.Config.Database, "failed to drop database: %s", err.Error()))
+		newErr := DropDatabase(dc)
+		if newErr != nil {
+			log.Error(LogDBName(dc.Config.Database, "failed to drop database: %s", newErr.Error()))
 		}
 		return err
 	}
