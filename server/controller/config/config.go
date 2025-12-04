@@ -120,13 +120,23 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	if !c.ControllerConfig.MySqlCfg.Enabled && !c.ControllerConfig.PostgreSQLCfg.Enabled {
-		return fmt.Errorf("mysql or postgresql must be enabled")
-	}
-	if c.ControllerConfig.MySqlCfg.Enabled && c.ControllerConfig.PostgreSQLCfg.Enabled {
-		return fmt.Errorf("mysql and postgresql can not be enabled at the same time")
+	if !c.exactlyOneMetadbEnabled() {
+		return fmt.Errorf("only one metadb can be enabled at the same time")
 	}
 	return nil
+}
+
+func (c *Config) exactlyOneMetadbEnabled() bool {
+	count := 0
+	for _, enabled := range []bool{c.ControllerConfig.MySqlCfg.Enabled, c.ControllerConfig.PostgreSQLCfg.Enabled, c.ControllerConfig.DMCfg.Enabled} {
+		if enabled {
+			count++
+			if count > 1 {
+				return false
+			}
+		}
+	}
+	return count == 1
 }
 
 func (c *Config) Load(path string) {
