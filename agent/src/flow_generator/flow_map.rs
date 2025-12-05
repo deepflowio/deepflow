@@ -1318,6 +1318,7 @@ impl FlowMap {
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
+            init_ipid: meta_packet.ip_id as u32,
             ..Default::default()
         };
         tagged_flow.flow = flow;
