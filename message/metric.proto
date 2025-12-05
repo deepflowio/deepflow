@@ -128,6 +128,8 @@ message Performance {
     uint64 zero_win_rx = 4;
     uint32 retrans_syn = 5;
     uint32 retrans_synack = 6;
+    uint64 ooo_tx = 7;
+    uint64 ooo_rx = 8;
 }
 
 message Anomaly {
